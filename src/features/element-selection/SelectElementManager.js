@@ -280,6 +280,17 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Deactivate Select Element mode
+   * @param {Object} [options]
+   * @param {string} [options.reason='manual'] - Cleanup/UX semantics only
+   *   ('success' | 'error' | 'cancel' | 'manual' | 'conflict'). Never grants
+   *   propagation authority.
+   * @param {boolean} [options.fromBackground=false] - Trusted broadcast
+   *   receiver marker; suppresses every outbound state/global request.
+   * @param {boolean} [options.requestGlobalDeactivation=false] - Explicit
+   *   producer-declared tab-wide exit intent (user Escape / explicit Cancel).
+   *   Routes the trusted DEACTIVATE_SELECT_ELEMENT_MODE request through the
+   *   background, which authenticates the sender tab and broadcasts to all
+   *   frames. Frame position never implies this intent.
    */
   async deactivate(options = {}) {
     if (!this.isActive) return;
@@ -288,6 +299,7 @@ class SelectElementManager extends ResourceTracker {
       const {
         reason = 'manual', // 'success', 'error', 'cancel', 'manual', 'conflict'
         fromBackground = false,
+        requestGlobalDeactivation = false,
         silent = false,
         preserveTranslations = options.preserveTranslations !== undefined
           ? options.preserveTranslations
@@ -324,7 +336,11 @@ class SelectElementManager extends ResourceTracker {
       }
 
       if (!fromBackground) {
-        if (this.isTopFrame) {
+        if (requestGlobalDeactivation) {
+          // Explicit tab-wide exit intent: background authenticates the
+          // sender tab and broadcasts deactivation to every frame. The
+          // initiating frame already cleaned up locally above; its own copy
+          // of the broadcast is an idempotent no-op.
           try {
             await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
           } catch { /* ignore */ }
@@ -483,7 +499,7 @@ class SelectElementManager extends ResourceTracker {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      this.deactivate({ fromCancel: true, silent: false, reason: 'cancel' });
+      this.deactivate({ silent: false, reason: 'cancel', requestGlobalDeactivation: true });
     }
   }
 
@@ -660,7 +676,10 @@ class SelectElementManager extends ResourceTracker {
     }
 
     if (isFatalError(error) && !isSilentSkip) {
-      this.deactivate({ preserveTranslations: true, reason: 'error' });
+      // Fatal failure is a terminal outcome: route through the terminal
+      // owner so child frames use the trusted IFRAME_SELECT_ELEMENT_FINISHED
+      // global deactivation path instead of frame-local cleanup.
+      this.performPostTranslationCleanup({ reason: 'error' });
     } else if (isNoTranslatableContent) {
       this.performPostTranslationCleanup({ reason: 'no-content' });
     } else {
@@ -714,7 +733,10 @@ class SelectElementManager extends ResourceTracker {
       // Also locally deactivate to ensure clean state
       this.deactivate({ preserveTranslations, reason, fromBackground: true }).catch(() => {});
     } else if (this.isActive) {
-      this.deactivate({ preserveTranslations, reason }).catch(() => {});
+      // Terminal outcome owns tab-wide deactivation in the top frame. The
+      // explicit flag preserves that ownership without making frame position
+      // authoritative inside deactivate().
+      this.deactivate({ preserveTranslations, reason, requestGlobalDeactivation: true }).catch(() => {});
     } else {
       // Safety guard: ensure notification is dismissed in top frame even if already inactive
       this.dismissNotification();
@@ -733,7 +755,7 @@ class SelectElementManager extends ResourceTracker {
     pageEventBus.emit('show-select-element-notification', {
       managerId: this.instanceId,
       actions: {
-        cancel: () => this.deactivate({ fromNotification: true, reason: 'cancel' }),
+        cancel: () => this.deactivate({ fromNotification: true, reason: 'cancel', requestGlobalDeactivation: true }),
         revert: () => this.revertTranslations(),
       },
     });
@@ -754,7 +776,7 @@ class SelectElementManager extends ResourceTracker {
 
   setupCancelListener() {
     this.addEventListener(pageEventBus, 'cancel-select-element-mode', () => {
-      if (this.isActive) this.deactivate({ fromCancel: true, silent: true, reason: 'cancel' });
+      if (this.isActive) this.deactivate({ silent: true, reason: 'cancel', requestGlobalDeactivation: true });
     });
   }
 

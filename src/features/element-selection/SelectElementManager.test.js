@@ -889,7 +889,6 @@ describe('SelectElementManager', () => {
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
       isFatalError.mockReturnValueOnce(true);
-      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
 
       await manager.startTranslation(document.createElement('div'));
 
@@ -903,7 +902,7 @@ describe('SelectElementManager', () => {
       );
       expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw canonical detail');
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
     it('migrates circuit-breaker failures without copying reason metadata', async () => {
@@ -916,7 +915,6 @@ describe('SelectElementManager', () => {
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
       isFatalError.mockReturnValueOnce(true);
-      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
 
       await manager.startTranslation(document.createElement('div'));
 
@@ -944,7 +942,7 @@ describe('SelectElementManager', () => {
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
     it('migrates translation-not-found without retry or fatal deactivation', async () => {
@@ -1020,7 +1018,6 @@ describe('SelectElementManager', () => {
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
       isFatalError.mockReturnValueOnce(true);
-      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
 
       await manager.startTranslation(document.createElement('div'));
 
@@ -1047,7 +1044,7 @@ describe('SelectElementManager', () => {
         supportRetry: false,
         suggestAction: 'change-provider',
       });
-      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
     });
 
@@ -1217,7 +1214,6 @@ describe('SelectElementManager', () => {
       const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
       isFatalError.mockReturnValueOnce(true);
-      const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
@@ -1229,8 +1225,7 @@ describe('SelectElementManager', () => {
         expect.objectContaining({ type: ErrorTypes.API_KEY_INVALID, cause: error }),
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
-      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
-      expect(cleanupSpy).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
@@ -1902,15 +1897,19 @@ describe('SelectElementManager', () => {
       expect(manager.isProcessingClick).toBe(false);
     });
 
-    it('uses trusted background deactivation for top-frame cleanup', async () => {
+    it('keeps plain manual deactivation local regardless of frame position', async () => {
       const { sendMessage, sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
       manager.isTopFrame = true;
       manager.isActive = true;
 
       await manager.deactivate({ reason: 'manual' });
 
-      expect(sendMessage).toHaveBeenCalledWith({
+      expect(sendMessage).not.toHaveBeenCalledWith({
         action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+      });
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'SET_SELECT_ELEMENT_STATE',
+        data: { active: false },
       });
       expect(sendRegularMessage).not.toHaveBeenCalledWith(
         expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
@@ -1949,5 +1948,216 @@ describe('SelectElementManager', () => {
       expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
       expect(removeSpy).toHaveBeenCalled();
     });
+  });
+});
+
+describe('explicit tab-wide deactivation ownership', () => {
+  let manager;
+  let sendMessage;
+  let sendRegularMessage;
+
+  const GLOBAL_DEACTIVATE = { action: 'DEACTIVATE_SELECT_ELEMENT_MODE' };
+  const STATE_REPORT = { action: 'SET_SELECT_ELEMENT_STATE', data: { active: false } };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    isSelectableTextRoot.mockReturnValue(true);
+    const module = await import('./SelectElementManager.js');
+    manager = new module.SelectElementManager();
+  });
+
+  async function activateManager(isTopFrame) {
+    ({ sendMessage, sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js'));
+    manager.isTopFrame = isTopFrame;
+    await manager.initialize();
+    await manager.activateSelectElementMode();
+    sendMessage.mockClear();
+  }
+
+  it('requests tab-wide deactivation when Escape fires in a child frame', async () => {
+    await activateManager(false);
+
+    manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests tab-wide deactivation when Escape fires in the top frame', async () => {
+    await activateManager(true);
+
+    manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the global request only when the explicit flag is set in a child frame', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    await manager.deactivate({ reason: 'cancel', requestGlobalDeactivation: true });
+
+    expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('never derives propagation from the reason string alone', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    await manager.deactivate({ reason: 'cancel' });
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT);
+  });
+
+  it.each([true, false])('keeps conflict cleanup local (isTopFrame=%s)', async (isTopFrame) => {
+    await activateManager(isTopFrame);
+    manager.isActive = true;
+
+    await manager.deactivate({ reason: 'conflict', silent: true });
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+  });
+
+  it('suppresses every outbound request for trusted background receivers even with the flag present', async () => {
+    await activateManager(true);
+    manager.isActive = true;
+
+    await manager.deactivate({ fromBackground: true, requestGlobalDeactivation: true });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps top-frame internal cleanup local despite frame position', async () => {
+    await activateManager(true);
+    manager.isActive = true;
+
+    await manager.cleanup();
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(manager.isActive).toBe(false);
+  });
+
+  it('keeps child-frame internal cleanup local with state bookkeeping only', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    await manager.cleanup();
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT);
+  });
+
+  it('requests tab-wide exit from the notification cancel action', async () => {
+    await activateManager(true);
+    const { pageEventBus } = await import('@/core/PageEventBus.js');
+    const emitCall = pageEventBus.emit.mock.calls.find(([event]) => event === 'show-select-element-notification');
+    expect(emitCall).toBeDefined();
+
+    emitCall[1].actions.cancel();
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests tab-wide exit from the shared cancel bus event', async () => {
+    await activateManager(true);
+    const { pageEventBus } = await import('@/core/PageEventBus.js');
+    const registration = pageEventBus.on.mock.calls.find(([event]) => event === 'cancel-select-element-mode');
+    expect(registration).toBeDefined();
+
+    registration[1]();
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['success', 'error'])('keeps terminal child completion single-owner via IFRAME_FINISHED (%s)', async (reason) => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    manager.performPostTranslationCleanup({ reason });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(sendRegularMessage).toHaveBeenCalledTimes(1);
+    expect(sendRegularMessage).toHaveBeenCalledWith(
+      { action: 'IFRAME_SELECT_ELEMENT_FINISHED', data: { reason } },
+      { silent: true },
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+  });
+
+  it.each(['success', 'error', 'no-content'])('requests one trusted global deactivation for top terminal outcomes (%s)', async (reason) => {
+    await activateManager(true);
+
+    manager.performPostTranslationCleanup({ reason });
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendRegularMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
+      expect.anything(),
+    );
+  });
+
+  it('routes fatal child translation failures through terminal cleanup ownership', async () => {
+    await activateManager(false);
+    const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+    isFatalError.mockReturnValueOnce(true);
+    manager.domTranslatorAdapter.translateElement.mockRejectedValue(
+      Object.assign(new Error('fatal provider failure'), { type: ErrorTypes.API_KEY_INVALID })
+    );
+    const cleanupSpy = vi.spyOn(manager, 'performPostTranslationCleanup');
+
+    await manager.startTranslation(document.createElement('div'));
+
+    expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    expect(sendRegularMessage).toHaveBeenCalledWith(
+      { action: 'IFRAME_SELECT_ELEMENT_FINISHED', data: { reason: 'error' } },
+      { silent: true },
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+  });
+
+  it('routes fatal top translation failures through one terminal global request', async () => {
+    await activateManager(true);
+    const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+    isFatalError.mockReturnValueOnce(true);
+    manager.domTranslatorAdapter.translateElement.mockRejectedValue(
+      Object.assign(new Error('fatal provider failure'), { type: ErrorTypes.API_KEY_INVALID })
+    );
+    const cleanupSpy = vi.spyOn(manager, 'performPostTranslationCleanup');
+
+    await manager.startTranslation(document.createElement('div'));
+
+    expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendRegularMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
+      expect.anything(),
+    );
+  });
+
+  it('keeps adapter result.cancelled an internal echo without global requests', async () => {
+    await activateManager(false);
+    manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: false, cancelled: true });
+
+    await manager.startTranslation(document.createElement('div'));
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT);
+  });
+
+  it('ignores duplicate background broadcasts when already inactive', async () => {
+    await activateManager(false);
+    manager.isActive = false;
+
+    await manager.deactivate({ fromBackground: true });
+
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

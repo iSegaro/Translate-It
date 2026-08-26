@@ -76,11 +76,12 @@ export class RevertShortcut {
       logger.debug('[RevertShortcut] Translation in progress. Executing CANCEL action.');
 
       try {
-        // Cancel via SelectElementManager
+        // Cancel via SelectElementManager. Explicit user ESC: request the
+        // trusted tab-wide deactivation (Escape listeners may already be
+        // removed while a translation is active).
         const selectElementManager = await getActiveSelectElementManager();
         if (selectElementManager) {
-          // New API: Use deactivate with reason 'cancel' which internally calls domTranslatorAdapter.cancelTranslation()
-          await selectElementManager.deactivate({ reason: 'cancel', silent: false });
+          await selectElementManager.deactivate({ reason: 'cancel', silent: false, requestGlobalDeactivation: true });
           logger.debug('[RevertShortcut] Cancelled translations via SelectElementManager.deactivate()');
         }
 
