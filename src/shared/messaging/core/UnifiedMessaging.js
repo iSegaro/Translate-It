@@ -253,11 +253,6 @@ export async function sendRegularMessage(message, options = {}) {
             if (cancellationInterval) clearInterval(cancellationInterval);
             reject(lifecycleError);
           }
-        } else if (typeof window !== 'undefined' && window.selectElementHandlingESC === true) {
-          if (cancellationInterval) clearInterval(cancellationInterval);
-          const cancelError = new Error('Translation cancelled by user ESC');
-          cancelError.type = 'USER_CANCELLED';
-          reject(cancelError);
         }
       }, 50);
     });

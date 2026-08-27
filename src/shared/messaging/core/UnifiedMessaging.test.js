@@ -93,6 +93,7 @@ describe('UnifiedMessaging', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    delete window.selectElementHandlingESC;
   });
 
   describe('sendRegularMessage', () => {
@@ -106,6 +107,36 @@ describe('UnifiedMessaging', () => {
 
       expect(browser.runtime.sendMessage).toHaveBeenCalledWith(message);
       expect(response).toEqual(expectedResponse);
+    });
+
+    it('resolves unrelated messages while Select Element ESC flag is set', async () => {
+      const message = { action: 'PING' };
+      const expectedResponse = { success: true, data: 'pong' };
+      browser.runtime.sendMessage.mockReturnValue(
+        new Promise(resolve => setTimeout(() => resolve(expectedResponse), 100))
+      );
+      window.selectElementHandlingESC = true;
+
+      const promise = sendRegularMessage(message);
+      await vi.advanceTimersByTimeAsync(100);
+
+      await expect(promise).resolves.toEqual(expectedResponse);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(message);
+    });
+
+    it('does not cancel delayed Select Element deactivation from ESC flag', async () => {
+      const message = { action: 'deactivateSelectElementMode' };
+      const expectedResponse = { success: true, active: false };
+      browser.runtime.sendMessage.mockReturnValue(
+        new Promise(resolve => setTimeout(() => resolve(expectedResponse), 100))
+      );
+      window.selectElementHandlingESC = true;
+
+      const promise = sendRegularMessage(message);
+      await vi.advanceTimersByTimeAsync(100);
+
+      await expect(promise).resolves.toEqual(expectedResponse);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(message);
     });
 
     it('should throw an error if the operation times out', async () => {
