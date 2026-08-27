@@ -65,6 +65,31 @@ describe('selectElementStateManager', () => {
       }));
     });
 
+    it('does not publish repeated same-state writes', async () => {
+      const tabId = 461;
+
+      setStateForTab(tabId, true);
+      setStateForTab(tabId, true);
+      await Promise.resolve();
+
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes real state transitions', async () => {
+      const tabId = 462;
+
+      setStateForTab(tabId, true);
+      setStateForTab(tabId, false);
+      await Promise.resolve();
+
+      expect(getStateForTab(tabId).active).toBe(false);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(2);
+      expect(browser.runtime.sendMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        action: 'selectElementStateChanged',
+        data: { tabId, active: false }
+      }));
+    });
+
     it('should return default state for unknown tab', () => {
       const state = getStateForTab(999);
       expect(state.active).toBe(false);

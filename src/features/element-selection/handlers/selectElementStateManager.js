@@ -9,6 +9,9 @@ const selectElementStateByTab = new Map();
 function setStateForTab(tabId, active) {
   if (!tabId) return;
   const canonicalActive = active === true;
+  const currentState = selectElementStateByTab.get(tabId);
+  if (currentState?.active === canonicalActive) return;
+
   selectElementStateByTab.set(tabId, { active: canonicalActive, updatedAt: Date.now() });
 
   // Notify all parts of the extension about the state change
