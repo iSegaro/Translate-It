@@ -124,6 +124,13 @@ export class MainFrameCoordinator {
     }
 
     if (action === this.MessageActions.PAGE_TRANSLATION_FRAME_RETIRED) {
+      const retirementSessionId = data?.sessionId;
+      if (typeof retirementSessionId === 'string' && retirementSessionId.length > 0) {
+        const ownedSession = this.frameSessionOwners.get(frameId);
+        if (ownedSession !== retirementSessionId) {
+          return { success: true, ignored: true, reason: 'stale-session' };
+        }
+      }
       return this.retireFrame(frameId);
     }
 

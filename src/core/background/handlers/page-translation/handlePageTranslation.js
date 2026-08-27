@@ -152,6 +152,13 @@ export async function handlePageTranslation(message, sender) {
         return { success: false, error: 'Unsupported page lifecycle action' };
       }
 
+      if (lifecycleAction === MessageActions.PAGE_TRANSLATION_FRAME_RETIRED) {
+        const sessionId = message.data?.data?.sessionId;
+        if (typeof sessionId !== 'string' || sessionId.length === 0) {
+          return { success: true, ignored: true, reason: 'missing-session' };
+        }
+      }
+
       try {
         await waitForFrameRetirement(senderTabId, senderFrameId);
         const response = await browser.tabs.sendMessage(senderTabId, {

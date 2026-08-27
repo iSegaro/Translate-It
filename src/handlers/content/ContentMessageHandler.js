@@ -1,6 +1,7 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageFormat, MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { revertHandler } from './RevertHandler.js';
@@ -33,6 +34,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
+    this.childFrameRetirementListenerInstalled = false;
     this.errorHandler = ErrorHandler.getInstance();
 
     // Track processed message IDs to prevent duplicates
@@ -64,6 +66,29 @@ export class ContentMessageHandler extends ResourceTracker {
 
   setPageTranslationManager(manager) {
     this.pageTranslationManager = manager;
+  }
+
+  _ensureChildFrameRetirementListener() {
+    if (this.childFrameRetirementListenerInstalled || window === window.top) return;
+
+    this.addEventListener(window, 'beforeunload', () => {
+      const sessionId = this.pageTranslationManager?.acceptedLifecycleSessionId;
+      if (typeof sessionId !== 'string' || sessionId.length === 0) return;
+
+      try {
+        void browser.runtime.sendMessage({
+          action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+          data: {
+            action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+            data: { sessionId },
+          },
+          context: 'page-translation-frame-retirement',
+        }).catch(() => {});
+      } catch {
+        // Unload retirement is best effort.
+      }
+    });
+    this.childFrameRetirementListenerInstalled = true;
   }
 
   initialize() {
@@ -703,8 +728,13 @@ export class ContentMessageHandler extends ResourceTracker {
       }
 
       // Ensure manager is initialized
-      if (!this.pageTranslationManager.isActive) {
-        await this.pageTranslationManager.activate();
+      let managerReady = this.pageTranslationManager.isActive;
+      if (!managerReady) {
+        managerReady = (await this.pageTranslationManager.activate()) === true;
+      }
+
+      if (managerReady) {
+        this._ensureChildFrameRetirementListener();
       }
 
       // Execute page translation - PASS message.data to support options like { isAuto: true }
@@ -852,6 +882,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
+    this.childFrameRetirementListenerInstalled = false;
 
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();

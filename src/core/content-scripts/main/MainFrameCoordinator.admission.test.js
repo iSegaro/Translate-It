@@ -170,6 +170,86 @@ describe('MainFrameCoordinator per-frame admission', () => {
     expect(aggregator.frameProgressMap.has(7)).toBe(false);
   });
 
+  it('retires frame for matching session-scoped unload retirement', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'session-a' },
+    });
+
+    expect(coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+      data: { sessionId: 'session-a' },
+    })).toEqual({ success: true, retired: true });
+    expect(coordinator.frameSessionOwners.has(7)).toBe(false);
+    expect(aggregator.frameProgressMap.has(7)).toBe(false);
+  });
+
+  it('ignores late unload retirement from replaced session', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'session-a' },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'session-b' },
+    });
+
+    expect(coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+      data: { sessionId: 'session-a' },
+    })).toEqual({ success: true, ignored: true, reason: 'stale-session' });
+    expect(coordinator.frameSessionOwners.get(7)).toBe('session-b');
+    expect(aggregator.frameProgressMap.has(7)).toBe(true);
+  });
+
+  it('keeps browser navigation retirement unconditional after replacement', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'session-a' },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'session-b' },
+    });
+
+    expect(coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+    })).toEqual({ success: true, retired: true });
+    expect(coordinator.frameSessionOwners.has(7)).toBe(false);
+    expect(aggregator.frameProgressMap.has(7)).toBe(false);
+  });
+
+  it('keeps navigation and unload retirement idempotent', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'old-session' },
+    });
+
+    expect(coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+    })).toEqual({ success: true, retired: true });
+    expect(coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+    })).toEqual({ success: true, retired: true });
+    expect(coordinator.frameSessionOwners.has(7)).toBe(false);
+    expect(aggregator.frameProgressMap.has(7)).toBe(false);
+  });
+
   it('allows replacement session to register on retired numeric frame ID', () => {
     const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
     coordinator.handleTrustedPageLifecycle({

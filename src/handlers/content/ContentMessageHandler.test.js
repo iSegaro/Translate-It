@@ -5,6 +5,15 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ActionReasons } from '@/shared/messaging/core/MessagingConstants.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import browser from 'webextension-polyfill';
+
+vi.mock('webextension-polyfill', () => ({
+  default: {
+    runtime: {
+      sendMessage: vi.fn(),
+    },
+  },
+}));
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
@@ -18,9 +27,31 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 vi.mock('@/core/memory/ResourceTracker.js', () => ({
   default: class ResourceTracker {
-    constructor() {}
+    constructor() {
+      this.eventListeners = [];
+    }
+
+    addEventListener(element, event, handler, options = null) {
+      if (options) {
+        element.addEventListener(event, handler, options);
+      } else {
+        element.addEventListener(event, handler);
+      }
+      this.eventListeners.push({ element, event, handler, options });
+    }
+
     trackResource() {}
-    cleanup() {}
+
+    cleanup() {
+      for (const { element, event, handler, options } of this.eventListeners) {
+        if (options) {
+          element.removeEventListener(event, handler, options);
+        } else {
+          element.removeEventListener(event, handler);
+        }
+      }
+      this.eventListeners = [];
+    }
   },
 }));
 
@@ -50,7 +81,9 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
   let handler;
 
   beforeEach(() => {
+    ContentMessageHandler.resetInstance();
     vi.clearAllMocks();
+    browser.runtime.sendMessage.mockResolvedValue({ success: true });
     handler = new ContentMessageHandler();
     handler.handlers.clear();
     handler.setSelectElementManager(null);
@@ -193,6 +226,159 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       expect(handleTrustedPageLifecycle).toHaveBeenCalledWith(relay);
     } finally {
       window.translateItContentCore = previousCore;
+    }
+  });
+
+  it('installs one child retirement listener after translation participation becomes available', async () => {
+    const previousTop = window.top;
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+    try {
+      handler.setPageTranslationManager({
+        isActive: true,
+        acceptedLifecycleSessionId: 'session-a',
+        translatePage: vi.fn().mockResolvedValue({ success: true }),
+      });
+
+      expect(addEventListener.mock.calls.filter(([event]) => event === 'beforeunload')).toHaveLength(0);
+
+      await handler.handlePageTranslate({ data: {} });
+      await handler.handlePageTranslate({ data: {} });
+
+      expect(addEventListener.mock.calls.filter(([event]) => event === 'beforeunload')).toHaveLength(1);
+    } finally {
+      addEventListener.mockRestore();
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
+    }
+  });
+
+  it('sends child retirement through runtime messaging without payload identity', async () => {
+    const previousTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+    try {
+      handler.setPageTranslationManager({
+        isActive: true,
+        acceptedLifecycleSessionId: 'session-a',
+        translatePage: vi.fn().mockResolvedValue({ success: true }),
+      });
+      await handler.handlePageTranslate({ data: {} });
+      browser.runtime.sendMessage.mockClear();
+
+      window.dispatchEvent(new Event('beforeunload'));
+
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: {
+          action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+          data: { sessionId: 'session-a' },
+        },
+        context: 'page-translation-frame-retirement',
+      });
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
+    }
+  });
+
+  it('does not send child retirement without an accepted session', async () => {
+    const previousTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+    try {
+      handler.setPageTranslationManager({
+        isActive: true,
+        acceptedLifecycleSessionId: null,
+        translatePage: vi.fn().mockResolvedValue({ success: true }),
+      });
+      await handler.handlePageTranslate({ data: {} });
+      browser.runtime.sendMessage.mockClear();
+
+      window.dispatchEvent(new Event('beforeunload'));
+
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
+    }
+  });
+
+  it('reads latest accepted session when child unloads', async () => {
+    const previousTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+    try {
+      const pageTranslationManager = {
+        isActive: true,
+        acceptedLifecycleSessionId: 'session-a',
+        translatePage: vi.fn().mockResolvedValue({ success: true }),
+      };
+      handler.setPageTranslationManager(pageTranslationManager);
+      await handler.handlePageTranslate({ data: {} });
+      pageTranslationManager.acceptedLifecycleSessionId = 'session-b';
+      browser.runtime.sendMessage.mockClear();
+
+      window.dispatchEvent(new Event('beforeunload'));
+
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: {
+          action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+          data: { sessionId: 'session-b' },
+        },
+      }));
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
+    }
+  });
+
+  it('does not install or send child retirement from the top frame', async () => {
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    handler.setPageTranslationManager({
+      isActive: true,
+      translatePage: vi.fn().mockResolvedValue({ success: true }),
+    });
+
+    await handler.handlePageTranslate({ data: {} });
+    window.dispatchEvent(new Event('beforeunload'));
+
+    expect(addEventListener.mock.calls.filter(([event]) => event === 'beforeunload')).toHaveLength(0);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    addEventListener.mockRestore();
+  });
+
+  it('removes child retirement listener on cleanup and reinstalls one after reinjection', async () => {
+    const previousTop = window.top;
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+    try {
+      handler.setPageTranslationManager({
+        isActive: true,
+        acceptedLifecycleSessionId: 'session-a',
+        translatePage: vi.fn().mockResolvedValue({ success: true }),
+      });
+      await handler.handlePageTranslate({ data: {} });
+      await handler.cleanup();
+      browser.runtime.sendMessage.mockClear();
+      window.dispatchEvent(new Event('beforeunload'));
+      expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+
+      ContentMessageHandler.resetInstance();
+      handler = new ContentMessageHandler();
+      handler.setPageTranslationManager({
+        isActive: true,
+        acceptedLifecycleSessionId: 'session-b',
+        translatePage: vi.fn().mockResolvedValue({ success: true }),
+      });
+      await handler.handlePageTranslate({ data: {} });
+      browser.runtime.sendMessage.mockClear();
+      window.dispatchEvent(new Event('beforeunload'));
+
+      expect(addEventListener.mock.calls.filter(([event]) => event === 'beforeunload')).toHaveLength(2);
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+    } finally {
+      addEventListener.mockRestore();
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
     }
   });
 

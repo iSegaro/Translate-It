@@ -456,6 +456,47 @@ describe('trusted frame lifecycle relay', () => {
     }, { frameId: 0 });
   });
 
+  it('relays retirement with sender frame identity and top-frame targeting', async () => {
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+        tabId: 99,
+        frameId: 99,
+        data: { sessionId: 'child-session', tabId: 98, frameId: 98 },
+      },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    expect(result).toEqual({ success: true, aggregated: true });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(42, {
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        frameId: 7,
+        action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+        data: { sessionId: 'child-session', tabId: 98, frameId: 98 },
+      },
+      context: 'page-translation-frame-lifecycle-relay',
+      }, { frameId: 0 });
+  });
+
+  it.each([
+    {},
+    { sessionId: 'session-a' },
+    { data: { sessionId: '' } },
+    { data: { sessionId: 42 } },
+  ])('ignores runtime retirement without valid nested session: %o', async (retirementData) => {
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+        ...retirementData,
+      },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    expect(result).toEqual({ success: true, ignored: true, reason: 'missing-session' });
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('relays top-frame lifecycle with sender frame zero', async () => {
     await handlePageTranslation({
       action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
