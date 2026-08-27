@@ -75,6 +75,8 @@ function projectPageTranslationFailure(response, responses) {
 // deliver an aggregated result before the caller stops waiting.
 const FRAME_COMMAND_RESPONSE_TIMEOUT_MS = 6000;
 const FRAME_COMMAND_RESPONSE_TIMEOUT_REASON = 'frame_command_response_timeout';
+const PRE_FANOUT_COMMAND_TIMEOUT_MS = 1500;
+const PRE_FANOUT_COMMAND_TIMEOUT_REASON = 'pre_fanout_command_timeout';
 
 /**
  * Sends a Whole Page command to a single frame with a bounded response wait.
@@ -131,6 +133,71 @@ function projectFrameDelivery({ frameId, response, isResponseTimeout }) {
       reason: FRAME_COMMAND_RESPONSE_TIMEOUT_REASON,
     }),
   };
+}
+
+/**
+ * Resolve Whole Page command preparation under one shared deadline.
+ * Immediate preparation failures keep their existing error handling; only a
+ * stalled preparation stage is converted to the timeout marker.
+ */
+async function runPreFanoutPreparation(message, sender) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const timeoutError = new Error('Whole Page command preparation timed out');
+      timeoutError.isPreFanoutTimeout = true;
+      reject(timeoutError);
+    }, PRE_FANOUT_COMMAND_TIMEOUT_MS);
+  });
+
+  const preparationPromise = (async () => {
+    const senderTab = sender?.tab;
+    let targetTabId;
+
+    if (senderTab !== undefined && senderTab !== null) {
+      if (!Number.isInteger(senderTab.id)) {
+        return { error: { success: false, error: 'Invalid sender tab' } };
+      }
+      targetTabId = senderTab.id;
+    } else {
+      // Extension UI callers without sender.tab retain active-tab behavior.
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tabs.length) {
+        return { error: { success: false, error: 'No active tab found' } };
+      }
+      targetTabId = tabs[0].id;
+    }
+
+    const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    if (!access.isAccessible) {
+      return { targetTabId, access };
+    }
+
+    // Get all frames in the tab to ensure we reach every part of the page (especially iframes)
+    const hasWebNav = typeof browser !== 'undefined' && browser.webNavigation;
+    let allFrames = hasWebNav
+      ? await browser.webNavigation.getAllFrames({ tabId: targetTabId }).catch(() => [{ frameId: 0 }])
+      : [{ frameId: 0 }];
+
+    // Filter frames to skip common ad domains and non-content frames
+    allFrames = allFrames.filter(frame => {
+      if (frame.frameId === 0) return true;
+      if (!frame.url || frame.url.startsWith('about:') || frame.url.startsWith('javascript:') || frame.url.startsWith('chrome-extension:')) return false;
+
+      const adDomains = ['doubleclick.net', 'googleads', 'adnxs.com', 'pubmatic.com', 'rubiconproject.com', 'openx.net', 'advertising.com'];
+      if (adDomains.some(domain => frame.url.includes(domain))) return false;
+
+      return true;
+    });
+
+    return { targetTabId, access, allFrames };
+  })();
+
+  try {
+    return await Promise.race([preparationPromise, timeoutPromise]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
@@ -300,24 +367,10 @@ export async function handlePageTranslation(message, sender) {
       return { success: false, error: 'Unknown page translation action' };
     }
 
-    const senderTab = sender?.tab;
-    let targetTabId;
+    const preparation = await runPreFanoutPreparation(message, sender);
+    if (preparation.error) return preparation.error;
 
-    if (senderTab !== undefined && senderTab !== null) {
-      if (!Number.isInteger(senderTab.id)) {
-        return { success: false, error: 'Invalid sender tab' };
-      }
-      targetTabId = senderTab.id;
-    } else {
-      // Extension UI callers without sender.tab retain active-tab behavior.
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-      if (!tabs.length) {
-        return { success: false, error: 'No active tab found' };
-      }
-      targetTabId = tabs[0].id;
-    }
-
-    const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    const { targetTabId, access, allFrames } = preparation;
     if (!access.isAccessible) {
       logger.debug(`Page translation blocked on restricted tab ${targetTabId}: ${access.errorMessage}`);
       return {
@@ -330,23 +383,6 @@ export async function handlePageTranslation(message, sender) {
     }
 
     try {
-      // Get all frames in the tab to ensure we reach every part of the page (especially iframes)
-      const hasWebNav = typeof browser !== 'undefined' && browser.webNavigation;
-      let allFrames = hasWebNav 
-        ? await browser.webNavigation.getAllFrames({ tabId: targetTabId }).catch(() => [{ frameId: 0 }])
-        : [{ frameId: 0 }];
-      
-      // Filter frames to skip common ad domains and non-content frames
-      allFrames = allFrames.filter(frame => {
-        if (frame.frameId === 0) return true;
-        if (!frame.url || frame.url.startsWith('about:') || frame.url.startsWith('javascript:') || frame.url.startsWith('chrome-extension:')) return false;
-        
-        const adDomains = ['doubleclick.net', 'googleads', 'adnxs.com', 'pubmatic.com', 'rubiconproject.com', 'openx.net', 'advertising.com'];
-        if (adDomains.some(domain => frame.url.includes(domain))) return false;
-        
-        return true;
-      });
-
       if (message.action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
         const statusResults = await Promise.all(
           allFrames.map(frame =>
@@ -449,6 +485,15 @@ export async function handlePageTranslation(message, sender) {
       return { success: false, error: 'Content script not available' };
     }
   } catch (error) {
+    if (error?.isPreFanoutTimeout === true) {
+      logger.debug('Whole Page command preparation timed out');
+      return {
+        success: false,
+        reason: PRE_FANOUT_COMMAND_TIMEOUT_REASON,
+        isTransportFailure: true,
+      };
+    }
+
     logger.error('Error handling page translation message:', error);
     return { success: false, error: error.message };
   }

@@ -59,6 +59,8 @@ vi.mock('@/core/tabPermissions.js', () => ({
 }));
 
 const sender = { tab: { id: 42 } };
+const PRE_FANOUT_TIMEOUT_MS = 1500;
+const PRE_FANOUT_TIMEOUT_REASON = 'pre_fanout_command_timeout';
 const onCommittedListener = browser.webNavigation.onCommitted.addListener.mock.calls[0][0];
 
 function setupFrames(frameResults, { activeTabId = 42 } = {}) {
@@ -77,6 +79,17 @@ function setupFrames(frameResults, { activeTabId = 42 } = {}) {
     if (frame?.error) return Promise.reject(frame.error);
     return Promise.resolve(frame?.response);
   });
+}
+
+async function expectPreFanoutTimeout(resultPromise) {
+  await vi.advanceTimersByTimeAsync(PRE_FANOUT_TIMEOUT_MS);
+  await expect(resultPromise).resolves.toEqual({
+    success: false,
+    reason: PRE_FANOUT_TIMEOUT_REASON,
+    isTransportFailure: true,
+  });
+  expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
 }
 
 describe('handlePageTranslation response projection', () => {
@@ -350,6 +363,74 @@ describe('handlePageTranslation target tab ownership', () => {
     expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(20);
     expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 20 });
     expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 20)).toBe(true);
+  });
+
+  it('bounds stalled active-tab lookup before fan-out', async () => {
+    vi.useFakeTimers();
+    try {
+      browser.tabs.query.mockReturnValue(new Promise(() => {}));
+
+      const resultPromise = handlePageTranslation(
+        { action: MessageActions.PAGE_TRANSLATE },
+        {}
+      );
+
+      await expectPreFanoutTimeout(resultPromise);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds stalled tab-access lookup before fan-out', async () => {
+    vi.useFakeTimers();
+    try {
+      tabPermissionChecker.checkTabAccess.mockReturnValue(new Promise(() => {}));
+
+      const resultPromise = handlePageTranslation(
+        { action: MessageActions.PAGE_TRANSLATE },
+        sender
+      );
+
+      await expectPreFanoutTimeout(resultPromise);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds stalled frame discovery before fan-out', async () => {
+    vi.useFakeTimers();
+    try {
+      tabPermissionChecker.checkTabAccess.mockResolvedValue({ isAccessible: true });
+      browser.webNavigation.getAllFrames.mockReturnValue(new Promise(() => {}));
+
+      const resultPromise = handlePageTranslation(
+        { action: MessageActions.PAGE_TRANSLATE },
+        sender
+      );
+
+      await expectPreFanoutTimeout(resultPromise);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    MessageActions.PAGE_TRANSLATE,
+    MessageActions.PAGE_RESTORE,
+    MessageActions.PAGE_TRANSLATE_GET_STATUS,
+    MessageActions.PAGE_TRANSLATE_STOP_AUTO,
+  ])('bounds shared preparation for %s', async (action) => {
+    vi.useFakeTimers();
+    try {
+      tabPermissionChecker.checkTabAccess.mockResolvedValue({ isAccessible: true });
+      browser.webNavigation.getAllFrames.mockReturnValue(new Promise(() => {}));
+
+      const resultPromise = handlePageTranslation({ action }, sender);
+
+      await expectPreFanoutTimeout(resultPromise);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([
