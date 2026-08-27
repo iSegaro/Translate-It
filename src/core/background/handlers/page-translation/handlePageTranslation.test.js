@@ -59,6 +59,7 @@ vi.mock('@/core/tabPermissions.js', () => ({
 }));
 
 const sender = { tab: { id: 42 } };
+const onCommittedListener = browser.webNavigation.onCommitted.addListener.mock.calls[0][0];
 
 function setupFrames(frameResults, { activeTabId = 42 } = {}) {
   browser.tabs.query.mockResolvedValue([{ id: activeTabId }]);
@@ -505,6 +506,72 @@ describe('trusted frame lifecycle relay', () => {
     }, { tab: { id: 42 }, frameId: 7 });
 
     expect(result).toEqual({ success: false, error: 'Unsupported page lifecycle action' });
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('trusted subframe navigation retirement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    browser.runtime.sendMessage.mockResolvedValue({ success: true });
+    browser.tabs.sendMessage.mockResolvedValue({ success: true, retired: true });
+  });
+
+  it('retires subframe state before relaying replacement lifecycle', async () => {
+    let resolveRetirement;
+    const retirementResponse = new Promise(resolve => {
+      resolveRetirement = resolve;
+    });
+
+    browser.tabs.sendMessage.mockImplementation((_tabId, message) => {
+      if (message.data?.action === MessageActions.PAGE_TRANSLATION_FRAME_RETIRED) {
+        return retirementResponse;
+      }
+      return Promise.resolve({ success: true, aggregated: true });
+    });
+
+    const navigation = onCommittedListener({ tabId: 42, frameId: 7, transitionType: 'link' });
+    const lifecycle = handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        action: MessageActions.PAGE_TRANSLATE_START,
+        data: { sessionId: 'replacement-session' },
+      },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    await vi.waitFor(() => expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1));
+    expect(browser.tabs.sendMessage).toHaveBeenNthCalledWith(1, 42, {
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        frameId: 7,
+        action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+      },
+      context: 'page-translation-frame-retirement',
+    }, { frameId: 0 });
+
+    resolveRetirement({ success: true, retired: true });
+    await expect(navigation).resolves.toEqual({ success: true, retired: true });
+    await expect(lifecycle).resolves.toEqual({ success: true, aggregated: true });
+
+    expect(browser.tabs.sendMessage.mock.calls.map(([, message]) => message.data.action)).toEqual([
+      MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+      MessageActions.PAGE_TRANSLATE_START,
+    ]);
+  });
+
+  it('keeps top-level navigation on existing auto-translation path', async () => {
+    await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'auto-session',
+        translatedCount: 1,
+        totalCount: 1,
+        isAutoTranslating: true,
+      },
+    }, sender);
+
+    await onCommittedListener({ tabId: 42, frameId: 0, transitionType: 'reload' });
+
     expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
   });
 });

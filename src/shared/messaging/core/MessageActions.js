@@ -56,6 +56,7 @@ export class MessageActions {
   static PAGE_TRANSLATE_STOP_AUTO = 'page-translate-stop-auto'; // Stop auto-translation (NEW)
   static PAGE_AUTO_RESTORE_COMPLETE = 'page-auto-restore-complete'; // Auto-restore complete (NEW)
   static PAGE_TRANSLATION_FRAME_LIFECYCLE = 'page-translation-frame-lifecycle';
+  static PAGE_TRANSLATION_FRAME_RETIRED = 'page-translation-frame-retired';
   static PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS = Object.freeze([
     'page-translate-start',
     'page-translate-progress',
@@ -66,6 +67,7 @@ export class MessageActions {
     'page-auto-restore-complete',
     'page-translate-cancelled',
     'page-restore-error',
+    'page-translation-frame-retired',
   ]);
   static PAGE_TRANSLATION_AGGREGATE_ACTIONS = Object.freeze([
     'page-translate-start',

@@ -12,6 +12,42 @@ const logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'handlePageTrans
 // Registry to track which tabs have auto-translation active
 // Map<tabId, { targetLanguage: string, settings: object }>
 const autoTranslateRegistry = new Map();
+const pendingFrameRetirements = new Map();
+
+function getFrameKey(tabId, frameId) {
+  return `${tabId}:${frameId}`;
+}
+
+function scheduleFrameRetirement(tabId, frameId) {
+  const key = getFrameKey(tabId, frameId);
+  const previousRetirement = pendingFrameRetirements.get(key) || Promise.resolve();
+  const retirement = previousRetirement
+    .catch(() => {})
+    .then(() => browser.tabs.sendMessage(tabId, {
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        frameId,
+        action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+      },
+      context: 'page-translation-frame-retirement',
+    }, { frameId: 0 }))
+    .catch((error) => {
+      logger.debug(`Could not retire frame ${frameId} in tab ${tabId}:`, error.message);
+    });
+
+  pendingFrameRetirements.set(key, retirement);
+  retirement.then(() => {
+    if (pendingFrameRetirements.get(key) === retirement) {
+      pendingFrameRetirements.delete(key);
+    }
+  });
+
+  return retirement;
+}
+
+async function waitForFrameRetirement(tabId, frameId) {
+  await pendingFrameRetirements.get(getFrameKey(tabId, frameId));
+}
 
 const PAGE_TRANSLATION_FAILURE_FIELDS = [
   'reason',
@@ -117,6 +153,7 @@ export async function handlePageTranslation(message, sender) {
       }
 
       try {
+        await waitForFrameRetirement(senderTabId, senderFrameId);
         const response = await browser.tabs.sendMessage(senderTabId, {
           action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
           data: {
@@ -413,8 +450,9 @@ export async function handlePageTranslation(message, sender) {
 // Handle navigation events to persistent auto-translation across same-tab link clicks
 if (typeof browser !== 'undefined' && browser.webNavigation) {
   browser.webNavigation.onCommitted.addListener((details) => {
-    // Only care about top-level navigation
-    if (details.frameId !== 0) return;
+    if (details.frameId !== 0) {
+      return scheduleFrameRetirement(details.tabId, details.frameId);
+    }
 
     const tabId = details.tabId;
     const transitionType = details.transitionType;
@@ -450,5 +488,11 @@ if (typeof browser !== 'undefined' && browser.webNavigation) {
   // Cleanup on tab closure
   browser.tabs.onRemoved.addListener((tabId) => {
     autoTranslateRegistry.delete(tabId);
+    const tabKeyPrefix = `${tabId}:`;
+    for (const key of pendingFrameRetirements.keys()) {
+      if (key.startsWith(tabKeyPrefix)) {
+        pendingFrameRetirements.delete(key);
+      }
+    }
   });
 }

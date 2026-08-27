@@ -26,6 +26,7 @@ const MessageActions = {
   PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO',
   PAGE_TRANSLATE_CANCELLED: 'PAGE_TRANSLATE_CANCELLED',
   PAGE_RESTORE_ERROR: 'PAGE_RESTORE_ERROR',
+  PAGE_TRANSLATION_FRAME_RETIRED: 'PAGE_TRANSLATION_FRAME_RETIRED',
   PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS: [
     'PAGE_TRANSLATE_START',
     'PAGE_TRANSLATE_PROGRESS',
@@ -36,6 +37,7 @@ const MessageActions = {
     'PAGE_AUTO_RESTORE_COMPLETE',
     'PAGE_TRANSLATE_CANCELLED',
     'PAGE_RESTORE_ERROR',
+    'PAGE_TRANSLATION_FRAME_RETIRED',
   ],
   PAGE_TRANSLATION_AGGREGATE_ACTIONS: [
     'PAGE_TRANSLATE_START',
@@ -134,6 +136,78 @@ describe('MainFrameCoordinator per-frame admission', () => {
     });
     expect(aggregator.frameProgressMap.has(99)).toBe(false);
     expect(aggregator.frameProgressMap.has('https://other-frame.example')).toBe(false);
+  });
+
+  it('retires owner and aggregate row on trusted frame retirement', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'old-session' },
+    });
+
+    const result = coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+    });
+
+    expect(result).toEqual({ success: true, retired: true });
+    expect(coordinator.frameSessionOwners.has(7)).toBe(false);
+    expect(aggregator.frameProgressMap.has(7)).toBe(false);
+  });
+
+  it('makes repeated frame retirement idempotent', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'old-session' },
+    });
+
+    expect(coordinator.retireFrame(7)).toEqual({ success: true, retired: true });
+    expect(coordinator.retireFrame(7)).toEqual({ success: true, retired: true });
+    expect(coordinator.frameSessionOwners.has(7)).toBe(false);
+    expect(aggregator.frameProgressMap.has(7)).toBe(false);
+  });
+
+  it('allows replacement session to register on retired numeric frame ID', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'old-session' },
+    });
+    coordinator.retireFrame(7);
+
+    const result = coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'replacement-session' },
+    });
+
+    expect(result).toMatchObject({ success: true, aggregated: true });
+    expect(coordinator.frameSessionOwners.get(7)).toBe('replacement-session');
+    expect(aggregator.frameProgressMap.has(7)).toBe(true);
+  });
+
+  it('ignores late lifecycle from retired session', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'old-session' },
+    });
+    coordinator.retireFrame(7);
+
+    const result = coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+      data: { sessionId: 'old-session', translatedCount: 99 },
+    });
+
+    expect(result).toEqual({ success: true, ignored: true, reason: 'stale-session' });
+    expect(coordinator.frameSessionOwners.has(7)).toBe(false);
+    expect(aggregator.frameProgressMap.has(7)).toBe(false);
   });
 
   it('marks aggregate stopped only after trusted Stop lifecycle from every active frame', () => {

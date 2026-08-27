@@ -57,6 +57,21 @@ export class MainFrameCoordinator {
   }
 
   /**
+   * Retires state for a frame whose browser document was replaced.
+   * @param {number} frameId - Trusted browser subframe ID
+   * @returns {{success: boolean, retired?: boolean, error?: string}}
+   */
+  retireFrame(frameId) {
+    if (!Number.isInteger(frameId) || frameId <= 0) {
+      return { success: false, error: 'Invalid frame identity' };
+    }
+
+    this.frameSessionOwners.delete(frameId);
+    this.aggregator.removeFrame(frameId);
+    return { success: true, retired: true };
+  }
+
+  /**
    * Sets up the global 'message' listener for unrelated iframe interactions.
    */
   setupMessageListener() {
@@ -106,6 +121,10 @@ export class MainFrameCoordinator {
 
     if (!this.MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS.includes(action)) {
       return { success: false, error: 'Unsupported page lifecycle action' };
+    }
+
+    if (action === this.MessageActions.PAGE_TRANSLATION_FRAME_RETIRED) {
+      return this.retireFrame(frameId);
     }
 
     const { sessionId, ...aggregateData } = data || {};
