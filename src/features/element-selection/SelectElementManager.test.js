@@ -449,13 +449,68 @@ describe('SelectElementManager', () => {
   it('should deactivate select element mode', async () => {
     await manager.initialize();
     await manager.activateSelectElementMode();
-    manager.deactivate();
+    await manager.deactivate();
     
     const { pageEventBus } = await import('@/core/PageEventBus.js');
     
     expect(manager.isActive).toBe(false);
     expect(manager.elementSelector.deactivate).toHaveBeenCalled();
     expect(pageEventBus.emit).toHaveBeenCalledWith('dismiss-select-element-notification', expect.any(Object));
+  });
+
+  it('returns a successful cleanup ACK after deactivation', async () => {
+    manager.isActive = true;
+
+    await expect(manager.deactivate({ fromBackground: true })).resolves.toEqual({
+      success: true,
+      cleanupCompleted: true,
+    });
+  });
+
+  it('returns an idempotent cleanup ACK when already inactive', async () => {
+    await expect(manager.deactivate()).resolves.toEqual({
+      success: true,
+      cleanupCompleted: true,
+      alreadyInactive: true,
+    });
+  });
+
+  it('returns a failed cleanup ACK after emergency cleanup', async () => {
+    manager.isActive = true;
+    manager.elementSelector.deactivate.mockImplementationOnce(() => {
+      throw new Error('internal cleanup detail');
+    });
+    const emergencyCleanup = vi.spyOn(manager, 'emergencyCleanup');
+
+    const result = await manager.deactivate({ fromBackground: true });
+
+    expect(result).toEqual({
+      success: false,
+      cleanupCompleted: false,
+      error: 'Could not deactivate Select Element mode.',
+    });
+    expect(emergencyCleanup).toHaveBeenCalledTimes(1);
+    expect(result.error).not.toContain('internal cleanup detail');
+  });
+
+  it('waits for adapter cancellation before continuing cleanup', async () => {
+    manager.isActive = true;
+    let resolveCancellation;
+    manager.domTranslatorAdapter.cancelTranslation.mockImplementation(() => new Promise((resolve) => {
+      resolveCancellation = resolve;
+    }));
+
+    const deactivation = manager.deactivate({ reason: 'cancel', fromBackground: true });
+    await vi.waitFor(() => expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalled());
+
+    expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+
+    resolveCancellation();
+    await expect(deactivation).resolves.toEqual({
+      success: true,
+      cleanupCompleted: true,
+    });
+    expect(manager.elementSelector.deactivate).toHaveBeenCalledTimes(1);
   });
 
   it('should handle click on element to translate', async () => {

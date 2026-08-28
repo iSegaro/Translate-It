@@ -143,7 +143,7 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
   });
 
   it('deactivates once for trusted background Select Element messages', async () => {
-    const deactivate = vi.fn().mockResolvedValue(undefined);
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
     handler.setSelectElementManager({ deactivate });
 
     await handler.handleDeactivateSelectElementMode({
@@ -152,6 +152,52 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
 
     expect(deactivate).toHaveBeenCalledTimes(1);
     expect(deactivate).toHaveBeenCalledWith({ fromBackground: true });
+  });
+
+  it.each([
+    ['success', { success: true, cleanupCompleted: true }, {
+      success: true,
+      cleanupCompleted: true,
+      activated: false,
+    }],
+    ['failure', { success: false, cleanupCompleted: false, error: 'safe cleanup error' }, {
+      success: false,
+      cleanupCompleted: false,
+      activated: false,
+      error: 'safe cleanup error',
+    }],
+  ])('propagates manager deactivation ACK: %s', async (_name, managerResult, expected) => {
+    const deactivate = vi.fn().mockResolvedValue(managerResult);
+    handler.setSelectElementManager({ deactivate });
+
+    await expect(handler.handleDeactivateSelectElementMode({
+      data: { fromBackground: true, isExplicitDeactivation: true },
+    })).resolves.toEqual(expected);
+  });
+
+  it('rejects a successful ACK without completed cleanup', async () => {
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: false });
+    handler.setSelectElementManager({ deactivate });
+
+    await expect(handler.handleDeactivateSelectElementMode({
+      data: { fromBackground: true, isExplicitDeactivation: true },
+    })).resolves.toEqual({
+      success: false,
+      cleanupCompleted: false,
+      activated: false,
+      error: 'Could not deactivate Select Element mode.',
+    });
+  });
+
+  it('returns a failed cleanup ACK when Select Element manager is unavailable', async () => {
+    await expect(handler.handleDeactivateSelectElementMode({
+      data: { fromBackground: true, isExplicitDeactivation: true },
+    })).resolves.toEqual({
+      success: false,
+      cleanupCompleted: false,
+      activated: false,
+      error: 'Select Element manager unavailable',
+    });
   });
 
   it('leaves generic non-activation error responses unchanged', async () => {

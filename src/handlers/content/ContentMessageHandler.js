@@ -388,15 +388,34 @@ export class ContentMessageHandler extends ResourceTracker {
 
       try {
         // Deactivate the manager directly
-        await this.selectElementManager.deactivate({ fromBackground });
+        const result = await this.selectElementManager.deactivate({ fromBackground });
 
-        return { success: true, activated: false };
+        if (result?.success === true && result?.cleanupCompleted === true) {
+          return { success: true, cleanupCompleted: true, activated: false };
+        }
+
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: false,
+          error: result?.error || 'Could not deactivate Select Element mode.',
+        };
       } catch (error) {
         this.logger.warn("ContentMessageHandler: selectElementManager deactivation failed:", error);
-        return { success: false, error: error.message };
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: false,
+          error: 'Could not deactivate Select Element mode.',
+        };
       }
     } else {
-      return { success: true, activated: false };
+      return {
+        success: false,
+        cleanupCompleted: false,
+        activated: false,
+        error: 'Select Element manager unavailable',
+      };
     }
   }
 

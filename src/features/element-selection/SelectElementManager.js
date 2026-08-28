@@ -49,6 +49,7 @@ const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text wa
 
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
+const SELECT_ELEMENT_DEACTIVATION_ERROR = 'Could not deactivate Select Element mode.';
 const GENERIC_TRANSLATION_ERROR_TYPES = new Set([
   ErrorTypes.TRANSLATION_ERROR,
   ErrorTypes.TRANSLATION_FAILED,
@@ -291,9 +292,12 @@ class SelectElementManager extends ResourceTracker {
    *   Routes the trusted DEACTIVATE_SELECT_ELEMENT_MODE request through the
    *   background, which authenticates the sender tab and broadcasts to all
    *   frames. Frame position never implies this intent.
+   * @returns {Promise<{success: boolean, cleanupCompleted: boolean, alreadyInactive?: boolean, error?: string}>}
    */
   async deactivate(options = {}) {
-    if (!this.isActive) return;
+    if (!this.isActive) {
+      return { success: true, cleanupCompleted: true, alreadyInactive: true };
+    }
 
     try {
       const {
@@ -318,9 +322,9 @@ class SelectElementManager extends ResourceTracker {
       // User/manual cancellation and conflict teardown both invalidate active
       // adapter work, while retaining distinct cleanup reasons and UX.
       if (reason === 'cancel' || reason === 'manual') {
-        this.domTranslatorAdapter.cancelTranslation({ silent });
+        await this.domTranslatorAdapter.cancelTranslation({ silent });
       } else if (reason === 'conflict') {
-        this.domTranslatorAdapter.cancelTranslation({ silent: true });
+        await this.domTranslatorAdapter.cancelTranslation({ silent: true });
       }
 
       this.removeEventListeners();
@@ -349,6 +353,7 @@ class SelectElementManager extends ResourceTracker {
         }
       }
       pageEventBus.emit('select-mode-deactivated');
+      return { success: true, cleanupCompleted: true };
 
     } catch (error) {
       this.logger.error('Critical error deactivating SelectElementManager:', error);
@@ -361,6 +366,11 @@ class SelectElementManager extends ResourceTracker {
       }
       
       this.emergencyCleanup();
+      return {
+        success: false,
+        cleanupCompleted: false,
+        error: SELECT_ELEMENT_DEACTIVATION_ERROR,
+      };
     } finally {
       // Final guard for the UI lock
       document.documentElement.removeAttribute('data-translate-it-select-mode');
