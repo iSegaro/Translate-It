@@ -52,13 +52,14 @@ describe('SocksProxyStrategy timeout provenance', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const execution = strategy.execute('http://target.test/translate');
-    await vi.advanceTimersByTimeAsync(5000);
-
-    await expect(execution).rejects.toMatchObject({
+    const rejection = expect(execution).rejects.toMatchObject({
       type: ErrorTypes.NETWORK_ERROR,
       transportFailure: 'socks-proxy-timeout',
       cause: expect.objectContaining({ name: 'TimeoutError' }),
     });
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await rejection;
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -119,14 +120,15 @@ describe('SocksProxyStrategy timeout provenance', () => {
     const execution = strategy.execute('http://target.test/translate', {
       signal: callerController.signal,
     });
+    const rejection = expect(execution).rejects.toMatchObject({
+      type: ErrorTypes.NETWORK_ERROR,
+      transportFailure: 'socks-proxy-timeout',
+    });
 
     await vi.advanceTimersByTimeAsync(5000);
     callerController.abort('user-cancelled');
 
-    await expect(execution).rejects.toMatchObject({
-      type: ErrorTypes.NETWORK_ERROR,
-      transportFailure: 'socks-proxy-timeout',
-    });
+    await rejection;
   });
 
   it('cleans caller listener and timeout after successful preflight', async () => {
