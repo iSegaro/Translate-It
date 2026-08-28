@@ -77,6 +77,9 @@ const FRAME_COMMAND_RESPONSE_TIMEOUT_MS = 6000;
 const FRAME_COMMAND_RESPONSE_TIMEOUT_REASON = 'frame_command_response_timeout';
 const PRE_FANOUT_COMMAND_TIMEOUT_MS = 1500;
 const PRE_FANOUT_COMMAND_TIMEOUT_REASON = 'pre_fanout_command_timeout';
+// UnifiedMessaging applies an 8s default outer deadline. 250ms leaves 250ms
+// scheduling margin after the 1.5s preparation and 6s fallback deadlines.
+const STATUS_AGGREGATE_PROBE_TIMEOUT_MS = 250;
 
 /**
  * Sends a Whole Page command to a single frame with a bounded response wait.
@@ -90,9 +93,15 @@ const PRE_FANOUT_COMMAND_TIMEOUT_REASON = 'pre_fanout_command_timeout';
  * @param {number} tabId Target tab id
  * @param {Object} message Command message forwarded unchanged
  * @param {number} frameId Target frame id
+ * @param {number} deadlineMs Response deadline override
  * @returns {Promise<{frameId: number, response: Object|null, isResponseTimeout: boolean}>}
  */
-async function sendFrameCommandWithResponseDeadline(tabId, message, frameId) {
+async function sendFrameCommandWithResponseDeadline(
+  tabId,
+  message,
+  frameId,
+  deadlineMs = FRAME_COMMAND_RESPONSE_TIMEOUT_MS
+) {
   let timeoutId;
   try {
     const response = await Promise.race([
@@ -102,7 +111,7 @@ async function sendFrameCommandWithResponseDeadline(tabId, message, frameId) {
           const timeoutError = new Error(`Frame ${frameId} command response timed out`);
           timeoutError.isResponseTimeout = true;
           reject(timeoutError);
-        }, FRAME_COMMAND_RESPONSE_TIMEOUT_MS);
+        }, deadlineMs);
       }),
     ]);
     return { frameId, response, isResponseTimeout: false };
@@ -140,7 +149,7 @@ function projectFrameDelivery({ frameId, response, isResponseTimeout }) {
  * Immediate preparation failures keep their existing error handling; only a
  * stalled preparation stage is converted to the timeout marker.
  */
-async function runPreFanoutPreparation(message, sender) {
+async function runPreFanoutPreparation(message, sender, discoverFrames = true) {
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
@@ -169,7 +178,7 @@ async function runPreFanoutPreparation(message, sender) {
     }
 
     const access = await tabPermissionChecker.checkTabAccess(targetTabId);
-    if (!access.isAccessible) {
+    if (!access.isAccessible || !discoverFrames) {
       return { targetTabId, access };
     }
 
@@ -367,7 +376,24 @@ export async function handlePageTranslation(message, sender) {
       return { success: false, error: 'Unknown page translation action' };
     }
 
-    const preparation = await runPreFanoutPreparation(message, sender);
+    let preparation;
+    if (message.action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
+      const fastPathPreparation = await runPreFanoutPreparation(message, sender, false);
+      if (!fastPathPreparation.error && fastPathPreparation.access.isAccessible) {
+        const { response } = await sendFrameCommandWithResponseDeadline(
+          fastPathPreparation.targetTabId,
+          message,
+          0,
+          STATUS_AGGREGATE_PROBE_TIMEOUT_MS
+        );
+        if (response?.success && response.isAggregated === true) {
+          logger.debug('Returning aggregated translation status from main frame');
+          return response;
+        }
+      }
+    }
+
+    preparation = await runPreFanoutPreparation(message, sender);
     if (preparation.error) return preparation.error;
 
     const { targetTabId, access, allFrames } = preparation;

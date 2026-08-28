@@ -312,8 +312,13 @@ describe('handlePageTranslation target tab ownership', () => {
     expect(result.success).toBe(true);
     expect(browser.tabs.query).not.toHaveBeenCalled();
     expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(10);
-    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
-    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+    if (action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
+      expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+    } else {
+      expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
+      expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+    }
     expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 10)).toBe(true);
     expect(browser.tabs.sendMessage.mock.calls.some(([tabId]) => tabId === 20)).toBe(false);
   });
@@ -427,7 +432,17 @@ describe('handlePageTranslation target tab ownership', () => {
 
       const resultPromise = handlePageTranslation({ action }, sender);
 
-      await expectPreFanoutTimeout(resultPromise);
+      if (action === MessageActions.PAGE_TRANSLATE_GET_STATUS) {
+        await vi.advanceTimersByTimeAsync(PRE_FANOUT_TIMEOUT_MS);
+        await expect(resultPromise).resolves.toEqual({
+          success: false,
+          reason: PRE_FANOUT_TIMEOUT_REASON,
+          isTransportFailure: true,
+        });
+        expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+      } else {
+        await expectPreFanoutTimeout(resultPromise);
+      }
     } finally {
       vi.useRealTimers();
     }
@@ -498,8 +513,64 @@ describe('handlePageTranslation target tab ownership', () => {
     expect(result).toBe(aggregatedResponse);
     expect(browser.tabs.query).not.toHaveBeenCalled();
     expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalledWith(10);
-    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 10 });
-    expect(browser.tabs.sendMessage.mock.calls.every(([tabId]) => tabId === 10)).toBe(true);
+    expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }),
+      { frameId: 0 }
+    );
+  });
+});
+
+describe('PAGE_TRANSLATE_GET_STATUS aggregated fast path', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns top aggregate without discovering or querying child frames', async () => {
+    const aggregate = { success: true, isAggregated: true, translatedCount: 4 };
+    setupFrames([
+      { frameId: 0, response: aggregate },
+      { frameId: 7, error: new Error('child must not be queried') },
+    ]);
+
+    const result = await handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+
+    expect(result).toBe(aggregate);
+    expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(42, expect.anything(), { frameId: 0 });
+  });
+
+  it('uses existing fan-out fallback after top-frame transport failure', async () => {
+    const aggregate = { success: true, isAggregated: true, translatedCount: 4 };
+    setupFrames([
+      { frameId: 0, response: aggregate },
+      { frameId: 7, response: { success: true } },
+    ]);
+    browser.tabs.sendMessage.mockImplementationOnce(() => Promise.reject(new Error('top unavailable')));
+
+    const result = await handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+
+    expect(result).toBe(aggregate);
+    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 42 });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses existing fan-out fallback for non-aggregated top responses', async () => {
+    const aggregate = { success: true, isAggregated: true, translatedCount: 4 };
+    setupFrames([
+      { frameId: 0, response: aggregate },
+      { frameId: 7, response: { success: true } },
+    ]);
+    browser.tabs.sendMessage.mockImplementationOnce(() => Promise.resolve({ success: true, translatedCount: 1 }));
+
+    const result = await handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+
+    expect(result).toBe(aggregate);
+    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 42 });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -700,6 +771,10 @@ describe('trusted subframe navigation retirement', () => {
 
 describe('bounded frame command response deadline', () => {
   const RESPONSE_TIMEOUT_MS = 6000;
+  const STATUS_AGGREGATE_PROBE_TIMEOUT_MS = 250;
+  const OUTER_STATUS_TIMEOUT_MS = 8000;
+  const FALLBACK_PREPARATION_DELAY_MS = 1450;
+  const FALLBACK_AGGREGATE_DELAY_MS = 5900;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -815,19 +890,54 @@ describe('bounded frame command response deadline', () => {
     expect(JSON.stringify(result)).not.toContain('TRANSLATION_FAILED');
   });
 
-  it('returns usable top-frame aggregated status while a child hangs', async () => {
+  it('returns usable top-frame aggregated status without querying a hanging child', async () => {
     const aggregatedResponse = { success: true, isAggregated: true, translatedCount: 4 };
     setupBoundedFrames([
       { frameId: 0, run: () => Promise.resolve(aggregatedResponse) },
       { frameId: 7, run: never },
     ]);
 
-    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
-    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
-    const result = await resultPromise;
+    const result = await handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
 
     expect(result).toBe(aggregatedResponse);
-    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
+    expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+  });
+
+  it('keeps delayed fallback inside the outer caller budget after the short top-frame status probe times out', async () => {
+    const aggregatedResponse = { success: true, isAggregated: true, translatedCount: 4 };
+    browser.tabs.query.mockResolvedValue([{ id: 42 }]);
+    tabPermissionChecker.checkTabAccess.mockResolvedValue({ isAccessible: true });
+    browser.webNavigation.getAllFrames.mockImplementation(() => new Promise(resolve => {
+      setTimeout(() => resolve([
+        { frameId: 0, url: 'https://example.com' },
+        { frameId: 7, url: 'https://frame-7.example' },
+      ]), FALLBACK_PREPARATION_DELAY_MS);
+    }));
+    let topFrameCalls = 0;
+    browser.tabs.sendMessage.mockImplementation((_tabId, _message, { frameId }) => {
+      if (frameId === 0) {
+        topFrameCalls += 1;
+        return topFrameCalls === 1
+          ? never()
+          : new Promise(resolve => setTimeout(() => resolve(aggregatedResponse), FALLBACK_AGGREGATE_DELAY_MS));
+      }
+      return Promise.resolve({ success: true });
+    });
+
+    const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
+    const outerTimeout = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('outer status timeout')), OUTER_STATUS_TIMEOUT_MS);
+    });
+    await vi.advanceTimersByTimeAsync(
+      STATUS_AGGREGATE_PROBE_TIMEOUT_MS
+      + FALLBACK_PREPARATION_DELAY_MS
+      + FALLBACK_AGGREGATE_DELAY_MS
+    );
+
+    await expect(Promise.race([resultPromise, outerTimeout])).resolves.toBe(aggregatedResponse);
+    expect(browser.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 42 });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(3);
   });
 
   it('reports Status uncertainty instead of no-active-translation when every frame times out', async () => {
@@ -837,7 +947,7 @@ describe('bounded frame command response deadline', () => {
     ]);
 
     const resultPromise = handlePageTranslation({ action: MessageActions.PAGE_TRANSLATE_GET_STATUS }, sender);
-    await vi.advanceTimersByTimeAsync(RESPONSE_TIMEOUT_MS + 100);
+    await vi.advanceTimersByTimeAsync((RESPONSE_TIMEOUT_MS * 2) + 100);
     const result = await resultPromise;
 
     expect(result).toEqual({
