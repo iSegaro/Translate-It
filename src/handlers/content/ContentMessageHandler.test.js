@@ -80,6 +80,22 @@ vi.mock('@/core/PageEventBus.js', () => ({
 describe('ContentMessageHandler iframe Select Element activation', () => {
   let handler;
 
+  const createQueuedManager = manager => {
+    let queue = Promise.resolve();
+    const run = operation => operation({
+      activate: options => manager.activateSelectElementMode?.(options),
+      deactivate: options => manager.deactivate?.(options),
+    });
+    return {
+      ...manager,
+      enqueueSelectElementLifecycle(operation) {
+        const queued = queue.then(run.bind(null, operation), run.bind(null, operation));
+        queue = queued.catch(() => {});
+        return queued;
+      },
+    };
+  };
+
   beforeEach(() => {
     ContentMessageHandler.resetInstance();
     vi.clearAllMocks();
@@ -140,6 +156,220 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       activated: true,
       managerId: 'manager-1',
     });
+  });
+
+  it('stores accepted activation generation only after successful activation', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({
+      isActive: true,
+      instanceId: 'manager-1',
+    });
+    handler.setSelectElementManager({ isInitialized: true, activateSelectElementMode });
+
+    const response = await handler.handleActivateSelectElementMode({
+      data: { activationGeneration: 7 },
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      activated: true,
+      activationGeneration: 7,
+    });
+    expect(handler.acceptedSelectElementGeneration).toBe(7);
+  });
+
+  it('does not replace accepted generation when newer activation fails', async () => {
+    const activateSelectElementMode = vi.fn()
+      .mockResolvedValueOnce({ isActive: true })
+      .mockRejectedValueOnce(new Error('activation failed'));
+    handler.setSelectElementManager({ isInitialized: true, activateSelectElementMode });
+
+    await handler.handleActivateSelectElementMode({ data: { activationGeneration: 8 } });
+    const failedResponse = await handler.handleActivateSelectElementMode({ data: { activationGeneration: 9 } });
+
+    expect(failedResponse.success).toBe(false);
+    expect(handler.acceptedSelectElementGeneration).toBe(8);
+  });
+
+  it('rejects stale deactivation before manager cleanup', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn();
+    handler.setSelectElementManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: vi.fn(() => true),
+    });
+    await handler.handleActivateSelectElementMode({ data: { activationGeneration: 1 } });
+    await handler.handleActivateSelectElementMode({ data: { activationGeneration: 2 } });
+
+    await expect(handler.handleDeactivateSelectElementMode({
+      data: {
+        fromBackground: true,
+        isExplicitDeactivation: true,
+        activationGeneration: 1,
+      },
+    })).resolves.toEqual({
+      success: false,
+      cleanupCompleted: false,
+      activated: true,
+      staleGeneration: true,
+    });
+
+    expect(deactivate).not.toHaveBeenCalled();
+  });
+
+  it('blocks delayed activation after compensating invalidation arrives first', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => false,
+    });
+
+    await expect(handler.handleDeactivateSelectElementMode({
+      data: {
+        fromBackground: true,
+        isExplicitDeactivation: true,
+        activationGeneration: 1,
+      },
+    })).resolves.toMatchObject({ success: true, cleanupCompleted: true });
+
+    await expect(handler.handleActivateSelectElementMode({
+      data: { activationGeneration: 1 },
+    })).resolves.toMatchObject({
+      success: false,
+      activated: false,
+      staleGeneration: true,
+    });
+    expect(activateSelectElementMode).not.toHaveBeenCalled();
+  });
+
+  it('serializes deactivation before queued newer activation', async () => {
+    let resolveCleanup;
+    let managerActive = true;
+    const activateSelectElementMode = vi.fn().mockImplementation(async () => {
+      managerActive = true;
+      return { isActive: true };
+    });
+    const deactivate = vi.fn().mockImplementation(() => new Promise(resolve => {
+      managerActive = false;
+      resolveCleanup = resolve;
+    }));
+    handler.setSelectElementManager(createQueuedManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => managerActive,
+    }));
+    handler.acceptedSelectElementGeneration = 1;
+
+    const deactivation = handler.handleDeactivateSelectElementMode({
+      data: {
+        fromBackground: true,
+        isExplicitDeactivation: true,
+        activationGeneration: 1,
+      },
+    });
+    await vi.waitFor(() => expect(deactivate).toHaveBeenCalledTimes(1));
+
+    const activation = handler.handleActivateSelectElementMode({
+      data: { activationGeneration: 2 },
+    });
+    expect(activateSelectElementMode).not.toHaveBeenCalled();
+
+    resolveCleanup({ success: true, cleanupCompleted: true });
+    await expect(deactivation).resolves.toMatchObject({ success: true, cleanupCompleted: true });
+    await expect(activation).resolves.toMatchObject({
+      success: true,
+      activated: true,
+      activationGeneration: 2,
+    });
+    expect(handler.acceptedSelectElementGeneration).toBe(2);
+    expect(managerActive).toBe(true);
+  });
+
+  it('rejects older deactivation queued after newer activation', async () => {
+    let resolveActivation;
+    const activateSelectElementMode = vi.fn().mockImplementation(() => new Promise(resolve => {
+      resolveActivation = resolve;
+    }));
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager(createQueuedManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => true,
+    }));
+    handler.acceptedSelectElementGeneration = 1;
+
+    const activation = handler.handleActivateSelectElementMode({
+      data: { activationGeneration: 2 },
+    });
+    await vi.waitFor(() => expect(activateSelectElementMode).toHaveBeenCalledTimes(1));
+
+    const deactivation = handler.handleDeactivateSelectElementMode({
+      data: {
+        fromBackground: true,
+        isExplicitDeactivation: true,
+        activationGeneration: 1,
+      },
+    });
+    expect(deactivate).not.toHaveBeenCalled();
+
+    resolveActivation({ isActive: true });
+    await expect(activation).resolves.toMatchObject({ success: true, activationGeneration: 2 });
+    await expect(deactivation).resolves.toEqual({
+      success: false,
+      cleanupCompleted: false,
+      activated: true,
+      staleGeneration: true,
+    });
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(handler.acceptedSelectElementGeneration).toBe(2);
+  });
+
+  it('does not let generation-less deactivation bypass accepted ownership', async () => {
+    const deactivate = vi.fn();
+    handler.setSelectElementManager({
+      deactivate,
+      isSelectElementActive: () => true,
+    });
+    handler.acceptedSelectElementGeneration = 2;
+
+    await expect(handler.handleDeactivateSelectElementMode({
+      data: { fromBackground: true, isExplicitDeactivation: true },
+    })).resolves.toEqual({
+      success: false,
+      cleanupCompleted: false,
+      activated: true,
+      staleGeneration: true,
+    });
+    expect(deactivate).not.toHaveBeenCalled();
+  });
+
+  it('cleans up matching generation and returns strict cleanup ACK', async () => {
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({ deactivate });
+    handler.acceptedSelectElementGeneration = 2;
+
+    const response = await handler.handleDeactivateSelectElementMode({
+      data: {
+        fromBackground: true,
+        isExplicitDeactivation: true,
+        activationGeneration: 2,
+      },
+    });
+
+    expect(response).toEqual({
+      success: true,
+      cleanupCompleted: true,
+      activated: false,
+      activationGeneration: 2,
+    });
+    expect(handler.acceptedSelectElementGeneration).toBeNull();
+    expect(deactivate).toHaveBeenCalledWith({ fromBackground: true });
   });
 
   it('deactivates once for trusted background Select Element messages', async () => {

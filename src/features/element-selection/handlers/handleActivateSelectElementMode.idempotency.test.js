@@ -9,6 +9,10 @@ vi.mock('webextension-polyfill', () => ({
       onRemoved: { addListener: vi.fn() },
       onActivated: { addListener: vi.fn() },
     },
+    webNavigation: {
+      getAllFrames: vi.fn(),
+      onCommitted: { addListener: vi.fn() },
+    },
     runtime: {
       sendMessage: vi.fn(() => Promise.resolve()),
     },
@@ -74,12 +78,13 @@ describe('handleActivateSelectElementMode state publication', () => {
       isRestricted: false,
       fullUrl: 'https://example.com',
     });
+    browser.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0 }]);
   });
 
-  it('publishes current-version activation once after content report and response confirmation', async () => {
+  it('publishes current-version activation once after response confirmation', async () => {
     browser.tabs.sendMessage.mockImplementationOnce(async () => {
       setStateForTab(701, true);
-      return { success: true, activated: true };
+      return { success: true, activated: true, activationGeneration: 1 };
     });
 
     const response = await handleActivateSelectElementMode(
@@ -96,7 +101,7 @@ describe('handleActivateSelectElementMode state publication', () => {
     }));
   });
 
-  it('keeps legacy response fallback state publication', async () => {
+  it('does not publish authoritative state for legacy response fallback', async () => {
     browser.tabs.sendMessage.mockResolvedValueOnce(true);
 
     const response = await handleActivateSelectElementMode(
@@ -105,11 +110,7 @@ describe('handleActivateSelectElementMode state publication', () => {
     );
 
     expect(response.success).toBe(true);
-    expect(getStateForTab(701).active).toBe(true);
-    expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
-    expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'selectElementStateChanged',
-      data: { tabId: 701, active: true },
-    }));
+    expect(getStateForTab(701).active).toBe(false);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
   });
 });

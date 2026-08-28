@@ -513,6 +513,55 @@ describe('SelectElementManager', () => {
     expect(manager.elementSelector.deactivate).toHaveBeenCalledTimes(1);
   });
 
+  it('serializes local deactivation before a queued activation', async () => {
+    manager.isInitialized = true;
+    manager.isActive = true;
+    let resolveCancellation;
+    manager.domTranslatorAdapter.cancelTranslation.mockImplementation(() => new Promise(resolve => {
+      resolveCancellation = resolve;
+    }));
+
+    const deactivation = manager.deactivate({ reason: 'cancel', fromBackground: true });
+    await vi.waitFor(() => expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalled());
+
+    const activation = manager.activateSelectElementMode();
+    expect(manager.elementSelector.activate).not.toHaveBeenCalled();
+
+    resolveCancellation();
+    await expect(deactivation).resolves.toMatchObject({ success: true, cleanupCompleted: true });
+    await expect(activation).resolves.toMatchObject({ isActive: true });
+    expect(manager.isActive).toBe(true);
+  });
+
+  it('serializes local deactivation after an in-flight activation', async () => {
+    manager.isInitialized = true;
+    let resolveServices;
+    manager._ensureServicesAvailable = vi.fn(() => new Promise(resolve => {
+      resolveServices = resolve;
+    }));
+
+    const activation = manager.activateSelectElementMode();
+    await vi.waitFor(() => expect(manager._ensureServicesAvailable).toHaveBeenCalled());
+
+    const deactivation = manager.deactivate({ fromBackground: true });
+    expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+
+    resolveServices(true);
+    await expect(activation).resolves.toMatchObject({ isActive: true });
+    await expect(deactivation).resolves.toMatchObject({ success: true, cleanupCompleted: true });
+    expect(manager.isActive).toBe(false);
+  });
+
+  it('recovers manager lifecycle queue after a rejected operation', async () => {
+    const firstOperation = manager.enqueueSelectElementLifecycle(() => {
+      throw new Error('first lifecycle failure');
+    });
+    const secondOperation = manager.enqueueSelectElementLifecycle(() => 'second operation');
+
+    await expect(firstOperation).rejects.toThrow('first lifecycle failure');
+    await expect(secondOperation).resolves.toBe('second operation');
+  });
+
   it('should handle click on element to translate', async () => {
     await manager.initialize();
     await manager.activateSelectElementMode();
@@ -1626,10 +1675,10 @@ describe('SelectElementManager', () => {
       manager.activationTime = 0; // Bypass cooldown
     });
 
-    it('should handle ESC key to deactivate', () => {
+    it('should handle ESC key to deactivate', async () => {
       const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
       manager.handleKeyDown(event);
-      expect(manager.isActive).toBe(false);
+      await vi.waitFor(() => expect(manager.isActive).toBe(false));
     });
 
     it('should handle mouseover to highlight element', () => {
@@ -2068,6 +2117,28 @@ describe('explicit tab-wide deactivation ownership', () => {
     expect(sendMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('releases local lifecycle cleanup before waiting for global deactivation', async () => {
+    await activateManager(true);
+    let resolveGlobalRequest;
+    sendMessage.mockImplementationOnce(() => new Promise(resolve => {
+      resolveGlobalRequest = resolve;
+    }));
+    const cleanupSpy = manager.elementSelector.deactivate;
+
+    const localDeactivation = manager.deactivate({ reason: 'cancel', requestGlobalDeactivation: true });
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+
+    await expect(manager.deactivate({ fromBackground: true })).resolves.toMatchObject({
+      success: true,
+      alreadyInactive: true,
+    });
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+
+    resolveGlobalRequest();
+    await expect(localDeactivation).resolves.toMatchObject({ success: true });
+  });
+
   it('never derives propagation from the reason string alone', async () => {
     await activateManager(false);
     manager.isActive = true;
@@ -2215,7 +2286,7 @@ describe('explicit tab-wide deactivation ownership', () => {
     await manager.startTranslation(document.createElement('div'));
 
     expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
-    expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT);
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT));
   });
 
   it('ignores duplicate background broadcasts when already inactive', async () => {

@@ -91,6 +91,7 @@ class SelectElementManager extends ResourceTracker {
     this.isActive = false;
     this.isProcessingClick = false;
     this.isInitialized = false;
+    this.selectElementLifecycleQueue = Promise.resolve();
     this.instanceId = Math.random().toString(36).substring(7);
     this.isTopFrame = window === window.top;
 
@@ -192,10 +193,25 @@ class SelectElementManager extends ResourceTracker {
     }
   }
 
+  // Single frame-local owner for manager and ContentMessageHandler lifecycle work.
+  enqueueSelectElementLifecycle(operation) {
+    const run = () => operation({
+      activate: options => this._activateSelectElementMode(options),
+      deactivate: options => this._deactivateSelectElementMode(options),
+    });
+    const queuedOperation = this.selectElementLifecycleQueue.then(run, run);
+    this.selectElementLifecycleQueue = queuedOperation.catch(() => {});
+    return queuedOperation;
+  }
+
   /**
    * Activate Select Element mode
    */
   async activateSelectElementMode(options = {}) {
+    return this.enqueueSelectElementLifecycle(({ activate }) => activate(options));
+  }
+
+  async _activateSelectElementMode(options = {}) {
     if (this.isActive) return { isActive: this.isActive, instanceId: this.instanceId };
 
     await this._ensureStylesInjected();
@@ -293,8 +309,26 @@ class SelectElementManager extends ResourceTracker {
    *   background, which authenticates the sender tab and broadcasts to all
    *   frames. Frame position never implies this intent.
    * @returns {Promise<{success: boolean, cleanupCompleted: boolean, alreadyInactive?: boolean, error?: string}>}
-   */
+  */
   async deactivate(options = {}) {
+    const result = await this.enqueueSelectElementLifecycle(({ deactivate }) => deactivate(options));
+
+    // Background broadcasts re-enter this manager's queue. Propagate only once
+    // local cleanup has released it, otherwise ESC/cancel can wait on itself.
+    if (
+      result?.success === true
+      && options.requestGlobalDeactivation === true
+      && options.fromBackground !== true
+    ) {
+      try {
+        await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
+      } catch { /* ignore */ }
+    }
+
+    return result;
+  }
+
+  async _deactivateSelectElementMode(options = {}) {
     if (!this.isActive) {
       return { success: true, cleanupCompleted: true, alreadyInactive: true };
     }
@@ -340,15 +374,7 @@ class SelectElementManager extends ResourceTracker {
       }
 
       if (!fromBackground) {
-        if (requestGlobalDeactivation) {
-          // Explicit tab-wide exit intent: background authenticates the
-          // sender tab and broadcasts deactivation to every frame. The
-          // initiating frame already cleaned up locally above; its own copy
-          // of the broadcast is an idempotent no-op.
-          try {
-            await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
-          } catch { /* ignore */ }
-        } else {
+        if (!requestGlobalDeactivation) {
           await this.notifyBackgroundDeactivation();
         }
       }

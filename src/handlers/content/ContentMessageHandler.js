@@ -17,6 +17,17 @@ import { getPageTranslationErrorPresentation } from '@/features/page-translation
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
 
+function isSelectElementGeneration(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+function getSelectElementActiveState(manager) {
+  if (typeof manager?.isSelectElementActive === 'function') {
+    return manager.isSelectElementActive() === true;
+  }
+  return manager?.isActive === true;
+}
+
 export class ContentMessageHandler extends ResourceTracker {
   constructor() {
     super('content-message-handler')
@@ -32,6 +43,9 @@ export class ContentMessageHandler extends ResourceTracker {
     this.context = MessagingContexts.CONTENT;
     this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
+    // Generation is local to this content frame; tab-wide authority stays in Background.
+    this.acceptedSelectElementGeneration = null;
+    this.invalidatedSelectElementGeneration = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
     this.childFrameRetirementListenerInstalled = false;
@@ -54,6 +68,18 @@ export class ContentMessageHandler extends ResourceTracker {
 
   setSelectElementManager(manager) {
     this.selectElementManager = manager;
+  }
+
+  _enqueueSelectElementLifecycle(operation) {
+    const manager = this.selectElementManager;
+    // SelectElementManager owns frame-local serialization; this method only bridges handler admission.
+    if (typeof manager?.enqueueSelectElementLifecycle === 'function') {
+      return manager.enqueueSelectElementLifecycle(operation);
+    }
+    return operation({
+      activate: options => manager?.activateSelectElementMode(options),
+      deactivate: options => manager?.deactivate(options),
+    });
   }
 
   setScreenCaptureManager(manager) {
@@ -302,6 +328,10 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleActivateSelectElementMode(message) {
+    return this._handleActivateSelectElementMode(message);
+  }
+
+  async _handleActivateSelectElementMode(message) {
     this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
     try {
@@ -335,21 +365,56 @@ export class ContentMessageHandler extends ResourceTracker {
         }
       }
 
-      // Initialize if not already initialized
-      if (!this.selectElementManager.isInitialized) {
-        await this.selectElementManager.initialize();
-      }
+      return await this._enqueueSelectElementLifecycle(async ({ activate }) => {
+        const requestedGeneration = message?.data?.activationGeneration;
+        if (
+          isSelectElementGeneration(requestedGeneration)
+          && this.invalidatedSelectElementGeneration !== null
+          && requestedGeneration <= this.invalidatedSelectElementGeneration
+        ) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleGeneration: true,
+          };
+        }
 
-      // Activate Select Element mode
-      const result = await this.selectElementManager.activateSelectElementMode(message.data || {});
-      this.logger.info("SelectElementManager activation process completed");
+        // Initialize if not already initialized
+        if (!this.selectElementManager.isInitialized) {
+          await this.selectElementManager.initialize();
+        }
 
-      // Return success result
-      return { 
-        success: result !== false, 
-        activated: result?.isActive ?? (result !== false), 
-        managerId: result?.instanceId 
-      };
+        // Activate Select Element mode
+        const result = await activate(message.data || {});
+        this.logger.info("SelectElementManager activation process completed");
+
+        const activated = result?.isActive === true || result === true;
+        if (
+          activated
+          && isSelectElementGeneration(requestedGeneration)
+          && (
+            this.acceptedSelectElementGeneration === null
+            || requestedGeneration >= this.acceptedSelectElementGeneration
+          )
+        ) {
+          this.acceptedSelectElementGeneration = requestedGeneration;
+        }
+
+        // Return success result
+        const response = {
+          success: activated,
+          activated,
+          managerId: result?.instanceId,
+        };
+        if (
+          activated
+          && isSelectElementGeneration(requestedGeneration)
+          && requestedGeneration === this.acceptedSelectElementGeneration
+        ) {
+          response.activationGeneration = requestedGeneration;
+        }
+        return response;
+      });
       
     } catch (error) {
       this.logger.warn("ContentMessageHandler: SelectElement activation failed:", error);
@@ -372,7 +437,36 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleDeactivateSelectElementMode(message) {
+    return this._enqueueSelectElementLifecycle(
+      lifecycle => this._handleDeactivateSelectElementMode(message, lifecycle),
+    );
+  }
+
+  async _handleDeactivateSelectElementMode(message, lifecycle) {
     if (this.selectElementManager) {
+      const requestedGeneration = message?.data?.activationGeneration;
+      const currentGeneration = this.acceptedSelectElementGeneration;
+      if (isSelectElementGeneration(requestedGeneration)) {
+        this.invalidatedSelectElementGeneration = Math.max(
+          this.invalidatedSelectElementGeneration || 0,
+          requestedGeneration,
+        );
+      }
+      if (
+        currentGeneration !== null
+        && (
+          !isSelectElementGeneration(requestedGeneration)
+          || requestedGeneration !== currentGeneration
+        )
+      ) {
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: getSelectElementActiveState(this.selectElementManager),
+          staleGeneration: true,
+        };
+      }
+
       // Check if this is from background (to avoid circular messaging)
       const fromBackground = message?.data?.fromBackground;
             
@@ -381,17 +475,30 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Only process deactivation if it's explicit or from non-background sources
       if (fromBackground && !isExplicitDeactivation) {
-        return { success: true, activated: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false };
+        return { success: true, activated: getSelectElementActiveState(this.selectElementManager) };
       }
 
       this.logger.info('DEACTIVATE_SELECT_ELEMENT_MODE received');
 
       try {
         // Deactivate the manager directly
-        const result = await this.selectElementManager.deactivate({ fromBackground });
+        const result = await lifecycle.deactivate({ fromBackground });
 
         if (result?.success === true && result?.cleanupCompleted === true) {
-          return { success: true, cleanupCompleted: true, activated: false };
+          if (
+            !isSelectElementGeneration(requestedGeneration)
+            || this.acceptedSelectElementGeneration === requestedGeneration
+          ) {
+            this.acceptedSelectElementGeneration = null;
+          }
+          return {
+            success: true,
+            cleanupCompleted: true,
+            activated: false,
+            ...(isSelectElementGeneration(requestedGeneration)
+              ? { activationGeneration: requestedGeneration }
+              : {}),
+          };
         }
 
         return {
@@ -601,6 +708,12 @@ export class ContentMessageHandler extends ResourceTracker {
 
   // IFrame support handlers
   async handleIFrameActivateSelectElement(/* data */) {
+    return this._enqueueSelectElementLifecycle(
+      lifecycle => this._handleIFrameActivateSelectElement(lifecycle),
+    );
+  }
+
+  async _handleIFrameActivateSelectElement(lifecycle) {
     this.logger.info('IFrame activate select element request');
     try {
       if (this.selectElementManager) {
@@ -609,7 +722,7 @@ export class ContentMessageHandler extends ResourceTracker {
           await this.selectElementManager.initialize();
         }
 
-        const result = await this.selectElementManager.activateSelectElementMode();
+        const result = await lifecycle.activate();
         return { success: true, activated: result.isActive, managerId: result.instanceId };
       }
 
