@@ -158,7 +158,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useLanguageDefaults } from '@/features/settings/composables/useLanguageDefaults.js'
 import { pageEventBus } from '@/core/PageEventBus.js'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
-import { MessageActions, MessageContexts } from '@/shared/messaging/core/MessagingCore.js'
+import { MessageActions, MessageContexts, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js'
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { TranslationMode } from '@/shared/config/config.js'
@@ -170,6 +170,9 @@ import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import ExtensionContextManager from '@/core/extensionContext.js'
+import { isCancellationError } from '@/shared/error-management/ErrorMatcher.js'
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
 
 const mobileStore = useMobileStore()
 const settingsStore = useSettingsStore()
@@ -245,6 +248,27 @@ const handlePaste = async () => {
   }
 }
 
+/**
+ * Resolves a confirmed translation-request failure into safe display text.
+ * Returns null for silent failures (cancellation/context invalidation).
+ * Must only be called with translation-domain errors; local/non-translation
+ * errors keep their existing getErrorForDisplay path.
+ *
+ * @param {Error|object|string} errorLike
+ * @returns {Promise<string|null>}
+ */
+const resolveTranslationError = async (errorLike) => {
+  const canonicalError = reconstructTranslationError(errorLike);
+
+  if (isCancellationError(canonicalError) || ExtensionContextManager.isContextError(canonicalError)) {
+    return null;
+  }
+
+  const publicError = mapCanonicalTranslationError(canonicalError);
+  const displayError = await createLegacyDisplayError(canonicalError, publicError);
+  return displayError ? displayError.message : null;
+}
+
 const handleTranslate = async () => {
   if (!inputText.value || isLoading.value) return
   isLoading.value = true
@@ -292,21 +316,21 @@ const handleTranslate = async () => {
         resultText.value = t('mobile_input_no_result_error', "No translation found.");
       }
     } else {
-      // Check if it was cancelled
-      const errorMsg = response?.error || "Translation failed.";
-      if (errorMsg.includes('cancelled') || response?.type === 'USER_CANCELLED') {
+      // Translation-domain failure response: route through the canonical
+      // presentation chain so raw backend diagnostics never reach the UI.
+      const errorLike = response?.errorDetails || response?.error || response?.message || 'Translation failed';
+      const message = await resolveTranslationError(errorLike);
+      if (!message) {
         logger.debug('Manual translation cancelled by user');
         return;
       }
 
       isError.value = true;
-      const errorInfo = await getErrorForDisplay(errorMsg, 'mobile-input');
-      logger.error('Manual translation failed', { error: errorInfo.message });
-      resultText.value = errorInfo.message;
+      logger.error('Manual translation failed', { error: message });
+      resultText.value = message;
     }
   } catch (error) {
-    // Check for cancellation in exception too
-    if (error.message?.includes('cancelled') || error.type === 'USER_CANCELLED') {
+    if (isCancellationError(error)) {
       logger.debug('Manual translation exception: cancelled');
       return;
     }
@@ -315,12 +339,27 @@ const handleTranslate = async () => {
       mobileStore.closeSheet();
       ExtensionContextManager.handleContextError(error, 'mobile-input:translate');
       resultText.value = t('mobile_input_context_error', "Extension context unavailable. Please refresh the page.");
-    } else {
-      isError.value = true;
-      const errorInfo = await getErrorForDisplay(error, 'mobile-input');
-      logger.error('Manual translation exception', { error: errorInfo.message });
-      resultText.value = errorInfo.message;
+      return;
     }
+
+    if (typeof error?.type === 'string' && error.type.length > 0) {
+      // Translation-domain exception: canonical presentation, no raw details.
+      const message = await resolveTranslationError(error);
+      if (!message) {
+        logger.debug('Manual translation exception: silent');
+        return;
+      }
+      isError.value = true;
+      logger.error('Manual translation exception', { error: message });
+      resultText.value = message;
+      return;
+    }
+
+    // Local/non-translation error: preserve existing presentation.
+    isError.value = true;
+    const errorInfo = await getErrorForDisplay(error, 'mobile-input');
+    logger.error('Manual translation exception', { error: errorInfo.message });
+    resultText.value = errorInfo.message;
   } finally { 
     isLoading.value = false;
     currentMessageId.value = null;

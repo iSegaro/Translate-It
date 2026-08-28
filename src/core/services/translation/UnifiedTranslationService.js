@@ -215,6 +215,8 @@ export class UnifiedTranslationService {
       // ConversationAcceptanceHandle was actually registered for this request.
       // The consuming feature gates parent acceptance ACK emission on this value.
       const conversationAcceptanceRegistered = this._registerConversationAcceptance(request, executionContext, providerName, participates);
+      // Transport-only handoff metadata. Keep this outside operation metadata and history.
+      executionContext.conversationAcceptanceRegistered = conversationAcceptanceRegistered;
 
       let result;
       try {
@@ -247,10 +249,11 @@ export class UnifiedTranslationService {
         return MessageFormat.createErrorResponse(error, messageId);
       }
 
-      // Propagate the authoritative conversation acceptance decision to the
-      // requesting feature so ACK emission mirrors registration exactly.
+      // Propagate only a positive registration decision. Missing metadata means
+      // the requesting feature must not emit a parent acceptance ACK.
       if (result && typeof result === 'object') {
-        result.conversationAcceptance = conversationAcceptanceRegistered;
+        delete result.conversationAcceptance;
+        if (conversationAcceptanceRegistered) result.conversationAcceptance = true;
       }
 
       const transition = this.requestTracker.completeRequest(messageId, result);
@@ -273,7 +276,11 @@ export class UnifiedTranslationService {
 
       try {
         await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
-        this.conversationAcceptanceCoordinator.activate(messageId);
+        if (conversationAcceptanceRegistered && result?.success === true) {
+          this.conversationAcceptanceCoordinator.activate(messageId);
+        } else if (conversationAcceptanceRegistered) {
+          this.conversationAcceptanceCoordinator.remove(messageId);
+        }
       } catch (error) {
         logger.error('Result dispatch failed:', error.message);
         this.conversationAcceptanceCoordinator.remove(messageId);
@@ -361,7 +368,9 @@ export class UnifiedTranslationService {
       reason: cancellation.reason,
       cancelled: true,
     });
-    if (this.translationEngine) this.translationEngine.cancelTranslation(messageId);
+    if (this.translationEngine) {
+      this.translationEngine.cancelTranslation(messageId, false, undefined, reason);
+    }
     
     await this.resultDispatcher.dispatchCancellation({ messageId, request });
     return { handled: true, success: true };

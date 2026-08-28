@@ -197,6 +197,16 @@ describe('AIResponseParser', () => {
       expect(result).toEqual({ results: ['AA', 'BB', 'CC'], contractViolation: false });
     });
 
+    it('restores shuffled plain-string response IDs to canonical request order', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '[{"id":2,"text":"TC"},{"id":0,"text":"TA"},{"id":1,"text":"TB"}]',
+        3,
+        ['A', 'B', 'C'],
+      );
+
+      expect(result).toEqual({ results: ['TA', 'TB', 'TC'], contractViolation: false });
+    });
+
     it('keeps object batch mapping identity-based', () => {
       const result = AIResponseParser.parseBatchResult(
         '[{"id":"y","text":"BB"},{"id":"x","text":"AA"}]',
@@ -457,6 +467,125 @@ describe('AIResponseParser', () => {
       );
 
       expect(result.contractViolation).toBe(true);
+    });
+
+    it.each([null, 0, 42, false, true])('rejects JSON_OBJECT top-level scalar %p', (value) => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify([value]),
+        1,
+        ['source'],
+        'TestProvider',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result.contractViolation).toBe(true);
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          violationCodes: expect.arrayContaining(['INVALID_TRANSLATED_TEXT']),
+        }),
+      ]);
+    });
+
+    it.each(['0', '42', 'false', 'true', 'null'])('accepts quoted JSON_OBJECT scalar %j', (value) => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify([value]),
+        1,
+        ['source'],
+        'TestProvider',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({ results: [value], contractViolation: false });
+    });
+
+    it.each([null, 42, false])('rejects JSON_ARRAY scalar %p', (value) => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify([value]),
+        1,
+        ['source'],
+        'TestProvider',
+        ResponseFormat.JSON_ARRAY,
+      );
+
+      expect(result.contractViolation).toBe(true);
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          violationCodes: expect.arrayContaining(['INVALID_TRANSLATED_TEXT']),
+        }),
+      ]);
+    });
+
+    it('rejects non-string text in the normal JSON_OBJECT wrapper', () => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [null] }),
+        1,
+        ['source'],
+        'TestProvider',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result.contractViolation).toBe(true);
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          violationCodes: expect.arrayContaining(['INVALID_TRANSLATED_TEXT']),
+        }),
+      ]);
+    });
+
+    it.each(['', '   '])('classifies JSON_OBJECT blank string %j as EMPTY_TRANSLATED_TEXT', (value) => {
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify([value]),
+        1,
+        ['source'],
+        'TestProvider',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result.contractViolation).toBe(true);
+      expect(result.invalidUnits).toEqual([
+        expect.objectContaining({
+          violationCodes: expect.arrayContaining(['EMPTY_TRANSLATED_TEXT']),
+        }),
+      ]);
+      expect(result.invalidUnits[0].violationCodes).not.toContain('INVALID_TRANSLATED_TEXT');
+    });
+
+    it('accepts JSON_OBJECT identity string', () => {
+      const result = AIResponseParser.parseBatchResult(
+        '["URL"]',
+        1,
+        ['URL'],
+        'TestProvider',
+        ResponseFormat.JSON_OBJECT,
+      );
+
+      expect(result).toEqual({ results: ['URL'], contractViolation: false });
+    });
+
+    it('preserves missing-result cardinality taxonomy', () => {
+      const observeValidationResult = vi.fn();
+      const originalBatch = [{ i: 'unit-0', t: 'source' }];
+      const result = AIResponseParser.parseBatchResult(
+        JSON.stringify({ translations: [] }),
+        1,
+        originalBatch,
+        'TestProvider',
+        ResponseFormat.JSON_OBJECT,
+        { observeValidationResult },
+        createManifestView(createRequestUnitManifest(originalBatch)),
+      );
+
+      expect(result).toEqual(expect.objectContaining({
+        results: [''],
+        contractViolation: true,
+      }));
+      expect(result.invalidUnits).toEqual([]);
+      expect(observeValidationResult).toHaveBeenCalledWith(expect.objectContaining({
+        violations: expect.arrayContaining([
+          expect.objectContaining({ code: 'CARDINALITY_MISMATCH' }),
+          expect.objectContaining({ code: 'MISSING_REQUESTED_UNITS' }),
+        ]),
+      }));
     });
 
     it.each(['', '   '])('accepts %j output for a blank source', (text) => {

@@ -1,5 +1,6 @@
 import { createTranslationDiagnosticReport } from './TranslationOutcome.js'
 import { createUsageRecord, normalizeCompletionTermination } from './CompletionContract.js'
+import { TranslationCallPurpose } from '../providers/ProviderConstants.js'
 
 const MAX_DIAGNOSTIC_ENTRIES = 100
 const MAX_COMPLETION_ENTRIES = 100
@@ -236,6 +237,7 @@ function sanitizeCompletion(record = {}) {
 export function createTranslationOperation(messageId, manifest = null) {
   const diagnostics = []
   const completions = []
+  const providerMetadata = []
   const parentCandidates = new Map()
   const manifestUnits = Array.isArray(manifest?.units) ? manifest.units : []
   let unitStates = null
@@ -263,6 +265,17 @@ export function createTranslationOperation(messageId, manifest = null) {
     pendingAcceptedUnitIds = []
     pendingAcceptedUnitIdSet = new Set()
     return { list: pendingAcceptedUnitIds, set: pendingAcceptedUnitIdSet }
+  }
+
+  function getPrimaryDetectedLanguages() {
+    const languages = new Set()
+    for (const record of providerMetadata) {
+      if (record.callPurpose !== TranslationCallPurpose.PRIMARY_TRANSLATION) continue
+      const language = record.metadata?.detectedLanguage
+      if (typeof language !== 'string' || !language.trim()) continue
+      languages.add(language.trim().toLowerCase())
+    }
+    return languages
   }
 
   return {
@@ -312,6 +325,33 @@ export function createTranslationOperation(messageId, manifest = null) {
     },
     snapshotCompletions() {
       return Object.freeze([...completions])
+    },
+    recordProviderExecutionMetadata(metadata, callPurpose) {
+      if (finalized || !metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return false
+      const stored = Object.freeze({
+        callPurpose: callPurpose == null ? TranslationCallPurpose.PRIMARY_TRANSLATION : callPurpose,
+        metadata: Object.freeze({ ...metadata }),
+      })
+      providerMetadata.push(stored)
+      return stored
+    },
+    snapshotProviderExecutionMetadata() {
+      return Object.freeze([...providerMetadata])
+    },
+    snapshotAggregatedProviderMetadata() {
+      const languages = getPrimaryDetectedLanguages()
+      return languages.size === 1
+        ? Object.freeze({ detectedLanguage: languages.values().next().value })
+        : Object.freeze({})
+    },
+    snapshotProviderDetectionDiagnostic() {
+      const languages = getPrimaryDetectedLanguages()
+      if (languages.size === 0) return Object.freeze({ status: 'absent' })
+      if (languages.size > 1) return Object.freeze({ status: 'conflict' })
+      return Object.freeze({
+        status: 'unanimous',
+        detectedLanguage: languages.values().next().value,
+      })
     },
     settleUnits(unitIds) {
       const accepted = []
@@ -406,6 +446,44 @@ export function recordProviderCompletion(executionContext, record) {
   if (stored && executionContext?.completionRef) {
     executionContext.completionRef.record = stored
   }
+  return stored
+}
+
+/**
+ * Creates mutable metadata storage for one semantic provider execution. The
+ * ref is detached from the logical operation until execution succeeds.
+ */
+export function createProviderExecutionMetadataRef() {
+  return { metadata: {}, published: false }
+}
+
+export function discardProviderExecutionMetadata(providerMetadataRef) {
+  if (!providerMetadataRef || providerMetadataRef.published) return
+  providerMetadataRef.metadata = {}
+}
+
+export async function executeProviderExecutionAttempt(providerMetadataRef, attempt) {
+  if (!providerMetadataRef || typeof attempt !== 'function') return attempt()
+
+  providerMetadataRef.metadata = {}
+  try {
+    return await attempt()
+  } catch (error) {
+    discardProviderExecutionMetadata(providerMetadataRef)
+    throw error
+  }
+}
+
+/**
+ * Publishes one successful provider-execution metadata slot into its
+ * operation. Internal HTTP retries and failover stay inside this slot.
+ * Recovery and primary records remain separate; aggregation is a later phase.
+ */
+export function publishProviderExecutionMetadata(executionContext, providerMetadataRef, callPurpose) {
+  const metadata = providerMetadataRef?.metadata
+  if (providerMetadataRef?.published || !metadata || typeof metadata !== 'object' || Array.isArray(metadata) || Object.keys(metadata).length === 0) return false
+  const stored = executionContext?.operation?.recordProviderExecutionMetadata(metadata, callPurpose) || false
+  if (stored) providerMetadataRef.published = true
   return stored
 }
 

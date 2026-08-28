@@ -306,6 +306,13 @@ describe('PdfTranslationCoordinator', () => {
     })
 
     await coordinator.cancelActiveTranslation('document-replaced')
+    expect(sendRegularMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'CANCEL_TRANSLATION',
+        data: expect.objectContaining({ reason: 'document-replaced' }),
+      }),
+      expect.objectContaining({ silent: true })
+    )
     deferred.resolve({
       success: true,
       translatedText: JSON.stringify([{ blockId: 'block-a', text: 'Hola' }]),
@@ -644,7 +651,21 @@ describe('PdfTranslationCoordinator', () => {
     session.getVisibleLogicalBlocks.mockResolvedValue([
       { id: 'block-a', text: 'Hello', role: 'paragraph', sourceTextHash: 'hash-a' }
     ])
-    sendRegularMessageMock.mockRejectedValue(new Error('Provider failed: quota exceeded'))
+    const providerError = new Error('Provider failed: quota exceeded')
+    Object.assign(providerError, {
+      type: 'PROVIDER_ERROR',
+      originalType: 'HTTP_ERROR',
+      statusCode: 503,
+      context: 'pdf-translation',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'QUOTA_EXCEEDED',
+      errorCode: 'E_QUOTA',
+      translationOutcome: { partial: true },
+      cause: 'private',
+      arbitrary: { ignored: true }
+    })
+    sendRegularMessageMock.mockRejectedValue(providerError)
 
     const summary = await coordinator.translateVisibleBlocks({ sourceLanguage: 'en', targetLanguage: 'es', translationIntent })
 
@@ -655,7 +676,19 @@ describe('PdfTranslationCoordinator', () => {
       totalCount: 1,
       translationOccurrenceId: 1,
       error: 'Provider failed: quota exceeded',
-      failureReason: 'unknown'
+      errorDetails: {
+        message: 'Provider failed: quota exceeded',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'pdf-translation',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'QUOTA_EXCEEDED',
+        errorCode: 'E_QUOTA',
+        translationOutcome: { partial: true }
+      },
+      failureReason: 'provider-error'
     })
   })
 

@@ -9,7 +9,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'paste-optimized');
 /**
  * تلاش برای جایگذاری با Paste Event بهینه‌شده (الهام از example.js)
  */
-export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
+export async function tryOptimizedPasteInsertion(element, text, hasSelection, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
   logger.debug('Attempting optimized paste insertion');
 
@@ -50,12 +52,15 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection) {
     // Focus element
     element.focus();
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     // ارسال event
+    if (!isCurrent()) return false;
     element.dispatchEvent(pasteEvent);
 
     // کمی صبر کن تا event پردازش شود
     await smartDelay(100);
+    if (!isCurrent()) return false;
 
     // تنظیف clipboard data
     clipboardData.clearData();

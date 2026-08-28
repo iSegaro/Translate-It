@@ -125,7 +125,7 @@ Modes: `Select_Element`.
 - **Duplicate logical identities applied once** via UID + `processedUnits` set.
 - **Esc / user cancellation**: `SelectElementManager.handleKeyDown` → `deactivate({ fromCancel: true })` → `cancelTranslation`. It does **not** revert already-applied partial translations.
 - **Revert** (`SelectElementManager.revertTranslations`) restores the **original text and direction metadata** (`restoreElementDirection`, removes `data-has-original`).
-- **Block-group reconstruction is atomic.** `BlockGroupReconstructor` validates first (segment markers, node connectivity/content), then commits all units synchronously; any failure aborts before the mutation phase.
+- **Block-group reconstruction is atomic.** `BlockGroupReconstructor` validates first (segment markers, node connectivity/content), then commits all units synchronously. Atomicity is enforced through validation plus transactional rollback: validation occurs before mutation, mutation may then begin, and a mutation-phase failure triggers best-effort rollback of the affected transaction. Rollback failures are aggregated as secondary diagnostics and never replace the primary mutation failure.
 
 Revert can be invoked for a partial state: `preserveTranslations` keeps intervening decomposable successes; only reverted on explicit user action.
 

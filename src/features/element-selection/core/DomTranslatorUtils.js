@@ -10,13 +10,14 @@ import { DOM_FILTERS } from '@/utils/dom/DomFilters.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
 import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
 import { isSelectElementTraversable, SelectElementReason } from '@/features/element-selection/core/SelectElementPolicy.js';
+import { iterateSelectElementAncestors } from '../utils/shadowDom.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'DomTranslatorUtils');
 
 /**
  * Finds the closest block-level parent for a node based on context boundaries
  * @param {Node} node - The DOM node to check
- * @returns {HTMLElement} - The block-level ancestor or document.body
+ * @returns {HTMLElement|null} - The block-level ancestor, or null at a shadow boundary
  */
 function findClosestBlockParent(node) {
   let parent = node.parentElement;
@@ -26,7 +27,66 @@ function findClosestBlockParent(node) {
     }
     parent = parent.parentElement;
   }
-  return document.body;
+  return node.getRootNode?.()?.host ? null : document.body;
+}
+
+function getBlockOwner(node) {
+  return findClosestBlockParent(node) || node.getRootNode();
+}
+
+function getBlockId(owner, blockMap, blockCounter, prefix) {
+  if (owner?.nodeType === Node.ELEMENT_NODE && owner.dataset) {
+    if (!owner.dataset.blockId) owner.dataset.blockId = `b${Math.random().toString(36).substr(2, 4)}`;
+    return owner.dataset.blockId;
+  }
+
+  let blockId = blockMap.get(owner);
+  if (!blockId) {
+    blockCounter.value++;
+    blockId = `${prefix}${blockCounter.value}`;
+    blockMap.set(owner, blockId);
+  }
+  return blockId;
+}
+
+function walkSelectTree(root, filter, onNode, options = {}) {
+  const seenNodes = options.seenNodes || new WeakSet();
+  const seenRoots = options.seenRoots || new WeakSet();
+  const nestedRoots = [];
+
+  if (options.includeOpenShadowRoots && root.nodeType === Node.ELEMENT_NODE && root.shadowRoot) {
+    seenRoots.add(root.shadowRoot);
+    nestedRoots.push(root.shadowRoot);
+  }
+
+  const traversalFilter = (node) => {
+    const result = filter(node);
+    if (
+      result !== NodeFilter.FILTER_REJECT
+      && options.includeOpenShadowRoots
+      && node.nodeType === Node.ELEMENT_NODE
+      && node.shadowRoot
+      && !seenRoots.has(node.shadowRoot)
+    ) {
+      seenRoots.add(node.shadowRoot);
+      nestedRoots.push(node.shadowRoot);
+    }
+    return result;
+  };
+  traversalFilter.acceptNode = traversalFilter;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, traversalFilter);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (seenNodes.has(node)) continue;
+    seenNodes.add(node);
+    onNode(node);
+
+  }
+
+  for (const shadowRoot of nestedRoots) {
+    walkSelectTree(shadowRoot, filter, onNode, { ...options, seenNodes, seenRoots });
+  }
 }
 
 /**
@@ -36,8 +96,7 @@ function findClosestBlockParent(node) {
  * @returns {boolean}
  */
 function isPreformatted(node) {
-  let parent = node.parentElement;
-  while (parent) {
+  for (const parent of iterateSelectElementAncestors(node)) {
     const tagName = parent.tagName.toUpperCase();
     if (['PRE', 'CODE', 'TEXTAREA', 'SAMP', 'KBD'].includes(tagName)) {
       return true;
@@ -50,7 +109,6 @@ function isPreformatted(node) {
     } catch {
       // computed style check failed, traverse parent
     }
-    parent = parent.parentElement;
   }
   return false;
 }
@@ -62,13 +120,11 @@ function isPreformatted(node) {
  * @returns {'rtl'|'ltr'|null}
  */
 function getDirectionHint(node) {
-  let parent = node.parentElement;
-  while (parent) {
+  for (const parent of iterateSelectElementAncestors(node)) {
     const dir = parent.getAttribute('dir');
     if (dir === 'rtl' || dir === 'ltr') {
       return dir;
     }
-    parent = parent.parentElement;
   }
   const text = node.textContent || '';
   try {
@@ -246,6 +302,7 @@ function isExcludedAncestorWithOptions(node, isRoot = false, options = {}) {
  * @param {HTMLElement} element - Root element to crawl
  * @param {Object} [options] - Collection options
  * @param {string} [options.extractionMode] - Resolved extraction mode ('v2'|'v3')
+ * @param {boolean} [options.includeOpenShadowRoots=false] - Phase 1 traversal capability; disabled by production adapter
  * @returns {Object[]} Array of objects { node, text, uid, blockId, role }
  */
 export function collectTextNodes(element, options = {}) {
@@ -255,6 +312,8 @@ export function collectTextNodes(element, options = {}) {
   }
 
   const textNodesData = [];
+  const blockMap = new WeakMap();
+  const blockCounter = { value: 0 };
   
   // 2. High-performance filter that rejects entire branches
   const filter = (node) => {
@@ -301,31 +360,23 @@ export function collectTextNodes(element, options = {}) {
   // Necessary for cross-browser compatibility with TreeWalker
   filter.acceptNode = filter;
 
-  // Use SHOW_ELEMENT | SHOW_TEXT to allow branch rejection
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filter);
-
-  let node;
   let nodeCounter = 0;
-  while ((node = walker.nextNode())) {
+  walkSelectTree(element, filter, (node) => {
     // Skip element nodes in the loop, we only process accepted text nodes
-    if (node.nodeType === Node.ELEMENT_NODE) continue;
+    if (node.nodeType === Node.ELEMENT_NODE) return;
 
-    const blockParent = findClosestBlockParent(node);
-    
-    // Ensure blockId persists for mapping back to the DOM
-    if (!blockParent.dataset.blockId) {
-      blockParent.dataset.blockId = `b${Math.random().toString(36).substr(2, 4)}`;
-    }
+    const blockOwner = getBlockOwner(node);
+    const blockId = getBlockId(blockOwner, blockMap, blockCounter, 'sb');
 
     nodeCounter++;
     textNodesData.push({
       node,
       text: node.textContent || '',
       uid: `n${nodeCounter}`,
-      blockId: blockParent.dataset.blockId,
-      role: blockParent.tagName.toLowerCase()
+      blockId,
+      role: blockOwner?.tagName?.toLowerCase() || 'shadow-root'
     });
-  }
+  }, options);
 
   logger.debug(`Collected ${textNodesData.length} text nodes with structural data.`);
   
@@ -362,6 +413,7 @@ export function collectTextNodes(element, options = {}) {
  * @param {string} [options.extractionMode] - Resolved extraction mode ('v2'|'v3').
  *   Required for preformatted traversal (V3); absent mode conservatively rejects
  *   preformatted categories.
+ * @param {boolean} [options.includeOpenShadowRoots=false] - Phase 1 traversal capability; disabled by production adapter
  * @returns {TranslationUnit[]} Array of enriched TranslationUnits
  */
 export function collectBlockGroups(element, sessionContext = {}, options = {}) {
@@ -419,23 +471,19 @@ export function collectBlockGroups(element, sessionContext = {}, options = {}) {
   // Necessary for cross-browser compatibility with TreeWalker
   filter.acceptNode = filter;
 
-  // Use SHOW_ELEMENT | SHOW_TEXT to allow branch rejection
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, filter);
-
-  let node;
   let nodeCounter = 0;
-  while ((node = walker.nextNode())) {
+  walkSelectTree(element, filter, (node) => {
     // Skip element nodes in the loop, we only process accepted text nodes
-    if (node.nodeType === Node.ELEMENT_NODE) continue;
+    if (node.nodeType === Node.ELEMENT_NODE) return;
 
-    const blockParent = findClosestBlockParent(node);
+    const blockOwner = getBlockOwner(node);
     
     // Assign blockId using WeakMap session context (no DOM writes)
-    let blockId = sessionContext.blockMap.get(blockParent);
+    let blockId = sessionContext.blockMap.get(blockOwner);
     if (!blockId) {
       sessionContext.blockCounter.value++;
       blockId = `g${sessionContext.blockCounter.value}`;
-      sessionContext.blockMap.set(blockParent, blockId);
+      sessionContext.blockMap.set(blockOwner, blockId);
     }
 
     nodeCounter++;
@@ -457,7 +505,7 @@ export function collectBlockGroups(element, sessionContext = {}, options = {}) {
     const directionHint = getDirectionHint(node);
 
     // Inline parent tags collection
-    const inlineParentTags = getInlineParentTags(node, blockParent);
+    const inlineParentTags = getInlineParentTags(node, blockOwner);
 
     // Build the unit using the TranslationUnit class
     const unit = new TranslationUnit({
@@ -474,7 +522,7 @@ export function collectBlockGroups(element, sessionContext = {}, options = {}) {
     unit.node = node;
 
     units.push(unit);
-  }
+  }, options);
 
   logger.debug(`[collectBlockGroups] Collected ${units.length} units cleanly in session.`);
   

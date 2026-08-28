@@ -1,4 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+
+const loggerMock = vi.hoisted(() => ({
+  init: vi.fn(),
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
 
 // Mock extension polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -10,18 +19,11 @@ vi.mock('webextension-polyfill', () => ({
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    init: vi.fn(),
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
+  getScopedLogger: () => loggerMock,
 }));
 
 describe('QueueManager', () => {
   let queueManager;
-  let ErrorTypes;
 
   const createDeferred = () => {
     let resolve;
@@ -41,9 +43,6 @@ describe('QueueManager', () => {
     
     const mod = await import('./QueueManager.js');
     queueManager = mod.queueManager;
-    
-    const errMod = await import('@/shared/error-management/ErrorTypes.js');
-    ErrorTypes = errMod.ErrorTypes;
     
     vi.spyOn(Math, 'random').mockReturnValue(0.5); // Predictable jitter (0.75x)
   });
@@ -96,9 +95,87 @@ describe('QueueManager', () => {
   });
 
   describe('Retry Logic', () => {
+    it('does not claim a strategy denominator for initial processing', async () => {
+      const request = vi.fn().mockResolvedValue('Success');
+      const promise = queueManager.enqueue('initial-attempt-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      await promise;
+
+      const processingLog = loggerMock.debug.mock.calls.find(([message]) => (
+        message.startsWith('Processing item initial-attempt-provider-')
+      ));
+      expect(processingLog?.[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLog?.[0]).not.toContain('attempt 1/');
+    });
+
+    it('logs retry scheduling as the next execution attempt', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+      const request = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockResolvedValueOnce('Success');
+      const promise = queueManager.enqueue('single-retry-observability-provider', request, 0, 'context', { executionContext });
+
+      await vi.advanceTimersByTimeAsync(150);
+      await vi.advanceTimersByTimeAsync(2000);
+      await promise;
+
+      const processingLogs = loggerMock.debug.mock.calls
+        .filter(([message]) => message.startsWith('Processing item single-retry-observability-provider-'))
+        .map(([message]) => message);
+      const retryLog = loggerMock.warn.mock.calls
+        .find(([message]) => message.startsWith('Item single-retry-observability-provider-'));
+
+      expect(processingLogs[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLogs[1]).toMatch(/\(attempt 2\/4\)$/);
+      expect(retryLog?.[0]).toMatch(/next attempt 2\/4/);
+      expect(executionContext.operation.appendDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'QUEUE_RETRY',
+        attempt: 1,
+      }));
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses current strategy denominator when error type changes', async () => {
+      const networkError = { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' };
+      const serverError = { type: ErrorTypes.SERVER_ERROR, message: 'server failure' };
+      const request = vi.fn()
+        .mockRejectedValueOnce(networkError)
+        .mockRejectedValueOnce(serverError)
+        .mockResolvedValueOnce('Success');
+      const promise = queueManager.enqueue('mixed-retry-observability-provider', request);
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+
+      await vi.advanceTimersByTimeAsync(150);
+      await vi.advanceTimersByTimeAsync(10000);
+      await vi.advanceTimersByTimeAsync(10000);
+      await expect(outcome).resolves.toEqual({ value: 'Success' });
+
+      const processingLogs = loggerMock.debug.mock.calls
+        .filter(([message]) => message.startsWith('Processing item mixed-retry-observability-provider-'))
+        .map(([message]) => message);
+      const retryLogs = loggerMock.warn.mock.calls
+        .filter(([message]) => message.startsWith('Item mixed-retry-observability-provider-'))
+        .map(([message]) => message);
+
+      expect(processingLogs).toHaveLength(3);
+      expect(processingLogs[0]).toMatch(/\(attempt 1\)$/);
+      expect(processingLogs[1]).toMatch(/\(attempt 2\/4\)$/);
+      expect(processingLogs[2]).toMatch(/\(attempt 3\/3\)$/);
+      expect(retryLogs).toEqual([
+        expect.stringMatching(/next attempt 2\/4/),
+        expect.stringMatching(/next attempt 3\/3/),
+      ]);
+      expect(request).toHaveBeenCalledTimes(3);
+    });
+
     it('should retry a failed request with exponential backoff', async () => {
       // RATE_LIMIT_REACHED: baseDelay 2000. Jittered (0.75x) = 1500ms.
-      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
+      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode: 429, message: 'Rate limit' };
       
       const mockRequest = vi.fn()
         .mockRejectedValueOnce(mockError)
@@ -123,6 +200,196 @@ describe('QueueManager', () => {
       expect(result).toBe('Success');
     });
 
+    it('uses request-local RATE_LIMIT_REACHED maxExecutions without changing generic strategy', async () => {
+      const rateLimitError = { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'Rate limit' };
+      const request = vi.fn().mockRejectedValue(rateLimitError);
+      const queueRetryPolicy = { maxExecutions: { RATE_LIMIT_REACHED: 3 } };
+      const promise = queueManager.enqueue('configured-rate-limit-provider', request, 0, 'unknown', {
+        queueRetryPolicy,
+      });
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+      promise.catch(() => {});
+
+      queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = 5;
+      await vi.advanceTimersByTimeAsync(10000);
+
+      await expect(outcome).resolves.toEqual({ error: rateLimitError });
+      expect(request).toHaveBeenCalledTimes(3);
+
+      const genericRequest = vi.fn()
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValue('Success');
+      const genericPromise = queueManager.enqueue('generic-rate-limit-provider', genericRequest);
+      const genericOutcome = genericPromise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+      genericPromise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(30000);
+      await expect(genericOutcome).resolves.toEqual({ value: 'Success' });
+      expect(genericRequest).toHaveBeenCalledTimes(5);
+    });
+
+    it.each([
+      [ErrorTypes.SERVER_ERROR, 3],
+      [ErrorTypes.NETWORK_ERROR, 4],
+      [ErrorTypes.MODEL_OVERLOADED, 4],
+      [ErrorTypes.TRANSLATION_TIMEOUT, 1],
+      [ErrorTypes.OPERATION_TIMEOUT, 1],
+    ])('keeps generic %s budget with a RATE_LIMIT_REACHED-only override', async (errorType, expectedExecutions) => {
+      const error = { type: errorType, message: errorType };
+      const request = vi.fn().mockRejectedValue(error);
+      const promise = queueManager.enqueue(`unrelated-${errorType}`, request, 0, 'unknown', {
+        queueRetryPolicy: { maxExecutions: { RATE_LIMIT_REACHED: 3 } },
+      });
+      const outcome = promise.then(
+        value => ({ value }),
+        error => ({ error }),
+      );
+
+      await vi.advanceTimersByTimeAsync(30000);
+      await expect(outcome).resolves.toEqual({ error });
+      expect(request).toHaveBeenCalledTimes(expectedExecutions);
+    });
+
+    it.each([ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.OPERATION_TIMEOUT])(
+      'does not retry terminal %s',
+      async (timeoutType) => {
+        const timeoutError = Object.assign(new Error(`${timeoutType} deadline`), {
+          type: timeoutType,
+        });
+        const request = vi.fn().mockRejectedValue(timeoutError);
+        const promise = queueManager.enqueue(`terminal-${timeoutType}`, request);
+
+        await expect(promise).rejects.toBe(timeoutError);
+        await vi.advanceTimersByTimeAsync(10000);
+
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(queueManager.retryTimeouts.size).toBe(0);
+        expect(queueManager.getQueueStatus(`terminal-${timeoutType}`).total).toBe(0);
+      },
+    );
+
+    it('waits for Retry-After when it exceeds client retry delay', async () => {
+      const retryableError = {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        retryAt: Date.now() + 10000,
+      };
+      const request = vi.fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockResolvedValue('Success');
+      const promise = queueManager.enqueue('retry-after-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(9849);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(promise).resolves.toBe('Success');
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps client retry delay when Retry-After expires sooner', async () => {
+      const retryableError = {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        retryAt: Date.now() + 500,
+      };
+      const request = vi.fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockResolvedValue('Success');
+      const promise = queueManager.enqueue('short-retry-after-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1349);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      await expect(promise).resolves.toBe('Success');
+      expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry earlier than a very long Retry-After', async () => {
+      const retryableError = {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        retryAt: Date.now() + 2_147_483_648,
+      };
+      const request = vi.fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockResolvedValue('Success');
+      const promise = queueManager.enqueue('long-retry-after-provider', request);
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(request).toHaveBeenCalledTimes(1);
+      queueManager.cancelProvider('long-retry-after-provider');
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+    });
+
+    it('does not start a scheduled retry after operation abort', async () => {
+      const abortController = new AbortController();
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(serverError);
+      const promise = queueManager.enqueue('aborted-operation-provider', request, 0, 'select_element', {
+        messageId: 'aborted-operation',
+        abortController,
+      });
+      promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(1);
+
+      abortController.abort('provider-fail-fast');
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      await expect(promise).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+    });
+
+    it('detaches root circuit item before fail-fast abort reaches its signal', async () => {
+      const abortController = new AbortController();
+      const circuitError = Object.assign(new Error('Circuit open'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(circuitError);
+      const promise = queueManager.enqueue('root-circuit-provider', request, 0, 'select_element', {
+        messageId: 'root-circuit-operation',
+        abortController,
+      });
+
+      const rejection = await promise.catch((error) => error);
+      expect(rejection).toMatchObject({
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+
+      abortController.abort('provider-fail-fast');
+
+      expect(rejection).not.toHaveProperty('operationAborted');
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
     it('should fail permanently after max retries', async () => {
       const mockError = new Error('Network');
       mockError.type = ErrorTypes.NETWORK_ERROR;
@@ -141,6 +408,102 @@ describe('QueueManager', () => {
 
       await expect(promise).rejects.toThrow('Network');
       expect(mockRequest).toHaveBeenCalledTimes(4);
+    });
+
+    it.each([
+      ['mixed network/server', () => [
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        }),
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.SERVER_ERROR, 500],
+      ['pure network', () => [
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('Failed to fetch'), { type: ErrorTypes.NETWORK_ERROR }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.NETWORK_ERROR,
+        }),
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.NETWORK_ERROR, undefined],
+      ['pure server', () => [
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('HTTP 500'), { type: ErrorTypes.SERVER_ERROR, statusCode: 500 }),
+        Object.assign(new Error('Circuit open'), {
+          type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+          originalType: ErrorTypes.SERVER_ERROR,
+          statusCode: 500,
+        }),
+      ], ErrorTypes.CIRCUIT_BREAKER_OPEN, ErrorTypes.SERVER_ERROR, 500],
+    ])('preserves operational circuit identity for %s', async (_label, createErrors, expectedType, expectedOriginalType, expectedStatus) => {
+      const errors = createErrors();
+      const request = vi.fn()
+        .mockRejectedValueOnce(errors[0])
+        .mockRejectedValueOnce(errors[1])
+        .mockRejectedValueOnce(errors[2]);
+      const promise = queueManager.enqueue('terminal-cause-provider', request);
+      const rejection = promise.catch(error => error);
+
+      await vi.advanceTimersByTimeAsync(10000);
+      const terminalError = await rejection;
+      expect(terminalError).toMatchObject({ type: expectedType, originalType: expectedOriginalType });
+      expect(terminalError).not.toBe(errors[0]);
+      if (expectedStatus === undefined) {
+        expect(terminalError).not.toHaveProperty('statusCode');
+      } else {
+        expect(terminalError).toMatchObject({ statusCode: expectedStatus });
+      }
+      expect(request).toHaveBeenCalledTimes(3);
+
+      if (_label === 'mixed network/server') {
+        const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+        expect(mapCanonicalTranslationError(terminalError)).toMatchObject({
+          type: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+          messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+        });
+      }
+    });
+
+    it('returns non-circuit SERVER_ERROR unchanged after bounded retries', async () => {
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const request = vi.fn().mockRejectedValue(serverError);
+      const promise = queueManager.enqueue('server-only-provider', request);
+      const rejection = expect(promise).rejects.toBe(serverError);
+
+      await vi.advanceTimersByTimeAsync(10000);
+
+      await rejection;
+      expect(request).toHaveBeenCalledTimes(3);
+    });
+
+    it('preserves HTTP 402 semantic type on permanent failure', async () => {
+      const paymentError = Object.assign(new Error('HTTP 402'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+      const request = vi.fn().mockRejectedValue(paymentError);
+      const promise = queueManager.enqueue('payment-provider', request);
+
+      await expect(promise).rejects.toBe(paymentError);
+      expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry insufficient balance when status is 429', async () => {
+      const paymentError = Object.assign(new Error('No credits remaining'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      const request = vi.fn().mockRejectedValue(paymentError);
+      const promise = queueManager.enqueue('quota-provider', request);
+
+      await expect(promise).rejects.toBe(paymentError);
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
     });
   });
 
@@ -388,6 +751,86 @@ describe('QueueManager', () => {
       await expect(p1).resolves.toBe(textTooLongError);
       await expect(p2).resolves.toBe('task2-ok');
       expect(queueManager.getQueueStatus('progress-provider').total).toBe(0);
+    });
+  });
+
+  describe('provider HTTP TEXT_EMPTY', () => {
+    it.each([400, 422])('does not retry HTTP %s TEXT_EMPTY errors', async (statusCode) => {
+      const error = { type: ErrorTypes.TEXT_EMPTY, statusCode, message: 'Text is empty' };
+      const request = vi.fn().mockRejectedValue(error);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue('provider-empty', request, 0, 'context', { executionContext });
+      const rejection = expect(promise).rejects.toBe(error);
+
+      await vi.advanceTimersByTimeAsync(150);
+      await rejection;
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+  });
+
+  describe('deterministic client HTTP_ERROR', () => {
+    it.each([400, 404, 422])('does not retry HTTP %s errors', async (statusCode) => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode, message: `HTTP ${statusCode}` };
+      const request = vi.fn().mockRejectedValue(error);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue(`deterministic-http-${statusCode}`, request, 0, 'context', { executionContext });
+      const rejection = expect(promise).rejects.toBe(error);
+
+      await vi.advanceTimersByTimeAsync(150);
+      await rejection;
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+  });
+
+  describe('provider request-size HTTP_ERROR', () => {
+    it.each([
+      [400, 'request is too long'],
+      [422, 'maximum context length exceeded'],
+      [413, 'Payload Too Large'],
+    ])('does not retry HTTP %s remote-size errors', async (statusCode, message) => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode, message };
+      const request = vi.fn().mockRejectedValue(error);
+      const executionContext = { operation: { appendDiagnostic: vi.fn() } };
+
+      const promise = queueManager.enqueue('provider-size', request, 0, 'context', { executionContext });
+      const rejection = expect(promise).rejects.toBe(error);
+
+      await vi.advanceTimersByTimeAsync(150);
+      await rejection;
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+      expect(executionContext.operation.appendDiagnostic).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'QUEUE_RETRY' })
+      );
+    });
+
+    it('retains retries for HTTP_ERROR 409', async () => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode: 409, message: 'Conflict' };
+      const request = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('healthy');
+
+      const promise = queueManager.enqueue('ordinary-http', request);
+      await vi.advanceTimersByTimeAsync(150);
+      expect(request).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(3000);
+
+      await expect(promise).resolves.toBe('healthy');
+      expect(request).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -10,6 +10,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { isUserCancellationReason, normalizeOperationAbortReason } from '@/shared/error-management/CancellationPolicy.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingTimeoutManager');
 
@@ -159,8 +160,11 @@ export class StreamingTimeoutManager {
     streamState.lastError = error;
 
     // Handle both Error objects and cancellation info objects
+    const isOperationAbort = error.operationAborted === true;
     if (error.isCancellation || error.type === ErrorTypes.USER_CANCELLED) {
       logger.debug(`Streaming cancelled for ${messageId}:`, error.message || error);
+    } else if (isOperationAbort) {
+      logger.debug(`Streaming operation aborted for ${messageId}:`, error.message || error);
     } else {
       logger.debug(`Streaming error for ${messageId}:`, error);
     }
@@ -189,6 +193,14 @@ export class StreamingTimeoutManager {
         type: ErrorTypes.USER_CANCELLED,
         reason: error.message || error.reason,
         messageId
+      });
+    } else if (isOperationAbort) {
+      streamState.resolve({
+        success: false,
+        error,
+        messageId,
+        timedOut: false,
+        cancelled: false,
       });
     } else {
       // Use centralized error handling and resolve instead of reject to avoid uncaught promise
@@ -249,12 +261,18 @@ export class StreamingTimeoutManager {
     // Mark as cancelled for timeout detection
     streamState.isCancelled = true;
 
-    // Create cancellation object for logging purposes (not for throwing)
-    const cancellationInfo = {
-      message: reason,
-      type: ErrorTypes.USER_CANCELLED,
-      isCancellation: true
-    };
+    const isUserCancellation = isUserCancellationReason(reason);
+    const cancellationInfo = isUserCancellation
+      ? {
+          message: reason,
+          type: ErrorTypes.USER_CANCELLED,
+          isCancellation: true
+        }
+      : {
+          message: reason,
+          operationAborted: true,
+          cancellationReason: normalizeOperationAbortReason(reason),
+        };
 
     // Handle cancellation gracefully
     try {
@@ -289,6 +307,22 @@ export class StreamingTimeoutManager {
       return true;
     }
     return !streamState.isCompleted && !streamState.isCancelled && !streamState.hasTimedOut;
+  }
+
+  /**
+   * Read terminal state for lifecycle owners that need to preserve identity.
+   * @param {string} messageId - Unique message ID
+   * @returns {{isCancelled: boolean, hasTimedOut: boolean, isCompleted: boolean}|null}
+   */
+  getOperationState(messageId) {
+    const streamState = this.activeStreams.get(messageId);
+    if (!streamState) return null;
+
+    return {
+      isCancelled: streamState.isCancelled,
+      hasTimedOut: streamState.hasTimedOut,
+      isCompleted: streamState.isCompleted,
+    };
   }
 
   /**

@@ -189,6 +189,7 @@ export class PdfTranslationCoordinator {
       let translatedCount = 0
       let failedCount = 0
       let firstError = ''
+      let firstErrorDetails = null
       let firstFailureReason = ''
 
       for (const batch of batches) {
@@ -217,12 +218,11 @@ export class PdfTranslationCoordinator {
             })
           )
         } catch (error) {
+          const errorDetails = MessageFormat.serializeTranslationError(error)
           response = {
             success: false,
-            error: {
-              message: error?.message || 'PDF translation failed',
-              type: error?.type
-            }
+            error: errorDetails.message,
+            errorDetails
           }
         } finally {
           this.activeRequestIds.delete(messageId)
@@ -244,6 +244,9 @@ export class PdfTranslationCoordinator {
         if (!firstError && response?.success === false && batchFailure) {
           firstError = batchFailure.error || 'PDF translation failed'
         }
+        if (!firstErrorDetails && batchFailure?.errorDetails) {
+          firstErrorDetails = batchFailure.errorDetails
+        }
 
         const batchCounts = this._applyBatchResults(mappedResults, translationIntent)
         translatedCount += batchCounts.translatedCount
@@ -258,6 +261,7 @@ export class PdfTranslationCoordinator {
           totalCount: translatedCount + failedCount,
           translationOccurrenceId: runId,
           error: firstError,
+          ...(firstErrorDetails && { errorDetails: firstErrorDetails }),
           ...(firstFailureReason && { failureReason: firstFailureReason })
         }
         return this.lastSummary
@@ -267,10 +271,11 @@ export class PdfTranslationCoordinator {
         status: failedCount > 0 ? 'partial' : 'translated',
         translatedCount,
         failedCount,
-          totalCount: translatedCount + failedCount,
-          translationOccurrenceId: runId,
-          error: failedCount > 0 ? firstError : '',
-          ...(failedCount > 0 && { failureReason: firstFailureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN })
+        totalCount: translatedCount + failedCount,
+        translationOccurrenceId: runId,
+        error: failedCount > 0 ? firstError : '',
+        ...(failedCount > 0 && firstErrorDetails && { errorDetails: firstErrorDetails }),
+        ...(failedCount > 0 && { failureReason: firstFailureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN })
       }
 
       return this.lastSummary
@@ -338,35 +343,36 @@ export class PdfTranslationCoordinator {
           provider: result.provider || '',
           sourceLanguage: result.sourceLanguage || '',
           targetLanguage: result.targetLanguage || '',
+          sourceTextHash: result.sourceTextHash || '',
+          error: result.error || 'PDF translation failed',
+          ...(result.errorDetails && { errorDetails: result.errorDetails }),
+          failureReason: result.failureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
+        })
+        continue
+      }
+
+      translatedCount += 1
+      const currentState = this.session.getBlockTranslationState(result.blockId)
+      const mergedTranslatedCells = mergeStructuredTranslatedCells(
+        currentState?.translatedCells || null,
+        result.translatedCells || null
+      )
+      const nextTranslatedText = mergedTranslatedCells
+        ? deriveStructuredTranslatedText(mergedTranslatedCells)
+        : result.translatedText
+
+      this.session.setBlockTranslationState(result.blockId, {
+        translatedText: nextTranslatedText,
+        translatedCells: mergedTranslatedCells,
+        status: 'translated',
+        provider: result.provider || '',
+        sourceLanguage: result.sourceLanguage || '',
+        targetLanguage: result.targetLanguage || '',
         sourceTextHash: result.sourceTextHash || '',
-        error: result.error || 'PDF translation failed',
-        failureReason: result.failureReason || PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
+        translationSettingsHash: translationIntent.translationSettingsHash || '',
+        error: null,
+        failureReason: null
       })
-      continue
-    }
-
-    translatedCount += 1
-    const currentState = this.session.getBlockTranslationState(result.blockId)
-    const mergedTranslatedCells = mergeStructuredTranslatedCells(
-      currentState?.translatedCells || null,
-      result.translatedCells || null
-    )
-    const nextTranslatedText = mergedTranslatedCells
-      ? deriveStructuredTranslatedText(mergedTranslatedCells)
-      : result.translatedText
-
-    this.session.setBlockTranslationState(result.blockId, {
-      translatedText: nextTranslatedText,
-      translatedCells: mergedTranslatedCells,
-      status: 'translated',
-      provider: result.provider || '',
-      sourceLanguage: result.sourceLanguage || '',
-      targetLanguage: result.targetLanguage || '',
-      sourceTextHash: result.sourceTextHash || '',
-      translationSettingsHash: translationIntent.translationSettingsHash || '',
-      error: null,
-      failureReason: null
-    })
     }
 
     const blockIds = batchResults.map((result) => result?.blockId).filter(Boolean)

@@ -22,10 +22,12 @@ export async function handleCheckTranslationStatus(request, sender) {
       };
     }
 
+    const isFallbackMessage = messageId.startsWith('fb-') || messageId.startsWith('fallback-');
+
     logger.debug('[CheckTranslationStatus] Status check request received', {
       messageId,
       tabId: sender.tab?.id,
-      isFallback: messageId.startsWith('fallback-')
+      isFallback: isFallbackMessage
     });
 
     // Get the translation engine instance
@@ -41,7 +43,7 @@ export async function handleCheckTranslationStatus(request, sender) {
 
     // Check if this is a fallback request - we should never consider fallback requests as completed
     // since they're created when the original request timed out
-    if (messageId.startsWith('fallback-')) {
+    if (isFallbackMessage) {
       logger.debug('[CheckTranslationStatus] Fallback request detected - never considered completed', { messageId });
       return {
         success: true,

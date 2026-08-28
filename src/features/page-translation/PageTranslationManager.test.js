@@ -40,19 +40,24 @@ vi.mock('./PageTranslationHelper.js', () => ({
   }
 }));
 
-vi.mock('./PageTranslationScheduler.js', () => ({
-  PageTranslationScheduler: class {
-    constructor() {
-      this.reset = vi.fn();
-      this.setSettings = vi.fn();
-      this.setTranslationState = vi.fn();
-      this.enqueue = vi.fn();
-      this.translatedCount = 0;
-      this.signalScrollStop = vi.fn();
-      this.signalScrollStart = vi.fn();
+  vi.mock('./PageTranslationScheduler.js', () => ({
+    PageTranslationScheduler: class {
+      constructor({ onFatalError, onLifecycleEvent, onInternalError } = {}) {
+        this.onFatalError = onFatalError;
+        this.onLifecycleEvent = onLifecycleEvent;
+        this.onInternalError = onInternalError;
+        this.reset = vi.fn();
+        this.setSettings = vi.fn();
+        this.setTranslationState = vi.fn();
+        this.enqueue = vi.fn();
+        this.translatedCount = 0;
+        this.translationSessionId = null;
+        this.sessionContext = null;
+        this.signalScrollStop = vi.fn();
+        this.signalScrollStart = vi.fn();
+      }
     }
-  }
-}));
+  }));
 
 vi.mock('./PageTranslationBridge.js', () => ({
   PageTranslationBridge: class {
@@ -163,11 +168,26 @@ vi.stubGlobal('location', {
 
 import { PageTranslationManager } from './PageTranslationManager.js';
 import { PageTranslationHelper } from './PageTranslationHelper.js';
+import { PageTranslationSettingsLoader } from './utils/PageTranslationSettingsLoader.js';
+import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 describe('PageTranslationManager', () => {
   let manager;
+
+  const createDeferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((promiseResolve, promiseReject) => {
+      resolve = promiseResolve;
+      reject = promiseReject;
+    });
+    return { promise, resolve, reject };
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -180,8 +200,8 @@ describe('PageTranslationManager', () => {
     document.body.innerHTML = '<div>Original Content</div>';
   });
 
-  afterEach(() => {
-    manager.cleanup();
+  afterEach(async () => {
+    await manager.cleanup();
   });
 
   describe('Activation', () => {
@@ -194,6 +214,40 @@ describe('PageTranslationManager', () => {
   });
 
   describe('Translation Lifecycle', () => {
+    it('publishes aggregate lifecycle through trusted runtime transport', async () => {
+      const data = { translatedCount: 2, totalCount: 3, frameUrl: 'fake' };
+
+      await manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, data);
+
+      expect(sendRegularMessage).toHaveBeenCalledWith({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: {
+          action: MessageActions.PAGE_TRANSLATE_PROGRESS,
+          data,
+        },
+        context: 'page-translation-frame-lifecycle',
+      }, { silent: true });
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_PROGRESS, data);
+    });
+
+    it('publishes non-fatal scheduler errors through trusted lifecycle transport', () => {
+      const error = Object.assign(new Error('provider failure'), { type: ErrorTypes.MODEL_MISSING });
+
+      manager.scheduler.onInternalError({
+        error,
+        errorType: ErrorTypes.MODEL_MISSING,
+        isFatal: false,
+      });
+
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_TRANSLATE_ERROR,
+          data: expect.objectContaining({ isFatal: false }),
+        }),
+      }), { silent: true });
+    });
+
     it('should start translation successfully', async () => {
       await manager.activate();
       const result = await manager.translatePage();
@@ -203,10 +257,107 @@ describe('PageTranslationManager', () => {
       expect(manager.bridge.initialize).toHaveBeenCalled();
       expect(manager.bridge.translate).toHaveBeenCalledWith(document.body);
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.any(Object));
+      const startData = pageEventBus.emit.mock.calls.find(([action]) => action === MessageActions.PAGE_TRANSLATE_START)[1];
+      expect(startData).toMatchObject({
+        messageId: result.messageId,
+        sessionId: result.messageId,
+      });
       
       // Check for layout fix injection
       expect(document.getElementById('ti-translation-layout-fix')).not.toBeNull();
       expect(document.documentElement.classList.contains('ti-translation-active')).toBe(true);
+    });
+
+    it('handles matching scheduler fatal callback once', () => {
+      const sessionContext = Symbol('session-context');
+      manager.isTranslating = true;
+      manager.translationMessageId = 'session-b';
+      manager.sessionContext = sessionContext;
+      manager.scheduler.translationSessionId = 'session-b';
+      const handleFatalError = vi.spyOn(manager, '_handleFatalError').mockImplementation(() => {});
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('fatal'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-b',
+        sessionContext,
+        context: 'page-translation-batch',
+      })).toBe(true);
+
+      expect(handleFatalError).toHaveBeenCalledOnce();
+      expect(handleFatalError).toHaveBeenCalledWith(expect.any(Error), ErrorTypes.SERVER_ERROR, undefined, 'session-b');
+    });
+
+    it('ignores stale scheduler fatal callback from an older session', () => {
+      const currentContext = Symbol('current-context');
+      manager.isTranslating = true;
+      manager.translationMessageId = 'session-b';
+      manager.sessionContext = currentContext;
+      manager.scheduler.translationSessionId = 'session-b';
+      const handleFatalError = vi.spyOn(manager, '_handleFatalError').mockImplementation(() => {});
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('stale fatal'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-a',
+        sessionContext: Symbol('stale-context'),
+        context: 'page-translation-scheduler',
+      })).toBe(false);
+
+      expect(handleFatalError).not.toHaveBeenCalled();
+      expect(manager.isTranslating).toBe(true);
+      expect(manager.translationMessageId).toBe('session-b');
+    });
+
+    it('requires matching session context and accepted scheduler identity', () => {
+      const currentContext = Symbol('current-context');
+      manager.isTranslating = true;
+      manager.translationMessageId = 'session-b';
+      manager.sessionContext = currentContext;
+      const handleFatalError = vi.spyOn(manager, '_handleFatalError').mockImplementation(() => {});
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('wrong context'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-b',
+        sessionContext: Symbol('wrong-context'),
+      })).toBe(false);
+
+      expect(manager.scheduler.onFatalError({
+        error: new Error('pre-start'),
+        errorType: ErrorTypes.SERVER_ERROR,
+        sessionId: 'session-b',
+        sessionContext: currentContext,
+      })).toBe(false);
+
+      expect(handleFatalError).not.toHaveBeenCalled();
+    });
+
+    it('resolves Select Element conflict before Whole Page admission', async () => {
+      const resolveFeatureConflict = vi.fn().mockResolvedValue(undefined);
+      manager = new PageTranslationManager({ featureManager: { resolveFeatureConflict } });
+      await manager.activate();
+
+      await manager.translatePage();
+
+      expect(resolveFeatureConflict).toHaveBeenCalledWith('pageTranslation');
+      expect(resolveFeatureConflict.mock.invocationCallOrder[0]).toBeLessThan(
+        pageEventBus.emit.mock.invocationCallOrder.find((callOrder, index) => (
+          pageEventBus.emit.mock.calls[index][0] === MessageActions.PAGE_TRANSLATE_START
+            ? callOrder
+            : false
+        ))
+      );
+    });
+
+    it('propagates trusted conflict failures through translatePage error handling', async () => {
+      const error = Object.assign(new Error('Select Element teardown failed'), { type: ErrorTypes.API_ERROR });
+      manager = new PageTranslationManager({
+        featureManager: { resolveFeatureConflict: vi.fn().mockRejectedValue(error) },
+      });
+      await manager.activate();
+
+      await expect(manager.translatePage()).rejects.toBe(error);
     });
 
     it('should not translate if already translating', async () => {
@@ -226,30 +377,111 @@ describe('PageTranslationManager', () => {
 
     it('should restore page correctly', async () => {
       await manager.activate();
-      await manager.translatePage();
+      const { messageId } = await manager.translatePage();
+      manager.scheduler.setTranslationState.mockClear();
       
-      const result = await manager.restorePage();
+      const result = await manager.restorePage({ manual: true });
       
       expect(result.success).toBe(true);
       expect(manager.isTranslated).toBe(false);
       expect(manager.bridge.restore).toHaveBeenCalled();
       expect(PageTranslationHelper.deepCleanDOM).toHaveBeenCalled();
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+      );
       
       // Check layout fix removal
       expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
       expect(document.documentElement.classList.contains('ti-translation-active')).toBe(false);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: messageId })
+      );
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
     });
 
     it('should stop auto-translation without full restore', async () => {
       manager.isAutoTranslating = true;
       manager.isTranslating = true;
+      manager.translationMessageId = 'stop-session';
+      manager.acceptedLifecycleSessionId = 'stop-session';
       
       const result = await manager.stopAutoTranslation();
       
       expect(result.success).toBe(true);
       expect(manager.isAutoTranslating).toBe(false);
       expect(manager.bridge.stopPersistence).toHaveBeenCalled();
-      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+      );
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_AUTO_RESTORE_COMPLETE,
+          data: expect.objectContaining({
+            isAutoTranslating: false,
+            sessionId: 'stop-session',
+          }),
+        }),
+      }), { silent: true });
+      expect(manager.acceptedLifecycleSessionId).toBe('stop-session');
+
+      await manager.restorePage();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: 'stop-session' })
+      );
+    });
+
+    it('updates completion state through trusted scheduler callback', () => {
+      manager.isTranslating = true;
+      manager.isTranslated = false;
+
+      manager.scheduler.onLifecycleEvent(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+        sessionId: 'scheduler-session',
+        translatedCount: 2,
+        totalCount: 2,
+        failedCount: 0,
+      });
+
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isTranslated).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+          data: expect.objectContaining({ sessionId: 'scheduler-session' }),
+        }),
+      }), { silent: true });
+    });
+
+    it('preserves auto mode while trusted scheduler idle clears active translation', () => {
+      manager.isTranslating = true;
+      manager.isTranslated = false;
+      manager.isAutoTranslating = true;
+
+      manager.scheduler.onLifecycleEvent(MessageActions.PAGE_TRANSLATE_IDLE, {
+        sessionId: 'scheduler-session',
+        translatedCount: 2,
+        totalCount: 2,
+        failedCount: 0,
+        isAutoTranslating: true,
+      });
+
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isTranslated).toBe(true);
+      expect(manager.isAutoTranslating).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          action: MessageActions.PAGE_TRANSLATE_IDLE,
+          data: expect.objectContaining({ sessionId: 'scheduler-session' }),
+        }),
+      }), { silent: true });
     });
 
     it('should link bridge callback to scheduler enqueue', async () => {
@@ -266,16 +498,363 @@ describe('PageTranslationManager', () => {
       
       expect(manager.scheduler.enqueue).toHaveBeenCalledWith('Hello', { id: 'ctx' }, 1, mockNode);
     });
+
+    it('settles silently when bridge initialization fails after START', async () => {
+      const error = Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT });
+      manager.bridge.initialize.mockRejectedValueOnce(error);
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isAutoTranslating).toBe(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
+      expect(manager.scrollTracker.stop).toHaveBeenCalled();
+      expect(manager.bridge.stopPersistence).toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0,
+        isTranslated: false,
+        isTranslating: false,
+        isAutoTranslating: false
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+    });
+
+    it('does not emit IDLE for silent failure before START', async () => {
+      await manager.activate();
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(
+        Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT })
+      );
+      const result = await manager.translatePage();
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.abortController).toBeNull();
+      expect(manager.translationMessageId).toBeNull();
+      expect(manager.sessionContext).toBeNull();
+      expect(document.documentElement.classList.contains('ti-translation-active')).toBe(false);
+      expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
+      expect(sendRegularMessage.mock.calls.some(([message]) => (
+        message.action === MessageActions.CANCEL_SESSION
+      ))).toBe(false);
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('cleans provisional resources on non-silent settings failure', async () => {
+      const error = Object.assign(new Error('settings failure'), { type: ErrorTypes.API_ERROR });
+      await manager.activate();
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(error);
+
+      await expect(manager.translatePage()).rejects.toBe(error);
+
+      expect(manager.abortController).toBeNull();
+      expect(manager.translationMessageId).toBeNull();
+      expect(manager.sessionContext).toBeNull();
+      expect(document.documentElement.classList.contains('ti-translation-active')).toBe(false);
+      expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
+      expect(sendRegularMessage.mock.calls.some(([message]) => (
+        message.action === MessageActions.CANCEL_SESSION
+      ))).toBe(false);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        error: error.message,
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('does not leak a prior START into a later pre-START silent failure', async () => {
+      await manager.activate();
+      await manager.translatePage();
+      manager.isTranslating = false;
+      manager.isTranslated = true;
+
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(
+        Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT })
+      );
+      const emittedBeforeSecondAttempt = pageEventBus.emit.mock.calls.length;
+
+      const result = await manager.translatePage({ isAuto: true });
+      const secondAttemptEvents = pageEventBus.emit.mock.calls.slice(emittedBeforeSecondAttempt);
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(secondAttemptEvents).not.toContainEqual([MessageActions.PAGE_TRANSLATE_START, expect.anything()]);
+      expect(secondAttemptEvents).not.toContainEqual([MessageActions.PAGE_TRANSLATE_IDLE, expect.anything()]);
+      expect(manager.isTranslating).toBe(false);
+    });
+
+    it('settles silently when bridge translation fails after initialization', async () => {
+      const error = Object.assign(new Error('context lost'), { type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      manager.bridge.translate.mockImplementationOnce(() => { throw error; });
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 0,
+        isTranslated: false
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+    });
+
+    it('preserves partial counts and DOM state during silent settlement', async () => {
+      manager.scheduler.translatedCount = 2;
+      manager.scheduler.failedCount = 1;
+      manager.scheduler.totalTasks = 3;
+      manager.bridge.translate.mockImplementationOnce(() => {
+        throw Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT });
+      });
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result.reason).toBe('silent_error');
+      expect(manager.isTranslated).toBe(true);
+      expect(manager.bridge.restore).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 2,
+        failedCount: 1,
+        totalCount: 3,
+        isTranslated: true,
+        isTranslating: false,
+        isAutoTranslating: false
+      }));
+
+      const sessionId = manager.acceptedLifecycleSessionId;
+      await manager.restorePage();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId })
+      );
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
+    });
+
+    it('settles non-lazy zero-work translation without error presentation', async () => {
+      manager.scheduler.totalTasks = 0;
+
+      await manager.activate();
+      const result = await manager.translatePage();
+
+      expect(result.success).toBe(true);
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isTranslated).toBe(false);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.objectContaining({
+        translatedCount: 0,
+        failedCount: 0,
+        totalCount: 0,
+        isTranslated: false
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
+      expect(manager.acceptedLifecycleSessionId).toBe(result.messageId);
+
+      await manager.restorePage();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: result.messageId })
+      );
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
+    });
+
+    it('keeps non-silent setup failures on the existing error path', async () => {
+      const error = Object.assign(new Error('provider failure'), { type: ErrorTypes.API_ERROR });
+      manager.bridge.initialize.mockRejectedValueOnce(error);
+
+      await manager.activate();
+      await expect(manager.translatePage()).rejects.toBe(error);
+
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        error: error.message
+      }));
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('keeps explicit cancellation on restore lifecycle', async () => {
+      await manager.activate();
+      const { messageId } = await manager.translatePage();
+
+      manager.cancelTranslation();
+
+      expect(manager.bridge.restore).toHaveBeenCalled();
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+      );
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_CANCELLED,
+        expect.objectContaining({ sessionId: messageId })
+      );
+      await vi.waitFor(() => expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: messageId })
+      ));
+    });
+
+    it('sends CANCEL_SESSION for admitted session restore', async () => {
+      const sessionId = 'admitted-session';
+      manager.translationMessageId = sessionId;
+      manager.scheduler.translationSessionId = sessionId;
+      sendRegularMessage.mockClear();
+
+      await manager.restorePage();
+
+      expect(sendRegularMessage.mock.calls.filter(([message]) => (
+        message.action === MessageActions.CANCEL_SESSION
+      ))).toEqual([
+        [expect.objectContaining({
+          action: MessageActions.CANCEL_SESSION,
+          data: { sessionId },
+        })]
+      ]);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
+    });
+
+    it('replaces a silently settled lifecycle identity without clearing the replacement during stale restore completion', async () => {
+      manager.scheduler.totalTasks = 0;
+      await manager.activate();
+      const first = await manager.translatePage();
+      const restoring = manager.restorePage();
+      const second = await manager.translatePage();
+
+      await restoring;
+
+      expect(manager.acceptedLifecycleSessionId).toBe(second.messageId);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.objectContaining({ sessionId: first.messageId })
+      );
+    });
   });
 
   describe('Error Handling', () => {
-    it('should handle fatal errors by stopping translation', () => {
+    it('should handle fatal errors by stopping translation and presenting safely', async () => {
       const error = new Error('Fatal failure');
-      manager._handleFatalError(error, 'TEST_ERROR');
+      Object.assign(error, {
+        type: ErrorTypes.API_ERROR,
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        cause: 'private',
+        arbitrary: { ignored: true }
+      });
+      manager.isTranslating = true;
+      manager.isAutoTranslating = true;
+      manager._handleFatalError(error, ErrorTypes.API_ERROR);
       
       expect(manager.isTranslating).toBe(false);
       expect(manager.isAutoTranslating).toBe(false);
+      expect(manager.scheduler.setTranslationState).toHaveBeenCalledWith(
+        false,
+        undefined,
+        undefined,
+        'operation-abort'
+      );
       expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_PROGRESS, expect.objectContaining({ status: 'idle' }));
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        error: 'Fatal failure',
+         errorType: ErrorTypes.API_ERROR,
+        isFatal: true,
+        errorDetails: expect.objectContaining({
+          message: 'Fatal failure',
+           type: ErrorTypes.API_ERROR,
+          originalType: 'HTTP_ERROR',
+          statusCode: 503,
+          providerName: 'Provider',
+          providerId: 'provider-id',
+          code: 'UPSTREAM_FAILURE',
+          errorCode: 'E_UPSTREAM'
+        })
+      }));
+      const errorEvent = pageEventBus.emit.mock.calls.find(([action]) => action === MessageActions.PAGE_TRANSLATE_ERROR)[1];
+      expect(errorEvent.errorDetails).not.toHaveProperty('cause');
+      expect(errorEvent.errorDetails).not.toHaveProperty('arbitrary');
+
+      await vi.waitFor(
+        () => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1),
+        { timeout: 5000 }
+      );
+      const handledError = ErrorHandler.getInstance().handle.mock.calls[0][0];
+      expect(handledError.message).not.toContain('Fatal failure');
+      expect(handledError.message).not.toContain('private');
+      expect(ErrorHandler.getInstance().handle.mock.calls[0][1]).toMatchObject({
+        type: ErrorTypes.API_ERROR,
+        context: 'page-translation-fatal',
+        showToast: true,
+      });
+    });
+
+    it('preserves translated state and publishes committed count after fatal partial termination', async () => {
+      manager.scheduler.translatedCount = 1;
+      manager.isTranslating = true;
+      const error = Object.assign(new Error('Fatal failure'), {
+        type: ErrorTypes.NETWORK_ERROR,
+      });
+
+      manager._handleFatalError(error, ErrorTypes.NETWORK_ERROR);
+
+      expect(manager.isTranslated).toBe(true);
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.objectContaining({
+        translatedCount: 1,
+        isFatal: true,
+      }));
+    });
+
+    it('does not present cancellation or context fatal errors', async () => {
+      manager._handleFatalError(Object.assign(new Error('cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+      }), ErrorTypes.USER_CANCELLED);
+      manager._handleFatalError(Object.assign(new Error('context lost'), {
+        type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED,
+      }), ErrorTypes.EXTENSION_CONTEXT_INVALIDATED);
+
+      await Promise.resolve();
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+    });
+
+    it('preserves local restore failure behavior outside translation presentation', async () => {
+      const error = new Error('local restore failure');
+      manager.translationMessageId = 'restore-session';
+      manager.acceptedLifecycleSessionId = 'restore-session';
+      manager.scheduler.translationSessionId = 'restore-session';
+      manager.bridge.restore.mockImplementationOnce(() => { throw error; });
+
+      await expect(manager.restorePage()).rejects.toBe(error);
+      expect(ErrorHandler.getInstance().handle).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_RESTORE_ERROR, expect.objectContaining({
+        error: error.message,
+        errorDetails: expect.objectContaining({ message: error.message }),
+        sessionId: 'restore-session',
+      }));
+      expect(manager.acceptedLifecycleSessionId).toBe('restore-session');
+
+      await manager.restorePage();
+      expect(manager.acceptedLifecycleSessionId).toBeNull();
     });
   });
 
@@ -341,6 +920,16 @@ describe('PageTranslationManager', () => {
       const result = await manager.translatePage({ isAuto: true });
       expect(result.success).toBe(false);
       expect(manager.autoStartCancelledUrls.has(window.location.href)).toBe(true);
+      expect(manager.abortController).toBeNull();
+      expect(manager.translationMessageId).toBeNull();
+      expect(manager.sessionContext).toBeNull();
+      expect(document.documentElement.classList.contains('ti-translation-active')).toBe(false);
+      expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
+      expect(sendRegularMessage.mock.calls.some(([message]) => (
+        message.action === MessageActions.CANCEL_SESSION
+      ))).toBe(false);
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
     });
 
     it('should not add URL to autoStartCancelledUrls when token warning is declined on manual start', async () => {
@@ -356,6 +945,205 @@ describe('PageTranslationManager', () => {
       const result = await manager.translatePage({ isAuto: false });
       expect(result.success).toBe(false);
       expect(manager.autoStartCancelledUrls.has(window.location.href)).toBe(false);
+    });
+
+    it('settles token-warning setup rejection instead of hanging', async () => {
+      const { findProviderById } = await import('@/features/translation/providers/ProviderManifest.js');
+      const { getTranslationString } = await import('@/utils/i18n/i18n.js');
+      const error = new Error('localization setup failed');
+      findProviderById.mockReturnValueOnce({ displayName: 'AI Provider', consumesTokens: true });
+      getTranslationString.mockRejectedValueOnce(error);
+
+      await manager.activate();
+      await expect(manager.translatePage()).rejects.toBe(error);
+
+      expect(manager.abortController).toBeNull();
+      expect(manager.translationMessageId).toBeNull();
+      expect(manager.sessionContext).toBeNull();
+      expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('preserves accepted same-URL auto state when new admission fails', async () => {
+      const previousContext = Symbol('previous-session');
+      const previousController = new AbortController();
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+      manager.isTranslated = true;
+      manager.isAutoTranslating = true;
+      manager.abortController = previousController;
+      manager.translationMessageId = 'previous-message';
+      manager.sessionContext = previousContext;
+      manager.scheduler.translatedCount = 4;
+      manager.scheduler.failedCount = 1;
+      manager.scheduler.totalTasks = 5;
+      manager.scheduler.translationSessionId = 'previous-session';
+      manager.scheduler.sessionContext = previousContext;
+      manager.bridge.session = { active: true };
+      manager._injectLayoutFix();
+      manager.scheduler.reset.mockClear();
+      manager.bridge.cleanup.mockClear();
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(
+        Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT })
+      );
+
+      const result = await manager.translatePage({ isAuto: true });
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.isTranslated).toBe(true);
+      expect(manager.isTranslating).toBe(false);
+      expect(manager.isAutoTranslating).toBe(true);
+      expect(manager.scheduler.reset).not.toHaveBeenCalled();
+      expect(manager.scheduler.translatedCount).toBe(4);
+      expect(manager.scheduler.failedCount).toBe(1);
+      expect(manager.scheduler.totalTasks).toBe(5);
+      expect(manager.scheduler.translationSessionId).toBe('previous-session');
+      expect(manager.scheduler.sessionContext).toBe(previousContext);
+      expect(manager.bridge.cleanup).not.toHaveBeenCalled();
+      expect(manager.bridge.session).toEqual({ active: true });
+      expect(manager.abortController).toBe(previousController);
+      expect(manager.translationMessageId).toBe('previous-message');
+      expect(manager.sessionContext).toBe(previousContext);
+      expect(document.documentElement.classList.contains('ti-translation-active')).toBe(true);
+      expect(document.getElementById('ti-translation-layout-fix')).not.toBeNull();
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('resets scheduler only after START admission', async () => {
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+      manager.scheduler.reset.mockClear();
+      pageEventBus.emit.mockClear();
+
+      const result = await manager.translatePage();
+      const startCall = pageEventBus.emit.mock.invocationCallOrder.find((callOrder, index) => (
+        pageEventBus.emit.mock.calls[index][0] === MessageActions.PAGE_TRANSLATE_START
+          ? callOrder
+          : false
+      ));
+
+      expect(result.success).toBe(true);
+      expect(startCall).toBeDefined();
+      expect(manager.scheduler.reset).toHaveBeenCalledOnce();
+      expect(manager.scheduler.reset.mock.invocationCallOrder[0]).toBeGreaterThan(startCall);
+    });
+
+    it('does not admit a settings continuation after cancellation', async () => {
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+      const settings = createDeferred();
+      PageTranslationSettingsLoader.load.mockImplementationOnce(() => settings.promise);
+      const pending = manager.translatePage();
+
+      await vi.waitFor(() => expect(manager.abortController).not.toBeNull());
+      const provisionalMessageId = manager.translationMessageId;
+      expect(provisionalMessageId).not.toBe(manager.scheduler.translationSessionId);
+      manager.cancelTranslation();
+      settings.resolve({
+        translationApi: 'google',
+        targetLanguage: 'fa',
+        lazyLoading: false,
+        autoTranslateOnDOMChanges: false,
+        showOriginalOnHover: true,
+        tokenWarningHidden: true,
+      });
+
+      const result = await pending;
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.bridge.initialize).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(sendRegularMessage.mock.calls.some(([message]) => (
+        message.action === MessageActions.CANCEL_SESSION
+      ))).toBe(false);
+      await vi.waitFor(() => expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.any(Object)
+      ));
+    });
+
+    it('does not admit a token confirmation after cancellation', async () => {
+      const { findProviderById } = await import('@/features/translation/providers/ProviderManifest.js');
+      const confirmation = createDeferred();
+      findProviderById.mockReturnValueOnce({ displayName: 'AI Provider', consumesTokens: true });
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+      manager._confirmTokenUsage = vi.fn(() => confirmation.promise);
+      const pending = manager.translatePage();
+
+      await vi.waitFor(() => expect(manager._confirmTokenUsage).toHaveBeenCalled());
+      manager.cancelTranslation();
+      confirmation.resolve(true);
+
+      const result = await pending;
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.bridge.initialize).not.toHaveBeenCalled();
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+      expect(sendRegularMessage.mock.calls.some(([message]) => (
+        message.action === MessageActions.CANCEL_SESSION
+      ))).toBe(false);
+      await vi.waitFor(() => expect(pageEventBus.emit).toHaveBeenCalledWith(
+        MessageActions.PAGE_RESTORE_COMPLETE,
+        expect.any(Object)
+      ));
+    });
+
+    it('does not admit a settings continuation after navigation', async () => {
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+      const settings = createDeferred();
+      PageTranslationSettingsLoader.load.mockImplementationOnce(() => settings.promise);
+      const pending = manager.translatePage();
+
+      await vi.waitFor(() => expect(manager.abortController).not.toBeNull());
+      vi.stubGlobal('location', { ...window.location, href: 'https://new.example.com' });
+      settings.resolve({
+        translationApi: 'google',
+        targetLanguage: 'fa',
+        lazyLoading: false,
+        autoTranslateOnDOMChanges: false,
+        showOriginalOnHover: true,
+        tokenWarningHidden: true,
+      });
+
+      const result = await pending;
+
+      expect(result).toEqual({ success: false, reason: 'silent_error' });
+      expect(manager.abortController).toBeNull();
+      expect(manager.translationMessageId).toBeNull();
+      expect(manager.sessionContext).toBeNull();
+      expect(document.getElementById('ti-translation-layout-fix')).toBeNull();
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_START, expect.anything());
+    });
+
+    it('admits a clean second attempt after pre-START failure', async () => {
+      await manager.activate();
+      manager.currentUrl = window.location.href;
+      PageTranslationSettingsLoader.load.mockRejectedValueOnce(
+        Object.assign(new Error('context lost'), { type: ErrorTypes.CONTEXT })
+      );
+      await manager.translatePage();
+
+      pageEventBus.emit.mockClear();
+      PageTranslationSettingsLoader.load.mockResolvedValueOnce({
+        translationApi: 'google',
+        targetLanguage: 'fa',
+        lazyLoading: false,
+        autoTranslateOnDOMChanges: false,
+        showOriginalOnHover: true,
+        tokenWarningHidden: true,
+      });
+
+      const result = await manager.translatePage();
+
+      expect(result.success).toBe(true);
+      expect(pageEventBus.emit.mock.calls.filter(([action]) => (
+        action === MessageActions.PAGE_TRANSLATE_START
+      ))).toHaveLength(1);
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_ERROR, expect.anything());
     });
 
     it('should support comma and newline parsing for auto translate rules', () => {

@@ -21,6 +21,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
@@ -235,8 +236,6 @@ onMounted(async () => {
   // Inject specific styling
   try {
     const { windowsUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
-    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
-    
     if (windowsUiStyles && injectStylesToShadowRoot) {
       injectStylesToShadowRoot(windowsUiStyles, 'vue-windows-specific-styles');
     }

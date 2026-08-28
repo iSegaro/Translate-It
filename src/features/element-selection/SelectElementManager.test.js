@@ -48,11 +48,145 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
     getInstance: vi.fn()
   }
 }));
-vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
-  createPublicDisplayError: vi.fn(async (originalError) => {
-    const displayError = new Error('Translation failed');
-    displayError.type = 'TRANSLATION_FAILED';
-    displayError.cause = originalError;
+vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
+  mapCanonicalTranslationError: vi.fn((error) => ({
+    type: {
+      API_ERROR: 'API_FAILURE',
+      VALIDATION: 'INVALID_INPUT',
+      ELEMENT_TOO_LARGE: 'ELEMENT_TOO_LARGE',
+      GEMINI_QUOTA_REGION: 'GEMINI_QUOTA_REGION',
+      DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
+      API_RESPONSE_INVALID: 'INVALID_RESPONSE',
+      JSON_PARSING_ERROR: 'INVALID_RESPONSE',
+      UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+      HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
+      TRANSLATION_ERROR: 'TRANSLATION_FAILED',
+      CONNECTION_LOST: 'TRANSLATION_FAILED',
+      NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+      API_URL_MISSING: 'API_URL_MISSING',
+      API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
+      API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
+      BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+      FORBIDDEN_ERROR: 'ACCESS_DENIED',
+      TEXT_EMPTY: 'TEXT_EMPTY',
+      TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+      PROMPT_INVALID: 'PROMPT_INVALID',
+      LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
+      CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+      TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
+      MODEL_MISSING: 'MODEL_UNAVAILABLE',
+      API_KEY_MISSING: 'API_KEY_MISSING',
+      API_KEY_INVALID: 'API_KEY_INVALID',
+      QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+      INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+      RATE_LIMIT_REACHED: 'RATE_LIMITED',
+      MODEL_OVERLOADED: 'MODEL_OVERLOADED',
+      NETWORK_ERROR: 'NETWORK_ERROR',
+      SERVER_ERROR: 'SERVER_ERROR',
+      TRANSLATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+      OPERATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+      INVALID_REQUEST: 'INVALID_REQUEST',
+      TRANSLATION_FAILED: 'TRANSLATION_FAILED',
+      HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'MODEL_UNAVAILABLE' : 'REQUEST_FAILURE',
+      UNKNOWN: 'TRANSLATION_FAILED',
+     }[error?.type] || 'TRANSLATION_FAILED',
+     messageKey: {
+      API_ERROR: 'ERRORS_API_ERROR',
+      VALIDATION: 'ERRORS_INVALID_INPUT',
+      ELEMENT_TOO_LARGE: 'ERRORS_ELEMENT_TOO_LARGE',
+      GEMINI_QUOTA_REGION: 'ERRORS_GEMINI_QUOTA_REGION',
+      DEEPL_QUOTA_EXCEEDED: 'ERRORS_DEEPL_QUOTA_EXCEEDED',
+      API_RESPONSE_INVALID: 'ERRORS_API_RESPONSE_INVALID',
+      JSON_PARSING_ERROR: 'ERRORS_API_RESPONSE_INVALID',
+      UNEXPECTED_RESPONSE_FORMAT: 'ERRORS_API_RESPONSE_INVALID',
+      API_URL_MISSING: 'ERRORS_API_URL_MISSING',
+      API_CONFIG_INVALID: 'ERRORS_API_CONFIG_INVALID',
+      API_ENDPOINT_INVALID: 'ERRORS_API_ENDPOINT_INVALID',
+      BROWSER_API_UNAVAILABLE: 'ERRORS_BROWSER_API_UNAVAILABLE',
+      FORBIDDEN_ERROR: 'ERRORS_FORBIDDEN_ERROR',
+      TEXT_EMPTY: 'ERRORS_TEXT_EMPTY',
+      TEXT_TOO_LONG: 'ERRORS_TEXT_TOO_LONG',
+      PROMPT_INVALID: 'ERRORS_PROMPT_INVALID',
+      LANGUAGE_PAIR_NOT_SUPPORTED: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
+      CIRCUIT_BREAKER_OPEN: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+      TRANSLATION_NOT_FOUND: 'ERRORS_TRANSLATION_NOT_FOUND',
+      MODEL_MISSING: 'ERRORS_MODEL_MISSING',
+      API_KEY_MISSING: 'ERRORS_API_KEY_MISSING',
+      API_KEY_INVALID: 'ERRORS_API_KEY_INVALID',
+      QUOTA_EXCEEDED: 'ERRORS_QUOTA_EXCEEDED',
+      INSUFFICIENT_BALANCE: 'ERRORS_INSUFFICIENT_BALANCE',
+      RATE_LIMIT_REACHED: 'ERRORS_RATE_LIMIT_REACHED',
+      MODEL_OVERLOADED: 'ERRORS_MODEL_OVERLOADED',
+      NETWORK_ERROR: 'ERRORS_NETWORK_ERROR',
+      SERVER_ERROR: 'ERRORS_SERVER_ERROR',
+      TRANSLATION_TIMEOUT: 'ERRORS_TRANSLATION_TIMEOUT',
+      INVALID_REQUEST: 'ERRORS_INVALID_REQUEST',
+      TRANSLATION_FAILED: 'ERRORS_TRANSLATION_FAILED',
+      HTTP_ERROR: error?.originalType === 'MODEL_MISSING' ? 'ERRORS_MODEL_MISSING' : 'ERRORS_HTTP_ERROR',
+      }[error?.type] || 'ERRORS_TRANSLATION_FAILED',
+     severity: error?.type === 'CIRCUIT_BREAKER_OPEN'
+       ? 'warning'
+       : error?.type === 'TRANSLATION_NOT_FOUND' ? 'error' : undefined,
+     silent: false,
+  }))
+}));
+vi.mock('@/shared/error-management/PublicTranslationErrorAdapter.js', () => ({
+  createLegacyDisplayError: vi.fn(async (canonicalError, publicError) => {
+    const legacyType = {
+      API_FAILURE: 'API_ERROR',
+      MODEL_UNAVAILABLE: 'MODEL_MISSING',
+      INVALID_INPUT: 'TRANSLATION_FAILED',
+      ELEMENT_TOO_LARGE: 'ELEMENT_TOO_LARGE',
+      GEMINI_QUOTA_REGION: 'GEMINI_QUOTA_REGION',
+       DEEPL_QUOTA_EXCEEDED: 'DEEPL_QUOTA_EXCEEDED',
+       REQUEST_FAILURE: 'HTTP_ERROR',
+       API_URL_MISSING: 'API_URL_MISSING',
+       CONFIGURATION_INVALID: 'API_CONFIG_INVALID',
+       ENDPOINT_INVALID: 'API_ENDPOINT_INVALID',
+       BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+       ACCESS_DENIED: 'FORBIDDEN_ERROR',
+       TEXT_EMPTY: 'TEXT_EMPTY',
+       TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+       PROMPT_INVALID: 'PROMPT_INVALID',
+        LANGUAGE_PAIR_UNSUPPORTED: 'LANGUAGE_PAIR_NOT_SUPPORTED',
+        PROVIDER_TEMPORARILY_UNAVAILABLE: 'CIRCUIT_BREAKER_OPEN',
+        TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
+        API_KEY_MISSING: 'API_KEY_MISSING',
+        API_KEY_INVALID: 'API_KEY_INVALID',
+        QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+        INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+        RATE_LIMITED: 'RATE_LIMIT_REACHED',
+        MODEL_OVERLOADED: 'MODEL_OVERLOADED',
+        NETWORK_ERROR: 'NETWORK_ERROR',
+        SERVER_ERROR: 'SERVER_ERROR',
+        TRANSLATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+        INVALID_REQUEST: 'INVALID_REQUEST',
+        TRANSLATION_FAILED: 'TRANSLATION_FAILED',
+    }[publicError?.type] || publicError?.type || 'TRANSLATION_FAILED';
+    const message = {
+      ERRORS_API_ERROR: 'Translation service API error.',
+      ERRORS_ELEMENT_TOO_LARGE: 'This element is too large to translate at once.',
+      ERRORS_GEMINI_QUOTA_REGION: 'You reached the Gemini quota. (Region issue)',
+      ERRORS_DEEPL_QUOTA_EXCEEDED: 'DeepL quota exceeded. Please check your plan.',
+       ERRORS_API_RESPONSE_INVALID: 'Invalid API response format',
+       ERRORS_MODEL_MISSING: 'AI Model is missing or invalid',
+       ERRORS_HTTP_ERROR: 'HTTP error',
+       ERRORS_TRANSLATION_FAILED: 'Translation failed',
+       ERRORS_API_URL_MISSING: 'API URL is missing. Please enter it in settings.',
+       ERRORS_API_CONFIG_INVALID: 'Invalid API configuration. Please check your settings.',
+       ERRORS_API_ENDPOINT_INVALID: 'API Endpoint not found (404). Please check your URL.',
+       ERRORS_BROWSER_API_UNAVAILABLE: 'The translation API is not available or supported in this browser',
+       ERRORS_FORBIDDEN_ERROR: 'Access denied. Check permissions or potential content moderation.',
+       ERRORS_TEXT_EMPTY: 'Text is empty',
+       ERRORS_TEXT_TOO_LONG: 'Text is too long',
+       ERRORS_PROMPT_INVALID: 'Prompt is invalid',
+        ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED: 'Language pair not supported by the selected translation service',
+        ERRORS_CIRCUIT_BREAKER_OPEN: 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.',
+        ERRORS_TRANSLATION_NOT_FOUND: 'Translation not found',
+     }[publicError?.messageKey] || 'Translation failed';
+    const displayError = new Error(message);
+    displayError.type = legacyType;
+    displayError.cause = canonicalError;
     return displayError;
   })
 }));
@@ -60,6 +194,7 @@ vi.mock('@/shared/error-management/PublicErrorPolicy.js', () => ({
 vi.mock('@/shared/error-management/ErrorMatcher.js', () => ({
   isFatalError: vi.fn(() => false),
   isCancellationError: vi.fn(() => false),
+  isSilentError: vi.fn(() => false),
   matchErrorToType: vi.fn((error) => error?.type || 'TRANSLATION_ERROR')
 }));
 
@@ -215,6 +350,9 @@ vi.mock('@/utils/browser/compatibility.js', () => ({
 vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
   MessageActions: {
     ACTIVATE_SELECT_ELEMENT_MODE: 'ACTIVATE_SELECT_ELEMENT_MODE',
+    DEACTIVATE_SELECT_ELEMENT_MODE: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+    SET_SELECT_ELEMENT_STATE: 'SET_SELECT_ELEMENT_STATE',
+    IFRAME_SELECT_ELEMENT_FINISHED: 'IFRAME_SELECT_ELEMENT_FINISHED',
     TRANSLATE: 'TRANSLATE'
   }
 }));
@@ -261,16 +399,167 @@ describe('SelectElementManager', () => {
     expect(pageEventBus.emit).toHaveBeenCalledWith('show-select-element-notification', expect.any(Object));
   });
 
+  it('publishes canonical active state on direct activation', async () => {
+    await manager.initialize();
+    await manager.activateSelectElementMode();
+
+    const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+    expect(sendMessage).toHaveBeenCalledWith({
+      action: 'SET_SELECT_ELEMENT_STATE',
+      data: { active: true },
+    });
+  });
+
+  it('resolves Whole Page conflict before activating Select Element', async () => {
+    const resolveFeatureConflict = vi.fn().mockImplementation(async () => {
+      expect(manager.isActive).toBe(false);
+    });
+    manager = new SelectElementManager({ featureManager: { resolveFeatureConflict } });
+    await manager.initialize();
+
+    await manager.activateSelectElementMode();
+
+    expect(resolveFeatureConflict).toHaveBeenCalledWith('selectElement');
+    expect(manager.isActive).toBe(true);
+  });
+
+  it('fails activation when trusted Whole Page conflict resolution fails', async () => {
+    const error = new Error('restore failed');
+    manager = new SelectElementManager({
+      featureManager: { resolveFeatureConflict: vi.fn().mockRejectedValue(error) },
+    });
+    await manager.initialize();
+
+    await expect(manager.activateSelectElementMode()).rejects.toBe(error);
+    expect(manager.isActive).toBe(false);
+  });
+
+  it('ignores forged DOM conflict events', async () => {
+    await manager.initialize();
+    manager.isActive = true;
+    const deactivate = vi.spyOn(manager, 'deactivate');
+
+    window.dispatchEvent(new CustomEvent('STOP_CONFLICTING_FEATURES', {
+      detail: { source: 'malicious-page' },
+    }));
+
+    expect(deactivate).not.toHaveBeenCalled();
+  });
+
   it('should deactivate select element mode', async () => {
     await manager.initialize();
     await manager.activateSelectElementMode();
-    manager.deactivate();
+    await manager.deactivate();
     
     const { pageEventBus } = await import('@/core/PageEventBus.js');
     
     expect(manager.isActive).toBe(false);
     expect(manager.elementSelector.deactivate).toHaveBeenCalled();
     expect(pageEventBus.emit).toHaveBeenCalledWith('dismiss-select-element-notification', expect.any(Object));
+  });
+
+  it('returns a successful cleanup ACK after deactivation', async () => {
+    manager.isActive = true;
+
+    await expect(manager.deactivate({ fromBackground: true })).resolves.toEqual({
+      success: true,
+      cleanupCompleted: true,
+    });
+  });
+
+  it('returns an idempotent cleanup ACK when already inactive', async () => {
+    await expect(manager.deactivate()).resolves.toEqual({
+      success: true,
+      cleanupCompleted: true,
+      alreadyInactive: true,
+    });
+  });
+
+  it('returns a failed cleanup ACK after emergency cleanup', async () => {
+    manager.isActive = true;
+    manager.elementSelector.deactivate.mockImplementationOnce(() => {
+      throw new Error('internal cleanup detail');
+    });
+    const emergencyCleanup = vi.spyOn(manager, 'emergencyCleanup');
+
+    const result = await manager.deactivate({ fromBackground: true });
+
+    expect(result).toEqual({
+      success: false,
+      cleanupCompleted: false,
+      error: 'Could not deactivate Select Element mode.',
+    });
+    expect(emergencyCleanup).toHaveBeenCalledTimes(1);
+    expect(result.error).not.toContain('internal cleanup detail');
+  });
+
+  it('waits for adapter cancellation before continuing cleanup', async () => {
+    manager.isActive = true;
+    let resolveCancellation;
+    manager.domTranslatorAdapter.cancelTranslation.mockImplementation(() => new Promise((resolve) => {
+      resolveCancellation = resolve;
+    }));
+
+    const deactivation = manager.deactivate({ reason: 'cancel', fromBackground: true });
+    await vi.waitFor(() => expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalled());
+
+    expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+
+    resolveCancellation();
+    await expect(deactivation).resolves.toEqual({
+      success: true,
+      cleanupCompleted: true,
+    });
+    expect(manager.elementSelector.deactivate).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializes local deactivation before a queued activation', async () => {
+    manager.isInitialized = true;
+    manager.isActive = true;
+    let resolveCancellation;
+    manager.domTranslatorAdapter.cancelTranslation.mockImplementation(() => new Promise(resolve => {
+      resolveCancellation = resolve;
+    }));
+
+    const deactivation = manager.deactivate({ reason: 'cancel', fromBackground: true });
+    await vi.waitFor(() => expect(manager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalled());
+
+    const activation = manager.activateSelectElementMode();
+    expect(manager.elementSelector.activate).not.toHaveBeenCalled();
+
+    resolveCancellation();
+    await expect(deactivation).resolves.toMatchObject({ success: true, cleanupCompleted: true });
+    await expect(activation).resolves.toMatchObject({ isActive: true });
+    expect(manager.isActive).toBe(true);
+  });
+
+  it('serializes local deactivation after an in-flight activation', async () => {
+    manager.isInitialized = true;
+    let resolveServices;
+    manager._ensureServicesAvailable = vi.fn(() => new Promise(resolve => {
+      resolveServices = resolve;
+    }));
+
+    const activation = manager.activateSelectElementMode();
+    await vi.waitFor(() => expect(manager._ensureServicesAvailable).toHaveBeenCalled());
+
+    const deactivation = manager.deactivate({ fromBackground: true });
+    expect(manager.elementSelector.deactivate).not.toHaveBeenCalled();
+
+    resolveServices(true);
+    await expect(activation).resolves.toMatchObject({ isActive: true });
+    await expect(deactivation).resolves.toMatchObject({ success: true, cleanupCompleted: true });
+    expect(manager.isActive).toBe(false);
+  });
+
+  it('recovers manager lifecycle queue after a rejected operation', async () => {
+    const firstOperation = manager.enqueueSelectElementLifecycle(() => {
+      throw new Error('first lifecycle failure');
+    });
+    const secondOperation = manager.enqueueSelectElementLifecycle(() => 'second operation');
+
+    await expect(firstOperation).rejects.toThrow('first lifecycle failure');
+    await expect(secondOperation).resolves.toBe('second operation');
   });
 
   it('should handle click on element to translate', async () => {
@@ -364,6 +653,23 @@ describe('SelectElementManager', () => {
       expect(manager.domTranslatorAdapter.translateElement).not.toHaveBeenCalled();
     });
 
+    it('falls back to retargeted host while shadow translation is disabled', async () => {
+      const host = document.createElement('x-host');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const internal = document.createElement('button');
+      internal.textContent = 'Translate this button';
+      shadow.appendChild(internal);
+      manager.elementSelector.getHighlightedElement.mockReturnValue(null);
+      manager.elementSelector.isOurElement.mockReturnValue(false);
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: host });
+      event.composedPath = () => [internal, shadow, host, document, window];
+
+      await manager.handleClick(event);
+
+      expect(manager.domTranslatorAdapter.translateElement).toHaveBeenCalledWith(host, expect.any(Object));
+    });
+
     it('still forwards BUTTON to the adapter', async () => {
       const btn = document.createElement('button');
       manager.elementSelector.getHighlightedElement.mockReturnValue(btn);
@@ -442,8 +748,6 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
@@ -468,8 +772,6 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'no-content' });
@@ -528,8 +830,123 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
+    });
+
+    it.each(['operation-abort', 'System cleanup', 'lifecycle-cleanup', 'document-replaced', 'replacement'])('keeps internal operation abort silent for %s', async (cancellationReason) => {
+        const error = Object.assign(new Error('Translation operation aborted'), {
+          operationAborted: true,
+          cancellationReason,
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false,
+          },
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(errorHandler.handle).not.toHaveBeenCalled();
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+        const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
+        expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
+      });
+
+    it.each([ErrorTypes.TRANSLATION_ERROR, ErrorTypes.TRANSLATION_FAILED, ErrorTypes.UNKNOWN])('keeps operation abort silent with generic placeholder type %s', async (type) => {
+        const error = Object.assign(new Error('Translation operation aborted'), {
+          type,
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false,
+          },
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(errorHandler.handle).not.toHaveBeenCalled();
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+      });
+
+    it('keeps internal operation abort silent after positive commit', async () => {
+      const error = Object.assign(new Error('Translation operation aborted'), {
+        operationAborted: true,
+        cancellationReason: 'System cleanup',
+        translationOutcome: {
+          committedParentCount: 1,
+          totalParentCount: 2,
+          cancelled: false,
+        },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
+    });
+
+    it('keeps typed timeout visible when operation abort provenance is present', async () => {
+      const error = Object.assign(new Error('Timed out'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+        translationOutcome: {
+          committedParentCount: 0,
+          totalParentCount: 1,
+          cancelled: false,
+        },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it.each([ErrorTypes.NETWORK_ERROR, ErrorTypes.HTTP_ERROR, ErrorTypes.API_CONFIG_INVALID])('keeps typed terminal error visible with operation abort provenance: %s', async (type) => {
+        const error = Object.assign(new Error('Typed terminal failure'), {
+          name: 'AbortError',
+          type,
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+          translationOutcome: {
+            committedParentCount: 0,
+            totalParentCount: 1,
+            cancelled: false,
+          },
+        });
+        manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+        await manager.startTranslation(document.createElement('div'));
+
+        expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+        expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+        expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+      });
+
+    it('keeps a bare AbortError visible without operation abort provenance', async () => {
+      const error = Object.assign(new Error('Aborted request'), {
+        name: 'AbortError',
+        translationOutcome: {
+          committedParentCount: 0,
+          totalParentCount: 1,
+          cancelled: false,
+        },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
     it('keeps stale cancellation results silent', async () => {
@@ -543,14 +960,16 @@ describe('SelectElementManager', () => {
     });
 
     it('respects a central silent policy without skipping cleanup', async () => {
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       const error = Object.assign(new Error('Already translated'), { type: 'NODE_ALREADY_TRANSLATED' });
-      createPublicDisplayError.mockResolvedValueOnce(null);
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       expect(errorHandler.handle).not.toHaveBeenCalled();
+      expect(mapCanonicalTranslationError).not.toHaveBeenCalled();
+      expect(createLegacyDisplayError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -560,9 +979,11 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
-      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: 'NETWORK_ERROR' }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
@@ -571,32 +992,355 @@ describe('SelectElementManager', () => {
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
-    it('preserves committed content while routing non-context fatal errors through error deactivation', async () => {
-      const error = Object.assign(new Error('API key is invalid'), {
-        type: ErrorTypes.API_KEY_INVALID,
+    it.each([
+      [ErrorTypes.API_URL_MISSING, 'API_URL_MISSING', 'API URL is missing. Please enter it in settings.'],
+      [ErrorTypes.API_CONFIG_INVALID, 'API_CONFIG_INVALID', 'Invalid API configuration. Please check your settings.'],
+      [ErrorTypes.API_ENDPOINT_INVALID, 'API_ENDPOINT_INVALID', 'API Endpoint not found (404). Please check your URL.'],
+      [ErrorTypes.BROWSER_API_UNAVAILABLE, 'BROWSER_API_UNAVAILABLE', 'The translation API is not available or supported in this browser'],
+      [ErrorTypes.FORBIDDEN_ERROR, 'FORBIDDEN_ERROR', 'Access denied. Check permissions or potential content moderation.'],
+      [ErrorTypes.CIRCUIT_BREAKER_OPEN, 'CIRCUIT_BREAKER_OPEN', 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.'],
+    ])('preserves localized config/access display for %s', async (type, legacyType, message) => {
+      const error = Object.assign(new Error(`raw canonical detail for ${type}`), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalled();
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ type: legacyType, message, cause: error }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw canonical detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('migrates circuit-breaker failures without copying reason metadata', async () => {
+      const error = Object.assign(new Error('raw provider detail'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType: ErrorTypes.NETWORK_ERROR,
+        statusCode: 503,
+        providerName: 'Provider',
       });
-      const displayError = Object.assign(new Error('API key is wrong or invalid'), {
-        type: ErrorTypes.API_KEY_INVALID,
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+        messageKey: 'ERRORS_CIRCUIT_BREAKER_OPEN',
+        severity: 'warning',
+        silent: false,
+      }));
+      const displayError = errorHandler.handle.mock.calls[0][0];
+      expect(displayError).toMatchObject({
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        message: 'Circuit breaker is open. This provider is temporarily disabled due to too many failures.',
         cause: error,
       });
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
-      createPublicDisplayError.mockResolvedValueOnce(displayError);
-      isFatalError.mockReturnValueOnce(true);
+      expect(displayError).not.toHaveProperty('originalType');
+      expect(displayError).not.toHaveProperty('statusCode');
+      expect(displayError).not.toHaveProperty('providerName');
+      expect(displayError.message).not.toContain('raw provider detail');
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('migrates translation-not-found without retry or fatal deactivation', async () => {
+      const error = Object.assign(new Error('raw provider detail'), {
+        type: ErrorTypes.TRANSLATION_NOT_FOUND,
+        originalType: ErrorTypes.NETWORK_ERROR,
+        statusCode: 404,
+        providerName: 'Provider',
+        translationOutcome: { committedParentCount: 0 },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
       const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const { getErrorDisplayStrategy } = await import('@/shared/error-management/ErrorDisplayStrategies.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'TRANSLATION_NOT_FOUND',
+        messageKey: 'ERRORS_TRANSLATION_NOT_FOUND',
+        severity: 'error',
+        silent: false,
+      }));
+      const displayError = errorHandler.handle.mock.calls[0][0];
+      expect(displayError).toMatchObject({
+        type: ErrorTypes.TRANSLATION_NOT_FOUND,
+        message: 'Translation not found',
+        cause: error,
+      });
+      expect(displayError).not.toHaveProperty('originalType');
+      expect(displayError).not.toHaveProperty('statusCode');
+      expect(displayError).not.toHaveProperty('providerName');
+      expect(displayError).not.toHaveProperty('translationOutcome');
+      expect(displayError.message).not.toContain('raw provider detail');
+      expect(getErrorDisplayStrategy('select-element', ErrorTypes.TRANSLATION_NOT_FOUND)).toMatchObject({
+        showToast: true,
+        supportRetry: false,
+        supportSettings: true,
+      });
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(deactivateSpy).not.toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it.each([
+      [ErrorTypes.TEXT_EMPTY, 'TEXT_EMPTY', 'Text is empty'],
+      [ErrorTypes.TEXT_TOO_LONG, 'TEXT_TOO_LONG', 'Text is too long'],
+      [ErrorTypes.PROMPT_INVALID, 'PROMPT_INVALID', 'Prompt is invalid'],
+    ])('preserves localized input display for %s', async (type, legacyType, message) => {
+      const error = Object.assign(new Error(`raw canonical detail for ${type}`), { type });
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
-      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalled();
       expect(errorHandler.handle).toHaveBeenCalledWith(
-        displayError,
+        expect.objectContaining({ type: legacyType, message, cause: error }),
         expect.objectContaining({ context: 'select-element', showToast: true })
       );
-      expect(deactivateSpy).toHaveBeenCalledWith({ preserveTranslations: true, reason: 'error' });
-      expect(cleanupSpy).not.toHaveBeenCalled();
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw canonical detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves language-pair guidance and fatal cleanup', async () => {
+      const error = Object.assign(new Error('raw language-pair detail'), {
+        type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const { getErrorDisplayStrategy } = await import('@/shared/error-management/ErrorDisplayStrategies.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'LANGUAGE_PAIR_UNSUPPORTED',
+        messageKey: 'ERRORS_LANGUAGE_PAIR_NOT_SUPPORTED',
+        silent: false,
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+          message: 'Language pair not supported by the selected translation service',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw language-pair detail');
+      expect(getErrorDisplayStrategy('select-element', ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED)).toMatchObject({
+        supportSettings: true,
+        supportRetry: false,
+        suggestAction: 'change-provider',
+      });
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ErrorTypes.MODEL_MISSING,
+      ErrorTypes.API_ERROR,
+      ErrorTypes.API_KEY_MISSING,
+      ErrorTypes.API_KEY_INVALID,
+      ErrorTypes.QUOTA_EXCEEDED,
+      ErrorTypes.VALIDATION,
+      ErrorTypes.ELEMENT_TOO_LARGE,
+      ErrorTypes.GEMINI_QUOTA_REGION,
+      ErrorTypes.DEEPL_QUOTA_EXCEEDED,
+      ErrorTypes.INSUFFICIENT_BALANCE,
+      ErrorTypes.RATE_LIMIT_REACHED,
+      ErrorTypes.MODEL_OVERLOADED,
+      ErrorTypes.NETWORK_ERROR,
+      ErrorTypes.SERVER_ERROR,
+      ErrorTypes.TRANSLATION_TIMEOUT,
+      ErrorTypes.OPERATION_TIMEOUT,
+      ErrorTypes.INVALID_REQUEST,
+      ErrorTypes.TRANSLATION_FAILED,
+      ErrorTypes.UNKNOWN,
+      ErrorTypes.API_RESPONSE_INVALID,
+      ErrorTypes.JSON_PARSING_ERROR,
+      ErrorTypes.UNEXPECTED_RESPONSE_FORMAT,
+      ErrorTypes.HTML_RESPONSE_ERROR,
+      ErrorTypes.TRANSLATION_ERROR,
+      ErrorTypes.CONNECTION_LOST,
+      ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+      ErrorTypes.API_URL_MISSING,
+      ErrorTypes.API_CONFIG_INVALID,
+      ErrorTypes.API_ENDPOINT_INVALID,
+      ErrorTypes.BROWSER_API_UNAVAILABLE,
+      ErrorTypes.FORBIDDEN_ERROR,
+      ErrorTypes.TEXT_EMPTY,
+      ErrorTypes.TEXT_TOO_LONG,
+      ErrorTypes.PROMPT_INVALID,
+      ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+      ErrorTypes.CIRCUIT_BREAKER_OPEN,
+      ErrorTypes.TRANSLATION_NOT_FOUND,
+    ])('uses new public contract for safe type %s', async (type) => {
+      const error = Object.assign(new Error(`raw internal detail for ${type}`), { type });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const expectedPublicType = {
+        API_ERROR: 'API_FAILURE',
+        VALIDATION: 'INVALID_INPUT',
+        UNKNOWN: 'TRANSLATION_FAILED',
+        API_RESPONSE_INVALID: 'INVALID_RESPONSE',
+        JSON_PARSING_ERROR: 'INVALID_RESPONSE',
+        UNEXPECTED_RESPONSE_FORMAT: 'INVALID_RESPONSE',
+        HTML_RESPONSE_ERROR: 'TRANSLATION_FAILED',
+        TRANSLATION_ERROR: 'TRANSLATION_FAILED',
+        CONNECTION_LOST: 'TRANSLATION_FAILED',
+        NO_ACCEPTED_TRANSLATION_RESULTS: 'TRANSLATION_FAILED',
+        API_URL_MISSING: 'API_URL_MISSING',
+        API_CONFIG_INVALID: 'CONFIGURATION_INVALID',
+        API_ENDPOINT_INVALID: 'ENDPOINT_INVALID',
+        BROWSER_API_UNAVAILABLE: 'BROWSER_API_UNAVAILABLE',
+        FORBIDDEN_ERROR: 'ACCESS_DENIED',
+        TEXT_EMPTY: 'TEXT_EMPTY',
+        TEXT_TOO_LONG: 'TEXT_TOO_LONG',
+        PROMPT_INVALID: 'PROMPT_INVALID',
+        LANGUAGE_PAIR_NOT_SUPPORTED: 'LANGUAGE_PAIR_UNSUPPORTED',
+        MODEL_MISSING: 'MODEL_UNAVAILABLE',
+        API_KEY_MISSING: 'API_KEY_MISSING',
+        API_KEY_INVALID: 'API_KEY_INVALID',
+        QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+        INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+        RATE_LIMIT_REACHED: 'RATE_LIMITED',
+        MODEL_OVERLOADED: 'MODEL_OVERLOADED',
+        NETWORK_ERROR: 'NETWORK_ERROR',
+        SERVER_ERROR: 'SERVER_ERROR',
+        TRANSLATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+        OPERATION_TIMEOUT: 'TRANSLATION_TIMEOUT',
+        INVALID_REQUEST: 'INVALID_REQUEST',
+        CIRCUIT_BREAKER_OPEN: 'PROVIDER_TEMPORARILY_UNAVAILABLE',
+        TRANSLATION_NOT_FOUND: 'TRANSLATION_NOT_FOUND',
+       }[type] || type;
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: expectedPublicType }));
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      if ([
+        ErrorTypes.HTML_RESPONSE_ERROR,
+        ErrorTypes.TRANSLATION_ERROR,
+        ErrorTypes.CONNECTION_LOST,
+        ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+      ].includes(type)) {
+        expect(errorHandler.handle.mock.calls[0][0].type).toBe(ErrorTypes.TRANSLATION_FAILED);
+        expect(errorHandler.handle.mock.calls[0][0].message).toBe('Translation failed');
+        expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw internal detail');
+      }
+    });
+
+    it.each([
+      [ErrorTypes.HTTP_ERROR, { statusCode: 400 }],
+      [ErrorTypes.HTTP_ERROR, { statusCode: 401 }],
+      [ErrorTypes.HTTP_ERROR, { statusCode: 429 }],
+      [ErrorTypes.HTTP_ERROR, { statusCode: 500 }],
+      [ErrorTypes.HTTP_ERROR, { statusCode: 400, originalType: 'UNRELATED_TYPE' }],
+    ])('routes generic HTTP type %s through new public policy', async (type, fields) => {
+      const error = Object.assign(new Error(type), { type, ...fields });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'REQUEST_FAILURE',
+        messageKey: 'ERRORS_HTTP_ERROR',
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: ErrorTypes.HTTP_ERROR,
+          message: 'HTTP error',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+    });
+
+    it('migrates trusted unknown-model HTTP failures', async () => {
+      const error = Object.assign(new Error('Unknown model name; available models: secret-model'), {
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 400,
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(mapCanonicalTranslationError.mock.results[0].value).toMatchObject({
+        type: 'MODEL_UNAVAILABLE',
+        messageKey: 'ERRORS_MODEL_MISSING',
+      });
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'MODEL_UNAVAILABLE',
+        messageKey: 'ERRORS_MODEL_MISSING',
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: ErrorTypes.MODEL_MISSING,
+          message: 'AI Model is missing or invalid',
+          cause: error,
+        }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('available models');
+    });
+
+    it('preserves committed content while routing non-context fatal errors through error deactivation', async () => {
+      const error = Object.assign(new Error('API key is invalid'), {
+        type: ErrorTypes.API_KEY_INVALID,
+      });
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+      isFatalError.mockReturnValueOnce(true);
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: ErrorTypes.API_KEY_INVALID }));
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ type: ErrorTypes.API_KEY_INVALID, cause: error }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
       expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
@@ -614,7 +1358,6 @@ describe('SelectElementManager', () => {
       const deactivateSpy = vi.spyOn(manager, 'deactivate').mockResolvedValue(undefined);
       ExtensionContextManager.isContextError.mockReturnValue(true);
       const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
 
       try {
         isFatalError.mockReturnValue(true);
@@ -623,7 +1366,6 @@ describe('SelectElementManager', () => {
         await manager.startTranslation(document.createElement('div'));
 
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
-        expect(createPublicDisplayError).not.toHaveBeenCalled();
         expect(errorHandler.handle).not.toHaveBeenCalled();
         expect(deactivateSpy).not.toHaveBeenCalled();
         expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
@@ -637,12 +1379,10 @@ describe('SelectElementManager', () => {
       const error = Object.assign(new Error('Translation already in progress for this element'), {
         type: ErrorTypes.FEATURE_BLOCKED,
       });
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'cancel' });
       expect(manager.domTranslatorAdapter.revertTranslation).not.toHaveBeenCalled();
@@ -665,6 +1405,12 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: type === 'RATE_LIMIT_REACHED' ? 'RATE_LIMITED' : type,
+      }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
     });
 
@@ -674,6 +1420,10 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({ type: 'TRANSLATION_TIMEOUT' }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({ cause: error }), expect.objectContaining({ showToast: true }));
     });
 
@@ -681,22 +1431,21 @@ describe('SelectElementManager', () => {
       const error = Object.assign(new Error('Element is too large to translate (1001 text segments). Please select a smaller element.'), {
         type: ErrorTypes.ELEMENT_TOO_LARGE,
       });
-      const displayError = Object.assign(new Error('This element is too large to translate at once.'), {
-        type: ErrorTypes.ELEMENT_TOO_LARGE,
-        cause: error,
-      });
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      createPublicDisplayError.mockResolvedValueOnce(displayError);
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(createPublicDisplayError).toHaveBeenCalledTimes(1);
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
-      expect(errorHandler.handle).toHaveBeenCalledWith(displayError, expect.objectContaining({
-        context: 'select-element',
-        showToast: true,
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'ELEMENT_TOO_LARGE',
+        messageKey: 'ERRORS_ELEMENT_TOO_LARGE',
       }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ type: ErrorTypes.ELEMENT_TOO_LARGE }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle.mock.calls[0][0]).toMatchObject({
         type: ErrorTypes.ELEMENT_TOO_LARGE,
@@ -713,20 +1462,51 @@ describe('SelectElementManager', () => {
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
-    it('does not special-case an untyped error that merely contains the legacy phrase', async () => {
+    it('routes untyped errors through generic new public mapping', async () => {
       const error = new Error('Element is too large to translate (1001 text segments). Please select a smaller element.');
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).toHaveBeenCalledWith(error);
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        messageKey: 'ERRORS_TRANSLATION_FAILED',
+        silent: false,
+      }));
       expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
         type: 'TRANSLATION_FAILED',
         cause: error,
       }), expect.objectContaining({ showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0].message).toBe('Translation failed');
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain(error.message);
       expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(errorHandler.handle.mock.calls[0][0]).not.toBe(error);
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('routes unrecognized explicit types through generic new public mapping', async () => {
+      const error = Object.assign(new Error('raw unrecognized detail'), { type: 'UNRECOGNIZED_TYPE' });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      const { mapCanonicalTranslationError } = await import('@/shared/error-management/PublicTranslationErrorPolicy.js');
+      const { createLegacyDisplayError } = await import('@/shared/error-management/PublicTranslationErrorAdapter.js');
+      expect(mapCanonicalTranslationError).toHaveBeenCalledWith(error);
+      expect(createLegacyDisplayError).toHaveBeenCalledWith(error, expect.objectContaining({
+        type: 'TRANSLATION_FAILED',
+        messageKey: 'ERRORS_TRANSLATION_FAILED',
+        silent: false,
+      }));
+      expect(errorHandler.handle).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'TRANSLATION_FAILED',
+        message: 'Translation failed',
+        cause: error,
+      }), expect.objectContaining({ context: 'select-element', showToast: true }));
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('raw unrecognized detail');
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
     });
 
@@ -752,24 +1532,13 @@ describe('SelectElementManager', () => {
       ['V3 failure', Object.assign(new Error('V3 marker contract violation'), { type: 'VALIDATION' })],
       ['timeout', Object.assign(new Error('Batch translation timed out'), { type: 'TRANSLATION_TIMEOUT' })],
       ['provider failure', Object.assign(new Error('Network failed'), { type: 'NETWORK_ERROR' })],
-    ])('uses generic partial-failure display for %s', async (_label, error) => {
+    ])('suppresses partial-failure display when committed output exists for %s', async (_label, error) => {
       error.translationOutcome = { committedParentCount: 1, totalParentCount: 2, cancelled: false };
       manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Some content could not be translated.',
-          type: 'TRANSLATION_FAILED',
-          cause: error,
-        }),
-        expect.objectContaining({ context: 'select-element', showToast: true })
-      );
-      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
-      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('V3');
+      expect(errorHandler.handle).not.toHaveBeenCalled();
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
@@ -790,8 +1559,6 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
     });
 
     it('keeps successful translation cleanup unchanged', async () => {
@@ -800,8 +1567,6 @@ describe('SelectElementManager', () => {
       await manager.startTranslation(document.createElement('div'));
 
       expect(errorHandler.handle).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
@@ -842,13 +1607,11 @@ describe('SelectElementManager', () => {
       const { pageEventBus } = await import('@/core/PageEventBus.js');
       expect(pageEventBus.emit).toHaveBeenCalledWith('ELEMENT_TRANSLATIONS_AVAILABLE');
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
     });
 
-    it('shows the partial message once and keeps success cleanup for PARTIAL_SUCCESS', async () => {
+    it('suppresses partial message and keeps success cleanup for PARTIAL_SUCCESS', async () => {
       const failureSpy = vi.spyOn(manager, '_handleTranslationFailure').mockImplementation(() => Promise.resolve());
       manager.domTranslatorAdapter.translateElement.mockResolvedValue({
         success: true,
@@ -859,17 +1622,8 @@ describe('SelectElementManager', () => {
 
       await manager.startTranslation(document.createElement('div'));
 
-      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
-      expect(errorHandler.handle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Some content could not be translated.',
-          type: 'TRANSLATION_FAILED',
-        }),
-        expect.objectContaining({ context: 'select-element', showToast: true })
-      );
+      expect(errorHandler.handle).not.toHaveBeenCalled();
       expect(failureSpy).not.toHaveBeenCalled();
-      const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-      expect(createPublicDisplayError).not.toHaveBeenCalled();
       const ExtensionContextManager = (await import('@/core/extensionContext.js')).default;
       expect(ExtensionContextManager.handleContextError).not.toHaveBeenCalled();
       expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'success' });
@@ -880,6 +1634,38 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
       failureSpy.mockRestore();
     });
+
+    it('keeps one terminal presentation for zero committed output', async () => {
+      const error = Object.assign(new Error('No translation results were accepted'), {
+        type: ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS,
+        translationOutcome: { committedParentCount: 0, totalParentCount: 2, cancelled: false },
+      });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Translation failed', type: 'TRANSLATION_FAILED' }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(errorHandler.handle.mock.calls[0][0].message).not.toContain('No translation results were accepted');
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
+
+    it('preserves terminal presentation when outcome metadata is missing', async () => {
+      const error = Object.assign(new Error('Network failed'), { type: ErrorTypes.NETWORK_ERROR });
+      manager.domTranslatorAdapter.translateElement.mockRejectedValue(error);
+
+      await manager.startTranslation(document.createElement('div'));
+
+      expect(errorHandler.handle).toHaveBeenCalledTimes(1);
+      expect(errorHandler.handle).toHaveBeenCalledWith(
+        expect.objectContaining({ cause: error }),
+        expect.objectContaining({ context: 'select-element', showToast: true })
+      );
+      expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    });
   });
 
   describe('event handling', () => {
@@ -889,10 +1675,10 @@ describe('SelectElementManager', () => {
       manager.activationTime = 0; // Bypass cooldown
     });
 
-    it('should handle ESC key to deactivate', () => {
+    it('should handle ESC key to deactivate', async () => {
       const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
       manager.handleKeyDown(event);
-      expect(manager.isActive).toBe(false);
+      await vi.waitFor(() => expect(manager.isActive).toBe(false));
     });
 
     it('should handle mouseover to highlight element', () => {
@@ -980,7 +1766,7 @@ describe('SelectElementManager', () => {
       expect(pageEventBus.emit).toHaveBeenCalledWith('show-select-element-notification', expect.any(Object));
     });
 
-    it('should listen to global deactivation message', async () => {
+    it('should ignore legacy global deactivation messages', async () => {
       await manager.initialize();
       await manager.activateSelectElementMode();
       
@@ -988,7 +1774,7 @@ describe('SelectElementManager', () => {
         data: { type: 'DEACTIVATE_ALL_SELECT_MANAGERS' }
       }));
       
-      expect(manager.isActive).toBe(false);
+      expect(manager.isActive).toBe(true);
     });
   });
 
@@ -1140,8 +1926,6 @@ describe('SelectElementManager', () => {
 
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledTimes(1);
         expect(ExtensionContextManager.handleContextError).toHaveBeenCalledWith(error, 'element-selection');
-        const { createPublicDisplayError } = await import('@/shared/error-management/PublicErrorPolicy.js');
-        expect(createPublicDisplayError).not.toHaveBeenCalled();
         expect(errorHandler.handle).not.toHaveBeenCalled();
         const { pageEventBus } = await import('@/core/PageEventBus.js');
         expect(pageEventBus.emit).not.toHaveBeenCalledWith('show-select-element-info', expect.anything());
@@ -1188,15 +1972,64 @@ describe('SelectElementManager', () => {
       expect(manager.elementSelector.handleMouseOver).not.toHaveBeenCalled();
     });
 
-    it('should handle deactivation message from iframe', () => {
+    it('should ignore legacy iframe deactivation messages', async () => {
       manager.isTopFrame = true;
-      manager.setupEventListeners(); // Re-setup to bind iframeMessageHandler
+      await manager.initialize();
+      await manager.activateSelectElementMode();
       
       window.dispatchEvent(new MessageEvent('message', {
         data: { type: 'translate-it-deactivate-select-element' }
       }));
       
-      expect(manager.isActive).toBe(false);
+      expect(manager.isActive).toBe(true);
+      expect(manager.domTranslatorAdapter.cancelTranslation).not.toHaveBeenCalled();
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      expect(sendMessage).not.toHaveBeenCalledWith({
+        action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+      });
+    });
+
+    it('reports child-frame terminal cleanup through runtime messaging', async () => {
+      const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      manager.isTopFrame = false;
+
+      manager.performPostTranslationCleanup({ reason: 'success' });
+      await Promise.resolve();
+
+      expect(sendRegularMessage).toHaveBeenCalledWith({
+        action: 'IFRAME_SELECT_ELEMENT_FINISHED',
+        data: { reason: 'success' },
+      }, { silent: true });
+    });
+
+    it('keeps local cleanup successful when runtime completion reporting fails', async () => {
+      const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      sendRegularMessage.mockRejectedValueOnce(new Error('Background unavailable'));
+      manager.isTopFrame = false;
+
+      expect(() => manager.performPostTranslationCleanup({ reason: 'success' })).not.toThrow();
+      await Promise.resolve();
+      expect(manager.isProcessingClick).toBe(false);
+    });
+
+    it('keeps plain manual deactivation local regardless of frame position', async () => {
+      const { sendMessage, sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      manager.isTopFrame = true;
+      manager.isActive = true;
+
+      await manager.deactivate({ reason: 'manual' });
+
+      expect(sendMessage).not.toHaveBeenCalledWith({
+        action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+      });
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'SET_SELECT_ELEMENT_STATE',
+        data: { active: false },
+      });
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
+        expect.anything(),
+      );
     });
 
     it('should emit progress events during translation', async () => {
@@ -1230,5 +2063,238 @@ describe('SelectElementManager', () => {
       expect(document.documentElement.getAttribute('data-translate-it-select-mode')).toBeNull();
       expect(removeSpy).toHaveBeenCalled();
     });
+  });
+});
+
+describe('explicit tab-wide deactivation ownership', () => {
+  let manager;
+  let sendMessage;
+  let sendRegularMessage;
+
+  const GLOBAL_DEACTIVATE = { action: 'DEACTIVATE_SELECT_ELEMENT_MODE' };
+  const STATE_REPORT = { action: 'SET_SELECT_ELEMENT_STATE', data: { active: false } };
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    isSelectableTextRoot.mockReturnValue(true);
+    const module = await import('./SelectElementManager.js');
+    manager = new module.SelectElementManager();
+  });
+
+  async function activateManager(isTopFrame) {
+    ({ sendMessage, sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js'));
+    manager.isTopFrame = isTopFrame;
+    await manager.initialize();
+    await manager.activateSelectElementMode();
+    sendMessage.mockClear();
+  }
+
+  it('requests tab-wide deactivation when Escape fires in a child frame', async () => {
+    await activateManager(false);
+
+    manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests tab-wide deactivation when Escape fires in the top frame', async () => {
+    await activateManager(true);
+
+    manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends the global request only when the explicit flag is set in a child frame', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    await manager.deactivate({ reason: 'cancel', requestGlobalDeactivation: true });
+
+    expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases local lifecycle cleanup before waiting for global deactivation', async () => {
+    await activateManager(true);
+    let resolveGlobalRequest;
+    sendMessage.mockImplementationOnce(() => new Promise(resolve => {
+      resolveGlobalRequest = resolve;
+    }));
+    const cleanupSpy = manager.elementSelector.deactivate;
+
+    const localDeactivation = manager.deactivate({ reason: 'cancel', requestGlobalDeactivation: true });
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+
+    await expect(manager.deactivate({ fromBackground: true })).resolves.toMatchObject({
+      success: true,
+      alreadyInactive: true,
+    });
+    expect(cleanupSpy).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+
+    resolveGlobalRequest();
+    await expect(localDeactivation).resolves.toMatchObject({ success: true });
+  });
+
+  it('never derives propagation from the reason string alone', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    await manager.deactivate({ reason: 'cancel' });
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT);
+  });
+
+  it.each([true, false])('keeps conflict cleanup local (isTopFrame=%s)', async (isTopFrame) => {
+    await activateManager(isTopFrame);
+    manager.isActive = true;
+
+    await manager.deactivate({ reason: 'conflict', silent: true });
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+  });
+
+  it('suppresses every outbound request for trusted background receivers even with the flag present', async () => {
+    await activateManager(true);
+    manager.isActive = true;
+
+    await manager.deactivate({ fromBackground: true, requestGlobalDeactivation: true });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps top-frame internal cleanup local despite frame position', async () => {
+    await activateManager(true);
+    manager.isActive = true;
+
+    await manager.cleanup();
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(manager.isActive).toBe(false);
+  });
+
+  it('keeps child-frame internal cleanup local with state bookkeeping only', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    await manager.cleanup();
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT);
+  });
+
+  it('requests tab-wide exit from the notification cancel action', async () => {
+    await activateManager(true);
+    const { pageEventBus } = await import('@/core/PageEventBus.js');
+    const emitCall = pageEventBus.emit.mock.calls.find(([event]) => event === 'show-select-element-notification');
+    expect(emitCall).toBeDefined();
+
+    emitCall[1].actions.cancel();
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests tab-wide exit from the shared cancel bus event', async () => {
+    await activateManager(true);
+    const { pageEventBus } = await import('@/core/PageEventBus.js');
+    const registration = pageEventBus.on.mock.calls.find(([event]) => event === 'cancel-select-element-mode');
+    expect(registration).toBeDefined();
+
+    registration[1]();
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['success', 'error'])('keeps terminal child completion single-owner via IFRAME_FINISHED (%s)', async (reason) => {
+    await activateManager(false);
+    manager.isActive = true;
+
+    manager.performPostTranslationCleanup({ reason });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(sendRegularMessage).toHaveBeenCalledTimes(1);
+    expect(sendRegularMessage).toHaveBeenCalledWith(
+      { action: 'IFRAME_SELECT_ELEMENT_FINISHED', data: { reason } },
+      { silent: true },
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+  });
+
+  it.each(['success', 'error', 'no-content'])('requests one trusted global deactivation for top terminal outcomes (%s)', async (reason) => {
+    await activateManager(true);
+
+    manager.performPostTranslationCleanup({ reason });
+
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendRegularMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
+      expect.anything(),
+    );
+  });
+
+  it('routes fatal child translation failures through terminal cleanup ownership', async () => {
+    await activateManager(false);
+    const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+    isFatalError.mockReturnValueOnce(true);
+    manager.domTranslatorAdapter.translateElement.mockRejectedValue(
+      Object.assign(new Error('fatal provider failure'), { type: ErrorTypes.API_KEY_INVALID })
+    );
+    const cleanupSpy = vi.spyOn(manager, 'performPostTranslationCleanup');
+
+    await manager.startTranslation(document.createElement('div'));
+
+    expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    expect(sendRegularMessage).toHaveBeenCalledWith(
+      { action: 'IFRAME_SELECT_ELEMENT_FINISHED', data: { reason: 'error' } },
+      { silent: true },
+    );
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+  });
+
+  it('routes fatal top translation failures through one terminal global request', async () => {
+    await activateManager(true);
+    const { isFatalError } = await import('@/shared/error-management/ErrorMatcher.js');
+    isFatalError.mockReturnValueOnce(true);
+    manager.domTranslatorAdapter.translateElement.mockRejectedValue(
+      Object.assign(new Error('fatal provider failure'), { type: ErrorTypes.API_KEY_INVALID })
+    );
+    const cleanupSpy = vi.spyOn(manager, 'performPostTranslationCleanup');
+
+    await manager.startTranslation(document.createElement('div'));
+
+    expect(cleanupSpy).toHaveBeenCalledWith({ reason: 'error' });
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendRegularMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'IFRAME_SELECT_ELEMENT_FINISHED' }),
+      expect.anything(),
+    );
+  });
+
+  it('keeps adapter result.cancelled an internal echo without global requests', async () => {
+    await activateManager(false);
+    manager.domTranslatorAdapter.translateElement.mockResolvedValue({ success: false, cancelled: true });
+
+    await manager.startTranslation(document.createElement('div'));
+
+    expect(sendMessage).not.toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
+    await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(STATE_REPORT));
+  });
+
+  it('ignores duplicate background broadcasts when already inactive', async () => {
+    await activateManager(false);
+    manager.isActive = false;
+
+    await manager.deactivate({ fromBackground: true });
+
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });

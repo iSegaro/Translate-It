@@ -11,6 +11,10 @@ export default class PlatformStrategy {
     this.errorHandler = errorHandler;
   }
 
+  getApplicationGuard(applicationContext) {
+    return applicationContext?.isCurrent || (() => true);
+  }
+
   extractText(target) {
     try {
       if (!target) return "";

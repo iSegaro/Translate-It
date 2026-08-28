@@ -31,9 +31,12 @@ export async function optimizedTextInsertion(
   element,
   text,
   start = null,
-  end = null
+  end = null,
+  applicationContext = null
 ) {
   if (!element || !text) return false;
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
 
   const strategy = detectOptimalStrategy(element);
   const hasSelection = checkTextSelection(element);
@@ -59,7 +62,8 @@ export async function optimizedTextInsertion(
 
   switch (strategy) {
     case "google-docs": {
-      const googleDocsSuccess = await tryGoogleDocsInsertion(element, text);
+        const googleDocsSuccess = await tryGoogleDocsInsertion(element, text, applicationContext);
+        if (!isCurrent()) return false;
       if (googleDocsSuccess) {
         logger.debug('Google Docs insertion method succeeded');
         return true;
@@ -69,8 +73,9 @@ export async function optimizedTextInsertion(
 
     case "paste-first": {
       const pasteFirstSuccess =
-        (await tryOptimizedPasteInsertion(element, text, hasSelection)) ||
-        (await tryExecCommandInsertion(element, text, hasSelection));
+        (await tryOptimizedPasteInsertion(element, text, hasSelection, applicationContext)) ||
+        (await tryExecCommandInsertion(element, text, hasSelection, applicationContext));
+      if (!isCurrent()) return false;
       if (pasteFirstSuccess) {
         logger.debug('Paste-first insertion strategy succeeded');
         return true;
@@ -80,8 +85,9 @@ export async function optimizedTextInsertion(
 
     case "exec-first": {
       const execFirstSuccess =
-        (await tryExecCommandInsertion(element, text, hasSelection)) ||
-        (await tryOptimizedPasteInsertion(element, text, hasSelection));
+        (await tryExecCommandInsertion(element, text, hasSelection, applicationContext)) ||
+        (await tryOptimizedPasteInsertion(element, text, hasSelection, applicationContext));
+      if (!isCurrent()) return false;
       if (execFirstSuccess) {
         logger.debug('Exec-first insertion strategy succeeded');
         return true;
@@ -92,7 +98,7 @@ export async function optimizedTextInsertion(
 
   // اگر استراتژی بهینه موفق نشد، از روش عمومی استفاده کن
   logger.debug('Falling back to universal insertion method');
-  return await universalTextInsertion(element, text, start, end);
+  return await universalTextInsertion(element, text, start, end, applicationContext);
 }
 
 /**
@@ -107,15 +113,19 @@ export async function universalTextInsertion(
   element,
   text,
   start = null,
-  end = null
+  end = null,
+  applicationContext = null
 ) {
   if (!element || !text) return false;
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
 
   try {
     // Focus کردن المان با اطمینان
     if (document.activeElement !== element) {
       element.focus();
       await smartDelay(20);
+      if (!isCurrent()) return false;
     }
 
     // ذخیره محتوای اولیه برای تأیید تغییرات
@@ -160,6 +170,7 @@ export async function universalTextInsertion(
     }
 
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     // بررسی انتخاب موجود
     const hasSelection = checkTextSelection(element);
@@ -175,8 +186,10 @@ export async function universalTextInsertion(
     const execSuccess = await tryExecCommandInsertion(
       element,
       text,
-      hasSelection
+      hasSelection,
+      applicationContext
     );
+    if (!isCurrent()) return false;
     if (
       execSuccess &&
       (await verifyTextInsertion(element, text, initialContent))
@@ -186,7 +199,8 @@ export async function universalTextInsertion(
     }
 
     // استراتژی 2: Paste Event Simulation (سازگار با frameworks)
-    const pasteSuccess = await tryPasteInsertion(element, text, hasSelection);
+    const pasteSuccess = await tryPasteInsertion(element, text, hasSelection, applicationContext);
+    if (!isCurrent()) return false;
     if (
       pasteSuccess &&
       (await verifyTextInsertion(element, text, initialContent))
@@ -199,8 +213,10 @@ export async function universalTextInsertion(
     const beforeInputSuccess = await tryBeforeInputInsertion(
       element,
       text,
-      hasSelection
+      hasSelection,
+      applicationContext
     );
+    if (!isCurrent()) return false;
     if (
       beforeInputSuccess &&
       (await verifyTextInsertion(element, text, initialContent))
@@ -215,8 +231,10 @@ export async function universalTextInsertion(
       const contentEditableSuccess = await tryContentEditableInsertion(
         element,
         text,
-        hasSelection
+        hasSelection,
+        applicationContext
       );
+      if (!isCurrent()) return false;
       if (
         contentEditableSuccess &&
         (await verifyTextInsertion(element, text, initialContent))
@@ -231,8 +249,10 @@ export async function universalTextInsertion(
         text,
         hasSelection,
         start,
-        end
+        end,
+        applicationContext
       );
+      if (!isCurrent()) return false;
       if (
         inputSuccess &&
         (await verifyTextInsertion(element, text, initialContent))

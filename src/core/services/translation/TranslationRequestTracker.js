@@ -303,7 +303,10 @@ export class TranslationRequestTracker {
     }
 
     if (request.metadata?.toastId) {
-      this.toastRequests.delete(request.metadata.toastId);
+      const toastId = request.metadata.toastId;
+      if (this.toastRequests.get(toastId) === request.messageId) {
+        this.toastRequests.delete(toastId);
+      }
     }
   }
 
@@ -419,7 +422,15 @@ export class TranslationRequestTracker {
    * Find request by DOM element
    */
   findRequestByElement(element) {
-    return this.elementRequests.get(element);
+    const messageId = this.elementRequests.get(element);
+    if (!messageId) return undefined;
+
+    if (!this.requests.has(messageId) || !this.isRequestActive(messageId)) {
+      this.elementRequests.delete(element);
+      return undefined;
+    }
+
+    return messageId;
   }
 
   /**

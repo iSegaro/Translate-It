@@ -10,7 +10,7 @@ import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
-import { MessagingContexts } from "@/shared/messaging/core/MessagingCore.js";
+import { MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -32,6 +32,16 @@ const logger = new Proxy({}, {
     return typeof value === 'function' ? value.bind(instance) : value;
   }
 });
+
+function resolveFailureError(payload) {
+  if (isStructuredTranslationError(payload?.errorDetails)) {
+    return reconstructTranslationError(payload.errorDetails);
+  }
+  if (payload?.error !== undefined && payload?.error !== null) {
+    return reconstructTranslationError(payload.error);
+  }
+  return new Error('Translation failed');
+}
 
 /**
  * useUnifiedTranslation - Unified composable for translation features
@@ -374,8 +384,8 @@ export function useUnifiedTranslation(context = 'popup') {
         let resultData = response.result || response.data || response;
         logger.debug(`[${context}] Processing direct response - resultData:`, resultData);
 
-        if (resultData.success === false && resultData.error) {
-          handleTranslationError(resultData.error, messageId);
+        if (resultData.success === false && (resultData.error || resultData.errorDetails)) {
+          handleTranslationError(resolveFailureError(resultData), messageId);
         } else if (resultData.success === true && resultData.translatedText !== undefined) {
           handleTranslationSuccess(resultData);
           if (context === 'sidepanel') {
@@ -388,8 +398,8 @@ export function useUnifiedTranslation(context = 'popup') {
         currentMessageId.value = null;
         logger.debug(`[${context}] Direct response processed successfully`);
         return true;
-      } else if (response && response.success === false && response.error) {
-        handleTranslationError(response.error, messageId);
+      } else if (response && response.success === false && (response.error || response.errorDetails)) {
+        handleTranslationError(resolveFailureError(response), messageId);
         isTranslating.value = false;
         isStreaming.value = false;
         currentMessageId.value = null;
@@ -485,8 +495,8 @@ export function useUnifiedTranslation(context = 'popup') {
         let resultData = message.result || message.data || (message.translatedText ? message : null);
 
         if (resultData && (resultData.translatedText !== undefined || resultData.success === false || resultData.success === true)) {
-          if (resultData.success === false && resultData.error) {
-            handleTranslationError(resultData.error);
+          if (resultData.success === false && (resultData.error || resultData.errorDetails)) {
+            handleTranslationError(resolveFailureError(resultData));
           } else if (resultData.success === true && resultData.translatedText !== undefined) {
             handleTranslationSuccess(resultData);
           } else {
@@ -507,8 +517,8 @@ export function useUnifiedTranslation(context = 'popup') {
           await ensureMinimumLoadingDuration();
           isTranslating.value = false;
           isStreaming.value = false;
-          if (message.data.success === false && message.data.error) {
-            handleTranslationError(message.data.error);
+          if (message.data.success === false && (message.data.error || message.data.errorDetails)) {
+            handleTranslationError(resolveFailureError(message.data));
           } else if (message.data.success === true && message.data.translatedText !== undefined) {
             handleTranslationSuccess(message.data);
           } else {

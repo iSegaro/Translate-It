@@ -7,12 +7,32 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import browser from 'webextension-polyfill';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedResultDispatcher');
+
+function createSelectElementDeliveryError(messageId, cause = null, reason = 'transport_failure') {
+  const causeMessage = String(cause?.message || cause || '').toLowerCase();
+  const contextError = cause && (
+    ExtensionContextManager.isContextError(cause)
+    || cause.type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
+    || causeMessage.includes('extension context invalidated')
+    || causeMessage.includes('message channel closed')
+    || causeMessage.includes('receiving end does not exist')
+    || causeMessage.includes('could not establish connection')
+    || causeMessage.includes('message port closed')
+  );
+  const error = new Error(contextError ? 'Extension context invalidated' : 'Select Element result delivery failed');
+  error.type = contextError ? ErrorTypes.EXTENSION_CONTEXT_INVALIDATED : ErrorTypes.CONNECTION_LOST;
+  error.messageId = messageId;
+  error.dispatchStage = 'select-element-result';
+  error.reason = reason;
+  return error;
+}
 
 export async function dispatchTranslationCancellation({ messageId, request }) {
   if (request?.sender?.tab?.id) {
@@ -112,6 +132,7 @@ export class UnifiedResultDispatcher {
     if (this.processedResults.has(messageId)) return;
 
     this.processedResults.add(messageId);
+    const isSelectElement = request.mode === TranslationMode.Select_Element;
 
     // Clean up old processed results (prevent memory leak)
     if (this.processedResults.size > 1000) {
@@ -126,12 +147,17 @@ export class UnifiedResultDispatcher {
       });
     }
 
-    if (request.mode === TranslationMode.Field) {
-      await this.dispatchFieldResult({ messageId, result, request, originalMessage });
-    } else if (request.mode === TranslationMode.Select_Element) {
-      await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
-    } else if (request.mode === TranslationMode.Selection || request.mode === TranslationMode.Dictionary_Translation) {
-      await this.dispatchSelectionResult({ messageId, result, request, originalMessage });
+    try {
+      if (request.mode === TranslationMode.Field) {
+        await this.dispatchFieldResult({ messageId, result, request, originalMessage });
+      } else if (isSelectElement) {
+        await this.dispatchSelectElementResult({ messageId, result, request, originalMessage });
+      } else if (request.mode === TranslationMode.Selection || request.mode === TranslationMode.Dictionary_Translation) {
+        await this.dispatchSelectionResult({ messageId, result, request, originalMessage });
+      }
+    } catch (error) {
+      if (isSelectElement) this.processedResults.delete(messageId);
+      throw error;
     }
   }
 
@@ -190,7 +216,7 @@ export class UnifiedResultDispatcher {
     const frameId = request?.sender?.frameId;
     if (typeof tabId !== 'number' || typeof frameId !== 'number') {
       logger.warn('[ResultDispatcher] Missing Select Element tab/frame identity', { messageId, tabId, frameId });
-      return false;
+      throw createSelectElementDeliveryError(messageId, null, 'missing_route_identity');
     }
 
     try {
@@ -204,12 +230,18 @@ export class UnifiedResultDispatcher {
           isBroadcast: false
         }
       }, { frameId });
+      // A resolved send only proves transport handoff. Receiver may buffer the
+      // result until its streaming handler registers.
       return true;
     } catch (sendError) {
       if (!ExtensionContextManager.isContextError(sendError)) {
         logger.warn(`[ResultDispatcher] Failed to send Select Element result:`, sendError.message);
       }
-      return false;
+      if (sendError?.type === ErrorTypes.CONNECTION_LOST
+          || sendError?.type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED) {
+        throw sendError;
+      }
+      throw createSelectElementDeliveryError(messageId, sendError);
     }
   }
 

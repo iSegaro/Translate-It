@@ -3,7 +3,6 @@ import { BaseProvider } from './BaseProvider.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
-import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 
@@ -28,12 +27,6 @@ vi.mock('@/features/translation/providers/utils/ProviderRequestEngine.js', () =>
   ProviderRequestEngine: {
     executeRequest: vi.fn(),
     executeApiCall: vi.fn()
-  }
-}));
-
-vi.mock('@/features/translation/providers/utils/TraditionalBatchProcessor.js', () => ({
-  TraditionalBatchProcessor: {
-    processInBatches: vi.fn()
   }
 }));
 
@@ -78,8 +71,10 @@ describe('BaseProvider', () => {
   describe('Constructor and Initialization', () => {
     it('should initialize with correct name and default values', () => {
       expect(provider.providerName).toBe('MockProvider');
-      expect(provider.sessionContext).toBeNull();
+      expect(provider).not.toHaveProperty('sessionContext');
       expect(provider.providerSettingKey).toBeNull();
+      expect(provider).not.toHaveProperty('storeSessionContext');
+      expect(provider).not.toHaveProperty('shouldResetSession');
     });
 
     it('should have default static capabilities', () => {
@@ -166,14 +161,6 @@ describe('BaseProvider', () => {
       expect(ProviderRequestEngine.executeApiCall).toHaveBeenCalledWith(provider, params);
     });
 
-    it('_processInBatches should delegate to TraditionalBatchProcessor', async () => {
-      const segments = ['a'];
-      const translateChunk = vi.fn();
-      await provider._processInBatches(segments, translateChunk, { limit: 10 });
-      expect(TraditionalBatchProcessor.processInBatches).toHaveBeenCalledWith(
-        provider, segments, translateChunk, { limit: 10 }, null, null
-      );
-    });
   });
 
   describe('_executeWithRateLimit', () => {
@@ -235,28 +222,9 @@ describe('BaseProvider', () => {
     });
   });
 
-  describe('Session Context', () => {
-    it('should store and reset session context', () => {
-      provider.storeSessionContext({ id: 1 });
-      expect(provider.sessionContext).toMatchObject({ id: 1 });
-      expect(provider.sessionContext.timestamp).toBeDefined();
-
-      provider.resetSessionContext();
-      expect(provider.sessionContext).toBeNull();
-    });
-
-    it('should correctly identify when session should be reset', () => {
-      vi.useFakeTimers();
-      const now = Date.now();
-      
-      provider.storeSessionContext({ lastUsed: now });
-      expect(provider.shouldResetSession()).toBe(false);
-
-      // Advance time by 6 minutes (360,000 ms)
-      vi.setSystemTime(now + 360000);
-      expect(provider.shouldResetSession()).toBe(true);
-
-      vi.useRealTimers();
+  describe('Provider Cleanup Hook', () => {
+    it('keeps resetSessionContext callable as a compatibility hook', () => {
+      expect(() => provider.resetSessionContext()).not.toThrow();
     });
   });
 

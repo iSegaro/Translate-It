@@ -4,6 +4,7 @@
  */
 
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { MessageFormat } from "@/shared/messaging/core/MessagingCore.js";
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -23,6 +24,46 @@ import { resolveOperationSourceLanguage } from '@/features/translation/core/Oper
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'OptimizedJsonHandler');
 const MAX_PARENT_RECOVERIES_PER_BATCH = 2;
+const GENERIC_TRANSLATION_ERROR_TYPES = new Set([
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
+]);
+
+function isGenericOperationAbort(error) {
+  const type = error?.type;
+  return error?.operationAborted === true
+    && (!type || GENERIC_TRANSLATION_ERROR_TYPES.has(type));
+}
+
+function hasStrongTerminalType(error) {
+  const type = error?.type;
+  return error?.operationAborted === true
+    && typeof type === 'string'
+    && type.length > 0
+    && !GENERIC_TRANSLATION_ERROR_TYPES.has(type)
+    && type !== ErrorTypes.USER_CANCELLED
+    && type !== ErrorTypes.TRANSLATION_CANCELLED
+    && error?.isCancelled !== true;
+}
+
+function createAbortError(signal, message = 'Translation task cancelled') {
+  const isUserCancellation = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
+  const error = new Error(message);
+  error.name = 'AbortError';
+  if (isUserCancellation) {
+    error.type = ErrorTypes.USER_CANCELLED;
+    error.isCancelled = true;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
+  }
+  return error;
+}
 
 function getParentRecoveryCharacterLimit(primaryFragmentLimit) {
   // Halve marker density without producing tiny recovery calls; never exceed primary policy.
@@ -80,11 +121,24 @@ export class OptimizedJsonHandler {
       ...(executionContext || {}),
       deadlineAt: operationDeadlineAt,
     };
+    const conversationAcceptanceRegistered = operationExecutionContext.conversationAcceptanceRegistered === true;
     const sessionId = data.sessionId || messageId;
     const tabId = sender?.tab?.id;
     const frameId = typeof sender?.frameId === 'number' ? sender.frameId : null;
     const abortController = engine.lifecycleRegistry.getAbortController(messageId) || 
                              engine.lifecycleRegistry.registerRequest(messageId, typeof text === 'string' ? text.substring(0, 100) : '', uiContext);
+    if (!abortController) {
+      const cancellationReason = engine.lifecycleRegistry.getCancellationReason?.(messageId)
+        || 'operation-abort';
+      const error = new Error('Translation operation aborted before execution');
+      if (cancellationReason === 'user-cancelled') {
+        error.type = ErrorTypes.USER_CANCELLED;
+      } else {
+        error.operationAborted = true;
+        error.cancellationReason = cancellationReason;
+      }
+      throw error;
+    }
 
     let hasErrors = false;
     let lastError = null;
@@ -245,10 +299,7 @@ export class OptimizedJsonHandler {
           const violation = stageViolation || primaryViolation;
           if (!isRecoverableParentViolation(violation)) throw failure;
           if (abortController.signal.aborted || engine.isCancelled(messageId)) {
-            const cancellation = new Error('Translation task cancelled');
-            cancellation.name = 'AbortError';
-            cancellation.isCancelled = true;
-            throw cancellation;
+            throw createAbortError(abortController.signal);
           }
           if (operationDeadlineAt - Date.now() <= 0) {
             const timeout = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
@@ -335,10 +386,7 @@ export class OptimizedJsonHandler {
             recoveryResults = await Promise.race([
               Promise.all(recoveryFragments.map(async (fragment, fragmentIndex) => {
             if (abortController.signal.aborted || engine.isCancelled(messageId)) {
-              const cancellation = new Error('Translation task cancelled');
-              cancellation.name = 'AbortError';
-              cancellation.isCancelled = true;
-              throw cancellation;
+              throw createAbortError(abortController.signal);
             }
             if (operationDeadlineAt - Date.now() <= 0) {
               const timeout = new Error(`Batch translation timed out after ${TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS}ms`);
@@ -443,12 +491,20 @@ export class OptimizedJsonHandler {
               recoveryTimeout,
             ]);
           } catch (recoveryError) {
-            const recoveryType = recoveryError?.type || matchErrorToType(recoveryError);
-            const isCancellation = recoveryError?.name === 'AbortError'
-              || recoveryError?.isCancelled
+            const normalizedRecoveryError = recoveryError?.name === 'AbortError'
+              && !recoveryError?.type
+              && !recoveryError?.operationAborted
+              ? createAbortError(abortController.signal, recoveryError.message)
+              : recoveryError;
+            const recoveryType = normalizedRecoveryError?.operationAborted
+              ? null
+              : normalizedRecoveryError?.type || matchErrorToType(normalizedRecoveryError);
+            const isCancellation = (normalizedRecoveryError?.name === 'AbortError' && !normalizedRecoveryError?.type)
+              || normalizedRecoveryError?.operationAborted
+              || normalizedRecoveryError?.isCancelled
               || recoveryType === ErrorTypes.USER_CANCELLED
               || recoveryType === ErrorTypes.TRANSLATION_CANCELLED;
-            if (recoveryType === ErrorTypes.TRANSLATION_TIMEOUT || isCancellation) throw recoveryError;
+            if (recoveryType === ErrorTypes.TRANSLATION_TIMEOUT || isCancellation) throw normalizedRecoveryError;
             appendTranslationDiagnostic(executionContext, {
               type: 'PARENT_RECOVERY_FAILED',
               stage: 'parent-recovery',
@@ -679,7 +735,8 @@ export class OptimizedJsonHandler {
               completedBatchCount,
               abortController,
               engine,
-              frameId
+              frameId,
+              operationExecutionContext
             );
           }
         };
@@ -859,14 +916,12 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
           
           // If first batch failed fatally, don't continue
           if (hasErrors && lastError && isFatalError(lastError)) {
+            const serializedError = MessageFormat.serializeTranslationError(lastError);
             return { 
               success: false, 
               streaming: true, 
-              error: {
-                message: lastError.message || String(lastError),
-                type: lastError.type || matchErrorToType(lastError),
-                statusCode: lastError.statusCode
-              },
+              error: serializedError,
+              errorDetails: serializedError,
               results: batchResults.flat()
             };
           }
@@ -888,10 +943,7 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
 
         const checkCancellation = () => {
           if (engine.isCancelled(messageId) || abortController.signal.aborted) {
-            const abortError = new Error('Translation task cancelled');
-            abortError.name = 'AbortError';
-            abortError.isCancelled = true;
-            throw abortError;
+            throw createAbortError(abortController.signal);
           }
         };
 
@@ -936,11 +988,17 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
               if (!abortController.signal.aborted) abortController.abort();
             }, remainingMs);
             
-            // Link timeout cleanup to abort signal
-            onAbort = () => clearTimeout(timeoutId);
+            // Shared abort must settle local wait immediately, even when the
+            // provider ignores the signal and leaves its promise pending.
+            onAbort = () => {
+              clearTimeout(timeoutId);
+              resolve({ __kind: 'abort' });
+            };
             abortController.signal.addEventListener('abort', onAbort);
+            if (abortController.signal.aborted) onAbort();
           });
-
+          if (abortController.signal.aborted) checkCancellation();
+            
            batchPayload = hasManifestMembership ? batch.map(({ payload }) => payload) : batch;
            const explicitParentIds = batch.map(item => item && typeof item === 'object'
              ? (item.parentId ?? item.blockId)
@@ -1034,6 +1092,8 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             throw translatedBatchResponse.error;
           } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'provider-success') {
             translatedBatchResponse = translatedBatchResponse.value;
+          } else if (translatedBatchResponse && typeof translatedBatchResponse === 'object' && translatedBatchResponse.__kind === 'abort') {
+            checkCancellation();
           }
 
           checkCancellation();
@@ -1073,15 +1133,23 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
                 try {
                   recoveredParent = await recoverFailedV3Parent(batchError, batchExecutionContext, parallelExecution);
                 } catch (recoveryError) {
-                  if ((recoveryError?.type || matchErrorToType(recoveryError)) === ErrorTypes.TRANSLATION_TIMEOUT) {
+                  const normalizedRecoveryError = recoveryError?.name === 'AbortError'
+                    && !recoveryError?.type
+                    && !recoveryError?.operationAborted
+                    ? createAbortError(abortController.signal, recoveryError.message)
+                    : recoveryError;
+                  const recoveryType = normalizedRecoveryError?.operationAborted
+                    ? null
+                    : normalizedRecoveryError?.type || matchErrorToType(normalizedRecoveryError);
+                  if (recoveryType === ErrorTypes.TRANSLATION_TIMEOUT) {
                     didTimeout = true;
-                    timeoutError = recoveryError;
+                    timeoutError = normalizedRecoveryError;
                   }
                   // Recovery failures must still publish the results collected before
                   // the offending parent. Re-anchor the snapshot captured at the throw
                   // site when the provider rewrote the error object.
-                  if (!recoveryError.parentRecovery) recoveryError.parentRecovery = parentRecovery;
-                  throw recoveryError;
+                  if (!normalizedRecoveryError.parentRecovery) normalizedRecoveryError.parentRecovery = parentRecovery;
+                  throw normalizedRecoveryError;
                 }
                 const { completeResults: preservedResults, sameBatchIds, resumeIndex, parentId } = parentRecovery;
                 // The recovered parent replaces the failed original; clear its fragment
@@ -1122,49 +1190,46 @@ const parentError = createParentValidationError(parentIdStr, sourceText, transla
             throw timeoutError;
           }
 
-          const errorType = matchErrorToType(batchError);
-          const isCancellation = batchError.name === 'AbortError' || 
-                               batchError.isCancelled || 
+          const normalizedBatchError = batchError?.name === 'AbortError'
+            && !batchError?.type
+            && !batchError?.operationAborted
+            ? createAbortError(abortController.signal, batchError.message)
+            : batchError;
+          const errorType = normalizedBatchError.type || matchErrorToType(normalizedBatchError);
+          const isCancellation = (normalizedBatchError.name === 'AbortError' && !normalizedBatchError.type) ||
+                               isGenericOperationAbort(normalizedBatchError) ||
+                               normalizedBatchError.isCancelled || 
                                errorType === ErrorTypes.USER_CANCELLED || 
                                errorType === ErrorTypes.TRANSLATION_CANCELLED;
 
           if (isCancellation) {
             fragmentedUnits.clear();
             logger.debug(`[JsonHandler] Batch ${i + 1} cancelled for messageId: ${messageId}`);
-            
-            // FIX: Explicitly cancel any other pending batches for this provider in the QueueManager
-            // to prevent them from even attempting to start.
-            if (providerInstance.providerName) {
-              import('@/features/translation/core/ProviderCoordinator.js').then(({ providerCoordinator }) => {
-                if (providerCoordinator && providerCoordinator.queueManager) {
-                  // Actually, QueueManager is a singleton, we can use it directly
-                }
-              }).catch(() => { /* ignore */ });
-              
-              // More robust way: Use the QueueManager singleton directly
-              import('@/features/translation/core/QueueManager.js').then(({ queueManager }) => {
-                if (queueManager) {
-                  queueManager.cancelByMessageId(messageId);
-                }
-              }).catch(() => { /* ignore */ });
+
+            if (isGenericOperationAbort(normalizedBatchError) && !abortController.signal.aborted) {
+              abortController.abort(normalizedBatchError.cancellationReason || 'operation-abort');
             }
-            
-            return; // Exit silently on cancellation
+
+            // Queue cancellation is owned by handleCancelTranslation. Cancelling
+            // here races provider failures and rewrites them as USER_CANCELLED.
+            return;
           }
           
-           logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, batchError.message);
-           discardFailedFragments(batchPayload);
+            logger.debug(`[JsonHandler] Batch ${i + 1} failed:`, normalizedBatchError.message);
+            discardFailedFragments(batchPayload);
            appendTranslationDiagnostic(executionContext, {
              type: 'STRUCTURED_BATCH_FAILURE',
              stage: 'optimized-json-handler',
              batchIndex: i,
-             reason: batchError.message,
-             code: batchError.type || matchErrorToType(batchError),
+              reason: normalizedBatchError.message,
+              code: normalizedBatchError.operationAborted
+                ? normalizedBatchError.cancellationReason
+                : normalizedBatchError.type || matchErrorToType(normalizedBatchError),
              fallback: true,
            });
 hasErrors = true;
-           lastError = batchError;
-           const preservedResults = batchError?.parentRecovery?.completeResults;
+           lastError = normalizedBatchError;
+            const preservedResults = normalizedBatchError?.parentRecovery?.completeResults;
            if (preservedResults && preservedResults.length > 0) {
              // Recovery failed (or a later parent violated after a recovery): keep
              // the valid prefix/suffix collected before the failing parent instead
@@ -1178,10 +1243,14 @@ hasErrors = true;
            }
           
           // Stop all other batches if error is fatal (429, etc.)
-          if (isFatalError(batchError)) {
-            abortInitiator = 'fatal-error';
-            if (!abortController.signal.aborted) abortController.abort();
-          }
+            const fatalClassification = normalizedBatchError.operationAborted
+              && !isGenericOperationAbort(normalizedBatchError)
+              ? errorType
+              : normalizedBatchError;
+            if (isFatalError(fatalClassification)) {
+             abortInitiator = 'fatal-error';
+             if (!abortController.signal.aborted) abortController.abort();
+           }
         } finally {
           clearTimeout(timeoutId);
           abortController.signal.removeEventListener('abort', onAbort);
@@ -1193,45 +1262,84 @@ hasErrors = true;
       // Final check for cancellation before sending end-of-stream markers
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
         logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
-        if (hasErrors && lastError && abortInitiator === 'fatal-error') {
+        if (lastError && hasStrongTerminalType(lastError)) {
+          const serializedError = MessageFormat.serializeTranslationError(lastError);
           return {
             success: false,
             streaming: true,
-            error: {
-              message: lastError.message || String(lastError),
-              type: lastError.type || matchErrorToType(lastError),
-              statusCode: lastError.statusCode
-            },
+            error: serializedError,
+            errorDetails: serializedError,
             results: batchResults.flat()
           };
         }
-        return { success: false, streaming: true, error: { type: ErrorTypes.USER_CANCELLED, message: 'Cancelled' } };
+        if (hasErrors && lastError && abortInitiator === 'fatal-error') {
+          const serializedError = MessageFormat.serializeTranslationError(lastError);
+          return {
+            success: false,
+            streaming: true,
+            error: serializedError,
+            errorDetails: serializedError,
+            results: batchResults.flat()
+          };
+        }
+        const cancellation = createAbortError(abortController.signal);
+        if (lastError && !cancellation.isCancelled) {
+          const serializedError = MessageFormat.serializeTranslationError(lastError);
+          return {
+            success: false,
+            streaming: true,
+            error: serializedError,
+            errorDetails: serializedError,
+            results: batchResults.flat()
+          };
+        }
+        if (cancellation.isCancelled !== true) {
+          const serializedError = MessageFormat.serializeTranslationError(cancellation);
+          return {
+            success: false,
+            streaming: true,
+            error: serializedError,
+            errorDetails: serializedError,
+          };
+        }
+        return { success: false, streaming: true, error: cancellation };
       }
 
       if (!skipStreaming) {
         if (hasErrors) {
-          await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
+          // Strong typed operation aborts return a terminal result below. Do not
+          // also publish a stream-end error; one terminal delivery is enough.
+          if (!hasStrongTerminalType(lastError)) {
+            await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
+          }
         } else {
-          await this._sendStreamEnd(tabId, messageId, providerInstance.providerName, targetLanguage, detectedSourceLanguage, mode, frameId);
+            await this._sendStreamEnd(
+              tabId,
+              messageId,
+              providerInstance.providerName,
+              targetLanguage,
+              detectedSourceLanguage,
+              mode,
+              frameId,
+              operationExecutionContext
+            );
         }
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
 
-      const formattedError = lastError ? {
-        message: lastError.message || String(lastError),
-        type: lastError.type || matchErrorToType(lastError),
-        statusCode: lastError.statusCode
-      } : null;
+      const formattedError = lastError ? MessageFormat.serializeTranslationError(lastError) : null;
 
       return {
         success: !hasErrors,
         streaming: true,
         error: formattedError,
+        ...(formattedError && { errorDetails: formattedError }),
         results: batchResults.flat(),
         metadata: {
           batchCount: batches.length
-        }
+        },
+        ...(conversationAcceptanceRegistered && { conversationAcceptance: true })
       };
     } finally {
       fragmentedUnits?.clear();
@@ -1408,7 +1516,7 @@ hasErrors = true;
     });
   }
 
-  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null, frameId = null) {
+  async _streamResults(tabId, messageId, translatedData, batchIndex, totalBatches, targetLanguage, sourceLanguage, translationMode, completedCount = null, abortController = null, engine = null, frameId = null, executionContext = null) {
     if (!tabId) return;
     const isCancelled = () => {
       if (abortController?.signal?.aborted) return true;
@@ -1433,7 +1541,8 @@ hasErrors = true;
         sourceLanguage,
         targetLanguage,
         translationMode,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(executionContext?.conversationAcceptanceRegistered === true && { conversationAcceptance: true })
       }
     };
     try {
@@ -1447,7 +1556,7 @@ hasErrors = true;
     }
   }
 
-  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode, frameId = null) {
+  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode, frameId = null, executionContext = null) {
     if (!tabId) return;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
@@ -1459,7 +1568,8 @@ hasErrors = true;
         sourceLanguage,
         targetLanguage,
         translationMode,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        ...(executionContext?.conversationAcceptanceRegistered === true && { conversationAcceptance: true })
       }
     };
     try {
@@ -1471,16 +1581,14 @@ hasErrors = true;
 
   async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode, frameId = null) {
     if (!tabId) return;
+    const serializedError = lastError ? MessageFormat.serializeTranslationError(lastError) : null;
     const endMessage = {
       action: MessageActions.TRANSLATION_STREAM_END,
       messageId,
       data: {
         success: false,
-        error: lastError ? { 
-          message: lastError.message || String(lastError), 
-          type: lastError.type || matchErrorToType(lastError),
-          statusCode: lastError.statusCode
-        } : null,
+        error: serializedError,
+        errorDetails: serializedError,
         sourceLanguage,
         targetLanguage,
         translationMode,

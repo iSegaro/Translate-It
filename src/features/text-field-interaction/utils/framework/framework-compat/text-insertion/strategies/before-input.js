@@ -13,7 +13,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'before-input');
  * @param {boolean} hasSelection - آیا انتخاب دارد
  * @returns {Promise<boolean>}
  */
-export async function tryBeforeInputInsertion(element, text, hasSelection) {
+export async function tryBeforeInputInsertion(element, text, hasSelection, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
   logger.debug('Attempting beforeinput event simulation');
 
@@ -25,6 +27,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection) {
 
     element.focus();
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     // اگر انتخاب ندارد، کل محتوا را انتخاب کن
     if (!hasSelection) {
@@ -40,6 +43,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection) {
     }
 
     // ایجاد beforeinput event
+    if (!isCurrent()) return false;
     const beforeInputEvent = new InputEvent("beforeinput", {
       bubbles: true,
       cancelable: true,
@@ -59,6 +63,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection) {
     await smartDelay(20);
 
     // ارسال input event
+    if (!isCurrent()) return false;
     const inputEvent = new InputEvent("input", {
       bubbles: true,
       cancelable: false,

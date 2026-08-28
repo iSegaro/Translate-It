@@ -180,11 +180,8 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
             throw err;
           }
           
-          // Capture detected language from metadata if available
-          this._setDetectedLanguage(data[0].detectedLanguage?.language);
-          
           // Match anylang logic: Join multiple translation segments if present
-          return data.map(item => {
+          const translatedTexts = data.map(item => {
             if (!item.translations || !Array.isArray(item.translations)) {
               const err = new Error(ErrorTypes.API_RESPONSE_INVALID);
               err.type = ErrorTypes.API_RESPONSE_INVALID;
@@ -202,12 +199,16 @@ export class MicrosoftEdgeProvider extends BaseTranslateProvider {
             }
             return joinedText;
           });
+
+          this._setExecutionDetectedLanguage(options, data[0].detectedLanguage?.language);
+          return translatedTexts;
         },
         context: 'edge-translate-chunk',
         abortController,
         charCount: chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0),
         sessionId: options.sessionId,
-        originalCharCount: options.originalCharCount || chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0)
+        originalCharCount: options.originalCharCount || chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0),
+        callPurpose: options.callPurpose
       });
     };
 

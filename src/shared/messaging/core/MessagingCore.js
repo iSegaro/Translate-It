@@ -8,6 +8,100 @@ import { MessageActions } from './MessageActions.js';
 import { MessageContexts, ActionReasons } from './MessagingConstants.js';
 import { ErrorMatcher } from '@/shared/error-management/ErrorMatcher.js';
 
+const TRANSLATION_ERROR_FIELDS = [
+  'type',
+  'originalType',
+  'statusCode',
+  'context',
+  'providerName',
+  'providerId',
+  'code',
+  'errorCode',
+  'operationAborted',
+  'cancellationReason',
+  'translationOutcome',
+];
+
+const LEGACY_ERROR_OPTION_FIELDS = new Set([
+  'success',
+  'error',
+  ...TRANSLATION_ERROR_FIELDS,
+  'cause',
+  'originalError',
+  'stack',
+]);
+
+const UNSUPPORTED_VALUE = Symbol('unsupported-transport-value');
+const CIRCULAR_VALUE = Symbol('circular-transport-value');
+
+function isPlainObject(value) {
+  if (!value || typeof value !== 'object') return false;
+
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function cloneSafeValue(value, seen = new WeakSet()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : UNSUPPORTED_VALUE;
+  if (!Array.isArray(value) && !isPlainObject(value)) return UNSUPPORTED_VALUE;
+  if (seen.has(value)) return CIRCULAR_VALUE;
+
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    const result = [];
+    for (const item of value) {
+      if (item === value) return CIRCULAR_VALUE;
+      const cloned = cloneSafeValue(item, seen);
+      if (cloned !== UNSUPPORTED_VALUE && cloned !== CIRCULAR_VALUE) result.push(cloned);
+    }
+    seen.delete(value);
+    return result;
+  }
+
+  const result = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (item === value) return CIRCULAR_VALUE;
+    const cloned = cloneSafeValue(item, seen);
+    if (cloned !== UNSUPPORTED_VALUE && cloned !== CIRCULAR_VALUE) result[key] = cloned;
+  }
+
+  seen.delete(value);
+  return result;
+}
+
+function hasValue(object, field) {
+  return object && typeof object === 'object'
+    && Object.prototype.hasOwnProperty.call(object, field)
+    && object[field] !== undefined;
+}
+
+function getFieldValue(error, options, field) {
+  if (hasValue(options, field)) return options[field];
+  if (hasValue(error, field)) return error[field];
+  return undefined;
+}
+
+function copyScalar(target, field, value, acceptedTypes) {
+  if (acceptedTypes.includes(typeof value)) target[field] = value;
+}
+
+function copyLegacyOptions(target, options) {
+  if (!options || typeof options !== 'object') return;
+
+  for (const [key, value] of Object.entries(options)) {
+    if (LEGACY_ERROR_OPTION_FIELDS.has(key)) continue;
+
+    const cloned = cloneSafeValue(value);
+    if (cloned !== UNSUPPORTED_VALUE && cloned !== CIRCULAR_VALUE) target[key] = cloned;
+  }
+}
+
 /**
  * Message Format Utility
  * Provides methods for creating and validating message objects
@@ -32,6 +126,55 @@ export const MessageFormat = {
   },
 
   /**
+   * Serialize translation error identity into an explicit, messaging-safe DTO.
+   * Native Error internals and arbitrary properties never cross the boundary.
+   *
+   * @param {Error|Object|string} error - Error object, DTO, or message
+   * @param {Object} options - Explicit canonical field overrides
+   * @returns {Object} Plain translation error DTO
+   */
+  serializeTranslationError(error, options = {}) {
+    const serialized = {};
+    const isObjectError = error && typeof error === 'object';
+    const rawMessage = hasValue(options, 'message')
+      ? options.message
+      : error instanceof Error
+        ? error.message
+        : isObjectError
+          ? (error.message ?? error.error ?? 'Unknown error')
+          : String(error);
+
+    serialized.message = typeof rawMessage === 'string' ? rawMessage : String(rawMessage);
+
+    const explicitType = getFieldValue(error, options, 'type');
+    const errorType = explicitType === undefined
+      ? ErrorMatcher.matchErrorToType(error)
+      : explicitType;
+    copyScalar(serialized, 'type', errorType, ['string']);
+    copyScalar(serialized, 'originalType', getFieldValue(error, options, 'originalType'), ['string']);
+
+    const statusCode = getFieldValue(error, options, 'statusCode');
+    if (typeof statusCode === 'number' && Number.isFinite(statusCode)) {
+      serialized.statusCode = statusCode;
+    }
+
+    copyScalar(serialized, 'context', getFieldValue(error, options, 'context'), ['string']);
+    copyScalar(serialized, 'providerName', getFieldValue(error, options, 'providerName'), ['string']);
+    copyScalar(serialized, 'providerId', getFieldValue(error, options, 'providerId'), ['string', 'number']);
+    copyScalar(serialized, 'code', getFieldValue(error, options, 'code'), ['string', 'number']);
+    copyScalar(serialized, 'errorCode', getFieldValue(error, options, 'errorCode'), ['string', 'number']);
+    copyScalar(serialized, 'operationAborted', getFieldValue(error, options, 'operationAborted'), ['boolean']);
+    copyScalar(serialized, 'cancellationReason', getFieldValue(error, options, 'cancellationReason'), ['string']);
+
+    const translationOutcome = cloneSafeValue(getFieldValue(error, options, 'translationOutcome'));
+    if (translationOutcome !== UNSUPPORTED_VALUE && translationOutcome !== CIRCULAR_VALUE) {
+      serialized.translationOutcome = translationOutcome;
+    }
+
+    return serialized;
+  },
+
+  /**
    * Create a standard error response
    * @param {Error|Object|string} error - Error object or message
    * @param {string|null} messageId - Original message ID
@@ -39,36 +182,16 @@ export const MessageFormat = {
    * @returns {Object} Error response object
    */
   createErrorResponse(error, messageId = null, options = {}) {
-    let errorData;
-    const errorType = ErrorMatcher.matchErrorToType(error);
-    
-    if (error instanceof Error) {
-      errorData = {
-        message: error.message,
-        type: error.type || errorType,
-        originalType: error.originalType, // Preserve original type for Circuit Breaker
-        statusCode: error.statusCode,
-        ...options
-      };
-    } else if (error && typeof error === 'object') {
-      errorData = {
-        message: error.message || error.error || 'Unknown error',
-        type: error.type || errorType,
-        originalType: error.originalType, // Preserve original type if present
-        ...error,
-        ...options
-      };
-    } else {
-      errorData = {
-        message: String(error),
-        type: errorType,
-        ...options
-      };
-    }
+    // Keep legacy non-error options for compatibility, but never recursively
+    // spread error objects or duplicate the outer failure envelope.
+    const errorDetails = this.serializeTranslationError(error, options);
+    const errorData = cloneSafeValue(errorDetails);
+    copyLegacyOptions(errorData, options);
 
     return {
       success: false,
       error: errorData,
+      errorDetails,
       messageId,
       timestamp: Date.now()
     };
@@ -85,6 +208,34 @@ export const MessageFormat = {
     return true;
   }
 };
+
+/**
+ * Reconstruct a native Error while keeping canonical translation identity fields.
+ * @param {Error|Object|string} errorLike - Serialized error or error-like value
+ * @returns {Error} Error with canonical identity fields
+ */
+export function reconstructTranslationError(errorLike) {
+  const serialized = MessageFormat.serializeTranslationError(errorLike);
+  const error = new Error(serialized.message);
+
+  for (const field of TRANSLATION_ERROR_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(serialized, field)) {
+      error[field] = serialized[field];
+    }
+  }
+
+  return error;
+}
+
+/**
+ * Validate a candidate canonical errorDetails DTO.
+ * Minimal contract: non-null object (not array) with a string message.
+ * @param {*} value - Candidate errorDetails value
+ * @returns {boolean} True when the value is a usable canonical error DTO
+ */
+export function isStructuredTranslationError(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && typeof value.message === 'string';
+}
 
 /**
  * Unique ID generator for messages

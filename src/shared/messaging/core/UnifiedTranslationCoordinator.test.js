@@ -9,6 +9,7 @@ import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/trans
 vi.mock('./StreamingTimeoutManager.js', () => ({
   streamingTimeoutManager: {
     shouldContinue: vi.fn().mockReturnValue(true),
+    getOperationState: vi.fn().mockReturnValue(null),
     registerStreamingOperation: vi.fn(),
     completeStreaming: vi.fn(),
     cancelStreaming: vi.fn(),
@@ -41,6 +42,49 @@ describe('UnifiedTranslationCoordinator', () => {
   });
 
   describe('coordinateTranslation', () => {
+    it('preserves explicit user cancellation identity before coordination', async () => {
+      streamingTimeoutManager.shouldContinue.mockReturnValue(false);
+      streamingTimeoutManager.getOperationState.mockReturnValue({
+        isCancelled: true,
+        hasTimedOut: false,
+        isCompleted: false
+      });
+
+      try {
+        await expect(coordinator.coordinateTranslation({
+          action: MessageActions.TRANSLATE,
+          messageId: 'cancelled-before-start',
+          data: { text: 'short' }
+        })).rejects.toMatchObject({
+          message: 'Translation cancelled by user',
+          type: 'USER_CANCELLED'
+        });
+      } finally {
+        streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+        streamingTimeoutManager.getOperationState.mockReturnValue(null);
+      }
+    });
+
+    it('preserves timeout identity before coordination', async () => {
+      streamingTimeoutManager.shouldContinue.mockReturnValue(false);
+      streamingTimeoutManager.getOperationState.mockReturnValue({
+        isCancelled: false,
+        hasTimedOut: true,
+        isCompleted: false
+      });
+
+      try {
+        await expect(coordinator.coordinateTranslation({
+          action: MessageActions.TRANSLATE,
+          messageId: 'timed-out-before-start',
+          data: { text: 'short' }
+        })).rejects.toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+      } finally {
+        streamingTimeoutManager.shouldContinue.mockReturnValue(true);
+        streamingTimeoutManager.getOperationState.mockReturnValue(null);
+      }
+    });
+
     it('should use regular translation for small texts', async () => {
       const message = { 
         action: MessageActions.TRANSLATE, 
@@ -76,6 +120,26 @@ describe('UnifiedTranslationCoordinator', () => {
 
       expect(streamingTimeoutManager.registerStreamingOperation).toHaveBeenCalled();
       expect(result).toEqual(streamingResult);
+    });
+
+    it('preserves acceptance metadata from the initial streaming response', async () => {
+      const message = {
+        action: MessageActions.TRANSLATE,
+        messageId: 'stream-acceptance',
+        context: 'select-element',
+        data: { text: 'a'.repeat(300), mode: 'select-element' },
+      };
+      sendRegularMessage.mockResolvedValue({
+        success: true,
+        streaming: true,
+        conversationAcceptance: true,
+      });
+      const streamingResult = { success: true, type: 'stream_end', data: { success: true } };
+      streamingTimeoutManager.registerStreamingOperation.mockResolvedValue(streamingResult);
+
+      const result = await coordinator.coordinateTranslation(message);
+
+      expect(result).toEqual({ ...streamingResult, conversationAcceptance: true });
     });
 
     it('should fallback to regular translation if streaming is not initiated', async () => {

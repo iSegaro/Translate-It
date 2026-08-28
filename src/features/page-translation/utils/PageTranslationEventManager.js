@@ -1,9 +1,10 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
 
 /**
  * PageTranslationEventManager - Specialized class to handle external events
@@ -78,97 +79,50 @@ export class PageTranslationEventManager {
 
     this.logger.info('Setting up GLOBAL PageEventBus listeners for PageTranslationManager');
 
-    // 1. Progress & Completion Forwarding (Forward to background for UI updates)
-    bus.on(MessageActions.PAGE_TRANSLATE_PROGRESS, (data) => {
-      sendRegularMessage({ 
-        action: MessageActions.PAGE_TRANSLATE_PROGRESS, 
-        data, 
-        context: 'page-translation-progress-forward' 
-      }, { silent: true }).catch(() => {});
-    });
-
+    // Aggregate completion is canonical presentation because child-only failures
+    // have no top-frame local completion event.
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
-      this.manager.isTranslating = false;
-      this.manager.isTranslated = data.translatedCount > 0;
-      
-      sendRegularMessage({ 
-        action: MessageActions.PAGE_TRANSLATE_COMPLETE, 
-        data: {
-          ...data,
-          url: this.manager.currentUrl,
-          isAutoTranslating: this.manager.isAutoTranslating,
-          sessionId: this.manager.translationMessageId
-        }, 
-        context: 'page-translation-complete-forward' 
-      }, { silent: true }).catch(() => {});
+      if (
+        data?.isAggregated
+        && data.isTranslating === false
+        && data.isAutoTranslating === false
+        && data.translatedCount === 0
+        && data.failedCount > 0
+      ) {
+        void getPageTranslationErrorPresentation({
+          error: Object.assign(new Error('Translation failed'), {
+            type: ErrorTypes.TRANSLATION_FAILED,
+          }),
+          errorType: ErrorTypes.TRANSLATION_FAILED,
+        }).then((displayError) => {
+          if (!displayError) return;
+          return ErrorHandler.getInstance().handle(displayError, {
+            type: ErrorTypes.TRANSLATION_FAILED,
+            context: 'page-translation-zero-result',
+            showToast: true,
+          });
+        }).catch(err => this.logger.warn('ErrorHandler failed for zero-result page translation:', err));
+      }
     });
 
-    // 2. Lifecycle Commands (Translate, Restore, Stop, Cancel)
-    bus.on(MessageActions.PAGE_TRANSLATE, (options) => {
-      this.manager.translatePage(options || {}).catch(err => {
-        this.logger.error('Failed to translate page from PageEventBus:', err);
-      });
-    });
-
-    bus.on(MessageActions.PAGE_RESTORE, () => {
-      this.manager.restorePage({ manual: true }).catch(() => {});
-    });
-
-    bus.on(MessageActions.PAGE_TRANSLATE_CANCELLED, () => {
-      this.manager.cancelTranslation({ manual: true });
-    });
-
-    bus.on(MessageActions.PAGE_TRANSLATE_STOP_AUTO, () => {
-      this.manager.stopAutoTranslation().catch(() => {});
-    });
-
-    // 3. Error Handling
+    // 2. Error Handling
     bus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, (data) => {
       if (!data?.isInternal) this.manager.resetError();
     });
 
-    bus.on(MessageActions.PAGE_TRANSLATE_IDLE, (data) => {
-      if (this.manager.isTranslating) {
-        this.manager.isTranslating = false;
-        this.manager.isTranslated = data.translatedCount > 0;
-        
-        this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_PROGRESS, {
-          status: 'idle',
-          isTranslating: false,
-          isAutoTranslating: this.manager.isAutoTranslating,
-          isTranslated: this.manager.isTranslated,
-          translatedCount: data.translatedCount,
-          totalCount: data.totalCount
-        });
-      }
-    });
-
-    bus.on('page-translation-fatal-error', ({ error, errorType, localizedMessage }) => 
-      this.manager._handleFatalError(error, errorType, localizedMessage));
-
-    bus.on('page-translation-internal-error', (data) => {
+    bus.on('page-translation-internal-error', async (data) => {
       if (data.isFatal || ExtensionContextManager.isContextError(data.error)) return;
 
       this.logger.debug('Non-fatal page translation error received', data.error);
 
-      ErrorHandler.getInstance().handle(data.error, {
-        context: data.context || 'page-translation',
-        showToast: true
-      }).catch(err => this.logger.warn('ErrorHandler failed for non-fatal error:', err));
-
-      this.manager._broadcastEvent(MessageActions.PAGE_TRANSLATE_ERROR, {
-        error: data.error?.message || String(data.error),
+      const presentationPromise = getPageTranslationErrorPresentation({
+        error: data.error,
+        errorDetails: data.errorDetails,
         errorType: data.errorType,
-        isFatal: false
       });
-    });
 
-    // 4. Conflict Resolution
-    bus.on('STOP_CONFLICTING_FEATURES', (data) => {
-      if ((this.manager.isTranslating || this.manager.isTranslated) && data?.source !== 'page-translation') {
-        this.logger.info('Stopping/Restoring Page Translation due to conflicting feature:', data?.source);
-        this.manager.restorePage();
-      }
+      const displayError = await presentationPromise;
+      if (displayError) this.logger.debug('Non-fatal page translation failure kept silent', displayError.type);
     });
 
     window._translateItPageTranslationListenersSet = true;

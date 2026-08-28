@@ -7,6 +7,8 @@ export const isConfigError = vi.fn(() => false);
 export const isCancellationError = vi.fn(() => false);
 export const getProviderErrorPattern = vi.fn(() => null);
 export const isRetryableError = vi.fn(() => true);
+export const isProviderRequestSizeError = vi.fn(() => false);
+export const isDeterministicClientHttpError = vi.fn(() => false);
 export const isSilentError = vi.fn(() => false);
 export const needsSettings = vi.fn(() => false);
 export const shouldSuppressConsole = vi.fn(() => false);

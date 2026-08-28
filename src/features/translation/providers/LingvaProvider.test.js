@@ -150,6 +150,29 @@ describe('LingvaProvider', () => {
       await expect(translate({ translation: 'یک ترجمه بسیار طولانی' }, ['Hi']))
         .resolves.toBe('یک ترجمه بسیار طولانی');
     });
+
+    it('rejects blank mapped output for a nonblank source', async () => {
+      const response = 'A2' + DELIMITER + '' + DELIMITER + 'C2';
+      await expect(translate({ translation: response }, ['A', 'B', 'C']))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it.each(['   ', '\n\t'])('rejects %j mapped output for a nonblank source', async (blankTranslation) => {
+      const response = 'A2' + DELIMITER + blankTranslation + DELIMITER + 'C2';
+      await expect(translate({ translation: response }, ['A', 'B', 'C']))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('preserves blank source positions', async () => {
+      const response = '' + DELIMITER + 'A2';
+      await expect(translate({ translation: response }, ['', 'A'])).resolves.toBe(response);
+      await expect(translate({ translation: response }, ['   ', 'A'])).resolves.toBe(response);
+    });
+
+    it('preserves valid multi-item mapping order', async () => {
+      const response = 'A2' + DELIMITER + 'B2' + DELIMITER + 'C2';
+      await expect(translate({ translation: response }, ['A', 'B', 'C'])).resolves.toBe(response);
+    });
   });
 
   // ── Budget Partitioning ────────────────────────────────────────────────
@@ -178,6 +201,20 @@ describe('LingvaProvider', () => {
       const exec = vi.spyOn(provider, '_executeRequest').mockResolvedValue('ok');
       await provider._translateChunk([item, item, item], 'en', 'fa', 'selection');
       expect(exec).toHaveBeenCalledTimes(2);
+    });
+
+    it('preserves callPurpose across rebatched subgroup requests', async () => {
+      const item = 'a'.repeat(27);
+      const exec = vi.spyOn(provider, '_executeRequest').mockResolvedValue('ok');
+
+      await provider._translateChunk(
+        [item, item], 'en', 'fa', 'selection', null, 0, 2, 0, 1,
+        { callPurpose: 'PARENT_RECOVERY' }
+      );
+
+      expect(exec).toHaveBeenCalledTimes(2);
+      expect(exec.mock.calls.map(([options]) => options.callPurpose))
+        .toEqual(['PARENT_RECOVERY', 'PARENT_RECOVERY']);
     });
 
     it('every subgroup URL is within budget', async () => {
@@ -662,6 +699,31 @@ describe('LingvaProvider', () => {
   // ── Rebatched + Mapper Integration (Real _traditionalBatchTranslate Path) ─
 
   describe('rebatched integration — real _traditionalBatchTranslate path', () => {
+    it('rejects invalid mapped output in later subgroup without partial result', async () => {
+      const item = 'a'.repeat(26);
+      let callCount = 0;
+      const exec = vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
+        callCount++;
+        const translation = callCount === 1
+          ? 'TA' + DELIMITER + 'TB'
+          : 'TC' + DELIMITER + '   ';
+        return opts.extractResponse({ translation });
+      });
+
+      let result;
+      let error;
+      try {
+        result = await provider._translateChunk([item, item, item, item], 'en', 'fa', 'selection');
+      } catch (caughtError) {
+        error = caughtError;
+      }
+
+      expect(error).toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(result).toBeUndefined();
+      expect(callCount).toBe(2);
+      expect(exec).toHaveBeenCalledTimes(2);
+    });
+
     /**
      * Helper: run the real _traditionalBatchTranslate → _translateChunk → mapper path.
      * Only _executeRequest is mocked. Mapper, chunking, and rate limit are real.

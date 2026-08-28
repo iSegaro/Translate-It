@@ -51,7 +51,8 @@ export default class MediumStrategy extends PlatformStrategy {
   /**
    * به‌روزرسانی فیلد متنی مدیوم با پشتیبانی از انتخاب متن
    */
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (!translatedText || !element) {
       return false;
     }
@@ -64,15 +65,19 @@ export default class MediumStrategy extends PlatformStrategy {
         const selectionEnd = hasSelection ? element.selectionEnd : null;
 
         await this.applyVisualFeedback(element);
+        if (!isCurrent()) return false;
         const success = await smartTextReplacement(
           element,
           translatedText,
           selectionStart,
-          selectionEnd
+          selectionEnd,
+          undefined,
+          applicationContext
         );
         
         if (success) {
           await smartDelay(100);
+          if (!isCurrent()) return false;
           logger.debug('Medium input/textarea updated successfully');
         }
         return success;
@@ -86,21 +91,25 @@ export default class MediumStrategy extends PlatformStrategy {
 
       mediumField.focus();
       await smartDelay(50);
+      if (!isCurrent()) return false;
       
       const hasSelection = this._hasTextSelection(mediumField);
 
       if (hasSelection) {
         // جایگزینی متن انتخاب شده با استفاده از سیستم یکپارچه
         await this.applyVisualFeedback(mediumField);
-        return await smartTextReplacement(mediumField, translatedText);
+        if (!isCurrent()) return false;
+        return await smartTextReplacement(mediumField, translatedText, null, null, undefined, applicationContext);
       } else {
         // جایگزینی سطر فعلی (رفتار خاص مدیوم برای حفظ پاراگراف‌ها)
-        const success = await this.replaceCurrentLine(
-          mediumField,
-          translatedText,
-        );
+         const success = await this.replaceCurrentLine(
+           mediumField,
+           translatedText,
+           applicationContext,
+         );
         if (success) {
           await this.applyVisualFeedback(mediumField);
+          if (!isCurrent()) return false;
           return true;
         }
       }
@@ -196,7 +205,7 @@ export default class MediumStrategy extends PlatformStrategy {
   /**
    * جایگزینی سطر فعلی بجای کل محتوا
    */
-  async replaceCurrentLine(element, translatedText) {
+  async replaceCurrentLine(element, translatedText, applicationContext = null) {
     try {
       const selection = window.getSelection();
 
@@ -209,7 +218,7 @@ export default class MediumStrategy extends PlatformStrategy {
         while (currentNode && currentNode !== element) {
           if (currentNode.tagName === "DIV" || currentNode.tagName === "P") {
             // استفاده از سیستم جایگزینی هوشمند روی همان پاراگراف
-            const success = await smartTextReplacement(currentNode, translatedText);
+             const success = await smartTextReplacement(currentNode, translatedText, null, null, undefined, applicationContext);
             if (success) {
               logger.debug('Current line replaced successfully using smartTextReplacement');
               return true;
@@ -221,7 +230,7 @@ export default class MediumStrategy extends PlatformStrategy {
       }
 
       // fallback: استفاده از سیستم جایگزینی روی کل فیلد اگر سطر پیدا نشد
-      return await smartTextReplacement(element, translatedText);
+      return await smartTextReplacement(element, translatedText, null, null, undefined, applicationContext);
     } catch (error) {
       logger.error('replaceCurrentLine error:', error);
       return false;

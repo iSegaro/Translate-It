@@ -24,7 +24,7 @@
     </div>
 
     <div 
-      v-if="progress.terminalError"
+      v-if="displayTerminalError"
       class="terminal-error-alert fade-in"
     >
       <v-icon
@@ -33,7 +33,7 @@
       />
       <div class="error-content">
         <span class="error-title">{{ t('subtitle_terminal_error', 'Stopped due to error') }}</span>
-        <span class="error-msg">{{ progress.terminalError }}</span>
+        <span class="error-msg">{{ displayTerminalError }}</span>
       </div>
     </div>
 
@@ -75,15 +75,36 @@
 </template>
 
 <script setup>
+import { ref, watch } from 'vue';
 import { Icon as VIcon } from '@iconify/vue';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
+import { presentSubtitleTranslationError } from '../presentation/SubtitleTranslationErrorPresenter.js';
 const { t } = useUnifiedI18n();
 
-defineProps({
+const props = defineProps({
   progress: { type: Object, required: true },
   status: { type: String, required: true },
   filename: { type: String, default: '' }
 });
+
+const displayTerminalError = ref(null);
+let presentationVersion = 0;
+
+watch(
+  () => props.progress.terminalErrorDetails,
+  async (errorDetails) => {
+    const version = ++presentationVersion;
+    if (!errorDetails) {
+      displayTerminalError.value = null;
+      return;
+    }
+
+    const presentation = await presentSubtitleTranslationError({ errorDetails });
+    if (version !== presentationVersion) return;
+    displayTerminalError.value = presentation.kind === 'display' ? presentation.message : null;
+  },
+  { immediate: true }
+);
 
 const formatTime = (ms) => {
   if (!ms || ms < 0) return '--:--';

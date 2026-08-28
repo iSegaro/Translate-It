@@ -4,8 +4,8 @@ import { TranslationSegmentMapper } from './TranslationSegmentMapper.js';
 /**
  * TranslationSegmentMapper Unit Tests
  *
- * Owns: standard/alternative delimiter splitting, blank positional mapping,
- * word-ratio fallback, cardinality/mismatch behavior.
+ * Owns: deterministic structural splitting, legacy permissive mapping,
+ * blank positional mapping, and cardinality/mismatch behavior.
  *
  * Does NOT own: Lingva provider-level request construction, budget partitioning,
  * subgroup composition, or failure atomicity. Those belong to LingvaProvider.test.js.
@@ -21,6 +21,13 @@ const STANDARD_DELIMITER = '\n[[---]]\n';
 function mapAsLingvaWould(translatedJoined, originalSegments) {
   return TranslationSegmentMapper.mapTranslationToOriginalSegments(
     translatedJoined, originalSegments, STANDARD_DELIMITER, 'Lingva'
+  );
+}
+
+function mapStrict(translatedText, originalSegments) {
+  return TranslationSegmentMapper.mapTranslationToOriginalSegments(
+    translatedText, originalSegments, STANDARD_DELIMITER, 'StrictTest',
+    { requireDeterministic: true }
   );
 }
 
@@ -93,6 +100,16 @@ describe('TranslationSegmentMapper', () => {
       expect(TranslationSegmentMapper.mapTranslationToOriginalSegments(
         'TA\n\n---\n\nTB', ['A', 'B'], STANDARD_DELIMITER, 'Test'
       )).toEqual(['TA', 'TB']);
+    });
+
+    it('accepts structural alternative delimiters in strict mode', () => {
+      expect(mapStrict('TA\n\n---\n\nTB', ['A', 'B'])).toEqual(['TA', 'TB']);
+    });
+
+    it('rejects generic formatting delimiters in strict mode', () => {
+      expect(() => mapStrict('TA\nTB', ['A', 'B'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.AMBIGUOUS_MAPPING })
+      );
     });
   });
 
@@ -220,6 +237,19 @@ describe('TranslationSegmentMapper', () => {
       expect(mapAsLingvaWould('A B', ['A', 'B'])).toEqual(['A', 'B']);
     });
 
+    it('rejects source character-ratio reconstruction in strict mode', () => {
+      const source = [
+        'SEGMENT_ALPHA',
+        'SEGMENT_BRAVO_WITH_LONG_CONTEXT',
+        'SEGMENT_CHARLIE',
+      ];
+      const merged = 'ALPHA_T1 ALPHA_T2 BRAVO_T1 BRAVO_T2 CHARLIE_T1 CHARLIE_T2';
+
+      expect(() => mapStrict(merged, source)).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.AMBIGUOUS_MAPPING })
+      );
+    });
+
     it('blank originals preserved alongside full coverage', () => {
       expect(mapAsLingvaWould('TA TB', ['A', '', 'B'])).toEqual(['TA', '', 'TB']);
     });
@@ -270,6 +300,12 @@ describe('TranslationSegmentMapper', () => {
       const result = mapAsLingvaWould('paragraph one\n\nparagraph two', ['A', 'B', 'C']);
       expect(result.length).toBe(3);
     });
+
+    it('rejects ordinary newlines in strict multi-unit mode', () => {
+      expect(() => mapStrict('line one\nline two\nline three', ['A', 'B', 'C'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.AMBIGUOUS_MAPPING })
+      );
+    });
   });
 
   // ── Source-aware blank reconstruction ────────────────────────────────────
@@ -279,6 +315,17 @@ describe('TranslationSegmentMapper', () => {
       expect(mapAsLingvaWould(
         'TA' + LINGVA_DELIMITER + 'TB', ['A', '', 'B']
       )).toEqual(['TA', '', 'TB']);
+    });
+
+    it('rejects generic blank reconstruction in strict mode', () => {
+      expect(() => mapStrict('TA\nTB', ['A', '', 'B'])).toThrow(
+        expect.objectContaining({ type: TranslationSegmentMapper.AMBIGUOUS_MAPPING })
+      );
+    });
+
+    it('accepts structural blank reconstruction in strict mode', () => {
+      expect(mapStrict('TA' + LINGVA_DELIMITER + 'TB', ['A', '', 'B']))
+        .toEqual(['TA', '', 'TB']);
     });
 
     it('4 nonblanks with 4 translations → blanks at correct positions', () => {

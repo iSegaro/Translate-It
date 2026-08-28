@@ -270,11 +270,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { sendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { useMobileStore } from '@/store/modules/mobile.js';
 import useSettingsStore from '@/features/settings/stores/settings.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -316,6 +317,22 @@ const tracker = useResourceTracker('desktop-fab-menu');
 const tts = useTTSSmart();
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle();
 const exclusionChecker = ExclusionChecker.getInstance();
+
+const sendPageCommand = (message) => {
+  void sendRegularMessage(message, { returnFailureResponse: true })
+    .then((response) => {
+      if (response?.success === false) {
+        logger.debug('Page translation command rejected', response);
+      }
+    })
+    .catch((error) => {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'desktop-fab:page-translation');
+      } else {
+        logger.warn('Page translation command failed:', error);
+      }
+    });
+};
 
 const allowedFeatures = ref({
   selectElement: true,
@@ -584,7 +601,7 @@ const menuItems = computed(() => {
       closeMenu: false,
       action: () => {
         logger.info('Stopping page translation from FAB');
-        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_STOP_AUTO);
+        sendPageCommand({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO });
       },
       secondaryAction: pageSecondaryAction
     });
@@ -594,7 +611,7 @@ const menuItems = computed(() => {
       label: t('desktop_fab_restore_original_label'),
       icon: IconRestore,
       closeMenu: true,
-      action: () => pageEventBus.emit(MessageActions.PAGE_RESTORE),
+      action: () => sendPageCommand({ action: MessageActions.PAGE_RESTORE }),
       secondaryAction: pageSecondaryAction
     });
   } else if (isPageTranslationAllowed) {
@@ -606,7 +623,10 @@ const menuItems = computed(() => {
       icon: IconTranslatePage,
       disabled: !isPageTranslationSupported.value,
       closeMenu: false,
-      action: () => pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { provider }),
+      action: () => sendPageCommand({
+        action: MessageActions.PAGE_TRANSLATE,
+        data: { provider },
+      }),
       secondaryAction: pageSecondaryAction
     });
   }
@@ -902,8 +922,6 @@ onMounted(async () => {
   // Inject FAB-specific styles lazily into shadow root
   try {
     const { fabUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
-    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
-    
     if (fabUiStyles && injectStylesToShadowRoot) {
       injectStylesToShadowRoot(fabUiStyles, 'vue-fab-specific-styles');
     }

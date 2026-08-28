@@ -43,9 +43,11 @@ export class StreamingManager extends ResourceTracker {
    * @param {object} sender - Sender information from message
    * @param {object} provider - Translation provider instance
    * @param {string[]} segments - Text segments to translate
+   * @param {string|null} sessionId - Conversation/session identifier
+   * @param {boolean} conversationAcceptanceRegistered - Whether Background registered an acceptance handle
    * @returns {object} - Stream session info
    */
-  initializeStream(messageId, sender, provider, segments, sessionId = null) {
+  initializeStream(messageId, sender, provider, segments, sessionId = null, conversationAcceptanceRegistered = false) {
     if (this.activeStreams.has(messageId)) {
       logger.debug(`[StreamingManager] Stream already exists for messageId: ${messageId}`);
       return this.activeStreams.get(messageId);
@@ -60,7 +62,8 @@ export class StreamingManager extends ResourceTracker {
       startTime: Date.now(),
       status: 'active',
       batches: [],
-      results: []
+      results: [],
+      conversationAcceptanceRegistered: conversationAcceptanceRegistered === true
     };
 
     // Store sender information for streaming updates
@@ -174,7 +177,8 @@ export class StreamingManager extends ResourceTracker {
           totalSegments: streamInfo.totalSegments,
           sourceLanguage,
           targetLanguage,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          ...(streamInfo.conversationAcceptanceRegistered && { conversationAcceptance: true })
         },
         'background-streaming',
         messageId
@@ -217,16 +221,23 @@ export class StreamingManager extends ResourceTracker {
       return;
     }
 
+    if (error?.operationAborted === true) {
+      logger.debug(`[StreamingManager] Suppressed operation abort for batch ${batchIndex}`);
+      return;
+    }
+
     try {
       // Create stream error message
+      const serializedError = MessageFormat.serializeTranslationError(error, {
+        type: error?.type ?? matchErrorToType(error) ?? 'TRANSLATION_ERROR',
+        providerName: error?.providerName ?? streamInfo.providerName
+      });
       const streamErrorMessage = MessageFormat.create(
         MessageActions.TRANSLATION_STREAM_UPDATE,
         {
           success: false,
-          error: {
-            message: error.message || 'Translation failed',
-            type: error.type || matchErrorToType(error) || 'TRANSLATION_ERROR'
-          },
+          error: serializedError,
+          errorDetails: serializedError,
           batchIndex: batchIndex,
           provider: streamInfo.providerName,
           timestamp: Date.now()
@@ -284,6 +295,8 @@ export class StreamingManager extends ResourceTracker {
 
     try {
       // Send stream end message
+      const completionData = { ...additionalData };
+      delete completionData.conversationAcceptance;
       const streamEndMessage = MessageFormat.create(
         MessageActions.TRANSLATION_STREAM_END,
         {
@@ -294,7 +307,8 @@ export class StreamingManager extends ResourceTracker {
           totalSegments: streamInfo.totalSegments,
           duration: streamInfo.duration,
           timestamp: Date.now(),
-          ...additionalData
+          ...completionData,
+          ...(success && streamInfo.conversationAcceptanceRegistered && { conversationAcceptance: true })
         },
         'background-streaming',
         messageId
@@ -347,13 +361,18 @@ export class StreamingManager extends ResourceTracker {
     
     streamInfo.error = error.message;
 
+    const serializedError = {
+      ...MessageFormat.serializeTranslationError(error, {
+        type: error?.type ?? errorType ?? 'STREAMING_ERROR',
+        providerName: error?.providerName ?? streamInfo.providerName
+      }),
+      timestamp: Date.now()
+    };
+
     // Complete stream with error - status will be updated to 'error' inside completeStream
     await this.completeStream(messageId, false, {
-      error: {
-        message: error.message,
-        type: error.type || errorType || 'STREAMING_ERROR',
-        timestamp: Date.now()
-      }
+      error: serializedError,
+      errorDetails: serializedError
     });
   }
 

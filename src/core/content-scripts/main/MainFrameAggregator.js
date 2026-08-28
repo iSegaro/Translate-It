@@ -3,6 +3,7 @@
  * Manages and aggregates translation progress from the main frame and all child iframes.
  */
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -27,6 +28,10 @@ export class MainFrameAggregator {
   updateFrameData(frameId, newData) {
     const existing = this.frameProgressMap.get(frameId) || {};
     this.frameProgressMap.set(frameId, { ...existing, ...newData });
+  }
+
+  removeFrame(frameId) {
+    this.frameProgressMap.delete(frameId);
   }
 
   /**
@@ -78,7 +83,8 @@ export class MainFrameAggregator {
   }
 
   /**
-   * Aggregates progress from all frames and emits a unified event via PageEventBus.
+   * Aggregates progress from all trusted frames, then publishes local UI state
+   * and one unified top-frame runtime event.
    * @param {string|null} overrideAction - Optional action name to override the default progress event.
    * @param {Object} extraData - Additional data to include in the payload.
    */
@@ -119,6 +125,13 @@ export class MainFrameAggregator {
       logger.debug(`Emitting aggregated event: ${action}`, payload);
 
       pageEventBus.emit(action, payload);
+      sendRegularMessage({
+        action,
+        data: payload,
+        context: 'page-translation-aggregate',
+      }, { silent: true }).catch(() => {});
+
+      return payload;
     }
   }
 }

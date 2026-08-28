@@ -272,6 +272,7 @@ import { createPdfStatusBannerController } from './utils/pdfStatusBanner.js'
 import { DomainEvents } from './presentation/domainEvents.js'
 import { createPresentationHost } from './presentation/presentationHost.js'
 import { createPresentationSurfaces } from './presentation/presentationSurfaces.js'
+import { presentPdfTranslationError } from './presentation/PdfTranslationErrorPresenter.js'
 import { REGION_OCR_STATE } from './constants/regionOcrState.js'
 import { getTesseractLanguageCodeLabel } from '@/features/screen-capture/utils/ocrLanguageMap.js'
 import { mapOcrError } from '@/features/ocr/errors/ocrErrorMapper.js'
@@ -1301,6 +1302,13 @@ async function commitTransitionPage(targetPage, transitionDocumentGeneration) {
   navigateToPage(targetPage)
 }
 
+async function getTranslationPresentationError(summary) {
+  const presentation = await presentPdfTranslationError({ ...summary, translationDomain: true })
+  if (presentation.kind === 'silent') return null
+  if (presentation.kind === 'display') return presentation.message
+  return 'Translation failed. Try again.'
+}
+
 function handleTranslateVisiblePages() {
   presentation.present(DomainEvents.translationOutcomeCleared())
   presentation.present(DomainEvents.translationStarted())
@@ -1329,18 +1337,26 @@ function handleTranslateVisiblePages() {
         session.getPageContentSource(currentPage.value) === PAGE_CONTENT_SOURCE.OCR)
     )
     if (summary?.status === 'partial') {
-      presentation.present(DomainEvents.translationPartial({
-        occurrenceId: summary.translationOccurrenceId,
-        error: summary.error,
-        reason: summary.failureReason
-      }))
+      const error = await getTranslationPresentationError(summary)
+      if (error !== null) {
+        presentation.present(DomainEvents.translationPartial({
+          occurrenceId: summary.translationOccurrenceId,
+          error,
+          errorDetails: summary.errorDetails,
+          reason: summary.failureReason
+        }))
+      }
       if (shouldRevealTranslatedContent) await revealTranslation()
     } else if (summary?.status === 'error') {
-      presentation.present(DomainEvents.translationFailed({
-        occurrenceId: summary.translationOccurrenceId,
-        error: summary.error,
-        reason: summary.failureReason
-      }))
+      const error = await getTranslationPresentationError(summary)
+      if (error !== null) {
+        presentation.present(DomainEvents.translationFailed({
+          occurrenceId: summary.translationOccurrenceId,
+          error,
+          errorDetails: summary.errorDetails,
+          reason: summary.failureReason
+        }))
+      }
     } else if (summary?.status === 'translated') {
       if (shouldRevealTranslatedContent) await revealTranslation()
     }

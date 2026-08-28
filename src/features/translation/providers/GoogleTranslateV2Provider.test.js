@@ -214,6 +214,7 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
     });
 
     it('returns translation only when dictionary data is absent', async () => {
+      const options = { providerMetadataRef: { metadata: {} } };
       vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
         opts.extractResponse({
           sentences: [{ trans: 'translated text' }],
@@ -231,10 +232,12 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
         1,
         0,
         1,
-        {}
+         options
       );
 
       expect(result).toBe('translated text');
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
+      expect(provider).not.toHaveProperty('lastDetectedLanguage');
     });
 
     it.each([
@@ -244,8 +247,10 @@ describe('GoogleTranslateV2Provider newline chunk isolation', () => {
     ])('throws API_RESPONSE_INVALID for %s', async (_label, response) => {
       vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse(response));
 
-      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, {}))
+      const options = { providerMetadataRef: { metadata: {} } };
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'page', null, 0, 1, 0, 1, options))
         .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+      expect(options.providerMetadataRef.metadata).toEqual({});
     });
 
     it('appends single-segment dictionary output using the current Markdown contract', async () => {
@@ -657,5 +662,109 @@ describe('GoogleTranslateV2Provider delimiter classification', () => {
     expect(caughtError).toBeDefined();
     expect(caughtError.type).toBe(ErrorTypes.API_RESPONSE_INVALID);
     expect(caughtError.message).toBe('Google V2 response omitted a translated segment');
+  });
+});
+
+describe('GoogleTranslateV2Provider collapsed response reconstruction', () => {
+  let provider;
+  const delimiter = '\n[[---]]\n';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    provider = new GoogleTranslateV2Provider();
+  });
+
+  function mockCollapsedResponse(original, translated) {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) =>
+      opts.extractResponse([[ [translated, original] ]])
+    );
+  }
+
+  async function translate(texts) {
+    return provider._translateChunk(texts, 'en', 'fa', 'page', null, 0, texts.length, 0, 1, {});
+  }
+
+  it('reconstructs fully collapsed response using both original and translated delimiters', async () => {
+    mockCollapsedResponse(
+      ['A', 'B', 'C'].join(delimiter),
+      ['الف', 'ب', 'ج'].join(delimiter)
+    );
+
+    await expect(translate(['A', 'B', 'C'])).resolves.toEqual(['الف', 'ب', 'ج']);
+  });
+
+  it('reconstructs collapsed response starting at nonzero logical index', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse([[
+      ['اول', 'A'],
+      ['', delimiter],
+      ['دوم' + delimiter + 'سوم', 'B' + delimiter + 'C'],
+    ]]));
+
+    await expect(translate(['A', 'B', 'C'])).resolves.toEqual(['اول', 'دوم', 'سوم']);
+  });
+
+  it('preserves blank source slots in collapsed response', async () => {
+    mockCollapsedResponse(
+      ['A', '', 'B'].join(delimiter),
+      ['الف', '', 'ب'].join(delimiter)
+    );
+
+    await expect(translate(['A', '', 'B'])).resolves.toEqual(['الف', '', 'ب']);
+  });
+
+  it('scrubs bidi artifacts after deterministic split', async () => {
+    mockCollapsedResponse(
+      ['A', 'B'].join(delimiter),
+      ['\u200eالف', 'ب\u200f'].join(delimiter)
+    );
+
+    await expect(translate(['A', 'B'])).resolves.toEqual(['الف', 'ب']);
+  });
+
+  it.each([
+    ['original delimiter missing', ['A', 'B', 'C'].join(' '), ['الف', 'ب', 'ج'].join(delimiter)],
+    ['original delimiter extra', ['A', 'B', 'C', 'D'].join(delimiter), ['الف', 'ب', 'ج', 'د'].join(delimiter)],
+    ['translated delimiter missing', ['A', 'B', 'C'], ['الف', 'ب'].join(' ')],
+    ['translated delimiter extra', ['A', 'B', 'C'], ['الف', 'ب', 'ج', 'د'].join(delimiter)],
+    ['source delimiter collision', ['A' + delimiter, 'B'], ['الف', 'ب'].join(delimiter)],
+  ])('fails closed for %s', async (_label, source, translated) => {
+    const original = Array.isArray(source) ? source.join(delimiter) : source;
+    const sourceItems = Array.isArray(source) ? source : ['A', 'B', 'C'];
+    mockCollapsedResponse(original, translated);
+
+    await expect(translate(sourceItems)).rejects.toMatchObject({
+      type: ErrorTypes.API_RESPONSE_INVALID,
+    });
+  });
+
+  it('fails closed for ambiguous mixed ownership', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse([[
+      ['already translated', 'A'],
+      ['collapsed B' + delimiter + 'collapsed C', 'B' + delimiter + 'C'],
+    ]]));
+
+    await expect(translate(['A', 'B', 'C'])).rejects.toMatchObject({
+      type: ErrorTypes.API_RESPONSE_INVALID,
+    });
+  });
+
+  it('ignores trailing null metadata after valid collapsed response', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse([[
+      ['الف' + delimiter + 'ب', 'A' + delimiter + 'B'],
+      null,
+    ]]));
+
+    await expect(translate(['A', 'B'])).resolves.toEqual(['الف', 'ب']);
+  });
+
+  it('fails closed for non-null malformed response rows', async () => {
+    vi.spyOn(provider, '_executeApiCall').mockImplementation(async (opts) => opts.extractResponse([[
+      ['الف' + delimiter + 'ب', 'A' + delimiter + 'B'],
+      { unexpected: true },
+    ]]));
+
+    await expect(translate(['A', 'B'])).rejects.toMatchObject({
+      type: ErrorTypes.API_RESPONSE_INVALID,
+    });
   });
 });

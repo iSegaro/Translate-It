@@ -12,6 +12,7 @@ import { LanguageSwappingService } from "@/features/translation/providers/Langua
 import { LanguageDetectionService } from "@/shared/services/LanguageDetectionService.js";
 import { AIResponseParser } from "@/features/translation/providers/utils/AIResponseParser.js";
 import { TranslationMode } from "@/shared/config/config.js";
+import { getProviderConfiguration } from "@/features/translation/core/ProviderConfigurations.js";
 import { isFatalError, isTransientError, matchErrorToType } from "@/shared/error-management/ErrorMatcher.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
@@ -145,7 +146,9 @@ export class ProviderCoordinator {
       if (engine && typeof engine.registerStreamingSender === 'function') {
         engine.registerStreamingSender(messageId, options.sender);
       }
-      await this._initializeStreaming(provider, text, messageId, engine, sessionId, options.sender);
+      const streamingArgs = [provider, text, messageId, engine, sessionId, options.sender];
+      if (options.executionContext?.conversationAcceptanceRegistered === true) streamingArgs.push(true);
+      await this._initializeStreaming(...streamingArgs);
     }
 
     // 6. Execute based on strategy via QueueManager for retry and priority support
@@ -173,13 +176,20 @@ export class ProviderCoordinator {
       };
 
       const queueProviderName = options.parallelExecution ? `${providerName}::parallel` : providerName;
+      const providerConfig = getProviderConfiguration(providerName);
+      const configuredMaxExecutions = providerConfig?.queueRetryPolicy?.maxExecutions;
+      const queueRetryPolicy = configuredMaxExecutions
+        ? { maxExecutions: { ...configuredMaxExecutions } }
+        : undefined;
 
       // Enqueue the task - QueueManager handles retries and prioritization
       const result = await queueManager.enqueue(queueProviderName, executeTask, numericPriority, translateMode, {
-        messageId: options.messageId,
-        uiContext: options.uiContext,
-        parallelExecution: !!options.parallelExecution,
-        executionContext: options.executionContext,
+         messageId: options.messageId,
+         abortController: options.abortController,
+         uiContext: options.uiContext,
+         parallelExecution: !!options.parallelExecution,
+         executionContext: options.executionContext,
+         ...(queueRetryPolicy && { queueRetryPolicy }),
       });
 
       // 7. Post-processing & Normalization
@@ -198,12 +208,24 @@ export class ProviderCoordinator {
           if (typeof finalResult === 'string' && inputCount > 1) {
             const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
             const segments = Array.isArray(text) ? text : [text];
-            finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-              finalResult, 
-              segments, 
-              TranslationSegmentMapper.STANDARD_DELIMITER,
-              providerName
-            );
+            try {
+              finalResult = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+                finalResult,
+                segments,
+                TranslationSegmentMapper.STANDARD_DELIMITER,
+                providerName,
+                { requireDeterministic: true }
+              );
+            } catch (mappingError) {
+              if (mappingError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY
+                  || mappingError.type === TranslationSegmentMapper.AMBIGUOUS_MAPPING) {
+                const invalidResponse = new Error(`[${providerName}] Invalid deterministic segment mapping: ${mappingError.message}`);
+                invalidResponse.type = ErrorTypes.API_RESPONSE_INVALID;
+                invalidResponse.cause = mappingError;
+                throw invalidResponse;
+              }
+              throw mappingError;
+            }
           }
         }
       }
@@ -222,23 +244,10 @@ export class ProviderCoordinator {
         };
       }
 
-      // 8. Capture Detected Language & Register Feedback
-      const detectedLanguage = provider.lastDetectedLanguage || processedSourceLang;
-      
-      // Register detection result back to the service for future hits (Layer 0)
-      // SECURITY: Only register feedback if the user's initial request was 'auto'.
-      // This prevents manual user errors from poisoning the cache.
-      const isAutoRequest = sourceLang === AUTO_DETECT_VALUE || !sourceLang;
-      
-      if (isAutoRequest && provider.lastDetectedLanguage && provider.lastDetectedLanguage !== AUTO_DETECT_VALUE) {
-        const sampleText = Array.isArray(text) ? text[0] : (typeof text === 'string' ? text : '');
-        if (sampleText) {
-          LanguageDetectionService.registerDetectionResult(sampleText, provider.lastDetectedLanguage, {
-            url: options.url,
-            tabId: options.tabId
-          });
-        }
-      }
+      // Provider-reported detection is stored in request/operation-scoped metadata.
+      // This public field intentionally remains the effective processed source
+      // language; provider metadata is not promoted into its semantic contract.
+      const detectedLanguage = processedSourceLang;
 
       // Return unified response object
       return {
@@ -249,10 +258,19 @@ export class ProviderCoordinator {
         targetLanguage: processedTargetLang
       };
     } catch (error) {
-      const errorType = matchErrorToType(error);
+      if (error?.operationAborted === true) {
+        logger.debug(`[Coordinator] Execution stopped for ${providerName}: operation abort`);
+        throw error;
+      }
+
+      const errorType = error?.type || matchErrorToType(error);
+      const classificationError = error && typeof error === 'object'
+        ? { type: errorType, message: error.message, statusCode: error.statusCode }
+        : errorType;
       
       // Treat UNKNOWN errors from Error instances as transient to trigger retries/proper failure reporting
-      const isTransient = isTransientError(error) || isTransientError(errorType) || (errorType === ErrorTypes.UNKNOWN && error instanceof Error);
+      const isTransient = isTransientError(classificationError)
+        || (errorType === ErrorTypes.UNKNOWN && error instanceof Error);
       
       if (errorType === ErrorTypes.USER_CANCELLED) {
         logger.debug(`[Coordinator] Execution cancelled by user for ${providerName}`);
@@ -261,7 +279,7 @@ export class ProviderCoordinator {
       }
 
       // Throw if it's a recognized fatal/transient error or a generic system Error
-      if (isFatalError(error) || isTransient) throw error;
+      if (isFatalError(classificationError) || isTransient) throw error;
 
       // Non-fatal, non-transient: previously fell back to returning the original text
       // wrapped in a "successful" result. That is silent success - the caller believes
@@ -340,13 +358,15 @@ export class ProviderCoordinator {
    * Initializes the streaming session using the global streaming manager.
    * @private
    */
-  async _initializeStreaming(provider, text, messageId, engine, sessionId, sender) {
+  async _initializeStreaming(provider, text, messageId, engine, sessionId, sender, conversationAcceptanceRegistered = false) {
     if (!messageId || !engine) return;
 
     try {
       const segments = Array.isArray(text) ? text : [text];
       
-      streamingManager.initializeStream(messageId, sender, provider, segments, sessionId);
+      const streamArgs = [messageId, sender, provider, segments, sessionId];
+      if (conversationAcceptanceRegistered) streamArgs.push(true);
+      streamingManager.initializeStream(...streamArgs);
       logger.debug(`[Coordinator] Streaming initialized for messageId: ${messageId}`);
     } catch (error) {
       logger.error(`[Coordinator] Failed to initialize streaming:`, error.message);
@@ -370,28 +390,39 @@ export class ProviderCoordinator {
       ? response.translatedText 
       : response;
 
-    if (Array.isArray(results) && results.length === jsonArray.length) {
-      // Re-map back to original JSON structure
-      const translatedJson = jsonArray.map((item, idx) => {
-        if (typeof item === 'object') {
-          return { ...item, t: results[idx] || (item.t || item.text) };
-        }
-        return results[idx];
-      });
-      return JSON.stringify(translatedJson, null, 2);
+    const invalidResponse = (reason) => {
+      const error = new Error(`[${provider.providerName}] Invalid JSON-wrapped response: ${reason}`);
+      error.type = ErrorTypes.API_RESPONSE_INVALID;
+      throw error;
+    };
+
+    if (!Array.isArray(jsonArray) || !Array.isArray(results) || results.length !== jsonArray.length) {
+      invalidResponse(`expected ${jsonArray?.length ?? 0} results, received ${results?.length ?? 0}`);
     }
 
-    if (results?.length !== jsonArray.length) {
-      logger.warn(`[Coordinator] JSON mismatch: ${results?.length} vs ${jsonArray.length}. Attempting cleanup...`);
+    for (let idx = 0; idx < jsonArray.length; idx++) {
+      const item = jsonArray[idx];
+      const sourceText = typeof item === 'object' && item !== null
+        ? (item.t ?? item.text ?? '')
+        : item;
+      const sourceIsBlank = typeof sourceText === 'string' && sourceText.trim() === '';
+      const translatedText = results[idx];
+      const isValidText = typeof translatedText === 'string'
+        && (translatedText.trim() !== '' || sourceIsBlank);
+
+      if (!isValidText) {
+        invalidResponse(`invalid result at index ${idx}`);
+      }
     }
 
-    // Fallback: If results don't match, map what we can or return joined string
-    // But CRITICAL: ensure every part is processed via _ensureString to prevent JSON artifacts
-    if (Array.isArray(results)) {
-      return JSON.stringify(results.map(r => this._ensureString(r)));
-    }
-
-    return this._ensureString(results);
+    // Re-map back to original JSON structure without fabricating source text.
+    const translatedJson = jsonArray.map((item, idx) => {
+      if (typeof item === 'object' && item !== null) {
+        return { ...item, t: results[idx] };
+      }
+      return results[idx];
+    });
+    return JSON.stringify(translatedJson, null, 2);
   }
 
   /**

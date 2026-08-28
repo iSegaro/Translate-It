@@ -21,6 +21,7 @@
     "validate": "node scripts/validate/validate-all.mjs",
     "validate:chrome": "node scripts/validate/validate-chrome.mjs",
     "validate:firefox": "node scripts/validate/validate-firefox.mjs",
+    "validate:production-bundle": "node scripts/validate/validate-production-bundle.mjs",
     "publish": "pnpm run build && pnpm run validate && pnpm run source",
     "pre-submit": "pnpm run lint && pnpm run lint:styles && pnpm run build",
     "source": "node scripts/dev/create-source-zip.mjs",

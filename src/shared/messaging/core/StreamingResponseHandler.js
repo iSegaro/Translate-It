@@ -11,6 +11,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from './MessageActions.js';
+import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingResponseHandler');
 
@@ -155,12 +156,15 @@ export class StreamingResponseHandler {
         updateCount: handler.updateCount,
         targetLanguage: data.targetLanguage,
         sourceLanguage: data.sourceLanguage,
-        data
+        data,
+        ...(data?.conversationAcceptance === true && { conversationAcceptance: true })
       });
     } else {
-      const error = new Error(data?.error?.message || 'Streaming ended with error');
+      const errorSource = isStructuredTranslationError(data?.errorDetails)
+        ? data.errorDetails
+        : (data?.error || 'Streaming ended with error');
+      const error = reconstructTranslationError(errorSource);
       error.streamData = data;
-      if (data?.error?.type) error.type = data.error.type;
       this.coordinator.handleStreamingError(messageId, error);
     }
 
@@ -177,8 +181,9 @@ export class StreamingResponseHandler {
   _handleTranslationResult(handler, message) {
     const { messageId, data } = message;
 
-    // If this is just a streaming acknowledgement, don't complete or cleanup
-    if (data?.streaming) {
+    // A failed streaming result is terminal even when it carries the streaming
+    // marker. Successful streaming acknowledgements remain non-terminal.
+    if (data?.streaming && data?.success !== false) {
       try {
         handler.onTranslationResult(data);
       } catch (error) {
@@ -201,12 +206,15 @@ export class StreamingResponseHandler {
       this.coordinator.completeStreamingOperation(messageId, {
         success: true,
         type: 'translation_result',
-        data
+        data,
+        ...(data?.conversationAcceptance === true && { conversationAcceptance: true })
       });
     } else {
-      const error = new Error(data?.error?.message || 'Translation failed');
+      const errorSource = isStructuredTranslationError(data?.errorDetails)
+        ? data.errorDetails
+        : (data?.error || 'Translation failed');
+      const error = reconstructTranslationError(errorSource);
       error.translationData = data;
-      if (data?.error?.type) error.type = data.error.type;
       this.coordinator.handleStreamingError(messageId, error);
     }
 

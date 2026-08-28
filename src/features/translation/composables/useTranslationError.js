@@ -4,8 +4,13 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js'
+import ExtensionContextManager from '@/core/extensionContext.js'
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { getErrorDisplayStrategy, processErrorMessage, shouldShowRetry, shouldShowSettings } from '@/shared/error-management/ErrorDisplayStrategies.js'
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
+import { isCancellationError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js'
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js'
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js'
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
@@ -66,7 +71,7 @@ export function useTranslationError(context = 'unknown') {
 
     // Identify and ignore user cancellation errors
     const errorTypeValue = matchErrorToType(error)
-    if (errorTypeValue === 'USER_CANCELLED' || error.message?.includes('cancelled')) {
+    if (isCancellationError(error)) {
       logger.debug(`[${context}] Silently ignoring user cancellation error`);
       return;
     }
@@ -74,8 +79,28 @@ export function useTranslationError(context = 'unknown') {
     try {
       logger.debug(`[${context}] Handling translation error:`, error)
       
-      // Get error information
-      const errorInfo = await getErrorForDisplay(error, context)
+      const isContextError = ExtensionContextManager.isContextError(error)
+      const isLocalValidationError = [ErrorTypes.TEXT_EMPTY, ErrorTypes.TEXT_TOO_LONG].includes(errorTypeValue)
+      const usePublicBoundary = !isContextError && !isLocalValidationError
+      let displayError = error
+      let errorInfo
+      let publicError = null
+
+      if (usePublicBoundary) {
+        publicError = mapCanonicalTranslationError(error)
+        displayError = await createLegacyDisplayError(error, publicError)
+        if (!displayError) return
+
+        errorInfo = {
+          message: displayError.message,
+          timestamp: Date.now()
+        }
+      } else {
+        // Preserve context and local input-validation behavior outside the
+        // ordinary translation public boundary.
+        errorInfo = await getErrorForDisplay(error, context)
+      }
+
       const strategy = getErrorDisplayStrategy(context, errorTypeValue)
       
       // Update error state
@@ -83,8 +108,12 @@ export function useTranslationError(context = 'unknown') {
       errorMessage.value = errorInfo.message
       errorType.value = errorTypeValue
       errorTimestamp.value = errorInfo.timestamp
-      canRetry.value = shouldShowRetry(errorTypeValue, strategy)
-      canOpenSettings.value = shouldShowSettings(errorTypeValue, strategy)
+      canRetry.value = publicError
+        ? publicError.action === PublicTranslationErrorActions.RETRY
+        : shouldShowRetry(errorTypeValue, strategy)
+      canOpenSettings.value = publicError
+        ? publicError.action === PublicTranslationErrorActions.OPEN_SETTINGS
+        : shouldShowSettings(errorTypeValue, strategy)
       
       // Handle error with appropriate strategy
       const enhancedOptions = {
@@ -95,7 +124,10 @@ export function useTranslationError(context = 'unknown') {
         ...options
       }
       
-      await handleTranslationError(error, context, enhancedOptions)
+      await handleTranslationError(displayError, context, {
+        ...enhancedOptions,
+        ...(usePublicBoundary && { type: errorTypeValue })
+      })
       
       logger.debug(`[${context}] Error handled with strategy:`, strategy)
       
@@ -190,18 +222,27 @@ export function useTranslationError(context = 'unknown') {
       if (errorData.context && !errorData.context.includes(context)) {
         return
       }
-      
+
       logger.debug(`[${context}] Received UI error update:`, errorData)
-      
+
+      const hasPublicEcho = typeof errorData.canRetry === 'boolean'
+      const publicError = hasPublicEcho
+        ? mapCanonicalTranslationError({ type: errorData.type })
+        : null
+
       // Update error state from listener
       currentError.value = errorData
       errorMessage.value = errorData.message
       errorType.value = errorData.type
       errorTimestamp.value = errorData.timestamp
-      
+
       const strategy = getErrorDisplayStrategy(context, errorData.type)
-      canRetry.value = shouldShowRetry(errorData.type, strategy)
-      canOpenSettings.value = shouldShowSettings(errorData.type, strategy)
+      canRetry.value = hasPublicEcho
+        ? errorData.canRetry
+        : shouldShowRetry(errorData.type, strategy)
+      canOpenSettings.value = hasPublicEcho
+        ? publicError.action === PublicTranslationErrorActions.OPEN_SETTINGS
+        : shouldShowSettings(errorData.type, strategy)
     }
     
     unsubscribeListener = errorHandler.addUIErrorListener(listener)

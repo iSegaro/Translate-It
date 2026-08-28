@@ -5,13 +5,14 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { sendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isFatalError, isCancellationError } from '@/shared/error-management/ErrorMatcher.js';
-import { createPublicDisplayError } from '@/shared/error-management/PublicErrorPolicy.js';
+import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
+import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import { getEffectiveProviderAsync, TranslationMode } from '@/shared/config/config.js';
 import { NOTIFICATION_TIME } from '@/shared/constants/ui.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -32,6 +33,10 @@ import { DomTranslatorAdapter } from './core/DomTranslatorAdapter.js';
 import { ElementSelector } from './core/ElementSelector.js';
 import { extractTextFromElement, isSelectableTextRoot } from './utils/elementHelpers.js';
 import { SelectElementReason } from './core/SelectElementPolicy.js';
+import {
+  resolveSelectInteractionElement,
+  SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+} from './utils/shadowDom.js';
 
 // Import notification manager
 import { getSelectElementNotificationManager } from './SelectElementNotificationManager.js';
@@ -44,6 +49,12 @@ const SELECT_ELEMENT_NO_TRANSLATABLE_CONTENT_FALLBACK = 'No translatable text wa
 
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_KEY = 'SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE';
 const SELECT_ELEMENT_UNSUPPORTED_TRANSLATION_MODE_FALLBACK = 'This content cannot be translated with the current translation mode.';
+const SELECT_ELEMENT_DEACTIVATION_ERROR = 'Could not deactivate Select Element mode.';
+const GENERIC_TRANSLATION_ERROR_TYPES = new Set([
+  ErrorTypes.TRANSLATION_ERROR,
+  ErrorTypes.TRANSLATION_FAILED,
+  ErrorTypes.UNKNOWN,
+]);
 
 /**
  * Resolves the localized partial-completion message shared by non-terminal
@@ -56,18 +67,31 @@ async function getPartialCompletionMessage() {
     || SELECT_ELEMENT_PARTIAL_ERROR_FALLBACK;
 }
 
+function hasUsefulCommittedOutput(outcome) {
+  return Number.isInteger(outcome?.committedParentCount)
+    && outcome.committedParentCount > 0;
+}
+
+function isSilentInternalOperationAbort(error) {
+  const type = error?.type;
+  return error?.operationAborted === true
+    && (!type || GENERIC_TRANSLATION_ERROR_TYPES.has(type));
+}
+
 /**
  * SelectElementManager - Coordinates the interactive Select Element mode.
  * Uses a specialized DomTranslatorAdapter optimized for AI/DeepL context and token efficiency.
  */
 class SelectElementManager extends ResourceTracker {
-  constructor() {
+  constructor({ featureManager } = {}) {
     super('select-element-manager');
+    this.featureManager = featureManager || null;
 
     // Core state
     this.isActive = false;
     this.isProcessingClick = false;
     this.isInitialized = false;
+    this.selectElementLifecycleQueue = Promise.resolve();
     this.instanceId = Math.random().toString(36).substring(7);
     this.isTopFrame = window === window.top;
 
@@ -131,8 +155,6 @@ class SelectElementManager extends ResourceTracker {
 
       this.setupKeyboardListeners();
       this.setupCancelListener();
-      this.setupCrossFrameCommunication();
-
       // Initialize hover manager for original text preview if enabled
       getSelectElementShowOriginalOnHoverAsync().then(enabled => {
         if (enabled) {
@@ -143,12 +165,6 @@ class SelectElementManager extends ResourceTracker {
 
       this.addEventListener(pageEventBus, MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, (data) => {
         this.activateSelectElementMode(data || {}).catch(() => {});
-      });
-
-      this.addEventListener(pageEventBus, 'STOP_CONFLICTING_FEATURES', (data) => {
-        if (this.isActive && data?.source !== 'select-element') {
-          this.deactivate({ silent: true, reason: 'conflict' });
-        }
       });
 
       // Listen for translation progress events
@@ -177,10 +193,25 @@ class SelectElementManager extends ResourceTracker {
     }
   }
 
+  // Single frame-local owner for manager and ContentMessageHandler lifecycle work.
+  enqueueSelectElementLifecycle(operation) {
+    const run = () => operation({
+      activate: options => this._activateSelectElementMode(options),
+      deactivate: options => this._deactivateSelectElementMode(options),
+    });
+    const queuedOperation = this.selectElementLifecycleQueue.then(run, run);
+    this.selectElementLifecycleQueue = queuedOperation.catch(() => {});
+    return queuedOperation;
+  }
+
   /**
    * Activate Select Element mode
    */
   async activateSelectElementMode(options = {}) {
+    return this.enqueueSelectElementLifecycle(({ activate }) => activate(options));
+  }
+
+  async _activateSelectElementMode(options = {}) {
     if (this.isActive) return { isActive: this.isActive, instanceId: this.instanceId };
 
     await this._ensureStylesInjected();
@@ -190,9 +221,10 @@ class SelectElementManager extends ResourceTracker {
     this._startContextWatchdog();
 
     const activationOptions = { targetLanguage: options.targetLanguage || null, ...options };
-    pageEventBus.emit('STOP_CONFLICTING_FEATURES', { source: 'select-element' });
 
     try {
+      await this.featureManager?.resolveFeatureConflict?.('selectElement');
+
       this.isActive = true;
       this.isProcessingClick = false;
       this.hasInitialMovementOccurred = false; 
@@ -265,14 +297,47 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Deactivate Select Element mode
-   */
+   * @param {Object} [options]
+   * @param {string} [options.reason='manual'] - Cleanup/UX semantics only
+   *   ('success' | 'error' | 'cancel' | 'manual' | 'conflict'). Never grants
+   *   propagation authority.
+   * @param {boolean} [options.fromBackground=false] - Trusted broadcast
+   *   receiver marker; suppresses every outbound state/global request.
+   * @param {boolean} [options.requestGlobalDeactivation=false] - Explicit
+   *   producer-declared tab-wide exit intent (user Escape / explicit Cancel).
+   *   Routes the trusted DEACTIVATE_SELECT_ELEMENT_MODE request through the
+   *   background, which authenticates the sender tab and broadcasts to all
+   *   frames. Frame position never implies this intent.
+   * @returns {Promise<{success: boolean, cleanupCompleted: boolean, alreadyInactive?: boolean, error?: string}>}
+  */
   async deactivate(options = {}) {
-    if (!this.isActive) return;
+    const result = await this.enqueueSelectElementLifecycle(({ deactivate }) => deactivate(options));
+
+    // Background broadcasts re-enter this manager's queue. Propagate only once
+    // local cleanup has released it, otherwise ESC/cancel can wait on itself.
+    if (
+      result?.success === true
+      && options.requestGlobalDeactivation === true
+      && options.fromBackground !== true
+    ) {
+      try {
+        await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
+      } catch { /* ignore */ }
+    }
+
+    return result;
+  }
+
+  async _deactivateSelectElementMode(options = {}) {
+    if (!this.isActive) {
+      return { success: true, cleanupCompleted: true, alreadyInactive: true };
+    }
 
     try {
       const {
         reason = 'manual', // 'success', 'error', 'cancel', 'manual', 'conflict'
         fromBackground = false,
+        requestGlobalDeactivation = false,
         silent = false,
         preserveTranslations = options.preserveTranslations !== undefined
           ? options.preserveTranslations
@@ -291,9 +356,9 @@ class SelectElementManager extends ResourceTracker {
       // User/manual cancellation and conflict teardown both invalidate active
       // adapter work, while retaining distinct cleanup reasons and UX.
       if (reason === 'cancel' || reason === 'manual') {
-        this.domTranslatorAdapter.cancelTranslation({ silent });
+        await this.domTranslatorAdapter.cancelTranslation({ silent });
       } else if (reason === 'conflict') {
-        this.domTranslatorAdapter.cancelTranslation({ silent: true });
+        await this.domTranslatorAdapter.cancelTranslation({ silent: true });
       }
 
       this.removeEventListeners();
@@ -308,8 +373,13 @@ class SelectElementManager extends ResourceTracker {
         await this.domTranslatorAdapter.revertTranslation();
       }
 
-      if (!fromBackground) await this.notifyBackgroundDeactivation();
+      if (!fromBackground) {
+        if (!requestGlobalDeactivation) {
+          await this.notifyBackgroundDeactivation();
+        }
+      }
       pageEventBus.emit('select-mode-deactivated');
+      return { success: true, cleanupCompleted: true };
 
     } catch (error) {
       this.logger.error('Critical error deactivating SelectElementManager:', error);
@@ -322,6 +392,11 @@ class SelectElementManager extends ResourceTracker {
       }
       
       this.emergencyCleanup();
+      return {
+        success: false,
+        cleanupCompleted: false,
+        error: SELECT_ELEMENT_DEACTIVATION_ERROR,
+      };
     } finally {
       // Final guard for the UI lock
       document.documentElement.removeAttribute('data-translate-it-select-mode');
@@ -350,14 +425,6 @@ class SelectElementManager extends ResourceTracker {
 
       window.addEventListener('keydown', this.handleKeyDown, true);
 
-      if (this.isTopFrame) {
-        this.iframeMessageHandler = (event) => {
-          if (event.data?.type === 'translate-it-deactivate-select-element') {
-            this.deactivate({ fromIframe: true, reason: 'manual' }).catch(() => {});
-          }
-        };
-        window.addEventListener('message', this.iframeMessageHandler);
-      }
     }
   }
 
@@ -375,10 +442,6 @@ class SelectElementManager extends ResourceTracker {
     });
 
     window.removeEventListener('keydown', this.handleKeyDown, true);
-    if (this.isTopFrame && this.iframeMessageHandler) {
-      window.removeEventListener('message', this.iframeMessageHandler);
-      this.iframeMessageHandler = null;
-    }
   }
 
   isCooldownActive() { return Date.now() - (this.activationTime || 0) < 100; }
@@ -393,8 +456,13 @@ class SelectElementManager extends ResourceTracker {
     this.lastMouseX = currentX;
     this.lastMouseY = currentY;
     if (!this.hasInitialMovementOccurred) return;
-    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) return;
-    this.elementSelector.handleMouseOver(event.target);
+    const target = resolveSelectInteractionElement(
+      event,
+      element => this.elementSelector?.isOurElement(element),
+      { allowShadowDom: SELECT_ELEMENT_SHADOW_DOM_ENABLED }
+    );
+    if (!target) return;
+    this.elementSelector.handleMouseOver(target);
   }
 
   handleTouchStart(event) {
@@ -421,8 +489,13 @@ class SelectElementManager extends ResourceTracker {
 
   handleMouseOut(event) {
     if (!this.isActive || this.isProcessingClick) return;
-    if (this.elementSelector && this.elementSelector.isOurElement(event.target)) return;
-    this.elementSelector.handleMouseOut(event.target);
+    const target = resolveSelectInteractionElement(
+      event,
+      element => this.elementSelector?.isOurElement(element),
+      { allowShadowDom: SELECT_ELEMENT_SHADOW_DOM_ENABLED }
+    );
+    if (!target) return;
+    this.elementSelector.handleMouseOut(target);
   }
 
   handleInteraction(event) {
@@ -462,7 +535,7 @@ class SelectElementManager extends ResourceTracker {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      this.deactivate({ fromCancel: true, silent: false, reason: 'cancel' });
+      this.deactivate({ silent: false, reason: 'cancel', requestGlobalDeactivation: true });
     }
   }
 
@@ -470,7 +543,13 @@ class SelectElementManager extends ResourceTracker {
     if (this.isProcessingClick) return;
     try {
       this.isProcessingClick = true;
-      const elementToTranslate = this.elementSelector.getHighlightedElement() || event.target;
+      const elementToTranslate = this.elementSelector.getHighlightedElement()
+        || resolveSelectInteractionElement(
+          event,
+          element => this.elementSelector?.isOurElement(element),
+          { allowShadowDom: SELECT_ELEMENT_SHADOW_DOM_ENABLED }
+        );
+      if (!elementToTranslate) return;
 
       // Authoritative click revalidation: re-run root eligibility at click time
       // even if the element was highlighted earlier. The DOM may change between
@@ -541,7 +620,7 @@ class SelectElementManager extends ResourceTracker {
         pageEventBus.emit('hide-translation', { element: targetElement });
         pageEventBus.emit('ELEMENT_TRANSLATIONS_AVAILABLE'); // Notify that revert is now possible
 
-        if (result.partial === true) {
+        if (result.partial === true && !hasUsefulCommittedOutput(result)) {
           // Non-terminal partial completion: stream/provider completed normally but
           // some requested logical parents remain uncommitted. Committed translations
           // are valid and preserved; this is feature outcome UX, not a terminal error.
@@ -586,11 +665,15 @@ class SelectElementManager extends ResourceTracker {
       ? outcome.totalParentCount
       : 0;
     const isCancellation = Boolean(outcome?.cancelled) || isCancellationError(error);
+    const isInternalOperationAbort = !isCancellation && isSilentInternalOperationAbort(error);
+    const hasCommittedOutput = hasUsefulCommittedOutput(outcome);
     const isPartialFailure = !isCancellation
       && committedParentCount > 0
       && committedParentCount < totalParentCount;
     const isNoTranslatableContent = error.type === ErrorTypes.NO_TRANSLATABLE_CONTENT;
+    const isAlreadyTranslated = error.type === ErrorTypes.NODE_ALREADY_TRANSLATED;
     const isSilentSkip = isCancellation
+      || isInternalOperationAbort
       || error.type === ErrorTypes.FEATURE_BLOCKED
       || ExtensionContextManager.isContextError(error);
 
@@ -598,7 +681,7 @@ class SelectElementManager extends ResourceTracker {
       this.logger.debug('Select Element translation cancelled:', error.message);
     } else if (isNoTranslatableContent) {
       await this._handleNoTranslatableContent(error);
-    } else if (isSilentSkip) {
+    } else if (isSilentSkip || isAlreadyTranslated || hasCommittedOutput) {
       this.logger.debug('Select Element translation skipped:', error.message);
     } else {
       this.logger.warn('Select Element translation failed:', error);
@@ -610,7 +693,8 @@ class SelectElementManager extends ResourceTracker {
           translationOutcome: outcome,
         });
       } else {
-        displayError = await createPublicDisplayError(error);
+        const publicError = mapCanonicalTranslationError(error);
+        displayError = await createLegacyDisplayError(error, publicError);
       }
       if (isPartialFailure) {
         this.logger.warn('Select Element translation partially failed:', {
@@ -628,7 +712,10 @@ class SelectElementManager extends ResourceTracker {
     }
 
     if (isFatalError(error) && !isSilentSkip) {
-      this.deactivate({ preserveTranslations: true, reason: 'error' });
+      // Fatal failure is a terminal outcome: route through the terminal
+      // owner so child frames use the trusted IFRAME_SELECT_ELEMENT_FINISHED
+      // global deactivation path instead of frame-local cleanup.
+      this.performPostTranslationCleanup({ reason: 'error' });
     } else if (isNoTranslatableContent) {
       this.performPostTranslationCleanup({ reason: 'no-content' });
     } else {
@@ -640,7 +727,7 @@ class SelectElementManager extends ResourceTracker {
    * Handles an accepted Select Element request that produced zero translatable
    * units. Non-error, non-cancellation outcome: shows one informational message
    * and lets cleanup run on a semantic 'no-content' reason. Deliberately keeps
-   * the outcome out of ErrorHandler / PublicErrorPolicy error semantics.
+    * the outcome out of ErrorHandler error semantics.
    * @private
    * @param {Error} error - The NO_TRANSLATABLE_CONTENT error.
    */
@@ -657,7 +744,7 @@ class SelectElementManager extends ResourceTracker {
 
   /**
    * Routes an informational Select Element message through the notification
-   * owner. Feature-owned non-error path; never PublicErrorPolicy.
+    * owner. Feature-owned non-error path; never public translation error handling.
    * @param {string} message - Localized informational message.
    */
   showNoContentNotification(message) {
@@ -671,19 +758,21 @@ class SelectElementManager extends ResourceTracker {
 
     if (!this.isTopFrame) {
       try {
-        // Notify top frame that this iframe has finished its selection/translation
-        // This will trigger a global deactivation to clean up all other iframes
-        window.top.postMessage({
-          type: 'translate-it-deactivate-select-element',
-          source: 'iframe-translation-complete',
-          instanceId: this.instanceId
-        }, '*');
+        void sendRegularMessage({
+          action: MessageActions.IFRAME_SELECT_ELEMENT_FINISHED,
+          data: { reason },
+        }, { silent: true }).catch((error) => {
+          this.logger.debug('Failed to report iframe Select Element completion:', error);
+        });
       } catch { /* ignore */ }
 
       // Also locally deactivate to ensure clean state
       this.deactivate({ preserveTranslations, reason, fromBackground: true }).catch(() => {});
     } else if (this.isActive) {
-      this.deactivate({ preserveTranslations, reason }).catch(() => {});
+      // Terminal outcome owns tab-wide deactivation in the top frame. The
+      // explicit flag preserves that ownership without making frame position
+      // authoritative inside deactivate().
+      this.deactivate({ preserveTranslations, reason, requestGlobalDeactivation: true }).catch(() => {});
     } else {
       // Safety guard: ensure notification is dismissed in top frame even if already inactive
       this.dismissNotification();
@@ -702,7 +791,7 @@ class SelectElementManager extends ResourceTracker {
     pageEventBus.emit('show-select-element-notification', {
       managerId: this.instanceId,
       actions: {
-        cancel: () => this.deactivate({ fromNotification: true, reason: 'cancel' }),
+        cancel: () => this.deactivate({ fromNotification: true, reason: 'cancel', requestGlobalDeactivation: true }),
         revert: () => this.revertTranslations(),
       },
     });
@@ -723,16 +812,7 @@ class SelectElementManager extends ResourceTracker {
 
   setupCancelListener() {
     this.addEventListener(pageEventBus, 'cancel-select-element-mode', () => {
-      if (this.isActive) this.deactivate({ fromCancel: true, silent: true, reason: 'cancel' });
-    });
-  }
-
-  setupCrossFrameCommunication() {
-    this.addEventListener(window, 'message', (event) => {
-      // Respond to global deactivation signals
-      if (event.data?.type === 'DEACTIVATE_ALL_SELECT_MANAGERS') {
-        this.deactivate({ fromBackground: true, reason: 'manual' });
-      }
+      if (this.isActive) this.deactivate({ silent: true, reason: 'cancel', requestGlobalDeactivation: true });
     });
   }
 

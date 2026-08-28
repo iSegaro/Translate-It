@@ -5,6 +5,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { streamingManager } from '@/features/translation/core/StreamingManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'AIStreamManager');
@@ -44,11 +45,20 @@ export const AIStreamManager = {
     if (!messageId) return;
 
     try {
+      let streamEndOptions = options;
+      if (options.error) {
+        const serializedError = MessageFormat.serializeTranslationError(options.error, {
+          providerName: options.error?.providerName || providerName,
+        });
+        streamEndOptions = {
+          ...options,
+          error: serializedError,
+          errorDetails: serializedError,
+        };
+      }
+
       // Delegate to central manager for proper lifecycle completion
-      await streamingManager.completeStream(messageId, !options.error, {
-        error: options.error,
-        targetLanguage: options.targetLanguage
-      });
+      await streamingManager.completeStream(messageId, !options.error, streamEndOptions);
       
       logger.debug(`[${providerName}] Stream end delegated to central manager for messageId: ${messageId}`);
     } catch (error) {

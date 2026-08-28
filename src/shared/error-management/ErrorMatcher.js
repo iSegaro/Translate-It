@@ -130,6 +130,8 @@ export const TRANSIENT_ERRORS = new Set([
   ErrorTypes.OPERATION_TIMEOUT
 ]);
 
+const MODEL_OVERLOAD_MESSAGE_PATTERN = /\bmodel(?:\s+is(?:\s+currently)?|\s+currently)?\s+overloaded\b|\bmodel_overloaded\b/i;
+
 /**
  * ErrorMatcher - Centralizes the logic for identifying and classifying errors
  * based on their messages, codes, or types.
@@ -159,9 +161,15 @@ export function isConfigError(errorOrType) {
  */
 export function isCancellationError(error) {
   if (!error) return false;
-  if (error.isCancelled) return true;
-  
-  const type = typeof error === 'string' ? error : (error.type || matchErrorToType(error));
+  if (isOperationAborted(error)) return false;
+
+  if (typeof error !== 'string' && error.type) {
+    return error.type === ErrorTypes.USER_CANCELLED || error.type === ErrorTypes.TRANSLATION_CANCELLED;
+  }
+
+  if (typeof error !== 'string' && error.isCancelled) return true;
+
+  const type = typeof error === 'string' ? error : matchErrorToType(error);
   return type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
 }
 
@@ -170,6 +178,7 @@ export function isCancellationError(error) {
  */
 export function isFatalError(errorOrType) {
   if (!errorOrType) return false;
+  if (isOperationAborted(errorOrType)) return false;
   
   const type = typeof errorOrType === 'string' 
     ? errorOrType 
@@ -187,6 +196,7 @@ export function isFatalError(errorOrType) {
  */
 export function isTransientError(errorOrType) {
   if (!errorOrType) return false;
+  if (isOperationAborted(errorOrType)) return false;
   const type = typeof errorOrType === 'string' ? errorOrType : (errorOrType.type || matchErrorToType(errorOrType));
   
   const isTransientStatusCode = errorOrType && typeof errorOrType === 'object' && 
@@ -199,7 +209,33 @@ export function isTransientError(errorOrType) {
  * Determines if an error should trigger a retry or fallback
  */
 export function isRetryableError(errorOrType) {
+  if (isOperationAborted(errorOrType) || isCancellationError(errorOrType)) return false;
   return isTransientError(errorOrType) || !isFatalError(errorOrType);
+}
+
+/**
+ * Identifies provider HTTP failures caused by request-size limits.
+ * This is execution-policy metadata; canonical public type remains HTTP_ERROR.
+ */
+export function isProviderRequestSizeError(error) {
+  if (error?.type !== ErrorTypes.HTTP_ERROR) return false;
+
+  const statusCode = Number(error.statusCode);
+  if (statusCode === 413) return true;
+  if (statusCode !== 400 && statusCode !== 422) return false;
+
+  const message = typeof error.message === 'string' ? error.message.toLowerCase() : '';
+  return /\btoo\s+long\b|\bmaximum\s+length\b|\bcontext\s+length\b/.test(message);
+}
+
+/**
+ * Identifies deterministic client HTTP failures for execution policy only.
+ * Canonical error type remains HTTP_ERROR.
+ */
+export function isDeterministicClientHttpError(error) {
+  if (error?.type !== ErrorTypes.HTTP_ERROR) return false;
+
+  return [400, 404, 422].includes(Number(error.statusCode));
 }
 
 /**
@@ -237,24 +273,26 @@ export function needsSettings(errorOrType) {
  * @returns {string} One of the keys from ErrorTypes.
  */
 export function matchErrorToType(rawOrError = "") {
-  // Priority 0: Check for AbortError (user cancellation)
-  if (rawOrError && typeof rawOrError === "object" && rawOrError.name === 'AbortError') {
-    return ErrorTypes.USER_CANCELLED;
+  // Internal execution provenance must not become public user cancellation.
+  if (isOperationAborted(rawOrError)) {
+    return ErrorTypes.TRANSLATION_ERROR;
   }
 
-  // اولویت ۱: اگر نوع خطا به صراحت در آبجکت مشخص شده است
+  // Specific canonical types are authoritative; generic placeholders remain refinable.
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
     const type = rawOrError.type;
-    
-    if (type === ErrorTypes.API_RESPONSE_INVALID) return ErrorTypes.API_RESPONSE_INVALID;
-    
-    if (type !== ErrorTypes.TRANSLATION_ERROR && 
-        type !== ErrorTypes.TRANSLATION_FAILED && 
-        type !== ErrorTypes.UNKNOWN &&
-        type !== 'TRANSLATION_ERROR' && 
-        type !== 'TRANSLATION_FAILED') {
-      return type;
-    }
+    const isGenericType = type === ErrorTypes.TRANSLATION_ERROR
+      || type === ErrorTypes.TRANSLATION_FAILED
+      || type === ErrorTypes.UNKNOWN
+      || type === "TRANSLATION_ERROR"
+      || type === "TRANSLATION_FAILED";
+
+    if (!isGenericType) return type;
+  }
+
+  // Keep legacy user-owned cancellation metadata after canonical provenance.
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.isCancelled === true) {
+    return ErrorTypes.USER_CANCELLED;
   }
 
   // اولویت ۲: تشخیص دقیق خطا بر اساس کد وضعیت HTTP
@@ -266,12 +304,12 @@ export function matchErrorToType(rawOrError = "") {
       if (code === 400 || code === 422) {
         if (errorMsg.includes("api key") || errorMsg.includes("auth") || errorMsg.includes("invalid key")) return ErrorTypes.API_KEY_INVALID;
         if (errorMsg.includes("text is empty") || errorMsg.includes("empty text")) return ErrorTypes.TEXT_EMPTY;
-        if (errorMsg.includes("too long") || errorMsg.includes("limit") || errorMsg.includes("maximum length")) return ErrorTypes.TEXT_TOO_LONG;
       }
 
       if (code === 404) {
         const providerType = rawOrError.providerType;
-        if (providerType === ProviderTypes.AI || errorMsg.includes('model')) return ErrorTypes.MODEL_MISSING;
+        if (providerType === ProviderTypes.AI) return ErrorTypes.HTTP_ERROR;
+        if (errorMsg.includes('model')) return ErrorTypes.MODEL_MISSING;
         if (errorMsg.includes('chrome') || errorMsg.includes('translator')) return ErrorTypes.BROWSER_API_UNAVAILABLE;
         return ErrorTypes.API_URL_MISSING;
       }
@@ -282,13 +320,10 @@ export function matchErrorToType(rawOrError = "") {
       if (code === 429) return ErrorTypes.RATE_LIMIT_REACHED;
       if (code === 456) return ErrorTypes.DEEPL_QUOTA_EXCEEDED;
       
-      if (code === 503 || code === 504 || code === 500) {
-        if (errorMsg.includes("overloaded") || errorMsg.includes("high demand") || errorMsg.includes("busy") || errorMsg.includes("unavailable")) {
-          return ErrorTypes.MODEL_OVERLOADED;
-        }
+      if (code >= 500 && code <= 599) {
+        if (MODEL_OVERLOAD_MESSAGE_PATTERN.test(errorMsg)) return ErrorTypes.MODEL_OVERLOADED;
+        return ErrorTypes.SERVER_ERROR;
       }
-
-      if (code >= 500 && code <= 599) return ErrorTypes.SERVER_ERROR;
       return ErrorTypes.HTTP_ERROR;
     }
   }
@@ -350,14 +385,9 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("translation failed") || msg.includes("translation_failed") || msg.includes("batch translation failed") || msg === "translation failed") return ErrorTypes.TRANSLATION_FAILED;
   if (msg.includes("translation error") || msg.includes("translation_error")) return ErrorTypes.TRANSLATION_ERROR;
 
-  if (msg.includes("cancelled by user") || 
-      msg.includes("translation cancelled") || 
-      msg.includes("user cancelled") || 
-      msg.includes("user_cancelled") || 
-      msg.includes("operation cancelled") ||
-      msg === "cancelled" ||
-      msg === "handler cancelled" ||
-      msg === "request cancelled") return ErrorTypes.USER_CANCELLED;
+  if (msg.includes("cancelled by user") ||
+      msg.includes("user cancelled") ||
+      msg.includes("user_cancelled")) return ErrorTypes.USER_CANCELLED;
 
   if (msg.includes("html response") || msg.includes("returned html") || msg.includes("html instead of json")) return ErrorTypes.HTML_RESPONSE_ERROR;
   if (msg.includes("json parsing") || msg.includes("json parse") || msg.includes("unexpected end of json input")) return ErrorTypes.JSON_PARSING_ERROR;
@@ -386,7 +416,7 @@ export function matchErrorToType(rawOrError = "") {
 
   if ((msg.includes("api url") && msg.includes("missing")) || msg.includes("no endpoints found") || msg === "api_url_missing") return ErrorTypes.API_URL_MISSING;
   if (msg.includes("not a valid model id") || msg.includes("invalid model") || msg.includes("model not found") || msg.includes("model_missing")) return ErrorTypes.MODEL_MISSING;
-  if (msg.includes("the model is overloaded") || msg.includes("overloaded") || msg.includes("model_overloaded") || msg.includes("high demand") || msg.includes("service unavailable")) return ErrorTypes.MODEL_OVERLOADED;
+  if (MODEL_OVERLOAD_MESSAGE_PATTERN.test(msg)) return ErrorTypes.MODEL_OVERLOADED;
 
   if ((msg.includes("quota exceeded") && msg.includes("region")) || msg.includes("location is not supported") || msg.includes("gemini_quota_region")) return ErrorTypes.GEMINI_QUOTA_REGION;
   if (msg.includes("quota exceeded") || msg.includes("resource has been exhausted") || msg.includes("quota_exceeded") || msg.includes("limit exceeded")) return ErrorTypes.QUOTA_EXCEEDED;
@@ -404,6 +434,11 @@ export function matchErrorToType(rawOrError = "") {
   
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
 
+  // AbortError name alone carries no user-intent provenance.
+  if (rawOrError && typeof rawOrError === "object" && rawOrError.name === "AbortError") {
+    return ErrorTypes.TRANSLATION_ERROR;
+  }
+
   // Final fallback: If we still don't have a match but the error object HAD an explicit type, use it.
   if (rawOrError && typeof rawOrError === "object" && rawOrError.type) {
     return rawOrError.type;
@@ -418,3 +453,7 @@ export function matchErrorToType(rawOrError = "") {
 }
 
 export default ErrorMatcher;
+
+function isOperationAborted(error) {
+  return Boolean(error && typeof error === "object" && error.operationAborted === true);
+}

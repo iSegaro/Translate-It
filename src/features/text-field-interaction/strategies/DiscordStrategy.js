@@ -103,8 +103,10 @@ export default class DiscordStrategy extends PlatformStrategy {
   /**
    * به‌روزرسانی محتوا از طریق Slate API
    */
-  async _updateViaSlateAPI(element, translatedText) {
+  async _updateViaSlateAPI(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     try {
+      if (!isCurrent()) return false;
       const slateEditor = this._getSlateEditor(element);
       if (!slateEditor) {
         logger.debug('Slate editor instance پیدا نشد');
@@ -115,6 +117,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
       // تلاش برای استفاده از Slate Transforms
       if (window.Slate && window.Slate.Transforms) {
+        if (!isCurrent()) return false;
         const { Transforms, Editor } = window.Slate;
 
         // انتخاب تمام محتوا
@@ -140,7 +143,8 @@ export default class DiscordStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (translatedText === undefined || translatedText === null) {
       return false;
     }
@@ -162,18 +166,20 @@ export default class DiscordStrategy extends PlatformStrategy {
       // روش 1: استفاده از Slate API (بهترین روش اختصاصی دیسکورد)
       if (this._isSlateEditor(element)) {
         logger.debug('تلاش با Slate API...');
-        success = await this._updateViaSlateAPI(element, translatedText);
+        success = await this._updateViaSlateAPI(element, translatedText, applicationContext);
+        if (!isCurrent()) return false;
       }
 
       // روش 2: استفاده از جایگزینی هوشمند متن (جایگزین تمام متدهای clipboard/natural typing/execCommand دستی)
       if (!success) {
         logger.debug('تلاش با smartTextReplacement...');
-        success = await smartTextReplacement(element, translatedText);
+        success = await smartTextReplacement(element, translatedText, null, null, undefined, applicationContext);
       }
 
       // تأیید نهایی و تنظیمات
       if (success) {
         await smartDelay(100);
+        if (!isCurrent()) return false;
 
         // بررسی صحت به‌روزرسانی
         const finalText = this.extractText(element);
@@ -182,6 +188,7 @@ export default class DiscordStrategy extends PlatformStrategy {
 
           // اعمال visual feedback
           await this.applyVisualFeedback(element);
+          if (!isCurrent()) return false;
 
           // فوکوس مجدد برای حفظ حالت ادیتور
           element.focus();
@@ -189,6 +196,7 @@ export default class DiscordStrategy extends PlatformStrategy {
           // تنظیم cursor در انتهای متن
           const selection = window.getSelection();
           if (selection) {
+            if (!isCurrent()) return false;
             const range = document.createRange();
             const textNode = element.querySelector(
               '[data-slate-string="true"]',

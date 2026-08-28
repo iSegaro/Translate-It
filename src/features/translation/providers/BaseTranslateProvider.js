@@ -3,7 +3,7 @@
  * Provides streaming support for chunk-based translation with real-time DOM updates
  */
 
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseProvider, createOperationAbortError } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
@@ -14,6 +14,13 @@ import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextPr
 import { TraditionalStreamManager } from "./utils/TraditionalStreamManager.js";
 import { statsManager } from '@/features/translation/core/TranslationStatsManager.js';
 import { getProviderBatching } from "@/features/translation/core/ProviderConfigurations.js";
+import {
+  createProviderExecutionMetadataRef,
+  discardProviderExecutionMetadata,
+  executeProviderExecutionAttempt,
+  publishProviderExecutionMetadata,
+} from "@/features/translation/ir/TranslationOperation.js";
+import { TranslationCallPurpose } from "@/features/translation/providers/ProviderConstants.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseTranslateProvider');
 
@@ -31,11 +38,11 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Enhanced batch translation with streaming support
    */
-  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _batchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     if (this.constructor.supportsStreaming && this._shouldUseStreaming(texts, messageId, engine, translateMode)) {
-      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
+      return this._streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
     }
-    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat);
+    return this._traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options);
   }
 
   /**
@@ -79,14 +86,16 @@ export class BaseTranslateProvider extends BaseProvider {
   /**
    * Streaming batch translation with real-time results
    */
-  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _streamingBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     logger.debug(`[${this.providerName}] Starting streaming translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     
     if (messageId && engine) {
       try {
         const sender = typeof engine.getStreamingSender === 'function' ? engine.getStreamingSender(messageId) : null;
         if (sender) {
-          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          const streamArgs = [messageId, sender, this, texts, sessionId];
+          if (options.executionContext?.conversationAcceptanceRegistered === true) streamArgs.push(true);
+          streamingManager.initializeStream(...streamArgs);
         } else {
           logger.debug(`[${this.providerName}] No sender found for streaming messageId: ${messageId}`);
         }
@@ -95,16 +104,16 @@ export class BaseTranslateProvider extends BaseProvider {
     
     const chunks = await this._createChunks(texts);
     const allResults = [];
+    const callPurpose = options.callPurpose ?? TranslationCallPurpose.PRIMARY_TRANSLATION;
     
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
       if ((abortController && abortController.signal.aborted) || (engine && engine.isCancelled(messageId))) {
-        const error = new Error('Translation cancelled by user');
-        error.type = ErrorTypes.USER_CANCELLED;
-        throw error;
+        throw createOperationAbortError(abortController?.signal);
       }
 
       const chunk = chunks[chunkIndex];
       const chunkContext = `streaming-chunk-${chunkIndex + 1}/${chunks.length}`;
+      const providerMetadataRef = createProviderExecutionMetadataRef();
 
       try {
         const statsBefore = sessionId ? statsManager.getSessionSummary(sessionId) : null;
@@ -113,7 +122,23 @@ export class BaseTranslateProvider extends BaseProvider {
         if (abortController) abortController.sessionId = sessionId;
 
         const chunkResponse = await this._executeWithRateLimit(
-          (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, chunkIndex, chunks.length, { ...opts, originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0) }),
+          (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._translateChunk(
+            chunk.texts,
+            sourceLang,
+            targetLang,
+            translateMode,
+            abortController,
+            0,
+            chunk.texts.length,
+            chunkIndex,
+            chunks.length,
+            {
+              ...opts,
+              callPurpose,
+              originalCharCount: chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0),
+              providerMetadataRef,
+            },
+          )),
           chunkContext,
           priority,
           { sessionId, abortController, messageId }
@@ -127,6 +152,9 @@ export class BaseTranslateProvider extends BaseProvider {
             })
           : TraditionalTextProcessor.scrubBidiArtifacts(chunkResponse);
 
+        // Provider metadata records validated execution provenance; delivery remains best-effort.
+        publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
+
         const statsAfter = sessionId ? statsManager.getSessionSummary(sessionId) : null;
         const actualChunkChars = statsAfter ? (statsAfter.chars - charsBefore) : this._calculateTraditionalCharCount(chunk.texts);
         const originalChunkChars = chunk.texts.reduce((sum, t) => sum + (t?.length || 0), 0);
@@ -134,12 +162,13 @@ export class BaseTranslateProvider extends BaseProvider {
         allResults.push(...(Array.isArray(scrubbedResponse) ? scrubbedResponse : [scrubbedResponse]));
         await TraditionalStreamManager.streamChunkResults(this.providerName, scrubbedResponse, chunk.texts, chunkIndex, messageId, sourceLang, targetLang, actualChunkChars, originalChunkChars);
       } catch (error) {
+        discardProviderExecutionMetadata(providerMetadataRef);
         const errorType = error.type || matchErrorToType(error);
         if (errorType === ErrorTypes.USER_CANCELLED) logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} cancelled:`, error);
         else logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
 
         await TraditionalStreamManager.streamChunkError(this.providerName, error, chunkIndex, messageId);
-        await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { error: { message: error.message, type: error.type || errorType } });
+        await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { error });
         throw error;
       }
     }
@@ -148,19 +177,27 @@ export class BaseTranslateProvider extends BaseProvider {
     return allResults;
   }
 
-  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat) {
+  async _traditionalBatchTranslate(texts, sourceLang, targetLang, translateMode, engine, messageId, abortController, priority, sessionId, expectedFormat, options = {}) {
     logger.debug(`[${this.providerName}] Starting traditional batch translation for ${texts.length} texts (Format: ${expectedFormat || 'default'})`);
     const context = `${this.providerName.toLowerCase()}-traditional-batch`;
     const chunks = await this._createChunks(texts);
     const allResults = [];
+    const callPurpose = options.callPurpose ?? TranslationCallPurpose.PRIMARY_TRANSLATION;
 
     const { TranslationSegmentMapper } = await import("@/utils/translation/TranslationSegmentMapper.js");
 
     for (let i = 0; i < chunks.length; i++) {
       if (abortController && abortController.signal.aborted) {
-        const cancelError = new Error('Translation cancelled by user');
+        const isUserAbort = abortController.signal.reason === 'user-cancelled'
+          || abortController.signal.reason === 'user_cancelled';
+        const cancelError = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
         cancelError.name = 'AbortError';
-        cancelError.type = ErrorTypes.USER_CANCELLED;
+        if (isUserAbort) {
+          cancelError.type = ErrorTypes.USER_CANCELLED;
+        } else {
+          cancelError.operationAborted = true;
+          cancelError.cancellationReason = 'operation-abort';
+        }
         throw cancelError;
       }
 
@@ -170,14 +207,32 @@ export class BaseTranslateProvider extends BaseProvider {
       if (abortController) abortController.sessionId = sessionId;
       const originalCharCount = chunk.texts.reduce((sum, t) => sum + getTextInfo(t).length, 0);
 
-      const chunkResponse = await this._executeWithRateLimit(
-        (opts) => this._translateChunk(chunk.texts, sourceLang, targetLang, translateMode, abortController, 0, chunk.texts.length, i, chunks.length, { ...opts, originalCharCount }),
-        chunkContext,
-        priority,
-        { sessionId, abortController, messageId }
-      );
+      const providerMetadataRef = createProviderExecutionMetadataRef();
+      try {
+        const chunkResponse = await this._executeWithRateLimit(
+          (opts) => executeProviderExecutionAttempt(providerMetadataRef, () => this._translateChunk(
+            chunk.texts,
+            sourceLang,
+            targetLang,
+            translateMode,
+            abortController,
+            0,
+            chunk.texts.length,
+            i,
+            chunks.length,
+            {
+              ...opts,
+              callPurpose,
+              originalCharCount,
+              providerMetadataRef,
+            },
+          )),
+          chunkContext,
+          priority,
+          { sessionId, abortController, messageId }
+        );
 
-      // Handle different response formats and CRITICAL: Split joined strings back into segments
+        // Handle different response formats and reconstruct only deterministic mappings.
       let chunkResults = [];
       const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
 
@@ -191,8 +246,8 @@ export class BaseTranslateProvider extends BaseProvider {
           return TraditionalTextProcessor.scrubBidiArtifacts(text);
         });
       } else {
-        // MISMATCH CASE: Provider did internal splitting or merged segments
-        // Join everything and let the SegmentMapper redistribute it correctly
+        // MISMATCH CASE: Provider did internal splitting or merged segments.
+        // Strict mapping rejects output without provable source ownership.
         const joinedResult = responseArray
           .map(r => {
             if (typeof r === 'string') return r;
@@ -202,27 +257,43 @@ export class BaseTranslateProvider extends BaseProvider {
           .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
         try {
-          chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-            joinedResult,
-            chunk.texts,
-            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
-            this.providerName
-          ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
+            chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+              joinedResult,
+              chunk.texts,
+              TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+              this.providerName,
+              { requireDeterministic: true }
+            ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
         } catch (mapperError) {
-          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY) {
+          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY
+              || mapperError.type === TranslationSegmentMapper.AMBIGUOUS_MAPPING) {
             const err = new Error(`[${this.providerName}] Incomplete translation: ${mapperError.message}`);
             err.type = ErrorTypes.API_RESPONSE_INVALID;
+            err.cause = mapperError;
             throw err;
           }
           throw mapperError;
         }
       }
 
-      allResults.push(...chunkResults);
+        publishProviderExecutionMetadata(options.executionContext, providerMetadataRef, callPurpose);
+
+        allResults.push(...chunkResults);
+      } catch (error) {
+        discardProviderExecutionMetadata(providerMetadataRef);
+        throw error;
+      }
     }
     
     // Final safety check: if somehow we still have a mismatch, log it
     if (allResults.length !== texts.length) {
+      if (texts.length > 1) {
+        const err = new Error(
+          `[${this.providerName}] Incomplete translation: expected ${texts.length} logical results, received ${allResults.length}`
+        );
+        err.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw err;
+      }
       logger.warn(`[${this.providerName}] Final batch result count mismatch! Expected ${texts.length}, got ${allResults.length}`);
     }
 
@@ -232,16 +303,17 @@ export class BaseTranslateProvider extends BaseProvider {
   _calculateTraditionalCharCount(texts) { return TraditionalTextProcessor.calculateTraditionalCharCount(texts); }
   
   /**
-   * Standardized helper to capture and log the language detected by the provider's API.
-   * This property is inherited by the TranslationEngine and used for metadata (e.g., TTS).
-   * @param {string|null|undefined} lang - The raw language code from the API response
+   * Stores provider-reported source language in current execution slot.
+   * @param {Object} options - Current provider execution options
+   * @param {string|null|undefined} lang - Raw language code from API response
    * @protected
    */
-  _setDetectedLanguage(lang) {
-    if (lang && typeof lang === 'string' && lang.trim() !== '') {
-      this.lastDetectedLanguage = lang.toLowerCase().trim();
-      logger.debug(`[${this.providerName}] API detected source language: ${this.lastDetectedLanguage}`);
-    }
+  _setExecutionDetectedLanguage(options, lang) {
+    if (!options?.providerMetadataRef || typeof lang !== 'string' || !lang.trim()) return;
+
+    const detectedLanguage = lang.toLowerCase().trim();
+    options.providerMetadataRef.metadata.detectedLanguage = detectedLanguage;
+    logger.debug(`[${this.providerName}] API detected source language: ${detectedLanguage}`);
   }
 
   async _translateChunk() { throw new Error(`_translateChunk not implemented by ${this.providerName}`); }

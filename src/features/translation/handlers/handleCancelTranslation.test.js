@@ -69,7 +69,7 @@ describe('handleCancelTranslation', () => {
 
     expect(result).toMatchObject({ success: true, cancelledCount: 2 })
     for (const id of ['one', 'two']) {
-      expect(engine.cancelTranslation).toHaveBeenCalledWith(id)
+      expect(engine.cancelTranslation).toHaveBeenCalledWith(id, false, undefined, 'user_cancelled')
       expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith(id, 'user_cancelled')
       expect(dispatchCancellationMock).toHaveBeenCalledWith({ messageId: id, request: { messageId: 'request' } })
       expect(cancelStreamMock).toHaveBeenCalledWith(id, 'user_cancelled')
@@ -84,7 +84,7 @@ describe('handleCancelTranslation', () => {
     await handleCancelTranslation({ data: { cancelAll: true, context: 'popup' } }, {})
 
     expect(engine.getActiveTranslationIds).toHaveBeenCalledWith('popup')
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('popup-id')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('popup-id', false, undefined, 'user_cancelled')
   })
 
   it('does not notify for a rejected tracker cancellation', async () => {
@@ -94,7 +94,7 @@ describe('handleCancelTranslation', () => {
     await handleCancelTranslation({ data: { cancelAll: true } }, {})
 
     expect(dispatchCancellationMock).not.toHaveBeenCalled()
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal', false, undefined, 'user_cancelled')
   })
 
   it('delegates active timeout lifecycle before exact-ID cleanup', async () => {
@@ -162,10 +162,26 @@ describe('handleCancelTranslation', () => {
 
     await handleCancelTranslation({ data: { cancelAll: true } }, {})
 
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('one')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('one', false, undefined, 'user_cancelled')
     expect(cancelStreamMock).toHaveBeenCalledWith('one', 'user_cancelled')
     expect(rateLimitCancelMock).toHaveBeenCalledWith('one')
     expect(queueCancelMock).toHaveBeenCalledWith('one')
+  })
+
+  it('preserves internal lifecycle reason when falling back to engine cancellation', async () => {
+    engine.getActiveTranslationIds.mockReturnValue(['replaced'])
+
+    await handleCancelTranslation({
+      data: { cancelAll: true, reason: 'document-replaced' }
+    }, {})
+
+    expect(engine.cancelTranslation).toHaveBeenCalledWith(
+      'replaced',
+      false,
+      undefined,
+      'document-replaced'
+    )
+    expect(cancelStreamMock).toHaveBeenCalledWith('replaced', 'document-replaced')
   })
 
   it('continues remaining cleanup when one engine cancellation rejects', async () => {
@@ -187,7 +203,7 @@ describe('handleCancelTranslation', () => {
 
     expect(rateLimitCancelMock).toHaveBeenCalledWith('one')
     expect(queueCancelMock).toHaveBeenCalledWith('one')
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('two')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('two', false, undefined, 'user_cancelled')
   })
 
   it('isolates a synchronous queue cleanup failure', async () => {
@@ -226,7 +242,7 @@ describe('handleCancelTranslation', () => {
 
     expect(engine.getActiveTranslationIds).not.toHaveBeenCalled()
     expect(engine.cancelTranslation).toHaveBeenCalledTimes(1)
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('match')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('match', false, undefined, 'user_cancelled')
   })
 
   it('returns successful zero cancellation for an empty no-tab selection', async () => {
@@ -266,7 +282,7 @@ describe('handleCancelTranslation', () => {
 
     expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('legacy', 'user_cancelled')
     expect(dispatchCancellationMock).toHaveBeenCalledWith({ messageId: 'legacy', request: { messageId: 'request' } })
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('legacy')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('legacy', false, undefined, 'user_cancelled')
   })
 
   it('delegates timeout through the service timeout API only', async () => {
@@ -288,7 +304,7 @@ describe('handleCancelTranslation', () => {
 
     expect(translationRequestTracker.cancelRequest).not.toHaveBeenCalled()
     expect(dispatchCancellationMock).not.toHaveBeenCalled()
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('terminal', false, undefined, 'user_cancelled')
   })
 
   it('safely falls back when the delegate rejects', async () => {
@@ -299,7 +315,7 @@ describe('handleCancelTranslation', () => {
 
     expect(result).toMatchObject({ success: true })
     expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('fallback', 'user_cancelled')
-    expect(engine.cancelTranslation).toHaveBeenCalledWith('fallback')
+    expect(engine.cancelTranslation).toHaveBeenCalledWith('fallback', false, undefined, 'user_cancelled')
   })
 
   it('supports mixed delegated and fallback IDs for cancelAll', async () => {

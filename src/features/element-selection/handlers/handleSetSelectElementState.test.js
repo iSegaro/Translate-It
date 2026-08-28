@@ -1,17 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import browser from 'webextension-polyfill';
 
-// Mock dependencies
 vi.mock('webextension-polyfill', () => ({
   default: {
+    runtime: { sendMessage: vi.fn(() => Promise.resolve()) },
     tabs: {
-      sendMessage: vi.fn(() => Promise.resolve())
-    }
-  }
-}));
-
-vi.mock('./selectElementStateManager.js', () => ({
-  setStateForTab: vi.fn()
+      onRemoved: { addListener: vi.fn() },
+      onActivated: { addListener: vi.fn() },
+    },
+    webNavigation: {
+      onCommitted: { addListener: vi.fn() },
+    },
+  },
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -38,49 +37,58 @@ vi.mock('@/shared/messaging/core/MessagingCore.js', () => ({
 }));
 
 import { handleSetSelectElementState } from './handleSetSelectElementState.js';
-import { setStateForTab } from './selectElementStateManager.js';
+import { clearStateForTab, getStateForTab, setStateForTab } from './selectElementStateManager.js';
 
 describe('handleSetSelectElementState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearStateForTab(789);
+    clearStateForTab(101);
   });
 
-  it('should set state for a tab from sender', async () => {
+  it('should acknowledge state reports from sender without changing authority', async () => {
     const message = { data: { activate: true } };
     const sender = { tab: { id: 123 } };
     
     const response = await handleSetSelectElementState(message, sender);
 
     expect(response.success).toBe(true);
-    expect(setStateForTab).toHaveBeenCalledWith(123, true);
+    expect(response).toMatchObject({ tabId: 123, active: true });
+    expect(getStateForTab(123).active).toBe(false);
   });
 
-  it('should set state for a tab from data tabId', async () => {
+  it('should use canonical active when both state fields are present', async () => {
+    const response = await handleSetSelectElementState({
+      data: { active: false, activate: true, tabId: 321 },
+    }, {});
+
+    expect(response).toMatchObject({ success: true, tabId: 321, active: false });
+  });
+
+  it('should accept legacy activate only when active is absent', async () => {
+    const response = await handleSetSelectElementState({
+      data: { activate: true, tabId: 654 },
+    }, {});
+
+    expect(response).toMatchObject({ success: true, tabId: 654, active: true });
+  });
+
+  it('should acknowledge state for a tab from data tabId', async () => {
     const message = { data: { activate: false, tabId: 456 } };
     
     const response = await handleSetSelectElementState(message, {});
 
     expect(response.success).toBe(true);
-    expect(setStateForTab).toHaveBeenCalledWith(456, false);
+    expect(response).toMatchObject({ tabId: 456, active: false });
   });
 
-  it('should broadcast deactivation if explicit', async () => {
+  it('should not clear authoritative state for explicit deactivation reports', async () => {
     const message = { data: { activate: false, tabId: 789, isExplicitDeactivation: true } };
-    
+
+    setStateForTab(789, true);
     await handleSetSelectElementState(message, {});
 
-    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(789, expect.objectContaining({
-      action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
-      data: expect.objectContaining({ isExplicitDeactivation: true })
-    }));
-  });
-
-  it('should not broadcast activation', async () => {
-    const message = { data: { activate: true, tabId: 101 } };
-    
-    await handleSetSelectElementState(message, {});
-
-    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(getStateForTab(789).active).toBe(true);
   });
 
   it('should return error if no tabId', async () => {
@@ -89,10 +97,9 @@ describe('handleSetSelectElementState', () => {
     expect(response.error).toBe('No tabId available');
   });
 
-  it('should handle errors in setStateForTab', async () => {
-    setStateForTab.mockImplementation(() => { throw new Error('State error'); });
+  it('should not establish active authority for a report', async () => {
     const response = await handleSetSelectElementState({ data: { activate: true, tabId: 1 } }, {});
-    expect(response.success).toBe(false);
-    expect(response.error).toBe('State error');
+    expect(response).toEqual({ success: true, tabId: 1, active: true });
+    expect(getStateForTab(1).active).toBe(false);
   });
 });

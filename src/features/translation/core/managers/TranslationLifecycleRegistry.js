@@ -5,18 +5,25 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { isUserCancellationReason, normalizeOperationAbortReason } from '@/shared/error-management/CancellationPolicy.js';
 import { streamingManager } from "../StreamingManager.js";
 import { getTranslationInputPreview } from "../translationInputHelpers.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'TranslationLifecycleRegistry');
 // Retain out-of-order cancellation intent long enough for extension messaging to register its request.
 const CANCELLATION_TOMBSTONE_TTL_MS = 60_000;
+const INTERNAL_ABORT_REASON = 'operation-abort';
+
+function getAbortReason(reason, timeout) {
+  if (timeout) return 'timeout';
+  if (isUserCancellationReason(reason)) return 'user-cancelled';
+  return normalizeOperationAbortReason(reason) || INTERNAL_ABORT_REASON;
+}
 
 export class TranslationLifecycleRegistry {
   constructor() {
     this.activeTranslations = new Map(); // Track active translations: messageId -> { controller: AbortController, context: string }
-    this.cancelledRequests = new Map(); // Track cancellation tombstones: messageId -> timestamp
+    this.cancelledRequests = new Map(); // Track tombstones: messageId -> { timestamp, reason }
     this.recentRequests = new Map();     // Track recent requests to prevent duplicates
     this.streamingSenders = new Map();    // Track tab info for streaming: messageId -> sender
   }
@@ -33,7 +40,8 @@ export class TranslationLifecycleRegistry {
   registerRequest(messageId, text, context = 'unknown') {
     this._pruneCancelledRequests();
 
-    if (this.cancelledRequests.has(messageId)) {
+    const tombstone = this.cancelledRequests.get(messageId);
+    if (tombstone) {
       logger.debug(`[LifecycleRegistry] Ignoring pre-cancelled request: ${messageId}`);
       return null;
     }
@@ -88,6 +96,12 @@ export class TranslationLifecycleRegistry {
     return this.cancelledRequests.has(messageId);
   }
 
+  getCancellationReason(messageId) {
+    this._pruneCancelledRequests();
+    const tombstone = this.cancelledRequests.get(messageId);
+    return typeof tombstone === 'object' ? tombstone.reason : null;
+  }
+
   /**
    * Cancel a specific translation by ID.
    * 
@@ -97,25 +111,30 @@ export class TranslationLifecycleRegistry {
    * @param {string} [reason] - Timeout or cancellation reason
    * @returns {Promise<boolean>} True if found and cancelled
    */
-  async cancelTranslation(messageId, timeout = false, timeoutType, reason = timeout ? 'Translation timed out' : ErrorTypes.USER_CANCELLED) {
+  async cancelTranslation(messageId, timeout = false, timeoutType, reason = null) {
     if (!messageId) return false;
 
     this._pruneCancelledRequests();
-    this.cancelledRequests.set(messageId, Date.now());
+    const abortReason = getAbortReason(reason, timeout);
+    const streamReason = reason || (timeout ? 'Translation timed out' : INTERNAL_ABORT_REASON);
+    this.cancelledRequests.set(messageId, {
+      timestamp: Date.now(),
+      reason: abortReason,
+    });
     
     if (this.activeTranslations.has(messageId)) {
       logger.info(`[LifecycleRegistry] Aborting active translation: ${messageId}`);
-      this.activeTranslations.get(messageId).controller.abort();
+      this.activeTranslations.get(messageId).controller.abort(abortReason);
     }
 
     try {
       // Notify streaming manager to clean up resources
       if (timeoutType) {
-        await streamingManager.cancelStream(messageId, reason, timeout, timeoutType);
+        await streamingManager.cancelStream(messageId, streamReason, timeout, timeoutType);
       } else if (timeout) {
-        await streamingManager.cancelStream(messageId, reason, true);
+        await streamingManager.cancelStream(messageId, streamReason, true);
       } else {
-        await streamingManager.cancelStream(messageId, reason);
+        await streamingManager.cancelStream(messageId, streamReason);
       }
     } catch { /* ignore */ }
 
@@ -189,7 +208,8 @@ export class TranslationLifecycleRegistry {
    */
   _pruneCancelledRequests() {
     const expiresBefore = Date.now() - CANCELLATION_TOMBSTONE_TTL_MS;
-    for (const [messageId, cancelledAt] of this.cancelledRequests) {
+    for (const [messageId, tombstone] of this.cancelledRequests) {
+      const cancelledAt = typeof tombstone === 'number' ? tombstone : tombstone.timestamp;
       if (cancelledAt <= expiresBefore) {
         this.cancelledRequests.delete(messageId);
       }

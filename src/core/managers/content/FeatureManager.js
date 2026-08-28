@@ -327,6 +327,32 @@ export class FeatureManager extends ResourceTracker {
     }
   }
 
+  /**
+   * Resolves the two mutually exclusive in-page translation modes without
+   * routing state-changing commands through the DOM event bus.
+   * @param {'pageTranslation'|'selectElement'} requestingFeature
+   * @returns {Promise<boolean>} Whether a conflicting active feature was stopped.
+   */
+  async resolveFeatureConflict(requestingFeature) {
+    if (requestingFeature === 'pageTranslation') {
+      const selectElementManager = this.featureHandlers.get('selectElement');
+      if (!selectElementManager?.isActive) return false;
+
+      await selectElementManager.deactivate({ silent: true, reason: 'conflict' });
+      return true;
+    }
+
+    if (requestingFeature === 'selectElement') {
+      const pageTranslationManager = this.featureHandlers.get('pageTranslation');
+      if (!pageTranslationManager?.isTranslating && !pageTranslationManager?.isTranslated) return false;
+
+      await pageTranslationManager.restorePage();
+      return true;
+    }
+
+    return false;
+  }
+
   async loadFeatureHandler(featureName) {
     try {
       let HandlerClass;
@@ -571,9 +597,15 @@ export class FeatureManager extends ResourceTracker {
                 }
                 if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(newUrl)) {
                   logger.info('Auto-translate rule matched on SPA URL change. Triggering translation...');
-                  const { pageEventBus } = await import('@/core/PageEventBus.js');
                   const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-                  pageEventBus.emit(MessageActions.PAGE_TRANSLATE, { isAuto: true });
+                  const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+                  const response = await sendRegularMessage({
+                    action: MessageActions.PAGE_TRANSLATE,
+                    data: { isAuto: true },
+                  }, { returnFailureResponse: true });
+                  if (response?.success === false) {
+                    logger.debug('SPA auto page translation command rejected', response);
+                  }
                 }
               }
             }

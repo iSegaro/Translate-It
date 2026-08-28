@@ -84,7 +84,8 @@ export default class TelegramStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (!translatedText || !element) {
       return false;
     }
@@ -94,6 +95,7 @@ export default class TelegramStrategy extends PlatformStrategy {
 
     try {
       await smartDelay(100);
+      if (!isCurrent()) return false;
 
       // 1. ادغام منطق پیدا کردن فیلد
       const telegramField =
@@ -118,11 +120,13 @@ export default class TelegramStrategy extends PlatformStrategy {
 
       // اعمال فیدبک بصری
       await this.applyVisualFeedback(telegramField);
+      if (!isCurrent()) return false;
 
       // 4. استفاده از جایگزینی هوشمند متن
-      const success = await smartTextReplacement(telegramField, translatedText);
+      const success = await smartTextReplacement(telegramField, translatedText, null, null, undefined, applicationContext);
 
       if (success) {
+        if (!isCurrent()) return false;
         // اعمال جهت متن برای فیلدهای input
         if (this.isInputField(telegramField)) {
           telegramField.setAttribute(
