@@ -541,7 +541,7 @@
             <div class="setting-control-group">
               <BaseSelect
                 id="MOUSE_HOVER_TRIGGER"
-                v-model="mouseHoverTrigger"
+                v-model="mouseHoverTriggerUi"
                 :options="mouseHoverTriggerOptions"
                 :disabled="!extensionEnabled || !mouseHoverEnabled"
                 class="compact-select"
@@ -842,6 +842,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { detectOS, OS_PLATFORMS } from '@/utils/browser/compatibility.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -1013,12 +1014,21 @@ const handleKeyDown = (e) => {
 // Mouse on Hover
 const mouseHoverEnabled = createSetting('MOUSE_HOVER_TRANSLATION_ENABLED', false)
 const mouseHoverScope = createSetting('MOUSE_HOVER_SCOPE', 'container')
-const mouseHoverTrigger = createSetting('MOUSE_HOVER_TRIGGER', 'ctrl')
+const mouseHoverTrigger = createSetting('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER)
 const mouseHoverDelay = createSetting('MOUSE_HOVER_DELAY', 500)
 const mouseHoverAutoClose = createSetting('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave')
 const mouseHoverTimerDuration = createSetting('MOUSE_HOVER_TIMER_DURATION', 3000)
 const mouseHoverShowBorder = createSetting('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)
 const showMouseHoverInFab = createSetting('SHOW_MOUSE_HOVER_IN_FAB', true)
+const isMacOS = detectOS() === OS_PLATFORMS.MAC
+const mouseHoverTriggerUi = computed({
+  get: () => !isMacOS && mouseHoverTrigger.value === 'control'
+    ? 'primary'
+    : mouseHoverTrigger.value,
+  set: (value) => {
+    mouseHoverTrigger.value = value
+  }
+})
 
 const mouseHoverScopeOptions = computed(() => [
   { value: 'word', label: t('mouse_hover_scope_word') || 'Word' },
@@ -1026,12 +1036,25 @@ const mouseHoverScopeOptions = computed(() => [
   { value: 'container', label: t('mouse_hover_scope_container') || 'Container' }
 ])
 
-const mouseHoverTriggerOptions = computed(() => [
-  { value: 'hover', label: t('mouse_hover_trigger_hover') || 'Immediate (Hover)' },
-  { value: 'ctrl', label: t('mouse_hover_trigger_ctrl') || 'Ctrl + Hover' },
-  { value: 'alt', label: t('mouse_hover_trigger_alt') || 'Alt + Hover' },
-  { value: 'shift', label: t('mouse_hover_trigger_shift') || 'Shift + Hover' }
-])
+const mouseHoverTriggerOptions = computed(() => {
+  const modifierOptions = isMacOS
+    ? [
+        { value: 'primary', label: t('mouse_hover_trigger_primary_mac') || 'Command ⌘' },
+        { value: 'control', label: t('mouse_hover_trigger_control') || 'Control ⌃' },
+        { value: 'alt', label: t('mouse_hover_trigger_alt_mac') || 'Option ⌥' },
+        { value: 'shift', label: t('mouse_hover_trigger_shift_mac') || 'Shift ⇧' }
+      ]
+    : [
+        { value: 'primary', label: t('mouse_hover_trigger_primary') || 'Ctrl' },
+        { value: 'alt', label: t('mouse_hover_trigger_alt') || 'Alt' },
+        { value: 'shift', label: t('mouse_hover_trigger_shift') || 'Shift' }
+      ]
+
+  return [
+    { value: 'hover', label: t('mouse_hover_trigger_hover') || 'Immediate (Hover)' },
+    ...modifierOptions
+  ]
+})
 
 const mouseHoverAutoCloseOptions = computed(() => [
   { value: 'mouseleave', label: t('mouse_hover_autoclose_mouseleave') || 'On Mouse Leave' },

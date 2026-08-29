@@ -110,7 +110,7 @@ class SettingsManager {
       // Mouse on Hover Translation Settings
       MOUSE_HOVER_TRANSLATION_ENABLED: false,
       MOUSE_HOVER_SCOPE: 'sentence',
-      MOUSE_HOVER_TRIGGER: 'hover',
+      MOUSE_HOVER_TRIGGER: CONFIG.MOUSE_HOVER_TRIGGER,
       MOUSE_HOVER_DELAY: 500,
       MOUSE_HOVER_AUTO_CLOSE: 'mouseleave',
       MOUSE_HOVER_TIMER_DURATION: 3000,

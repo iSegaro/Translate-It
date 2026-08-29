@@ -656,14 +656,26 @@
   "mouse_hover_trigger_hover": {
     "message": "即時（ホバー）"
   },
-  "mouse_hover_trigger_ctrl": {
-    "message": "Ctrl + ホバー"
+  "mouse_hover_trigger_primary": {
+    "message": "Ctrl"
+  },
+  "mouse_hover_trigger_primary_mac": {
+    "message": "コマンド ⌘"
+  },
+  "mouse_hover_trigger_control": {
+    "message": "Control ⌃"
   },
   "mouse_hover_trigger_alt": {
-    "message": "Alt + ホバー"
+    "message": "Alt"
   },
   "mouse_hover_trigger_shift": {
-    "message": "Shift + ホバー"
+    "message": "Shift"
+  },
+  "mouse_hover_trigger_alt_mac": {
+    "message": "オプション ⌥"
+  },
+  "mouse_hover_trigger_shift_mac": {
+    "message": "シフト ⇧"
   },
   "mouse_hover_delay_label": {
     "message": "ホバー遅延"

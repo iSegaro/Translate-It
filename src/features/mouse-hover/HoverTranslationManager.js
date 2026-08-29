@@ -5,7 +5,7 @@ import { HoverTextDetector } from './HoverTextDetector.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { TranslationMode } from '@/shared/config/config.js';
+import { CONFIG, TranslationMode } from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
@@ -14,6 +14,7 @@ import { isEditable } from '@/core/helpers.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
+import { ModifierTriggerController } from './ModifierTriggerController.js';
 
 // Import CSS as inline string
 import hoverStyles from './HoverHighlight.scss?inline';
@@ -52,11 +53,17 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentRect = null; // Rectangle Cache for performance optimization
     this.borderedElement = null; // Tracking element with active border
     this.currentMessageId = null; // Tracking active translation request
+    this.modifierTriggerController = new ModifierTriggerController();
     
     // Bind handlers
     this.handleMouseMove = this.handleMouseMove.bind(this);
     this.handleMouseLeave = this.handleMouseLeave.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
+    this.handlePointerDown = this.handlePointerDown.bind(this);
+    this.handleWheel = this.handleWheel.bind(this);
+    this.handleWindowBlur = this.handleWindowBlur.bind(this);
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
   }
 
   /**
@@ -75,7 +82,13 @@ export class HoverTranslationManager extends ResourceTracker {
       // Use ResourceTracker to manage event listeners
       this.addEventListener(document, 'mousemove', this.handleMouseMove, { passive: true });
       this.addEventListener(document, 'keydown', this.handleKeyDown, { passive: true });
+      this.addEventListener(document, 'keyup', this.handleKeyUp, { passive: true });
+      this.addEventListener(document, 'mousedown', this.handlePointerDown, { passive: true });
+      this.addEventListener(document, 'pointerdown', this.handlePointerDown, { passive: true });
+      this.addEventListener(document, 'wheel', this.handleWheel, { passive: true });
       this.addEventListener(document, 'mouseleave', this.handleMouseLeave, { passive: true });
+      this.addEventListener(window, 'blur', this.handleWindowBlur, { passive: true });
+      this.addEventListener(document, 'visibilitychange', this.handleVisibilityChange, { passive: true });
       
       this.isActive = true;
       logger.info('Hover translation manager activated and listening');
@@ -99,7 +112,10 @@ export class HoverTranslationManager extends ResourceTracker {
    * Deactivate the hover translation feature
    */
   async deactivate() {
-    if (!this.isActive) return true;
+    if (!this.isActive) {
+      this.modifierTriggerController.reset();
+      return true;
+    }
 
     this.cleanup(); // Clean up all listeners and timers
     this.isActive = false;
@@ -116,7 +132,7 @@ export class HoverTranslationManager extends ResourceTracker {
    * Handle mouse move events with debouncing logic
    */
   handleMouseMove(event) {
-    // Store last mouse event for keydown trigger
+    // Store last mouse event for modifier release trigger
     this.lastMouseEvent = event;
 
     // Check if mouse actually moved significantly to avoid noise
@@ -153,15 +169,16 @@ export class HoverTranslationManager extends ResourceTracker {
 
     // Skip if mouse is over editable elements (inputs, textareas, etc.)
     if (isEditable(event.target)) {
+      this.modifierTriggerController.reset();
       this._cancelPendingHover();
       this._handleMouseOut();
       return;
     }
 
-    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
+    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
     
-    // Check modifier key if required
-    if (trigger !== 'hover' && !this._isModifierPressed(event, trigger)) {
+    // Modifier modes trigger only from the modifier release lifecycle.
+    if (trigger !== 'hover') {
       this._cancelPendingHover();
       
       // If we don't have a tooltip, we can stop here. 
@@ -183,29 +200,78 @@ export class HoverTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Handle key down for modifier triggers
+   * Handle key down for modifier trigger gesture recognition
    */
   handleKeyDown(event) {
-    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
-    if (trigger === 'hover') return;
-
-    // Ignore modifier keys if user is typing in a field (focused on an editable element)
-    if (isEditable(document.activeElement)) {
+    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
+    if (trigger === 'hover') {
+      this.modifierTriggerController.reset();
       return;
     }
 
-    if (this._isModifierPressed(event, trigger)) {
-      // If we have a stored mouse event and we're over an element
-      if (this.lastMouseEvent && this.lastMouseEvent.target) {
-        logger.debug(`Modifier key ${trigger} pressed while mouse over element, triggering immediate hover check`);
-        this._cancelPendingHover();
-        
-        // Trigger check with a very small safety delay
-        this.hoverTimer = this.setTimeout(() => {
-          this._processHover(this.lastMouseEvent);
-        }, MODIFIER_TRIGGER_DELAY);
-      }
+    // Ignore modifier keys if user is typing in a field (focused on an editable element)
+    if (isEditable(document.activeElement)) {
+      this.modifierTriggerController.reset();
+      return;
     }
+
+    this.modifierTriggerController.handleKeyDown(event, trigger);
+  }
+
+  /**
+   * Handle modifier release and schedule one hover check for valid gestures.
+   */
+  handleKeyUp(event) {
+    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
+    if (trigger === 'hover') {
+      this.modifierTriggerController.reset();
+      return;
+    }
+
+    if (isEditable(document.activeElement)) {
+      this.modifierTriggerController.reset();
+      return;
+    }
+
+    if (!this.modifierTriggerController.handleKeyUp(event, trigger)) return;
+
+    const mouseEvent = this.lastMouseEvent;
+    if (!mouseEvent?.target || isEditable(mouseEvent.target)) return;
+    if (ElementDetectionService.getInstance().isUIElement(mouseEvent.target)) return;
+
+    logger.debug(`Modifier key ${trigger} released while mouse over element, scheduling hover check`);
+    this._cancelPendingHover();
+    this.hoverTimer = this.setTimeout(() => {
+      this._processHover(mouseEvent);
+    }, MODIFIER_TRIGGER_DELAY);
+  }
+
+  /**
+   * Invalidate modifier gesture when pointer interaction begins.
+   */
+  handlePointerDown() {
+    this.modifierTriggerController.invalidate();
+  }
+
+  /**
+   * Invalidate modifier gesture when wheel interaction begins.
+   */
+  handleWheel() {
+    this.modifierTriggerController.invalidate();
+  }
+
+  /**
+   * Clear modifier gesture when page focus is lost.
+   */
+  handleWindowBlur() {
+    this.modifierTriggerController.reset();
+  }
+
+  /**
+   * Clear modifier gesture on document visibility changes.
+   */
+  handleVisibilityChange() {
+    this.modifierTriggerController.reset();
   }
 
   /**
@@ -507,22 +573,10 @@ export class HoverTranslationManager extends ResourceTracker {
   }
 
   /**
-   * Check if the required modifier key is pressed
-   * @private
-   */
-  _isModifierPressed(event, modifier) {
-    switch (modifier) {
-      case 'ctrl': return event.ctrlKey || event.metaKey;
-      case 'alt': return event.altKey;
-      case 'shift': return event.shiftKey;
-      default: return true;
-    }
-  }
-
-  /**
    * Clean up resources
    */
   cleanup() {
+    this.modifierTriggerController.reset();
     this._cancelPendingHover();
     super.cleanup();
   }

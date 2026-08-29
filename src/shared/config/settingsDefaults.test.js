@@ -39,6 +39,7 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.GEMINI_THINKING_MODE).toBe('default');
     expect(defaults).not.toHaveProperty('OPENAI_API_URL');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
+    expect(defaults.MOUSE_HOVER_TRIGGER).toBe(CONFIG.MOUSE_HOVER_TRIGGER);
     expect(defaults.translationHistory).toBeUndefined();
     expect(defaults.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
     expect(defaults.APP_NAME).toBeUndefined();

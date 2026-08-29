@@ -32,6 +32,36 @@ describe('Settings Migrations', () => {
     expect(updates.CHANGELOG_URL).toBeUndefined();
   });
 
+  it('should migrate the legacy Mouse Hover ctrl trigger to primary', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      MOUSE_HOVER_TRIGGER: 'ctrl'
+    });
+
+    expect(updates.MOUSE_HOVER_TRIGGER).toBe('primary');
+    expect(logs).toContain('Migrated MOUSE_HOVER_TRIGGER from ctrl to primary');
+  });
+
+  it.each(['hover', 'primary', 'control', 'alt', 'shift'])(
+    'should preserve canonical Mouse Hover trigger %s',
+    async (trigger) => {
+      const { updates } = await runSettingsMigrations({
+        MOUSE_HOVER_TRIGGER: trigger
+      });
+
+      expect(updates.MOUSE_HOVER_TRIGGER).toBeUndefined();
+    }
+  );
+
+  it('should make Mouse Hover trigger migration idempotent', async () => {
+    const first = await runSettingsMigrations({ MOUSE_HOVER_TRIGGER: 'ctrl' });
+    const second = await runSettingsMigrations({
+      MOUSE_HOVER_TRIGGER: first.updates.MOUSE_HOVER_TRIGGER
+    });
+
+    expect(first.updates.MOUSE_HOVER_TRIGGER).toBe('primary');
+    expect(second.updates.MOUSE_HOVER_TRIGGER).toBeUndefined();
+  });
+
   it('should not re-add non-editable prompt wrappers via missing-setting fill', async () => {
     const currentSettings = { THEME: 'dark' }; // Missing most things
     const { updates } = await runSettingsMigrations(currentSettings);
