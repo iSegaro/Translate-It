@@ -1087,7 +1087,7 @@ The mouse on hover system provides a high-performance, "zero-click" translation 
 - **HoverTextDetector**: A specialized engine that uses browser range APIs for high-precision detection of words, sentences, or containers.
 - **Rectangle Cache**: An optimization layer that stores the bounding box of the detected text, skipping expensive DOM lookups as long as the mouse remains within the same area.
 - **Shadow DOM Tooltip**: Renders the translation within an isolated UI Host component (`MouseHoverTooltip.vue`), using smart positioning to avoid viewport clipping.
-- **Modifier Key Integration**: Supports standalone Ctrl/Alt/Shift press/release gestures; successful release triggers translation, while normal shortcuts invalidate the gesture.
+- **Modifier Key Integration**: Supports standalone primary/control/Alt/Shift press/release gestures; primary resolves to Control on Windows/Linux or Command on macOS, while control remains explicit Control. Successful release triggers translation, while normal shortcuts invalidate the gesture.
 
 ### Documentation
 For detailed information on detection scopes, performance benchmarks, and positioning logic, refer to the **[Mouse on Hover System Documentation](MOUSE_HOVER_SYSTEM.md)**.

@@ -5,7 +5,7 @@ import { HoverTextDetector } from './HoverTextDetector.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { TranslationMode } from '@/shared/config/config.js';
+import { CONFIG, TranslationMode } from '@/shared/config/config.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { ElementDetectionService } from '@/shared/services/ElementDetectionService.js';
@@ -175,7 +175,7 @@ export class HoverTranslationManager extends ResourceTracker {
       return;
     }
 
-    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
+    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
     
     // Modifier modes trigger only from the modifier release lifecycle.
     if (trigger !== 'hover') {
@@ -203,7 +203,7 @@ export class HoverTranslationManager extends ResourceTracker {
    * Handle key down for modifier trigger gesture recognition
    */
   handleKeyDown(event) {
-    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
+    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
     if (trigger === 'hover') {
       this.modifierTriggerController.reset();
       return;
@@ -222,7 +222,7 @@ export class HoverTranslationManager extends ResourceTracker {
    * Handle modifier release and schedule one hover check for valid gestures.
    */
   handleKeyUp(event) {
-    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', 'hover');
+    const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
     if (trigger === 'hover') {
       this.modifierTriggerController.reset();
       return;

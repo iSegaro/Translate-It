@@ -288,7 +288,7 @@ export const CONFIG = {
   // --- Mouse on Hover Translation Settings ---
   MOUSE_HOVER_TRANSLATION_ENABLED: false, // فعال بودن ترجمه با حرکت موس
   MOUSE_HOVER_SCOPE: 'container', // محدوده ترجمه: word, sentence, container
-  MOUSE_HOVER_TRIGGER: 'ctrl', // نحوه فعال‌سازی: hover, ctrl, alt, shift
+  MOUSE_HOVER_TRIGGER: 'primary', // نحوه فعال‌سازی: hover, primary, control, alt, shift
   MOUSE_HOVER_DELAY: 500, // زمان انتظار برای شروع ترجمه (میلی‌ثانیه)
   MOUSE_HOVER_AUTO_CLOSE: 'mouseleave', // نحوه بسته شدن: mouseleave, timer
   MOUSE_HOVER_TIMER_DURATION: 3000, // زمان نمایش تولتیپ در حالت timer (میلی‌ثانیه)

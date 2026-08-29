@@ -473,17 +473,20 @@
   "mouse_hover_trigger_hover": {
     "message": "فقط مکث موس"
   },
-  "mouse_hover_trigger_ctrl": {
+  "mouse_hover_trigger_primary": {
     "message": "Ctrl"
+  },
+  "mouse_hover_trigger_primary_mac": {
+    "message": "فرمان ⌘"
+  },
+  "mouse_hover_trigger_control": {
+    "message": "کنترل ⌃"
   },
   "mouse_hover_trigger_alt": {
     "message": "Alt"
   },
   "mouse_hover_trigger_shift": {
     "message": "Shift"
-  },
-  "mouse_hover_trigger_ctrl_mac": {
-    "message": "فرمان ⌘ / کنترل ⌃"
   },
   "mouse_hover_trigger_alt_mac": {
     "message": "گزینه ⌥"

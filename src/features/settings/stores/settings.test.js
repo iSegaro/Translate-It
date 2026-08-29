@@ -232,6 +232,30 @@ describe('Settings Store', () => {
       expect(storageManager.set).toHaveBeenCalled();
     });
 
+    it('importSettings should pass legacy Mouse Hover triggers through centralized migration', async () => {
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        MOUSE_HOVER_TRIGGER: 'ctrl'
+      });
+      const migrationInputs = [];
+      runSettingsMigrations.mockImplementationOnce(async (settings) => {
+        migrationInputs.push({ ...settings });
+        return {
+          updates: { MOUSE_HOVER_TRIGGER: 'primary' },
+          removals: [],
+          logs: ['Migrated MOUSE_HOVER_TRIGGER from ctrl to primary']
+        };
+      });
+      const store = useSettingsStore();
+
+      await store.importSettings({ THEME: 'dark', _exported: true });
+
+      expect(migrationInputs[0]).toEqual(
+        expect.objectContaining({ MOUSE_HOVER_TRIGGER: 'ctrl' })
+      );
+      expect(store.settings.MOUSE_HOVER_TRIGGER).toBe('primary');
+    });
+
     it('importSettings should drop non-editable wrappers from old backups and keep editable prompts', async () => {
       secureStorage.processImportedSettings.mockResolvedValue({
         THEME: 'dark',

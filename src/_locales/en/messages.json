@@ -473,17 +473,20 @@
   "mouse_hover_trigger_hover": {
     "message": "Immediate (Hover)"
   },
-  "mouse_hover_trigger_ctrl": {
+  "mouse_hover_trigger_primary": {
     "message": "Ctrl"
+  },
+  "mouse_hover_trigger_primary_mac": {
+    "message": "Command ⌘"
+  },
+  "mouse_hover_trigger_control": {
+    "message": "Control ⌃"
   },
   "mouse_hover_trigger_alt": {
     "message": "Alt"
   },
   "mouse_hover_trigger_shift": {
     "message": "Shift"
-  },
-  "mouse_hover_trigger_ctrl_mac": {
-    "message": "Command ⌘ / Control ⌃"
   },
   "mouse_hover_trigger_alt_mac": {
     "message": "Option ⌥"

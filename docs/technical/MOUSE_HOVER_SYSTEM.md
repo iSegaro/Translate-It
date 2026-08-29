@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Mouse on Hover** system provides a highly responsive, "zero-click" translation experience. Users can translate words, sentences, or entire containers simply by hovering their mouse over text. The system supports various triggers (including modifier keys like Ctrl/Alt/Shift), intelligent text detection, and a high-performance "Rectangle Cache" to minimize CPU overhead. The UI is rendered within a isolated Shadow DOM tooltip for a seamless look and feel.
+The **Mouse on Hover** system provides a highly responsive, "zero-click" translation experience. Users can translate words, sentences, or entire containers simply by hovering their mouse over text. The system supports various triggers (including primary, Control, Alt, and Shift modifiers), intelligent text detection, and a high-performance "Rectangle Cache" to minimize CPU overhead. The UI is rendered within a isolated Shadow DOM tooltip for a seamless look and feel.
 
 ## Architecture
 
@@ -77,9 +77,9 @@ To maintain 60fps performance on complex pages:
 
 ## Modifier Trigger Semantics
 
-For `ctrl`, `alt`, and `shift` trigger modes, translation activates only after a standalone modifier press is released. Normal keyboard shortcuts invalidate the gesture, so `Ctrl+A`, `Ctrl+C`, `Ctrl+F`, `Shift+A`, and modifier combinations do not translate. Pointer interaction, wheel input, window blur, and hidden-document state also invalidate pending gestures.
+For `primary`, `control`, `alt`, and `shift` trigger modes, translation activates only after a standalone modifier press is released. `primary` resolves to Control on Windows/Linux and Meta/Command on macOS. `control` always resolves to physical/logical Control, including explicit Control on macOS. Normal keyboard shortcuts invalidate the gesture, so `Ctrl+A`, `Command+A`, `Ctrl+C`, `Ctrl+F`, `Shift+A`, and modifier combinations do not translate. Pointer interaction, wheel input, window blur, and hidden-document state also invalidate pending gestures.
 
-Mouse movement updates the latest cursor event but does not independently schedule translation in modifier modes. A `ctrl` trigger accepts both `Control` and `Meta` key identities for macOS compatibility. Editable targets never create or complete modifier gestures.
+Mouse movement updates the latest cursor event but does not independently schedule translation in modifier modes. Editable targets never create or complete modifier gestures.
 
 ## Configuration & Settings
 
@@ -88,11 +88,13 @@ Behavior is fully customizable via the **Activation Tab** in the Options Page:
 | Setting Key | Default | Description |
 |-------------|---------|-------------|
 | `MOUSE_HOVER_SCOPE` | `container` | Detection depth: `word`, `sentence`, or `container`. |
-| `MOUSE_HOVER_TRIGGER` | `ctrl` | Trigger mode: `hover`, `ctrl`, `alt`, or `shift`. |
+| `MOUSE_HOVER_TRIGGER` | `primary` | Trigger mode: `hover`, `primary`, `control`, `alt`, or `shift`. `primary` is Control on Windows/Linux and Command on macOS; `control` remains explicit Control on macOS. |
 | `MOUSE_HOVER_DELAY` | `500ms` | Wait time before starting translation in normal `hover` trigger mode. Modifier-release activation does not use this setting. |
 | `MOUSE_HOVER_AUTO_CLOSE` | `mouseleave` | Close behavior: `mouseleave` or `timer`. |
 | `MOUSE_HOVER_TIMER_DURATION`| `3000ms` | Visibility duration if `timer` mode is selected. |
 | `MOUSE_HOVER_SHOW_CONTAINER_BORDER` | `true` | Visual outline for the 'container' scope. |
+
+Legacy `MOUSE_HOVER_TRIGGER=ctrl` settings migrate to `primary`.
 
 ## Feature Lifecycle
 

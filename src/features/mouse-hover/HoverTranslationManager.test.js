@@ -90,7 +90,7 @@ describe('HoverTranslationManager', () => {
     // Set default setting mocks
     settingsManager.get.mockImplementation((key, def) => {
       if (key === 'MOUSE_HOVER_AUTO_CLOSE') return 'mouseleave';
-      if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
+      if (key === 'MOUSE_HOVER_TRIGGER') return 'primary';
       if (key === 'MOUSE_HOVER_DELAY') return 300;
       return def;
     });
@@ -231,8 +231,12 @@ describe('HoverTranslationManager', () => {
       expect(HoverTextDetector.detect).not.toHaveBeenCalled();
     });
 
-    it('should trigger exactly once on standalone modifier release', async () => {
+    it.each(['primary', 'control'])('should trigger exactly once on standalone %s release', async (trigger) => {
       await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return trigger;
+        return def;
+      });
       manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
 
       manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
@@ -244,8 +248,8 @@ describe('HoverTranslationManager', () => {
     });
 
     it.each([
-      ['A', 'ctrl'],
-      ['C', 'ctrl'],
+      ['A', 'primary'],
+      ['C', 'primary'],
       ['A', 'shift']
     ])('should not translate %s shortcut with %s trigger', async (key, trigger) => {
       await manager.activate();
@@ -256,13 +260,13 @@ describe('HoverTranslationManager', () => {
 
       manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
 
-      const modifier = trigger === 'ctrl' ? 'Control' : 'Shift';
+      const modifier = trigger === 'primary' ? 'Control' : 'Shift';
       manager.handleKeyDown(keyEvent(modifier, {
-        ctrlKey: trigger === 'ctrl',
+        ctrlKey: trigger === 'primary',
         shiftKey: trigger === 'shift'
       }));
       manager.handleKeyDown(keyEvent(key, {
-        ctrlKey: trigger === 'ctrl',
+        ctrlKey: trigger === 'primary',
         shiftKey: trigger === 'shift'
       }));
       manager.handleKeyUp(keyEvent(modifier));
@@ -377,12 +381,17 @@ describe('HoverTranslationManager', () => {
       expect(manager.modifierTriggerController.state).toBe('IDLE');
     });
 
-    it('preserves ctrl Meta compatibility', async () => {
+    it('does not trigger explicit Control mode from Meta', async () => {
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'control';
+        return def;
+      });
+
       manager.handleKeyDown(keyEvent('Meta', { metaKey: true }));
       manager.handleKeyUp(keyEvent('Meta'));
       vi.advanceTimersByTime(50);
 
-      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
     });
   });
 

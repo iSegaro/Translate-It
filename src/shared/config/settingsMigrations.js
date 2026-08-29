@@ -50,6 +50,16 @@ const MODEL_VALUE_MIGRATIONS = {
 };
 
 /**
+ * Migrate the former ambiguous Ctrl trigger to the platform-aware primary modifier.
+ */
+function migrateMouseHoverTrigger(currentSettings, updates, migrationLog) {
+  if (currentSettings.MOUSE_HOVER_TRIGGER !== 'ctrl') return;
+
+  updates.MOUSE_HOVER_TRIGGER = 'primary';
+  migrationLog.push('Migrated MOUSE_HOVER_TRIGGER from ctrl to primary');
+}
+
+/**
  * Determine whether a value is a plain object.
  *
  * Only plain objects are candidates for recursive nested migration. Arrays,
@@ -201,6 +211,9 @@ function runMainMigration(currentSettings) {
 
   // Migrate Mode Provider keys first to ensure new structure is used
   migrateModeProviderKeys(currentSettings, updates, migrationLog);
+
+  // Migrate legacy Mouse Hover trigger values before filling missing defaults.
+  migrateMouseHoverTrigger(currentSettings, updates, migrationLog);
   
   // Migrate Bilingual Mode keys
   migrateBilingualModeKeys(currentSettings, updates, migrationLog);
