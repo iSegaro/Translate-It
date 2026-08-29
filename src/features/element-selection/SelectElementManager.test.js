@@ -359,6 +359,80 @@ vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
 
 let SelectElementManager;
 
+describe('SelectElementManager Escape fallback event dispatch', () => {
+  async function createActiveManager() {
+    vi.clearAllMocks();
+    isSelectableTextRoot.mockReturnValue(true);
+    const module = await import('./SelectElementManager.js');
+    const manager = new module.SelectElementManager();
+    await manager.initialize();
+    await manager.activateSelectElementMode();
+    return manager;
+  }
+
+  it('cancels through keyup when a website stops capture-phase keydown', async () => {
+    const websiteHandler = vi.fn(event => {
+      if (event.key === 'Escape') event.stopImmediatePropagation();
+    });
+    let manager;
+
+    window.addEventListener('keydown', websiteHandler, true);
+    try {
+      manager = await createActiveManager();
+      const deactivate = vi.spyOn(manager, 'deactivate');
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      sendMessage.mockClear();
+
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }));
+
+      expect(websiteHandler).toHaveBeenCalledTimes(1);
+      expect(deactivate).not.toHaveBeenCalled();
+      expect(manager.isActive).toBe(true);
+
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }));
+
+      await vi.waitFor(() => expect(manager.isActive).toBe(false));
+      await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith({
+        action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
+      }));
+      expect(deactivate).toHaveBeenCalledTimes(1);
+      expect(sendMessage).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener('keydown', websiteHandler, true);
+      if (manager?.isActive) await manager.deactivate({ reason: 'manual' });
+      manager?.removeEventListeners();
+    }
+  });
+
+  it('does not retain keyup cancellation listener after listeners are removed', async () => {
+    const manager = await createActiveManager();
+    const deactivate = vi.spyOn(manager, 'deactivate');
+
+    try {
+      manager.removeEventListeners();
+      manager.isActive = true;
+
+      window.dispatchEvent(new KeyboardEvent('keyup', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      }));
+
+      expect(deactivate).not.toHaveBeenCalled();
+    } finally {
+      if (manager.isActive) await manager.deactivate({ reason: 'manual' });
+    }
+  });
+});
+
 describe('SelectElementManager', () => {
   let manager;
   let errorHandler;
@@ -1680,12 +1754,60 @@ describe('SelectElementManager', () => {
       const preventDefault = vi.spyOn(event, 'preventDefault');
       const stopPropagation = vi.spyOn(event, 'stopPropagation');
       const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+      const deactivate = vi.spyOn(manager, 'deactivate');
       manager.handleKeyDown(event);
       await vi.waitFor(() => expect(manager.isActive).toBe(false));
+      expect(deactivate).toHaveBeenCalledTimes(1);
       expect(event.defaultPrevented).toBe(true);
       expect(preventDefault).toHaveBeenCalled();
       expect(stopPropagation).toHaveBeenCalled();
       expect(stopImmediatePropagation).toHaveBeenCalled();
+    });
+
+    it('ignores keyup Escape after keydown has started cancellation', async () => {
+      const deactivate = vi.spyOn(manager, 'deactivate');
+
+      manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+      manager.handleKeyUp(new KeyboardEvent('keyup', { key: 'Escape' }));
+
+      await vi.waitFor(() => expect(manager.isActive).toBe(false));
+      expect(deactivate).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels on keyup Escape when keydown was not received', async () => {
+      const deactivate = vi.spyOn(manager, 'deactivate');
+      const event = new KeyboardEvent('keyup', { key: 'Escape', bubbles: true, cancelable: true });
+      const preventDefault = vi.spyOn(event, 'preventDefault');
+      const stopPropagation = vi.spyOn(event, 'stopPropagation');
+      const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
+
+      manager.handleKeyUp(event);
+
+      await vi.waitFor(() => expect(manager.isActive).toBe(false));
+      expect(deactivate).toHaveBeenCalledTimes(1);
+      expect(event.defaultPrevented).toBe(true);
+      expect(preventDefault).toHaveBeenCalled();
+      expect(stopPropagation).toHaveBeenCalled();
+      expect(stopImmediatePropagation).toHaveBeenCalled();
+    });
+
+    it('ignores keyup Escape while inactive', () => {
+      manager.isActive = false;
+      const deactivate = vi.spyOn(manager, 'deactivate');
+
+      manager.handleKeyUp(new KeyboardEvent('keyup', { key: 'Escape' }));
+
+      expect(deactivate).not.toHaveBeenCalled();
+    });
+
+    it('ignores repeated Escape while cancellation is in progress', async () => {
+      const deactivate = vi.spyOn(manager, 'deactivate');
+
+      manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape', repeat: true }));
+      manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape', repeat: true }));
+
+      await vi.waitFor(() => expect(manager.isActive).toBe(false));
+      expect(deactivate).toHaveBeenCalledTimes(1);
     });
 
     it('should handle mouseover to highlight element', () => {
@@ -2096,10 +2218,11 @@ describe('explicit tab-wide deactivation ownership', () => {
     sendMessage.mockClear();
   }
 
-  it('requests tab-wide deactivation when Escape fires in a child frame', async () => {
+  it('requests tab-wide deactivation once when keydown and keyup Escape fire in a child frame', async () => {
     await activateManager(false);
 
     manager.handleKeyDown(new KeyboardEvent('keydown', { key: 'Escape' }));
+    manager.handleKeyUp(new KeyboardEvent('keyup', { key: 'Escape' }));
 
     await vi.waitFor(() => expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE));
     expect(sendMessage).toHaveBeenCalledTimes(1);

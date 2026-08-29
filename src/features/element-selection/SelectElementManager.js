@@ -90,6 +90,7 @@ class SelectElementManager extends ResourceTracker {
     // Core state
     this.isActive = false;
     this.isProcessingClick = false;
+    this.isCancellationInProgress = false;
     this.isInitialized = false;
     this.selectElementLifecycleQueue = Promise.resolve();
     this.instanceId = Math.random().toString(36).substring(7);
@@ -133,6 +134,7 @@ class SelectElementManager extends ResourceTracker {
     this.handleClick = this.handleClick.bind(this);
     this.handleInteraction = this.handleInteraction.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
 
     window.selectElementHandlingESC = false;
   }
@@ -227,6 +229,7 @@ class SelectElementManager extends ResourceTracker {
 
       this.isActive = true;
       this.isProcessingClick = false;
+      this.isCancellationInProgress = false;
       this.hasInitialMovementOccurred = false; 
       this.currentOptions = activationOptions; 
 
@@ -424,6 +427,7 @@ class SelectElementManager extends ResourceTracker {
       });
 
       window.addEventListener('keydown', this.handleKeyDown, true);
+      window.addEventListener('keyup', this.handleKeyUp, true);
 
     }
   }
@@ -442,6 +446,7 @@ class SelectElementManager extends ResourceTracker {
     });
 
     window.removeEventListener('keydown', this.handleKeyDown, true);
+    window.removeEventListener('keyup', this.handleKeyUp, true);
   }
 
   isCooldownActive() { return Date.now() - (this.activationTime || 0) < 100; }
@@ -528,15 +533,24 @@ class SelectElementManager extends ResourceTracker {
   }
 
   handleKeyDown(event) {
-    if (!this.isActive) return;
-    if (event.key === 'Escape' && !window.selectElementHandlingESC) {
-      window.selectElementHandlingESC = true;
-      setTimeout(() => { window.selectElementHandlingESC = false; }, 100);
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      this.deactivate({ silent: false, reason: 'cancel', requestGlobalDeactivation: true });
-    }
+    this.handleEscape(event);
+  }
+
+  handleKeyUp(event) {
+    this.handleEscape(event);
+  }
+
+  handleEscape(event) {
+    if (!this.isActive || this.isCancellationInProgress || event.key !== 'Escape' || window.selectElementHandlingESC) return;
+
+    window.selectElementHandlingESC = true;
+    setTimeout(() => { window.selectElementHandlingESC = false; }, 100);
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    this.isCancellationInProgress = true;
+    this.deactivate({ silent: false, reason: 'cancel', requestGlobalDeactivation: true })
+      .finally(() => { this.isCancellationInProgress = false; });
   }
 
   async handleClick(event) {
