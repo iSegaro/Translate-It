@@ -110,6 +110,7 @@ Modes: hover / mouse-on-hover inline tooltip.
 - **Loading UI settles on success / error / timeout / cancel.** Streaming settles via `isStreaming`; error → `showError`; timeout → `showError`; cancel → ignored (no UI error) and the tooltip hides.
 - **Duplicate result/display prevented.** Ready only emitted when message id matches; a redundant (source-equal) result hides the tooltip rather than displaying.
 - **Late result cannot recreate a dismissed box.** `_cancelPendingHover` bumps `messageId`; old resolve/reject does not match.
+- **Modifier trigger intent is standalone.** `ctrl`, `alt`, and `shift` modes activate only after a standalone modifier press is released; normal keyboard shortcuts invalidate the gesture. Mouse movement updates position but does not independently schedule modifier-mode translation.
 
 ---
 

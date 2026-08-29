@@ -66,6 +66,16 @@ vi.mock('@/core/helpers.js', () => ({
 
 import { isEditable } from '@/core/helpers.js';
 
+const keyEvent = (key, options = {}) => ({
+  key,
+  ctrlKey: false,
+  altKey: false,
+  shiftKey: false,
+  metaKey: false,
+  repeat: false,
+  ...options
+});
+
 describe('HoverTranslationManager', () => {
   let manager;
 
@@ -115,8 +125,13 @@ describe('HoverTranslationManager', () => {
   describe('handleMouseMove', () => {
     it('should debounce detection', async () => {
       await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return 300;
+        return def;
+      });
       
-      const event = { clientX: 10, clientY: 10, target: document.body, ctrlKey: true };
+      const event = { clientX: 10, clientY: 10, target: document.body };
       manager.handleMouseMove(event);
 
       expect(HoverTextDetector.detect).not.toHaveBeenCalled();
@@ -140,13 +155,18 @@ describe('HoverTranslationManager', () => {
 
     it('should cancel pending hover if mouse moves away before delay', async () => {
       await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return 300;
+        return def;
+      });
       
       // First move
-      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body, ctrlKey: true });
+      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body });
       vi.advanceTimersByTime(200);
       
       // Second move (cancels first)
-      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body, ctrlKey: true });
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
       
       vi.advanceTimersByTime(200); // Only 200ms since 2nd move
       expect(HoverTextDetector.detect).not.toHaveBeenCalled();
@@ -155,21 +175,35 @@ describe('HoverTranslationManager', () => {
       expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
     });
 
-    it('should respect modifier key settings', async () => {
+    it('should not schedule translation from mousemove in modifier mode', async () => {
       await manager.activate();
-      settingsManager.get.mockImplementation((key, def) => {
-        if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
-        return def;
-      });
-
-      // Move without Ctrl
-      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body, ctrlKey: false });
-      vi.advanceTimersByTime(600);
-      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
-
-      // Move with Ctrl (different position to avoid dist < 2)
+      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body, ctrlKey: true });
       manager.handleMouseMove({ clientX: 50, clientY: 50, target: document.body, ctrlKey: true });
       vi.advanceTimersByTime(600);
+
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('keeps latest mouse event for modifier release', async () => {
+      await manager.activate();
+      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body });
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleMouseMove({ clientX: 50, clientY: 50, target: document.body, ctrlKey: true });
+      manager.handleKeyUp(keyEvent('Control'));
+
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).toHaveBeenCalledWith(50, 50, 'sentence');
+    });
+
+    it('does not invalidate pending modifier gesture on mouse movement', async () => {
+      await manager.activate();
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleMouseMove({ clientX: 20, clientY: 20, target: document.body, ctrlKey: true });
+      manager.handleKeyUp(keyEvent('Control'));
+
+      vi.advanceTimersByTime(50);
+
       expect(HoverTextDetector.detect).toHaveBeenCalled();
     });
 
@@ -186,35 +220,169 @@ describe('HoverTranslationManager', () => {
   });
 
   describe('handleKeyDown', () => {
-    it('should trigger translation immediately if modifier is pressed', async () => {
+    it('should not trigger translation before modifier release', async () => {
       await manager.activate();
-      settingsManager.get.mockImplementation((key, def) => {
-        if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
-        return def;
-      });
 
       manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
       
-      manager.handleKeyDown({ ctrlKey: true });
-      
-      vi.advanceTimersByTime(60); // Modifier trigger has 50ms delay
-      expect(HoverTextDetector.detect).toHaveBeenCalled();
-    });
-
-    it('should NOT trigger translation if active element is editable', async () => {
-      await manager.activate();
-      settingsManager.get.mockImplementation((key, def) => {
-        if (key === 'MOUSE_HOVER_TRIGGER') return 'ctrl';
-        return def;
-      });
-      
-      isEditable.mockReturnValue(true);
-      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
-      
-      manager.handleKeyDown({ ctrlKey: true });
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
       
       vi.advanceTimersByTime(60);
       expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('should trigger exactly once on standalone modifier release', async () => {
+      await manager.activate();
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleKeyUp(keyEvent('Control'));
+      manager.handleKeyUp(keyEvent('Control'));
+
+      vi.advanceTimersByTime(50);
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['A', 'ctrl'],
+      ['C', 'ctrl'],
+      ['A', 'shift']
+    ])('should not translate %s shortcut with %s trigger', async (key, trigger) => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return trigger;
+        return def;
+      });
+
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+
+      const modifier = trigger === 'ctrl' ? 'Control' : 'Shift';
+      manager.handleKeyDown(keyEvent(modifier, {
+        ctrlKey: trigger === 'ctrl',
+        shiftKey: trigger === 'shift'
+      }));
+      manager.handleKeyDown(keyEvent(key, {
+        ctrlKey: trigger === 'ctrl',
+        shiftKey: trigger === 'shift'
+      }));
+      manager.handleKeyUp(keyEvent(modifier));
+
+      vi.advanceTimersByTime(60);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('should not translate Ctrl+Shift', async () => {
+      await manager.activate();
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleKeyDown(keyEvent('Shift', { ctrlKey: true, shiftKey: true }));
+      manager.handleKeyUp(keyEvent('Control'));
+
+      vi.advanceTimersByTime(60);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('should translate standalone Alt release', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'alt';
+        return def;
+      });
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+
+      manager.handleKeyDown(keyEvent('Alt', { altKey: true }));
+      manager.handleKeyUp(keyEvent('Alt'));
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+    });
+
+    it('should ignore modifier auto-repeat', async () => {
+      await manager.activate();
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true, repeat: true }));
+      manager.handleKeyUp(keyEvent('Control'));
+      manager.handleKeyUp(keyEvent('Control'));
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not translate while editable target is focused', async () => {
+      await manager.activate();
+      isEditable.mockReturnValue(true);
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleKeyUp(keyEvent('Control'));
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('modifier gesture lifecycle', () => {
+    beforeEach(async () => {
+      await manager.activate();
+      manager.lastMouseEvent = { clientX: 10, clientY: 10, target: document.body };
+    });
+
+    it.each([
+      ['pointer', () => manager.handlePointerDown({})],
+      ['wheel', () => manager.handleWheel({})]
+    ])('cancels pending gesture on %s interaction', async (_name, interact) => {
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      interact();
+      manager.handleKeyUp(keyEvent('Control'));
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('cancels pending gesture on window blur', async () => {
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleWindowBlur();
+      manager.handleKeyUp(keyEvent('Control'));
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('cancels pending gesture when document becomes hidden', async () => {
+      const hidden = Object.getOwnPropertyDescriptor(document, 'hidden');
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      try {
+        manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+        manager.handleVisibilityChange();
+        manager.handleKeyUp(keyEvent('Control'));
+        vi.advanceTimersByTime(50);
+
+        expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+      } finally {
+        if (hidden) {
+          Object.defineProperty(document, 'hidden', hidden);
+        } else {
+          delete document.hidden;
+        }
+      }
+    });
+
+    it('clears pending gesture on deactivation', async () => {
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      await manager.deactivate();
+
+      expect(manager.modifierTriggerController.state).toBe('IDLE');
+    });
+
+    it('preserves ctrl Meta compatibility', async () => {
+      manager.handleKeyDown(keyEvent('Meta', { metaKey: true }));
+      manager.handleKeyUp(keyEvent('Meta'));
+      vi.advanceTimersByTime(50);
+
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
     });
   });
 

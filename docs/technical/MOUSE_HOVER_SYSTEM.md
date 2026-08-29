@@ -9,7 +9,7 @@ The **Mouse on Hover** system provides a highly responsive, "zero-click" transla
 The system follows the **Autonomous Feature Pattern**, isolating logic from the core while integrating deeply with the extension's translation and messaging layers. It uses an **Event-Driven & Streaming** model for high responsiveness.
 
 ```
-Mouse Move / Key Down → HoverTranslationManager (Orchestrator)
+Mouse Move / Modifier Key Press + Release → HoverTranslationManager (Orchestrator)
      ↓
      ├─→ Rectangle Cache (Hit-test optimization)
      ├─→ Request Cancellation (Prevent race conditions)
@@ -31,8 +31,8 @@ Mouse Move / Key Down → HoverTranslationManager (Orchestrator)
 The **Central Coordinator** managing the feature lifecycle and interaction logic.
 
 **Responsibilities:**
-- Event Orchestration: Listens to global `mousemove`, `mouseleave`, and `keydown` events.
-- Trigger Validation: Checks if the configured trigger (e.g., Ctrl + Hover) is met.
+- Event Orchestration: Listens to global mouse, keyboard, pointer, wheel, focus, and visibility events.
+- Trigger Validation: Requires a standalone configured modifier press and release; conflicting interaction invalidates the gesture.
 - **Request Management**: Automatically cancels previous translation requests when a new hover is triggered to prevent race conditions.
 - **Streaming Coordination**: Registers handlers for streaming updates via `ContentScriptIntegration`.
 - Optimization: Implements a "Rectangle Cache" to skip expensive DOM lookups when the mouse stays within the same text block.
@@ -42,7 +42,7 @@ The **Central Coordinator** managing the feature lifecycle and interaction logic
 |--------|-------------|
 | `activate()` / `deactivate()` | Lifecycle control via `FeatureManager` |
 | `handleMouseMove(event)` | Main entry point for detection with debouncing |
-| `handleKeyDown(event)` | Support for modifier-key triggers (e.g., press Ctrl while hovering) |
+| `handleKeyDown(event)` / `handleKeyUp(event)` | Recognizes standalone modifier gestures and triggers after release |
 | `_processHover(event)` | Orchestrates detection, cancellation, streaming registration, and translation |
 | `_removeBorder()` | Safely restores the original style of highlighted containers |
 
@@ -75,6 +75,12 @@ To maintain 60fps performance on complex pages:
 3. If it is, all expensive detection logic and timers are skipped (CPU cost: near zero).
 4. The cache is invalidated immediately when moving to empty space or when the tooltip closes.
 
+## Modifier Trigger Semantics
+
+For `ctrl`, `alt`, and `shift` trigger modes, translation activates only after a standalone modifier press is released. Normal keyboard shortcuts invalidate the gesture, so `Ctrl+A`, `Ctrl+C`, `Ctrl+F`, `Shift+A`, and modifier combinations do not translate. Pointer interaction, wheel input, window blur, and hidden-document state also invalidate pending gestures.
+
+Mouse movement updates the latest cursor event but does not independently schedule translation in modifier modes. A `ctrl` trigger accepts both `Control` and `Meta` key identities for macOS compatibility. Editable targets never create or complete modifier gestures.
+
 ## Configuration & Settings
 
 Behavior is fully customizable via the **Activation Tab** in the Options Page:
@@ -83,14 +89,14 @@ Behavior is fully customizable via the **Activation Tab** in the Options Page:
 |-------------|---------|-------------|
 | `MOUSE_HOVER_SCOPE` | `sentence` | Detection depth: `word`, `sentence`, or `container`. |
 | `MOUSE_HOVER_TRIGGER` | `hover` | Trigger mode: `hover`, `ctrl`, `alt`, or `shift`. |
-| `MOUSE_HOVER_DELAY` | `500ms` | Wait time before starting translation. |
+| `MOUSE_HOVER_DELAY` | `500ms` | Wait time before starting translation in normal `hover` trigger mode. Modifier-release activation does not use this setting. |
 | `MOUSE_HOVER_AUTO_CLOSE` | `mouseleave` | Close behavior: `mouseleave` or `timer`. |
 | `MOUSE_HOVER_TIMER_DURATION`| `3000ms` | Visibility duration if `timer` mode is selected. |
 | `MOUSE_HOVER_SHOW_CONTAINER_BORDER` | `true` | Visual outline for the 'container' scope. |
 
 ## Feature Lifecycle
 
-1. **Detection**: User hovers/presses modifier. `HoverTextDetector` finds text.
+1. **Detection**: User hovers or completes a standalone modifier gesture. `HoverTextDetector` finds text.
 2. **Registration**: `HoverTranslationManager` cancels old requests and registers a new streaming handler via `ContentScriptIntegration`.
 3. **Request**: Sends a `TRANSLATE` request to the background.
 4. **Streaming Response**: Background returns progressive text chunks.
