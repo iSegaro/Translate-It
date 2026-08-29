@@ -78,7 +78,8 @@ export class ShortcutManager extends ResourceTracker {
     const { FieldShortcutManager } = await import('@/features/text-field-interaction/managers/FieldShortcutManager.js');
     
     // Register ESC shortcut for revert
-    this.registerShortcut('Escape', new RevertShortcut());
+    this.revertShortcut = new RevertShortcut();
+    this.registerShortcut('Escape', this.revertShortcut);
     
     // Register Ctrl+/ shortcut for translation (will be updated dynamically)
     const ctrlSlashShortcut = new FieldShortcutManager();
@@ -229,10 +230,15 @@ export class ShortcutManager extends ResourceTracker {
         return;
       }
 
-      // Prevent default behavior
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
+      // Handlers may opt out when browser-native behavior must remain available.
+      const shouldConsumeEvent = typeof handler.shouldConsumeEvent === 'function'
+        ? await handler.shouldConsumeEvent(event)
+        : true;
+      if (shouldConsumeEvent) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
 
       // Execute shortcut
       const result = await handler.execute(event);
@@ -296,6 +302,9 @@ export class ShortcutManager extends ResourceTracker {
    * Cleanup shortcut manager
    */
   cleanup() {
+    this.revertShortcut?.cleanup();
+    this.revertShortcut = null;
+
     // Clear shortcuts
     this.shortcuts.clear();
     this.listeners.clear();

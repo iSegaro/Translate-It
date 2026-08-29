@@ -245,6 +245,34 @@ describe('Ctrl+/ dispatch characterization', () => {
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('does not manually redispatch Escape after ShortcutManager is initialized', async () => {
+    await activateShortcutWiring();
+    const dispatchSpy = vi.spyOn(shortcutManager, 'handleKeyboardEvent');
+    const event = createEvent('Escape');
+
+    coordinator.revertMightBeNeeded = true;
+    await coordinator._handleKeyboardInteraction(event);
+
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    dispatchSpy.mockRestore();
+  });
+
+  it('delegates first lazy Escape once after ShortcutManager initializes', async () => {
+    mocks.loadFeature.mockImplementationOnce(async () => {
+      handler = ShortcutHandler.getInstance({ featureManager: {} });
+      await handler.activate();
+      return handler;
+    });
+    await coordinator.initialize();
+    coordinator.revertMightBeNeeded = true;
+    const dispatchSpy = vi.spyOn(shortcutManager, 'handleKeyboardEvent');
+
+    await coordinator._handleKeyboardInteraction(createEvent('Escape'));
+
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    dispatchSpy.mockRestore();
+  });
+
   it('characterizes first-event lazy activation separately', async () => {
     let lazyHandler;
     mocks.loadFeature.mockImplementationOnce(async () => {

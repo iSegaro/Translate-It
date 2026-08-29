@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 // We need to get it via FeatureManager or use alternative approaches
 
 const logger = getScopedLogger(LOG_COMPONENTS.SHORTCUTS, 'RevertShortcut');
+const DOUBLE_ESCAPE_INTERVAL = 400;
 
 /**
  * Get active SelectElementManager via FeatureManager
@@ -32,7 +33,8 @@ async function getActiveSelectElementManager() {
 export class RevertShortcut {
   constructor() {
     this.key = 'Escape';
-    this.description = 'Revert all translations on the page';
+    this.description = 'Double Escape to cancel or revert Select Element translations';
+    this.lastEscapeAt = null;
   }
 
   /**
@@ -41,9 +43,34 @@ export class RevertShortcut {
    * @returns {Promise<boolean>} Whether to execute the shortcut
    */
   async shouldExecute(event) {
-    // This shortcut should always be checked on Escape key press.
-    // The decision to cancel or revert is handled in the execute method.
-    return event.key === 'Escape' || event.code === 'Escape';
+    if (!this.isPlainEscape(event)) return false;
+
+    const now = Date.now();
+    const isDoubleEscape = this.lastEscapeAt !== null
+      && now - this.lastEscapeAt <= DOUBLE_ESCAPE_INTERVAL;
+    this.lastEscapeAt = isDoubleEscape ? null : now;
+    return isDoubleEscape;
+  }
+
+  /**
+   * Preserve native Escape behavior even when Double Escape triggers an action.
+   * @returns {boolean} Whether ShortcutManager should consume the event
+   */
+  shouldConsumeEvent() {
+    return false;
+  }
+
+  isPlainEscape(event) {
+    return (event.key === 'Escape' || event.code === 'Escape')
+      && !event.repeat
+      && !event.ctrlKey
+      && !event.altKey
+      && !event.shiftKey
+      && !event.metaKey;
+  }
+
+  resetDoubleEscape() {
+    this.lastEscapeAt = null;
   }
 
   /**
@@ -178,7 +205,11 @@ export class RevertShortcut {
       key: this.key,
       description: this.description,
       type: 'RevertShortcut',
-      triggers: ['Escape key press with translations present']
+      triggers: ['Double Escape with Select Element translations present']
     };
+  }
+
+  cleanup() {
+    this.resetDoubleEscape();
   }
 }

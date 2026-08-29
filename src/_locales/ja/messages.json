@@ -1407,7 +1407,7 @@
     "message": "元に戻す"
   },
   "popup_revert_title_icon": {
-    "message": "元に戻す（Escキー）"
+    "message": "元に戻す（Esc x2）"
   },
   "popup_clear_storage_alt_icon": {
     "message": "クリア"
@@ -1569,7 +1569,7 @@
     "message": "フィールドをクリア"
   },
   "SIDEPANEL_REVERT_TOOLTIP": {
-    "message": "元に戻す（Escキー）"
+    "message": "元に戻す（Esc x2）"
   },
   "SIDEPANEL_SELECT_ELEMENT_TOOLTIP": {
     "message": "要素を選択"

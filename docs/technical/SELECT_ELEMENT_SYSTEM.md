@@ -86,6 +86,8 @@ The feature contract defines the complete observable behavior. Core invariants:
 - User cancellation and conflict cancellation preserve committed content.
 - Failure and cancellation do not automatically perform explicit revert.
 - Explicit revert is separate from cancellation and restores stored original state.
+- During active selection, single Esc cancels the mode and is consumed by the manager.
+- Outside active selection, global cancellation and revert require Double Esc. Both browser events remain available to the website; repeated and modifier Escape presses do not count.
 - Raw provider fragments are not feature-visible results.
 - Public feedback uses feature and shared error boundaries, not raw runtime text.
 

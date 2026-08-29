@@ -139,12 +139,12 @@ await interactionCoordinator.initialize();
 | `textFieldIcon` | `TRANSLATE_ON_TEXT_SELECTION` | `DEFAULT_EXCLUDED_TEXT_FIELDS_ICON` + `EXCLUDED_SITES` | `focusin` |
 | `shortcut` | `ENABLE_SHORTCUT_FOR_TEXT_FIELDS` | `EXCLUDED_SITES` | `keydown` (Ctrl+/) |
 
-### Special Case: Revert (ESC)
-The Revert functionality is unique because it must work even if the user has disabled shortcuts.
-1. `SelectElementManager` emits `ELEMENT_TRANSLATIONS_AVAILABLE`.
-2. `InteractionCoordinator` sets `revertMightBeNeeded = true`.
-3. Even if `shortcut` is disabled, `InteractionCoordinator` keeps the `keydown` listener active.
-4. On `Escape`, it calls `loadFeature('shortcut', true)` (Forced Load) to execute the Revert logic.
+### Special Case: Select Element Escape
+Select Element Escape support works even if user disabled field shortcuts.
+1. Active selection owns and consumes single Esc through `SelectElementManager`.
+2. Outside selection, global cancellation and revert require non-consuming Double Esc; websites receive both events.
+3. Repeated or modifier Escape does not count.
+4. Lazy shortcut activation may delegate only its triggering event when `ShortcutManager` was not initialized; initialized managers own dispatch directly, preventing duplicate delivery.
 
 ---
 
