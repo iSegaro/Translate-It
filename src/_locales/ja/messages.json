@@ -1916,6 +1916,9 @@
   "select_element_use_translation_font_label": {
     "message": "要素選択で翻訳フォントを使用"
   },
+  "whole_page_use_translation_font_label": {
+    "message": "ページ翻訳で翻訳フォントを使用"
+  },
   "font_family_label": {
     "message": "フォントファミリー"
   },

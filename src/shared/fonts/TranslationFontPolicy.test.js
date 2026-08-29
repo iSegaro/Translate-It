@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getSelectElementFontTarget } from './SelectElementFontPolicy.js';
+import { getTranslationFontTarget } from './TranslationFontPolicy.js';
 
-describe('getSelectElementFontTarget', () => {
+describe('getTranslationFontTarget', () => {
   it('allows a single meaningful direct TextNode', () => {
     const element = document.createElement('span');
     element.textContent = 'source';
 
-    expect(getSelectElementFontTarget(element.firstChild)).toBe(element);
+    expect(getTranslationFontTarget(element.firstChild)).toBe(element);
   });
 
   it('ignores an extra whitespace-only direct TextNode', () => {
@@ -14,7 +14,7 @@ describe('getSelectElementFontTarget', () => {
     const text = document.createTextNode('source');
     element.append(text, document.createTextNode('   '));
 
-    expect(getSelectElementFontTarget(text)).toBe(element);
+    expect(getTranslationFontTarget(text)).toBe(element);
   });
 
   it('rejects another meaningful direct TextNode, including technical text', () => {
@@ -25,8 +25,8 @@ describe('getSelectElementFontTarget', () => {
     const technicalText = document.createTextNode('label');
     technical.append(technicalText, document.createTextNode('--data-id--'));
 
-    expect(getSelectElementFontTarget(translated)).toBeNull();
-    expect(getSelectElementFontTarget(technicalText)).toBeNull();
+    expect(getTranslationFontTarget(translated)).toBeNull();
+    expect(getTranslationFontTarget(technicalText)).toBeNull();
   });
 
   it('rejects element children and unsafe interactive, form, custom, SVG, and media parents', () => {
@@ -45,13 +45,13 @@ describe('getSelectElementFontTarget', () => {
     const video = document.createElement('video');
     video.appendChild(document.createTextNode('source'));
 
-    expect(getSelectElementFontTarget(mixed.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(button.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(link.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(form.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(custom.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(svg.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(video.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(mixed.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(button.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(link.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(form.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(custom.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(svg.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(video.firstChild)).toBeNull();
   });
 
   it('rejects interactive roles, editable parents, pseudo content, and important font families', () => {
@@ -71,10 +71,10 @@ describe('getSelectElementFontTarget', () => {
       return { content: 'none' };
     });
 
-    expect(getSelectElementFontTarget(roleButton.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(editable.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(important.firstChild)).toBeNull();
-    expect(getSelectElementFontTarget(pseudo.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(roleButton.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(editable.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(important.firstChild)).toBeNull();
+    expect(getTranslationFontTarget(pseudo.firstChild)).toBeNull();
     getComputedStyle.mockRestore();
   });
 });

@@ -4,7 +4,8 @@ import {
   getWholePageRootMarginAsync, 
   getWholePageExcludedSelectorsAsync, 
   getWholePageAttributesToTranslateAsync, 
-  getWholePageShowOriginalOnHoverAsync, 
+  getWholePageShowOriginalOnHoverAsync,
+  getWholePageUseTranslationFontAsync,
   getWholePageTranslateAfterScrollStopAsync,
   getWholePageScrollStopDelayAsync,
   getWholePageTokenWarningHiddenAsync,
@@ -12,11 +13,13 @@ import {
   getTargetLanguageAsync,
   getModeProvidersAsync,
   getAIContextTranslationEnabledAsync,
+  getTranslationFontFamilyAsync,
   TranslationMode,
   CONFIG
 } from '@/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
 
 /**
  * PageTranslationSettingsLoader - Specialized utility for loading and formatting
@@ -94,11 +97,32 @@ export class PageTranslationSettingsLoader {
       maxConcurrentFlushes: CONFIG.WHOLE_PAGE_MAX_CONCURRENT_REQUESTS
     };
 
+    let useTranslationFont = false;
+    let translationFontFamily = null;
+    try {
+      useTranslationFont = Boolean(await getWholePageUseTranslationFontAsync());
+    } catch (error) {
+      logger.debug('Optional Page Translation font setting unavailable', error);
+    }
+
+    if (useTranslationFont) {
+      try {
+        const configuredFont = await getTranslationFontFamilyAsync();
+        translationFontFamily = resolveTranslationFontFamily(configuredFont, settings.targetLanguage);
+      } catch (error) {
+        logger.debug('Optional Page Translation font enhancement unavailable', error);
+      }
+    }
+
     logger.debugLazy(() => [
       'Settings Loaded:', 
-      { provider: settings.translationApi, onStop: settings.translateAfterScrollStop }
+      {
+        provider: settings.translationApi,
+        onStop: settings.translateAfterScrollStop,
+        useTranslationFont,
+      }
     ]);
 
-    return settings;
+    return { ...settings, useTranslationFont, translationFontFamily };
   }
 }

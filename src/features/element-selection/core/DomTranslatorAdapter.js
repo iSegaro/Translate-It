@@ -54,7 +54,7 @@ import {
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
 import { SelectElementExtractionMode, isSelectElementTraversable, SelectElementReason } from './SelectElementPolicy.js';
 import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
-import { getSelectElementFontTarget } from './SelectElementFontPolicy.js';
+import { getTranslationFontTarget } from '@/shared/fonts/TranslationFontPolicy.js';
 import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
@@ -1287,7 +1287,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
   _applyTranslationFont(textNode, fontFamily, fontParents) {
     if (!fontFamily || !fontParents) return;
-    const target = getSelectElementFontTarget(textNode);
+    const target = getTranslationFontTarget(textNode);
     if (!target || fontParents.has(target)) return;
     try {
       fontParents.set(target, readAuxiliaryState(target, 'style:font-family'));

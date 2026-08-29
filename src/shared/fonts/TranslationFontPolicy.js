@@ -7,7 +7,7 @@ function hasGeneratedContent(element, pseudo) {
   return content && content !== 'none' && content !== 'normal' && content !== '""' && content !== "''";
 }
 
-export function getSelectElementFontTarget(textNode) {
+export function getTranslationFontTarget(textNode) {
   try {
     const parent = textNode?.parentElement;
     if (!parent || parent.childElementCount > 0) return null;

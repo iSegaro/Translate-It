@@ -345,6 +345,7 @@ export const CONFIG = {
   WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1, // حداکثر تعداد درخواست‌های همزمان برای ترجمه صفحه
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
   WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover روی متن ترجمه شده
+  WHOLE_PAGE_USE_TRANSLATION_FONT: false,
   SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
   SELECT_ELEMENT_USE_TRANSLATION_FONT: false,
   WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false, // ترجمه فقط پس از توقف اسکرول
@@ -1476,6 +1477,13 @@ export const getWholePageShowOriginalOnHoverAsync = async () => {
   return getSettingValueAsync(
     "WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER",
     CONFIG.WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER
+  );
+};
+
+export const getWholePageUseTranslationFontAsync = async () => {
+  return getSettingValueAsync(
+    "WHOLE_PAGE_USE_TRANSLATION_FONT",
+    CONFIG.WHOLE_PAGE_USE_TRANSLATION_FONT
   );
 };
 

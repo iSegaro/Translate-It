@@ -24,6 +24,18 @@ vi.mock('@/utils/dom/DomDirectionManager.js', () => ({
 }));
 
 import { PageTranslationBridge } from './PageTranslationBridge.js';
+import { getTranslationFontTarget } from '@/shared/fonts/TranslationFontPolicy.js';
+
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+let fontComputedStyleSpy;
+
+const enableFontPolicyStyles = () => {
+  if (fontComputedStyleSpy) return;
+  fontComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    if (pseudo) return { content: 'none' };
+    return nativeGetComputedStyle(element, pseudo);
+  });
+};
 
 const settings = (overrides = {}) => ({
   targetLanguage: 'en',
@@ -42,6 +54,7 @@ const createHost = (parent = document.body) => {
 };
 
 const start = async (root = document.body, overrides = {}) => {
+  if (overrides.useTranslationFont) enableFontPolicyStyles();
   const onTranslate = vi.fn((text) => settlement(`Translated ${text}`));
   const bridge = new PageTranslationBridge();
   await bridge.initialize(settings(overrides), onTranslate);
@@ -49,13 +62,14 @@ const start = async (root = document.body, overrides = {}) => {
   return { bridge, onTranslate };
 };
 
-const startDeferred = async (root = document.body) => {
+const startDeferred = async (root = document.body, overrides = {}) => {
+  if (overrides.useTranslationFont) enableFontPolicyStyles();
   const pending = [];
   const onTranslate = vi.fn((text, context, score, node) => new Promise(resolve => {
     pending.push({ text, context, score, node, resolve });
   }));
   const bridge = new PageTranslationBridge();
-  await bridge.initialize(settings(), onTranslate);
+  await bridge.initialize(settings(overrides), onTranslate);
   bridge.translate(root);
   return { bridge, onTranslate, pending };
 };
@@ -79,6 +93,8 @@ describe('PageTranslationBridge persistent ShadowRoot observation', () => {
   const bridges = [];
 
   afterEach(() => {
+    fontComputedStyleSpy?.mockRestore();
+    fontComputedStyleSpy = null;
     bridges.forEach(bridge => bridge.cleanup());
     bridges.length = 0;
     document.body.innerHTML = '';
@@ -277,6 +293,227 @@ describe('PageTranslationBridge persistent ShadowRoot observation', () => {
     await Promise.resolve();
     expect(span.textContent).toBe('Pending');
     expect(stale).toHaveBeenCalledWith('stale');
+  });
+
+  it('applies translation font only after accepted text writes and restores the original inline font', async () => {
+    const owner = document.createElement('span');
+    owner.style.setProperty('font-family', 'serif');
+    owner.textContent = 'Font source';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Font source'));
+    expect(owner.textContent).toContain('\u200e');
+    expect(owner.getAttribute('data-page-translated')).toBe('true');
+    expect(bridge.session.translationFontFamily).toBe('system-ui');
+    expect(getTranslationFontTarget(owner.firstChild)).toBe(owner);
+    expect(bridge.session.fontOwnership.size).toBe(1);
+    expect(owner.style.fontFamily).toBe('system-ui');
+
+    bridge.restore(document.body);
+
+    expect(owner.style.fontFamily).toBe('serif');
+    expect(owner.style.getPropertyPriority('font-family')).toBe('');
+    expect(bridge.session).toBeNull();
+    bridge.cleanup();
+    expect(owner.style.fontFamily).toBe('serif');
+    expect(bridge.session).toBeNull();
+  });
+
+  it('removes an originally absent inline font on full restore', async () => {
+    const owner = document.createElement('span');
+    owner.textContent = 'Absent font';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Absent font'));
+    expect(owner.style.fontFamily).toBe('system-ui');
+
+    bridge.restore(document.body);
+
+    expect(owner.style.getPropertyValue('font-family')).toBe('');
+    expect(owner.style.getPropertyPriority('font-family')).toBe('');
+  });
+
+  it('leaves website font unchanged when Page Translation font is disabled', async () => {
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    owner.textContent = 'Font disabled';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body);
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Font disabled'));
+
+    expect(owner.style.fontFamily).toBe('serif');
+    expect(bridge.session.fontOwnership.size).toBe(0);
+  });
+
+  it('skips unsafe mixed parents and translated attributes', async () => {
+    const mixed = document.createElement('div');
+    mixed.append(document.createTextNode('Mixed source'), document.createElement('strong'));
+    const attributeOnly = document.createElement('span');
+    attributeOnly.title = 'Attribute source';
+    document.body.append(mixed, attributeOnly);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(mixed.textContent).toContain('Translated Mixed source'));
+    await vi.waitFor(() => expect(attributeOnly.title).toContain('Translated Attribute source'));
+
+    expect(mixed.style.getPropertyValue('font-family')).toBe('');
+    expect(attributeOnly.style.getPropertyValue('font-family')).toBe('');
+  });
+
+  it('does not apply font for identical translated text', async () => {
+    const owner = document.createElement('span');
+    owner.textContent = 'Identical source';
+    document.body.appendChild(owner);
+    const { bridge, pending } = await startDeferred(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+    await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0));
+
+    pending.forEach(({ text, resolve }) => resolve(settlement(text)));
+    await vi.waitFor(() => expect(owner.textContent).toBe('Identical source'));
+
+    expect(owner.style.getPropertyValue('font-family')).toBe('');
+    expect(bridge.session.fontOwnership.size).toBe(0);
+  });
+
+  it('keeps translation successful when font style mutation fails', async () => {
+    const owner = document.createElement('span');
+    owner.textContent = 'Style failure';
+    document.body.appendChild(owner);
+    const setProperty = vi.spyOn(owner.style, 'setProperty').mockImplementation((property, value, priority) => {
+      if (property === 'font-family') throw new Error('font style failure');
+      return CSSStyleDeclaration.prototype.setProperty.call(owner.style, property, value, priority);
+    });
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Style failure'));
+    setProperty.mockRestore();
+
+    expect(owner.style.getPropertyValue('font-family')).toBe('');
+    expect(bridge.session.fontOwnership.size).toBe(0);
+  });
+
+  it('preserves external font changes during restore', async () => {
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    owner.textContent = 'External drift';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated External drift'));
+    owner.style.fontFamily = 'site-override';
+    bridge.restore(document.body);
+
+    expect(owner.style.fontFamily).toBe('site-override');
+  });
+
+  it('restores connected font ownership during cleanup and clears the session', async () => {
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    owner.textContent = 'Cleanup ownership';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Cleanup ownership'));
+    bridge.cleanup();
+
+    expect(owner.style.fontFamily).toBe('serif');
+    expect(bridge.session).toBeNull();
+  });
+
+  it('restores detached font ownership during cleanup', async () => {
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    owner.textContent = 'Detached cleanup';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Detached cleanup'));
+    owner.remove();
+    expect(owner.style.fontFamily).toBe('system-ui');
+    bridge.cleanup();
+
+    expect(owner.style.fontFamily).toBe('serif');
+    expect(bridge.session).toBeNull();
+  });
+
+  it('preserves external font drift during cleanup', async () => {
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    owner.textContent = 'Cleanup drift';
+    document.body.appendChild(owner);
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Cleanup drift'));
+    owner.style.fontFamily = 'site-override';
+    bridge.cleanup();
+
+    expect(owner.style.fontFamily).toBe('site-override');
+    expect(bridge.session).toBeNull();
+  });
+
+  it('applies and restores the same owned font for dynamic text updates after persistence stops', async () => {
+    const { bridge } = await start(document.body, {
+      useTranslationFont: true,
+      translationFontFamily: 'system-ui',
+    });
+    track(bridge);
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    owner.textContent = 'Dynamic font';
+    document.body.appendChild(owner);
+
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Dynamic font'));
+    const firstOwnershipSize = bridge.session.fontOwnership.size;
+    owner.firstChild.nodeValue = 'Dynamic changed';
+    await vi.waitFor(() => expect(owner.textContent).toContain('Translated Dynamic changed'));
+
+    expect(owner.style.fontFamily).toBe('system-ui');
+    expect(bridge.session.fontOwnership.size).toBe(firstOwnershipSize);
+    bridge.stopPersistence();
+    expect(owner.style.fontFamily).toBe('system-ui');
+    expect(bridge.session.fontOwnership.size).toBe(firstOwnershipSize);
+    bridge.restore(document.body);
+
+    expect(owner.style.fontFamily).toBe('serif');
   });
 
   it('stops future Shadow work while preserving already translated content', async () => {

@@ -6,7 +6,7 @@ import { detectDirectionFromContent, applyNodeDirection, captureNodeDirectionSta
 import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
 import { iterateSelectElementAncestors } from '../utils/shadowDom.js';
-import { getSelectElementFontTarget } from './SelectElementFontPolicy.js';
+import { getTranslationFontTarget } from '@/shared/fonts/TranslationFontPolicy.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
 
@@ -310,7 +310,7 @@ export class BlockGroupReconstructor {
 
         task.unit.node.nodeValue = task.finalValue;
         if (translationFontFamily) {
-          const fontTarget = getSelectElementFontTarget(task.unit.node);
+          const fontTarget = getTranslationFontTarget(task.unit.node);
           if (fontTarget && !fontParents.has(fontTarget)) {
             try {
               fontParents.set(fontTarget, {
