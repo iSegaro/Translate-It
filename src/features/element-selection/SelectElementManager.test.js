@@ -1676,9 +1676,16 @@ describe('SelectElementManager', () => {
     });
 
     it('should handle ESC key to deactivate', async () => {
-      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      const preventDefault = vi.spyOn(event, 'preventDefault');
+      const stopPropagation = vi.spyOn(event, 'stopPropagation');
+      const stopImmediatePropagation = vi.spyOn(event, 'stopImmediatePropagation');
       manager.handleKeyDown(event);
       await vi.waitFor(() => expect(manager.isActive).toBe(false));
+      expect(event.defaultPrevented).toBe(true);
+      expect(preventDefault).toHaveBeenCalled();
+      expect(stopPropagation).toHaveBeenCalled();
+      expect(stopImmediatePropagation).toHaveBeenCalled();
     });
 
     it('should handle mouseover to highlight element', () => {

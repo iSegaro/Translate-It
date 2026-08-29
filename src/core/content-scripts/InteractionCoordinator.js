@@ -119,12 +119,10 @@ class InteractionCoordinator {
     const shortcutManagerWasInitialized = shortcutManager.initialized;
     const { loadFeature } = await import('./chunks/lazy-features.js');
     
-    // Load shortcut feature on demand. ShortcutManager owns Ctrl+/ dispatch;
-    // only invoke it directly when this event triggered first-time activation.
-    const handler = await loadFeature('shortcut', isEscape);
-    if (isEscape && handler && typeof handler.handleKeyboardEvent === 'function') {
-      handler.handleKeyboardEvent(event);
-    } else if (isMainShortcut && !shortcutManagerWasInitialized && shortcutManager.initialized) {
+    // ShortcutManager owns dispatch once initialized. First lazy activation
+    // happens after this event has propagated, so delegate only that event once.
+    await loadFeature('shortcut', isEscape);
+    if (!shortcutManagerWasInitialized && shortcutManager.initialized) {
       shortcutManager.handleKeyboardEvent(event);
     }
   }

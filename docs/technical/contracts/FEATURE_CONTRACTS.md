@@ -72,7 +72,7 @@ Additional invariants:
 | ------- | -------------- | --------------- | -------------- | ------------- | ------------------ |
 | Selection Window | none (read-only overlay) | n/a (single result) | not needed | `TranslationHandler` (window manager) | `WindowsManager.cancelCurrentTranslation` |
 | Inline Selection | none (tooltip overlay) | n/a (single result) | not needed | `TranslationHandler.performTranslation` | `HoverTranslationManager._cancelPendingHover` |
-| Select Element | `DomTranslatorAdapter` + `BlockGroupReconstructor` | yes (per-unit, A/B/C kept) | manual via `SelectElementManager.revertTranslations` | pipeline (`ErrorTypes.TRANSLATION_TIMEOUT`) | `SelectElementManager.handleKeyDown` → `deactivate({ fromCancel })` |
+| Select Element | `DomTranslatorAdapter` + `BlockGroupReconstructor` | yes (per-unit, A/B/C kept) | manual via `SelectElementManager.revertTranslations` | pipeline (`ErrorTypes.TRANSLATION_TIMEOUT`) | selection: single Esc via `SelectElementManager`; global cancellation/revert: non-consuming Double Esc |
 | Field | smart-handler replacement service | n/a (single value) | no (write-on-apply) | shared pipeline | `cancelTranslation` via `useUnifiedTranslation` / `dataStore.abortExistingRequest` |
 | Popup | none (app-owned store) | n/a (single result) | not needed | shared pipeline | `cancelTranslation` (silent reset) |
 | Sidepanel | none (app-owned store) | n/a (single result) | not needed | shared pipeline | `cancelTranslation` |
@@ -123,7 +123,7 @@ Modes: `Select_Element`.
 - **Partial success scenario: A success, B failure, C success** → nodes A and C stay translated; node B remains original. No rollback of completed independent units on a later provider failure.
 - **Raw fragments suppressed** at the adapter boundary (`isSplitFragment` / `isV3Fragment` → skip before any write).
 - **Duplicate logical identities applied once** via UID + `processedUnits` set.
-- **Esc / user cancellation**: `SelectElementManager.handleKeyDown` → `deactivate({ fromCancel: true })` → `cancelTranslation`. It does **not** revert already-applied partial translations.
+- **Esc / user cancellation**: during active selection, `SelectElementManager.handleKeyDown` owns and consumes single Esc to cancel the mode. Outside selection, global cancellation or revert requires two plain Esc presses within 400ms and never consumes either event. Repeated or modifier Escape does not count. Cancellation does **not** revert already-applied partial translations.
 - **Revert** (`SelectElementManager.revertTranslations`) restores the **original text and direction metadata** (`restoreElementDirection`, removes `data-has-original`).
 - **Block-group reconstruction is atomic.** `BlockGroupReconstructor` validates first (segment markers, node connectivity/content), then commits all units synchronously. Atomicity is enforced through validation plus transactional rollback: validation occurs before mutation, mutation may then begin, and a mutation-phase failure triggers best-effort rollback of the affected transaction. Rollback failures are aggregated as secondary diagnostics and never replace the primary mutation failure.
 
