@@ -11,12 +11,87 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
-import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
-import { CONFIG, SelectionTranslationMode, isMobile } from '@/shared/config/config.js'
+import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js'
 import { ref, computed, watchEffect } from 'vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
+
+/**
+ * Settings needed by SettingsManager fallback consumers.
+ * Keep fallback storage reads narrower than the complete persisted schema.
+ */
+const FALLBACK_SETTING_KEYS = Object.freeze([
+  'APPLICATION_LOCALIZE',
+  'EXTENSION_ENABLED',
+  'TRANSLATE_ON_TEXT_FIELDS',
+  'TRANSLATE_ON_TEXT_SELECTION',
+  'TRANSLATE_WITH_SELECT_ELEMENT',
+  'ENABLE_SCREEN_CAPTURE',
+  'OCR_DEFAULT_LANG',
+  'OCR_PREFERRED_ACTION',
+  'REQUIRE_CTRL_FOR_TEXT_SELECTION',
+  'selectionTranslationMode',
+  'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
+  'SOURCE_LANGUAGE',
+  'TARGET_LANGUAGE',
+  'TRANSLATION_API',
+  'MODE_PROVIDERS',
+  'ENABLE_DICTIONARY',
+  'EXCLUDED_SITES',
+  'ENHANCED_TRIPLE_CLICK_DRAG',
+  'POPUP_MAX_CHARS',
+  'SIDEPANEL_MAX_CHARS',
+  'SELECTION_MAX_CHARS',
+  'SELECT_ELEMENT_MAX_CHARS',
+  'MOBILE_UI_MODE',
+  'SHOW_DESKTOP_FAB',
+  'WINDOW_IS_PINNED',
+  'WINDOW_DOCK_MODE',
+  'WINDOW_DOCKED_WIDTH',
+  'WHOLE_PAGE_TRANSLATION_ENABLED',
+  'WHOLE_PAGE_LAZY_LOADING',
+  'WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES',
+  'WHOLE_PAGE_EXCLUDED_SELECTORS',
+  'WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE',
+  'WHOLE_PAGE_MAX_ELEMENTS',
+  'WHOLE_PAGE_CHUNK_SIZE',
+  'WHOLE_PAGE_MAX_CHARS',
+  'WHOLE_PAGE_AI_MAX_CHARS',
+  'WHOLE_PAGE_DEBOUNCE_DELAY',
+  'WHOLE_PAGE_ROOT_MARGIN',
+  'WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL',
+  'WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER',
+  'WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP',
+  'WHOLE_PAGE_SCROLL_STOP_DELAY',
+  'WHOLE_PAGE_TOKEN_WARNING_HIDDEN',
+  'WHOLE_PAGE_AUTO_TRANSLATE_RULES',
+  'CONTEXT_MENU_VISIBILITY',
+  'MOUSE_HOVER_TRANSLATION_ENABLED',
+  'MOUSE_HOVER_SCOPE',
+  'MOUSE_HOVER_TRIGGER',
+  'MOUSE_HOVER_DELAY',
+  'MOUSE_HOVER_AUTO_CLOSE',
+  'MOUSE_HOVER_TIMER_DURATION',
+  'MOUSE_HOVER_SHOW_CONTAINER_BORDER'
+]);
+
+function getFallbackDefaults() {
+  const persistedDefaults = getPersistedDefaultSettings();
+  const missingKeys = FALLBACK_SETTING_KEYS.filter(key => (
+    !Object.prototype.hasOwnProperty.call(persistedDefaults, key)
+    || persistedDefaults[key] === undefined
+  ));
+
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `Fallback settings missing canonical persisted defaults: ${missingKeys.join(', ')}`
+    );
+  }
+
+  return Object.fromEntries(
+    FALLBACK_SETTING_KEYS.map(key => [key, persistedDefaults[key]])
+  );
+}
 
 /**
  * SettingsManager - Unified settings management system
@@ -41,81 +116,8 @@ class SettingsManager {
     // Create a reactive settings object for non-Vue contexts
     this._settings = ref({})
 
-    // Default settings from CONFIG (will be overridden by loaded settings)
-    this._defaults = {
-      APPLICATION_LOCALIZE: 'en',
-      EXTENSION_ENABLED: true,
-      TRANSLATE_ON_TEXT_FIELDS: false,
-      TRANSLATE_ON_TEXT_SELECTION: !isMobile,
-      TRANSLATE_WITH_SELECT_ELEMENT: true,
-      ENABLE_SCREEN_CAPTURE: true,
-      OCR_DEFAULT_LANG: CONFIG.OCR_DEFAULT_LANG || 'eng',
-      OCR_PREFERRED_ACTION: CONFIG.OCR_PREFERRED_ACTION || 'region',
-      REQUIRE_CTRL_FOR_TEXT_SELECTION: false,
-      selectionTranslationMode: SelectionTranslationMode.ON_CLICK,
-      ENABLE_SHORTCUT_FOR_TEXT_FIELDS: true,
-      SOURCE_LANGUAGE: 'auto',
-      TARGET_LANGUAGE: 'fa',
-      TRANSLATION_API: ProviderRegistryIds.GOOGLE_V2,
-      MODE_PROVIDERS: {},
-      ENABLE_DICTIONARY: true,
-      EXCLUDED_SITES: [],
-      ENHANCED_TRIPLE_CLICK_DRAG: false,
-      // Character Limits
-      POPUP_MAX_CHARS: 5000,
-      SIDEPANEL_MAX_CHARS: 10000,
-      SELECTION_MAX_CHARS: 5000,
-      SELECT_ELEMENT_MAX_CHARS: 300000,
-      MOBILE_UI_MODE: MOBILE_CONSTANTS.UI_MODE.AUTO,
-      SHOW_DESKTOP_FAB: true,
-      DESKTOP_FAB_POSITION: { side: 'right', y: -1 },
-      WINDOW_IS_PINNED: false,
-      WINDOW_DOCK_MODE: 'none', // 'none', 'left', 'right'
-      WINDOW_DOCKED_WIDTH: 300,
-      MOBILE_FAB_POSITION: { 
-        side: MOBILE_CONSTANTS.FAB.SIDE.RIGHT, 
-        y: MOBILE_CONSTANTS.FAB.DEFAULT_Y 
-      },
-      // Whole Page Translation Defaults
-      WHOLE_PAGE_TRANSLATION_ENABLED: true,
-      WHOLE_PAGE_LAZY_LOADING: true,
-      WHOLE_PAGE_AUTO_TRANSLATE_ON_DOM_CHANGES: true,
-      WHOLE_PAGE_EXCLUDED_SELECTORS: [],
-      WHOLE_PAGE_ATTRIBUTES_TO_TRANSLATE: ["title", "alt", "placeholder", "label", "value"],
-      WHOLE_PAGE_MAX_ELEMENTS: 10000,
-      WHOLE_PAGE_CHUNK_SIZE: 250,
-      WHOLE_PAGE_MAX_CHARS: 5000,
-      WHOLE_PAGE_AI_MAX_CHARS: 15000,
-      WHOLE_PAGE_DEBOUNCE_DELAY: 500,
-      WHOLE_PAGE_ROOT_MARGIN: '10px',
-      WHOLE_PAGE_MAX_CONCURRENT_REQUESTS: 1,
-      WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100,
-      WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false,
-      WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false,
-      WHOLE_PAGE_SCROLL_STOP_DELAY: 500,
-      WHOLE_PAGE_TOKEN_WARNING_HIDDEN: false,
-      WHOLE_PAGE_AUTO_TRANSLATE_RULES: [],
-      CONTEXT_MENU_VISIBILITY: {
-        PAGE_CONTEXT_SELECT_ELEMENT: true,
-        PAGE_CONTEXT_SCREEN_CAPTURE: true,
-        PAGE_CONTEXT_PDF_TRANSLATOR: true,
-        ACTION_CONTEXT_SELECT_ELEMENT: true,
-        ACTION_CONTEXT_SCREEN_CAPTURE: true,
-        ACTION_CONTEXT_PDF_TRANSLATOR: true,
-        ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true,
-        ACTION_CONTEXT_OPTIONS: true,
-        ACTION_CONTEXT_SHORTCUTS: true,
-        ACTION_CONTEXT_HELP: true
-      },
-      // Mouse on Hover Translation Settings
-      MOUSE_HOVER_TRANSLATION_ENABLED: false,
-      MOUSE_HOVER_SCOPE: 'sentence',
-      MOUSE_HOVER_TRIGGER: CONFIG.MOUSE_HOVER_TRIGGER,
-      MOUSE_HOVER_DELAY: 500,
-      MOUSE_HOVER_AUTO_CLOSE: 'mouseleave',
-      MOUSE_HOVER_TIMER_DURATION: 3000,
-      MOUSE_HOVER_SHOW_CONTAINER_BORDER: true
-    }
+    // Canonical values restricted to fallback consumers; loaded settings override these values.
+    this._defaults = getFallbackDefaults()
 
     logger.debug('SettingsManager singleton created')
   }
