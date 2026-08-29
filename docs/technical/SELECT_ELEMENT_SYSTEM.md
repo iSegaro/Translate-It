@@ -6,6 +6,14 @@ owns feature lifecycle. `DomTranslatorAdapter` owns page mutation. Shared
 translation services own provider execution, validation, recovery, and request
 lifecycle.
 
+## Translation Font
+
+`SELECT_ELEMENT_USE_TRANSLATION_FONT` is disabled by default. When enabled,
+Select Element applies resolved translation `font-family` only to immediate,
+text-only parents. Mixed or unsafe content is skipped without affecting
+translation. Font changes use normal inline styles and Select Element ownership
+tracking, so revert restores prior values while preserving external changes.
+
 This document explains feature architecture and integration. Observable
 behavior is defined by [Feature Behavioral Contracts](contracts/FEATURE_CONTRACTS.md#6-select-element-contract).
 

@@ -18,7 +18,9 @@ vi.mock('@/config.js', () => ({
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
   getAIContextTranslationEnabledAsync: vi.fn(() => Promise.resolve(true)),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
-  getFeatureSemanticBlockGroupingAsync: vi.fn(() => Promise.resolve(false))
+  getFeatureSemanticBlockGroupingAsync: vi.fn(() => Promise.resolve(false)),
+  getSelectElementUseTranslationFontAsync: vi.fn(() => Promise.resolve(false)),
+  getTranslationFontFamilyAsync: vi.fn(() => Promise.resolve('auto'))
 }));
 
 vi.mock('@/shared/config/constants.js', () => ({
@@ -35,6 +37,10 @@ vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: {
     Select_Element: 'select-element'
   }
+}));
+
+vi.mock('@/shared/fonts/TranslationFontResolver.js', () => ({
+  resolveTranslationFontFamily: vi.fn(() => 'system-ui')
 }));
 
 vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
@@ -56,6 +62,7 @@ vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => ({
 // Re-export mocked functions for easy access in tests
 const { registerTranslation, contentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
 const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+const { resolveTranslationFontFamily } = await import('@/shared/fonts/TranslationFontResolver.js');
 
 vi.mock('@/shared/error-management/ErrorHandler.js');
 vi.mock('@/shared/error-management/ErrorMatcher.js');
@@ -199,6 +206,127 @@ describe('DomTranslatorAdapter', () => {
           })
         })
       );
+    });
+
+    it('continues translation when font settings fail and does not read font family while disabled', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(false);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.style.getPropertyValue('font-family')).toBe('');
+      expect(getTranslationFontFamilyAsync).not.toHaveBeenCalled();
+    });
+
+    it('continues translation when font toggle read fails', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      getSelectElementUseTranslationFontAsync.mockRejectedValueOnce(new Error('font toggle unavailable'));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+      expect(getTranslationFontFamilyAsync).not.toHaveBeenCalled();
+    });
+
+    it('continues translation when font family read fails', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
+      getTranslationFontFamilyAsync.mockRejectedValueOnce(new Error('font family unavailable'));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+      expect(testElement.style.getPropertyValue('font-family')).toBe('');
+    });
+
+    it('continues translation when font resolution fails', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
+      getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
+      resolveTranslationFontFamily.mockImplementationOnce(() => {
+        throw new Error('font resolver unavailable');
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.textContent).toContain('سلام');
+      expect(testElement.style.getPropertyValue('font-family')).toBe('');
+    });
+
+    it('applies and publishes V2 font ownership, then restores it without overwriting drift', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      testElement.style.setProperty('font-family', 'serif');
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
+      getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
+      resolveTranslationFontFamily.mockReturnValueOnce('system-ui');
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+      const entry = globalSelectElementState.translationHistory.at(-1);
+      const fontRecord = entry.auxiliaryOwnershipRecords.find(record => record.property === 'style:font-family');
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(testElement.style.fontFamily).toBe('system-ui');
+      expect(fontRecord).toEqual(expect.objectContaining({
+        original: { present: true, value: 'serif', priority: '' },
+        applied: { present: true, value: 'system-ui', priority: '' },
+      }));
+
+      testElement.style.setProperty('font-family', 'monospace');
+      await revertSelectElementTranslation(entry.sessionId);
+      expect(testElement.style.fontFamily).toBe('monospace');
+    });
+
+    it('restores the original V2 font through normal Revert', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      testElement.style.setProperty('font-family', 'serif');
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
+      getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
+      resolveTranslationFontFamily.mockReturnValueOnce('system-ui');
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      const result = await adapter.translateElement(testElement);
+      const entry = globalSelectElementState.translationHistory.at(-1);
+
+      expect(result.success).toBe(true);
+      expect(testElement.style.fontFamily).toBe('system-ui');
+      await revertSelectElementTranslation(entry.sessionId);
+      expect(testElement.style.fontFamily).toBe('serif');
+      expect(testElement.style.getPropertyPriority('font-family')).toBe('');
     });
 
     it('rejects direct internal shadow roots before extraction while shadow support is disabled', async () => {
@@ -635,6 +763,53 @@ describe('DomTranslatorAdapter', () => {
       expect(ownership.map(snapshot => snapshot.appliedText)).toEqual([first.nodeValue, second.nodeValue]);
     });
 
+    it('publishes V3 font ownership through normal Revert', async () => {
+      const { getFeatureSemanticBlockGroupingAsync, getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
+      getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
+      resolveTranslationFontFamily.mockReturnValueOnce('system-ui');
+
+      const owner = document.createElement('span');
+      const text = document.createTextNode('A');
+      owner.appendChild(text);
+      testElement.replaceChildren(owner);
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      collectBlockGroups.mockReturnValueOnce([{
+        id: 'n1',
+        blockId: 'g1',
+        text: 'A',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+        node: text,
+      }]);
+      let callbacks;
+      registerTranslation.mockImplementationOnce((_id, registered) => { callbacks = registered; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({ success: true, streaming: true });
+
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+
+      const result = await translation;
+      const entry = globalSelectElementState.translationHistory.at(-1);
+
+      expect(result).toMatchObject({ success: true, committedParentCount: 1 });
+      expect(owner.style.fontFamily).toBe('system-ui');
+      expect(entry.auxiliaryOwnershipRecords).toEqual(expect.arrayContaining([
+        expect.objectContaining({ property: 'style:font-family', element: owner })
+      ]));
+      await revertSelectElementTranslation(entry.sessionId);
+      expect(owner.style.fontFamily).toBe('');
+      expect(text.nodeValue).toBe('A');
+    });
+
     it('marks grouped non-passthrough rejected content invalid and reports PARTIAL_SUCCESS', async () => {
       const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
       getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
@@ -885,6 +1060,32 @@ describe('DomTranslatorAdapter', () => {
       expect(first.nodeValue).toContain('Uno');
       expect(second.nodeValue).toBe('B');
       apply.mockRestore();
+    });
+
+    it('rolls back V2 font mutation when ownership publication fails', async () => {
+      const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      testElement.style.setProperty('font-family', 'serif');
+      getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
+      getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
+      resolveTranslationFontFamily.mockReturnValueOnce('system-ui');
+      const publish = vi.spyOn(adapter, '_publishCommittedOwnership')
+        .mockImplementationOnce(() => { throw new Error('ownership publication failed'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true,
+        streaming: false,
+        translatedText: JSON.stringify([{ t: 'سلام', i: 'n1' }])
+      });
+
+      await expect(adapter.translateElement(testElement)).rejects.toThrow('ownership publication failed');
+      publish.mockRestore();
+
+      expect(testElement.textContent).toBe('Hello');
+      expect(testElement.style.fontFamily).toBe('serif');
+      expect(testElement.style.getPropertyPriority('font-family')).toBe('');
+      expect(globalSelectElementState.translationHistory.flatMap(entry => entry.auxiliaryOwnershipRecords || [])
+        .some(record => record.property === 'style:font-family')).toBe(false);
+      expect([...globalSelectElementState.auxiliaryOwnership.values()]
+        .some(properties => properties.has('style:font-family'))).toBe(false);
     });
 
     it('should create one conversation parent and ACK once for shared blockId units', async () => {

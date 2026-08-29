@@ -346,6 +346,7 @@ export const CONFIG = {
   WHOLE_PAGE_PROGRESS_UPDATE_INTERVAL: 100, // فاصله بین progress updates (ms)
   WHOLE_PAGE_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover روی متن ترجمه شده
   SELECT_ELEMENT_SHOW_ORIGINAL_ON_HOVER: false, // نمایش متن اصلی هنگام hover در حالت انتخاب المان
+  SELECT_ELEMENT_USE_TRANSLATION_FONT: false,
   WHOLE_PAGE_TRANSLATE_AFTER_SCROLL_STOP: false, // ترجمه فقط پس از توقف اسکرول
   WHOLE_PAGE_SCROLL_STOP_DELAY: 500, // تاخیر برای توقف اسکرول (ms)
   WHOLE_PAGE_TOKEN_WARNING_HIDDEN: false, // پنهان کردن هشدار مصرف توکن در ترجمه صفحه
@@ -1273,6 +1274,10 @@ export const getTranslationFontFamilyAsync = async () => {
 
 export const getTranslationFontSizeAsync = async () => {
   return getSettingValueAsync("TRANSLATION_FONT_SIZE", CONFIG.TRANSLATION_FONT_SIZE);
+};
+
+export const getSelectElementUseTranslationFontAsync = async () => {
+  return getSettingValueAsync("SELECT_ELEMENT_USE_TRANSLATION_FONT", CONFIG.SELECT_ELEMENT_USE_TRANSLATION_FONT);
 };
 
 // --- Multi-API Key Support (2025) ---

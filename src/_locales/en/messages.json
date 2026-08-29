@@ -1913,6 +1913,9 @@
   "font_settings_description": {
     "message": "Customize the font and size for translation display"
   },
+  "select_element_use_translation_font_label": {
+    "message": "Use translation font in Select Element"
+  },
   "font_family_label": {
     "message": "Font Family"
   },

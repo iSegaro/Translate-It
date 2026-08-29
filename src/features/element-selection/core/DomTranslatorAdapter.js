@@ -21,7 +21,9 @@ import {
   getAIContextTranslationEnabledAsync,
   getSourceLanguageAsync,
   getEffectiveProviderAsync,
-  getFeatureSemanticBlockGroupingAsync
+  getFeatureSemanticBlockGroupingAsync,
+  getSelectElementUseTranslationFontAsync,
+  getTranslationFontFamilyAsync
 } from '@/config.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
@@ -52,6 +54,8 @@ import {
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
 import { SelectElementExtractionMode, isSelectElementTraversable, SelectElementReason } from './SelectElementPolicy.js';
 import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
+import { getSelectElementFontTarget } from './SelectElementFontPolicy.js';
+import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
 import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 
 // Import hover manager dependencies
@@ -114,7 +118,7 @@ function auxiliaryStatesEqual(original, applied, property) {
   return !property.startsWith('style:') || original.priority === applied.priority;
 }
 
-function createAuxiliaryOwnershipRecords({ attributeParents = new Map(), directionSnapshots = [] } = {}) {
+function createAuxiliaryOwnershipRecords({ attributeParents = new Map(), directionSnapshots = [], fontParents = new Map() } = {}) {
   const records = [];
   const addRecord = (element, property, original) => {
     const applied = readAuxiliaryState(element, property);
@@ -135,6 +139,10 @@ function createAuxiliaryOwnershipRecords({ attributeParents = new Map(), directi
     for (const [name, original] of Object.entries(snapshot.styles || {})) {
       addRecord(snapshot.element, `style:${name}`, original);
     }
+  }
+
+  for (const [element, original] of fontParents || []) {
+    addRecord(element, 'style:font-family', original);
   }
 
   return records;
@@ -278,6 +286,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
         options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
         options.targetLanguage || getTargetLanguageAsync()
       ]);
+      let translationFontFamily = null;
+      try {
+        if (await getSelectElementUseTranslationFontAsync()) {
+          const configuredFont = await getTranslationFontFamilyAsync();
+          translationFontFamily = resolveTranslationFontFamily(configuredFont, targetLanguage);
+        }
+      } catch (error) {
+        this.logger.debug('Select Element font enhancement skipped', error);
+        translationFontFamily = null;
+      }
 
       // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag and provider type
       const isAIProvider = isProviderType(registryIdToName(provider), ProviderTypes.AI);
@@ -498,6 +516,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
           nodes: plan.map(({ nodeData }) => ({ node: nodeData.node, value: nodeData.node.nodeValue })),
           attributeParents: new Map(),
           directionSnapshots: [],
+          fontParents: new Map(),
           hoverNodes: plan.map(({ nodeData }) => ({ node: nodeData.node, value: hoverPreviewLookup.get(nodeData.node) })),
         };
         const directionElements = new Set();
@@ -523,7 +542,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
         try {
           for (const { nodeData, translatedText } of plan) {
-            this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
+            this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element, translationFontFamily, mutationSnapshot.fontParents);
           }
            this._publishCommittedOwnership(
              plan.map(({ nodeData }) => ({
@@ -564,6 +583,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
                 return { kind: 'attribute', element: parentElement, error: rollbackError };
               },
+            })),
+            ...[...mutationSnapshot.fontParents].map(([parentElement, state]) => ({
+              kind: 'font',
+              restore: () => {
+                if (state.present) parentElement.style.setProperty('font-family', state.value, state.priority);
+                else parentElement.style.removeProperty('font-family');
+              },
+              createFailure: (rollbackError) => ({ kind: 'font', element: parentElement, error: rollbackError }),
             })),
             {
               kind: 'direction',
@@ -727,7 +754,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
           targetLanguage,
           element,
           this.currentSessionId,
-          this.currentEntropy
+          this.currentEntropy,
+          translationFontFamily
         );
         this._commitBlockGroup(group, reconstruction, translatedBlock, processedUids, token);
         group.applied = true;
@@ -833,7 +861,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                       if (!anyProcessed) {
                         try {
                            if (!this._isCurrentTranslation(translationToken)) return;
-                           const reconstruction = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                            const reconstruction = BlockGroupReconstructor.apply(group.units, text, effectiveTargetLanguage, element, this.currentSessionId, this.currentEntropy, translationFontFamily);
                            this._commitBlockGroup(group, reconstruction, text, processedUids, translationToken);
                         } catch (error) {
                           const originalError = unwrapMutationFailure(error);
@@ -980,10 +1008,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
           effectiveTargetLanguage,
           element,
           translationToken,
-           ingestDirectResult,
-           finalizeDirectParents,
-           ingestPassthroughResult,
-           settleTerminalParents
+            ingestDirectResult,
+            finalizeDirectParents,
+            ingestPassthroughResult,
+            settleTerminalParents,
+            translationFontFamily
          );
       } else {
         result = response;
@@ -1205,7 +1234,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     );
   }
 
-  _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement) {
+  _applyTranslationToNode(textNode, translatedText, targetLanguage, rootElement, translationFontFamily = null, fontParents = null) {
     if (!textNode || !translatedText) return;
     
     // Safety check: extract string content
@@ -1250,9 +1279,23 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     textNode.nodeValue = finalValue;
+    this._applyTranslationFont(textNode, translationFontFamily, fontParents);
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement, {
       shadowAware: isSelectShadowNode(textNode),
     });
+  }
+
+  _applyTranslationFont(textNode, fontFamily, fontParents) {
+    if (!fontFamily || !fontParents) return;
+    const target = getSelectElementFontTarget(textNode);
+    if (!target || fontParents.has(target)) return;
+    try {
+      fontParents.set(target, readAuxiliaryState(target, 'style:font-family'));
+      target.style.setProperty('font-family', fontFamily);
+    } catch (error) {
+      fontParents.delete(target);
+      this.logger.debug('Select Element font enhancement skipped', error);
+    }
   }
 
   _commitBlockGroup(group, reconstruction, translatedText, processedUids, translationToken) {
@@ -1311,7 +1354,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents, ingestPassthroughResult, settleTerminalParents) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents, ingestPassthroughResult, settleTerminalParents, translationFontFamily = null) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
 
     if (this.sessionContext === undefined && (!ingestDirectResult || !finalizeDirectParents)) {
@@ -1398,7 +1441,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
             if (!anyProcessed) {
               try {
                   if (translationToken && !this._isCurrentTranslation(translationToken)) return;
-                  const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy);
+                  const reconstruction = BlockGroupReconstructor.apply(group.units, text, finalTargetLanguage, element, this.currentSessionId, this.currentEntropy, translationFontFamily);
                   this._commitBlockGroup(group, reconstruction, text, processedUids, translationToken);
                } catch (error) {
                  const originalError = unwrapMutationFailure(error);

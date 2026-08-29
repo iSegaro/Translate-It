@@ -6,6 +6,7 @@ import { detectDirectionFromContent, applyNodeDirection, captureNodeDirectionSta
 import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
 import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
 import { iterateSelectElementAncestors } from '../utils/shadowDom.js';
+import { getSelectElementFontTarget } from './SelectElementFontPolicy.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
 
@@ -117,7 +118,7 @@ export class BlockGroupReconstructor {
    * Applies the parsed translations atomically to the DOM.
    * Synchronously performs connection validation check first, ensuring absolute rollback safety.
    */
-  static apply(expectedUnits, translatedText, targetLanguage, rootElement, sessionId = '', entropy = '') {
+  static apply(expectedUnits, translatedText, targetLanguage, rootElement, sessionId = '', entropy = '', translationFontFamily = null) {
     if (!expectedUnits || expectedUnits.length === 0) {
       return false;
     }
@@ -220,6 +221,7 @@ export class BlockGroupReconstructor {
     const firstNodeParent = expectedUnits[0].node.parentElement;
     const attributeParents = new Map();
     const directionSnapshots = [];
+    const fontParents = new Map();
     const directionElements = new Set();
     const hoverSnapshots = commitPlan.map(({ unit }) => ({ node: unit.node, value: hoverPreviewLookup.get(unit.node) }));
     for (const { unit } of commitPlan) {
@@ -263,6 +265,14 @@ export class BlockGroupReconstructor {
           },
           createFailure: (error) => ({ kind: 'attribute', element, error }),
         })),
+        ...[...fontParents].map(([element, state]) => ({
+          kind: 'font',
+          restore: () => {
+            if (state.present) element.style.setProperty('font-family', state.value, state.priority);
+            else element.style.removeProperty('font-family');
+          },
+          createFailure: (error) => ({ kind: 'font', element, error }),
+        })),
         {
           kind: 'direction',
           restore: () => restoreNodeDirectionState(directionSnapshots),
@@ -299,6 +309,22 @@ export class BlockGroupReconstructor {
         }
 
         task.unit.node.nodeValue = task.finalValue;
+        if (translationFontFamily) {
+          const fontTarget = getSelectElementFontTarget(task.unit.node);
+          if (fontTarget && !fontParents.has(fontTarget)) {
+            try {
+              fontParents.set(fontTarget, {
+                present: fontTarget.style.getPropertyValue('font-family') !== '',
+                value: fontTarget.style.getPropertyValue('font-family'),
+                priority: fontTarget.style.getPropertyPriority('font-family'),
+              });
+              fontTarget.style.setProperty('font-family', translationFontFamily);
+            } catch (fontError) {
+              fontParents.delete(fontTarget);
+              logger.debug('[Reconstructor] Select Element font enhancement skipped', fontError);
+            }
+          }
+        }
         applyNodeDirection(task.unit.node, targetLanguage, rootElement, {
           shadowAware: Boolean(task.unit.node?.getRootNode?.()?.host),
         });
@@ -309,7 +335,7 @@ export class BlockGroupReconstructor {
         success: true,
         cleanResult: parsedSegments.map(segment => segment.text).join(''),
         segments: parsedSegments,
-        auxiliarySnapshots: { attributeParents, directionSnapshots },
+        auxiliarySnapshots: { attributeParents, directionSnapshots, fontParents },
         transaction: {
           rollback,
           finalize() { active = false; },

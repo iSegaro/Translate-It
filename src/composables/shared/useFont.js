@@ -9,8 +9,7 @@ import { CONFIG } from '@/shared/config/config.js'
 import { systemFontDetector } from '@/shared/fonts/SystemFontDetector.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js'
-import { isRTLLanguage } from '@/features/element-selection/utils/textDirection.js'
+import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useFont');
 
@@ -76,43 +75,19 @@ export function useFont(targetLanguage = CONFIG.TARGET_LANGUAGE || 'fa', options
   // Smart font detection based on target language
   const getSmartFontFamily = (lang) => {
     if (!enableSmartDetection) return FONT_CSS_MAP[fallbackFont]
-    
-    // Normalize language to code for consistent checking
-    const langCode = UI_LOCALE_TO_CODE_MAP[lang] || lang?.toLowerCase();
-    
-    // Persian/Farsi languages
-    if (langCode === 'fa' || langCode === 'farsi' || langCode === 'persian') {
-      return FONT_CSS_MAP['vazirmatn']
-    }
-    
-    // Arabic languages
-    if (langCode === 'ar' || langCode === 'arabic') {
-      return FONT_CSS_MAP['noto-sans']
-    }
-    
-    // Check if it's any other RTL language
-    if (isRTLLanguage(langCode)) {
-      return FONT_CSS_MAP['noto-sans']
-    }
-    
-    // Default for Latin scripts
-    return FONT_CSS_MAP['system']
+    return resolveTranslationFontFamily('auto', lang)
   }
   
   // Generate CSS font-family value using SystemFontDetector
   const fontFamilyCSS = computed(() => {
-    const fontValue = fontFamily.value
-    
-    if (fontValue === 'auto') {
-      return getSmartFontFamily(computedTargetLanguage.value)
-    }
-    
-    // Use SystemFontDetector for dynamic font CSS generation
     try {
-      return systemFontDetector.getFontCSSFamily(fontValue)
+      if (fontFamily.value === 'auto') {
+        return getSmartFontFamily(computedTargetLanguage.value)
+      }
+      return resolveTranslationFontFamily(fontFamily.value, computedTargetLanguage.value)
     } catch (error) {
       logger.warn('Failed to get font CSS from SystemFontDetector, using fallback:', error)
-      return FONT_CSS_MAP[fontValue] || FONT_CSS_MAP[fallbackFont]
+      return FONT_CSS_MAP[fontFamily.value] || FONT_CSS_MAP[fallbackFont]
     }
   })
   
