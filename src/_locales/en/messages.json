@@ -474,13 +474,22 @@
     "message": "Immediate (Hover)"
   },
   "mouse_hover_trigger_ctrl": {
-    "message": "Ctrl + Hover"
+    "message": "Ctrl"
   },
   "mouse_hover_trigger_alt": {
-    "message": "Alt + Hover"
+    "message": "Alt"
   },
   "mouse_hover_trigger_shift": {
-    "message": "Shift + Hover"
+    "message": "Shift"
+  },
+  "mouse_hover_trigger_ctrl_mac": {
+    "message": "Command ⌘ / Control ⌃"
+  },
+  "mouse_hover_trigger_alt_mac": {
+    "message": "Option ⌥"
+  },
+  "mouse_hover_trigger_shift_mac": {
+    "message": "Shift ⇧"
   },
   "mouse_hover_delay_label": {
     "message": "Hover Delay"

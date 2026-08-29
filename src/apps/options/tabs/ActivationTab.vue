@@ -842,6 +842,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/config/config.js'
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { detectOS, OS_PLATFORMS } from '@/utils/browser/compatibility.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -1019,6 +1020,7 @@ const mouseHoverAutoClose = createSetting('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave'
 const mouseHoverTimerDuration = createSetting('MOUSE_HOVER_TIMER_DURATION', 3000)
 const mouseHoverShowBorder = createSetting('MOUSE_HOVER_SHOW_CONTAINER_BORDER', true)
 const showMouseHoverInFab = createSetting('SHOW_MOUSE_HOVER_IN_FAB', true)
+const isMacOS = detectOS() === OS_PLATFORMS.MAC
 
 const mouseHoverScopeOptions = computed(() => [
   { value: 'word', label: t('mouse_hover_scope_word') || 'Word' },
@@ -1028,9 +1030,20 @@ const mouseHoverScopeOptions = computed(() => [
 
 const mouseHoverTriggerOptions = computed(() => [
   { value: 'hover', label: t('mouse_hover_trigger_hover') || 'Immediate (Hover)' },
-  { value: 'ctrl', label: t('mouse_hover_trigger_ctrl') || 'Ctrl + Hover' },
-  { value: 'alt', label: t('mouse_hover_trigger_alt') || 'Alt + Hover' },
-  { value: 'shift', label: t('mouse_hover_trigger_shift') || 'Shift + Hover' }
+  {
+    value: 'ctrl',
+    label: isMacOS
+      ? t('mouse_hover_trigger_ctrl_mac') || 'Command ⌘ / Control ⌃'
+      : t('mouse_hover_trigger_ctrl') || 'Ctrl'
+  },
+  {
+    value: 'alt',
+    label: isMacOS ? t('mouse_hover_trigger_alt_mac') || 'Option ⌥' : t('mouse_hover_trigger_alt') || 'Alt'
+  },
+  {
+    value: 'shift',
+    label: isMacOS ? t('mouse_hover_trigger_shift_mac') || 'Shift ⇧' : t('mouse_hover_trigger_shift') || 'Shift'
+  }
 ])
 
 const mouseHoverAutoCloseOptions = computed(() => [

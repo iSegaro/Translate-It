@@ -474,13 +474,22 @@
     "message": "فقط مکث موس"
   },
   "mouse_hover_trigger_ctrl": {
-    "message": "Ctrl + مکث موس"
+    "message": "Ctrl"
   },
   "mouse_hover_trigger_alt": {
-    "message": "Alt + مکث موس"
+    "message": "Alt"
   },
   "mouse_hover_trigger_shift": {
-    "message": "Shift + مکث موس"
+    "message": "Shift"
+  },
+  "mouse_hover_trigger_ctrl_mac": {
+    "message": "فرمان ⌘ / کنترل ⌃"
+  },
+  "mouse_hover_trigger_alt_mac": {
+    "message": "گزینه ⌥"
+  },
+  "mouse_hover_trigger_shift_mac": {
+    "message": "شیفت ⇧"
   },
   "mouse_hover_delay_label": {
     "message": "زمان انتظار"
