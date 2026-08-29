@@ -7,8 +7,8 @@ import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
-import { tabPermissionChecker } from "@/core/tabPermissions.js";
 import { injectContentScriptsForTab } from "@/core/background/handlers/common/contentScriptInjector.js";
+import { handleActivateSelectElementModeLazy } from "@/core/background/handlers/lazy/handleElementSelectionLazy.js";
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, "command-handler");
 
 async function handleCommand(tab, action, data = {}) {
@@ -94,28 +94,32 @@ async function handleSelectElementCommand(tab) {
       `[CommandHandler] Activating select element mode for tab ${tab.id}`,
     );
 
-    // Check tab accessibility before attempting command
-    const accessInfo = await tabPermissionChecker.checkTabAccess(tab.id);
-    if (!accessInfo.isAccessible) {
-      logger.debug(
-        `[CommandHandler] Select element command ignored on restricted page:`,
-        {
-          tabId: tab.id,
-          url: accessInfo.fullUrl,
-          reason: accessInfo.errorMessage,
-        },
-      );
-      return false;
-    }
-
-    // Send activation command with force load flag to trigger on-demand loading
+    // Route keyboard activation through the authoritative Background handler.
     const message = MessageFormat.create(
       MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-      { source: "keyboard_shortcut", forceLoad: true },
+      { source: "keyboard_shortcut", forceLoad: true, tabId: tab.id, active: true },
       MessagingContexts.BACKGROUND,
     );
 
-    await browser.tabs.sendMessage(tab.id, message);
+    const activate = () => handleActivateSelectElementModeLazy(message, { tab });
+    let result = await activate();
+
+    if (
+      result?.success === false
+      && result.message === "Failed to communicate with tab - try refreshing the page"
+    ) {
+      logger.debug(
+        `[CommandHandler] Attempting to inject content script for Select Element activation`,
+      );
+      await injectContentScriptsForTab(tab.id);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      result = await activate();
+    }
+
+    if (result?.success !== true) {
+      return false;
+    }
+
     logger.debug(
       `[CommandHandler] Select element activation sent to content script`,
     );
@@ -125,54 +129,6 @@ async function handleSelectElementCommand(tab) {
       `[CommandHandler] Error handling select element command:`,
       error,
     );
-
-    // Provide specific error context
-    if (
-      error.message &&
-      error.message.includes("Receiving end does not exist")
-    ) {
-      logger.debug(
-        `[CommandHandler] Content script not available in tab ${tab?.id} for select element command`,
-      );
-
-      // Try to inject content script as fallback
-      try {
-        logger.debug(
-          `[CommandHandler] Attempting to inject content script for select element mode`,
-        );
-
-        await injectContentScriptsForTab(tab.id);
-
-        // Wait for initialization and retry
-        await new Promise((resolve) => setTimeout(resolve, 200));
-
-        // Create retry message
-        const retryMessage = MessageFormat.create(
-          MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-          { source: "keyboard_shortcut", forceLoad: true },
-          MessagingContexts.BACKGROUND,
-        );
-
-        // Retry the activation command
-        await browser.tabs.sendMessage(tab.id, retryMessage);
-        logger.debug(
-          `[CommandHandler] Select element activation successful after content script injection`,
-        );
-        return true;
-      } catch (retryError) {
-        logger.error(
-          `[CommandHandler] Fallback content script injection failed:`,
-          retryError,
-        );
-      }
-    } else if (
-      error.message &&
-      error.message.includes("Could not establish connection")
-    ) {
-      logger.debug(
-        `[CommandHandler] Cannot connect to tab ${tab?.id} for select element command`,
-      );
-    }
 
     return false;
   }

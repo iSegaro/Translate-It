@@ -1,6 +1,6 @@
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -37,13 +37,18 @@ export async function handleBatchTranslate(message, sender) {
     // UnifiedTranslationService's handleTranslationRequest is already designed to be generic
     const result = await unifiedTranslationService.handleTranslationRequest(message, sender);
 
-    // Format error results if needed
-    if (result && result.success === false && result.error) {
+    // Format error results if needed, keeping canonical identity authoritative.
+    const errorSource = isStructuredTranslationError(result?.errorDetails)
+      ? result.errorDetails
+      : result?.error;
+    if (result && result.success === false && errorSource) {
+      const legacyOptions = { ...result };
+      delete legacyOptions.errorDetails;
       return MessageFormat.createErrorResponse(
-        result.error, 
+        errorSource,
         message.messageId, 
         { 
-          ...result, 
+          ...legacyOptions,
           context: message.context || 'unknown' 
         }
       );

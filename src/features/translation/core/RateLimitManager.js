@@ -7,12 +7,90 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { registryIdToName } from '@/features/translation/providers/ProviderConstants.js';
-import { isFatalError, isConfigError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import {
+  isFatalError,
+  isConfigError,
+  isProviderRequestSizeError,
+  isDeterministicClientHttpError,
+  matchErrorToType,
+} from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
 import { PROVIDER_CONFIGURATIONS, getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
 import { getProviderOptimizationLevelAsync } from '@/shared/config/config.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'RateLimitManager');
+
+const LEGACY_ADAPTIVE_BACKOFF = Object.freeze({
+  enabled: true,
+  baseMultiplier: 2,
+  maxMultiplier: 10,
+  resetAfterSuccess: 1,
+});
+
+const EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS = Object.freeze({
+  enabled: true,
+  baseMultiplier: 2,
+  maxDelay: 30000,
+  resetAfterSuccess: 1,
+});
+
+const DEFAULT_CIRCUIT_BREAK_THRESHOLD = 5;
+
+function resolveCircuitBreakThreshold(value) {
+  return typeof value === 'number'
+    && Number.isFinite(value)
+    && Number.isInteger(value)
+    && value >= 1
+    ? value
+    : DEFAULT_CIRCUIT_BREAK_THRESHOLD;
+}
+
+function getAdaptiveBackoffConfig(config = {}) {
+  const raw = config.adaptiveBackoff;
+  if (!raw || typeof raw !== 'object') {
+    return { ...LEGACY_ADAPTIVE_BACKOFF, explicit: false };
+  }
+
+  const baseMultiplier = Number(raw.baseMultiplier);
+  const maxDelay = Number(raw.maxDelay);
+  const resetAfterSuccess = Number(raw.resetAfterSuccess);
+
+  return {
+    explicit: true,
+    enabled: raw.enabled !== false,
+    baseMultiplier: Number.isFinite(baseMultiplier) && baseMultiplier > 1
+      ? baseMultiplier
+      : EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS.baseMultiplier,
+    maxDelay: Number.isFinite(maxDelay) && maxDelay > 0
+      ? maxDelay
+      : EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS.maxDelay,
+    resetAfterSuccess: Number.isFinite(resetAfterSuccess) && resetAfterSuccess >= 1
+      ? resetAfterSuccess
+      : EXPLICIT_ADAPTIVE_BACKOFF_DEFAULTS.resetAfterSuccess,
+  };
+}
+
+function createAbortError(signal, message = 'Request aborted') {
+  const isUserAbort = signal?.aborted
+    && (signal.reason === 'user-cancelled' || signal.reason === 'user_cancelled');
+  const error = new Error(isUserAbort ? 'Request cancelled' : message);
+  error.name = 'AbortError';
+
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+    error.isCancelled = true;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
+  }
+
+  return error;
+}
 
 /**
  * Priority levels for translation requests
@@ -56,7 +134,8 @@ export class RateLimitManager {
       this._initializeProvider(name, optimizedConfig.rateLimit, {
         isManualConfig: false,
         optimizationLevel: level,
-        configSource: 'fresh-load'
+        configSource: 'fresh-load',
+        circuitBreakThreshold: optimizedConfig.errorHandling?.circuitBreakThreshold,
       });
     }
   }
@@ -76,7 +155,8 @@ export class RateLimitManager {
     return this._initializeProvider(providerName, optimizedConfig.rateLimit, {
       isManualConfig: false,
       optimizationLevel: level,
-      configSource: 'fresh-load'
+      configSource: 'fresh-load',
+      circuitBreakThreshold: optimizedConfig.errorHandling?.circuitBreakThreshold,
     });
   }
 
@@ -109,10 +189,13 @@ export class RateLimitManager {
       consecutiveFailures: 0,
       isCircuitOpen: false,
       circuitOpenTime: 0,
-      circuitBreakThreshold: 5,
+      circuitBreakThreshold: resolveCircuitBreakThreshold(
+        options.circuitBreakThreshold ?? config.circuitBreakThreshold
+      ),
       circuitRecoveryTime: 30000,
       // Adaptive backoff
       currentBackoffMultiplier: 1,
+      successfulRequestsSinceBackoff: 0,
       // Performance monitoring (Crucial for AI providers)
       performanceStats: {
         totalRequests: 0,
@@ -160,18 +243,7 @@ export class RateLimitManager {
 
     // Check circuit breaker
     if (this._isCircuitOpen(state)) {
-      const lastError = state.lastCircuitError;
-      const reason = lastError ? `: ${lastError.message || lastError}` : '';
-      const error = new Error(`Circuit breaker open for ${name}. Too many failures${reason}`);
-      error.type = 'CIRCUIT_BREAKER_OPEN';
-      
-      // If the underlying error was fatal/retryable, preserve its characteristics safely
-      if (lastError) {
-        error.originalType = lastError.type || matchErrorToType(lastError);
-        if (lastError.statusCode) error.statusCode = lastError.statusCode;
-      }
-      
-      throw error;
+      throw this._createCircuitOpenError(name, state);
     }
 
     const startTime = Date.now();
@@ -201,20 +273,14 @@ export class RateLimitManager {
           const index = queue.indexOf(request);
           if (index !== -1) {
             queue.splice(index, 1);
-            const abortError = new Error('Request aborted while in queue');
-            abortError.name = 'AbortError';
-            abortError.isCancelled = true;
-            reject(abortError);
+            reject(createAbortError(abortSignal, 'Request aborted while in queue'));
           }
         };
         abortSignal.addEventListener('abort', onAbort, { once: true });
         
         // If already aborted
         if (abortSignal.aborted) {
-          const abortError = new Error('Request aborted before enqueuing');
-          abortError.name = 'AbortError';
-          abortError.isCancelled = true;
-          reject(abortError);
+          reject(createAbortError(abortSignal, 'Request aborted before enqueuing'));
           return;
         }
       }
@@ -233,7 +299,7 @@ export class RateLimitManager {
 
     // Stop processing if circuit is open
     if (this._isCircuitOpen(state)) {
-      this._rejectQueue(state, new Error(`Circuit breaker open for ${providerName}`));
+      this._rejectQueue(state, this._createCircuitOpenError(providerName, state));
       return;
     }
 
@@ -242,7 +308,13 @@ export class RateLimitManager {
       // Check delay between requests
       const now = Date.now();
       const baseDelay = state.config.delayBetweenRequests || 0;
-      const adjustedDelay = baseDelay * (state.currentBackoffMultiplier || 1);
+      const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
+      const effectiveDelay = baseDelay * (state.currentBackoffMultiplier || 1);
+      const adjustedDelay = adaptiveBackoff.enabled === false
+        ? baseDelay
+        : adaptiveBackoff.explicit
+          ? Math.min(effectiveDelay, adaptiveBackoff.maxDelay)
+          : Math.min(effectiveDelay, baseDelay * adaptiveBackoff.maxMultiplier);
       const timeSinceLast = now - state.lastRequestTime;
 
       if (timeSinceLast < adjustedDelay) {
@@ -289,17 +361,35 @@ export class RateLimitManager {
       while (state.queues[p].length > 0) {
         const req = state.queues[p].shift();
         
-        // If it's a circuit breaker reject, we want it to be fatal enough to stop but 
-        // also recognizable as a cancellation if the user/handler decides so.
-        // For now, let's keep the error as provided but add Abort properties if it's a clear stop.
-        if (isCircuitBreaker) {
-          error.name = 'AbortError';
-          error.isCancelled = true;
-        }
-        
-        req.reject(error);
+        const rejection = isCircuitBreaker
+          ? this._copyCircuitError(error)
+          : error;
+        req.reject(rejection);
       }
     });
+  }
+
+  _createCircuitOpenError(providerName, state) {
+    const lastError = state.lastCircuitError;
+    const reason = lastError ? `: ${lastError.message || lastError}` : '';
+    const error = new Error(`Circuit breaker open for ${providerName}. Too many failures${reason}`);
+    error.type = ErrorTypes.CIRCUIT_BREAKER_OPEN;
+    error.providerName = providerName;
+
+    if (lastError) {
+      error.originalType = lastError.type || matchErrorToType(lastError);
+      if (lastError.statusCode) error.statusCode = lastError.statusCode;
+    }
+
+    return error;
+  }
+
+  _copyCircuitError(error) {
+    const rejection = new Error(error.message);
+    for (const field of ['type', 'originalType', 'statusCode', 'providerName']) {
+      if (error[field] !== undefined) rejection[field] = error[field];
+    }
+    return rejection;
   }
 
   async _executeRequest(state, request, providerName, options = {}) {
@@ -308,10 +398,7 @@ export class RateLimitManager {
     // Check if aborted before starting
     if (request.options?.abortController?.signal?.aborted) {
       state.activeRequests--; // Decrease because it was increased before calling _executeRequest
-      const abortError = new Error('Request aborted before execution');
-      abortError.name = 'AbortError';
-      abortError.isCancelled = true;
-      request.reject(abortError);
+      request.reject(createAbortError(request.options.abortController.signal, 'Request aborted before execution'));
       // Immediately process next to keep concurrency high
       this._processQueue(providerName);
       return;
@@ -329,12 +416,13 @@ export class RateLimitManager {
       request.resolve(result);
     } catch (error) {
       // Don't count cancellations as failures
-      const isCancellation = error.name === 'AbortError' || 
+      const isCancellation = error.name === 'AbortError' ||
+                           error.operationAborted ||
                            error.isCancelled || 
                            error.message?.includes('cancelled') ||
                            error.message?.includes('aborted');
       
-      if (!isCancellation && !isLocalDeterministicValidationError(error)) {
+      if (!isCancellation && (!isLocalDeterministicValidationError(error) || isProviderRequestSizeError(error))) {
         this._recordFailure(state, error, providerName);
       }
       
@@ -382,32 +470,73 @@ export class RateLimitManager {
   }
 
   _recordSuccess(state) {
+    const isCoolingDown = state.isCircuitOpen
+      && Date.now() - state.circuitOpenTime <= state.circuitRecoveryTime;
+
     state.consecutiveFailures = 0;
-    state.isCircuitOpen = false;
+    if (!isCoolingDown) state.isCircuitOpen = false;
+
+    const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
+    if (adaptiveBackoff.enabled !== false
+        && adaptiveBackoff.resetAfterSuccess > 1
+        && state.currentBackoffMultiplier > 1) {
+      state.successfulRequestsSinceBackoff++;
+      if (state.successfulRequestsSinceBackoff < adaptiveBackoff.resetAfterSuccess) return;
+    }
+
     state.currentBackoffMultiplier = 1;
+    state.successfulRequestsSinceBackoff = 0;
   }
 
   _recordFailure(state, error, providerName) {
     state.performanceStats.failedRequests++;
     
-    // Config errors (API key missing, etc.) should NOT count towards circuit breaking
-    // because they are client-side issues, not provider health issues.
+    // Request fatality and provider-health eligibility are separate decisions.
+    // Configuration/account failures and ambiguous request denials must not
+    // count as provider-health evidence.
     const isConfig = isConfigError(error);
-    if (!isConfig) {
+    const isProviderRequestSize = isProviderRequestSizeError(error);
+    const isDeterministicClientHttp = isDeterministicClientHttpError(error);
+    const isProviderHttpTextEmpty = error?.type === ErrorTypes.TEXT_EMPTY
+      && [400, 422].includes(error?.statusCode);
+    const isForbidden = error?.type === ErrorTypes.FORBIDDEN_ERROR;
+    const isRequestLocalProviderFailure = [
+      ErrorTypes.API_ENDPOINT_INVALID,
+      ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+    ].includes(error?.type);
+    const isSocksProxyTimeout = error?.transportFailure === 'socks-proxy-timeout';
+    const isProviderHealthFailure = !isSocksProxyTimeout
+      && !isConfig
+      && error?.type !== ErrorTypes.INVALID_REQUEST
+      && !isProviderRequestSize
+      && !isDeterministicClientHttp
+      && !isProviderHttpTextEmpty
+      && !isForbidden
+      && !isRequestLocalProviderFailure;
+    if (isProviderHealthFailure) {
       state.consecutiveFailures++;
     }
     
-    // Adaptive Backoff: Increase delay on 429 or quota errors
-    const isRateLimit = error.message?.includes('429') || error.message?.includes('quota');
-    if (isRateLimit) {
-      state.currentBackoffMultiplier = Math.min(state.currentBackoffMultiplier * 2, 10);
+    // Adaptive Backoff: canonical rate-limit errors own rate-limit backoff.
+    // Status-only fallback is limited to unclassified 429s entering this layer.
+    const isRateLimit = error?.type === ErrorTypes.RATE_LIMIT_REACHED
+      || (!error?.type && Number(error?.statusCode) === 429);
+    const adaptiveBackoff = getAdaptiveBackoffConfig(state.config);
+    if (isRateLimit && adaptiveBackoff.enabled !== false) {
+      state.currentBackoffMultiplier = adaptiveBackoff.explicit
+        ? state.currentBackoffMultiplier * adaptiveBackoff.baseMultiplier
+        : Math.min(state.currentBackoffMultiplier * adaptiveBackoff.baseMultiplier, adaptiveBackoff.maxMultiplier);
+      state.successfulRequestsSinceBackoff = 0;
       logger.warn(`Rate limit detected for ${providerName}, increasing backoff to ${state.currentBackoffMultiplier}x`);
     }
 
-    // CRITICAL: Open circuit breaker immediately on fatal errors (excluding config errors)
+    // Provider-health-eligible fatal errors open the circuit immediately. Fatality
+    // alone is not sufficient because request-local INVALID_REQUEST,
+    // FORBIDDEN_ERROR, endpoint/language failures, and provider HTTP TEXT_EMPTY
+    // are terminal for their requests but say nothing about provider health.
     const isFatal = isFatalError(error);
 
-    if ((isFatal && !isConfig) || state.consecutiveFailures >= state.circuitBreakThreshold) {
+    if ((isFatal && isProviderHealthFailure) || state.consecutiveFailures >= state.circuitBreakThreshold) {
       if (!state.isCircuitOpen) {
         state.isCircuitOpen = true;
         state.circuitOpenTime = Date.now();
@@ -470,10 +599,7 @@ export class RateLimitManager {
           const reqMessageId = request.options?.messageId || request.options?.abortController?.messageId;
           
           if (!messageId || reqMessageId === messageId) {
-            const error = new Error(messageId ? 'Request cancelled' : 'All requests cleared');
-            error.name = 'AbortError';
-            error.isCancelled = true;
-            request.reject(error);
+            request.reject(createAbortError(null, messageId ? 'Request cancelled' : 'All requests cleared'));
           } else {
             remaining.push(request);
           }

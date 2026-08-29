@@ -141,7 +141,7 @@ await interactionCoordinator.initialize();
 
 ### Special Case: Revert (ESC)
 The Revert functionality is unique because it must work even if the user has disabled shortcuts.
-1. `SelectElementManager` or `ShortcutHandler` emits `ELEMENT_TRANSLATIONS_AVAILABLE`.
+1. `SelectElementManager` emits `ELEMENT_TRANSLATIONS_AVAILABLE`.
 2. `InteractionCoordinator` sets `revertMightBeNeeded = true`.
 3. Even if `shortcut` is disabled, `InteractionCoordinator` keeps the `keydown` listener active.
 4. On `Escape`, it calls `loadFeature('shortcut', true)` (Forced Load) to execute the Revert logic.

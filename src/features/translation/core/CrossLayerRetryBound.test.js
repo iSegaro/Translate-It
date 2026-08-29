@@ -37,12 +37,15 @@ import { ProviderRequestEngine } from '@/features/translation/providers/utils/Pr
 const KEYS = ['key1', 'key2', 'key3'];
 const PROVIDER_SETTING_KEY = 'TEST_API_KEY';
 
-const make429Response = () => ({
+const make429Response = (retryAfter = null) => ({
   ok: false,
   status: 429,
   statusText: 'Too Many Requests',
   json: async () => ({ error: { message: 'Rate limit exceeded' } }),
-  headers: new Map([['content-type', 'application/json']]),
+  headers: new Map([
+    ['content-type', 'application/json'],
+    ...(retryAfter === null ? [] : [['Retry-After', retryAfter]]),
+  ]),
   clone() { return this; }
 });
 
@@ -163,6 +166,21 @@ describe('Cross-Layer Retry Bound Integration', () => {
       expect(queueManager.getQueueStatus('bound-type').total).toBe(0);
       expect(queueManager.retryTimeouts.size).toBe(0);
     });
+
+    it('keeps Retry-After timing separate from the five-execution budget', async () => {
+      installFetch(() => make429Response('10'));
+
+      const promise = queueManager.enqueue('retry-after-bound', makeRequestFn(), 0, 'select_element', {
+        messageId: 'retry-after-bound-type'
+      });
+      const rejection = promise.catch(() => {});
+
+      await vi.advanceTimersByTimeAsync(120000);
+      await rejection;
+
+      expect(executionCount).toBe(5);
+      expect(queueManager.getQueueStatus('retry-after-bound').total).toBe(0);
+    });
   });
 
   describe('control: NETWORK_ERROR (no key failover)', () => {
@@ -226,6 +244,28 @@ describe('Cross-Layer Retry Bound Integration', () => {
       expect(queueManager.getQueueStatus('cancelled').total).toBe(0);
       expect(queueManager.retryTimeouts.size).toBe(0);
     });
+  });
+
+  describe('control: operation timeout', () => {
+    it.each([ErrorTypes.TRANSLATION_TIMEOUT, ErrorTypes.OPERATION_TIMEOUT])(
+      'keeps %s terminal at QueueManager boundary',
+      async (timeoutType) => {
+        const timeoutError = Object.assign(new Error(`${timeoutType} deadline`), {
+          type: timeoutType,
+        });
+        const request = vi.fn().mockRejectedValue(timeoutError);
+        const promise = queueManager.enqueue(`timeout-${timeoutType}`, request, 0, 'select_element', {
+          messageId: `timeout-${timeoutType}`,
+        });
+
+        await expect(promise).rejects.toBe(timeoutError);
+        await vi.advanceTimersByTimeAsync(30000);
+
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(queueManager.retryTimeouts.size).toBe(0);
+        expect(queueManager.getQueueStatus(`timeout-${timeoutType}`).total).toBe(0);
+      },
+    );
   });
 
   describe('control: TEXT_TOO_LONG', () => {

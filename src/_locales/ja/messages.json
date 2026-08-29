@@ -752,6 +752,12 @@
   "mobile_page_failed_status": {
     "message": "失敗"
   },
+  "mobile_page_partial_completion": {
+    "message": "一部のコンテンツを翻訳できませんでした"
+  },
+  "mobile_page_no_result_error": {
+    "message": "翻訳されたコンテンツはありません"
+  },
   "mobile_page_unknown_error": {
     "message": "不明な翻訳エラー"
   },

@@ -1,10 +1,28 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { TranslationMode } from '@/shared/config/config.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
+import { MessageFormat, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js'
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js'
 import { normalizePdfText } from './PdfBlockIdentity.js'
 
 const STRUCTURED_MAX_CELLS_PER_LINE = 10
+
+function getStructuredChildIdentity(block, child, lineIndex, cellIndex = null) {
+  const upstreamId = child?.cellId ?? child?.structuredCell?.cellId ?? child?.structuredCell?.id
+  if (upstreamId !== null && upstreamId !== undefined && upstreamId !== '') return upstreamId
+
+  if (cellIndex != null) {
+    return `${block.id}|line:${lineIndex}|cell:${cellIndex}`
+  }
+
+  // Parent blocks can emit multiple line segments when table metadata is absent.
+  const sourceItemIndex = child?.sourceItemIndex
+    ?? child?.sourceReferences?.sourceItemIndices?.[0]
+    ?? child?.index
+    ?? 0
+
+  return `${block.id}|line:${lineIndex}|item:${sourceItemIndex}`
+}
 
 const READING_ROLE_KPI = 'metric'
 const READING_ROLE_KV = 'summary'
@@ -42,6 +60,9 @@ export function getPdfTranslationFailureReason(error) {
   if (CANCELLATION_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.CANCELLED
   if (TIMEOUT_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.TIMEOUT
   if (PROVIDER_UNAVAILABLE_ERROR_TYPES.has(type)) return PDF_TRANSLATION_FAILURE_REASON.PROVIDER_UNAVAILABLE
+  if (type === ErrorTypes.UNKNOWN || type === PDF_TRANSLATION_FAILURE_REASON.UNKNOWN) {
+    return PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
+  }
   if (type) return PDF_TRANSLATION_FAILURE_REASON.PROVIDER_ERROR
   return PDF_TRANSLATION_FAILURE_REASON.UNKNOWN
 }
@@ -316,7 +337,7 @@ export class PdfTranslationAdapter {
                 columnIndex: block.columnIndex,
                 readingOrderIndex: block.readingOrderIndex,
                 position: items.length,
-                cellId: cell.cellId ?? null,
+                cellId: getStructuredChildIdentity(block, cell, lineIndex, cellIndex),
                 tableRowIndex: cell.rowIndex ?? null,
                 tableColumnIndex: cell.columnIndex ?? null,
                 colSpanCandidate: cell.colSpanCandidate || false,
@@ -326,6 +347,7 @@ export class PdfTranslationAdapter {
               })
             }
           } else {
+            const lineItem = line.items?.[0]
             items.push({
               i: block.id,
               b: block.id,
@@ -338,9 +360,10 @@ export class PdfTranslationAdapter {
               sourceTextHash: block.sourceTextHash,
               pageNumber: block.pageNumber,
               columnIndex: block.columnIndex,
-              readingOrderIndex: block.readingOrderIndex,
-              position: items.length,
-              ...(hasStructuredCellMetadata(line.items?.[0]) && { structuredCell: line.items[0].structuredCell }),
+                readingOrderIndex: block.readingOrderIndex,
+                position: items.length,
+                cellId: getStructuredChildIdentity(block, lineItem, lineIndex),
+                ...(hasStructuredCellMetadata(line.items?.[0]) && { structuredCell: line.items[0].structuredCell }),
               ...(semanticContext && { semanticContext })
             })
           }
@@ -475,7 +498,15 @@ export class PdfTranslationAdapter {
 
     if (!response || response.success === false) {
       const errorMessage = response?.error?.message || response?.error || 'PDF translation failed'
-      const failureReason = getPdfTranslationFailureReason(response?.error)
+      const errorDetails = isStructuredTranslationError(response?.errorDetails)
+        ? response.errorDetails
+        : null
+      const failureReason = getPdfTranslationFailureReason(errorDetails || response?.error)
+      const serializedErrorDetails = errorDetails
+        ? MessageFormat.serializeTranslationError(errorDetails)
+        : (response?.error && typeof response.error === 'object'
+          ? MessageFormat.serializeTranslationError(response.error)
+          : null)
       return batchItems.map((item) => ({
         blockId: item.blockId,
         status: 'error',
@@ -485,7 +516,8 @@ export class PdfTranslationAdapter {
         targetLanguage: targetLanguage || response?.targetLanguage || '',
         sourceTextHash: item.sourceTextHash || '',
         error: errorMessage,
-        failureReason
+        failureReason,
+        ...(serializedErrorDetails && { errorDetails: serializedErrorDetails })
       }))
     }
 

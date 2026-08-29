@@ -10,12 +10,14 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'simpleReplacement');
 /**
  * جایگزینی ساده (fallback) با حفظ undo capability
  */
-export function handleSimpleReplacement(element, newValue, start, end) {
+export function handleSimpleReplacement(element, newValue, start, end, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
     if (element.isContentEditable) {
-      return handleContentEditableWithUndo(element, newValue, start, end);
+      return handleContentEditableWithUndo(element, newValue, start, end, isCurrent);
     } else {
-      return handleInputWithUndo(element, newValue, start, end);
+      return handleInputWithUndo(element, newValue, start, end, isCurrent);
     }
   } catch (error) {
     logger.warn('Error in simple replacement:', error);
@@ -26,7 +28,7 @@ export function handleSimpleReplacement(element, newValue, start, end) {
 /**
  * جایگزینی contentEditable با حفظ undo
  */
-function handleContentEditableWithUndo(element, newValue) {
+function handleContentEditableWithUndo(element, newValue, start, end, isCurrent) {
   try {
     if (typeof window === 'undefined') {
       return false;
@@ -44,6 +46,7 @@ function handleContentEditableWithUndo(element, newValue) {
     
     // Focus element
     element.focus();
+    if (!isCurrent()) return false;
     
     if (hasSelection && selection.rangeCount > 0) {
       // جایگزینی انتخاب با execCommand
@@ -105,13 +108,14 @@ function handleContentEditableWithUndo(element, newValue) {
 /**
  * جایگزینی input/textarea با حفظ undo
  */
-function handleInputWithUndo(element, newValue, start, end) {
+function handleInputWithUndo(element, newValue, start, end, isCurrent) {
   try {
     const originalStart = element.selectionStart || 0;
     const originalEnd = element.selectionEnd || 0;
     
     // Focus element
     element.focus();
+    if (!isCurrent()) return false;
     
     if (start !== null && end !== null) {
       // جایگزینی محدوده مشخص

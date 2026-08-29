@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Create stable objects for mocks
-const { mockWindowsManagerEvents, mockPageEventBus } = vi.hoisted(() => {
+const { mockWindowsManagerEvents, mockPageEventBus, mockDeviceDetector } = vi.hoisted(() => {
   const listeners = {};
   return {
     eventListeners: listeners,
@@ -26,6 +26,9 @@ const { mockWindowsManagerEvents, mockPageEventBus } = vi.hoisted(() => {
           if (res instanceof Promise) await res;
         }
       })
+    },
+    mockDeviceDetector: {
+      shouldEnableMobileUI: vi.fn().mockReturnValue(false)
     }
   };
 });
@@ -161,9 +164,14 @@ vi.mock('@/features/exclusion/core/ExclusionChecker.js', () => ({
   default: { getInstance: vi.fn(() => ({ isFeatureAllowed: vi.fn().mockResolvedValue(true) })) }
 }));
 
-vi.mock('@/utils/browser/compatibility.js', () => ({ 
-  deviceDetector: { shouldEnableMobileUI: vi.fn().mockReturnValue(false) } 
-}));
+vi.mock('@/utils/browser/compatibility.js', async (importOriginal) => {
+  const actual = await importOriginal();
+
+  return {
+    ...actual,
+    deviceDetector: mockDeviceDetector
+  };
+});
 
 vi.mock('@/shared/constants/ui.js', () => ({ UI_HOST_IDS: { MAIN: 'm', IFRAME: 'i' } }));
 vi.mock('@/shared/constants/translation.js', () => ({ TRANSLATION_HTML: { ICON_ID: 'i', WINDOW_CLASS: 'w' } }));
@@ -264,6 +272,18 @@ describe('WindowsManager', () => {
       expect(mockWindowsManagerEvents.showWindow).toHaveBeenCalledWith(expect.objectContaining({ isLoading: true }));
       await promise;
       expect(mockWindowsManagerEvents.updateWindow).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ isLoading: false, initialTranslatedText: 'translated content' }));
+    });
+
+    it('cleans DisplayManager delayed activation before destroy', async () => {
+      const displayManager = windowsManager.displayManager;
+      const cleanupSpy = vi.spyOn(displayManager, 'cleanup');
+
+      await windowsManager._showWindow('text', { x: 1, y: 1 });
+      windowsManager.destroy();
+      await vi.runAllTimersAsync();
+
+      expect(cleanupSpy).toHaveBeenCalledTimes(1);
+      expect(windowsManager.clickManager.addOutsideClickListener).not.toHaveBeenCalled();
     });
   });
 

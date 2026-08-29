@@ -9,13 +9,16 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'input');
 /**
  * روش عمومی input/textarea (با حفظ undo)
  */
-export async function tryInputInsertion(element, text, hasSelection, start, end) {
+export async function tryInputInsertion(element, text, hasSelection, start, end, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
   logger.debug('Attempting input/textarea insertion with undo preservation');
 
     // Focus element
     element.focus();
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     const currentValue = element.value || "";
     let startPos, endPos;
@@ -34,11 +37,13 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
     // تنظیم انتخاب
     element.setSelectionRange(startPos, endPos);
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     // تلاش برای استفاده از execCommand برای حفظ undo
     if (typeof document.execCommand === "function") {
       const execResult = document.execCommand("insertText", false, text);
       if (execResult) {
+        if (!isCurrent()) return false;
   logger.init('Used execCommand for undo preservation');
 
         // رویدادهای ضروری
@@ -51,6 +56,7 @@ export async function tryInputInsertion(element, text, hasSelection, start, end)
 
     // fallback: جایگزینی مستقیم (بدون undo)
   logger.debug('Falling back to direct value assignment (no undo)');
+    if (!isCurrent()) return false;
     const newValue =
       currentValue.substring(0, startPos) +
       text +

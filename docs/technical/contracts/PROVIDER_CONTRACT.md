@@ -328,7 +328,7 @@ Numeric response IDs are valid only in a proven positional-wire context; they ar
 | Contract area | Primary tests |
 | --- | --- |
 | Local validation (TEXT_TOO_LONG: no network, no retry, no health) | `src/features/translation/core/QueueManager.test.js`, `src/features/translation/core/RateLimitManager.test.js`, `RateLimitManager.real-policy.test.js`, `src/shared/error-management/ValidationPolicy.test.js`, `src/features/translation/core/CrossLayerRetryBound.test.js`, `src/features/translation/providers/LingvaProvider.test.js` |
-| Rate limit / circuit breaker | `src/features/translation/core/RateLimitManager.test.js`, `RateLimitManager.real-policy.test.js`, `src/features/translation/core/ErrorClassifier.test.js` |
+| Rate limit / circuit breaker | `src/features/translation/core/RateLimitManager.test.js`, `RateLimitManager.real-policy.test.js`, `src/shared/error-management/ErrorMatcher.test.js` |
 | Queue retry | `src/features/translation/core/QueueManager.test.js`, `src/features/translation/core/CrossLayerRetryBound.test.js` |
 | API-key failover | `src/features/translation/providers/ApiKeyManager.test.js`, `src/features/translation/providers/utils/ProviderRequestEngine.test.js` |
 | Timeout / cancel / late settlement | `src/features/translation/core/managers/OptimizedJsonHandler.test.js`, `src/features/translation/core/StreamingManager.test.js`, `src/features/translation/handlers/handleCancelTranslation.test.js` |

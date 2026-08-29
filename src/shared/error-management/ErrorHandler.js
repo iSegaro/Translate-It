@@ -12,6 +12,8 @@ import {
   FATAL_ERRORS
 } from "./ErrorMatcher.js";
 import { getErrorDisplayStrategy, getErrorToastType, shouldShowRetry } from "./ErrorDisplayStrategies.js";
+import { mapCanonicalTranslationError } from './PublicTranslationErrorPolicy.js';
+import { PublicTranslationErrorActions } from './PublicTranslationError.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -19,6 +21,18 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 const logger = getScopedLogger(LOG_COMPONENTS.ERROR, 'ErrorHandler');
 
 let _instance = null; // Singleton instance
+
+function getCanonicalCause(error) {
+  return error?.cause && typeof error.cause === 'object' ? error.cause : null;
+}
+
+function getPublicRetryDecision(error) {
+  const canonicalError = getCanonicalCause(error);
+  if (!canonicalError) return null;
+
+  return mapCanonicalTranslationError(canonicalError).action
+    === PublicTranslationErrorActions.RETRY;
+}
 
 export class ErrorHandler {
   constructor(notifier) {
@@ -192,12 +206,14 @@ export class ErrorHandler {
 
       // Notify UI
       if (enhancedMeta.showInUI) {
+        const publicRetryDecision = getPublicRetryDecision(err);
         this._notifyUIErrorListeners({
           message: msg,
           type: type,
           context: enhancedMeta.context,
           errorLevel: enhancedMeta.errorLevel,
-          timestamp: enhancedMeta.timestamp
+          timestamp: enhancedMeta.timestamp,
+          ...(publicRetryDecision !== null && { canRetry: publicRetryDecision })
         });
       }
 
@@ -247,6 +263,7 @@ export class ErrorHandler {
       }
 
       const type = matchErrorToType(err);
+      const publicRetryDecision = getPublicRetryDecision(err);
       
       let msg;
       try {
@@ -309,7 +326,9 @@ export class ErrorHandler {
         type: type,
         context: context,
         timestamp: Date.now(),
-        canRetry: shouldShowRetry(type, getErrorDisplayStrategy(context, type)),
+           canRetry: publicRetryDecision === null
+             ? shouldShowRetry(type, getErrorDisplayStrategy(context, type))
+             : publicRetryDecision,
         needsSettings: needsSettings(type)
       };
     } catch (error) {

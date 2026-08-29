@@ -1,5 +1,6 @@
 // src/providers/implementations/BingTranslateProvider.js
 import { BaseTranslateProvider } from "@/features/translation/providers/BaseTranslateProvider.js";
+import { createOperationAbortError } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
@@ -14,6 +15,40 @@ import { getProviderConfiguration } from "@/features/translation/core/ProviderCo
 import { getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
+const BING_TOKEN_CONTEXT = 'bingtranslate-token-fetch';
+
+function createBingTokenError(message, type, statusCode) {
+  const error = new Error(message);
+  error.type = type;
+  error.context = BING_TOKEN_CONTEXT;
+  if (statusCode !== undefined) error.statusCode = statusCode;
+  return error;
+}
+
+function classifyBingTokenStatus(status) {
+  if (status === 429) return ErrorTypes.RATE_LIMIT_REACHED;
+  if ([500, 502, 503, 504].includes(status)) return ErrorTypes.SERVER_ERROR;
+  if (status === 403) return ErrorTypes.FORBIDDEN_ERROR;
+  return ErrorTypes.HTTP_ERROR;
+}
+
+function createInvalidBingTokenResponseError(message) {
+  return createBingTokenError(message, ErrorTypes.API_RESPONSE_INVALID);
+}
+
+function normalizeBingTokenFetchError(error, abortController) {
+  if (error?.operationAborted || error?.type === ErrorTypes.USER_CANCELLED) return error;
+
+  if (error?.name === 'AbortError' || abortController?.signal?.aborted) {
+    return createOperationAbortError(abortController?.signal, 'Bing token request aborted');
+  }
+
+  const normalizedError = error || new Error('Bing token request failed');
+  if (!normalizedError.type || normalizedError.type === ErrorTypes.API_ERROR) {
+    normalizedError.type = ErrorTypes.NETWORK_ERROR;
+  }
+  return normalizedError;
+}
 
 export class BingTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -78,8 +113,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       // Get Bing access token
       const tokenData = await this._getBingAccessToken(abortController);
       
-      if (abortController?.signal.aborted) {
-        throw new Error('Translation cancelled by user');
+      if (abortController?.signal?.aborted) {
+        throw createOperationAbortError(abortController.signal, 'Bing translation aborted after token acquisition');
       }
 
       const textToTranslate = chunkTexts
@@ -159,6 +194,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           if (data?.statusCode === 400) {
             const err = new Error('Bing API returned status 400');
             err.name = 'BingApiError';
+            err.type = ErrorTypes.HTTP_ERROR;
+            err.statusCode = 400;
             throw err;
           }
 
@@ -204,17 +241,13 @@ export class BingTranslateProvider extends BaseTranslateProvider {
     } catch (error) {
       const errorType = error.type || matchErrorToType(error);
       
-      // Handle HTML response, JSON parsing errors, and Status 400 with retry
-      // We check these BEFORE the fatal check to allow adaptive chunking/retries
-      // for BingApiError (which is usually a 400 bad request that can be fixed by splitting).
-      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError' || error.name === 'BingApiError') {
-        const maxRetries = providerConfig?.batching?.maxRetries || 3;
-        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking || true;
+      // Handle HTML response and JSON parsing errors with existing adaptive recovery.
+      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
+        const maxRetries = providerConfig?.batching?.maxRetries ?? 3;
+        const adaptiveChunking = providerConfig?.batching?.adaptiveChunking ?? true;
 
         logger.warn(`[Bing] ${error.name} on attempt ${retryAttempt + 1}/${maxRetries + 1}. Chunk size: ${chunkTexts.length}. Reason: ${error.message}`);
 
-        // For BingApiError (Status 400), we MUST reduce chunk size as it often means the request was too large, 
-        // complex, or had language detection issues (like the 'ny' detection bug).
         if (adaptiveChunking && retryAttempt < maxRetries && chunkTexts.length > 1) {
           // Calculate new chunk size - halving it is usually the most effective way to bypass Bing's 400 errors
           const newChunkSize = Math.max(
@@ -228,11 +261,8 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             const results = [];
             for (let i = 0; i < chunkTexts.length; i += newChunkSize) {
               // Check for cancellation before processing each sub-chunk
-              if (abortController?.signal.aborted) {
-                const cancelError = new Error('Translation cancelled by user');
-                cancelError.name = 'AbortError';
-                cancelError.isCancelled = true;
-                throw cancelError;
+              if (abortController?.signal?.aborted) {
+                throw createOperationAbortError(abortController.signal, 'Bing translation aborted during adaptive retry');
               }
 
               const subChunk = chunkTexts.slice(i, i + newChunkSize);
@@ -283,39 +313,72 @@ export class BingTranslateProvider extends BaseTranslateProvider {
   async _getBingAccessToken(abortController) {
     try {
       if (abortController?.signal.aborted) {
-        throw new Error('Translation cancelled');
+        throw createOperationAbortError(abortController.signal, 'Bing token request aborted before execution');
       }
       
       if (!BingTranslateProvider.bingAccessToken || 
           Date.now() - BingTranslateProvider.bingAccessToken.tokenTs > BingTranslateProvider.bingAccessToken.tokenExpiryInterval) {
         logger.debug('[Bing] Fetching new access token...');
         
-        const response = await fetch(BingTranslateProvider.bingTokenUrl, { 
-          signal: abortController?.signal 
-        });
-        
-        if (!response.ok) {
-          const err = new Error(`Failed to fetch token page: ${response.status}`);
-          err.type = ErrorTypes.API_KEY_MISSING;
-          throw err;
+        let response;
+        try {
+          response = await fetch(BingTranslateProvider.bingTokenUrl, {
+            signal: abortController?.signal
+          });
+        } catch (fetchError) {
+          throw normalizeBingTokenFetchError(fetchError, abortController);
         }
         
-        const data = await response.text();
+        if (!response.ok) {
+          throw createBingTokenError(
+            `Failed to fetch token page: ${response.status}`,
+            classifyBingTokenStatus(response.status),
+            response.status
+          );
+        }
+        
+        let data;
+        try {
+          data = await response.text();
+        } catch (bodyError) {
+          throw normalizeBingTokenFetchError(bodyError, abortController);
+        }
+
+        if (typeof data !== 'string') {
+          throw createInvalidBingTokenResponseError('Bing token response body is invalid');
+        }
 
         const igMatch = data.match(/IG:"([^"]+)"/);
         const iidMatch = data.match(/EventID:"([^"]+)"/);
         const paramsMatch = data.match(/var params_AbusePreventionHelper\s?=\s?(\[.*?\]);/);
 
         if (!igMatch || !iidMatch || !paramsMatch) {
-          logger.error('[Bing] Failed to extract token parameters. HTML might have changed.');
-          logger.debug('[Bing] Fetched HTML for token:', data.substring(0, 1000));
-          throw new Error("Failed to extract token parameters from Bing translator page");
+          logger.error('[Bing] Failed to extract token parameters. HTML might have changed.', {
+            responseLength: data.length,
+          });
+          throw createInvalidBingTokenResponseError('Bing token response missing required parameters');
         }
 
         const IG = igMatch[1];
         const IID = iidMatch[1];
-        const params = JSON.parse(paramsMatch[1]);
+        let params;
+        try {
+          params = JSON.parse(paramsMatch[1]);
+        } catch {
+          throw createInvalidBingTokenResponseError('Bing token response parameters are invalid');
+        }
+
+        if (!Array.isArray(params) || params.length < 3) {
+          throw createInvalidBingTokenResponseError('Bing token response parameters are incomplete');
+        }
+
         const [_key, _token, interval] = params;
+        const tokenExpiryInterval = Number(interval);
+        if (!IG || !IID || typeof _key !== 'string' || !_key
+          || typeof _token !== 'string' || !_token
+          || !Number.isFinite(tokenExpiryInterval) || tokenExpiryInterval <= 0) {
+          throw createInvalidBingTokenResponseError('Bing token response contains unusable token data');
+        }
 
         BingTranslateProvider.bingAccessToken = {
           IG: IG,
@@ -323,7 +386,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           key: _key,
           token: _token,
           tokenTs: Date.now(),
-          tokenExpiryInterval: interval,
+          tokenExpiryInterval,
           count: 0,
         };
         
@@ -333,8 +396,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
       return BingTranslateProvider.bingAccessToken;
     } catch (error) {
       logger.error(`[Bing] Failed to get access token:`, error);
-      if (!error.type) error.type = ErrorTypes.API_ERROR;
-      error.context = `${this.providerName.toLowerCase()}-token-fetch`;
+      if (!error.context) error.context = BING_TOKEN_CONTEXT;
       throw error;
     }
   }

@@ -6,6 +6,7 @@
 
 import { ProviderFactory } from "@/features/translation/providers/ProviderFactory.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { MessageFormat, reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { isEmptyTranslationInput, isStructuredBatchInput } from "./translationInputHelpers.js";
@@ -18,7 +19,6 @@ import {
   getSelectionMaxCharsAsync,
   getSelectElementMaxCharsAsync
 } from "@/shared/config/config.js";
-import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { resolveTranslationMode } from "../utils/translationModeHelper.js";
 import { TranslationLifecycleRegistry } from "./managers/TranslationLifecycleRegistry.js";
@@ -27,6 +27,40 @@ import { OptimizedJsonHandler } from "./managers/OptimizedJsonHandler.js";
 import { TranslationBatcher } from "./utils/TranslationBatcher.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'translation-engine');
+
+function createPreCancelledResult(reason) {
+  if (reason === 'user-cancelled') {
+    return {
+      success: false,
+      cancelled: true,
+      error: {
+        type: ErrorTypes.USER_CANCELLED,
+        message: 'Translation cancelled by user',
+      },
+    };
+  }
+
+  if (reason === 'timeout') {
+    return {
+      success: false,
+      timedOut: true,
+      error: {
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        message: 'Translation timed out',
+      },
+    };
+  }
+
+  return {
+    success: false,
+    cancelled: true,
+    error: {
+      operationAborted: true,
+      cancellationReason: reason || 'operation-abort',
+      message: 'Translation operation aborted before execution',
+    },
+  };
+}
 
 export class TranslationEngine {
   constructor() {
@@ -79,9 +113,7 @@ export class TranslationEngine {
     // Register and detect duplicate with context awareness
     const registration = this.lifecycleRegistry.registerRequest(messageId, data.text, context);
     if (registration === null) {
-      const cancellationError = new Error('Translation cancelled by user');
-      cancellationError.type = ErrorTypes.USER_CANCELLED;
-      return this.formatError(cancellationError, context);
+      return createPreCancelledResult(this.lifecycleRegistry.getCancellationReason(messageId));
     }
 
     try {
@@ -109,6 +141,12 @@ export class TranslationEngine {
   async executeTranslation(data, sender, uiContext = 'unknown', executionContext = null) {
     const { text, provider, sourceLanguage, targetLanguage } = data;
     let { mode } = data;
+
+    if (typeof text === 'string' && text.trim() === '') {
+      const error = new Error("Text to translate is required");
+      error.type = ErrorTypes.TEXT_EMPTY;
+      throw error;
+    }
 
     if (isEmptyTranslationInput(text)) {
       throw new Error("Text to translate is required");
@@ -170,9 +208,10 @@ export class TranslationEngine {
     }
 
     if (result.success === false) {
-      const failed = new Error(result.error?.message || 'Translation failed');
-      failed.type = result.error?.type || matchErrorToType(result.error);
-      throw failed;
+      const errorSource = isStructuredTranslationError(result.errorDetails)
+        ? result.errorDetails
+        : result.error || result;
+      throw reconstructTranslationError(errorSource);
     }
 
     // Extract values from the unified coordinator response
@@ -273,15 +312,11 @@ export class TranslationEngine {
    * Utility to format error responses consistently.
    */
   formatError(error, context) {
-    const errorType = error.type || matchErrorToType(error);
     return { 
       success: false, 
-      error: { 
-        type: errorType, 
-        message: error.message || "Translation failed", 
-        context: context || "unknown", 
-        timestamp: Date.now() 
-      } 
+      error: MessageFormat.serializeTranslationError(error, {
+        context: error?.context || context || "unknown",
+      })
     };
   }
 
@@ -293,6 +328,7 @@ export class TranslationEngine {
   async cancelAllTranslations(context = null) { return await this.lifecycleRegistry.cancelAllTranslations(context); }
   getActiveTranslationIds(context = null) { return this.lifecycleRegistry.getActiveTranslationIds(context); }
   getAbortController(messageId) { return this.lifecycleRegistry.getAbortController(messageId); }
+  getCancellationReason(messageId) { return this.lifecycleRegistry.getCancellationReason(messageId); }
   registerStreamingSender(messageId, sender) { return this.lifecycleRegistry.registerStreamingSender(messageId, sender); }
   getStreamingSender(messageId) { return this.lifecycleRegistry.getStreamingSender(messageId); }
   isCancelled(messageId) { return this.lifecycleRegistry.isCancelled(messageId); }

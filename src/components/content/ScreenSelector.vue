@@ -169,6 +169,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js'
 import { useScreenCapture } from '@/features/screen-capture/composables/useScreenCapture.js'
 import { useSettingsStore } from '@/features/settings/stores/settings'
 import { SUPPORTED_OCR_LANGUAGES, toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js'
@@ -516,8 +517,6 @@ onMounted(async () => {
   // Inject Screen Capture specific styles lazily
   try {
     const { screenCaptureUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
-    const { injectStylesToShadowRoot } = await import('@/utils/ui/styleInjector.js');
-    
     if (screenCaptureUiStyles && injectStylesToShadowRoot) {
       await injectStylesToShadowRoot(screenCaptureUiStyles, 'vue-screen-capture-specific-styles');
     }

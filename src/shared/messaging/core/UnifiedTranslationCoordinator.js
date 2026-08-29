@@ -24,6 +24,23 @@ const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedTranslationCoor
 // delivery and Content-side result handling, not provider execution.
 const STRUCTURED_TRANSPORT_ALLOWANCE_MS = 30000;
 
+function getTerminalError(messageId) {
+  const state = streamingTimeoutManager.getOperationState(messageId);
+  if (state?.isCancelled) {
+    const cancelError = new Error('Translation cancelled by user');
+    cancelError.type = ErrorTypes.USER_CANCELLED;
+    return cancelError;
+  }
+
+  if (state?.hasTimedOut) {
+    const timeoutError = new Error('Translation timed out');
+    timeoutError.type = ErrorTypes.TRANSLATION_TIMEOUT;
+    return timeoutError;
+  }
+
+  return null;
+}
+
 export class UnifiedTranslationCoordinator {
   constructor() {
     this.activeTranslations = new Map();
@@ -47,8 +64,8 @@ export class UnifiedTranslationCoordinator {
     try {
       // Early check if operation was cancelled before any processing
       if (message.messageId && streamingTimeoutManager.shouldContinue(message.messageId) === false) {
-        logger.debug('Translation operation cancelled before coordination');
-        throw new Error('Translation cancelled by user');
+        const terminalError = getTerminalError(message.messageId);
+        if (terminalError) throw terminalError;
       }
 
       // Determine if this should be a streaming operation
@@ -78,8 +95,8 @@ export class UnifiedTranslationCoordinator {
     try {
       // Check if operation was cancelled before sending the request
       if (messageId && streamingTimeoutManager.shouldContinue(messageId) === false) {
-        logger.debug('Regular translation operation cancelled');
-        throw new Error('Translation cancelled by user');
+        const terminalError = getTerminalError(messageId);
+        if (terminalError) throw terminalError;
       }
 
       // Track regular translation
@@ -171,6 +188,16 @@ export class UnifiedTranslationCoordinator {
             throw cancelError;
           }
           throw streamingResult.error || new Error('Streaming failed without explicit error');
+        }
+
+        if (streamingResult && typeof streamingResult === 'object') {
+          const hasConversationAcceptance = initialResponse?.conversationAcceptance === true
+            || streamingResult.conversationAcceptance === true
+            || streamingResult.data?.conversationAcceptance === true;
+          const finalResult = { ...streamingResult };
+          delete finalResult.conversationAcceptance;
+          if (hasConversationAcceptance) finalResult.conversationAcceptance = true;
+          return finalResult;
         }
 
         return streamingResult;

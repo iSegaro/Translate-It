@@ -164,6 +164,15 @@ describe("PageTranslationButton.vue", () => {
     ).toBe(true);
   });
 
+  it("should render safe mapped error message", () => {
+    mockUsePageTranslation.hasError.value = true;
+    mockUsePageTranslation.message.value = "Localized model error";
+    const wrapper = mount(PageTranslationButton);
+
+    expect(wrapper.find(".error-message").text()).toBe("Localized model error");
+    expect(wrapper.text()).not.toContain("raw provider response body");
+  });
+
   describe("Auto-Translate Star Toggle", () => {
     beforeEach(() => {
       mockUseAutoTranslateRules.isAutoTranslateToggleVisible.value = false;

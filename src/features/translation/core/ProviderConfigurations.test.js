@@ -11,11 +11,36 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 import {
   PROVIDER_CONFIGURATIONS,
+  getProviderConfiguration,
   getProviderBatching,
   getProviderRateLimit,
 } from './ProviderConfigurations.js';
 
 describe('ProviderConfigurations optimization scaling', () => {
+  it('configures explicit traditional network Queue budgets without affecting BrowserAPI', () => {
+    for (const providerName of [
+      'GoogleTranslate',
+      'GoogleTranslateV2',
+      'BingTranslate',
+      'DeepLTranslate',
+      'YandexTranslate',
+      'MicrosoftEdge',
+      'Lingva',
+      'Vajehyab',
+    ]) {
+      expect(getProviderConfiguration(providerName).queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED)
+        .toBe(3);
+    }
+
+    expect(getProviderConfiguration('BrowserAPI').queueRetryPolicy).toBeUndefined();
+    expect(getProviderConfiguration('OpenAI').queueRetryPolicy).toBeUndefined();
+  });
+
+  it('preserves Bing internal retry and circuit settings', () => {
+    expect(PROVIDER_CONFIGURATIONS.BingTranslate.batching.maxRetries).toBe(3);
+    expect(PROVIDER_CONFIGURATIONS.BingTranslate.errorHandling.circuitBreakThreshold).toBe(3);
+  });
+
   it('should give base-2 providers a distinct Level 2 concurrency step', () => {
     const levels = [1, 2, 3, 4, 5];
     const expected = [1, 2, 2, 3, 4];

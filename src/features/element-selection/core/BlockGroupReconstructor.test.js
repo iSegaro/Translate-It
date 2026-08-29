@@ -100,6 +100,70 @@ describe('BlockGroupReconstructor', () => {
     });
   });
 
+  describe('shadow direction ancestry', () => {
+    it('uses composed host direction without crossing the BlockGroup mutation boundary', () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'rtl');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const text = document.createTextNode('Hello');
+      owner.appendChild(text);
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+
+      const unit = new TranslationUnit({
+        id: 'n1',
+        blockId: 'shadow-group',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'rtl',
+        inlineParentTags: ['span'],
+        mode: 'standard',
+      });
+      unit.node = text;
+
+      const result = BlockGroupReconstructor.apply([unit], 'سلام', 'fa', host);
+
+      expect(text.nodeValue).toBe('سلام');
+      expect(host.textContent).toBe('');
+      expect(host.style.direction).toBe('');
+      result.transaction.finalize();
+      document.body.removeChild(host);
+    });
+
+    it('injects BiDi marks for direct ShadowRoot text without mutating host direction', () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'ltr');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const text = document.createTextNode('Hello');
+      shadow.appendChild(text);
+      document.body.appendChild(host);
+
+      const unit = new TranslationUnit({
+        id: 'n1',
+        blockId: 'direct-shadow-group',
+        text: 'Hello',
+        leadingWS: '',
+        trailingWS: '',
+        preWhitespace: false,
+        directionHint: 'ltr',
+        inlineParentTags: [],
+        mode: 'standard',
+      });
+      unit.node = text;
+
+      const result = BlockGroupReconstructor.apply([unit], 'سلام', 'fa', host);
+
+      expect(text.nodeValue).toContain('\u200fسلام\u200f');
+      expect(host.style.direction).toBe('');
+      expect(host.hasAttribute('data-translate-dir')).toBe(false);
+      result.transaction.finalize();
+      document.body.removeChild(host);
+    });
+  });
+
   describe('splitTranslatedBlock & Corruption Detection', () => {
     it('should split translated text correctly into expected segments', () => {
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';

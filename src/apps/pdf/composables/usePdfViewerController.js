@@ -12,6 +12,7 @@ import { pdfCacheManager } from '@/features/pdf-translation/core/PdfCacheManager
 import { pdfHistoryManager } from '@/features/pdf-translation/core/PdfHistoryManager.js'
 import { sha256HexFromText } from '@/features/pdf-translation/core/PdfBlockIdentity.js'
 import { classifyPdfLoadFailure } from '@/features/pdf-translation/failures/PdfLoadFailure.js'
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.PDF, 'usePdfViewerController')
 const pdfTranslationCoordinator = new PdfTranslationCoordinator(pdfDocumentSession)
@@ -382,6 +383,7 @@ export function usePdfViewerController() {
         totalCount: 0,
         translationOccurrenceId: 0,
         error: translateError?.message || 'Failed to translate visible PDF blocks.',
+        errorDetails: MessageFormat.serializeTranslationError(translateError),
         failureReason: getPdfTranslationFailureReason(translateError)
       }
       return false

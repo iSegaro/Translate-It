@@ -285,6 +285,7 @@ describe('ConversationAcceptanceCoordinator', () => {
     await coordinator.acknowledge('partial', 'g1', false)
     expect(await coordinator.acknowledge('partial', 'g2', true, 'b')).toMatchObject({ committed: ['g2'] })
     expect(translationSessionManager.sessions.get('partial-session').history).toHaveLength(2)
+    expect(coordinator.lookup('partial')).toBeNull()
   })
 
   it('preserves committed parent when later sibling is rejected', async () => {
@@ -306,5 +307,53 @@ describe('ConversationAcceptanceCoordinator', () => {
 
     expect(handle.snapshot().parents.map(parent => parent.state)).toEqual(['COMMITTED', 'REJECTED'])
     expect(translationSessionManager.sessions.get('sibling-session').history.map(item => item.content)).toEqual(['A', 'a'])
+  })
+
+  it('removes fully rejected acceptance without waiting for timeout', async () => {
+    const coordinator = new ConversationAcceptanceCoordinator()
+    const handle = new ConversationAcceptanceHandle(new ConversationAcceptanceHandoff({
+      messageId: 'all-rejected', sessionId: 'all-rejected-session', provider: 'OpenAI', mode: 'select-element',
+      parents: [
+        { parentId: 'g1', sourceOrder: 0, cleanSource: 'A' },
+        { parentId: 'g2', sourceOrder: 1, cleanSource: 'B' },
+      ],
+    }))
+    const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js')
+    translationSessionManager.sessions.clear()
+    translationSessionManager.getOrCreateSession('all-rejected-session', 'OpenAI')
+    coordinator.register('all-rejected', handle)
+    coordinator.activate('all-rejected')
+
+    await coordinator.acknowledge('all-rejected', 'g1', false)
+    await coordinator.acknowledge('all-rejected', 'g2', false)
+
+    expect(coordinator.lookup('all-rejected')).toBeNull()
+    expect(translationSessionManager.sessions.get('all-rejected-session').history).toHaveLength(0)
+  })
+
+  it('commits accepted siblings after rejected parent in source order', async () => {
+    const coordinator = new ConversationAcceptanceCoordinator()
+    const handle = new ConversationAcceptanceHandle(new ConversationAcceptanceHandoff({
+      messageId: 'rejected-middle', sessionId: 'rejected-middle-session', provider: 'OpenAI', mode: 'select-element',
+      parents: [
+        { parentId: 'g1', sourceOrder: 0, cleanSource: 'A' },
+        { parentId: 'g2', sourceOrder: 1, cleanSource: 'B' },
+        { parentId: 'g3', sourceOrder: 2, cleanSource: 'C' },
+      ],
+    }))
+    const { translationSessionManager } = await import('@/features/translation/core/TranslationSessionManager.js')
+    translationSessionManager.sessions.clear()
+    translationSessionManager.getOrCreateSession('rejected-middle-session', 'OpenAI')
+    coordinator.register('rejected-middle', handle)
+    coordinator.activate('rejected-middle')
+
+    await coordinator.acknowledge('rejected-middle', 'g1', false)
+    await coordinator.acknowledge('rejected-middle', 'g2', true, 'b')
+    const result = await coordinator.acknowledge('rejected-middle', 'g3', true, 'c')
+
+    expect(result.committed).toEqual(['g3'])
+    expect(translationSessionManager.sessions.get('rejected-middle-session').history.map(item => item.content))
+      .toEqual(['B', 'b', 'C', 'c'])
+    expect(coordinator.lookup('rejected-middle')).toBeNull()
   })
 })

@@ -7,6 +7,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { AUTO_DETECT_VALUE } from '@/shared/constants/core.js';
@@ -101,6 +102,10 @@ export class UnifiedModeCoordinator {
       }),
       handleError: async (error, items) => {
         const { isFatalError, matchErrorToType } = await import('@/shared/error-management/ErrorMatcher.js');
+        const errorType = error?.type || matchErrorToType(error);
+        const classificationError = error && typeof error === 'object'
+          ? { type: errorType, statusCode: error.statusCode }
+          : errorType;
         const fallbackResults = items.map(item => ({ text: item.text || item }));
         return {
           success: false,
@@ -109,8 +114,9 @@ export class UnifiedModeCoordinator {
           originalCharCount: items.reduce((sum, i) => sum + (i.text?.length || i.length || 0), 0),
           hasError: true,
           error: error.message,
-          errorType: matchErrorToType(error),
-          isFatal: isFatalError(error)
+          errorDetails: MessageFormat.serializeTranslationError(error, { type: errorType }),
+          errorType,
+          isFatal: isFatalError(classificationError)
         };
       }
     });
@@ -382,10 +388,19 @@ export class UnifiedModeCoordinator {
     const sampleText = (items[0]?.text || items[0] || '').substring(0, 100);
     const abortController = translationEngine.lifecycleRegistry.registerRequest(messageId, sampleText, mode.toLowerCase());
     if (!abortController) {
+      const cancellationReason = translationEngine.lifecycleRegistry.getCancellationReason?.(messageId)
+        || 'operation-abort';
+      const isUserCancellation = cancellationReason === 'user-cancelled';
       return {
         success: false,
         cancelled: true,
-        error: { type: 'USER_CANCELLED', message: 'Translation cancelled before execution' }
+        error: isUserCancellation
+          ? { type: ErrorTypes.USER_CANCELLED, message: 'Translation cancelled before execution' }
+          : {
+              operationAborted: true,
+              cancellationReason,
+              message: 'Translation operation aborted before execution',
+            }
       };
     }
 
@@ -521,6 +536,14 @@ export class UnifiedModeCoordinator {
       // session slot so a later batch may establish a fresh resolver.
       if (sourceResolution?.isOwner) {
         this._failPageSourceResolution(sessionId, sourceResolution, error);
+      }
+      if (error?.operationAborted === true) {
+        logger.debug(`[UnifiedCoordinator] ${mode} batch stopped: operation abort`);
+        return {
+          success: false,
+          suppressed: true,
+          messageId
+        };
       }
       if (handleError) {
         return await handleError(error, items);

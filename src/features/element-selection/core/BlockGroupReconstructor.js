@@ -4,6 +4,8 @@ import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreview
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 import { detectDirectionFromContent, applyNodeDirection, captureNodeDirectionState, restoreNodeDirectionState, BIDI_MARKS } from '@/utils/dom/DomDirectionManager.js';
 import { parseV3Intervals } from '@/features/translation/core/V3IntervalParser.js';
+import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
+import { iterateSelectElementAncestors } from '../utils/shadowDom.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'BlockGroupReconstructor');
 
@@ -127,12 +129,12 @@ export class BlockGroupReconstructor {
     // Instantiating a fresh cache per apply transaction ensures fresh direction lookups.
     const transactionCache = new WeakMap();
     const resolveDir = (node) => {
-      if (!node || !node.parentElement) return 'ltr';
-      const el = node.parentElement;
+      if (!node || (!node.parentElement && !node.parentNode?.host)) return 'ltr';
+      const el = node.parentElement || node.parentNode?.host;
       if (transactionCache.has(el)) return transactionCache.get(el);
       let direction = 'ltr';
       try {
-        const dirNode = el.closest('[dir]');
+        const dirNode = iterateSelectElementAncestors(node).find(parent => parent.hasAttribute('dir'));
         if (dirNode) direction = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
         else direction = window.getComputedStyle(el).direction || 'ltr';
       } catch {
@@ -188,13 +190,11 @@ export class BlockGroupReconstructor {
       
       let finalValue;
       const shouldBidi = () => {
-        if (!unit.node || !unit.node.parentElement) return false;
-        let p = unit.node.parentElement;
-        while (p) {
+        if (!unit.node) return false;
+        for (const p of iterateSelectElementAncestors(unit.node)) {
           const t = p.tagName.toUpperCase();
           if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(t)) return false;
           if (p.contentEditable === 'true' || p.getAttribute('contenteditable') === 'true') return false;
-          p = p.parentElement;
         }
         if (!exactTranslation || typeof exactTranslation !== 'string') return false;
         if (!/[\p{L}\p{N}]/u.test(exactTranslation)) return false;
@@ -230,7 +230,9 @@ export class BlockGroupReconstructor {
           value: parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
         });
       }
-      for (const snapshot of captureNodeDirectionState(unit.node, rootElement)) {
+      for (const snapshot of captureNodeDirectionState(unit.node, rootElement, {
+        shadowAware: Boolean(unit.node?.getRootNode?.()?.host),
+      })) {
         if (!directionElements.has(snapshot.element)) {
           directionElements.add(snapshot.element);
           directionSnapshots.push(snapshot);
@@ -244,30 +246,43 @@ export class BlockGroupReconstructor {
       if (hadTranslatingClass) firstNodeParent.classList.add('ti-translating');
       else firstNodeParent.classList.remove('ti-translating');
     };
-    const rollback = () => {
+    const rollback = (primaryError = null) => {
       if (!active) return [];
       active = false;
-      const failures = [];
-      for (const task of [...commitPlan].reverse()) {
-        try { task.unit.node.nodeValue = task.originalText; }
-        catch (error) { failures.push({ kind: 'text', id: task.unit.id, error }); }
-      }
-      for (const [element, state] of attributeParents) {
-        try {
-          if (state.present) element.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
-          else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
-        } catch (error) { failures.push({ kind: 'attribute', element, error }); }
-      }
-      failures.push(...restoreNodeDirectionState(directionSnapshots));
-      for (const { node, value } of hoverSnapshots) {
-        try {
-          if (value === undefined) hoverPreviewLookup.delete(node);
-          else hoverPreviewLookup.add(node, value);
-        } catch (error) { failures.push({ kind: 'hover', node, error }); }
-      }
-      try { restoreTranslatingClass(); }
-      catch (error) { failures.push({ kind: 'class', element: firstNodeParent, error }); }
-      return failures;
+      const restorations = [
+        ...[...commitPlan].reverse().map(({ unit, originalText }) => ({
+          kind: 'text',
+          restore: () => { unit.node.nodeValue = originalText; },
+          createFailure: (error) => ({ kind: 'text', id: unit.id, error }),
+        })),
+        ...[...attributeParents].map(([element, state]) => ({
+          kind: 'attribute',
+          restore: () => {
+            if (state.present) element.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
+            else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+          },
+          createFailure: (error) => ({ kind: 'attribute', element, error }),
+        })),
+        {
+          kind: 'direction',
+          restore: () => restoreNodeDirectionState(directionSnapshots),
+        },
+        ...hoverSnapshots.map(({ node, value }) => ({
+          kind: 'hover',
+          restore: () => {
+            if (value === undefined) hoverPreviewLookup.delete(node);
+            else hoverPreviewLookup.add(node, value);
+          },
+          createFailure: (error) => ({ kind: 'hover', node, error }),
+        })),
+        {
+          kind: 'class',
+          restore: restoreTranslatingClass,
+          createFailure: (error) => ({ kind: 'class', element: firstNodeParent, error }),
+        },
+      ];
+
+      return runBestEffortRollback({ primaryError, restorations }).rollbackFailures;
     };
 
     try {
@@ -284,7 +299,9 @@ export class BlockGroupReconstructor {
         }
 
         task.unit.node.nodeValue = task.finalValue;
-        applyNodeDirection(task.unit.node, targetLanguage, rootElement);
+        applyNodeDirection(task.unit.node, targetLanguage, rootElement, {
+          shadowAware: Boolean(task.unit.node?.getRootNode?.()?.host),
+        });
       }
       restoreTranslatingClass();
 
@@ -292,13 +309,14 @@ export class BlockGroupReconstructor {
         success: true,
         cleanResult: parsedSegments.map(segment => segment.text).join(''),
         segments: parsedSegments,
+        auxiliarySnapshots: { attributeParents, directionSnapshots },
         transaction: {
           rollback,
           finalize() { active = false; },
         },
       };
     } catch (error) {
-      throw new BlockGroupMutationFailure(error, rollback());
+      throw new BlockGroupMutationFailure(error, rollback(error));
     }
   }
 }

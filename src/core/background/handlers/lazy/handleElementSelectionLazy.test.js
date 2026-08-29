@@ -25,8 +25,14 @@ vi.mock('@/features/element-selection/handlers/handleGetSelectElementState.js', 
 vi.mock('@/features/element-selection/handlers/handleSetSelectElementState.js', () => ({
   handleSetSelectElementState: vi.fn(),
 }));
+vi.mock('@/features/element-selection/handlers/handleIframeSelectElementFinished.js', () => ({
+  handleIframeSelectElementFinished: vi.fn(() => ({ success: true })),
+}));
 
-import { handleActivateSelectElementModeLazy } from './handleElementSelectionLazy.js';
+import {
+  handleActivateSelectElementModeLazy,
+  handleIframeSelectElementFinishedLazy,
+} from './handleElementSelectionLazy.js';
 
 describe('handleActivateSelectElementModeLazy', () => {
   it('returns safe feedback when activation handler fails internally', async () => {
@@ -38,5 +44,14 @@ describe('handleActivateSelectElementModeLazy', () => {
       error: 'Could not activate Select Element mode.',
     });
     expect(JSON.stringify(response)).not.toContain('INTERNAL_PORT_9f81');
+  });
+
+  it('loads and delegates iframe completion handler lazily', async () => {
+    const response = await handleIframeSelectElementFinishedLazy(
+      { data: { reason: 'success' } },
+      { tab: { id: 1 }, frameId: 2 },
+    );
+
+    expect(response).toBeDefined();
   });
 });

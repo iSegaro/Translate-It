@@ -1,7 +1,18 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleTranslationLazy');
+
+function importFailureResponse(safeMessage, error) {
+  return {
+    success: false,
+    error: safeMessage,
+    errorDetails: MessageFormat.serializeTranslationError(error, {
+      message: safeMessage
+    })
+  };
+}
 
 export async function handleTranslateLazy(message, sender, sendResponse) {
     try {
@@ -11,7 +22,7 @@ export async function handleTranslateLazy(message, sender, sendResponse) {
         return handleTranslate(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load Translate handler:', error);
-        return { success: false, error: 'Failed to load translation functionality' };
+        return importFailureResponse('Failed to load translation functionality', error);
     }
 }
 
@@ -23,7 +34,8 @@ export async function handleTranslateTextLazy(message, sender, sendResponse) {
         return handleTranslateText(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load TranslateText handler:', error);
-        return { success: false, error: 'Failed to load text translation functionality' };
+        const errorMessage = 'Failed to load text translation functionality';
+        return importFailureResponse(errorMessage, error);
     }
 }
 
@@ -35,7 +47,7 @@ export async function handleTranslationResultLazy(message, sender, sendResponse)
         return handleTranslationResult(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load TranslationResult handler:', error);
-        return { success: false, error: 'Failed to load translation result functionality' };
+        return importFailureResponse('Failed to load translation result functionality', error);
     }
 }
 
@@ -47,7 +59,7 @@ export async function handleRevertTranslationLazy(message, sender, sendResponse)
         return handleRevertTranslation(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load RevertTranslation handler:', error);
-        return { success: false, error: 'Failed to load revert translation functionality' };
+        return importFailureResponse('Failed to load revert translation functionality', error);
     }
 }
 
@@ -59,7 +71,7 @@ export async function handleCancelTranslationLazy(message, sender, sendResponse)
         return handleCancelTranslation(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load CancelTranslation handler:', error);
-        return { success: false, error: 'Failed to load cancel translation functionality' };
+        return importFailureResponse('Failed to load cancel translation functionality', error);
     }
 }
 
@@ -71,7 +83,7 @@ export async function handleCancelSessionLazy(message, sender, sendResponse) {
         return handleCancelSession(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load CancelSession handler:', error);
-        return { success: false, error: 'Failed to load cancel session functionality' };
+        return importFailureResponse('Failed to load cancel session functionality', error);
     }
 }
 
@@ -93,7 +105,7 @@ export async function handleCheckTranslationStatusLazy(message, sender, sendResp
         return handleCheckTranslationStatus(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load CheckTranslationStatus handler:', error);
-        return { success: false, error: 'Failed to load translation status check functionality' };
+        return importFailureResponse('Failed to load translation status check functionality', error);
     }
 }
 
@@ -105,6 +117,6 @@ export async function handleBatchTranslateLazy(message, sender, sendResponse) {
         return handleBatchTranslate(message, sender, sendResponse);
     } catch (error) {
         logger.error('Failed to load BatchTranslate handler:', error);
-        return { success: false, error: 'Failed to load batch translation functionality' };
+        return importFailureResponse('Failed to load batch translation functionality', error);
     }
 }

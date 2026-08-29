@@ -28,11 +28,16 @@ import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { TranslationMode } from '@/shared/config/config.js';
-import { MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import {
+  MessageContexts,
+  ActionReasons,
+  reconstructTranslationError,
+  isStructuredTranslationError
+} from '@/shared/messaging/core/MessagingCore.js';
 import { registerTranslation, contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
+import { isCancellationError, isFatalError, isTransientError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
@@ -40,6 +45,8 @@ import { registryIdToName, isProviderType, ProviderTypes } from '@/features/tran
 import {
   globalSelectElementState,
   pruneDisconnectedSelectElementTranslations,
+  publishSelectElementTranslationOwnership,
+  removeSelectElementTranslation,
   revertSelectElementTranslation
 } from './DomTranslatorState.js';
 import { collectTextNodes, collectBlockGroups, generateElementId, extractContextMetadata } from './DomTranslatorUtils.js';
@@ -50,12 +57,21 @@ import * as DirectionManager from '@/utils/dom/DomDirectionManager.js';
 // Import hover manager dependencies
 import { hoverPreviewLookup } from '@/features/shared/hover-preview/HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
+import { runBestEffortRollback } from '@/utils/dom/DomRollback.js';
+import {
+  isSelectShadowNode,
+  isComposedDescendant,
+  SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+  iterateSelectElementAncestors,
+} from '../utils/shadowDom.js';
 
 export { getSelectElementTranslationState, revertSelectElementTranslation } from './DomTranslatorState.js';
 
 // Strategy X - Subtree Exclusion Active Set
 const activeTranslationRoots = new Set();
-
+const ACCEPTANCE_ACK_TIMEOUT_MS = 500;
+const ACCEPTANCE_ACK_RETRY_DELAYS_MS = [25, 50];
+const ACCEPTANCE_ACK_TERMINAL_STATUSES = new Set(['ACCEPTED', 'DUPLICATE', 'STALE', 'UNKNOWN_PARENT', 'CONFLICT']);
 class DirectMutationFailure {
   constructor(cause, rollbackFailures = []) {
     this.cause = cause;
@@ -69,6 +85,61 @@ function unwrapMutationFailure(error) {
     : error;
 }
 
+function readAuxiliaryState(element, property) {
+  const separator = property.indexOf(':');
+  const kind = property.slice(0, separator);
+  const name = property.slice(separator + 1);
+  if (!element || separator <= 0 || !name) return null;
+
+  if (kind === 'style') {
+    const value = element.style.getPropertyValue(name);
+    return {
+      present: value !== '',
+      value,
+      priority: element.style.getPropertyPriority(name),
+    };
+  }
+  if (kind !== 'attribute') return null;
+
+  return {
+    present: element.hasAttribute(name),
+    value: element.getAttribute(name),
+  };
+}
+
+function auxiliaryStatesEqual(original, applied, property) {
+  if (!original || !applied || original.present !== applied.present) return false;
+  if (!original.present) return true;
+  if (original.value !== applied.value) return false;
+  return !property.startsWith('style:') || original.priority === applied.priority;
+}
+
+function createAuxiliaryOwnershipRecords({ attributeParents = new Map(), directionSnapshots = [] } = {}) {
+  const records = [];
+  const addRecord = (element, property, original) => {
+    const applied = readAuxiliaryState(element, property);
+    if (!applied || !auxiliaryStatesEqual(original, applied, property)) {
+      if (applied) records.push({ element, property, original, applied });
+    }
+  };
+
+  for (const [element, original] of attributeParents || []) {
+    addRecord(element, `attribute:${PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL}`, original);
+  }
+
+  for (const snapshot of directionSnapshots || []) {
+    if (!snapshot?.element) continue;
+    for (const [name, original] of Object.entries(snapshot.attributes || {})) {
+      addRecord(snapshot.element, `attribute:${name}`, original);
+    }
+    for (const [name, original] of Object.entries(snapshot.styles || {})) {
+      addRecord(snapshot.element, `style:${name}`, original);
+    }
+  }
+
+  return records;
+}
+
 function attachTranslationOutcome(error, outcome) {
   const meaningfulError = error && typeof error === 'object' && 'cause' in error
     ? error.cause
@@ -78,6 +149,15 @@ function attachTranslationOutcome(error, outcome) {
     : Object.assign(new Error(String(meaningfulError || 'Translation failed')), { cause: error });
   normalizedError.translationOutcome = outcome;
   return normalizedError;
+}
+
+function reconstructSelectElementError(errorLike) {
+  if (errorLike instanceof Error) return errorLike;
+  if (errorLike && typeof errorLike === 'object') {
+    const prototype = Object.getPrototypeOf(errorLike);
+    if (prototype !== Object.prototype && prototype !== null) return errorLike;
+  }
+  return reconstructTranslationError(errorLike);
 }
 
 /**
@@ -102,6 +182,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     // Operation-local: mirrors the background ConversationAcceptanceCoordinator
     // registration decision for the current translation. Reset per operation.
     this._conversationAcceptanceEnabled = false;
+    this._pendingAcceptanceAcks = new Set();
+    this._acceptanceAckControllers = new Set();
 
     // Cache for original settings
     this.originalSettings = null;
@@ -155,9 +237,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
     this.logger.operation('Starting element translation');
 
     try {
+      if (!SELECT_ELEMENT_SHADOW_DOM_ENABLED && isSelectShadowNode(element)) {
+        const error = new Error('Shadow DOM translation is not enabled');
+        error.type = ErrorTypes.FEATURE_BLOCKED;
+        error.reason = 'shadow-dom-disabled';
+        throw error;
+      }
+
       // Strategy X - Subtree Exclusion Check
       for (const root of activeTranslationRoots) {
-        if (root === element || root.contains(element) || element.contains(root)) {
+        if (root === element || isComposedDescendant(root, element) || isComposedDescendant(element, root)) {
           const error = new Error('Translation already in progress for this element');
           error.isFatal = false;
           error.type = ErrorTypes.FEATURE_BLOCKED;
@@ -222,7 +311,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
           blockCounter: { value: 0 },
           activeSessionId: this.currentSessionId
         };
-        const translationUnits = collectBlockGroups(element, this.sessionContext, { extractionMode });
+        const translationUnits = collectBlockGroups(element, this.sessionContext, {
+          extractionMode,
+          includeOpenShadowRoots: SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+        });
         
         // Build groups and maps for V3 block grouping
         const blockMap = new Map();
@@ -238,6 +330,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               pendingResultsByUid: new Map(),
               invalid: false,
               applied: false,
+              acceptanceSettled: false,
             };
             blockMap.set(unit.blockId, group);
             groups.push(group);
@@ -260,7 +353,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
       } else {
         this.groupMap = null;
         this.sessionContext = undefined;
-        textNodesData = collectTextNodes(element, { extractionMode });
+        textNodesData = collectTextNodes(element, {
+          extractionMode,
+          includeOpenShadowRoots: SELECT_ELEMENT_SHADOW_DOM_ENABLED,
+        });
       }
 
       if (textNodesData.length === 0) {
@@ -268,6 +364,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
         error.type = ErrorTypes.NO_TRANSLATABLE_CONTENT;
         throw error;
       }
+      const shadowSpanning = textNodesData.some(({ node }) => isSelectShadowNode(node));
 
       // Validate segment count to prevent timeout issues
       const MAX_SEGMENTS = 1000; // Prevent excessive API calls and timeouts
@@ -356,6 +453,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
                 invalid: false,
                 applied: false,
                 acknowledged: false,
+                acceptanceSettled: false,
               };
               directParentStates.set(parentId, parent);
               parents.push(parent.handoffParent);
@@ -411,7 +509,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
               value: parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
             });
           }
-          for (const snapshot of DirectionManager.captureNodeDirectionState(nodeData.node, element)) {
+          for (const snapshot of DirectionManager.captureNodeDirectionState(
+            nodeData.node,
+            element,
+            SELECT_ELEMENT_SHADOW_DOM_ENABLED ? { shadowAware: true } : undefined
+          )) {
             if (!directionElements.has(snapshot.element)) {
               directionElements.add(snapshot.element);
               mutationSnapshot.directionSnapshots.push(snapshot);
@@ -423,56 +525,76 @@ export class DomTranslatorAdapter extends ResourceTracker {
           for (const { nodeData, translatedText } of plan) {
             this._applyTranslationToNode(nodeData.node, translatedText, targetLanguage, element);
           }
+           this._publishCommittedOwnership(
+             plan.map(({ nodeData }) => ({
+               node: nodeData.node,
+               appliedText: nodeData.node.nodeValue,
+             })),
+             createAuxiliaryOwnershipRecords(mutationSnapshot),
+           );
           parent.applied = true;
-          if (!parent.acknowledged) {
-            parent.acknowledged = true;
-            this._sendParentAcceptanceAck(
-              parent.parentId,
-              plan.map(({ translatedText }) => translatedText).join(''),
-              true,
-              translationToken
-            ).catch(() => {});
-          }
+          this._settleParentAcceptance(
+            parent,
+            true,
+            plan.map(({ translatedText }) => translatedText).join(''),
+            translationToken
+          );
         } catch (error) {
           parent.invalid = true;
           parent.applied = false;
           parent.acknowledged = false;
-          const rollbackFailures = [];
-          for (const { node, value } of [...mutationSnapshot.nodes].reverse()) {
-            try {
-              if (node) node.nodeValue = value;
-            } catch (rollbackError) {
-              rollbackFailures.push({ kind: 'text', node, error: rollbackError });
-              this.logger.error('[DomTranslatorAdapter] Direct text rollback failed', { error: rollbackError });
-            }
-          }
-          for (const [parentElement, state] of mutationSnapshot.attributeParents) {
-            try {
-              if (state.present) parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
-              else parentElement.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
-            } catch (rollbackError) {
-              rollbackFailures.push({ kind: 'attribute', element: parentElement, error: rollbackError });
-              this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
-            }
-          }
-          const directionFailures = DirectionManager.restoreNodeDirectionState(mutationSnapshot.directionSnapshots) || [];
-          for (const failure of directionFailures) {
-            rollbackFailures.push(failure);
-            this.logger.error('[DomTranslatorAdapter] Direct direction rollback failed', failure);
-          }
-          for (const { node, value } of mutationSnapshot.hoverNodes) {
-            try {
-              if (value === undefined) hoverPreviewLookup.delete(node);
-              else hoverPreviewLookup.add(node, value);
-            } catch (rollbackError) {
-              rollbackFailures.push({ kind: 'hover', node, error: rollbackError });
-              this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
-            }
-          }
+          const restorations = [
+            ...[...mutationSnapshot.nodes].reverse().map(({ node, value }) => ({
+              kind: 'text',
+              restore: () => {
+                if (node) node.nodeValue = value;
+              },
+              createFailure: (rollbackError) => {
+                this.logger.error('[DomTranslatorAdapter] Direct text rollback failed', { error: rollbackError });
+                return { kind: 'text', node, error: rollbackError };
+              },
+            })),
+            ...[...mutationSnapshot.attributeParents].map(([parentElement, state]) => ({
+              kind: 'attribute',
+              restore: () => {
+                if (state.present) parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, state.value);
+                else parentElement.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
+              },
+              createFailure: (rollbackError) => {
+                this.logger.error('[DomTranslatorAdapter] Direct attribute rollback failed', { error: rollbackError });
+                return { kind: 'attribute', element: parentElement, error: rollbackError };
+              },
+            })),
+            {
+              kind: 'direction',
+              restore: () => {
+                const directionFailures = DirectionManager.restoreNodeDirectionState(mutationSnapshot.directionSnapshots) || [];
+                directionFailures.forEach(failure => {
+                  this.logger.error('[DomTranslatorAdapter] Direct direction rollback failed', failure);
+                });
+                return directionFailures;
+              },
+            },
+            ...mutationSnapshot.hoverNodes.map(({ node, value }) => ({
+              kind: 'hover',
+              restore: () => {
+                if (value === undefined) hoverPreviewLookup.delete(node);
+                else hoverPreviewLookup.add(node, value);
+              },
+              createFailure: (rollbackError) => {
+                this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
+                return { kind: 'hover', node, error: rollbackError };
+              },
+            })),
+          ];
+          const { rollbackFailures } = runBestEffortRollback({
+            primaryError: error,
+            restorations,
+          });
           // Mutation failure lifecycle: best-effort rollback performed above, then
           // emit a rejection ACK for the failed canonical parent so the background
           // coordinator marks it REJECTED (never left PENDING blocking later parents).
-          this._sendParentAcceptanceAck(parent.parentId, null, false, translationToken).catch(() => {});
+          this._settleParentAcceptance(parent, false, null, translationToken);
           throw new DirectMutationFailure(error, rollbackFailures);
         }
       };
@@ -527,7 +649,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
             if (!firstFailure) firstFailure = error;
           }
         }
-        if (firstFailure) throw firstFailure;
+        if (firstFailure) {
+          settleTerminalParents(translationToken);
+          throw firstFailure;
+        }
+      };
+
+      const settleTerminalParents = (translationToken) => {
+        if (!this._isCurrentTranslation(translationToken)) return;
+        const parents = isBlockGroupingEnabled ? groups : Array.from(directParentStates.values());
+        parents.forEach(parent => {
+          if (parent.applied || parent.acceptanceSettled) return;
+          this._settleParentAcceptance(parent, false, null, translationToken);
+        });
       };
 
       // Context
@@ -549,7 +683,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
         })), 
         targetLanguage,
         sessionId: this.currentSessionId,
-        partial: true
+        partial: true,
+        shadowSpanning,
       });
 
       const messageId = `m${Math.random().toString(36).substr(2, 6)}`;
@@ -620,12 +755,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
               }
               return;
             }
+            this._latchConversationAcceptance(data);
             try {
               if (data.success === false || data.error) {
-                if (isFatalError(data.error)) {
-                  const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
-                  const error = new Error(errObj.message || 'Fatal error');
-                  Object.assign(error, errObj);
+                const canonicalErrorSource = isStructuredTranslationError(data?.errorDetails)
+                  ? data.errorDetails
+                  : data.error;
+                if (isFatalError(canonicalErrorSource)) {
+                  const errObj = typeof canonicalErrorSource === 'object' ? canonicalErrorSource : { message: canonicalErrorSource, type: matchErrorToType(canonicalErrorSource) };
+                  const error = reconstructSelectElementError(errObj);
+                  // Select Element owns fatal stream termination state; keep it explicit
+                  // after canonical reconstruction instead of copying transport fields.
                   error.isFatal = true;
                   safeResolve({ success: false, error }); // Resolve with error data
                 }
@@ -679,8 +819,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                            if (error instanceof BlockGroupMutationFailure) {
                              error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
                            }
-                           this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                           throw error;
+                            this._settleParentAcceptance(group, false, null, translationToken);
+                            settleTerminalParents(translationToken);
+                            throw error;
                          }
                     } else {
                       if (contentResult.status !== 'valid') {
@@ -702,8 +843,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                           } else {
                             this._rollbackBlockGroup(this.currentSessionId, group.blockId);
                           }
-                           this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                           throw error;
+                          this._settleParentAcceptance(group, false, null, translationToken);
+                          settleTerminalParents(translationToken);
+                          throw error;
                         }
                       }
                     }
@@ -732,27 +874,33 @@ export class DomTranslatorAdapter extends ResourceTracker {
                   }
                 }
               }
-            } catch (err) {
-              this.logger.error('Error during onStreamUpdate processing:', err);
-              safeResolve({ success: false, error: err });
-            }
-          },
-           onStreamEnd: (data) => {
-             if (isSettled) return;
-             if (!this._isCurrentTranslation(translationToken)) {
-               return safeResolve(
-                 ExtensionContextManager.isValidSync()
-                   ? { success: false, cancelled: true }
-                   : { success: false, error: this._createContextInvalidationError() }
-               );
+             } catch (err) {
+               this.logger.error('Error during onStreamUpdate processing:', err);
+               if (err instanceof BlockGroupMutationFailure) {
+                 settleTerminalParents(translationToken);
+               }
+               safeResolve({ success: false, error: err });
              }
-             if (data.cancelled) return safeResolve({ success: false, cancelled: true });
+          },
+          onStreamEnd: (data) => {
+            if (isSettled) return;
+            if (!this._isCurrentTranslation(translationToken)) {
+              return safeResolve(
+                ExtensionContextManager.isValidSync()
+                  ? { success: false, cancelled: true }
+                  : { success: false, error: this._createContextInvalidationError() }
+              );
+            }
+            this._latchConversationAcceptance(data);
+            if (data.cancelled) return safeResolve({ success: false, cancelled: true });
              if (data.success === false || data.error) {
                terminalStreamFailure = true;
-               const errObj = typeof data.error === 'object' ? data.error : { message: data.error, type: matchErrorToType(data.error) };
-               const error = new Error(errObj.message || 'Stream failed');
-              Object.assign(error, errObj);
-              return safeResolve({ success: false, error });
+               const canonicalErrorSource = isStructuredTranslationError(data?.errorDetails)
+                 ? data.errorDetails
+                 : data.error;
+                const errObj = typeof canonicalErrorSource === 'object' ? canonicalErrorSource : { message: canonicalErrorSource, type: matchErrorToType(canonicalErrorSource) };
+                const error = reconstructSelectElementError(errObj);
+               return safeResolve({ success: false, error });
             }
 
             // Capture final language from stream end metadata if available
@@ -811,8 +959,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
       // Authoritative background signal: parent acceptance ACKs are only emitted
       // when the ConversationAcceptanceCoordinator registered a handle for this
-      // request (mirrors the background participation decision).
-      this._conversationAcceptanceEnabled = response?.conversationAcceptance === true;
+      // request (mirrors the background participation decision). Stream metadata
+      // may have enabled this earlier, so latch instead of overwriting it.
+      if (this._isCurrentTranslation(translationToken)) {
+        this._latchConversationAcceptance(response);
+      }
 
       // CRITICAL: Await stream completion if streaming was used, otherwise process direct response
       let result;
@@ -829,10 +980,11 @@ export class DomTranslatorAdapter extends ResourceTracker {
           effectiveTargetLanguage,
           element,
           translationToken,
-          ingestDirectResult,
-          finalizeDirectParents,
-          ingestPassthroughResult
-        );
+           ingestDirectResult,
+           finalizeDirectParents,
+           ingestPassthroughResult,
+           settleTerminalParents
+         );
       } else {
         result = response;
       }
@@ -845,7 +997,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
 
        // If the result contains an error, throw it now
-       if (result && result.success === false && result.error) {
+       if (result && result.success === false && (result.error || result.errorDetails)) {
          const outcome = getCurrentOutcome(Boolean(result.cancelled));
          if (terminalStreamFailure
              && !outcome.cancelled
@@ -857,7 +1009,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
            });
            result = { success: true, targetLanguage: result.targetLanguage };
          } else {
-           throw attachTranslationOutcome(result.error, outcome);
+           const canonicalErrorSource = isStructuredTranslationError(result?.errorDetails)
+             ? result.errorDetails
+             : result.error;
+            throw attachTranslationOutcome(reconstructSelectElementError(canonicalErrorSource), outcome);
          }
        }
 
@@ -875,8 +1030,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
         zeroCommit: committedParentCount === 0,
       });
 
+      if (result?.success) settleTerminalParents(translationToken);
+
       const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount, shadowSpanning
       });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
@@ -938,6 +1095,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
       const type = matchErrorToType(originalError);
       const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
       const outcome = getCurrentOutcome(isCancellation);
+      if (outcome.committedParentCount === 0) {
+        removeSelectElementTranslation(this.currentSessionId);
+      }
       const finalError = attachTranslationOutcome(originalError, outcome);
 
       if (!isCancellation) {
@@ -950,18 +1110,17 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (ownsActiveTranslationRoot) {
         activeTranslationRoots.delete(element);
       }
+      await this._drainAcceptanceAcks();
       this._cleanupCurrentSession(true, translationToken);
     }
   }
 
   _shouldInjectBidi(node, translation) {
-    if (!node || !node.parentElement) return false;
-    let parent = node.parentElement;
-    while (parent) {
+    if (!node) return false;
+    for (const parent of iterateSelectElementAncestors(node)) {
       const tag = parent.tagName.toUpperCase();
       if (['PRE', 'CODE', 'INPUT', 'TEXTAREA'].includes(tag)) return false;
       if (parent.contentEditable === 'true' || parent.getAttribute('contenteditable') === 'true') return false;
-      parent = parent.parentElement;
     }
     
     if (!translation || typeof translation !== 'string') return false;
@@ -975,7 +1134,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     let parentDir = 'ltr';
     try {
       // Avoid getComputedStyle layout flush by reading attributes directly
-      const dirNode = node.parentElement.closest('[dir]');
+      const dirNode = iterateSelectElementAncestors(node)
+        .find(parent => parent.hasAttribute('dir'));
       if (dirNode) {
         parentDir = (dirNode.dir || dirNode.getAttribute('dir')).toLowerCase();
       } else {
@@ -1090,7 +1250,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     textNode.nodeValue = finalValue;
-    DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement);
+    DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement, {
+      shadowAware: isSelectShadowNode(textNode),
+    });
   }
 
   _commitBlockGroup(group, reconstruction, translatedText, processedUids, translationToken) {
@@ -1120,8 +1282,22 @@ export class DomTranslatorAdapter extends ResourceTracker {
         throw new Error('Grouped translation became stale before acceptance');
       }
       reconstruction.transaction.finalize();
+       try {
+         this._publishCommittedOwnership(
+           group.units.map(unit => ({
+             node: unit.node,
+             appliedText: unit.node.nodeValue,
+           })),
+           createAuxiliaryOwnershipRecords(reconstruction.auxiliarySnapshots),
+         );
+      } catch (error) {
+        // Finalization has closed the reconstructor rollback window. Use the
+        // session snapshot fallback if ownership publication itself fails.
+        this._rollbackBlockGroup(this.currentSessionId, group.blockId);
+        throw error;
+      }
       group.applied = true;
-      this._sendParentAcceptanceAck(group.blockId, reconstruction.cleanResult, true, translationToken).catch(() => {});
+      this._settleParentAcceptance(group, true, reconstruction.cleanResult, translationToken);
     } catch (error) {
       for (const [uid, state] of previousMap) {
         if (state.present) this.translatedSegmentMap.set(uid, state.value);
@@ -1135,7 +1311,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents, ingestPassthroughResult) {
+  async _handleDirectResponse(response, textNodesData, nodeMap, targetLanguage, element, translationToken, ingestDirectResult, finalizeDirectParents, ingestPassthroughResult, settleTerminalParents) {
     this.logger.debug(`[DomTranslatorAdapter] _handleDirectResponse called (batchCount: ${this.batchCount})`);
 
     if (this.sessionContext === undefined && (!ingestDirectResult || !finalizeDirectParents)) {
@@ -1207,9 +1383,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
                  this.logger.error(`[Reconstructor] Apply failed for V2 group ${group.blockId}:`, originalError);
                  if (error instanceof BlockGroupMutationFailure) {
                    error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
-                 }
-                 this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
-                 throw error;
+                  }
+                  this._settleParentAcceptance(group, false, null, translationToken);
+                  settleTerminalParents?.(translationToken);
+                  throw error;
                }
           } else {
             if (contentResult.status !== 'valid') {
@@ -1230,8 +1407,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
                    error.rollbackFailures.forEach(failure => this.logger.error('[Reconstructor] Group rollback failed', failure));
                  } else {
                    this._rollbackBlockGroup(this.currentSessionId, group.blockId);
-                 }
-                  this._sendParentAcceptanceAck(group.blockId, null, false, translationToken).catch(() => {});
+                  }
+                  this._settleParentAcceptance(group, false, null, translationToken);
+                  settleTerminalParents?.(translationToken);
                   throw error;
               }
             }
@@ -1265,6 +1443,9 @@ export class DomTranslatorAdapter extends ResourceTracker {
         targetLanguage: finalTargetLanguage
       };
     } catch (err) {
+      if (err instanceof BlockGroupMutationFailure) {
+        settleTerminalParents?.(translationToken);
+      }
       this.logger.error('Direct translation handling failed:', err);
       const errorType = matchErrorToType(err);
       if (
@@ -1284,7 +1465,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
   }
 
-  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, translationToken, committedParentCount = 0, totalParentCount = 0 }) {
+  async _finalizeTranslation({ result, element, elementId, targetLanguage, onComplete, sessionId, translationToken, committedParentCount = 0, totalParentCount = 0, shadowSpanning = false }) {
     this._assertCurrentTranslationContext(translationToken);
 
     const translationOutcome = {
@@ -1293,14 +1474,19 @@ export class DomTranslatorAdapter extends ResourceTracker {
       cancelled: Boolean(result?.cancelled),
     };
     if (!result?.success) {
-      if (result.cancelled) return {
-        success: false,
-        cancelled: true,
-        element,
-        committedParentCount,
-        totalParentCount,
-        translationOutcome,
-      };
+      if (result.cancelled) {
+        if (committedParentCount === 0) {
+          removeSelectElementTranslation(sessionId);
+        }
+        return {
+          success: false,
+          cancelled: true,
+          element,
+          committedParentCount,
+          totalParentCount,
+          translationOutcome,
+        };
+      }
       const error = attachTranslationOutcome(result.error || new Error('Translation failed'), translationOutcome);
       throw error;
     }
@@ -1310,6 +1496,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     if (committedParentCount === 0) {
       const error = new Error('No translation results were accepted');
       error.type = ErrorTypes.NO_ACCEPTED_TRANSLATION_RESULTS;
+      removeSelectElementTranslation(sessionId);
       return {
         success: false,
         error: attachTranslationOutcome(error, translationOutcome),
@@ -1324,7 +1511,16 @@ export class DomTranslatorAdapter extends ResourceTracker {
     
     // Non-streaming fallback already applied translations in _handleDirectResponse
     
-    DirectionManager.applyElementDirection(element, finalTarget);
+      if (!shadowSpanning) {
+        const directionSnapshot = DirectionManager.captureElementDirectionState(element);
+        DirectionManager.applyElementDirection(element, finalTarget);
+        const auxiliaryRecords = createAuxiliaryOwnershipRecords({
+          directionSnapshots: directionSnapshot ? [directionSnapshot] : [],
+        });
+        if (auxiliaryRecords.length > 0) {
+          this._publishCommittedOwnership([], auxiliaryRecords);
+        }
+      }
     
     // Update the existing state entry with finalized metadata
     if (globalSelectElementState.currentTranslation) {
@@ -1364,11 +1560,135 @@ export class DomTranslatorAdapter extends ResourceTracker {
       });
       return;
     }
-    await sendRegularMessage({
+    return await sendRegularMessage({
       action: MessageActions.PARENT_ACCEPTANCE_ACK,
       messageId: this.currentMessageId,
       data: { parentId, cleanResult: accepted ? cleanResult : undefined, accepted },
-    }, { silent: true });
+    }, { silent: true, timeout: ACCEPTANCE_ACK_TIMEOUT_MS });
+  }
+
+  _latchConversationAcceptance(response) {
+    if (response?.conversationAcceptance === true) {
+      this._conversationAcceptanceEnabled = true;
+    }
+  }
+
+  _settleParentAcceptance(parent, accepted, cleanResult, translationToken = null) {
+    if (!parent || parent.acceptanceSettled) return;
+    if (translationToken && !this._isCurrentTranslation(translationToken)) return;
+    if (!ExtensionContextManager.isValidSync()) return;
+
+    const parentId = parent.parentId || parent.blockId;
+    if (!parentId) return;
+
+    parent.acceptanceSettled = true;
+    parent.acknowledged = accepted;
+    this._queueParentAcceptanceAck(parentId, accepted ? cleanResult : null, accepted, translationToken);
+  }
+
+  _queueParentAcceptanceAck(parentId, cleanResult, accepted, translationToken = null) {
+    if (!accepted) {
+      const delivery = this._sendParentAcceptanceAck(parentId, cleanResult, false, translationToken)
+        .catch(() => {})
+        .finally(() => this._pendingAcceptanceAcks.delete(delivery));
+      this._pendingAcceptanceAcks.add(delivery);
+      return;
+    }
+
+    const controller = new AbortController();
+    this._acceptanceAckControllers.add(controller);
+    const delivery = this._deliverParentAcceptanceAck(
+      parentId,
+      cleanResult,
+      translationToken,
+      controller.signal,
+    ).finally(() => {
+      this._acceptanceAckControllers.delete(controller);
+      this._pendingAcceptanceAcks.delete(delivery);
+    });
+    this._pendingAcceptanceAcks.add(delivery);
+  }
+
+  async _deliverParentAcceptanceAck(parentId, cleanResult, translationToken, signal) {
+    for (let attempt = 0; attempt <= ACCEPTANCE_ACK_RETRY_DELAYS_MS.length; attempt++) {
+      if (signal.aborted || !this._isAcceptanceAckActive(translationToken)) return;
+
+      try {
+        const response = await this._sendParentAcceptanceAck(parentId, cleanResult, true, translationToken);
+        if (response?.isContextInvalidated) {
+          this.logger.warn('[DomTranslatorAdapter] Parent acceptance ACK skipped after context invalidation', {
+            code: 'PARENT_ACCEPTANCE_ACK_CONTEXT_INVALIDATED',
+            parentId,
+          });
+          return;
+        }
+        if (response?.success === false) {
+          const error = new Error(response.error?.message || response.error || 'Parent acceptance ACK rejected');
+          error.type = response.error?.type || response.errorType;
+          throw error;
+        }
+        const status = response?.status;
+        if (!status || status === 'ACCEPTED' || status === 'DUPLICATE') return;
+        if (ACCEPTANCE_ACK_TERMINAL_STATUSES.has(status)) {
+          this.logger.warn('[DomTranslatorAdapter] Parent acceptance ACK reached terminal coordinator state', {
+            code: 'PARENT_ACCEPTANCE_ACK_TERMINAL',
+            status,
+            parentId,
+          });
+          return;
+        }
+        throw new Error(`Unexpected parent acceptance ACK status: ${status}`);
+      } catch (error) {
+        if (
+          signal.aborted
+          || !this._isAcceptanceAckActive(translationToken)
+          || isCancellationError(error)
+          || this._contextInvalidated
+          || !ExtensionContextManager.isValidSync()
+        ) return;
+
+        const errorType = matchErrorToType(error);
+        const retryable = isTransientError(errorType) || !error?.type;
+        if (!retryable || attempt === ACCEPTANCE_ACK_RETRY_DELAYS_MS.length) {
+          this.logger.warn('[DomTranslatorAdapter] Parent acceptance ACK delivery failed', {
+            code: 'PARENT_ACCEPTANCE_ACK_DELIVERY_FAILED',
+            attempts: attempt + 1,
+            errorType,
+            parentId,
+          });
+          return;
+        }
+
+        await this._waitForAcceptanceAckRetry(ACCEPTANCE_ACK_RETRY_DELAYS_MS[attempt], signal);
+      }
+    }
+  }
+
+  _isAcceptanceAckActive(translationToken) {
+    return translationToken
+      ? this._isCurrentTranslation(translationToken)
+      : !this._contextInvalidated && ExtensionContextManager.isValidSync();
+  }
+
+  _waitForAcceptanceAckRetry(delay, signal) {
+    if (signal.aborted) return Promise.resolve();
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, delay);
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  async _drainAcceptanceAcks() {
+    if (this._pendingAcceptanceAcks.size === 0) return;
+    await Promise.all([...this._pendingAcceptanceAcks]);
   }
 
   _storeTranslationState(data) {
@@ -1376,6 +1696,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     pruneDisconnectedSelectElementTranslations();
     
     // Ensure absolute immutability of the rollback text node snapshots and register them
+    // appliedText is intentionally published only after a node commit succeeds.
     const frozenTextNodesData = originalTextNodesData
       ? originalTextNodesData.map(d => Object.freeze({
           node: d.node,
@@ -1383,6 +1704,35 @@ export class DomTranslatorAdapter extends ResourceTracker {
           blockId: d.blockId || null
         }))
       : null;
+
+    const metadataSnapshots = [];
+    const metadataElements = new Set();
+    for (const nodeData of frozenTextNodesData || []) {
+      const metadataElement = nodeData.node?.parentElement;
+      if (!metadataElement || metadataElements.has(metadataElement)) continue;
+      metadataElements.add(metadataElement);
+      metadataSnapshots.push(Object.freeze({
+        element: metadataElement,
+        present: metadataElement.hasAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+        value: metadataElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL),
+      }));
+    }
+
+    const directionSnapshots = [];
+    const directionElements = new Set();
+    if (data.shadowSpanning) {
+      for (const nodeData of frozenTextNodesData || []) {
+        for (const snapshot of DirectionManager.captureNodeDirectionState(
+          nodeData.node,
+          element,
+          { shadowAware: true }
+        )) {
+          if (directionElements.has(snapshot.element)) continue;
+          directionElements.add(snapshot.element);
+          directionSnapshots.push(snapshot);
+        }
+      }
+    }
 
     // Enforce namespaced and session-scoped snapshots for rollback safety
     if (frozenTextNodesData && sessionId) {
@@ -1404,6 +1754,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     const stateEntry = { 
       ...data, 
       originalTextNodesData: frozenTextNodesData,
+      originalMetadataSnapshots: Object.freeze(metadataSnapshots),
+      originalDirectionSnapshots: Object.freeze(directionSnapshots),
       originalDir: element.getAttribute('dir'),
       originalStyleDirection: element.style.direction,
       originalTextAlign: element.style.textAlign,
@@ -1414,6 +1766,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
     globalSelectElementState.currentTranslation = stateEntry; // IMPORTANT: Set current translation pointer
   }
 
+  _publishCommittedOwnership(ownershipRecords, auxiliaryRecords = []) {
+    if (!this.currentSessionId) return;
+    if (!publishSelectElementTranslationOwnership(this.currentSessionId, ownershipRecords, auxiliaryRecords)) {
+      throw new Error('Select Element revert ownership publication failed');
+    }
+  }
+
   _rollbackBlockGroup(sessionId, blockId) {
     if (!sessionId || !blockId) return;
     const key = `${sessionId}:${blockId}`;
@@ -1421,7 +1780,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
     if (snapshots && snapshots.length > 0) {
       this.logger.warn(`[Rollback] Performing atomic rollback for block group ${blockId} (Session: ${sessionId})`);
       snapshots.forEach(({ node, originalText }) => {
-        if (node && node.parentNode && document.documentElement.contains(node)) {
+        if (node?.isConnected) {
           node.nodeValue = originalText;
         }
       });
@@ -1435,6 +1794,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     this.isTranslating = false;
+    this._acceptanceAckControllers.forEach(controller => controller.abort());
+    this._acceptanceAckControllers.clear();
     const messageId = this.currentMessageId;
     if (token && !isSuccess) token.cancelled = true;
     if (messageId) {

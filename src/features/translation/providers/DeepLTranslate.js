@@ -19,7 +19,7 @@ import {
 } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
-import { matchErrorToType, isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import { matchErrorToType, isFatalError, isProviderRequestSizeError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
@@ -535,9 +535,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         throw error;
       }
 
-      // If HTTP 400 error and we have more than 1 segment, try splitting into smaller chunks
-      if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt < 3) {
-        logger.debug(`[DeepL] HTTP 400 error, retrying with smaller chunks (${retryAttempt + 1}/3)`);
+      // Split only when shared request-size evidence says smaller payloads can recover.
+      if (isProviderRequestSizeError(error) && validTexts.length > 1 && retryAttempt < 3) {
+        logger.debug(`[DeepL] Request-size error, retrying with smaller chunks (${retryAttempt + 1}/3)`);
 
         const midPoint = Math.ceil(chunkTexts.length / 2);
         const firstHalf = chunkTexts.slice(0, midPoint);
@@ -552,9 +552,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         return [...firstResult, ...secondResult];
       }
 
-      // Final fallback for HTTP 400: translate each segment individually
-      if (error.message?.includes('HTTP 400') && validTexts.length > 1 && retryAttempt >= 3) {
-        logger.debug(`[DeepL] Exhausted retries, attempting sequential fallback for ${validTexts.length} segments`);
+      // Final fallback for request-size errors: translate each segment individually.
+      if (isProviderRequestSizeError(error) && validTexts.length > 1 && retryAttempt >= 3) {
+        logger.debug(`[DeepL] Exhausted request-size retries, attempting sequential fallback for ${validTexts.length} segments`);
 
         const results = [];
         for (const text of chunkTexts) {

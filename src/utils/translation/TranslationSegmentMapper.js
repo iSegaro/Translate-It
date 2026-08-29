@@ -44,12 +44,35 @@ export class TranslationSegmentMapper {
   static INCOMPLETE_CARDINALITY = 'INCOMPLETE_CARDINALITY';
 
   /**
-   * Enhanced mapping: attempt to reconstruct original segments from translated text
+   * Error type for output whose source ownership cannot be proven.
    */
-  static mapTranslationToOriginalSegments(translatedText, originalSegments, delimiter, providerName = 'Unknown') {
+  static AMBIGUOUS_MAPPING = 'AMBIGUOUS_MAPPING';
+
+  /**
+   * Reconstruct translated segments from deterministic structural boundaries.
+   * Permissive mode remains for legacy callers; strict mode never promotes
+   * heuristic distribution to successful multi-unit mapping.
+   */
+  static mapTranslationToOriginalSegments(
+    translatedText,
+    originalSegments,
+    delimiter,
+    providerName = 'Unknown',
+    { requireDeterministic = false } = {}
+  ) {
     const scrub = (text) => this.removeAllDelimiters(text, delimiter);
 
     if (!translatedText || !Array.isArray(originalSegments)) {
+      if (requireDeterministic && Array.isArray(originalSegments) && originalSegments.length > 1) {
+        const allBlank = originalSegments.every((segment) => {
+          const text = typeof segment === 'object' ? (segment?.t || segment?.text || '') : segment;
+          return !String(text || '').trim();
+        });
+        if (allBlank) return originalSegments.map(() => '');
+        const error = new Error(`[${providerName}] Unable to prove translated segment ownership`);
+        error.type = this.AMBIGUOUS_MAPPING;
+        throw error;
+      }
       return [typeof translatedText === 'string' ? scrub(translatedText) : translatedText];
     }
 
@@ -83,7 +106,8 @@ export class TranslationSegmentMapper {
 
     // 1. Try standard splitting
     let segments = translatedText.split(delimiter);
-    if (segments.length === originalSegments.length) {
+    const primaryIsStructural = STRUCTURAL_SEGMENT_DELIMITERS.has(delimiter);
+    if (segments.length === originalSegments.length && (!requireDeterministic || primaryIsStructural)) {
       return segments.map(s => scrub(s).trim());
     }
 
@@ -111,6 +135,11 @@ export class TranslationSegmentMapper {
       for (const altDelim of genericDelims) {
         const testSegments = translatedText.split(altDelim);
         if (testSegments.length === originalSegments.length) {
+          if (requireDeterministic) {
+            const error = new Error(`[${providerName}] Generic formatting delimiter cannot prove segment ownership`);
+            error.type = this.AMBIGUOUS_MAPPING;
+            throw error;
+          }
           logger.info(`[${providerName}] Found working alternative delimiter: "${altDelim}"`);
           return testSegments.map(s => scrub(s).trim());
         }
@@ -150,7 +179,7 @@ export class TranslationSegmentMapper {
       const structuralResult = reconstruct(structuralDelims);
       if (structuralResult) return structuralResult;
 
-      if (!delimiterFound) {
+      if (!requireDeterministic && !delimiterFound) {
         const genericResult = reconstruct(genericDelims);
         if (genericResult) return genericResult;
       }
@@ -166,7 +195,14 @@ export class TranslationSegmentMapper {
       throw error;
     }
 
-    // 4. Last Resort: Smart Word-Based Distribution (Replacing the broken character-ratio split)
+    if (requireDeterministic) {
+      const error = new Error(`[${providerName}] Unable to prove translated segment ownership`);
+      error.type = this.AMBIGUOUS_MAPPING;
+      throw error;
+    }
+
+    // 4. Legacy last resort: word-based distribution. Strict multi-unit callers
+    // return above instead of treating this heuristic as source ownership.
     // CRITICAL: Before word-ratio splitting, remove ALL possible delimiters from the text
     // to avoid them appearing as "words" in the output segments.
     const cleanedText = this.removeAllDelimiters(translatedText, delimiter);

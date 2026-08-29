@@ -3,7 +3,7 @@
  * Provides streaming support for chunk-based translation with real-time DOM updates
  */
 
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseProvider, createOperationAbortError } from "@/features/translation/providers/BaseProvider.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { TranslationMode, getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
@@ -93,7 +93,9 @@ export class BaseTranslateProvider extends BaseProvider {
       try {
         const sender = typeof engine.getStreamingSender === 'function' ? engine.getStreamingSender(messageId) : null;
         if (sender) {
-          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          const streamArgs = [messageId, sender, this, texts, sessionId];
+          if (options.executionContext?.conversationAcceptanceRegistered === true) streamArgs.push(true);
+          streamingManager.initializeStream(...streamArgs);
         } else {
           logger.debug(`[${this.providerName}] No sender found for streaming messageId: ${messageId}`);
         }
@@ -106,9 +108,7 @@ export class BaseTranslateProvider extends BaseProvider {
     
     for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
       if ((abortController && abortController.signal.aborted) || (engine && engine.isCancelled(messageId))) {
-        const error = new Error('Translation cancelled by user');
-        error.type = ErrorTypes.USER_CANCELLED;
-        throw error;
+        throw createOperationAbortError(abortController?.signal);
       }
 
       const chunk = chunks[chunkIndex];
@@ -168,7 +168,7 @@ export class BaseTranslateProvider extends BaseProvider {
         else logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
 
         await TraditionalStreamManager.streamChunkError(this.providerName, error, chunkIndex, messageId);
-        await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { error: { message: error.message, type: error.type || errorType } });
+        await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { error });
         throw error;
       }
     }
@@ -188,9 +188,16 @@ export class BaseTranslateProvider extends BaseProvider {
 
     for (let i = 0; i < chunks.length; i++) {
       if (abortController && abortController.signal.aborted) {
-        const cancelError = new Error('Translation cancelled by user');
+        const isUserAbort = abortController.signal.reason === 'user-cancelled'
+          || abortController.signal.reason === 'user_cancelled';
+        const cancelError = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
         cancelError.name = 'AbortError';
-        cancelError.type = ErrorTypes.USER_CANCELLED;
+        if (isUserAbort) {
+          cancelError.type = ErrorTypes.USER_CANCELLED;
+        } else {
+          cancelError.operationAborted = true;
+          cancelError.cancellationReason = 'operation-abort';
+        }
         throw cancelError;
       }
 
@@ -225,7 +232,7 @@ export class BaseTranslateProvider extends BaseProvider {
           { sessionId, abortController, messageId }
         );
 
-      // Handle different response formats and CRITICAL: Split joined strings back into segments
+        // Handle different response formats and reconstruct only deterministic mappings.
       let chunkResults = [];
       const { TRANSLATION_CONSTANTS } = await import("@/shared/config/translationConstants.js");
 
@@ -239,8 +246,8 @@ export class BaseTranslateProvider extends BaseProvider {
           return TraditionalTextProcessor.scrubBidiArtifacts(text);
         });
       } else {
-        // MISMATCH CASE: Provider did internal splitting or merged segments
-        // Join everything and let the SegmentMapper redistribute it correctly
+        // MISMATCH CASE: Provider did internal splitting or merged segments.
+        // Strict mapping rejects output without provable source ownership.
         const joinedResult = responseArray
           .map(r => {
             if (typeof r === 'string') return r;
@@ -250,16 +257,19 @@ export class BaseTranslateProvider extends BaseProvider {
           .join(TRANSLATION_CONSTANTS.TEXT_DELIMITER);
 
         try {
-          chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
-            joinedResult,
-            chunk.texts,
-            TRANSLATION_CONSTANTS.TEXT_DELIMITER,
-            this.providerName
-          ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
+            chunkResults = TranslationSegmentMapper.mapTranslationToOriginalSegments(
+              joinedResult,
+              chunk.texts,
+              TRANSLATION_CONSTANTS.TEXT_DELIMITER,
+              this.providerName,
+              { requireDeterministic: true }
+            ).map(text => TraditionalTextProcessor.scrubBidiArtifacts(text));
         } catch (mapperError) {
-          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY) {
+          if (mapperError.type === TranslationSegmentMapper.INCOMPLETE_CARDINALITY
+              || mapperError.type === TranslationSegmentMapper.AMBIGUOUS_MAPPING) {
             const err = new Error(`[${this.providerName}] Incomplete translation: ${mapperError.message}`);
             err.type = ErrorTypes.API_RESPONSE_INVALID;
+            err.cause = mapperError;
             throw err;
           }
           throw mapperError;
@@ -277,6 +287,13 @@ export class BaseTranslateProvider extends BaseProvider {
     
     // Final safety check: if somehow we still have a mismatch, log it
     if (allResults.length !== texts.length) {
+      if (texts.length > 1) {
+        const err = new Error(
+          `[${this.providerName}] Incomplete translation: expected ${texts.length} logical results, received ${allResults.length}`
+        );
+        err.type = ErrorTypes.API_RESPONSE_INVALID;
+        throw err;
+      }
       logger.warn(`[${this.providerName}] Final batch result count mismatch! Expected ${texts.length}, got ${allResults.length}`);
     }
 

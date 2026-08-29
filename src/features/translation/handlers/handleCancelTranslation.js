@@ -104,7 +104,7 @@ export async function handleCancelTranslation(request, sender) {
           if (!delegatedResult.success) {
             // Preserve abort-always behavior; never touch tracker/dispatch again.
             try {
-              await translationEngine.cancelTranslation(id);
+              await translationEngine.cancelTranslation(id, false, undefined, resolvedReason);
             } catch { /* continue remaining exact-ID cleanup */ }
           }
         } else {
@@ -116,7 +116,7 @@ export async function handleCancelTranslation(request, sender) {
             } catch { /* continue exact-ID cleanup */ }
           }
           try {
-            cancelled = await translationEngine.cancelTranslation(id);
+            cancelled = await translationEngine.cancelTranslation(id, false, undefined, resolvedReason);
           } catch { /* continue remaining exact-ID cleanup */ }
         }
       }

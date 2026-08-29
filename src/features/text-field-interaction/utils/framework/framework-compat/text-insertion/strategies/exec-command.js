@@ -9,7 +9,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'exec-command');
 /**
  * تلاش برای جایگذاری با execCommand (بهترین روش برای حفظ undo)
  */
-export async function tryExecCommandInsertion(element, text, hasSelection) {
+export async function tryExecCommandInsertion(element, text, hasSelection, applicationContext = null) {
+  const isCurrent = applicationContext?.isCurrent || (() => true);
+  if (!isCurrent()) return false;
   try {
     // بررسی پشتیبانی از execCommand
     if (typeof document.execCommand !== "function") {
@@ -25,6 +27,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
     // Focus element first
     element.focus();
     await smartDelay(10);
+    if (!isCurrent()) return false;
 
     // برای input/textarea
     if (!element.isContentEditable) {
@@ -40,6 +43,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         // اگر انتخاب ندارد، ابتدا همه را انتخاب کن سپس جایگزین کن
         element.setSelectionRange(0, element.value.length);
         await smartDelay(10);
+        if (!isCurrent()) return false;
         const result = document.execCommand("insertText", false, text);
         if (result) {
           logger.init('execCommand succeeded for input/textarea full replacement');
@@ -69,6 +73,7 @@ export async function tryExecCommandInsertion(element, text, hasSelection) {
         selection.removeAllRanges();
         selection.addRange(range);
         await smartDelay(10);
+        if (!isCurrent()) return false;
 
         // جایگزینی کل محتوا
         const insertResult = document.execCommand("insertText", false, text);

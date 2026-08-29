@@ -7,6 +7,7 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 import { isSelectableTextRoot } from '../utils/elementHelpers.js';
 import { ToastElementDetector } from '@/shared/toast/ToastElementDetector.js';
+import { iterateSelectElementAncestors } from '../utils/shadowDom.js';
 
 /**
  * Element selection and highlighting functionality
@@ -162,11 +163,11 @@ export class ElementSelector extends ResourceTracker {
    * @returns {HTMLElement|null} Best element to highlight
    */
   findBestTextElement(startElement) {
-    let element = startElement;
     let maxAncestors = this.config.maxAncestors || 10;
 
     // We want the DEEPEST element that satisfies the minimum requirements.
-    while (element && element !== document.body && element !== document.documentElement && maxAncestors-- > 0) {
+    for (const element of iterateSelectElementAncestors(startElement)) {
+      if (element === document.body || element === document.documentElement || maxAncestors-- <= 0) break;
       if (this.isSelectionCandidate(element)) {
         const area = element.offsetWidth * element.offsetHeight;
         const text = element.textContent?.trim() || '';
@@ -183,7 +184,6 @@ export class ElementSelector extends ResourceTracker {
         }
       }
 
-      element = element.parentElement;
     }
 
     // Fallback: if no good candidate found via area, use startElement if it is a valid text element

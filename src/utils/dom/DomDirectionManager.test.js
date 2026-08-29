@@ -5,6 +5,7 @@ import {
   applyNodeDirection, 
   applyElementDirection,
   restoreElementDirection,
+  captureElementDirectionState,
   captureNodeDirectionState,
   restoreNodeDirectionState
 } from './DomDirectionManager.js';
@@ -107,6 +108,24 @@ describe('DomDirectionManager', () => {
   });
 
   describe('Restoration', () => {
+    it('captures raw dir and exact inline style priority', () => {
+      const div = document.createElement('div');
+      const text = document.createTextNode('Original');
+      div.appendChild(text);
+      div.setAttribute('dir', '');
+      div.style.setProperty('direction', 'ltr', 'important');
+      document.body.appendChild(div);
+
+      const snapshot = captureElementDirectionState(div);
+      div.setAttribute('dir', 'rtl');
+      div.style.setProperty('direction', 'rtl');
+      restoreNodeDirectionState([snapshot]);
+
+      expect(div.getAttribute('dir')).toBe('');
+      expect(div.style.getPropertyValue('direction')).toBe('ltr');
+      expect(div.style.getPropertyPriority('direction')).toBe('important');
+    });
+
     it('captures and restores exact node direction state', () => {
       const div = document.createElement('div');
       const span = document.createElement('span');
@@ -210,6 +229,95 @@ describe('DomDirectionManager', () => {
   });
 
   describe('Edge Cases & Advanced Logic', () => {
+    it('inherits direction across an open shadow boundary only when shadowAware is enabled', () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'rtl');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const text = document.createTextNode('Shadow text');
+      owner.appendChild(text);
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+
+      LanguageDetectionService.isRTL.mockReturnValue(true);
+      LanguageDetectionService.getDirection.mockReturnValue('rtl');
+
+      const defaultSnapshot = captureNodeDirectionState(text, host);
+      const shadowSnapshot = captureNodeDirectionState(text, host, { shadowAware: true });
+
+      expect(defaultSnapshot.map(snapshot => snapshot.element)).toEqual([owner]);
+      expect(shadowSnapshot.map(snapshot => snapshot.element)).toEqual([owner]);
+      document.body.removeChild(host);
+    });
+
+    it('mutates and snapshots internal shadow containers without mutating host', () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'rtl');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      owner.setAttribute('dir', 'ltr');
+      const text = document.createTextNode('Shadow text');
+      owner.appendChild(text);
+      shadow.appendChild(owner);
+      document.body.appendChild(host);
+
+      LanguageDetectionService.isRTL.mockReturnValue(true);
+      LanguageDetectionService.getDirection.mockReturnValue('rtl');
+      const snapshots = captureNodeDirectionState(text, host, { shadowAware: true });
+      applyNodeDirection(text, 'fa', host, { shadowAware: true });
+
+      expect(owner.style.direction).toBe('rtl');
+      expect(host.style.direction).toBe('');
+      restoreNodeDirectionState(snapshots);
+      expect(owner.style.direction).toBe('');
+      expect(host.style.direction).toBe('');
+      document.body.removeChild(host);
+    });
+
+    it('stops mutation before nested shadow boundary hosts while retaining inference ancestry', () => {
+      const outerHost = document.createElement('x-outer');
+      outerHost.setAttribute('dir', 'rtl');
+      const outerShadow = outerHost.attachShadow({ mode: 'open' });
+      const innerHost = document.createElement('x-inner');
+      const innerShadow = innerHost.attachShadow({ mode: 'open' });
+      const owner = document.createElement('span');
+      const text = document.createTextNode('Nested text');
+      owner.appendChild(text);
+      innerShadow.appendChild(owner);
+      outerShadow.appendChild(innerHost);
+      document.body.appendChild(outerHost);
+
+      LanguageDetectionService.isRTL.mockReturnValue(true);
+      LanguageDetectionService.getDirection.mockReturnValue('rtl');
+      const snapshots = captureNodeDirectionState(text, outerHost, { shadowAware: true });
+      applyNodeDirection(text, 'fa', outerHost, { shadowAware: true });
+
+      expect(snapshots.map(snapshot => snapshot.element)).toEqual([owner]);
+      expect(owner.style.direction).toBe('rtl');
+      expect(innerHost.style.direction).toBe('');
+      expect(outerHost.style.direction).toBe('');
+      document.body.removeChild(outerHost);
+    });
+
+    it('does not mutate or snapshot a host for direct ShadowRoot text', () => {
+      const host = document.createElement('x-host');
+      host.setAttribute('dir', 'ltr');
+      const shadow = host.attachShadow({ mode: 'open' });
+      const text = document.createTextNode('Direct shadow text');
+      shadow.appendChild(text);
+      document.body.appendChild(host);
+
+      LanguageDetectionService.isRTL.mockReturnValue(true);
+      LanguageDetectionService.getDirection.mockReturnValue('rtl');
+      applyNodeDirection(text, 'fa', host, { shadowAware: true });
+      const snapshots = captureNodeDirectionState(text, host, { shadowAware: true });
+
+      expect(snapshots).toEqual([]);
+      expect(host.style.direction).toBe('');
+      expect(host.hasAttribute('data-translate-dir')).toBe(false);
+      document.body.removeChild(host);
+    });
+
     it('should apply unicode-bidi: isolate for directional isolation', () => {
       const div = document.createElement('div');
       div.innerText = 'Isolated text';

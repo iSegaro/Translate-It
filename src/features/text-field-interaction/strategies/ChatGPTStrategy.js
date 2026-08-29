@@ -55,7 +55,8 @@ export default class ChatGPTStrategy extends PlatformStrategy {
     }
   }
 
-  async updateElement(element, translatedText) {
+  async updateElement(element, translatedText, applicationContext = null) {
+    const isCurrent = this.getApplicationGuard(applicationContext);
     if (!translatedText || !element) {
       return false;
     }
@@ -76,11 +77,13 @@ export default class ChatGPTStrategy extends PlatformStrategy {
 
       // اعمال فیدبک بصری
       await this.applyVisualFeedback(element);
+      if (!isCurrent()) return false;
 
       // استفاده از جایگزینی هوشمند متن (جایگزین دستی appendChild و filterXSS)
-      const success = await smartTextReplacement(element, translatedText);
+      const success = await smartTextReplacement(element, translatedText, null, null, undefined, applicationContext);
 
       if (success) {
+        if (!isCurrent()) return false;
         this.applyBaseStyling(element, translatedText);
         await smartDelay(100);
       }

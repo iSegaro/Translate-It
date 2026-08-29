@@ -61,7 +61,6 @@ New provider dictionary shapes must be covered by:
 
 ### 1. Request & Execution
 - **ProviderRequestEngine**: Centralizes API call execution, header preparation, proxy handling, and orchestrates the **Multi-API Key Failover** lifecycle.
-- **TraditionalBatchProcessor**: Manages character-limit chunking and sequential execution for traditional providers.
 
 ### 2. AI & Context Logic
 - **AIConversationHelper**: Manages session history and context-enriched prompt preparation (Injecting Page Title/Headings).

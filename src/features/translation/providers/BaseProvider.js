@@ -5,12 +5,28 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
-import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
+
+export function createOperationAbortError(signal, message = 'Translation operation aborted') {
+  const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
+  const error = new Error(isUserAbort ? 'Translation cancelled by user' : message);
+  error.name = 'AbortError';
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
+  }
+  return error;
+}
 
 /**
  * Base class for all translation providers.
@@ -103,7 +119,7 @@ export class BaseProvider {
 
     // Pre-check
     if (options.abortController?.signal?.aborted) {
-      throw new Error('Task aborted before execution');
+      throw createOperationAbortError(options.abortController.signal, 'Task aborted before execution');
     }
 
     const result = await rateLimitManager.executeWithRateLimit(
@@ -116,7 +132,7 @@ export class BaseProvider {
 
     // Post-check
     if (options.abortController?.signal?.aborted) {
-      throw new Error('Task aborted during execution');
+      throw createOperationAbortError(options.abortController.signal, 'Task aborted during execution');
     }
 
     return result;
@@ -175,10 +191,4 @@ export class BaseProvider {
     }
   }
 
-  /**
-   * Processes segments in batches - Delegated to TraditionalBatchProcessor
-   */
-  async _processInBatches(segments, translateChunk, limits, abortController = null, priority = null) {
-    return TraditionalBatchProcessor.processInBatches(this, segments, translateChunk, limits, abortController, priority);
-  }
 }

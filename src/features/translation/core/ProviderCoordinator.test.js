@@ -12,6 +12,8 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock("@/shared/error-management/ErrorMatcher.js");
 
 import { providerCoordinator } from './ProviderCoordinator.js';
+import { queueManager } from './QueueManager.js';
+import { PROVIDER_CONFIGURATIONS } from './ProviderConfigurations.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
@@ -240,6 +242,49 @@ describe('ProviderCoordinator', () => {
     });
   });
 
+  describe('Queue retry policy snapshot', () => {
+    it.each([
+      ['GoogleTranslate', 3],
+      ['GoogleTranslateV2', 3],
+    ])('passes configured RATE_LIMIT_REACHED budget for %s', async (providerName, maxExecutions) => {
+      mockProvider.providerName = providerName;
+
+      await providerCoordinator.execute(mockProvider, 'hello', 'en', 'fa');
+
+      const options = queueManager.enqueue.mock.calls.at(-1)[4];
+      expect(options.queueRetryPolicy).toEqual({
+        maxExecutions: { RATE_LIMIT_REACHED: maxExecutions },
+      });
+    });
+
+    it('does not pass Google policy to unrelated providers', async () => {
+      mockProvider.providerName = 'OpenAI';
+
+      await providerCoordinator.execute(mockProvider, 'hello', 'en', 'fa');
+
+      const options = queueManager.enqueue.mock.calls.at(-1)[4];
+      expect(options.queueRetryPolicy).toBeUndefined();
+    });
+
+    it('snapshots policy instead of retaining provider configuration reference', async () => {
+      mockProvider.providerName = 'GoogleTranslate';
+      const original = PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED;
+
+      try {
+        await providerCoordinator.execute(mockProvider, 'hello', 'en', 'fa');
+        const options = queueManager.enqueue.mock.calls.at(-1)[4];
+        PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = 5;
+
+        expect(options.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED).toBe(3);
+        expect(options.queueRetryPolicy).not.toBe(PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy);
+        expect(options.queueRetryPolicy.maxExecutions)
+          .not.toBe(PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions);
+      } finally {
+        PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = original;
+      }
+    });
+  });
+
   describe('Result Normalization', () => {
     it('should clean AI response using AIResponseParser', async () => {
       const { AIResponseParser } = await import("@/features/translation/providers/utils/AIResponseParser.js");
@@ -264,6 +309,67 @@ describe('ProviderCoordinator', () => {
       );
 
       expect(result.translatedText).toBe('Extracted Text');
+    });
+
+    it('accepts same-cardinality traditional arrays positionally without provenance checks', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue(['TA', 'TC', 'TB']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, ['A', 'B', 'C'], 'en', 'fa'
+      );
+
+      expect(result.translatedText).toEqual(['TA', 'TC', 'TB']);
+    });
+
+    it('accepts deterministic structural reconstruction for traditional multi-input strings', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue('TA\n[[---]]\nTB');
+
+      const result = await providerCoordinator.execute(
+        mockProvider, ['A', 'B'], 'en', 'fa'
+      );
+
+      expect(result.translatedText).toEqual(['TA', 'TB']);
+    });
+
+    it.each([
+      ['ambiguous mapping', 'TA TB', ['A', 'B']],
+      ['incomplete structural mapping', 'TA\n[[---]]\nTB', ['A', 'B', 'C']],
+    ])('converts %s to API_RESPONSE_INVALID', async (_label, translatedText, source) => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue(translatedText);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, source, 'en', 'fa'
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+    });
+
+    it('does not classify ambiguous mapping as UNKNOWN transient failure', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue('TA TB');
+      isTransientError.mockReturnValue(true);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, ['A', 'B'], 'en', 'fa'
+      )).rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
+    it('keeps single-input multi-part array normalization', async () => {
+      mockProvider.constructor.isAI = false;
+      mockProvider.providerName = 'GoogleTranslate';
+      mockProvider.translate.mockResolvedValue(['Part 1', 'Part 2']);
+
+      const result = await providerCoordinator.execute(
+        mockProvider, 'Input', 'en', 'fa'
+      );
+
+      expect(result.translatedText).toBe('Part 1\nPart 2');
     });
 
     it('should handle array results by joining them if expected format is STRING', async () => {
@@ -374,6 +480,74 @@ describe('ProviderCoordinator', () => {
   });
 
   describe('Error Resilience', () => {
+    it('propagates operation abort without matcher classification', async () => {
+      const operationAbort = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      mockProvider.translate.mockRejectedValue(operationAbort);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(operationAbort);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+      expect(isTransientError).not.toHaveBeenCalled();
+      expect(isFatalError).not.toHaveBeenCalled();
+      expect(operationAbort).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(operationAbort.type).not.toBe(ErrorTypes.USER_CANCELLED);
+    });
+
+    it('preserves typed timeout AbortError without matcher classification', async () => {
+      const timeoutError = Object.assign(new Error('timed out'), {
+        name: 'AbortError',
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      });
+      mockProvider.translate.mockRejectedValue(timeoutError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(timeoutError);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+      expect(timeoutError.type).toBe(ErrorTypes.TRANSLATION_TIMEOUT);
+      expect(timeoutError.operationAborted).not.toBe(true);
+      expect(isTransientError).toHaveBeenCalledWith(expect.objectContaining({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+      expect(isFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+      }));
+    });
+
+    it('continues matching ordinary untyped provider errors', async () => {
+      const ordinaryError = new Error('Temporary API Error');
+      mockProvider.translate.mockRejectedValue(ordinaryError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(ordinaryError);
+
+      expect(matchErrorToType).toHaveBeenCalledWith(ordinaryError);
+    });
+
+    it('propagates explicit USER_CANCELLED without matcher classification', async () => {
+      const userError = Object.assign(new Error('cancelled'), {
+        type: ErrorTypes.USER_CANCELLED,
+      });
+      mockProvider.translate.mockRejectedValue(userError);
+
+      await expect(providerCoordinator.execute(
+        mockProvider, 'Original Text', 'en', 'fa'
+      )).rejects.toBe(userError);
+
+      expect(matchErrorToType).not.toHaveBeenCalled();
+    });
+
     it('should throw if provider fails with a non-fatal non-transient error instead of fabricating success', async () => {
       mockProvider.translate.mockRejectedValue(new Error('Temporary API Error'));
 

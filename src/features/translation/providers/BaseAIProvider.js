@@ -3,7 +3,7 @@
  * Provides centralized batching, prompt preparation, and streaming support for AI models.
  */
 
-import { BaseProvider } from "@/features/translation/providers/BaseProvider.js";
+import { BaseProvider, createOperationAbortError } from "@/features/translation/providers/BaseProvider.js";
 import {
   getProviderStreaming,
   getProviderBatching
@@ -529,10 +529,7 @@ export class BaseAIProvider extends BaseProvider {
 
         if (!selectivePlan) {
           if (abortController?.signal?.aborted) {
-            const error = new Error('Translation cancelled by user');
-            error.name = 'AbortError';
-            error.type = ErrorTypes.USER_CANCELLED;
-            throw error;
+            throw createOperationAbortError(abortController.signal);
           }
           logger.warn(`[${this.providerName}] Full structured recovery retry started`);
           try {
@@ -603,10 +600,7 @@ export class BaseAIProvider extends BaseProvider {
 
         if (subsetPlan) {
           if (abortController?.signal?.aborted) {
-            const error = new Error('Translation cancelled by user');
-            error.name = 'AbortError';
-            error.type = ErrorTypes.USER_CANCELLED;
-            throw error;
+            throw createOperationAbortError(abortController.signal);
           }
           const subsetExpectedFormat = expectedFormat || ResponseFormat.JSON_ARRAY;
           const subsetExecutionContext = contextMetadata?.executionContext;
@@ -862,10 +856,7 @@ export class BaseAIProvider extends BaseProvider {
     // candidate and fail loudly as USER_CANCELLED.
     if (abortController?.signal?.aborted) {
       conversationCommitCandidate?.discard();
-      const cancelError = new Error('Translation cancelled by user');
-      cancelError.name = 'AbortError';
-      cancelError.type = ErrorTypes.USER_CANCELLED;
-      throw cancelError;
+      throw createOperationAbortError(abortController.signal);
     }
 
     if (!contextMetadata?.useParentConversationLifecycle) {
@@ -980,10 +971,7 @@ export class BaseAIProvider extends BaseProvider {
 
     for (let i = 0; i < texts.length; i++) {
       if (abortController?.signal?.aborted) {
-        const cancelError = new Error('Translation cancelled by user');
-        cancelError.name = 'AbortError';
-        cancelError.type = ErrorTypes.USER_CANCELLED;
-        throw cancelError;
+        throw createOperationAbortError(abortController.signal);
       }
       
       const text = texts[i];
@@ -1049,7 +1037,9 @@ export class BaseAIProvider extends BaseProvider {
         if (sender) {
           // If we have sender info, we can safely initialize the stream even if coordinator skipped it
           const { streamingManager } = await import("@/features/translation/core/StreamingManager.js");
-          streamingManager.initializeStream(messageId, sender, this, texts, sessionId);
+          const streamArgs = [messageId, sender, this, texts, sessionId];
+          if (options.executionContext?.conversationAcceptanceRegistered === true) streamArgs.push(true);
+          streamingManager.initializeStream(...streamArgs);
           logger.debug(`[${this.providerName}] Late-initialized stream for messageId: ${messageId}`);
         }
       } catch (err) {
@@ -1092,9 +1082,7 @@ export class BaseAIProvider extends BaseProvider {
 
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       if (abortController?.signal?.aborted || (engine && engine.isCancelled?.(messageId))) {
-        const cancelError = new Error('Translation cancelled by user');
-        cancelError.type = 'USER_CANCELLED';
-        throw cancelError;
+        throw createOperationAbortError(abortController?.signal);
       }
 
       const batch = batches[batchIndex];
@@ -1138,6 +1126,13 @@ export class BaseAIProvider extends BaseProvider {
         // Stream error to content script
         if (engine && messageId) {
           await AIStreamManager.streamErrorResults(this.providerName, error, batchIndex, messageId, engine);
+
+          const isLifecycleError = isCancellationError(error)
+            || error?.type === ErrorTypes.TRANSLATION_TIMEOUT
+            || error?.type === ErrorTypes.OPERATION_TIMEOUT;
+          if (!isLifecycleError) {
+            await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { error });
+          }
         }
 
         throw error;

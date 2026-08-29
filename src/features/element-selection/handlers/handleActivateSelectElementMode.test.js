@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import browser from 'webextension-polyfill';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock webextension-polyfill
 vi.mock('webextension-polyfill', () => ({
@@ -7,13 +8,30 @@ vi.mock('webextension-polyfill', () => ({
     tabs: {
       query: vi.fn(),
       sendMessage: vi.fn()
+    },
+    webNavigation: {
+      getAllFrames: vi.fn()
     }
   }
 }));
 
 // Mock local dependencies
 vi.mock('./selectElementStateManager.js', () => ({
-  setStateForTab: vi.fn()
+  completeActivationAttempt: vi.fn(),
+  compensateInvalidatedActivationAttempts: vi.fn(() => Promise.resolve([])),
+  setStateForTab: vi.fn(),
+  createActivationGeneration: vi.fn(() => 1),
+  getActivationAttemptToken: vi.fn(() => ({})),
+  invalidateOlderActivationAttempts: vi.fn(() => []),
+  isActivationAttemptCurrent: vi.fn(() => true),
+  recordActivationAttemptFrames: vi.fn(),
+  retainCompatibilityFrames: vi.fn(),
+  registerParticipant: vi.fn(() => true),
+  settleActivationAttemptFrame: vi.fn(),
+}));
+
+vi.mock('./handleDeactivateSelectElementMode.js', () => ({
+  handleDeactivateSelectElementMode: vi.fn(),
 }));
 
 vi.mock('@/core/tabPermissions.js', () => ({
@@ -60,13 +78,40 @@ vi.mock('@/shared/messaging/core/MessagingCore.js', () => ({
 
 import { handleActivateSelectElementMode } from './handleActivateSelectElementMode.js';
 import { tabPermissionChecker } from '@/core/tabPermissions.js';
-import { setStateForTab } from './selectElementStateManager.js';
+import {
+  compensateInvalidatedActivationAttempts,
+  createActivationGeneration,
+  getActivationAttemptToken,
+  invalidateOlderActivationAttempts,
+  isActivationAttemptCurrent,
+  recordActivationAttemptFrames,
+  retainCompatibilityFrames,
+  registerParticipant,
+  setStateForTab,
+  settleActivationAttemptFrame,
+} from './selectElementStateManager.js';
+import { handleDeactivateSelectElementMode } from './handleDeactivateSelectElementMode.js';
 
 describe('handleActivateSelectElementMode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createActivationGeneration.mockReturnValue(1);
+    getActivationAttemptToken.mockReturnValue({});
+    invalidateOlderActivationAttempts.mockReturnValue([]);
+    isActivationAttemptCurrent.mockReturnValue(true);
+    compensateInvalidatedActivationAttempts.mockResolvedValue([]);
+    recordActivationAttemptFrames.mockReturnValue(undefined);
+    retainCompatibilityFrames.mockReturnValue(undefined);
+    settleActivationAttemptFrame.mockReturnValue(undefined);
+    registerParticipant.mockReturnValue(true);
     tabPermissionChecker.checkTabAccess.mockResolvedValue({ isAccessible: true, isRestricted: false, fullUrl: 'https://example.com' });
-    browser.tabs.sendMessage.mockResolvedValue({ success: true, activated: true });
+    browser.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0 }]);
+    browser.tabs.sendMessage.mockResolvedValue({
+      success: true,
+      activated: true,
+      activationGeneration: 1,
+    });
+    handleDeactivateSelectElementMode.mockResolvedValue({ success: true, tabId: 1, active: false });
   });
 
   it('should activate mode for a specific tab', async () => {
@@ -75,8 +120,11 @@ describe('handleActivateSelectElementMode', () => {
 
     expect(response.success).toBe(true);
     expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
-      action: 'ACTIVATE_SELECT_ELEMENT_MODE'
-    }));
+      action: 'ACTIVATE_SELECT_ELEMENT_MODE',
+      data: expect.objectContaining({ active: true })
+    }), { frameId: 0 });
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data).not.toHaveProperty('activate');
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data.activationGeneration).toBe(1);
     expect(setStateForTab).toHaveBeenCalledWith(1, true);
   });
 
@@ -87,7 +135,7 @@ describe('handleActivateSelectElementMode', () => {
     await handleActivateSelectElementMode(message, {});
 
     expect(browser.tabs.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
-    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(2, expect.anything());
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(2, expect.anything(), { frameId: 0 });
   });
 
   it('should handle permission check failures', async () => {
@@ -102,6 +150,7 @@ describe('handleActivateSelectElementMode', () => {
 
     expect(response.success).toBe(false);
     expect(response.isRestrictedPage).toBe(true);
+    expect(response).not.toHaveProperty('errorDetails');
     expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
   });
 
@@ -113,6 +162,34 @@ describe('handleActivateSelectElementMode', () => {
 
     expect(response.success).toBe(false);
     expect(response.message).toContain('Failed to communicate');
+    expect(response.errorDetails).toEqual({
+      message: 'Could not activate Select Element mode.',
+      type: ErrorTypes.SELECT_ELEMENT,
+    });
+  });
+
+  it('settles a proven no-receiver frame without provisional cleanup debt', async () => {
+    browser.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 3 }]);
+    browser.tabs.sendMessage.mockImplementation((_tabId, _message, { frameId }) => {
+      if (frameId === 3) {
+        return Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
+      }
+      return Promise.resolve({ success: true, activated: true, activationGeneration: 1 });
+    });
+
+    const response = await handleActivateSelectElementMode({ data: { tabId: 1, active: true } }, {});
+
+    expect(response.success).toBe(true);
+    expect(registerParticipant).toHaveBeenCalledWith(1, 0, 1);
+    expect(settleActivationAttemptFrame).toHaveBeenCalledWith(1, 1, 3);
+  });
+
+  it('retains ambiguous delivery failures as provisional cleanup ownership', async () => {
+    browser.tabs.sendMessage.mockRejectedValue(new Error('Connection closed'));
+
+    await handleActivateSelectElementMode({ data: { tabId: 1, active: true } }, {});
+
+    expect(settleActivationAttemptFrame).not.toHaveBeenCalled();
   });
 
   it('should handle legacy boolean responses (true)', async () => {
@@ -122,6 +199,134 @@ describe('handleActivateSelectElementMode', () => {
     const response = await handleActivateSelectElementMode(message, {});
 
     expect(response.success).toBe(true);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(retainCompatibilityFrames).toHaveBeenCalledWith(1, 1, [0]);
+  });
+
+  it('should not establish authority without a generation echo', async () => {
+    browser.tabs.sendMessage.mockResolvedValue({ success: true, activated: true });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(true);
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+    expect(retainCompatibilityFrames).toHaveBeenCalledWith(1, 1, [0]);
+  });
+
+  it('should reject mismatched generation echoes without authority', async () => {
+    browser.tabs.sendMessage.mockResolvedValue({
+      success: true,
+      activated: true,
+      activationGeneration: 2,
+    });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+  });
+
+  it('should reject generation-verified ACKs from invalidated activation attempts', async () => {
+    isActivationAttemptCurrent.mockReturnValue(false);
+    browser.tabs.sendMessage.mockResolvedValue({
+      success: true,
+      activated: true,
+      activationGeneration: 1,
+    });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+    expect(isActivationAttemptCurrent).toHaveBeenCalledWith(1, 1, expect.anything());
+    expect(getActivationAttemptToken).toHaveBeenCalledWith(1);
+  });
+
+  it('tracks delivered frames provisionally and rejects their late ACKs', async () => {
+    let resolveFrameThree;
+    browser.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0 }, { frameId: 3 }]);
+    browser.tabs.sendMessage.mockImplementation((_tabId, _message, { frameId }) => {
+      if (frameId === 0) {
+        return Promise.resolve({ success: true, activated: true, activationGeneration: 1 });
+      }
+      return new Promise(resolve => {
+        resolveFrameThree = resolve;
+      });
+    });
+
+    const activation = handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+    await vi.waitFor(() => expect(resolveFrameThree).toEqual(expect.any(Function)));
+
+    expect(recordActivationAttemptFrames).toHaveBeenCalledWith(1, 1, [0]);
+    expect(recordActivationAttemptFrames).toHaveBeenCalledWith(1, 1, [3]);
+    isActivationAttemptCurrent.mockReturnValue(false);
+    resolveFrameThree({ success: true, activated: true, activationGeneration: 1 });
+
+    await expect(activation).resolves.toMatchObject({ success: false, activated: false });
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+  });
+
+  it('allows newer activation after older attempt invalidation', async () => {
+    let resolveFirstActivation;
+    let invalidated = false;
+    browser.tabs.sendMessage.mockImplementation((_tabId, message) => {
+      if (message.data.activationGeneration === 1) {
+        return new Promise(resolve => {
+          resolveFirstActivation = resolve;
+        });
+      }
+      return Promise.resolve({
+        success: true,
+        activated: true,
+        activationGeneration: 2,
+      });
+    });
+    isActivationAttemptCurrent.mockImplementation((_tabId, generation) => (
+      generation === 2 || (generation === 1 && !invalidated)
+    ));
+    createActivationGeneration.mockReturnValueOnce(1).mockReturnValueOnce(2);
+
+    const firstActivation = handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+    await vi.waitFor(() => expect(resolveFirstActivation).toEqual(expect.any(Function)));
+    await handleActivateSelectElementMode({ data: { tabId: 1, active: false } }, {});
+    invalidated = true;
+    const secondActivation = handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    resolveFirstActivation({
+      success: true,
+      activated: true,
+      activationGeneration: 1,
+    });
+
+    const [firstResponse, secondResponse] = await Promise.all([firstActivation, secondActivation]);
+
+    expect(firstResponse.success).toBe(false);
+    expect(secondResponse.success).toBe(true);
+    expect(registerParticipant).toHaveBeenCalledTimes(1);
+    expect(registerParticipant).toHaveBeenCalledWith(1, 0, 2);
     expect(setStateForTab).toHaveBeenCalledWith(1, true);
   });
 
@@ -131,15 +336,16 @@ describe('handleActivateSelectElementMode', () => {
     const message = { data: { tabId: 1, active: true } };
     const response = await handleActivateSelectElementMode(message, {});
 
-    // For accessible pages, false is treated as success for legacy reasons
-    expect(response.success).toBe(true);
+    expect(response.success).toBe(false);
     expect(response.isLegacyResponse).toBe(true);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
   });
 
   it('should handle structured error response from content script', async () => {
     browser.tabs.sendMessage.mockResolvedValue({ 
       success: false, 
       error: 'Already active',
+      errorType: 'MODEL_MISSING',
       isCompatibilityIssue: true 
     });
     
@@ -150,6 +356,11 @@ describe('handleActivateSelectElementMode', () => {
     expect(response.message).toBe('Could not activate Select Element mode.');
     expect(response.error).toBe('Could not activate Select Element mode.');
     expect(response.isCompatibilityIssue).toBe(true);
+    expect(response.errorType).toBe('MODEL_MISSING');
+    expect(response.errorDetails).toEqual({
+      message: 'Could not activate Select Element mode.',
+      type: 'MODEL_MISSING',
+    });
   });
 
   it('sanitizes unknown activation exceptions while retaining diagnostics in logs', async () => {
@@ -162,19 +373,99 @@ describe('handleActivateSelectElementMode', () => {
       success: false,
       message: 'Could not activate Select Element mode.',
       error: 'Could not activate Select Element mode.',
+      errorDetails: {
+        message: 'Could not activate Select Element mode.',
+        type: ErrorTypes.SELECT_ELEMENT,
+      },
     });
     expect(JSON.stringify(response)).not.toContain('INTERNAL_PORT_9f81');
     expect(JSON.stringify(response)).not.toContain('Receiving end does not exist');
   });
 
-  it('should deactivate mode', async () => {
+  it('should route deactivation through the authoritative barrier', async () => {
     const message = { data: { tabId: 1, active: false } };
     const response = await handleActivateSelectElementMode(message, {});
 
     expect(response.success).toBe(true);
-    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.objectContaining({
-      action: 'DEACTIVATE_SELECT_ELEMENT_MODE'
-    }));
-    expect(setStateForTab).toHaveBeenCalledWith(1, false);
+    expect(handleDeactivateSelectElementMode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { tabId: 1, active: false },
+      }),
+      {},
+    );
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, false);
+  });
+
+  it('should not invalidate existing state when activation has no strict ACK', async () => {
+    browser.tabs.sendMessage.mockResolvedValueOnce({ success: true, activated: false });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(response.activated).toBe(false);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, false);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+  });
+
+  it('should reject an activation response without confirmed state', async () => {
+    browser.tabs.sendMessage.mockResolvedValueOnce({ success: true });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
+  });
+
+  it('should activate and register every frame with a strict ACK', async () => {
+    browser.webNavigation.getAllFrames.mockResolvedValue([
+      { frameId: 0 },
+      { frameId: 4 },
+    ]);
+    browser.tabs.sendMessage.mockResolvedValue({
+      success: true,
+      activated: true,
+      activationGeneration: 1,
+    });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(true);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(2);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.anything(), { frameId: 0 });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(1, expect.anything(), { frameId: 4 });
+    expect(registerParticipant).toHaveBeenCalledWith(1, 0, 1);
+    expect(registerParticipant).toHaveBeenCalledWith(1, 4, 1);
+    expect(registerParticipant.mock.calls.map(([, , generation]) => generation)).toEqual([1, 1]);
+    expect(setStateForTab).toHaveBeenCalledWith(1, true);
+  });
+
+  it('should publish active state when at least one frame confirms activation', async () => {
+    browser.webNavigation.getAllFrames.mockResolvedValue([
+      { frameId: 0 },
+      { frameId: 4 },
+    ]);
+    browser.tabs.sendMessage
+      .mockResolvedValueOnce({ success: true, activated: true, activationGeneration: 1 })
+      .mockResolvedValueOnce({ success: false, error: 'Frame unavailable' });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(true);
+    expect(registerParticipant).toHaveBeenCalledTimes(1);
+    expect(registerParticipant).toHaveBeenCalledWith(1, 0, 1);
+    expect(setStateForTab).toHaveBeenCalledWith(1, true);
   });
 });

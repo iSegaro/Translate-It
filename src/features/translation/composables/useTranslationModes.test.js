@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createApp } from 'vue';
+import browser from 'webextension-polyfill';
 import { useSidepanelTranslation, useSelectElementTranslation, useSidepanelActions } from './useTranslationModes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
@@ -192,6 +193,23 @@ describe("useTranslationModes", () => {
 
       expect(success).toBe(false);
       expect(composable.error.value).toBe("Restricted page");
+    });
+
+    it("should include current tabId when deactivating from an extension page", async () => {
+      const [composable] = withSetup(() => useSelectElementTranslation());
+      const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+
+      browser.tabs.query.mockResolvedValueOnce([{ id: 42 }]);
+      sendMessage.mockClear();
+      sendMessage.mockResolvedValueOnce({ success: true, active: false });
+
+      const success = await composable.deactivateSelectMode();
+
+      expect(success).toBe(true);
+      expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+        data: { active: false, tabId: 42 },
+      }));
     });
 
     it("uses safe fallback when activation request throws a technical error", async () => {

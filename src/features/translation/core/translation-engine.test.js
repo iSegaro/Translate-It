@@ -31,6 +31,7 @@ vi.mock("./managers/TranslationLifecycleRegistry.js", () => {
       this.registerRequest = vi.fn();
       this.unregisterRequest = vi.fn();
       this.getAbortController = vi.fn();
+      this.getCancellationReason = vi.fn(() => null);
     }
   };
 });
@@ -111,6 +112,80 @@ describe('TranslationEngine', () => {
     getEnableDictionaryAsync.mockResolvedValue(true);
   });
 
+  describe('scalar empty input validation', () => {
+    it.each(['', ' ', '\n', '\t', ' \n\t '])('returns TEXT_EMPTY for %j', async (text) => {
+      const response = await engine.handleMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: `empty-${JSON.stringify(text)}`,
+        data: {
+          text,
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'selection',
+        },
+      }, {});
+
+      expect(response.error.type).toBe(ErrorTypes.TEXT_EMPTY);
+      expect(engine.factory.getProvider).not.toHaveBeenCalled();
+    });
+
+    it('keeps non-empty scalar input on the provider path', async () => {
+      const provider = await engine.getProvider('google');
+
+      const result = await engine.executeTranslation({
+        text: 'Hello',
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: 'selection',
+      }, {});
+
+      expect(result.success).toBe(true);
+      expect(provider.translate).toHaveBeenCalled();
+    });
+
+    it.each([null, undefined, [], {}])('does not reclassify %j as TEXT_EMPTY', async (text) => {
+      const response = await engine.handleMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: `non-scalar-${String(text)}`,
+        data: {
+          text,
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'selection',
+        },
+      }, {});
+
+      expect(response.error.type).not.toBe(ErrorTypes.TEXT_EMPTY);
+    });
+
+    it('preserves non-empty structured input behavior', async () => {
+      getEnableDictionaryAsync.mockResolvedValue(false);
+      engine.jsonHandler.execute.mockResolvedValue({
+        success: true,
+        translatedText: ['translated'],
+      });
+
+      const result = await engine.handleMessage({
+        action: MessageActions.TRANSLATE,
+        messageId: 'structured-non-empty',
+        data: {
+          text: [''],
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'select_element',
+          options: { rawJsonPayload: true },
+        },
+      }, {});
+
+      expect(result.success).toBe(true);
+      expect(engine.jsonHandler.execute).toHaveBeenCalled();
+    });
+  });
+
   it('forwards timeout classification and reason to lifecycle', async () => {
     engine.lifecycleRegistry.cancelTranslation = vi.fn().mockResolvedValue(true);
 
@@ -144,6 +219,176 @@ describe('TranslationEngine', () => {
     expect('streaming' in result).toBe(false);
   });
 
+  it('formatError preserves canonical provider identity and visible fields', () => {
+    const providerError = new Error('Unknown model name');
+    Object.assign(providerError, {
+      type: ErrorTypes.HTTP_ERROR,
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 400,
+      context: 'provider-request',
+      providerName: 'WebAI',
+    });
+
+    const result = engine.formatError(providerError, 'popup');
+
+    expect(result).toEqual({
+      success: false,
+      error: {
+        message: 'Unknown model name',
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 400,
+        context: 'provider-request',
+        providerName: 'WebAI',
+      },
+    });
+  });
+
+  it('preserves canonical fields when reconstructing resolved provider failures', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Unknown model name',
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 400,
+        providerName: 'WebAI',
+      },
+    });
+
+    let caughtError;
+    try {
+      await engine.executeTranslation({
+        text: 'Hello',
+        provider: 'google',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        mode: 'selection',
+      }, {});
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toMatchObject({
+      message: 'Unknown model name',
+      type: ErrorTypes.HTTP_ERROR,
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 400,
+      providerName: 'WebAI',
+    });
+  });
+
+  it('prefers errorDetails over conflicting legacy error', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      error: { message: 'legacy failure', type: 'LEGACY_ERROR' },
+      errorDetails: {
+        message: 'canonical failure',
+        type: ErrorTypes.HTTP_ERROR,
+        originalType: ErrorTypes.MODEL_MISSING,
+        statusCode: 503,
+        context: 'provider-request',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+      },
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'canonical failure',
+      type: ErrorTypes.HTTP_ERROR,
+      originalType: ErrorTypes.MODEL_MISSING,
+      statusCode: 503,
+      context: 'provider-request',
+      providerName: 'Provider',
+      providerId: 'provider-id',
+      code: 'UPSTREAM_FAILURE',
+      errorCode: 'E_UPSTREAM',
+      translationOutcome: { partial: true },
+    });
+  });
+
+  it('preserves canonical identity for errorDetails-only failures', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      errorDetails: {
+        message: 'API key invalid',
+        type: ErrorTypes.API_KEY_INVALID,
+        statusCode: 401,
+        providerName: 'Provider',
+      },
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'API key invalid',
+      type: ErrorTypes.API_KEY_INVALID,
+      statusCode: 401,
+      providerName: 'Provider',
+    });
+  });
+
+  it('falls back to legacy error when errorDetails is malformed', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'legacy failure',
+        type: ErrorTypes.NETWORK_ERROR,
+        statusCode: 502,
+      },
+      errorDetails: { arbitrary: true },
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'legacy failure',
+      type: ErrorTypes.NETWORK_ERROR,
+      statusCode: 502,
+    });
+  });
+
+  it('keeps whole-result fallback for failure envelopes without error fields', async () => {
+    const mockProvider = await engine.getProvider('google');
+    mockProvider.translate.mockResolvedValue({
+      success: false,
+      type: ErrorTypes.VALIDATION,
+      message: 'invalid provider result',
+    });
+
+    await expect(engine.executeTranslation({
+      text: 'Hello',
+      provider: 'google',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      mode: 'selection',
+    }, {})).rejects.toMatchObject({
+      message: 'invalid provider result',
+      type: ErrorTypes.VALIDATION,
+    });
+  });
+
   describe('handleMessage', () => {
     it('should process TRANSLATE message successfully', async () => {
       const request = {
@@ -165,8 +410,28 @@ describe('TranslationEngine', () => {
       expect(result.mode).toBe('selection'); // Not upgraded because multi-word
     });
 
-    it('returns cancellation without starting translation when registration was pre-cancelled', async () => {
+    it.each([
+      ['document-replaced', {
+        success: false,
+        cancelled: true,
+        error: {
+          operationAborted: true,
+          cancellationReason: 'document-replaced',
+        },
+      }],
+      ['user-cancelled', {
+        success: false,
+        cancelled: true,
+        error: { type: ErrorTypes.USER_CANCELLED },
+      }],
+      ['timeout', {
+        success: false,
+        timedOut: true,
+        error: { type: ErrorTypes.TRANSLATION_TIMEOUT },
+      }],
+    ])('returns %s lifecycle result without starting translation', async (reason, expectedResult) => {
       engine.lifecycleRegistry.registerRequest.mockReturnValue(null);
+      engine.lifecycleRegistry.getCancellationReason.mockReturnValue(reason);
       const executeTranslation = vi.spyOn(engine, 'executeTranslation');
       const request = {
         action: MessageActions.TRANSLATE,
@@ -182,7 +447,8 @@ describe('TranslationEngine', () => {
 
       const result = await engine.handleMessage(request, {});
 
-      expect(result).toMatchObject({ success: false, error: { type: 'USER_CANCELLED' } });
+      expect(result).toMatchObject(expectedResult);
+      expect(result.error.type).not.toBe(ErrorTypes.TRANSLATION_ERROR);
       expect(executeTranslation).not.toHaveBeenCalled();
       expect(engine.jsonHandler.execute).not.toHaveBeenCalled();
       expect(engine.factory.getProvider).not.toHaveBeenCalled();

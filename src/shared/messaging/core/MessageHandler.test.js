@@ -75,6 +75,45 @@ describe('MessageHandler', () => {
       expect(response).toEqual({ success: true, data: 'async' });
     });
 
+    it('returns additive canonical error details when an async handler rejects', async () => {
+      const error = Object.assign(new Error('Provider unavailable'), {
+        type: 'API_ERROR',
+        statusCode: 503,
+        code: 'UPSTREAM_FAILURE',
+        cause: new Error('private cause'),
+        arbitrary: { ignored: true },
+      });
+      const mockHandler = vi.fn().mockRejectedValue(error);
+      handler.registerHandler('ASYNC_FAILURE', mockHandler);
+
+      const response = await handler._handleMessage(
+        { action: 'ASYNC_FAILURE', messageId: 'msg-error' },
+        { id: 'sender' },
+        vi.fn()
+      );
+
+      expect(response).toMatchObject({
+        success: false,
+        messageId: 'msg-error',
+        error: {
+          message: 'Provider unavailable',
+          type: 'API_ERROR',
+          statusCode: 503,
+          code: 'UPSTREAM_FAILURE',
+        },
+        errorDetails: {
+          message: 'Provider unavailable',
+          type: 'API_ERROR',
+          statusCode: 503,
+          code: 'UPSTREAM_FAILURE',
+        },
+      });
+      expect(response.error).not.toHaveProperty('cause');
+      expect(response.error).not.toHaveProperty('arbitrary');
+      expect(response.errorDetails).not.toHaveProperty('cause');
+      expect(response.errorDetails).not.toHaveProperty('arbitrary');
+    });
+
     it('should handle handlers that return true for manual async response', () => {
       const mockHandler = vi.fn().mockReturnValue(true);
       handler.registerHandler('MANUAL_ASYNC', mockHandler);

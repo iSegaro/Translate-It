@@ -80,6 +80,80 @@ describe('TranslationRequestTracker', () => {
       expect(tracker.createRequest({ messageId, data: { text: 'replacement' } })).toBeNull();
       expect(tracker.getRequest(messageId)).toBe(original);
     });
+
+    it('retains overlapping pending requests until caller terminalizes them', () => {
+      const target = { id: 'field-1' };
+      const first = tracker.createRequest({
+        messageId: 'field-request-a',
+        data: { text: 'A', target, toastId: 'field-toast' },
+      });
+      const second = tracker.createRequest({
+        messageId: 'field-request-b',
+        data: { text: 'B', target, toastId: 'field-toast' },
+      });
+
+      expect(first.status).toBe(RequestStatus.PENDING);
+      expect(second.status).toBe(RequestStatus.PENDING);
+      expect(tracker.getRequest('field-request-a')).toBe(first);
+      expect(tracker.getRequest('field-request-b')).toBe(second);
+      expect(tracker.getRequestsByStatus(RequestStatus.PENDING)).toEqual([first, second]);
+      expect(tracker.getRequestByToastId('field-toast')).toBe(second);
+
+      expect(tracker.cleanup()).toBe(0);
+      expect(tracker.getRequest('field-request-a')).toBe(first);
+
+      vi.advanceTimersByTime(30 * 60 * 1000 + 1);
+      expect(tracker.cleanup()).toBe(2);
+      expect(tracker.getRequest('field-request-a')).toBeUndefined();
+      expect(tracker.getRequest('field-request-b')).toBeUndefined();
+    });
+
+    it.each([
+      ['completed', (messageId) => tracker.completeRequest(messageId, { success: true })],
+      ['failed', (messageId) => tracker.failRequest(messageId, new Error('failed'))],
+      ['cancelled', (messageId) => tracker.cancelRequest(messageId)],
+      ['timeout', (messageId) => tracker.markTimeout(messageId)],
+    ])('keeps newer shared-toast request indexed when older request is %s', (_status, terminalize) => {
+      tracker.createRequest({
+        messageId: 'shared-request-a',
+        data: { toastId: 'shared-toast' },
+        sender: { tab: { id: 1 } },
+      });
+      const second = tracker.createRequest({
+        messageId: 'shared-request-b',
+        data: { toastId: 'shared-toast' },
+        sender: { tab: { id: 1 } },
+      });
+
+      expect(tracker.getRequestByToastId('shared-toast')).toBe(second);
+      expect(terminalize('shared-request-a')).toMatchObject({ accepted: true });
+      expect(tracker.getRequestByToastId('shared-toast')).toBe(second);
+      expect(tracker.getTabRequests(1)).toEqual([expect.objectContaining({ messageId: 'shared-request-b' })]);
+    });
+
+    it('deletes current toast index without restoring older request', () => {
+      tracker.createRequest({ messageId: 'shared-request-a', data: { toastId: 'shared-toast' } });
+      tracker.createRequest({ messageId: 'shared-request-b', data: { toastId: 'shared-toast' } });
+
+      tracker.cancelRequest('shared-request-b');
+
+      expect(tracker.getRequestByToastId('shared-toast')).toBeNull();
+    });
+
+    it('isolates different toast indexes and preserves repeated terminalization', () => {
+      tracker.createRequest({ messageId: 'request-a', data: { toastId: 'toast-a' }, sender: { tab: { id: 1 } } });
+      tracker.createRequest({ messageId: 'request-b', data: { toastId: 'toast-b' }, sender: { tab: { id: 1 } } });
+
+      expect(tracker.completeRequest('request-a', { success: true })).toMatchObject({ accepted: true });
+      expect(tracker.getRequestByToastId('toast-a')).toBeNull();
+      expect(tracker.getRequestByToastId('toast-b')).toMatchObject({ messageId: 'request-b' });
+      expect(tracker.getTabRequests(1)).toEqual([expect.objectContaining({ messageId: 'request-b' })]);
+      expect(tracker.completeRequest('request-a', { success: true })).toMatchObject({
+        accepted: false,
+        reason: 'already_terminal',
+      });
+      expect(tracker.getRequestByToastId('toast-b')).toMatchObject({ messageId: 'request-b' });
+    });
   });
 
   describe('updateRequest', () => {
@@ -263,10 +337,80 @@ describe('TranslationRequestTracker', () => {
   });
 
   describe('element association', () => {
-    it('should associate and find requests by element', () => {
+    it.each([
+      ['pending', null],
+      ['processing', RequestStatus.PROCESSING],
+      ['streaming', RequestStatus.STREAMING],
+    ])('returns %s request association while request is active', (_name, status) => {
       const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'm1', data: { text: 'Hello' } });
       tracker.associateWithElement('m1', el);
+      if (status) tracker.updateRequest('m1', { status });
+
       expect(tracker.findRequestByElement(el)).toBe('m1');
+    });
+
+    it('returns undefined for a missing association', () => {
+      expect(tracker.findRequestByElement({ nodeType: 1 })).toBeUndefined();
+    });
+
+    it('removes missing request association and keeps repeated lookup empty', () => {
+      const el = { nodeType: 1 };
+      tracker.associateWithElement('missing', el);
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+    });
+
+    it.each([
+      ['completed', (id) => tracker.completeRequest(id, { success: true })],
+      ['failed', (id) => tracker.failRequest(id, new Error('failed'))],
+      ['cancelled', (id) => tracker.cancelRequest(id, 'user_cancelled')],
+      ['timeout', (id) => tracker.markTimeout(id)],
+    ])('removes %s request association from lookup', (_name, terminalize) => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'm1', data: { text: 'Hello' } });
+      tracker.associateWithElement('m1', el);
+      terminalize('m1');
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+    });
+
+    it('preserves newer association when older request terminalizes', () => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'request-a', data: { text: 'A' } });
+      tracker.createRequest({ messageId: 'request-b', data: { text: 'B' } });
+      tracker.associateWithElement('request-a', el);
+      tracker.associateWithElement('request-b', el);
+
+      tracker.completeRequest('request-a', { success: true });
+
+      expect(tracker.findRequestByElement(el)).toBe('request-b');
+    });
+
+    it('invalidates current association when newer request terminalizes', () => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'request-b', data: { text: 'B' } });
+      tracker.associateWithElement('request-b', el);
+
+      tracker.completeRequest('request-b', { success: true });
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+    });
+
+    it('does not rediscover terminal request after retention cleanup', () => {
+      const el = { nodeType: 1 };
+      tracker.createRequest({ messageId: 'request-b', data: { text: 'B' } });
+      tracker.associateWithElement('request-b', el);
+      tracker.completeRequest('request-b', { success: true });
+
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
+      vi.advanceTimersByTime(6 * 60 * 1000);
+      tracker.cleanup();
+
+      expect(tracker.getRequest('request-b')).toBeUndefined();
+      expect(tracker.findRequestByElement(el)).toBeUndefined();
     });
   });
 

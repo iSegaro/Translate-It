@@ -51,6 +51,7 @@ import BaseInput from '@/components/base/BaseInput.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
 
 const { t } = useI18n()
 
@@ -123,8 +124,7 @@ const testKeys = async (providerName) => {
   } catch (error) {
     testResult.value = {
       allInvalid: true,
-      messageKey: 'api_test_failed',
-      params: { error: error.message }
+      ...presentProviderSettingsError(error)
     }
   } finally {
     testingKeys.value = false

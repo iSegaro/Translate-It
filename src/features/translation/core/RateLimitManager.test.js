@@ -21,8 +21,14 @@ vi.mock('@/shared/error-management/ValidationPolicy.js', () => ({
 }));
 
 import { RateLimitManager, TranslationPriority } from './RateLimitManager.js';
-import { isFatalError } from '@/shared/error-management/ErrorMatcher.js';
+import {
+  isConfigError,
+  isFatalError,
+  isProviderRequestSizeError,
+  isDeterministicClientHttpError,
+} from '@/shared/error-management/ErrorMatcher.js';
 import { isLocalDeterministicValidationError } from '@/shared/error-management/ValidationPolicy.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('@/shared/config/config.js', () => ({
@@ -64,7 +70,10 @@ vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({
             maxConcurrent: 8,
           },
         },
-      }
+      },
+      ...(providerName === 'BingTranslate' && {
+        errorHandling: { circuitBreakThreshold: 3 },
+      }),
     };
   })
 }));
@@ -90,6 +99,19 @@ describe('RateLimitManager', () => {
 
     // Default mock behavior for ErrorMatcher
     isFatalError.mockImplementation((err) => err.message === 'FATAL');
+    isConfigError.mockReturnValue(false);
+    isProviderRequestSizeError.mockImplementation((error) => {
+      const statusCode = Number(error?.statusCode);
+      const message = typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+      return error?.type === ErrorTypes.HTTP_ERROR
+        && (statusCode === 413
+          || ((statusCode === 400 || statusCode === 422)
+            && /\btoo\s+long\b|\bmaximum\s+length\b|\bcontext\s+length\b/.test(message)));
+    });
+    isDeterministicClientHttpError.mockImplementation((error) => {
+      return error?.type === ErrorTypes.HTTP_ERROR
+        && [400, 404, 422].includes(Number(error?.statusCode));
+    });
 
     // Reset singleton instance for clean tests
     RateLimitManager.instance = null;
@@ -100,6 +122,44 @@ describe('RateLimitManager', () => {
   });
 
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  describe('provider circuit threshold configuration', () => {
+    it('uses Bing explicit threshold and opens after third eligible failure', async () => {
+      const state = await manager._initializeProviderWithLevel('BingTranslate');
+
+      expect(state.circuitBreakThreshold).toBe(3);
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        manager._recordFailure(
+          state,
+          Object.assign(new Error('Bing server failure'), { type: ErrorTypes.SERVER_ERROR }),
+          'BingTranslate'
+        );
+      }
+
+      expect(state.isCircuitOpen).toBe(true);
+
+      const task = vi.fn().mockResolvedValue('unexpected');
+      await expect(manager.executeWithRateLimit('BingTranslate', task))
+        .rejects.toMatchObject({ type: ErrorTypes.CIRCUIT_BREAKER_OPEN });
+      expect(task).not.toHaveBeenCalled();
+    });
+
+    it('keeps default threshold for providers without explicit override', async () => {
+      const state = await manager._initializeProviderWithLevel('TestProvider');
+
+      expect(state.circuitBreakThreshold).toBe(5);
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, '3'])('falls back for invalid explicit threshold %p', (threshold) => {
+      const state = manager._initializeProvider('InvalidThresholdProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+      }, { circuitBreakThreshold: threshold });
+
+      expect(state.circuitBreakThreshold).toBe(5);
+    });
+  });
 
   describe('Priority Queueing', () => {
     it('should execute HIGH priority tasks before NORMAL and LOW', async () => {
@@ -140,6 +200,329 @@ describe('RateLimitManager', () => {
   });
 
   describe('Circuit Breaker', () => {
+    it('keeps circuit open when an in-flight success arrives during cooldown', async () => {
+      vi.useFakeTimers();
+      try {
+        const state = manager._initializeProvider('CooldownProvider', {
+          maxConcurrent: 2,
+          delayBetweenRequests: 0,
+          adaptiveBackoff: {
+            enabled: true,
+            baseMultiplier: 2,
+            maxDelay: 1000,
+            resetAfterSuccess: 2,
+          },
+        });
+        state.circuitBreakThreshold = 1;
+        state.circuitRecoveryTime = 30000;
+        state.currentBackoffMultiplier = 2;
+
+        let rejectFirst;
+        let resolveSecond;
+        const firstTask = vi.fn(() => new Promise((resolve, reject) => {
+          rejectFirst = reject;
+        }));
+        const secondTask = vi.fn(() => new Promise(resolve => {
+          resolveSecond = resolve;
+        }));
+
+        const firstRequest = manager.executeWithRateLimit('CooldownProvider', firstTask);
+        const secondRequest = manager.executeWithRateLimit('CooldownProvider', secondTask);
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(firstTask).toHaveBeenCalledTimes(1);
+        expect(secondTask).toHaveBeenCalledTimes(1);
+
+        const openingError = Object.assign(new Error('network failure'), {
+          type: ErrorTypes.NETWORK_ERROR,
+        });
+        rejectFirst(openingError);
+        await expect(firstRequest).rejects.toBe(openingError);
+        expect(state.isCircuitOpen).toBe(true);
+        const openingTime = state.circuitOpenTime;
+
+        resolveSecond('in-flight success');
+        await expect(secondRequest).resolves.toBe('in-flight success');
+        expect(state.isCircuitOpen).toBe(true);
+        expect(state.circuitOpenTime).toBe(openingTime);
+        expect(state.lastCircuitError).toBe(openingError);
+        expect(state.successfulRequestsSinceBackoff).toBe(1);
+        expect(state.currentBackoffMultiplier).toBe(2);
+
+        const blockedTask = vi.fn().mockResolvedValue('blocked');
+        await expect(manager.executeWithRateLimit('CooldownProvider', blockedTask))
+          .rejects.toMatchObject({
+            type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+            originalType: ErrorTypes.NETWORK_ERROR,
+          });
+        expect(blockedTask).not.toHaveBeenCalled();
+
+        await vi.advanceTimersByTimeAsync(30001);
+
+        const recoveryTask = vi.fn().mockResolvedValue('recovered');
+        await expect(manager.executeWithRateLimit('CooldownProvider', recoveryTask))
+          .resolves.toBe('recovered');
+        expect(recoveryTask).toHaveBeenCalledTimes(1);
+        expect(state.isCircuitOpen).toBe(false);
+        expect(state.currentBackoffMultiplier).toBe(1);
+        expect(state.successfulRequestsSinceBackoff).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('does not count insufficient balance as transient circuit failure', async () => {
+      const error = Object.assign(new Error('No credits remaining'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      isFatalError.mockReturnValue(true);
+      isConfigError.mockImplementation(candidate => candidate?.type === ErrorTypes.INSUFFICIENT_BALANCE);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('does not count invalid requests and allows the next operation', async () => {
+      const error = Object.assign(new Error('Invalid request parameters'), {
+        type: ErrorTypes.INVALID_REQUEST,
+        statusCode: 400,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ErrorTypes.API_ENDPOINT_INVALID,
+      ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+    ])('keeps request-local %s out of provider health and allows the next operation', async (type) => {
+      const error = Object.assign(new Error(type), { type });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps SOCKS timeout transport failures out of provider health', async () => {
+      const error = Object.assign(new Error('SOCKS proxy connection timed out'), {
+        type: ErrorTypes.NETWORK_ERROR,
+        transportFailure: 'socks-proxy-timeout',
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('keeps ordinary NETWORK_ERROR provider-health behavior unchanged', async () => {
+      const error = Object.assign(new Error('Network failure'), {
+        type: ErrorTypes.NETWORK_ERROR,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+    });
+
+    it('keeps fatal FORBIDDEN_ERROR out of provider health and allows the next operation', async () => {
+      const error = Object.assign(new Error('Access denied'), {
+        type: ErrorTypes.FORBIDDEN_ERROR,
+        statusCode: 403,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([400, 422])('keeps HTTP %s TEXT_EMPTY out of provider health while recording failure', async (statusCode) => {
+      const error = Object.assign(new Error('Text is empty'), {
+        type: ErrorTypes.TEXT_EMPTY,
+        statusCode,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [400, true],
+      [404, true],
+      [422, true],
+      [409, false],
+    ])('keeps HTTP %s deterministic-client predicate expectation', (statusCode, expected) => {
+      const error = { type: ErrorTypes.HTTP_ERROR, statusCode };
+      expect(isDeterministicClientHttpError(error)).toBe(expected);
+    });
+
+    it.each([400, 404, 422])('excludes HTTP %s from provider health and allows the next operation', async (statusCode) => {
+      const error = Object.assign(new Error(`HTTP ${statusCode}`), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockImplementation((candidate) => candidate === error || candidate?.statusCode === 404);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps HTTP 409 provider-health accounting unchanged', async () => {
+      const error = Object.assign(new Error('Conflict'), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 409,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(false);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('still counts genuine SERVER_ERROR provider health failures', async () => {
+      const error = Object.assign(new Error('Server failure'), {
+        type: ErrorTypes.SERVER_ERROR,
+        statusCode: 500,
+      });
+      const state = manager.providerStates.get('TestProvider');
+      isFatalError.mockReturnValue(false);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(1);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it.each([
+      [400, 'request is too long'],
+      [422, 'maximum context length exceeded'],
+      [413, 'Payload Too Large'],
+    ])('records HTTP %s remote-size failure without health penalty', async (statusCode, message) => {
+      const error = Object.assign(new Error(message), {
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+      });
+      isFatalError.mockReturnValue(false);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      const state = manager.providerStates.get('TestProvider');
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+
+      const nextTask = vi.fn().mockResolvedValue('healthy');
+      await expect(manager.executeWithRateLimit('TestProvider', nextTask)).resolves.toBe('healthy');
+      expect(nextTask).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves HTTP 402 semantic type when opening circuit', async () => {
+      const error = Object.assign(new Error('HTTP 402'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 402,
+      });
+      isFatalError.mockReturnValue(true);
+
+      await expect(manager.executeWithRateLimit(
+        'TestProvider',
+        () => Promise.reject(error)
+      )).rejects.toBe(error);
+
+      expect(manager.providerStates.get('TestProvider').lastCircuitError).toBe(error);
+      expect(error.type).toBe(ErrorTypes.INSUFFICIENT_BALANCE);
+    });
+
     it('should open the circuit after 5 consecutive failures', async () => {
       const failingTask = () => Promise.reject(new Error('API Error'));
       
@@ -168,6 +551,158 @@ describe('RateLimitManager', () => {
 
       await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
         .rejects.toThrow(/Circuit breaker open/);
+    });
+
+    it('preserves provider identity and original cause on circuit rejection', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const serverError = Object.assign(new Error('HTTP 500'), {
+        type: 'SERVER_ERROR',
+        statusCode: 500,
+      });
+      state.isCircuitOpen = true;
+      state.circuitOpenTime = Date.now();
+      state.lastCircuitError = serverError;
+
+      await expect(manager.executeWithRateLimit('TestProvider', () => Promise.resolve('ok')))
+        .rejects.toMatchObject({
+          type: 'CIRCUIT_BREAKER_OPEN',
+          originalType: 'SERVER_ERROR',
+          statusCode: 500,
+         providerName: 'TestProvider',
+         });
+    });
+
+    it.each([
+      ['server', ErrorTypes.SERVER_ERROR, 500],
+      ['network', ErrorTypes.NETWORK_ERROR, undefined],
+    ])('keeps %s circuit rejections out of cancellation classification', async (_label, originalType, statusCode) => {
+      const state = manager.providerStates.get('TestProvider');
+      const circuitError = Object.assign(new Error('Circuit breaker open for TestProvider'), {
+        type: ErrorTypes.CIRCUIT_BREAKER_OPEN,
+        originalType,
+        ...(statusCode === undefined ? {} : { statusCode }),
+        providerName: 'TestProvider',
+      });
+      const reject = vi.fn();
+      state.queues[TranslationPriority.NORMAL].push({ reject });
+
+      manager._rejectQueue(state, circuitError);
+
+      const [rejection] = reject.mock.calls[0];
+      expect(rejection).toMatchObject({ type: ErrorTypes.CIRCUIT_BREAKER_OPEN, originalType });
+      expect(rejection.name).not.toBe('AbortError');
+      expect(rejection.isCancelled).not.toBe(true);
+      if (statusCode === undefined) expect(rejection).not.toHaveProperty('statusCode');
+      else expect(rejection.statusCode).toBe(statusCode);
+    });
+  });
+
+  describe('Abort provenance', () => {
+    const createDeferred = () => {
+      let resolve;
+      const promise = new Promise((res) => { resolve = res; });
+      return { promise, resolve };
+    };
+
+    const blockQueue = async () => {
+      const blocker = createDeferred();
+      const blockerPromise = manager.executeWithRateLimit('TestProvider', () => blocker.promise);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { blocker, blockerPromise };
+    };
+
+    it('preserves explicit user cancellation for queued requests', async () => {
+      const { blocker, blockerPromise } = await blockQueue();
+      const controller = new AbortController();
+      const request = manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+        abortController: controller,
+      });
+
+      controller.abort('user-cancelled');
+
+      await expect(request).rejects.toMatchObject({
+        type: ErrorTypes.USER_CANCELLED,
+        isCancelled: true,
+      });
+      blocker.resolve();
+      await blockerPromise;
+    });
+
+    it.each([['timeout', (controller) => controller.abort('timeout')], ['bare', (controller) => controller.abort()]])(
+      'classifies queued %s abort as an internal operation abort', async (_label, abort) => {
+        const { blocker, blockerPromise } = await blockQueue();
+        const controller = new AbortController();
+        const request = manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+          abortController: controller,
+        });
+
+        abort(controller);
+
+        const error = await request.catch((caughtError) => caughtError);
+        expect(error).toMatchObject({
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+        });
+        expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+        expect(error.isCancelled).not.toBe(true);
+        blocker.resolve();
+        await blockerPromise;
+      }
+    );
+
+    it('classifies already-aborted signals before enqueue as internal operation abort', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const error = await manager.executeWithRateLimit('TestProvider', () => 'not-run', '', TranslationPriority.NORMAL, {
+        abortController: controller,
+      }).catch((caughtError) => caughtError);
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+
+    it('classifies pre-start abort as an internal operation abort', async () => {
+      const controller = new AbortController();
+      const state = manager.providerStates.get('TestProvider');
+      const request = {
+        options: { abortController: controller },
+        reject: vi.fn(),
+      };
+      controller.abort('timeout');
+
+      state.activeRequests++;
+      await manager._executeRequest(state, request, 'TestProvider');
+
+      const [error] = request.reject.mock.calls[0];
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
+    });
+
+    it('classifies cleanup cancellation without signal as an internal operation abort', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const reject = vi.fn();
+      state.queues[TranslationPriority.NORMAL].push({
+        options: { messageId: 'cleanup-abort' },
+        reject,
+      });
+
+      manager.clearPendingRequests('cleanup-abort');
+
+      const [error] = reject.mock.calls[0];
+      expect(error).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(error.type).not.toBe(ErrorTypes.USER_CANCELLED);
+      expect(error.isCancelled).not.toBe(true);
     });
   });
 
@@ -301,17 +836,199 @@ describe('RateLimitManager', () => {
   });
 
   describe('Adaptive Backoff', () => {
-    it('should increase delay multiplier on 429 error', async () => {
+    it('uses canonical RATE_LIMIT_REACHED identity for adaptive backoff', async () => {
       const state = manager.providerStates.get('TestProvider');
       expect(state.currentBackoffMultiplier).toBe(1);
 
       try {
-        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(new Error('Error 429: Too Many Requests')));
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(
+          Object.assign(new Error('temporarily unavailable'), { type: ErrorTypes.RATE_LIMIT_REACHED })
+        ));
       } catch {
         // ignore
       }
 
       expect(state.currentBackoffMultiplier).toBe(2);
+    });
+
+    it('does not use quota wording from unrelated canonical errors', async () => {
+      const state = manager.providerStates.get('TestProvider');
+      const error = Object.assign(new Error('quota is unavailable'), {
+        type: ErrorTypes.INSUFFICIENT_BALANCE,
+        statusCode: 429,
+      });
+      isConfigError.mockReturnValueOnce(true);
+
+      try {
+        await manager.executeWithRateLimit('TestProvider', () => Promise.reject(error));
+      } catch {
+        // ignore
+      }
+
+      expect(state.currentBackoffMultiplier).toBe(1);
+      expect(state.performanceStats.failedRequests).toBe(1);
+      expect(state.consecutiveFailures).toBe(0);
+      expect(state.isCircuitOpen).toBe(false);
+    });
+
+    it('uses configured multiplier progression and success reset threshold', async () => {
+      const state = manager._initializeProvider('ConfiguredProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+        adaptiveBackoff: {
+          enabled: true,
+          baseMultiplier: 1.5,
+          maxDelay: 2500,
+          resetAfterSuccess: 2,
+        },
+      });
+      const rateLimitError = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+
+      manager._recordFailure(state, rateLimitError, 'ConfiguredProvider');
+      manager._recordFailure(state, rateLimitError, 'ConfiguredProvider');
+      expect(state.currentBackoffMultiplier).toBe(2.25);
+
+      manager._recordSuccess(state);
+      expect(state.currentBackoffMultiplier).toBe(2.25);
+      manager._recordSuccess(state);
+      expect(state.currentBackoffMultiplier).toBe(1);
+    });
+
+    it('caps effective dispatch delay in milliseconds', async () => {
+      vi.useFakeTimers();
+      try {
+        const state = manager._initializeProvider('CappedProvider', {
+          maxConcurrent: 1,
+          delayBetweenRequests: 1000,
+          adaptiveBackoff: {
+            enabled: true,
+            baseMultiplier: 2,
+            maxDelay: 2500,
+            resetAfterSuccess: 1,
+          },
+        });
+        const error = Object.assign(new Error('temporarily unavailable'), {
+          type: ErrorTypes.RATE_LIMIT_REACHED,
+        });
+        manager._recordFailure(state, error, 'CappedProvider');
+        manager._recordFailure(state, error, 'CappedProvider');
+        state.lastRequestTime = Date.now();
+
+        const task = vi.fn().mockResolvedValue('ok');
+        const result = manager.executeWithRateLimit('CappedProvider', task);
+        await Promise.resolve();
+
+        expect(task).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(2499);
+        expect(task).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(result).resolves.toBe('ok');
+        expect(task).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('preserves zero effective delay for Google-style configuration', async () => {
+      const state = manager._initializeProvider('GoogleStyleProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+        adaptiveBackoff: {
+          enabled: true,
+          baseMultiplier: 1.5,
+          maxDelay: 10000,
+          resetAfterSuccess: 2,
+        },
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+      manager._recordFailure(state, error, 'GoogleStyleProvider');
+
+      const task = vi.fn().mockResolvedValue('ok');
+      await expect(manager.executeWithRateLimit('GoogleStyleProvider', task)).resolves.toBe('ok');
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not increase backoff when adaptive backoff is disabled', async () => {
+      const state = manager._initializeProvider('DisabledBackoffProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 1000,
+        adaptiveBackoff: { enabled: false, baseMultiplier: 1.5, maxDelay: 2500, resetAfterSuccess: 2 },
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+
+      manager._recordFailure(state, error, 'DisabledBackoffProvider');
+
+      expect(state.currentBackoffMultiplier).toBe(1);
+    });
+
+    it('preserves legacy multiplier cap when adaptive configuration is missing', async () => {
+      vi.useFakeTimers();
+      try {
+        const state = manager._initializeProvider('LegacyProvider', {
+          maxConcurrent: 1,
+          delayBetweenRequests: 1000,
+        });
+        state.circuitBreakThreshold = 99;
+        const error = Object.assign(new Error('temporarily unavailable'), {
+          type: ErrorTypes.RATE_LIMIT_REACHED,
+        });
+
+        for (let i = 0; i < 5; i++) {
+          manager._recordFailure(state, error, 'LegacyProvider');
+        }
+
+        expect(state.currentBackoffMultiplier).toBe(10);
+        state.lastRequestTime = Date.now();
+        const task = vi.fn().mockResolvedValue('ok');
+        const result = manager.executeWithRateLimit('LegacyProvider', task);
+        await Promise.resolve();
+
+        await vi.advanceTimersByTimeAsync(9999);
+        expect(task).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(result).resolves.toBe('ok');
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('preserves zero effective delay for legacy configuration', async () => {
+      const state = manager._initializeProvider('LegacyZeroDelayProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 0,
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+      manager._recordFailure(state, error, 'LegacyZeroDelayProvider');
+
+      const task = vi.fn().mockResolvedValue('ok');
+      await expect(manager.executeWithRateLimit('LegacyZeroDelayProvider', task)).resolves.toBe('ok');
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('normalizes partial adaptive configuration per field', () => {
+      const state = manager._initializeProvider('PartialProvider', {
+        maxConcurrent: 1,
+        delayBetweenRequests: 1000,
+        adaptiveBackoff: {
+          enabled: true,
+          baseMultiplier: 1.5,
+        },
+      });
+      const error = Object.assign(new Error('temporarily unavailable'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+
+      manager._recordFailure(state, error, 'PartialProvider');
+
+      expect(state.currentBackoffMultiplier).toBe(1.5);
     });
   });
 

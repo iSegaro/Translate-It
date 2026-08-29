@@ -1,5 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const matchErrorToTypeMock = vi.hoisted(() => vi.fn(() => 'TRANSLATION_ERROR'));
+
+vi.mock('@/shared/error-management/ErrorMatcher.js', () => {
+  class ErrorMatcher {
+    static matchErrorToType(error) {
+      return matchErrorToTypeMock(error);
+    }
+  }
+
+  return { ErrorMatcher, matchErrorToType: matchErrorToTypeMock };
+});
+
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -51,7 +63,8 @@ describe('StreamingManager', () => {
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    vi.clearAllMocks();
+      vi.clearAllMocks();
+      matchErrorToTypeMock.mockClear();
     vi.resetModules();
     
     // Import modules dynamically to ensure mocks are applied
@@ -167,6 +180,50 @@ describe('StreamingManager', () => {
       expect(statsManager.printSummary).toHaveBeenCalled();
     });
 
+    it('includes acceptance metadata for registered sessions', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-acceptance';
+      streamingManager.initializeStream(
+        messageId,
+        { tab: { id: 999 } },
+        { providerName: 'TestProvider' },
+        ['s1'],
+        null,
+        true
+      );
+
+      await streamingManager.streamBatchResults(messageId, ['res'], ['s1'], 0);
+      await streamingManager.completeStream(messageId, true);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      const update = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
+      const end = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(update.data).toHaveProperty('conversationAcceptance', true);
+      expect(end.data).toHaveProperty('conversationAcceptance', true);
+    });
+
+    it('omits acceptance metadata for unregistered sessions', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-no-acceptance';
+      streamingManager.initializeStream(
+        messageId,
+        { tab: { id: 999 } },
+        { providerName: 'TestProvider' },
+        ['s1'],
+        null,
+        false
+      );
+
+      await streamingManager.streamBatchResults(messageId, ['res'], ['s1'], 0);
+      await streamingManager.completeStream(messageId, true);
+
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      expect(messages).not.toContainEqual(expect.objectContaining({
+        data: expect.objectContaining({ conversationAcceptance: false })
+      }));
+      expect(messages.every(message => !Object.hasOwn(message.data, 'conversationAcceptance'))).toBe(true);
+    });
+
     it('should handle missing sender info gracefully', async () => {
       const { default: browser } = await import('webextension-polyfill');
       const messageId = 'msg-123';
@@ -192,6 +249,41 @@ describe('StreamingManager', () => {
   });
 
   describe('streamBatchError', () => {
+    it('suppresses operation-abort errors before classification and serialization', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const { MessageFormat } = await import('@/shared/messaging/core/MessagingCore.js');
+      const serializeSpy = vi.spyOn(MessageFormat, 'serializeTranslationError');
+      const messageId = 'msg-operation-abort';
+      const error = Object.assign(new Error('operation stopped'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+
+      streamingManager.initializeStream(messageId, { tab: { id: 123 } }, { providerName: 'P' }, ['s1']);
+      await streamingManager.streamBatchError(messageId, error, 0);
+
+      expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+      expect(matchErrorToTypeMock).not.toHaveBeenCalled();
+      expect(serializeSpy).not.toHaveBeenCalled();
+    });
+
+    it('publishes typed timeout AbortError without suppressing it', async () => {
+      const { default: browser } = await import('webextension-polyfill');
+      const messageId = 'msg-typed-timeout';
+      const error = Object.assign(new Error('timed out'), {
+        name: 'AbortError',
+        type: 'TRANSLATION_TIMEOUT',
+      });
+
+      streamingManager.initializeStream(messageId, { tab: { id: 123 } }, { providerName: 'P' }, ['s1']);
+      await streamingManager.streamBatchError(messageId, error, 0);
+
+      const message = browser.tabs.sendMessage.mock.calls[0][1];
+      expect(message.data.error).toMatchObject({ type: 'TRANSLATION_TIMEOUT' });
+      expect(matchErrorToTypeMock).not.toHaveBeenCalled();
+    });
+
     it('should send error update message', async () => {
       const { default: browser } = await import('webextension-polyfill');
       const messageId = 'msg-error';
@@ -201,6 +293,16 @@ describe('StreamingManager', () => {
       
       const error = new Error('Network timeout');
       error.type = 'NETWORK_ERROR';
+      error.originalType = 'HTTP_ERROR';
+      error.statusCode = 503;
+      error.context = 'provider-request';
+      error.providerName = 'Source Provider';
+      error.providerId = 'source-provider';
+      error.code = 'NETWORK_TIMEOUT';
+      error.errorCode = 'E_NETWORK';
+      error.translationOutcome = { partial: true };
+      error.cause = new Error('private cause');
+      error.arbitrary = { unsupported: true };
       
       await streamingManager.streamBatchError(messageId, error, 0);
 
@@ -210,10 +312,38 @@ describe('StreamingManager', () => {
           success: false,
           error: expect.objectContaining({
             message: 'Network timeout',
-            type: 'NETWORK_ERROR'
+            type: 'NETWORK_ERROR',
+            originalType: 'HTTP_ERROR',
+            statusCode: 503,
+            context: 'provider-request',
+            providerName: 'Source Provider',
+            providerId: 'source-provider',
+            code: 'NETWORK_TIMEOUT',
+            errorCode: 'E_NETWORK',
+            translationOutcome: { partial: true }
           })
         })
       }));
+
+      const streamedData = browser.tabs.sendMessage.mock.calls[0][1].data;
+      expect(streamedData.timestamp).toEqual(expect.any(Number));
+      const streamedError = streamedData.error;
+      expect(streamedError).not.toHaveProperty('cause');
+      expect(streamedError).not.toHaveProperty('arbitrary');
+      expect(streamedError).not.toHaveProperty('timestamp');
+      expect(streamedData.errorDetails).toEqual(streamedError);
+      expect(streamedData.errorDetails).toMatchObject({
+        message: 'Network timeout',
+        type: 'NETWORK_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'provider-request',
+        providerName: 'Source Provider',
+        providerId: 'source-provider',
+        code: 'NETWORK_TIMEOUT',
+        errorCode: 'E_NETWORK',
+        translationOutcome: { partial: true }
+      });
     });
 
     it('should target the originating iframe on error', async () => {
@@ -293,11 +423,43 @@ describe('StreamingManager', () => {
       
       const completeSpy = vi.spyOn(streamingManager, 'completeStream');
       const error = new Error('Fatal provider error');
-      
+      error.type = 'PROVIDER_ERROR';
+      error.originalType = 'HTTP_ERROR';
+      error.statusCode = 502;
+      error.providerName = 'Provider';
+      error.providerId = 'provider-id';
+      error.code = 'UPSTREAM_FAILURE';
+      error.errorCode = 'E_UPSTREAM';
+      error.cause = new Error('private');
+      error.arbitrary = { secret: true };
+
       await streamingManager.handleStreamError(messageId, error);
-      
+
       expect(streamingManager.stats.errorSessions).toBe(1);
       expect(completeSpy).toHaveBeenCalledWith(messageId, false, expect.any(Object));
+      expect(completeSpy.mock.calls[0][2].error).toMatchObject({
+        message: 'Fatal provider error',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 502,
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM'
+      });
+      expect(completeSpy.mock.calls[0][2].error.timestamp).toEqual(expect.any(Number));
+      expect(completeSpy.mock.calls[0][2].errorDetails).toEqual(completeSpy.mock.calls[0][2].error);
+      expect(completeSpy.mock.calls[0][2].error).not.toHaveProperty('cause');
+      expect(completeSpy.mock.calls[0][2].error).not.toHaveProperty('arbitrary');
+
+      const { default: browser } = await import('webextension-polyfill');
+      const terminalMessages = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(terminalMessages).toHaveLength(1);
+      expect(terminalMessages[0].data.error).toBe(terminalMessages[0].data.errorDetails);
+      expect(terminalMessages[0].data.error).not.toHaveProperty('cause');
+      expect(terminalMessages[0].data.error).not.toHaveProperty('arbitrary');
     });
   });
 
@@ -407,6 +569,7 @@ describe('StreamingManager', () => {
     });
 
     it('preserves error when a late provider completion arrives', async () => {
+      const { default: browser } = await import('webextension-polyfill');
       const messageId = 'msg-error-late-complete';
       streamingManager.initializeStream(messageId, { tab: { id: 1 } }, { providerName: 'P' }, ['s1']);
 
@@ -414,6 +577,10 @@ describe('StreamingManager', () => {
       await streamingManager.completeStream(messageId, true);
 
       expect(streamingManager.getStreamInfo(messageId).status).toBe('error');
+      const terminalMessages = browser.tabs.sendMessage.mock.calls
+        .map(([, message]) => message)
+        .filter(message => message.action === MessageActions.TRANSLATION_STREAM_END);
+      expect(terminalMessages).toHaveLength(1);
     });
 
     it('keeps cancellation idempotent and schedules delayed cleanup', async () => {

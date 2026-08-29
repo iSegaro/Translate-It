@@ -20,13 +20,47 @@ describe('TranslationLifecycleRegistry', () => {
     registry = new TranslationLifecycleRegistry()
   })
 
-  it('rejects every registration for an ID cancelled before registration', async () => {
-    await registry.cancelTranslation('pre-cancelled')
+  it('rejects registration while retaining pre-cancelled provenance', async () => {
+    await registry.cancelTranslation('pre-cancelled', false, undefined, 'stale-run')
 
-    expect(registry.registerRequest('pre-cancelled', 'Hello')).toBeNull()
-    expect(registry.registerRequest('pre-cancelled', 'Hello')).toBeNull()
+    const firstController = registry.registerRequest('pre-cancelled', 'Hello')
+    const secondController = registry.registerRequest('pre-cancelled', 'Hello')
+
+    expect(firstController).toBeNull()
+    expect(secondController).toBeNull()
+    expect(registry.getCancellationReason('pre-cancelled')).toBe('stale-run')
     expect(registry.getAbortController('pre-cancelled')).toBeNull()
     expect(registry.isCancelled('pre-cancelled')).toBe(true)
+  })
+
+  it.each([
+    ['document-replaced', 'document-replaced'],
+    ['stale-run', 'stale-run'],
+  ])('preserves %s tombstone provenance before registration', async (reason, expectedReason) => {
+    await registry.cancelTranslation(`before-${reason}`, false, undefined, reason)
+
+    const controller = registry.registerRequest(`before-${reason}`, 'Hello')
+
+    expect(controller).toBeNull()
+    expect(registry.getCancellationReason(`before-${reason}`)).toBe(expectedReason)
+  })
+
+  it('preserves explicit user provenance before registration', async () => {
+    await registry.cancelTranslation('before-user', false, undefined, 'user-cancel')
+
+    const controller = registry.registerRequest('before-user', 'Hello')
+
+    expect(controller).toBeNull()
+    expect(registry.getCancellationReason('before-user')).toBe('user-cancelled')
+  })
+
+  it('preserves timeout provenance before registration', async () => {
+    await registry.cancelTranslation('before-timeout', true)
+
+    const controller = registry.registerRequest('before-timeout', 'Hello')
+
+    expect(controller).toBeNull()
+    expect(registry.getCancellationReason('before-timeout')).toBe('timeout')
   })
 
   it('registers non-cancelled requests normally', () => {
@@ -48,12 +82,29 @@ describe('TranslationLifecycleRegistry', () => {
     expect(cancelStreamMock).toHaveBeenCalledTimes(2)
   })
 
+  it('preserves internal cancellation provenance on the abort signal', async () => {
+    const controller = registry.registerRequest('replaced', 'Hello')
+
+    await registry.cancelTranslation('replaced', false, undefined, 'document-replaced')
+
+    expect(controller.signal.reason).toBe('document-replaced')
+  })
+
+  it('normalizes explicit user cancellation to user-cancelled', async () => {
+    const controller = registry.registerRequest('user-cancel', 'Hello')
+
+    await registry.cancelTranslation('user-cancel', false, undefined, 'user-cancel')
+
+    expect(controller.signal.reason).toBe('user-cancelled')
+  })
+
   it('preserves timeout classification while aborting active work', async () => {
     const controller = registry.registerRequest('timed-out', 'Hello')
 
     await registry.cancelTranslation('timed-out', true)
 
     expect(controller.signal.aborted).toBe(true)
+    expect(controller.signal.reason).toBe('timeout')
     expect(cancelStreamMock).toHaveBeenCalledWith('timed-out', expect.anything(), true)
   })
 
@@ -79,6 +130,7 @@ describe('TranslationLifecycleRegistry', () => {
     registry.unregisterRequest('active')
 
     expect(registry.registerRequest('active', 'Hello')).toBeNull()
+    expect(registry.getCancellationReason('active')).toBe('operation-abort')
     expect(registry.isCancelled('active')).toBe(true)
   })
 
@@ -132,7 +184,10 @@ describe('TranslationLifecycleRegistry', () => {
   })
 
   it('prunes expired unknown cancellation tombstones', () => {
-    registry.cancelledRequests.set('expired', Date.now() - 60_000)
+    registry.cancelledRequests.set('expired', {
+      timestamp: Date.now() - 60_000,
+      reason: 'stale-run',
+    })
     registry.registerRequest('normal', 'Hello')
 
     expect(registry.isCancelled('expired')).toBe(false)

@@ -185,7 +185,9 @@ describe('UnifiedTranslationService', () => {
       translationRequestTracker.createRequest.mockReturnValue(mockRequest);
       const registrationSpy = vi.spyOn(service, '_registerConversationAcceptance');
       let handleDuringProcessing;
-      service.modeCoordinator.processRequest.mockImplementation(async () => {
+      let executionContextDuringProcessing;
+      service.modeCoordinator.processRequest.mockImplementation(async (_request, { executionContext }) => {
+        executionContextDuringProcessing = executionContext;
         handleDuringProcessing = service.conversationAcceptanceCoordinator.lookup(message.messageId);
         return { success: true, translatedText: 'translated' };
       });
@@ -195,6 +197,7 @@ describe('UnifiedTranslationService', () => {
       const handle = service.conversationAcceptanceCoordinator.lookup(message.messageId);
       expect(handle).not.toBeNull();
       expect(handleDuringProcessing).toBe(handle);
+      expect(executionContextDuringProcessing.conversationAcceptanceRegistered).toBe(true);
       expect(registrationSpy).toHaveBeenCalledTimes(1);
       expect(handle.snapshot()).toMatchObject({
         messageId: message.messageId,
@@ -242,7 +245,8 @@ describe('UnifiedTranslationService', () => {
       service.modeCoordinator.processRequest.mockResolvedValueOnce({ success: true, translatedText: 'translated' });
 
       const resultOff = await service.handleTranslationRequest(messageOff);
-      expect(resultOff).toMatchObject({ success: true, conversationAcceptance: false });
+      expect(resultOff).toMatchObject({ success: true });
+      expect(resultOff).not.toHaveProperty('conversationAcceptance');
     });
 
     it('accepts ACK before execution completes without activating timeout', async () => {
@@ -514,6 +518,151 @@ describe('UnifiedTranslationService', () => {
       expect(result.success).toBe(true);
       expect(result.translatedText).toBe('bonjour');
       expect(service.resultDispatcher.dispatchResult).toHaveBeenCalled();
+    });
+
+    it('returns delivery failure without activating conversation acceptance', async () => {
+      const message = {
+        messageId: 'delivery-failure',
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 'delivery-failure',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data };
+      const deliveryError = Object.assign(new Error('Select Element result delivery failed'), {
+        type: ErrorTypes.CONNECTION_LOST,
+      });
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+      service.resultDispatcher.dispatchResult.mockRejectedValue(deliveryError);
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result).toMatchObject({ success: false, error: deliveryError.message });
+      expect(remove).toHaveBeenCalledWith(message.messageId);
+      expect(activate).not.toHaveBeenCalled();
+      expect(service.modeCoordinator.processRequest).toHaveBeenCalledTimes(1);
+      expect(translationRequestTracker.completeRequest).toHaveBeenCalledWith(message.messageId, expect.objectContaining({ success: true }));
+    });
+
+    it.each([
+      ['operation abort', {
+        success: false,
+        cancelled: false,
+        error: {
+          operationAborted: true,
+          cancellationReason: 'operation-abort',
+          message: 'Translation operation aborted',
+        },
+      }],
+      ['provider failure', {
+        success: false,
+        error: { type: ErrorTypes.API_ERROR, message: 'Provider rejected request' },
+      }],
+      ['pre-cancelled tombstone', {
+        success: false,
+        cancelled: true,
+        error: { type: ErrorTypes.USER_CANCELLED, message: 'Translation cancelled by user' },
+      }],
+    ])('removes acceptance without activating for terminal %s result', async (_label, failedResult) => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: `failed-result-${_label}`,
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: `failed-result-${_label}`,
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.completeRequest.mockReturnValue({ accepted: true, status: 'failed' });
+      service.modeCoordinator.processRequest.mockResolvedValue(failedResult);
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(service.resultDispatcher.dispatchResult).toHaveBeenCalledWith(expect.objectContaining({
+        messageId: message.messageId,
+        result: expect.objectContaining(failedResult),
+      }));
+      expect(result).toMatchObject(failedResult);
+      expect(activate).not.toHaveBeenCalled();
+      expect(remove).toHaveBeenCalledWith(message.messageId);
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+      expect(result.error).toMatchObject(failedResult.error);
+    });
+
+    it('activates acceptance exactly once for successful partial results', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: 'successful-partial-result',
+        data: {
+          text: 'source',
+          mode: 'select-element',
+          provider: 'openai',
+          sessionId: 'successful-partial-result',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'select-element',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'select-element' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({
+        success: true,
+        partial: true,
+        committedParentCount: 1,
+        translatedText: 'translated',
+      });
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      await service.handleTranslationRequest(message);
+
+      expect(activate).toHaveBeenCalledTimes(1);
+      expect(activate).toHaveBeenCalledWith(message.messageId);
+      expect(remove).not.toHaveBeenCalled();
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).not.toBeNull();
+      service.conversationAcceptanceCoordinator.remove(message.messageId);
+    });
+
+    it('does not touch acceptance for successful Field direct results', async () => {
+      const { getAIConversationHistoryEnabledAsync } = await import('../../../shared/config/config.js');
+      getAIConversationHistoryEnabledAsync.mockResolvedValue(true);
+      const message = {
+        messageId: 'field-direct-result',
+        data: {
+          text: 'source',
+          mode: 'field',
+          provider: 'openai',
+          sessionId: 'field-direct-result',
+          conversationParents: [{ parentId: 'g1', cleanSource: 'source' }],
+        },
+        context: 'content',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'field' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+      const activate = vi.spyOn(service.conversationAcceptanceCoordinator, 'activate');
+      const remove = vi.spyOn(service.conversationAcceptanceCoordinator, 'remove');
+
+      await service.handleTranslationRequest(message);
+
+      expect(activate).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+      expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
     });
 
     it('records OPERATION_FAILED with reason and code when the tracker transition is FAILED', async () => {
@@ -840,7 +989,7 @@ describe('UnifiedTranslationService', () => {
 
       expect(result).toEqual({ handled: true, success: true });
       expect(translationRequestTracker.cancelRequest).toHaveBeenCalledWith('m1', ActionReasons.USER_CANCELLED);
-      expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m1');
+       expect(mockEngine.cancelTranslation).toHaveBeenCalledWith('m1', false, undefined, ActionReasons.USER_CANCELLED);
       expect(service.resultDispatcher.dispatchCancellation).toHaveBeenCalled();
     });
 

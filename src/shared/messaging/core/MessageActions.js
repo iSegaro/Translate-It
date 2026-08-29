@@ -55,16 +55,39 @@ export class MessageActions {
   static PAGE_TRANSLATE_GET_STATUS = 'page-translate-get-status';
   static PAGE_TRANSLATE_STOP_AUTO = 'page-translate-stop-auto'; // Stop auto-translation (NEW)
   static PAGE_AUTO_RESTORE_COMPLETE = 'page-auto-restore-complete'; // Auto-restore complete (NEW)
+  static PAGE_TRANSLATION_FRAME_LIFECYCLE = 'page-translation-frame-lifecycle';
+  static PAGE_TRANSLATION_FRAME_RETIRED = 'page-translation-frame-retired';
+  static PAGE_TRANSLATION_FRAME_LIFECYCLE_ACTIONS = Object.freeze([
+    'page-translate-start',
+    'page-translate-progress',
+    'page-translate-complete',
+    'page-translate-idle',
+    'page-translate-error',
+    'page-restore-complete',
+    'page-auto-restore-complete',
+    'page-translate-cancelled',
+    'page-restore-error',
+    'page-translation-frame-retired',
+  ]);
+  static PAGE_TRANSLATION_AGGREGATE_ACTIONS = Object.freeze([
+    'page-translate-start',
+    'page-translate-progress',
+    'page-translate-complete',
+    'page-translate-idle',
+    'page-translate-error',
+    'page-restore-complete',
+    'page-auto-restore-complete',
+  ]);
 
   // IFrame Support actions
   static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';
-  static IFRAME_TRANSLATE_SELECTION = 'IFRAME_TRANSLATE_SELECTION';
   static IFRAME_GET_FRAME_INFO = 'IFRAME_GET_FRAME_INFO';
   static IFRAME_COORDINATE_OPERATION = 'IFRAME_COORDINATE_OPERATION';
   static IFRAME_DETECT_TEXT_FIELDS = 'IFRAME_DETECT_TEXT_FIELDS';
   static IFRAME_INSERT_TEXT = 'IFRAME_INSERT_TEXT';
   static IFRAME_SYNC_REQUEST = 'IFRAME_SYNC_REQUEST';
   static IFRAME_SYNC_RESPONSE = 'IFRAME_SYNC_RESPONSE';
+  static IFRAME_SELECT_ELEMENT_FINISHED = 'IFRAME_SELECT_ELEMENT_FINISHED';
   
   // Floating Window
   static TRANSLATION_COMPLETE = 'translationComplete';

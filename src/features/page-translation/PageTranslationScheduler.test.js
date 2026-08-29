@@ -28,7 +28,11 @@ import { PageTranslationScheduler } from './PageTranslationScheduler.js';
 import { isFatalError, matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { PageTranslationQueueFilter } from './utils/PageTranslationQueueFilter.js';
 import { PageTranslationFluidFilter } from './utils/PageTranslationFluidFilter.js';
-import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { safeSendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { pageEventBus } from '@/core/PageEventBus.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { ActionReasons, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 // 3. Mock other dependencies
 vi.mock('./utils/PageTranslationQueueFilter.js', () => ({
@@ -71,6 +75,15 @@ vi.mock('@/config.js', () => ({
 
 describe('PageTranslationScheduler', () => {
   let scheduler;
+  let onFatalError;
+
+  const getSettlement = (resolver) => resolver.mock.calls.at(-1)[0];
+  const expectSettlement = (resolver, text) => {
+    expect(getSettlement(resolver)).toEqual(expect.objectContaining({
+      __pageTranslationSettlement: true,
+      text,
+    }));
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,8 +98,10 @@ describe('PageTranslationScheduler', () => {
       return type === 'EXTENSION_CONTEXT_INVALIDATED';
     });
 
-    scheduler = new PageTranslationScheduler();
+    onFatalError = vi.fn();
+    scheduler = new PageTranslationScheduler({ onFatalError });
     scheduler.setTranslationState(true, 'test-session-123', { pageTitle: 'Test Page' });
+    vi.spyOn(pageEventBus, 'emit');
     
     // Default mock behavior for filters
     const defaultResult = {
@@ -105,6 +120,47 @@ describe('PageTranslationScheduler', () => {
   });
 
   describe('Initialization & State', () => {
+    it('uses trusted lifecycle callback instead of aggregate PageEventBus transport', () => {
+      const onLifecycleEvent = vi.fn();
+      const directScheduler = new PageTranslationScheduler({ onLifecycleEvent });
+      directScheduler.setTranslationState(true, 'direct-session', {});
+      directScheduler.totalTasks = 3;
+      directScheduler.translatedCount = 2;
+
+      directScheduler._reportProgress(true);
+
+      expect(onLifecycleEvent).toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        expect.objectContaining({ translatedCount: 2, totalCount: 3, sessionId: 'direct-session' })
+      );
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        expect.anything()
+      );
+      directScheduler.reset();
+    });
+
+    it('attaches scheduler-owned identity to progress, complete, and idle lifecycle events', () => {
+      const onLifecycleEvent = vi.fn();
+      const directScheduler = new PageTranslationScheduler({ onLifecycleEvent });
+      directScheduler.setTranslationState(true, 'direct-session', {});
+
+      for (const action of [
+        MessageActions.PAGE_TRANSLATE_PROGRESS,
+        MessageActions.PAGE_TRANSLATE_COMPLETE,
+        MessageActions.PAGE_TRANSLATE_IDLE,
+      ]) {
+        directScheduler._emitLifecycle(action, {});
+      }
+
+      expect(onLifecycleEvent.mock.calls).toEqual(expect.arrayContaining([
+        [MessageActions.PAGE_TRANSLATE_PROGRESS, { sessionId: 'direct-session' }],
+        [MessageActions.PAGE_TRANSLATE_COMPLETE, { sessionId: 'direct-session' }],
+        [MessageActions.PAGE_TRANSLATE_IDLE, { sessionId: 'direct-session' }],
+      ]));
+      directScheduler.reset();
+    });
+
     it('should initialize with correct default state', () => {
       expect(scheduler.isTranslated).toBe(true);
       expect(scheduler.queue).toHaveLength(0);
@@ -131,7 +187,213 @@ describe('PageTranslationScheduler', () => {
     });
   });
 
+  describe('Cancellation Provenance', () => {
+    const getCancelMessage = () => sendRegularMessage.mock.calls
+      .map(([message]) => message)
+      .find(message => message.action === MessageActions.CANCEL_TRANSLATION);
+
+    it('uses internal provenance for default stop', () => {
+      sendRegularMessage.mockClear();
+
+      scheduler.stop();
+
+      expect(getCancelMessage()).toMatchObject({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: {
+          cancelAll: true,
+          context: 'page-translation-batch',
+          sessionId: 'test-session-123',
+          reason: 'operation-abort',
+        },
+      });
+    });
+
+    it('preserves explicit user provenance', () => {
+      sendRegularMessage.mockClear();
+
+      scheduler.stop('cancelled', ActionReasons.USER_STOPPED_PAGE_TRANSLATION);
+
+      expect(getCancelMessage()?.data.reason).toBe(ActionReasons.USER_STOPPED_PAGE_TRANSLATION);
+    });
+
+    it('uses internal provenance for outer infrastructure failure', () => {
+      const item = { text: 'Infrastructure failure', resolve: vi.fn(), score: 1 };
+      const error = Object.assign(new Error('infrastructure failure'), { type: 'NETWORK_ERROR' });
+      const sessionContext = scheduler.sessionContext;
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      sendRegularMessage.mockClear();
+
+      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', sessionContext)).toBe(true);
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.failedCount).toBe(1);
+      expect(getCancelMessage()?.data.reason).toBe('operation-abort');
+      expect(onFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        error,
+        errorType: 'NETWORK_ERROR',
+        sessionId: 'test-session-123',
+        sessionContext,
+        context: 'page-translation-scheduler',
+      }));
+      expect(onFatalError).toHaveBeenCalledOnce();
+    });
+
+    it('uses internal provenance for context invalidation', () => {
+      const item = { text: 'Context failure', resolve: vi.fn(), score: 1 };
+      const error = Object.assign(new Error('context invalidated'), { type: 'EXTENSION_CONTEXT_INVALIDATED' });
+      const sessionContext = scheduler.sessionContext;
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      ExtensionContextManager.isContextError.mockReturnValueOnce(true);
+      sendRegularMessage.mockClear();
+
+      expect(scheduler._handleOuterFlushFailure(error, 'test-session-123', sessionContext)).toBe(true);
+      expect(getSettlement(item.resolve).state).toBe('cancelled');
+      expect(scheduler.failedCount).toBe(0);
+      expect(getCancelMessage()?.data.reason).toBe('operation-abort');
+      expect(onFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        error,
+        errorType: 'EXTENSION_CONTEXT_INVALIDATED',
+        sessionId: 'test-session-123',
+        sessionContext,
+        context: 'page-translation-scheduler',
+      }));
+      expect(onFatalError).toHaveBeenCalledOnce();
+    });
+
+    it('does not call fatal callback for a stale outer flush', () => {
+      const sessionContext = scheduler.sessionContext;
+
+      expect(scheduler._handleOuterFlushFailure(
+        new Error('stale failure'),
+        'stale-session',
+        sessionContext
+      )).toBe(false);
+
+      expect(onFatalError).not.toHaveBeenCalled();
+    });
+
+    it('uses internal provenance for reset session replacement', () => {
+      sendRegularMessage.mockClear();
+
+      scheduler.reset();
+
+      expect(getCancelMessage()?.data).toMatchObject({
+        sessionId: 'test-session-123',
+        reason: 'operation-abort',
+      });
+      expect(scheduler.translationSessionId).toBeNull();
+    });
+
+    it('does not send remote cancellation without an active session', () => {
+      scheduler.isTranslated = false;
+      scheduler.translationSessionId = null;
+      sendRegularMessage.mockClear();
+
+      scheduler.stop();
+
+      expect(sendRegularMessage).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Batch Execution (Fluid Mode)', () => {
+    it('defers success accounting until settlement acceptance', async () => {
+      const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['سلام'])
+      });
+
+      await scheduler.flush();
+
+      const settlement = getSettlement(mockItem.resolve);
+      expect(settlement.state).toBe('pending');
+      expect(scheduler.translatedCount).toBe(0);
+      settlement.settle('stale');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(1);
+    });
+
+    it('cancels pending settlements without manufacturing failure counts', async () => {
+      const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['سلام'])
+      });
+
+      await scheduler.flush();
+
+      const settlement = getSettlement(mockItem.resolve);
+      scheduler.stop();
+      expect(settlement.state).toBe('cancelled');
+      expect(scheduler.translatedCount).toBe(0);
+      expect(scheduler.failedCount).toBe(0);
+      expect(settlement.settle('accepted')).toBe(false);
+    });
+
+    it('emits completion once after stale settlement', async () => {
+      vi.useFakeTimers();
+      try {
+        const emitSpy = vi.spyOn(pageEventBus, 'emit');
+        const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
+        scheduler.queue.push(mockItem);
+        scheduler.totalTasks = 1;
+        PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+        vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+        safeSendMessage.mockResolvedValue({
+          success: true,
+          translatedText: JSON.stringify(['سلام'])
+        });
+
+        await scheduler.flush();
+        getSettlement(mockItem.resolve).settle('stale');
+        await vi.advanceTimersByTimeAsync(600);
+
+        expect(emitSpy.mock.calls.filter(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE))
+          .toHaveLength(1);
+        emitSpy.mockRestore();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('continues after a non-fatal batch failure and completes once', async () => {
+      const failedItem = { text: 'Failed', resolve: vi.fn(), score: 1 };
+      const translatedItem = { text: 'Translated', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(failedItem, translatedItem);
+      scheduler.totalTasks = 2;
+
+      PageTranslationFluidFilter.process
+        .mockReturnValueOnce({ batchItems: [failedItem], remainingItems: [translatedItem] })
+        .mockReturnValueOnce({ batchItems: [translatedItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage
+        .mockResolvedValueOnce({ success: false, error: 'Temporary provider failure', errorType: 'UNKNOWN' })
+        .mockResolvedValueOnce({ success: true, translatedText: JSON.stringify(['translated']) });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      await scheduler.flush();
+
+      expect(safeSendMessage).toHaveBeenCalledTimes(2);
+      expect(scheduler.fatalErrorOccurred).toBe(false);
+      expectSettlement(failedItem.resolve, 'Failed');
+      expectSettlement(translatedItem.resolve, 'translated');
+      getSettlement(failedItem.resolve).settle('failed');
+      getSettlement(translatedItem.resolve).settle('accepted');
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      expect(scheduler.failedCount).toBe(1);
+      expect(scheduler.translatedCount).toBe(1);
+      expect(emitSpy.mock.calls.filter(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE)).toHaveLength(1);
+      emitSpy.mockRestore();
+    });
+
     it('should process a successful batch translation', async () => {
       const mockItem = { text: 'Hello', resolve: vi.fn(), score: 1 };
       scheduler.queue.push(mockItem);
@@ -156,8 +418,9 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(safeSendMessage).toHaveBeenCalled();
-      expect(mockItem.resolve).toHaveBeenCalledWith('سلام');
-      expect(scheduler.translatedCount).toBe(1);
+       expectSettlement(mockItem.resolve, 'سلام');
+       getSettlement(mockItem.resolve).settle('accepted');
+       expect(scheduler.translatedCount).toBe(1);
     });
 
     it.each(['', '   ', '\n\t'])('should preserve original and count blank result as failed: %j', async (blankText) => {
@@ -173,7 +436,7 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Original');
+       expectSettlement(mockItem.resolve, 'Original');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -191,7 +454,7 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Original');
+       expectSettlement(mockItem.resolve, 'Original');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -211,9 +474,11 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A2');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
-      expect(itemC.resolve).toHaveBeenCalledWith('C2');
+       expectSettlement(itemA.resolve, 'A2');
+       expectSettlement(itemB.resolve, 'B');
+       expectSettlement(itemC.resolve, 'C2');
+       getSettlement(itemA.resolve).settle('accepted');
+       getSettlement(itemC.resolve).settle('accepted');
       expect(scheduler.translatedCount).toBe(2);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -233,8 +498,8 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
+       expectSettlement(itemA.resolve, 'A');
+       expectSettlement(itemB.resolve, 'B');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(2);
       expect(scheduler.translatedCount + scheduler.failedCount).toBe(scheduler.totalTasks);
@@ -257,9 +522,9 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(itemA.resolve).toHaveBeenCalledTimes(1);
-      expect(itemA.resolve).toHaveBeenCalledWith('A');
+       expectSettlement(itemA.resolve, 'A');
       expect(itemB.resolve).toHaveBeenCalledTimes(1);
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
+       expectSettlement(itemB.resolve, 'B');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(2);
     });
@@ -280,9 +545,11 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A2');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
-      expect(itemC.resolve).toHaveBeenCalledWith('C2');
+       expectSettlement(itemA.resolve, 'A2');
+       expectSettlement(itemB.resolve, 'B');
+       expectSettlement(itemC.resolve, 'C2');
+       getSettlement(itemA.resolve).settle('accepted');
+       getSettlement(itemC.resolve).settle('accepted');
       expect(scheduler.translatedCount).toBe(2);
       expect(scheduler.failedCount).toBe(1);
     });
@@ -302,8 +569,8 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(itemA.resolve).toHaveBeenCalledWith('A');
-      expect(itemB.resolve).toHaveBeenCalledWith('B');
+       expectSettlement(itemA.resolve, 'A');
+       expectSettlement(itemB.resolve, 'B');
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.failedCount).toBe(2);
     });
@@ -322,8 +589,9 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('URL');
-      expect(scheduler.translatedCount).toBe(1);
+       expectSettlement(mockItem.resolve, 'URL');
+       getSettlement(mockItem.resolve).settle('accepted');
+       expect(scheduler.translatedCount).toBe(1);
       expect(scheduler.failedCount).toBe(0);
     });
 
@@ -336,13 +604,82 @@ describe('PageTranslationScheduler', () => {
 
       safeSendMessage.mockResolvedValue({
         success: false,
-        error: 'Rate limit'
+        error: 'Rate limit',
+        errorType: 'SERVER_ERROR'
       });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Failed Text');
+       expectSettlement(mockItem.resolve, 'Failed Text');
       expect(scheduler.translatedCount).toBe(0);
+      const internalError = emitSpy.mock.calls.find(([event]) => event === 'page-translation-internal-error')?.[1];
+      expect(internalError.error.type).toBe('SERVER_ERROR');
+      expect(internalError.errorType).toBe('SERVER_ERROR');
+      expect(internalError.isFatal).toBe(true);
+      expect(onFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        error: expect.objectContaining({ type: 'SERVER_ERROR' }),
+        errorType: 'SERVER_ERROR',
+        sessionId: 'test-session-123',
+        sessionContext: { pageTitle: 'Test Page' },
+        context: 'page-translation-batch',
+      }));
+      emitSpy.mockRestore();
+    });
+
+    it('reconstructs canonical Page batch error identity from transport DTO', async () => {
+      const mockItem = { text: 'Failed Text', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+
+      const errorDetails = {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'page-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true },
+        cause: 'private',
+        arbitrary: { ignored: true }
+      };
+      safeSendMessage.mockResolvedValue({
+        success: false,
+        translatedText: JSON.stringify([{ text: 'Failed Text' }]),
+        hasError: true,
+        error: 'Provider failed',
+        errorType: 'SERVER_ERROR',
+        errorDetails,
+        isFatal: false
+      });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      await scheduler.flush();
+
+      const internalError = emitSpy.mock.calls.find(([event]) => event === 'page-translation-internal-error')?.[1];
+      expect(internalError.error).toMatchObject({
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR',
+        originalType: 'HTTP_ERROR',
+        statusCode: 503,
+        context: 'page-batch',
+        providerName: 'Provider',
+        providerId: 'provider-id',
+        code: 'UPSTREAM_FAILURE',
+        errorCode: 'E_UPSTREAM',
+        translationOutcome: { partial: true }
+      });
+      expect(internalError.error).not.toHaveProperty('cause');
+      expect(internalError.error).not.toHaveProperty('arbitrary');
+      expect(internalError.errorType).toBe('SERVER_ERROR');
+      expect(internalError.isFatal).toBe(true);
+      expect(scheduler.fatalErrorOccurred).toBe(true);
+       expectSettlement(mockItem.resolve, 'Failed Text');
+      emitSpy.mockRestore();
     });
   });
 
@@ -366,7 +703,7 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(PageTranslationQueueFilter.process).toHaveBeenCalled();
-      expect(mockItem.resolve).toHaveBeenCalledWith('صف');
+       expectSettlement(mockItem.resolve, 'صف');
     });
   });
 
@@ -388,7 +725,7 @@ describe('PageTranslationScheduler', () => {
       await scheduler.flush();
 
       expect(scheduler.fatalErrorOccurred).toBe(true);
-      expect(mockItem.resolve).toHaveBeenCalledWith('Fatal');
+       expectSettlement(mockItem.resolve, 'Fatal');
     });
 
     it('should discard and resolve original if context changes during request', async () => {
@@ -408,8 +745,453 @@ describe('PageTranslationScheduler', () => {
 
       await scheduler.flush();
 
-      expect(mockItem.resolve).toHaveBeenCalledWith('Old Context');
+       expectSettlement(mockItem.resolve, 'Old Context');
       expect(scheduler.translatedCount).toBe(0);
+    });
+
+    it('settles queued items and escalates once when batch config fails', async () => {
+      const item = { text: 'Config failure', resolve: vi.fn(), score: 1 };
+      const error = new Error('config unavailable');
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockRejectedValueOnce(error);
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.queue).toHaveLength(0);
+      expect(scheduler.isTranslated).toBe(false);
+      expect(scheduler.activeFlushes).toBe(0);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_COMPLETE, expect.anything());
+      expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_IDLE, expect.anything());
+    });
+
+    it('cancels owned items silently when batch config loses context', async () => {
+      const item = { text: 'Context failure', resolve: vi.fn(), score: 1 };
+      const error = Object.assign(new Error('context invalidated'), { type: 'EXTENSION_CONTEXT_INVALIDATED' });
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      ExtensionContextManager.isContextError.mockReturnValueOnce(true);
+      vi.spyOn(scheduler, '_getBatchConfig').mockRejectedValueOnce(error);
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('cancelled');
+      expect(scheduler.failedCount).toBe(0);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['fluid', false, PageTranslationFluidFilter],
+      ['queue', true, PageTranslationQueueFilter],
+    ])('settles items when %s filter throws', async (_name, translateAfterScrollStop, filter) => {
+      const item = { text: 'Filter failure', resolve: vi.fn(), score: 1 };
+      const error = new Error('filter invariant failed');
+      scheduler.settings.translateAfterScrollStop = translateAfterScrollStop;
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      filter.process.mockImplementationOnce(() => { throw error; });
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.queue).toHaveLength(0);
+      expect(scheduler.activeFlushes).toBe(0);
+    });
+
+    it('settles items when a filter returns malformed ownership data', async () => {
+      const item = { text: 'Malformed result', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      PageTranslationFluidFilter.process.mockReturnValueOnce({ batchItems: [item] });
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.queue).toHaveLength(0);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
+    });
+
+    it('settles a batch after it leaves queue ownership and execution fails outside its handler', async () => {
+      const item = { text: 'Owned batch', resolve: vi.fn(), score: 1 };
+      const error = new Error('batch boundary failure');
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockReturnValueOnce({ batchItems: [item], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      vi.spyOn(scheduler, '_executeBatchRequest').mockRejectedValueOnce(error);
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.activeBatches.size).toBe(0);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
+    });
+
+    it('settles a batch when MessageFormat fails before batch error handling', async () => {
+      const item = { text: 'Message failure', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(item);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockReturnValueOnce({ batchItems: [item], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      vi.spyOn(MessageFormat, 'create').mockImplementationOnce(() => {
+        throw new Error('message construction failure');
+      });
+
+      await scheduler.flush();
+
+      expect(getSettlement(item.resolve).state).toBe('failed');
+      expect(scheduler.activeBatches.size).toBe(0);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves partial accounting during outer failure', async () => {
+      const item = { text: 'Remaining work', resolve: vi.fn(), score: 1 };
+      scheduler.translatedCount = 2;
+      scheduler.failedCount = 1;
+      scheduler.totalTasks = 4;
+      scheduler.queue.push(item);
+      vi.spyOn(scheduler, '_getBatchConfig').mockRejectedValueOnce(new Error('infrastructure failure'));
+
+      await scheduler.flush();
+
+      expect(scheduler.translatedCount).toBe(2);
+      expect(scheduler.failedCount).toBe(2);
+      expect(scheduler.totalTasks).toBe(4);
+      expect(getSettlement(item.resolve).state).toBe('failed');
+    });
+
+    it('terminates concurrent session flushes with one fatal escalation', async () => {
+      const itemA = { text: 'A', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B', resolve: vi.fn(), score: 1 };
+      let releaseSecond;
+      const secondRequest = new Promise(resolve => { releaseSecond = resolve; });
+      scheduler.settings.maxConcurrentFlushes = 2;
+      scheduler.queue.push(itemA, itemB);
+      scheduler.totalTasks = 2;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      vi.spyOn(scheduler, '_executeBatchRequest')
+        .mockRejectedValueOnce(new Error('shared infrastructure failure'))
+        .mockImplementationOnce(() => secondRequest);
+
+      const firstFlush = scheduler.flush();
+      const secondFlush = scheduler.flush();
+      await vi.waitFor(() => expect(onFatalError).toHaveBeenCalledTimes(1));
+
+      expect(getSettlement(itemA.resolve).state).toBe('failed');
+      expect(getSettlement(itemB.resolve).state).toBe('failed');
+      expect(scheduler.activeFlushes).toBe(0);
+      releaseSecond({});
+      await Promise.all([firstFlush, secondFlush]);
+      expect(onFatalError).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not let an old flush touch a newer session after config resolves', async () => {
+      const oldItem = { text: 'Old', resolve: vi.fn(), score: 1 };
+      let resolveConfig;
+      const config = new Promise(resolve => { resolveConfig = resolve; });
+      scheduler.queue.push(oldItem);
+      scheduler.totalTasks = 1;
+      vi.spyOn(scheduler, '_getBatchConfig').mockReturnValueOnce(config);
+      const filterSpy = vi.spyOn(PageTranslationFluidFilter, 'process');
+
+      const oldFlush = scheduler.flush();
+      await vi.waitFor(() => expect(scheduler._getBatchConfig).toHaveBeenCalled());
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', { session: 'new' });
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+
+      resolveConfig({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      await oldFlush;
+
+      expect(filterSpy).not.toHaveBeenCalled();
+      expect(scheduler.queue).toEqual([newItem]);
+      expect(newItem.resolve).not.toHaveBeenCalled();
+      expect(scheduler.activeFlushes).toBe(0);
+      expect(onFatalError).not.toHaveBeenCalled();
+    });
+
+    it('settles stale batch failure without poisoning newer session state', async () => {
+      const oldItem = { text: 'Old', resolve: vi.fn(), score: 1 };
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+      let rejectOld;
+      let resolveNew;
+      const oldRequest = new Promise((_resolve, reject) => { rejectOld = reject; });
+      const newRequest = new Promise(resolve => { resolveNew = resolve; });
+      const newContext = { session: 'new' };
+      scheduler.queue.push(oldItem);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => oldRequest)
+        .mockImplementationOnce(() => newRequest);
+
+      const oldFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(1));
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', newContext);
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+      const newFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+
+      const queueBeforeStaleFailure = [...scheduler.queue];
+      const activeBatchesBeforeStaleFailure = scheduler.activeBatches.size;
+      const failedCountBeforeStaleFailure = scheduler.failedCount;
+      rejectOld(new Error('stale Session A failure'));
+      await oldFlush;
+
+      expect(getSettlement(oldItem.resolve).state).toBe('cancelled');
+      expect(scheduler.fatalErrorOccurred).toBe(false);
+      expect(onFatalError).not.toHaveBeenCalled();
+      expect(pageEventBus.emit.mock.calls.some(([event]) => event === 'page-translation-internal-error')).toBe(false);
+      expect(scheduler.translationSessionId).toBe('new-session');
+      expect(scheduler.sessionContext).toBe(newContext);
+      expect(scheduler.queue).toEqual(queueBeforeStaleFailure);
+      expect(scheduler.activeBatches.size).toBe(activeBatchesBeforeStaleFailure);
+      expect(scheduler.failedCount).toBe(failedCountBeforeStaleFailure);
+      expect(newItem.resolve).not.toHaveBeenCalled();
+
+      resolveNew({ success: true, translatedText: JSON.stringify(['new']) });
+      await newFlush;
+    });
+
+    it('does not let a stopped flush decrement a newer session counter', async () => {
+      const oldResponse = {};
+      const newResponse = {};
+      let resolveOld;
+      let resolveNew;
+      const oldRequest = new Promise(resolve => { resolveOld = resolve; });
+      const newRequest = new Promise(resolve => { resolveNew = resolve; });
+      const oldItem = { text: 'Old', resolve: vi.fn(), score: 1 };
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+
+      scheduler.queue.push(oldItem);
+      scheduler.totalTasks = 1;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => oldRequest)
+        .mockImplementationOnce(() => newRequest);
+
+      const oldFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(1));
+      expect(scheduler.activeFlushes).toBe(1);
+      const completionSpy = vi.spyOn(scheduler, '_checkCompletion');
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', { session: 'new' });
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+
+      const newFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolveOld(oldResponse);
+      await oldFlush;
+      expect(scheduler.activeFlushes).toBe(1);
+      expect(completionSpy).not.toHaveBeenCalled();
+      expect(newItem.resolve).not.toHaveBeenCalled();
+
+      resolveNew(newResponse);
+      await newFlush;
+      expect(scheduler.activeFlushes).toBe(0);
+    });
+
+    it('keeps independent batch results attached to their own items when completion reverses', async () => {
+      const itemA = { text: 'A1', resolve: vi.fn(), score: 1 };
+      const itemB = { text: 'B1', resolve: vi.fn(), score: 1 };
+      const resolveA = {};
+      const resolveB = {};
+      const responseA = new Promise(resolve => { resolveA.resolve = resolve; });
+      const responseB = new Promise(resolve => { resolveB.resolve = resolve; });
+
+      scheduler.settings.maxConcurrentFlushes = 2;
+      scheduler.queue.push(itemA, itemB);
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => responseA)
+        .mockImplementationOnce(() => responseB);
+
+      const flushA = scheduler.flush();
+      const flushB = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+
+      resolveB.resolve({ success: true, translatedText: JSON.stringify(['TB1']) });
+      await flushB;
+      expectSettlement(itemB.resolve, 'TB1');
+      expect(itemA.resolve).not.toHaveBeenCalled();
+
+      resolveA.resolve({ success: true, translatedText: JSON.stringify(['TA1']) });
+      await flushA;
+      expectSettlement(itemA.resolve, 'TA1');
+    });
+
+    it('applies same-batch positional results to corresponding scheduler items', async () => {
+      const items = [
+        { text: 'A', resolve: vi.fn(), score: 1 },
+        { text: 'B', resolve: vi.fn(), score: 1 },
+        { text: 'C', resolve: vi.fn(), score: 1 },
+      ];
+      scheduler.queue.push(...items);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: items, remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      safeSendMessage.mockResolvedValue({
+        success: true,
+        translatedText: JSON.stringify(['TA', 'TC', 'TB']),
+      });
+
+      await scheduler.flush();
+
+      expectSettlement(items[0].resolve, 'TA');
+      expectSettlement(items[1].resolve, 'TC');
+      expectSettlement(items[2].resolve, 'TB');
+    });
+
+    it('ignores multiple stopped flush finalizers while preserving current-session accounting', async () => {
+      const oldRequests = [];
+      const resolveOld = [];
+      const rejectOld = [];
+      const newResponse = {};
+      let resolveNew;
+      const newRequest = new Promise(resolve => { resolveNew = resolve; });
+      const oldItems = [
+        { text: 'Old A', resolve: vi.fn(), score: 1 },
+        { text: 'Old B', resolve: vi.fn(), score: 1 },
+      ];
+      const newItem = { text: 'New', resolve: vi.fn(), score: 1 };
+
+      oldItems.forEach(item => scheduler.queue.push(item));
+      scheduler.totalTasks = oldItems.length;
+      scheduler.settings.maxConcurrentFlushes = 2;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      oldItems.forEach(() => {
+        oldRequests.push(new Promise((resolve, reject) => {
+          resolveOld.push(resolve);
+          rejectOld.push(reject);
+        }));
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => oldRequests[0])
+        .mockImplementationOnce(() => oldRequests[1])
+        .mockImplementationOnce(() => newRequest);
+
+      const oldFlushes = [scheduler.flush(), scheduler.flush()];
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+      expect(scheduler.activeFlushes).toBe(2);
+
+      scheduler.stop();
+      scheduler.setTranslationState(true, 'new-session', { session: 'new' });
+      scheduler.queue.push(newItem);
+      scheduler.totalTasks = 1;
+      const newFlush = scheduler.flush();
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(3));
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolveOld[0]({});
+      rejectOld[1](new Error('old-session failure'));
+      await Promise.all(oldFlushes);
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolveNew(newResponse);
+      await newFlush;
+      expect(scheduler.activeFlushes).toBe(0);
+    });
+
+    it('decrements active flushes for current-session success and failure', async () => {
+      const requests = [];
+      const resolvers = [];
+      const items = [
+        { text: 'A', resolve: vi.fn(), score: 1 },
+        { text: 'B', resolve: vi.fn(), score: 1 },
+      ];
+
+      items.forEach(item => scheduler.queue.push(item));
+      scheduler.totalTasks = items.length;
+      scheduler.settings.maxConcurrentFlushes = 2;
+      PageTranslationFluidFilter.process.mockImplementation(queue => ({
+        batchItems: [queue[0]],
+        remainingItems: queue.slice(1),
+      }));
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({
+        providerRegistryId: 'google',
+        targetLanguage: 'fa',
+      });
+      items.forEach(() => {
+        requests.push(new Promise((resolve, reject) => resolvers.push({ resolve, reject })));
+      });
+      safeSendMessage
+        .mockImplementationOnce(() => requests[0])
+        .mockImplementationOnce(() => requests[1]);
+
+      const flushes = [scheduler.flush(), scheduler.flush()];
+      await vi.waitFor(() => expect(safeSendMessage).toHaveBeenCalledTimes(2));
+      expect(scheduler.activeFlushes).toBe(2);
+
+      resolvers[0].resolve({});
+      await flushes[0];
+      expect(scheduler.activeFlushes).toBe(1);
+
+      resolvers[1].reject(new Error('current-session failure'));
+      await flushes[1];
+      expect(scheduler.activeFlushes).toBe(0);
     });
   });
 });

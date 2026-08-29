@@ -3,7 +3,6 @@ import { BaseProvider } from './BaseProvider.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
-import { TraditionalBatchProcessor } from "@/features/translation/providers/utils/TraditionalBatchProcessor.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { getSettingsAsync } from "@/shared/config/config.js";
 
@@ -28,12 +27,6 @@ vi.mock('@/features/translation/providers/utils/ProviderRequestEngine.js', () =>
   ProviderRequestEngine: {
     executeRequest: vi.fn(),
     executeApiCall: vi.fn()
-  }
-}));
-
-vi.mock('@/features/translation/providers/utils/TraditionalBatchProcessor.js', () => ({
-  TraditionalBatchProcessor: {
-    processInBatches: vi.fn()
   }
 }));
 
@@ -168,14 +161,6 @@ describe('BaseProvider', () => {
       expect(ProviderRequestEngine.executeApiCall).toHaveBeenCalledWith(provider, params);
     });
 
-    it('_processInBatches should delegate to TraditionalBatchProcessor', async () => {
-      const segments = ['a'];
-      const translateChunk = vi.fn();
-      await provider._processInBatches(segments, translateChunk, { limit: 10 });
-      expect(TraditionalBatchProcessor.processInBatches).toHaveBeenCalledWith(
-        provider, segments, translateChunk, { limit: 10 }, null, null
-      );
-    });
   });
 
   describe('_executeWithRateLimit', () => {

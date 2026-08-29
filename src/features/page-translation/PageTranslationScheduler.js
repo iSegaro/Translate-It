@@ -1,5 +1,5 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat, MessageContexts, ActionReasons } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessageContexts, reconstructTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { 
   getTranslationApiAsync, 
@@ -23,14 +23,19 @@ import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { sendRegularMessage, safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
 import { registryIdToName, isProviderType, ProviderTypes } from '@/features/translation/providers/ProviderConstants.js';
 
+const INTERNAL_CANCELLATION_REASON = 'operation-abort';
+
 /**
  * PageTranslationScheduler - Optimized translation scheduler inspired by AnyLang.
  * Handles batching, prioritization (Viewport first), and fault tolerance.
  */
 export class PageTranslationScheduler extends ResourceTracker {
-  constructor() {
+  constructor({ onFatalError, onLifecycleEvent, onInternalError } = {}) {
     super('page-translation-scheduler');
     this.logger = getScopedLogger(LOG_COMPONENTS.PAGE_TRANSLATION, 'Scheduler');
+    this.onFatalError = typeof onFatalError === 'function' ? onFatalError : null;
+    this.onLifecycleEvent = typeof onLifecycleEvent === 'function' ? onLifecycleEvent : null;
+    this.onInternalError = typeof onInternalError === 'function' ? onInternalError : null;
     this.queue = []; // Tasks: { text, score, resolve, reject, context, node }
     this.batchTimer = null;
     this.translatedCount = 0;
@@ -60,6 +65,9 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._lastReportTime = 0;
     this._reportInterval = 300; // ms
     this._reportPending = false;
+    this._completionTimer = null;
+    this.pendingSettlements = new Set();
+    this.activeBatches = new Set();
 
     // Register queue for automatic memory management via ResourceTracker
     this.trackResource('translation-queue', () => {
@@ -76,9 +84,23 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.settings = { ...this.settings, ...settings };
   }
 
-  setTranslationState(isTranslated, sessionId, sessionContext = null) {
+  _emitLifecycle(action, data, sessionId = this.translationSessionId) {
+    const lifecycleData = typeof sessionId === 'string' && sessionId.length > 0
+      ? { ...data, sessionId }
+      : data;
+
+    if (this.onLifecycleEvent) {
+      this.onLifecycleEvent(action, lifecycleData);
+      return;
+    }
+
+    // Standalone scheduler consumers retain local presentation behavior.
+    pageEventBus.emit(action, lifecycleData);
+  }
+
+  setTranslationState(isTranslated, sessionId, sessionContext = null, cancellationReason) {
     if (!isTranslated) {
-      this.stop();
+      this.stop('cancelled', cancellationReason);
     } else {
       this.isTranslated = isTranslated;
       this.translationSessionId = sessionId;
@@ -102,7 +124,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     this._nextContextId = 1;
   }
 
-  stop() {
+  stop(settlementOutcome = 'cancelled', cancellationReason = INTERNAL_CANCELLATION_REASON) {
     const wasTranslating = this.isTranslated;
     this.isTranslated = false;
     this.sessionContext = null;
@@ -120,7 +142,7 @@ export class PageTranslationScheduler extends ResourceTracker {
           cancelAll: true,
           context: MessageContexts.PAGE_TRANSLATION_BATCH,
           sessionId: this.translationSessionId,
-          reason: ActionReasons.USER_STOPPED_PAGE_TRANSLATION
+          reason: cancellationReason
         }
       }).then(response => {
         this.logger.debug('[Scheduler] Cancel signal acknowledged by background:', response);
@@ -133,19 +155,65 @@ export class PageTranslationScheduler extends ResourceTracker {
       clearTimeout(this.batchTimer);
       this.batchTimer = null;
     }
+    if (this._completionTimer) {
+      clearTimeout(this._completionTimer);
+      this._completionTimer = null;
+    }
     
     if (this.queue.length > 0) {
       const itemsToReject = [...this.queue];
       this.queue = [];
       this.highPriorityCount = 0;
-      itemsToReject.forEach(item => {
-        try { item.resolve(item.text); } catch {
-          // Ignore resolution errors
-        }
-      });
+      itemsToReject.forEach(item => this._resolveItem(item, item.text, settlementOutcome));
     }
+
+    const activeBatches = [...this.activeBatches];
+    this.activeBatches.clear();
+    activeBatches.forEach(({ items }) => {
+      items.forEach(item => this._resolveItem(item, item.text, settlementOutcome));
+    });
+
+    [...this.pendingSettlements].forEach(settlement => settlement.settle(settlementOutcome));
     this.activeFlushes = 0;
     this.isFirstBatch = true;
+  }
+
+  _createSettlement(item, text) {
+    // Provider success stays pending until Bridge validates its DOM target.
+    let state = 'pending';
+    const settlement = {
+      __pageTranslationSettlement: true,
+      text,
+      get state() {
+        return state;
+      },
+      settle: (outcome) => {
+        if (state !== 'pending') return false;
+        state = outcome;
+        this.pendingSettlements.delete(settlement);
+        if (outcome === 'accepted') this.translatedCount++;
+        if (outcome === 'stale' || outcome === 'failed') this.failedCount++;
+        if (outcome === 'accepted' || outcome === 'stale') {
+          this._reportProgress();
+          this._checkCompletion();
+        }
+        return true;
+      },
+    };
+    this.pendingSettlements.add(settlement);
+    return settlement;
+  }
+
+  _resolveItem(item, text, outcome) {
+    if (!item || item.settled) return;
+    item.settled = true;
+    const settlement = this._createSettlement(item, text);
+    if (outcome !== 'success') settlement.settle(outcome);
+    try {
+      item.resolve(settlement);
+    } catch {
+      // Ignore resolution errors
+    }
   }
 
   /**
@@ -327,39 +395,48 @@ export class PageTranslationScheduler extends ResourceTracker {
       this.batchTimer = null;
     }
     
+    const flushSessionId = this.translationSessionId;
     const flushContext = this.sessionContext;
     this.activeFlushes++;
+    let activeBatch = null;
 
     try {
       // Process batches in a loop as long as there are items and we are still translating
       while (this.queue.length > 0 && this.isTranslated && flushContext === this.sessionContext) {
         const config = await this._getBatchConfig();
+        if (!this._ownsFlushSession(flushSessionId, flushContext)) return;
         let currentBatch = [];
 
         // 1. SELECT BATCH: Use specialized filters based on the mode
         if (this.settings.translateAfterScrollStop) {
           const result = PageTranslationQueueFilter.process(this.queue, config);
+          this._validateFilterResult(result);
           currentBatch = result.batchItems;
+          const ejectedItems = Array.isArray(result.ejectedItems) ? result.ejectedItems : [];
+          activeBatch = this._trackBatch(currentBatch, ejectedItems);
           this.queue = result.remainingItems;
 
           // HANDLE EJECTED ITEMS: These were too far, so we remove them from the 
           // scheduler's responsibility by resolving them with original text.
           if (result.purgedCount > 0) {
-            result.ejectedItems.forEach(item => {
+            ejectedItems.forEach(item => {
               if (item.isHighPriority) {
                 this.highPriorityCount = Math.max(0, this.highPriorityCount - 1);
               }
-              try { item.resolve(item.text); } catch { /* ignore */ }
-              this.failedCount++;
+              this._resolveItem(item, item.text, 'failed');
             });
           }
         } else {
           const result = PageTranslationFluidFilter.process(this.queue, config);
+          this._validateFilterResult(result);
           currentBatch = result.batchItems;
+          activeBatch = this._trackBatch(currentBatch);
           this.queue = result.remainingItems;
         }
 
         if (currentBatch.length === 0) {
+          this.activeBatches.delete(activeBatch);
+          activeBatch = null;
           this.logger.debug('No visible content in queue, stopping flush loop');
           this.isWaitingForVisibility = true; // No visible content found
           break;
@@ -372,7 +449,9 @@ export class PageTranslationScheduler extends ResourceTracker {
 
         // 2. EXECUTE BATCH: Process the selected items
         this.isFirstBatch = false;
-        await this._executeBatchRequest(currentBatch, config, flushContext);
+        await this._executeBatchRequest(currentBatch, config, flushContext, flushSessionId);
+        this.activeBatches.delete(activeBatch);
+        activeBatch = null;
 
         // 3. YIELD: Give event loop a breath if there's more work
         if (this.queue.length > 0) {
@@ -381,16 +460,67 @@ export class PageTranslationScheduler extends ResourceTracker {
       }
     } catch (error) {
       this.logger.error('Critical error in scheduler flush loop:', error);
+      this._handleOuterFlushFailure(error, flushSessionId, flushContext);
     } finally {
-      this.activeFlushes--;
-      this._checkCompletion();
+      if (activeBatch) this.activeBatches.delete(activeBatch);
+      // A stopped flush may settle after a newer session has started. Its
+      // finalizer must not decrement the newer session's accounting.
+      const ownsAccounting = this.translationSessionId === flushSessionId
+        && this.sessionContext === flushContext;
+      if (ownsAccounting) {
+        this.activeFlushes--;
+        this._checkCompletion();
+      }
     }
+  }
+
+  _ownsFlushSession(sessionId, sessionContext) {
+    return this.isTranslated
+      && this.translationSessionId === sessionId
+      && this.sessionContext === sessionContext;
+  }
+
+  _validateFilterResult(result) {
+    if (!result || !Array.isArray(result.batchItems) || !Array.isArray(result.remainingItems)) {
+      throw new TypeError('Page translation filter returned an invalid result');
+    }
+    if (result.purgedCount > 0 && !Array.isArray(result.ejectedItems)) {
+      throw new TypeError('Page translation filter omitted ejected items');
+    }
+  }
+
+  _trackBatch(batch, additionalItems = []) {
+    const activeBatch = {
+      items: [...batch, ...additionalItems]
+    };
+    this.activeBatches.add(activeBatch);
+    return activeBatch;
+  }
+
+  _handleOuterFlushFailure(error, sessionId, sessionContext) {
+    if (!this._ownsFlushSession(sessionId, sessionContext) || this.fatalErrorOccurred) return false;
+
+    this.fatalErrorOccurred = true;
+    const isContextError = ExtensionContextManager.isContextError(error);
+    this.stop(
+      isContextError ? 'cancelled' : 'failed',
+      INTERNAL_CANCELLATION_REASON
+    );
+
+    this.onFatalError?.({
+      error,
+      errorType: matchErrorToType(error),
+      context: 'page-translation-scheduler',
+      sessionId,
+      sessionContext,
+    });
+    return true;
   }
 
   /**
    * Internal method to handle the actual translation request and resolution.
    */
-  async _executeBatchRequest(batch, config, flushContext) {
+  async _executeBatchRequest(batch, config, flushContext, flushSessionId) {
     const textsToTranslate = batch.map(item => ({ text: item.text }));
     
     const batchMessage = MessageFormat.create(
@@ -418,23 +548,27 @@ export class PageTranslationScheduler extends ResourceTracker {
       // Validation after async call
       if (!this.isTranslated || (flushContext && flushContext !== this.sessionContext)) {
         this.logger.debug('Batch discarded: session changed or stopped');
-        batch.forEach(item => { try { item.resolve(item.text); } catch { /* ignore */ } });
+        batch.forEach(item => this._resolveItem(item, item.text, 'cancelled'));
         return;
       }
 
       // Detect failure or Soft-Failure with error details
       if (!result?.success || result?.hasError) {
         this.logger.debug('Batch failed:', result?.error || 'Unknown error');
-        const rawErrorMessage = result?.error || '';
-        const batchError = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
-          ? new Error(rawErrorMessage || 'Extension context invalidated')
-          : new Error(rawErrorMessage || 'Batch translation failed');
+        const rawErrorMessage = typeof result?.error === 'string' ? result.error : '';
+        const fallbackErrorMessage = ((!result && !ExtensionContextManager.isValidSync()) || ExtensionContextManager.isContextError(rawErrorMessage))
+          ? 'Extension context invalidated'
+          : 'Batch translation failed';
+        const batchError = result?.errorDetails
+          ? reconstructTranslationError(result.errorDetails)
+          : new Error(rawErrorMessage || fallbackErrorMessage);
 
-        // Preserve error details from Soft-Failure for better categorization
-        if (result?.errorType) batchError.type = result.errorType;
+        // Preserve legacy Page classification without overwriting canonical identity.
+        const pageErrorType = result?.errorType;
+        if (!batchError.type && pageErrorType) batchError.type = pageErrorType;
         if (result?.isFatal) batchError.isFatal = true;
 
-        await this._handleBatchError(batchError, batch);
+        await this._handleBatchError(batchError, batch, pageErrorType, flushSessionId, flushContext);
         return;
       }
 
@@ -475,19 +609,17 @@ export class PageTranslationScheduler extends ResourceTracker {
         // Blank and non-string results are unresolved. Identity translations
         // remain valid because only usability, not source equality, is checked.
         if (isExplicitlySkipped || typeof translatedText !== 'string' || !translatedText.trim()) {
-          item.resolve(item.text);
-          this.failedCount++;
+          this._resolveItem(item, item.text, 'failed');
           return;
         }
 
-        item.resolve(translatedText);
-        this.translatedCount++;
+        this._resolveItem(item, translatedText, 'success');
       });
 
       this._reportProgress();
     } catch (error) {
       this.logger.error('Batch execution error:', error);
-      await this._handleBatchError(error, batch);
+      await this._handleBatchError(error, batch, null, flushSessionId, flushContext);
     }  }
 
   async _getBatchConfig() {
@@ -548,11 +680,22 @@ export class PageTranslationScheduler extends ResourceTracker {
     };
   }
 
-  async _handleBatchError(error, batch) {
+  async _handleBatchError(
+    error,
+    batch,
+    pageErrorType = null,
+    sessionId = this.translationSessionId,
+    sessionContext = this.sessionContext
+  ) {
+    if (!this._ownsFlushSession(sessionId, sessionContext)) {
+      batch.forEach(item => this._resolveItem(item, item.text, 'cancelled'));
+      return false;
+    }
+
     if (this.fatalErrorOccurred) return;
 
     // Preserve original error identity as per guidelines
-    const errorType = matchErrorToType(error);
+    const errorType = pageErrorType || matchErrorToType(error);
     
     // Page Translation Specific: If a batch fails PERMANENTLY (after all internal retries)
     // due to network or server issues, we treat it as fatal for the session to prevent
@@ -566,10 +709,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     }
 
     // Resolve current batch items with original text to unblock domtranslator
-    batch.forEach(item => { 
-      try { item.resolve(item.text); } catch { /* ignore */ } 
-      this.failedCount++;
-    });
+    batch.forEach(item => this._resolveItem(item, item.text, 'failed'));
 
     // Emit internal event for the Manager to handle feedback and broadcasting
     pageEventBus.emit('page-translation-internal-error', { 
@@ -578,13 +718,25 @@ export class PageTranslationScheduler extends ResourceTracker {
       isFatal: isFatal,
       context: 'page-translation-batch'
     });
+    this.onInternalError?.({
+      error,
+      errorType,
+      isFatal,
+      context: 'page-translation-batch',
+      sessionId,
+    });
 
     // Also emit specific fatal event for the Manager's circuit breaker
     if (isFatal) {
-      pageEventBus.emit('page-translation-fatal-error', { 
-        error, 
-        errorType
-      });
+      if (this._ownsFlushSession(sessionId, sessionContext)) {
+        this.onFatalError?.({
+          error,
+          errorType,
+          context: 'page-translation-batch',
+          sessionId,
+          sessionContext,
+        });
+      }
     }
   }
 
@@ -595,7 +747,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     if (force || timeSinceLastReport >= this._reportInterval) {
       this._lastReportTime = now;
       this._reportPending = false;
-      pageEventBus.emit(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
+      this._emitLifecycle(MessageActions.PAGE_TRANSLATE_PROGRESS, { 
         translatedCount: this.translatedCount, 
         totalCount: this.totalTasks,
         failedCount: this.failedCount,
@@ -618,8 +770,10 @@ export class PageTranslationScheduler extends ResourceTracker {
    * Check if translation is complete or temporarily idle (waiting for more visible content)
    */
   _checkCompletion() {
+    if (this._completionTimer) return;
     // Small delay to ensure no more immediate tasks are coming
-    this.trackTimeout(() => {
+    this._completionTimer = this.trackTimeout(() => {
+      this._completionTimer = null;
       if (!this.isTranslated || this.activeFlushes > 0) return;
 
       const processedCount = this.translatedCount + this.failedCount;
@@ -630,7 +784,7 @@ export class PageTranslationScheduler extends ResourceTracker {
         // If auto-translating, we are never "truly" complete, just idle/watching
         if (isAuto) {
           this.logger.debug('Scheduler detected completion of current queue in Auto mode, signaling idle');
-          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
+          this._emitLifecycle(MessageActions.PAGE_TRANSLATE_IDLE, {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
             failedCount: this.failedCount,
@@ -642,7 +796,7 @@ export class PageTranslationScheduler extends ResourceTracker {
             total: this.totalTasks,
             failed: this.failedCount
           });
-          pageEventBus.emit(MessageActions.PAGE_TRANSLATE_COMPLETE, {
+          this._emitLifecycle(MessageActions.PAGE_TRANSLATE_COMPLETE, {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
             failedCount: this.failedCount,
@@ -658,7 +812,7 @@ export class PageTranslationScheduler extends ResourceTracker {
       // We allow idle even if some failed or nothing successfully translated yet.
       if (this.isWaitingForVisibility && processedCount >= 0) {
         this.logger.debug('Scheduler entering idle state (Visible content processed)');
-        pageEventBus.emit(MessageActions.PAGE_TRANSLATE_IDLE, {
+        this._emitLifecycle(MessageActions.PAGE_TRANSLATE_IDLE, {
           translatedCount: this.translatedCount,
           totalCount: this.totalTasks,
           failedCount: this.failedCount,

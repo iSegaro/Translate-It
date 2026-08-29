@@ -1,6 +1,7 @@
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessagingContexts } from '@/shared/messaging/core/MessagingCore.js';
+import { MessageFormat, MessagingContexts, reconstructTranslationError, isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { TranslationMode } from '@/shared/config/config.js';
+import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { revertHandler } from './RevertHandler.js';
@@ -10,9 +11,22 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
+import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
+
+function isSelectElementGeneration(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+function getSelectElementActiveState(manager) {
+  if (typeof manager?.isSelectElementActive === 'function') {
+    return manager.isSelectElementActive() === true;
+  }
+  return manager?.isActive === true;
+}
 
 export class ContentMessageHandler extends ResourceTracker {
   constructor() {
@@ -29,8 +43,12 @@ export class ContentMessageHandler extends ResourceTracker {
     this.context = MessagingContexts.CONTENT;
     this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
+    // Generation is local to this content frame; tab-wide authority stays in Background.
+    this.acceptedSelectElementGeneration = null;
+    this.invalidatedSelectElementGeneration = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
+    this.childFrameRetirementListenerInstalled = false;
     this.errorHandler = ErrorHandler.getInstance();
 
     // Track processed message IDs to prevent duplicates
@@ -52,6 +70,18 @@ export class ContentMessageHandler extends ResourceTracker {
     this.selectElementManager = manager;
   }
 
+  _enqueueSelectElementLifecycle(operation) {
+    const manager = this.selectElementManager;
+    // SelectElementManager owns frame-local serialization; this method only bridges handler admission.
+    if (typeof manager?.enqueueSelectElementLifecycle === 'function') {
+      return manager.enqueueSelectElementLifecycle(operation);
+    }
+    return operation({
+      activate: options => manager?.activateSelectElementMode(options),
+      deactivate: options => manager?.deactivate(options),
+    });
+  }
+
   setScreenCaptureManager(manager) {
     this.screenCaptureManager = manager;
   }
@@ -62,6 +92,29 @@ export class ContentMessageHandler extends ResourceTracker {
 
   setPageTranslationManager(manager) {
     this.pageTranslationManager = manager;
+  }
+
+  _ensureChildFrameRetirementListener() {
+    if (this.childFrameRetirementListenerInstalled || window === window.top) return;
+
+    this.addEventListener(window, 'beforeunload', () => {
+      const sessionId = this.pageTranslationManager?.acceptedLifecycleSessionId;
+      if (typeof sessionId !== 'string' || sessionId.length === 0) return;
+
+      try {
+        void browser.runtime.sendMessage({
+          action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+          data: {
+            action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+            data: { sessionId },
+          },
+          context: 'page-translation-frame-retirement',
+        }).catch(() => {});
+      } catch {
+        // Unload retirement is best effort.
+      }
+    });
+    this.childFrameRetirementListenerInstalled = true;
   }
 
   initialize() {
@@ -203,7 +256,6 @@ export class ContentMessageHandler extends ResourceTracker {
 
     // IFrame support handlers
     this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
-    this.registerHandler(MessageActions.IFRAME_TRANSLATE_SELECTION, this.handleIFrameTranslateSelection.bind(this));
     this.registerHandler(MessageActions.IFRAME_GET_FRAME_INFO, this.handleIFrameGetFrameInfo.bind(this));
     this.registerHandler(MessageActions.IFRAME_COORDINATE_OPERATION, this.handleIFrameCoordinateOperation.bind(this));
     this.registerHandler(MessageActions.IFRAME_DETECT_TEXT_FIELDS, this.handleIFrameDetectTextFields.bind(this));
@@ -216,6 +268,7 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.PAGE_RESTORE, this.handlePageRestore.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, this.handlePageGetStatus.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_STOP_AUTO, this.handlePageStopAuto.bind(this));
+    this.registerHandler(MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE, this.handlePageTranslationLifecycle.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -275,6 +328,10 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleActivateSelectElementMode(message) {
+    return this._handleActivateSelectElementMode(message);
+  }
+
+  async _handleActivateSelectElementMode(message) {
     this.logger.info("ContentMessageHandler: ACTIVATE_SELECT_ELEMENT_MODE received!");
 
     try {
@@ -308,21 +365,56 @@ export class ContentMessageHandler extends ResourceTracker {
         }
       }
 
-      // Initialize if not already initialized
-      if (!this.selectElementManager.isInitialized) {
-        await this.selectElementManager.initialize();
-      }
+      return await this._enqueueSelectElementLifecycle(async ({ activate }) => {
+        const requestedGeneration = message?.data?.activationGeneration;
+        if (
+          isSelectElementGeneration(requestedGeneration)
+          && this.invalidatedSelectElementGeneration !== null
+          && requestedGeneration <= this.invalidatedSelectElementGeneration
+        ) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleGeneration: true,
+          };
+        }
 
-      // Activate Select Element mode
-      const result = await this.selectElementManager.activateSelectElementMode(message.data || {});
-      this.logger.info("SelectElementManager activation process completed");
+        // Initialize if not already initialized
+        if (!this.selectElementManager.isInitialized) {
+          await this.selectElementManager.initialize();
+        }
 
-      // Return success result
-      return { 
-        success: result !== false, 
-        activated: result?.isActive ?? (result !== false), 
-        managerId: result?.instanceId 
-      };
+        // Activate Select Element mode
+        const result = await activate(message.data || {});
+        this.logger.info("SelectElementManager activation process completed");
+
+        const activated = result?.isActive === true || result === true;
+        if (
+          activated
+          && isSelectElementGeneration(requestedGeneration)
+          && (
+            this.acceptedSelectElementGeneration === null
+            || requestedGeneration >= this.acceptedSelectElementGeneration
+          )
+        ) {
+          this.acceptedSelectElementGeneration = requestedGeneration;
+        }
+
+        // Return success result
+        const response = {
+          success: activated,
+          activated,
+          managerId: result?.instanceId,
+        };
+        if (
+          activated
+          && isSelectElementGeneration(requestedGeneration)
+          && requestedGeneration === this.acceptedSelectElementGeneration
+        ) {
+          response.activationGeneration = requestedGeneration;
+        }
+        return response;
+      });
       
     } catch (error) {
       this.logger.warn("ContentMessageHandler: SelectElement activation failed:", error);
@@ -345,7 +437,36 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleDeactivateSelectElementMode(message) {
+    return this._enqueueSelectElementLifecycle(
+      lifecycle => this._handleDeactivateSelectElementMode(message, lifecycle),
+    );
+  }
+
+  async _handleDeactivateSelectElementMode(message, lifecycle) {
     if (this.selectElementManager) {
+      const requestedGeneration = message?.data?.activationGeneration;
+      const currentGeneration = this.acceptedSelectElementGeneration;
+      if (isSelectElementGeneration(requestedGeneration)) {
+        this.invalidatedSelectElementGeneration = Math.max(
+          this.invalidatedSelectElementGeneration || 0,
+          requestedGeneration,
+        );
+      }
+      if (
+        currentGeneration !== null
+        && (
+          !isSelectElementGeneration(requestedGeneration)
+          || requestedGeneration !== currentGeneration
+        )
+      ) {
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: getSelectElementActiveState(this.selectElementManager),
+          staleGeneration: true,
+        };
+      }
+
       // Check if this is from background (to avoid circular messaging)
       const fromBackground = message?.data?.fromBackground;
             
@@ -354,22 +475,54 @@ export class ContentMessageHandler extends ResourceTracker {
 
       // Only process deactivation if it's explicit or from non-background sources
       if (fromBackground && !isExplicitDeactivation) {
-        return { success: true, activated: this.selectElementManager ? this.selectElementManager.isSelectElementActive() : false };
+        return { success: true, activated: getSelectElementActiveState(this.selectElementManager) };
       }
 
       this.logger.info('DEACTIVATE_SELECT_ELEMENT_MODE received');
 
       try {
         // Deactivate the manager directly
-        await this.selectElementManager.deactivate({ fromBackground });
+        const result = await lifecycle.deactivate({ fromBackground });
 
-        return { success: true, activated: false };
+        if (result?.success === true && result?.cleanupCompleted === true) {
+          if (
+            !isSelectElementGeneration(requestedGeneration)
+            || this.acceptedSelectElementGeneration === requestedGeneration
+          ) {
+            this.acceptedSelectElementGeneration = null;
+          }
+          return {
+            success: true,
+            cleanupCompleted: true,
+            activated: false,
+            ...(isSelectElementGeneration(requestedGeneration)
+              ? { activationGeneration: requestedGeneration }
+              : {}),
+          };
+        }
+
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: false,
+          error: result?.error || 'Could not deactivate Select Element mode.',
+        };
       } catch (error) {
         this.logger.warn("ContentMessageHandler: selectElementManager deactivation failed:", error);
-        return { success: false, error: error.message };
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: false,
+          error: 'Could not deactivate Select Element mode.',
+        };
       }
     } else {
-      return { success: true, activated: false };
+      return {
+        success: false,
+        cleanupCompleted: false,
+        activated: false,
+        error: 'Select Element manager unavailable',
+      };
     }
   }
 
@@ -431,7 +584,7 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async handleTranslationResult(message) {
-    const { translationMode, translatedText, originalText, options, success, error } = message.data;
+    const { translationMode, translatedText, originalText, options, success, error, errorDetails } = message.data;
     const toastId = options?.toastId;
     this.logger.info(`Handling translation result for mode: ${translationMode}`, {
       success,
@@ -455,10 +608,12 @@ export class ContentMessageHandler extends ResourceTracker {
 
       case TranslationMode.Field:
       case TranslationMode.LEGACY_FIELD: // Handle both enum and legacy string for robustness
+      {
         this.logger.info('Processing Text Field translation result');
         
         // Check if translation failed at background level
-        if (success === false && error) {
+      const failureSource = isStructuredTranslationError(errorDetails) ? errorDetails : error;
+      if (success === false && failureSource) {
           // logger.trace('Text Field translation failed in background, handling error');
           
           // Dismiss status notification if exists
@@ -471,18 +626,20 @@ export class ContentMessageHandler extends ResourceTracker {
             window.pendingTranslationToastId = null;
           }
           
-          // Use centralized error handling system to get localized message and correct type
-          const errorInfo = await this.errorHandler.getErrorForUI(error, 'text-field-translation');
-          
-          // Log the error with proper context
-          await this.errorHandler.handle(error, {
-            context: 'text-field-translation',
-            type: errorInfo.type,
-            showToast: true
-          });
-          
-          const translationError = new Error(errorInfo.message);
-          translationError.type = errorInfo.type;
+          const presentation = await getFieldTranslationErrorPresentation(failureSource);
+          if (presentation) {
+            await this.errorHandler.handle(presentation.displayError, {
+              context: 'text-field-translation',
+              type: presentation.canonicalType || presentation.displayError.type,
+              showToast: true
+            });
+
+            presentation.displayError.alreadyHandled = true;
+            throw presentation.displayError;
+          }
+
+          // Preserve silent cancellation/context control flow without presenting.
+          const translationError = reconstructTranslationError(failureSource);
           translationError.alreadyHandled = true;
           throw translationError;
         }
@@ -512,6 +669,7 @@ export class ContentMessageHandler extends ResourceTracker {
           error.alreadyHandled = true;
           throw error;
         }
+      }
 
       case TranslationMode.Selection:
       case TranslationMode.Dictionary_Translation:
@@ -550,6 +708,12 @@ export class ContentMessageHandler extends ResourceTracker {
 
   // IFrame support handlers
   async handleIFrameActivateSelectElement(/* data */) {
+    return this._enqueueSelectElementLifecycle(
+      lifecycle => this._handleIFrameActivateSelectElement(lifecycle),
+    );
+  }
+
+  async _handleIFrameActivateSelectElement(lifecycle) {
     this.logger.info('IFrame activate select element request');
     try {
       if (this.selectElementManager) {
@@ -558,7 +722,7 @@ export class ContentMessageHandler extends ResourceTracker {
           await this.selectElementManager.initialize();
         }
 
-        const result = await this.selectElementManager.activateSelectElementMode();
+        const result = await lifecycle.activate();
         return { success: true, activated: result.isActive, managerId: result.instanceId };
       }
 
@@ -579,13 +743,6 @@ export class ContentMessageHandler extends ResourceTracker {
         errorType: ErrorTypes.SELECT_ELEMENT,
       };
     }
-  }
-
-  async handleIFrameTranslateSelection(data) {
-    this.logger.info('IFrame translate selection request');
-    // Delegate to WindowsManager through page event bus
-    pageEventBus.emit('iframe-translate-selection', data);
-    return { success: true };
   }
 
   async handleIFrameGetFrameInfo(/* data */) {
@@ -703,8 +860,13 @@ export class ContentMessageHandler extends ResourceTracker {
       }
 
       // Ensure manager is initialized
-      if (!this.pageTranslationManager.isActive) {
-        await this.pageTranslationManager.activate();
+      let managerReady = this.pageTranslationManager.isActive;
+      if (!managerReady) {
+        managerReady = (await this.pageTranslationManager.activate()) === true;
+      }
+
+      if (managerReady) {
+        this._ensureChildFrameRetirementListener();
       }
 
       // Execute page translation - PASS message.data to support options like { isAuto: true }
@@ -734,15 +896,21 @@ export class ContentMessageHandler extends ResourceTracker {
       this.logger.error('Page translation failed:', error);
 
       // Use centralized error handling system
-      const errorInfo = await this.errorHandler.getErrorForUI(error, 'page-translation');
+      const displayError = await getPageTranslationErrorPresentation({ error, errorType: error.type });
+      const errorInfo = await this.errorHandler.getErrorForUI(displayError || error, 'page-translation');
 
-      await this.errorHandler.handle(error, {
+      await this.errorHandler.handle(displayError || error, {
         type: errorInfo.type,
         context: 'page-translation',
         showToast: true
       });
 
-      return { success: false, error: errorInfo.message, errorType: errorInfo.type };
+      return {
+        success: false,
+        error: errorInfo.message,
+        errorType: errorInfo.type,
+        errorDetails: MessageFormat.serializeTranslationError(error),
+      };
     }
   }
 
@@ -828,11 +996,25 @@ export class ContentMessageHandler extends ResourceTracker {
     }
   }
 
+  async handlePageTranslationLifecycle(message) {
+    if (window !== window.top) {
+      return { success: false, error: 'Page lifecycle relay requires top frame' };
+    }
+
+    const coordinator = window.translateItContentCore?.mainFrameCoordinator;
+    if (!coordinator?.handleTrustedPageLifecycle) {
+      return { success: false, error: 'Main frame coordinator unavailable' };
+    }
+
+    return coordinator.handleTrustedPageLifecycle(message.data || {});
+  }
+
   async cleanup() {
     this.handlers.clear();
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
+    this.childFrameRetirementListenerInstalled = false;
 
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();

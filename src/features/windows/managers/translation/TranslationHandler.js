@@ -9,6 +9,7 @@ import { ProviderRegistryIds } from "@/features/translation/providers/ProviderCo
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { reconstructTranslationError, isStructuredTranslationError } from "@/shared/messaging/core/MessagingCore.js";
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { registerTranslation, sendUnifiedTranslation } from "@/shared/messaging/core/ContentScriptIntegration.js";
@@ -130,7 +131,10 @@ export class TranslationHandler {
           },
           onStreamEnd: (data) => {
             if (!data.success) {
-              reject(data.error || new Error('Streaming failed'));
+              const errorSource = isStructuredTranslationError(data?.errorDetails)
+                ? data.errorDetails
+                : (data.error || 'Streaming failed');
+              reject(reconstructTranslationError(errorSource));
               return;
             }
             
@@ -154,7 +158,10 @@ export class TranslationHandler {
             if (data.success && (data.translatedText || !data.streaming)) {
               resolve(data);
             } else if (!data.success) {
-              reject(data.error || new Error('Translation failed'));
+              const errorSource = isStructuredTranslationError(data?.errorDetails)
+                ? data.errorDetails
+                : (data.error || 'Translation failed');
+              reject(reconstructTranslationError(errorSource));
             }
           },
           onError: (error) => {
@@ -252,7 +259,7 @@ export class TranslationHandler {
   /**
    * Cancel active translation request
    */
-  cancelTranslation(messageId) {
+  cancelTranslation(messageId, reason = 'User cancelled') {
     const request = this.activeRequests.get(messageId);
     if (!request) return;
 
@@ -260,7 +267,7 @@ export class TranslationHandler {
     
     // Notify unified system to cancel
     import("@/shared/messaging/core/ContentScriptIntegration.js").then(m => {
-      m.cancelTranslation(messageId);
+      m.cancelTranslation(messageId, reason);
     }).catch(() => {});
 
     request.resolve({ cancelled: true });
@@ -277,8 +284,12 @@ export class TranslationHandler {
 
     if (!request) return false;
 
-    if (message.data?.error) {
-      request.reject(new Error(message.data.error.message || 'Translation failed'));
+    const errorSource = isStructuredTranslationError(message.data?.errorDetails)
+      ? message.data.errorDetails
+      : message.data?.error;
+
+    if (errorSource) {
+      request.reject(reconstructTranslationError(errorSource));
       this._cleanupRequest(messageId);
       return true;
     } else if (message.data?.translatedText) {
@@ -300,7 +311,7 @@ export class TranslationHandler {
    */
   cancelAllTranslations() {
     for (const [messageId] of this.activeRequests) {
-      this.cancelTranslation(messageId);
+      this.cancelTranslation(messageId, 'lifecycle-cleanup');
     }
     this.logger.debug('All translations cancelled');
   }
