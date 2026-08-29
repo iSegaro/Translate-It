@@ -10,6 +10,7 @@ vi.mock('@/config.js', () => ({
   getWholePageExcludedSelectorsAsync: vi.fn(),
   getWholePageAttributesToTranslateAsync: vi.fn(),
   getWholePageShowOriginalOnHoverAsync: vi.fn(),
+  getWholePageUseTranslationFontAsync: vi.fn(),
   getWholePageTranslateAfterScrollStopAsync: vi.fn(),
   getWholePageScrollStopDelayAsync: vi.fn(),
   getWholePageTokenWarningHiddenAsync: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('@/config.js', () => ({
   getTargetLanguageAsync: vi.fn(),
   getModeProvidersAsync: vi.fn(),
   getAIContextTranslationEnabledAsync: vi.fn(),
+  getTranslationFontFamilyAsync: vi.fn(),
   TranslationMode: { Page: 'page' },
   CONFIG: {
     WHOLE_PAGE_CHUNK_SIZE: 100,
@@ -31,7 +33,12 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }))
 }));
 
+vi.mock('@/shared/fonts/TranslationFontResolver.js', () => ({
+  resolveTranslationFontFamily: vi.fn(),
+}));
+
 import * as config from '@/config.js';
+import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
 
 describe('PageTranslationSettingsLoader', () => {
   beforeEach(() => {
@@ -51,6 +58,9 @@ describe('PageTranslationSettingsLoader', () => {
     config.getWholePageScrollStopDelayAsync.mockResolvedValue(500);
     config.getWholePageTokenWarningHiddenAsync.mockResolvedValue(false);
     config.getAIContextTranslationEnabledAsync.mockResolvedValue(true);
+    config.getWholePageUseTranslationFontAsync.mockResolvedValue(false);
+    config.getTranslationFontFamilyAsync.mockResolvedValue('auto');
+    resolveTranslationFontFamily.mockReturnValue('system-ui');
   });
 
   it('should load settings with correct formatting', async () => {
@@ -71,7 +81,47 @@ describe('PageTranslationSettingsLoader', () => {
       tokenWarningHidden: false,
       aiContextTranslationEnabled: true,
       chunkSize: 100,
-      maxConcurrentFlushes: 3
+      maxConcurrentFlushes: 3,
+      useTranslationFont: false,
+      translationFontFamily: null,
+    });
+  });
+
+  it('loads optional translation font settings only when enabled', async () => {
+    config.getWholePageUseTranslationFontAsync.mockResolvedValue(true);
+    config.getTranslationFontFamilyAsync.mockResolvedValue('auto');
+
+    const settings = await PageTranslationSettingsLoader.load();
+
+    expect(settings.useTranslationFont).toBe(true);
+    expect(settings.translationFontFamily).toBe('system-ui');
+    expect(resolveTranslationFontFamily).toHaveBeenCalledWith('auto', 'fa');
+  });
+
+  it('does not read or resolve font when optional toggle is off', async () => {
+    const settings = await PageTranslationSettingsLoader.load();
+
+    expect(settings.translationFontFamily).toBeNull();
+    expect(config.getTranslationFontFamilyAsync).not.toHaveBeenCalled();
+    expect(resolveTranslationFontFamily).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['toggle read', false, () => config.getWholePageUseTranslationFontAsync.mockRejectedValueOnce(new Error('toggle failure'))],
+    ['font read', true, () => {
+      config.getWholePageUseTranslationFontAsync.mockResolvedValueOnce(true);
+      config.getTranslationFontFamilyAsync.mockRejectedValueOnce(new Error('font failure'));
+    }],
+    ['font resolution', true, () => {
+      config.getWholePageUseTranslationFontAsync.mockResolvedValueOnce(true);
+      resolveTranslationFontFamily.mockImplementationOnce(() => { throw new Error('resolver failure'); });
+    }],
+  ])('keeps Page Translation settings load successful when %s fails', async (_name, expectedUse, fail) => {
+    fail();
+
+    await expect(PageTranslationSettingsLoader.load()).resolves.toMatchObject({
+      useTranslationFont: expectedUse,
+      translationFontFamily: null,
     });
   });
 

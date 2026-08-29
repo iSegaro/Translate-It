@@ -1913,6 +1913,12 @@
   "font_settings_description": {
     "message": "فونت و اندازه نمایش ترجمه را سفارشی کنید"
   },
+  "select_element_use_translation_font_label": {
+    "message": "استفاده از فونت ترجمه در انتخاب المان"
+  },
+  "whole_page_use_translation_font_label": {
+    "message": "استفاده از فونت ترجمه در ترجمه صفحه"
+  },
   "font_family_label": {
     "message": "نوع فونت"
   },

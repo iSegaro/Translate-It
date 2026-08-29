@@ -21,6 +21,14 @@
             @update:font-size="fontSize = $event"
           />
         </div>
+        <div class="ti-translation-font-toggle">
+          <span>{{ t('select_element_use_translation_font_label') || 'Use translation font in Select Element' }}</span>
+          <BaseToggle v-model="selectElementUseTranslationFont" />
+        </div>
+        <div class="ti-translation-font-toggle">
+          <span>{{ t('whole_page_use_translation_font_label') || 'Use translation font in Page Translation' }}</span>
+          <BaseToggle v-model="wholePageUseTranslationFont" />
+        </div>
       </BaseFieldset>
       
       <!-- Validation errors -->
@@ -48,6 +56,7 @@ import { onMounted, onUnmounted } from 'vue'
 // Components
 import BaseFieldset from '@/components/base/BaseFieldset.vue'
 import FontSelector from '@/components/feature/FontSelector.vue'
+import BaseToggle from '@/components/base/BaseToggle.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'AppearanceTab')
 const settingsStore = useSettingsStore()
@@ -68,6 +77,9 @@ const fontFamily = createSetting('TRANSLATION_FONT_FAMILY', 'auto', {
 const fontSize = createSetting('TRANSLATION_FONT_SIZE', '14', {
   onChanged: () => validateFonts()
 })
+
+const selectElementUseTranslationFont = createSetting('SELECT_ELEMENT_USE_TRANSLATION_FONT', false)
+const wholePageUseTranslationFont = createSetting('WHOLE_PAGE_USE_TRANSLATION_FONT', false)
 
 // Get target language for font preview
 const targetLanguage = computed(() => settingsStore.settings?.TARGET_LANGUAGE || 'en')

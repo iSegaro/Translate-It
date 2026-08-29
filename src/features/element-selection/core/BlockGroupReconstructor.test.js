@@ -164,6 +164,27 @@ describe('BlockGroupReconstructor', () => {
     });
   });
 
+  it('restores a translation font with its transaction', () => {
+    const owner = document.createElement('span');
+    owner.style.fontFamily = 'serif';
+    const text = document.createTextNode('Hello');
+    owner.appendChild(text);
+    document.body.appendChild(owner);
+    const unit = new TranslationUnit({
+      id: 'font-node', blockId: 'font-group', text: 'Hello', leadingWS: '', trailingWS: '',
+      preWhitespace: false, directionHint: 'ltr', inlineParentTags: ['span'], mode: 'standard',
+    });
+    unit.node = text;
+
+    const result = BlockGroupReconstructor.apply([unit], 'Bonjour', 'fr', document.body, '', '', 'system-ui');
+
+    expect(owner.style.fontFamily).toBe('system-ui');
+    result.transaction.rollback();
+    expect(owner.style.fontFamily).toBe('serif');
+    expect(owner.style.getPropertyPriority('font-family')).toBe('');
+    document.body.removeChild(owner);
+  });
+
   describe('splitTranslatedBlock & Corruption Detection', () => {
     it('should split translated text correctly into expected segments', () => {
       const translated = 'مرحبا @@SEG_n2@@بالعالم@@SEG_n3@@.';

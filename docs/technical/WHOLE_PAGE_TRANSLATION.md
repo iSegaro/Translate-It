@@ -90,6 +90,8 @@ Static utilities for DOM calculations and shared system values.
     - **Stability Guard**: Leverages the 5-minute background timeout to ensure resources are reclaimed if a provider hangs.
 5.  **Application**: Directionality (RTL/LTR) is applied, and text is replaced in the DOM.
 
+When enabled in Appearance, Page Translation resolves the existing `TRANSLATION_FONT_FAMILY` setting and best-effort applies only `font-family` to safe translated text parents after accepted text writes. The option defaults to off, and font setting or resolution failures do not fail translation.
+
 ## Stability & Resiliency
 
 ### 1. Background Timeout
@@ -131,6 +133,7 @@ The system is fully integrated with `ResourceTracker`. All queues, observers, an
 | `WHOLE_PAGE_SCROLL_STOP_DELAY` | 500ms | User-configurable debounce time after scrolling stops |
 | `VIEWPORT_BUFFER_PX` | 100px | Safety margin for batch-filling |
 | `rootMargin` | 150px | Recognition margin for node detection |
+| `WHOLE_PAGE_USE_TRANSLATION_FONT` | false | Apply the resolved translation `font-family` to safe translated text parents |
 
 ---
 

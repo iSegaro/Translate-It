@@ -15,6 +15,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { walkOpenShadowTree } from '@/utils/dom/walkOpenShadowTree.js';
+import { getTranslationFontTarget } from '@/shared/fonts/TranslationFontPolicy.js';
 
 const FORM_VALUE_TAGS = new Set(['INPUT', 'TEXTAREA', 'BUTTON']);
 
@@ -106,6 +107,48 @@ const isMutableEditableNode = (node) => {
   return false;
 };
 
+const FONT_FAMILY_PROPERTY = 'font-family';
+
+const readInlineFontState = (element) => {
+  const value = element.style.getPropertyValue(FONT_FAMILY_PROPERTY);
+  return {
+    present: value !== '',
+    value,
+    priority: element.style.getPropertyPriority(FONT_FAMILY_PROPERTY),
+  };
+};
+
+const restoreInlineFontState = (element, state) => {
+  if (state.present) element.style.setProperty(FONT_FAMILY_PROPERTY, state.value, state.priority);
+  else element.style.removeProperty(FONT_FAMILY_PROPERTY);
+};
+
+const restoreSessionFontOwnership = (session, logger) => {
+  if (!session?.fontOwnership?.size) return;
+
+  try {
+    for (const [element, ownership] of session.fontOwnership) {
+      try {
+        const current = readInlineFontState(element);
+        const wasNotChangedExternally = current.present === ownership.appliedPresent
+          && current.value === ownership.appliedValue
+          && current.priority === ownership.appliedPriority;
+
+        if (!wasNotChangedExternally) {
+          logger.debug('Skipping externally changed Page Translation font');
+          continue;
+        }
+
+        restoreInlineFontState(element, ownership.original);
+      } catch (error) {
+        logger.debug('Page Translation font restore skipped', error);
+      }
+    }
+  } finally {
+    session.fontOwnership.clear();
+  }
+};
+
 export class PageTranslationBridge extends ResourceTracker {
   constructor() {
     super('page-translation-bridge');
@@ -136,6 +179,8 @@ export class PageTranslationBridge extends ResourceTracker {
       shadowMutatedNodes: new WeakSet(),
       shadowMovedNodes: new WeakSet(),
       shadowPersistenceStarted: false,
+      translationFontFamily: settings.translationFontFamily || null,
+      fontOwnership: new Map(),
     };
     const targetGenerations = new WeakMap();
     const applyDecisions = new WeakMap();
@@ -222,6 +267,36 @@ export class PageTranslationBridge extends ResourceTracker {
       return Boolean(owner?.isConnected
         && (!root || (root.isConnected && isComposedDescendant(root, owner))));
     }
+
+    const applyTranslationFont = (textNode) => {
+      if (!currentSession.translationFontFamily || textNode?.nodeType !== Node.TEXT_NODE) return;
+
+      let target = null;
+      let original = null;
+      try {
+        target = getTranslationFontTarget(textNode);
+        if (!target || currentSession.fontOwnership.has(target)) return;
+
+        original = readInlineFontState(target);
+        target.style.setProperty(FONT_FAMILY_PROPERTY, currentSession.translationFontFamily);
+        const applied = readInlineFontState(target);
+        currentSession.fontOwnership.set(target, {
+          original,
+          appliedPresent: applied.present,
+          appliedValue: applied.value,
+          appliedPriority: applied.priority,
+        });
+      } catch (error) {
+        if (target && original) {
+          try {
+            restoreInlineFontState(target, original);
+          } catch {
+            // Best-effort font presentation must not affect translation.
+          }
+        }
+        this.logger.debug('Page Translation font enhancement skipped', error);
+      }
+    };
 
 
     if (settings.lazyLoading) {
@@ -459,13 +534,11 @@ export class PageTranslationBridge extends ResourceTracker {
         // Wrap the processed node callback
         const wrappedCallback = (processedNode) => {
           const decision = getApplyDecision(node);
-          const shouldPostProcess = !decision
-            || (
-              decision.session === currentSession
-              && currentSession.active
-              && decision.generation === targetGenerations.get(node)
-              && decision.outcome === 'applied'
-            );
+          const isAcceptedCurrent = decision?.session === currentSession
+            && currentSession.active
+            && decision.generation === targetGenerations.get(node)
+            && decision.outcome === 'applied';
+          const shouldPostProcess = !decision || isAcceptedCurrent;
 
           if (!shouldPostProcess) {
             // PersistentDOMTranslator uses callback to mark its own write as handled.
@@ -501,6 +574,7 @@ export class PageTranslationBridge extends ResourceTracker {
                       parent.setAttribute(HAS_ORIGINAL, 'true');
                     }
                   }
+                  if (isAcceptedCurrent) applyTranslationFont(processedNode);
                 }
               } catch (e) {
                 bridge.logger.warn('Failed to apply direction/marking to node', e);
@@ -787,15 +861,17 @@ export class PageTranslationBridge extends ResourceTracker {
   restore(element) {
     if (!this.session) return;
 
+    const currentSession = this.session;
     try {
-      const ownedRoot = this.session.root || element;
-      this.session.stopShadowPersistence?.();
+      const ownedRoot = currentSession.root || element;
+      restoreSessionFontOwnership(currentSession, this.logger);
+      currentSession.stopShadowPersistence?.();
 
       // 1. Surgical Restore: Revert all direction and alignment changes
       restoreElementDirection(ownedRoot, { shadowAware: true });
 
-      const pt = this.session.persistentTranslator;
-      const dt = this.session.domTranslator;
+      const pt = currentSession.persistentTranslator;
+      const dt = currentSession.domTranslator;
 
       // 2. Check if the node is still actively observed
       const isObserved = pt && pt.observedNodesStorage && pt.observedNodesStorage.has(element);
@@ -809,8 +885,8 @@ export class PageTranslationBridge extends ResourceTracker {
     } catch (e) {
       this.logger.warn('[Bridge] Restore failed:', e.message);
       // Last resort fallback directly on domTranslator
-      if (this.session.domTranslator) {
-        try { this.session.domTranslator.restore(this.session.root || element); } catch {
+      if (currentSession.domTranslator) {
+        try { currentSession.domTranslator.restore(currentSession.root || element); } catch {
           // Silent fallback
         }
       }
@@ -822,12 +898,24 @@ export class PageTranslationBridge extends ResourceTracker {
   cleanup() {
     if (!this.session) return;
 
-    this.session.active = false;
+    const currentSession = this.session;
+    currentSession.active = false;
 
     try {
-      this.session.stopShadowPersistence?.();
+      currentSession.stopShadowPersistence?.();
+    } catch (e) {
+      this.logger.error('Bridge Cleanup failed', e);
+    }
+
+    try {
+      restoreSessionFontOwnership(currentSession, this.logger);
+    } catch (e) {
+      this.logger.debug('Page Translation font cleanup restore skipped', e);
+    }
+
+    try {
       // 1. Manually disconnect all internal observers just in case
-      const pt = this.session.persistentTranslator;
+      const pt = currentSession.persistentTranslator;
       if (pt && pt.observedNodesStorage) {
         for (const observer of pt.observedNodesStorage.values()) {
           observer.disconnect();
@@ -835,7 +923,7 @@ export class PageTranslationBridge extends ResourceTracker {
         pt.observedNodesStorage.clear();
       }
 
-      const is = this.session.intersectionScheduler;
+      const is = currentSession.intersectionScheduler;
       if (is && is.intersectionObserver && is.intersectionObserver.intersectionObserver) {
         is.intersectionObserver.intersectionObserver.disconnect();
       }
