@@ -87,8 +87,8 @@ Behavior is fully customizable via the **Activation Tab** in the Options Page:
 
 | Setting Key | Default | Description |
 |-------------|---------|-------------|
-| `MOUSE_HOVER_SCOPE` | `sentence` | Detection depth: `word`, `sentence`, or `container`. |
-| `MOUSE_HOVER_TRIGGER` | `hover` | Trigger mode: `hover`, `ctrl`, `alt`, or `shift`. |
+| `MOUSE_HOVER_SCOPE` | `container` | Detection depth: `word`, `sentence`, or `container`. |
+| `MOUSE_HOVER_TRIGGER` | `ctrl` | Trigger mode: `hover`, `ctrl`, `alt`, or `shift`. |
 | `MOUSE_HOVER_DELAY` | `500ms` | Wait time before starting translation in normal `hover` trigger mode. Modifier-release activation does not use this setting. |
 | `MOUSE_HOVER_AUTO_CLOSE` | `mouseleave` | Close behavior: `mouseleave` or `timer`. |
 | `MOUSE_HOVER_TIMER_DURATION`| `3000ms` | Visibility duration if `timer` mode is selected. |
