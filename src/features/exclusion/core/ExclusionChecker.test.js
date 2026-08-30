@@ -113,6 +113,34 @@ describe('ExclusionChecker.refreshSettings', () => {
     expect(mocks.settingsManager.initialize).not.toHaveBeenCalled();
   });
 
+  it('updates URL and emits one feature status event', () => {
+    const newUrl = 'https://new.example/path';
+
+    checker.updateUrl(newUrl);
+
+    expect(checker.currentUrl).toBe(newUrl);
+    expect(mocks.pageEventBus.emit).toHaveBeenCalledTimes(1);
+    expect(mocks.pageEventBus.emit).toHaveBeenCalledWith('FEATURE_STATUS_CHANGED');
+  });
+
+  it('does not emit a feature status event when URL is unchanged', () => {
+    const currentUrl = checker.currentUrl;
+
+    checker.updateUrl(currentUrl);
+
+    expect(checker.currentUrl).toBe(currentUrl);
+    expect(mocks.pageEventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('preserves feature status events for relevant settings changes', async () => {
+    await checker.initialize();
+
+    mocks.settingsListeners[0].callback();
+
+    expect(mocks.pageEventBus.emit).toHaveBeenCalledTimes(1);
+    expect(mocks.pageEventBus.emit).toHaveBeenCalledWith('FEATURE_STATUS_CHANGED');
+  });
+
   it('refreshes after the checker and manager are already initialized', async () => {
     await checker.initialize();
     mocks.settingsManager.initialize.mockClear();

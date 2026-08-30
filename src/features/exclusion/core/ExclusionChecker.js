@@ -84,6 +84,7 @@ export class ExclusionChecker {
   updateUrl(newUrl) {
     if (this.currentUrl !== newUrl) {
       this.currentUrl = newUrl;
+      pageEventBus.emit('FEATURE_STATUS_CHANGED');
     }
   }
 
