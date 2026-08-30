@@ -31,3 +31,8 @@ if (browser.webNavigation?.onHistoryStateUpdated) {
   browser.webNavigation.onHistoryStateUpdated.addListener(handleSpaNavigation);
   logger.debug('SPA navigation listener registered');
 }
+
+if (browser.webNavigation?.onReferenceFragmentUpdated) {
+  browser.webNavigation.onReferenceFragmentUpdated.addListener(handleSpaNavigation);
+  logger.debug('SPA fragment navigation listener registered');
+}

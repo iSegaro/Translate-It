@@ -125,6 +125,27 @@ describe('FeatureManager SPA auto page command transport', () => {
     await firstChange;
   });
 
+  it('recognizes hash-only URL changes and deduplicates repeated signals', async () => {
+    const manager = FeatureManager.getInstance();
+    const oldUrl = new URL('/hash-route#one', window.location.href).href;
+    const newUrl = new URL('/hash-route#two', window.location.href).href;
+    manager._lastDetectedUrl = oldUrl;
+    window.history.replaceState({}, '', oldUrl);
+    const handleUrlChange = vi.spyOn(manager, 'handleUrlChange').mockResolvedValue(undefined);
+
+    window.history.replaceState({}, '', newUrl);
+    const firstChange = manager.checkForUrlChange();
+
+    expect(manager._lastDetectedUrl).toBe(newUrl);
+    expect(handleUrlChange).toHaveBeenCalledOnce();
+    expect(handleUrlChange).toHaveBeenCalledWith(oldUrl, newUrl);
+
+    manager.checkForUrlChange();
+
+    expect(handleUrlChange).toHaveBeenCalledOnce();
+    await firstChange;
+  });
+
   it('preserves rapid consecutive URL transitions', async () => {
     const manager = FeatureManager.getInstance();
     const urlA = window.location.href;

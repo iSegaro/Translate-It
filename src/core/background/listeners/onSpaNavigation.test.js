@@ -2,14 +2,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
-  addListener: vi.fn(),
+  historyStateAddListener: vi.fn(),
+  referenceFragmentAddListener: vi.fn(),
   debug: vi.fn(),
 }));
 
 vi.mock('webextension-polyfill', () => ({
   default: {
     tabs: { sendMessage: mocks.sendMessage },
-    webNavigation: { onHistoryStateUpdated: { addListener: mocks.addListener } },
+    webNavigation: {
+      onHistoryStateUpdated: { addListener: mocks.historyStateAddListener },
+      onReferenceFragmentUpdated: { addListener: mocks.referenceFragmentAddListener },
+    },
   },
 }));
 
@@ -32,8 +36,13 @@ describe('SPA navigation listener', () => {
   });
 
   it('registers once with webNavigation history updates', () => {
-    expect(mocks.addListener).toHaveBeenCalledTimes(1);
-    expect(mocks.addListener).toHaveBeenCalledWith(handleSpaNavigation);
+    expect(mocks.historyStateAddListener).toHaveBeenCalledTimes(1);
+    expect(mocks.historyStateAddListener).toHaveBeenCalledWith(handleSpaNavigation);
+  });
+
+  it('registers the same handler for reference fragment updates', () => {
+    expect(mocks.referenceFragmentAddListener).toHaveBeenCalledTimes(1);
+    expect(mocks.referenceFragmentAddListener).toHaveBeenCalledWith(handleSpaNavigation);
   });
 
   it('forwards top-frame navigation without trusting URL payload', async () => {
