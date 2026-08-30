@@ -541,6 +541,7 @@ class SettingsManager {
 
   /**
    * Manually trigger settings refresh (useful when settings are saved from options page)
+   * @returns {Promise<void>} Resolves after refresh; rejects when storage refresh fails
    */
   async refreshSettings() {
     if (!this._initialized) {
@@ -577,6 +578,8 @@ class SettingsManager {
       } else {
         logger.error('Error manually refreshing settings:', error)
       }
+
+      throw error
     }
   }
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
+import ExtensionContextManager from '@/core/extensionContext.js';
 
 const { storageManagerMock } = vi.hoisted(() => ({
   storageManagerMock: {
@@ -477,11 +478,95 @@ describe('SettingsManager defaults', () => {
     settingsManager.onChange('EXTENSION_ENABLED', onChange);
     const defaultValue = settingsManager._defaults.EXTENSION_ENABLED;
 
-    await settingsManager.refreshSettings();
+    await expect(settingsManager.refreshSettings()).resolves.toBeUndefined();
 
     expect(settingsManager.get('EXTENSION_ENABLED')).toBe(defaultValue);
     expect(onChange).toHaveBeenCalledWith(defaultValue, false, 'EXTENSION_ENABLED');
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows refresh storage failures without mutating runtime state', async () => {
+    storageManagerMock.get.mockResolvedValue({
+      EXTENSION_ENABLED: false,
+      TRANSLATE_ON_TEXT_FIELDS: false
+    });
+    await settingsManager.initialize();
+
+    const onExtensionChange = vi.fn();
+    const onFieldChange = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', onExtensionChange);
+    settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', onFieldChange);
+    const before = { ...settingsManager._settings.value };
+    const error = new Error('refresh failed');
+    storageManagerMock.get.mockRejectedValue(error);
+
+    await expect(settingsManager.refreshSettings()).rejects.toBe(error);
+
+    expect(settingsManager._settings.value).toEqual(before);
+    expect(onExtensionChange).not.toHaveBeenCalled();
+    expect(onFieldChange).not.toHaveBeenCalled();
+  });
+
+  it('resolves without emitting when refresh values are unchanged', async () => {
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    await settingsManager.initialize();
+
+    const onChange = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', onChange);
+    const stateBeforeRefresh = settingsManager._settings.value;
+
+    await expect(settingsManager.refreshSettings()).resolves.toBeUndefined();
+
+    expect(settingsManager._settings.value).toBe(stateBeforeRefresh);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('rethrows context refresh failures after context handling', async () => {
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    await settingsManager.initialize();
+
+    const error = new Error('Extension context invalidated');
+    const isContextError = vi
+      .spyOn(ExtensionContextManager, 'isContextError')
+      .mockReturnValue(true);
+    const handleContextError = vi
+      .spyOn(ExtensionContextManager, 'handleContextError')
+      .mockReturnValue({ handled: true, silent: true });
+    storageManagerMock.get.mockRejectedValue(error);
+
+    try {
+      await expect(settingsManager.refreshSettings()).rejects.toBe(error);
+      expect(handleContextError).toHaveBeenCalledWith(error, 'settings-manager-refresh');
+    } finally {
+      handleContextError.mockRestore();
+      isContextError.mockRestore();
+    }
+  });
+
+  it('recovers through the storage listener after a failed refresh', async () => {
+    const storageEvents = createStorageEventMock();
+    browser.storage.onChanged = storageEvents.onChanged;
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    await settingsManager.initialize();
+
+    const onChange = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', onChange);
+    const error = new Error('refresh failed');
+    storageManagerMock.get.mockRejectedValue(error);
+
+    await expect(settingsManager.refreshSettings()).rejects.toBe(error);
+
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+
+    storageEvents.dispatch({
+      EXTENSION_ENABLED: { oldValue: false, newValue: true }
+    }, 'local');
+
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(true, false, 'EXTENSION_ENABLED');
   });
 
   it('removes fallback storage listener during destroy', async () => {

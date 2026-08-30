@@ -93,6 +93,36 @@ describe('SettingsUpdateHandler router ownership', () => {
     expect(mocks.addListener).toHaveBeenCalledTimes(1)
   })
 
+  it('returns refresh failures through the routed response', async () => {
+    const error = new Error('refresh failed')
+    mocks.refreshSettings.mockRejectedValue(error)
+    const { handleSettingsUpdatedLazy } = await import('@/core/background/handlers/lazy/handleCommonLazy.js')
+    const handler = new MessageHandler()
+    const sendResponse = vi.fn()
+    handler.registerHandler(MessageActions.SETTINGS_UPDATED, handleSettingsUpdatedLazy)
+
+    const response = await handler._handleMessage({ action: MessageActions.SETTINGS_UPDATED }, {}, sendResponse)
+
+    expect(response).toEqual({ success: false, error: 'refresh failed' })
+    expect(sendResponse).toHaveBeenCalledWith({ success: false, error: 'refresh failed' })
+    expect(sendResponse).not.toHaveBeenCalledWith(expect.objectContaining({ success: true }))
+  })
+
+  it('does not report success for a routed context refresh failure', async () => {
+    const error = new Error('Extension context invalidated')
+    mocks.refreshSettings.mockRejectedValue(error)
+    const { handleSettingsUpdatedLazy } = await import('@/core/background/handlers/lazy/handleCommonLazy.js')
+    const handler = new MessageHandler()
+    const sendResponse = vi.fn()
+    handler.registerHandler(MessageActions.SETTINGS_UPDATED, handleSettingsUpdatedLazy)
+
+    const response = await handler._handleMessage({ action: MessageActions.SETTINGS_UPDATED }, {}, sendResponse)
+
+    expect(response).toEqual({ success: false, error: 'Extension context invalidated' })
+    expect(sendResponse).toHaveBeenCalledWith({ success: false, error: 'Extension context invalidated' })
+    expect(sendResponse).not.toHaveBeenCalledWith(expect.objectContaining({ success: true }))
+  })
+
   it('does not refresh settings for unrelated actions', async () => {
     const { handleSettingsUpdatedLazy } = await import('@/core/background/handlers/lazy/handleCommonLazy.js')
     const handler = new MessageHandler()
