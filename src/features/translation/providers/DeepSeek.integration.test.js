@@ -80,7 +80,8 @@ describe('DeepSeekProvider Internal Integration (Failover & Response)', () => {
         headers: expect.objectContaining({
           'Authorization': 'Bearer ds-key-1'
         })
-      })
+      }),
+      expect.any(Object)
     );
     expect(JSON.parse(proxyManager.fetch.mock.calls[0][1].body).thinking)
       .toEqual({ type: 'disabled' });

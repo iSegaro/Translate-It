@@ -290,10 +290,10 @@ export const ProviderRequestEngine = {
         finalFetchOptions.headers = this.prepareHeaders(finalFetchOptions.headers, provider.providerName);
       }
 
-      // Ensure proxy is initialized
-      await provider._initializeProxy();
+      // Capture proxy configuration for this physical attempt.
+      const proxyConfig = await provider._initializeProxy();
 
-      const response = await proxyManager.fetch(url, finalFetchOptions);
+      const response = await proxyManager.fetch(url, finalFetchOptions, proxyConfig);
       const duration = Date.now() - startTime;
       const retryAt = parseRetryAt(response);
       

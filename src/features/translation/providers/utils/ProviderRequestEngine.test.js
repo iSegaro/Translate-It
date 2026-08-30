@@ -48,17 +48,26 @@ import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
+const createProxyConfig = (host = 'proxy.test') => ({
+  enabled: true,
+  type: 'http',
+  host,
+  port: 8080,
+  auth: { username: `${host}-user`, password: `${host}-password` },
+});
+
 describe('ProviderRequestEngine', () => {
   const mockProvider = {
     providerName: 'TestProvider',
     providerSettingKey: 'test_key_setting',
-    _initializeProxy: vi.fn().mockResolvedValue(true),
+    _initializeProxy: vi.fn().mockResolvedValue(createProxyConfig()),
   };
 
   const mockExtractResponse = vi.fn((data) => data.translated);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockProvider._initializeProxy.mockReset().mockResolvedValue(createProxyConfig());
     delete mockProvider.classifyProviderHttpError;
   });
 
@@ -455,6 +464,40 @@ describe('ProviderRequestEngine', () => {
       expect(statsManager.recordError).toHaveBeenCalledTimes(1);
       expect(statsManager.recordRequest.mock.calls.every(([, , , , purpose]) => purpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', null, TranslationCallPurpose.STRUCTURED_RECOVERY);
+    });
+
+    it('should capture a fresh proxy snapshot for each physical failover attempt', async () => {
+      const firstSnapshot = createProxyConfig('proxy-first');
+      const secondSnapshot = createProxyConfig('proxy-second');
+      mockProvider._initializeProxy
+        .mockResolvedValueOnce(firstSnapshot)
+        .mockResolvedValueOnce(secondSnapshot);
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+
+      const response = (ok, body) => ({
+        ok,
+        status: ok ? 200 : 401,
+        statusText: ok ? 'OK' : 'Unauthorized',
+        json: async () => body,
+        headers: new Map([['content-type', 'application/json']]),
+        clone() { return this; },
+      });
+      proxyManager.fetch
+        .mockResolvedValueOnce(response(false, { error: { message: 'Invalid key' } }))
+        .mockResolvedValueOnce(response(true, { translated: 'translated' }));
+
+      const result = await ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com/translate?key=bad-key',
+        fetchOptions: { method: 'POST', headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: vi.fn(),
+      });
+
+      expect(result).toBe('translated');
+      expect(mockProvider._initializeProxy).toHaveBeenCalledTimes(2);
+      expect(proxyManager.fetch.mock.calls[0][2]).toBe(firstSnapshot);
+      expect(proxyManager.fetch.mock.calls[1][2]).toBe(secondSnapshot);
     });
 
     it('does not delay key failover for Retry-After from the first key', async () => {

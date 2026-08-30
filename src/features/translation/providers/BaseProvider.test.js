@@ -143,6 +143,28 @@ describe('BaseProvider', () => {
       });
     });
 
+    it('should return a detached proxy snapshot', async () => {
+      const settings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
+        PROXY_HOST: 'snapshot-proxy',
+        PROXY_PORT: 9010,
+        PROXY_USERNAME: 'user',
+        PROXY_PASSWORD: 'password'
+      });
+      vi.mocked(getProxySettingsAsync).mockResolvedValue(settings);
+
+      const snapshot = await provider._initializeProxy();
+      const committedConfig = proxyManager.setConfig.mock.calls[0][0];
+
+      expect(snapshot).toEqual(committedConfig);
+      expect(snapshot).not.toBe(committedConfig);
+      expect(snapshot.auth).not.toBe(committedConfig.auth);
+
+      snapshot.auth.password = 'changed';
+      expect(committedConfig.auth.password).toBe('password');
+    });
+
     it('should not let an older initialization overwrite a newer applied one', async () => {
       const olderRead = createDeferred();
       const newerRead = createDeferred();
@@ -171,9 +193,24 @@ describe('BaseProvider', () => {
       const newerInitialization = provider._initializeProxy();
 
       newerRead.resolve(newerSettings);
-      await newerInitialization;
+      const newerSnapshot = await newerInitialization;
       olderRead.resolve(olderSettings);
-      await olderInitialization;
+      const olderSnapshot = await olderInitialization;
+
+      expect(newerSnapshot).toEqual({
+        enabled: true,
+        type: 'socks',
+        host: 'new-proxy',
+        port: 9001,
+        auth: { username: 'new-user', password: 'new-password' }
+      });
+      expect(olderSnapshot).toEqual({
+        enabled: true,
+        type: 'http',
+        host: 'old-proxy',
+        port: 8001,
+        auth: { username: 'old-user', password: 'old-password' }
+      });
 
       expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
       expect(proxyManager.setConfig).toHaveBeenCalledWith({

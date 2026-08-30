@@ -68,23 +68,25 @@ export class ProxyManager {
 
   /**
    * Check if proxy is enabled and configured
+   * @param {Object|null} config - Optional request-local configuration
    * @returns {boolean}
    */
-  isEnabled() {
-    return this.config?.enabled &&
-           this.config?.host &&
-           this.config?.port &&
-           this.config?.type;
+  isEnabled(config = this.config) {
+    return config?.enabled &&
+           config?.host &&
+           config?.port &&
+           config?.type;
   }
 
   /**
    * Create fetch options with proxy support
    * @param {string} url - Target URL
    * @param {Object} originalOptions - Original fetch options
+   * @param {Object|null} config - Optional request-local configuration
    * @returns {Object} - Modified fetch options
    */
-  createFetchOptions(url, originalOptions = {}) {
-    if (!this.isEnabled()) {
+  createFetchOptions(url, originalOptions = {}, config = this.config) {
+    if (!this.isEnabled(config)) {
       return originalOptions;
     }
 
@@ -93,8 +95,8 @@ export class ProxyManager {
     const options = { ...originalOptions };
 
     // Add proxy headers if needed
-    if (this.config.auth?.username) {
-      const auth = btoa(`${this.config.auth.username}:${this.config.auth.password || ''}`);
+    if (config.auth?.username) {
+      const auth = btoa(`${config.auth.username}:${config.auth.password || ''}`);
       options.headers = {
         ...options.headers,
         'Proxy-Authorization': `Basic ${auth}`
@@ -107,8 +109,8 @@ export class ProxyManager {
 
     this.logger.debug('Proxy fetch options prepared', {
       url: this._sanitizeUrl(url),
-      hasAuth: !!(this.config.auth?.username),
-      proxyType: this.config.type
+      hasAuth: !!(config.auth?.username),
+      proxyType: config.type
     });
     return options;
   }
@@ -117,16 +119,19 @@ export class ProxyManager {
    * Make a fetch request through proxy (extension-only)
    * @param {string} url - Target URL
    * @param {Object} options - Fetch options
+   * @param {Object|null} requestConfig - Optional request-local proxy configuration
    * @returns {Promise<Response>}
    */
-  async fetch(url, options = {}) {
+  async fetch(url, options = {}, requestConfig) {
+    const config = this._cloneConfig(requestConfig === undefined ? this.config : requestConfig);
+
     // Check extension context first
     if (!ExtensionContextManager.isValidSync()) {
       this.logger.debug('Extension context invalid, using direct fetch');
       return fetch(url, options);
     }
 
-    if (!this.isEnabled()) {
+    if (!this.isEnabled(config)) {
       this.logger.debug('Proxy disabled, using direct fetch');
       return fetch(url, options);
     }
@@ -136,21 +141,21 @@ export class ProxyManager {
     try {
       this.logger.debug('Initiating proxy fetch', {
         url: this._sanitizeUrl(url),
-        proxyType: this.config.type,
-        proxyHost: this.config.host,
-        proxyPort: this.config.port
+        proxyType: config.type,
+        proxyHost: config.host,
+        proxyPort: config.port
       });
 
-      const strategy = await this._getStrategy(url);
+      const strategy = await this._getStrategy(config);
       const result = await strategy.execute(url, options);
 
       const duration = Date.now() - startTime;
-      this.logger.info(`[Proxy] Request successful: ${this._sanitizeUrl(url)} (${duration}ms via ${this.config.type})`);
+      this.logger.info(`[Proxy] Request successful: ${this._sanitizeUrl(url)} (${duration}ms via ${config.type})`);
       this.logger.debug('Proxy request details', {
         url: this._sanitizeUrl(url),
         duration,
-        proxyType: this.config.type,
-        proxyHost: this.config.host
+        proxyType: config.type,
+        proxyHost: config.host
       });
 
       return result;
@@ -163,7 +168,7 @@ export class ProxyManager {
         showToast: false, // Silent for proxy errors
         metadata: {
           url: this._sanitizeUrl(url),
-          proxyConfig: this._getConfigSummary(),
+          proxyConfig: this._getConfigSummary(config),
           duration: `${duration}ms`
         }
       });
@@ -173,8 +178,8 @@ export class ProxyManager {
         url: this._sanitizeUrl(url),
         error: error.message,
         duration,
-        proxyType: this.config.type,
-        proxyHost: this.config.host
+        proxyType: config.type,
+        proxyHost: config.host
       });
 
       // Do NOT fall back to direct connection - rethrow the error
@@ -183,22 +188,37 @@ export class ProxyManager {
   }
 
   /**
-   * Get appropriate strategy for URL and proxy type
+   * Get appropriate strategy for proxy type
    * @private
-   * @param {string} url - Target URL
+   * @param {Object|null} config - Proxy configuration
    * @returns {Object} Strategy instance
    */
-  async _getStrategy() {
+  async _getStrategy(config = this.config) {
     if (!this.strategies.size) {
       await this._initializeStrategies();
     }
 
-    const StrategyClass = this.strategies.get(this.config.type);
+    const StrategyClass = this.strategies.get(config?.type);
     if (!StrategyClass) {
-      throw new Error(`Unsupported proxy type: ${this.config.type}`);
+      throw new Error(`Unsupported proxy type: ${config?.type}`);
     }
 
-    return new StrategyClass(this.config);
+    return new StrategyClass(config);
+  }
+
+  /**
+   * Clone request configuration so later global or caller mutation cannot affect an active request.
+   * @private
+   */
+  _cloneConfig(config) {
+    if (!config || typeof config !== 'object') return config;
+
+    return {
+      ...config,
+      auth: config.auth && typeof config.auth === 'object'
+        ? { ...config.auth }
+        : config.auth
+    };
   }
 
   /**
@@ -491,14 +511,14 @@ export class ProxyManager {
    * @private
    * @returns {Object}
    */
-  _getConfigSummary() {
-    if (!this.config) return null;
+  _getConfigSummary(config = this.config) {
+    if (!config) return null;
 
     return {
-      type: this.config.type,
-      host: this.config.host,
-      port: this.config.port,
-      hasAuth: !!(this.config.auth?.username)
+      type: config.type,
+      host: config.host,
+      port: config.port,
+      hasAuth: !!(config.auth?.username)
     };
   }
 

@@ -13,6 +13,30 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 let proxyInitializationGeneration = 0;
 let appliedProxyInitializationGeneration = 0;
 
+function createProxyConfig(settings) {
+  return {
+    enabled: settings.PROXY_ENABLED || false,
+    type: settings.PROXY_TYPE || 'http',
+    host: settings.PROXY_HOST || '',
+    port: settings.PROXY_PORT || 8080,
+    auth: {
+      username: settings.PROXY_USERNAME || '',
+      password: settings.PROXY_PASSWORD || ''
+    }
+  };
+}
+
+function cloneProxyConfig(config) {
+  if (!config || typeof config !== 'object') return config;
+
+  return {
+    ...config,
+    auth: config.auth && typeof config.auth === 'object'
+      ? { ...config.auth }
+      : config.auth
+  };
+}
+
 export function createOperationAbortError(signal, message = 'Translation operation aborted') {
   const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
   const error = new Error(isUserAbort ? 'Translation cancelled by user' : message);
@@ -44,31 +68,27 @@ export class BaseProvider {
   /**
    * Initialize proxy configuration from proxy-owned keyed settings
    * Only generations newer than the latest successful commit may update shared proxy state.
+   * Returns detached configuration for the current request attempt.
    * @private
+   * @returns {Promise<Object|null|undefined>} Detached proxy configuration snapshot.
    */
   async _initializeProxy() {
     const generation = ++proxyInitializationGeneration;
 
     try {
       const settings = await getProxySettingsAsync();
+      const config = createProxyConfig(settings);
 
       if (generation <= appliedProxyInitializationGeneration) {
-        return;
+        return cloneProxyConfig(config);
       }
 
-      proxyManager.setConfig({
-        enabled: settings.PROXY_ENABLED || false,
-        type: settings.PROXY_TYPE || 'http',
-        host: settings.PROXY_HOST || '',
-        port: settings.PROXY_PORT || 8080,
-        auth: {
-          username: settings.PROXY_USERNAME || '',
-          password: settings.PROXY_PASSWORD || ''
-        }
-      });
+      proxyManager.setConfig(config);
       appliedProxyInitializationGeneration = generation;
+      return cloneProxyConfig(config);
     } catch (error) {
       logger.warn(`[${this.providerName}] Failed to initialize proxy:`, error);
+      return cloneProxyConfig(proxyManager.config);
     }
   }
 

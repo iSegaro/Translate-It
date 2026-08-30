@@ -80,6 +80,7 @@ describe('GeminiProvider Internal Integration', () => {
     expect(result).toBe('سلام دنیا');
     expect(proxyManager.fetch).toHaveBeenCalledWith(
       expect.stringContaining('key=key-1'),
+      expect.any(Object),
       expect.any(Object)
     );
   });
@@ -112,12 +113,14 @@ describe('GeminiProvider Internal Integration', () => {
     // Verify first call used key-1
     expect(proxyManager.fetch).toHaveBeenNthCalledWith(1, 
       expect.stringContaining('key=key-1'), 
+      expect.any(Object),
       expect.any(Object)
     );
 
     // Verify second call used key-2
     expect(proxyManager.fetch).toHaveBeenNthCalledWith(2, 
       expect.stringContaining('key=key-2'), 
+      expect.any(Object),
       expect.any(Object)
     );
 

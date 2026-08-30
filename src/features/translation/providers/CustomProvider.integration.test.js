@@ -80,7 +80,8 @@ describe('CustomProvider Internal Integration (Endpoint & Failover)', () => {
         headers: expect.objectContaining({
           'Authorization': 'Bearer custom-key-1'
         })
-      })
+      }),
+      expect.any(Object)
     );
   });
 

@@ -83,7 +83,8 @@ describe('OpenAIProvider Internal Integration (Failover & Response Extraction)',
         headers: expect.objectContaining({
           'Authorization': 'Bearer key-1'
         })
-      })
+      }),
+      expect.any(Object)
     );
   });
 

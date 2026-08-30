@@ -69,7 +69,13 @@ const makeCancelledError = () => Object.assign(new Error('cancelled'), {
 const provider = {
   providerName: 'TestProvider',
   providerSettingKey: PROVIDER_SETTING_KEY,
-  _initializeProxy: vi.fn().mockResolvedValue(true)
+  _initializeProxy: vi.fn().mockResolvedValue({
+    enabled: false,
+    type: 'http',
+    host: '',
+    port: 8080,
+    auth: { username: '', password: '' },
+  })
 };
 
 const extractResponse = vi.fn((data) => data);
