@@ -70,7 +70,7 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
     });
     vi.mocked(storageManager.set).mockResolvedValue(true);
     mockSaveSettings.mockResolvedValue(true);
-    safeSendMessageMock.mockResolvedValue(undefined);
+    safeSendMessageMock.mockResolvedValue({ success: true });
   });
 
   it('valid settings allows save successfully', async () => {
@@ -180,6 +180,145 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
     );
 
     window.removeEventListener('options-trigger-validation-feedback', customEventListener);
+  });
+
+  it('valid persistence stays successful when notification rejects', async () => {
+    mockValidateSettings.mockReturnValue({ isValid: true, errors: [] });
+    safeSendMessageMock.mockRejectedValue(new Error('notification failed'));
+
+    const savedEventListener = vi.fn();
+    window.addEventListener('options-settings-saved', savedEventListener);
+
+    const wrapper = mount(OptionsNavigation, {
+      global: {
+        stubs: {
+          RouterLink: true
+        },
+        mocks: {
+          $route: {
+            name: 'languages'
+          }
+        }
+      }
+    });
+
+    await wrapper.find('#saveSettings').trigger('click');
+    await flushPromises();
+
+    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+    expect(safeSendMessageMock).toHaveBeenCalledTimes(1);
+    expect(savedEventListener).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_SUCCESS');
+    expect(wrapper.find('#status').classes()).toContain('status-success');
+
+    window.removeEventListener('options-settings-saved', savedEventListener);
+  });
+
+  it('valid persistence stays successful when notification is unconfirmed', async () => {
+    mockValidateSettings.mockReturnValue({ isValid: true, errors: [] });
+    safeSendMessageMock.mockResolvedValue(null);
+
+    const savedEventListener = vi.fn();
+    window.addEventListener('options-settings-saved', savedEventListener);
+
+    const wrapper = mount(OptionsNavigation, {
+      global: {
+        stubs: {
+          RouterLink: true
+        },
+        mocks: {
+          $route: {
+            name: 'languages'
+          }
+        }
+      }
+    });
+
+    await wrapper.find('#saveSettings').trigger('click');
+    await flushPromises();
+
+    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+    expect(savedEventListener).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_SUCCESS');
+    expect(wrapper.find('#status').classes()).toContain('status-success');
+
+    window.removeEventListener('options-settings-saved', savedEventListener);
+  });
+
+  it('partial persistence keeps warning when notification rejects', async () => {
+    mockValidateSettings.mockReturnValue({
+      isValid: false,
+      errors: ['prompt:PROMPT_TEMPLATE:validation_prompt_template_empty']
+    });
+    mockSettingsStore.settings.PROMPT_TEMPLATE = 'invalid draft template';
+    mockSaveSettings.mockImplementation(() => Promise.resolve(true));
+    safeSendMessageMock.mockRejectedValue(new Error('notification failed'));
+
+    const savedEventListener = vi.fn();
+    window.addEventListener('options-settings-saved', savedEventListener);
+
+    const wrapper = mount(OptionsNavigation, {
+      global: {
+        stubs: {
+          RouterLink: true
+        },
+        mocks: {
+          $route: {
+            name: 'languages'
+          }
+        }
+      }
+    });
+
+    await wrapper.find('#saveSettings').trigger('click');
+    await flushPromises();
+
+    expect(mockSaveSettings).toHaveBeenCalledWith(true);
+    expect(mockSettingsStore.settings.PROMPT_TEMPLATE).toBe('invalid draft template');
+    expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_WITH_PROMPT_ERRORS');
+    expect(wrapper.find('#status').classes()).toContain('status-warning');
+    expect(pushMock).toHaveBeenCalledWith({ name: 'prompt' });
+    expect(savedEventListener).not.toHaveBeenCalled();
+
+    window.removeEventListener('options-settings-saved', savedEventListener);
+  });
+
+  it('partial persistence keeps warning when notification is unconfirmed', async () => {
+    mockValidateSettings.mockReturnValue({
+      isValid: false,
+      errors: ['prompt:PROMPT_TEMPLATE:validation_prompt_template_empty']
+    });
+    mockSettingsStore.settings.PROMPT_TEMPLATE = 'invalid draft template';
+    mockSaveSettings.mockImplementation(() => Promise.resolve(true));
+    safeSendMessageMock.mockResolvedValue(null);
+
+    const savedEventListener = vi.fn();
+    window.addEventListener('options-settings-saved', savedEventListener);
+
+    const wrapper = mount(OptionsNavigation, {
+      global: {
+        stubs: {
+          RouterLink: true
+        },
+        mocks: {
+          $route: {
+            name: 'languages'
+          }
+        }
+      }
+    });
+
+    await wrapper.find('#saveSettings').trigger('click');
+    await flushPromises();
+
+    expect(mockSaveSettings).toHaveBeenCalledWith(true);
+    expect(mockSettingsStore.settings.PROMPT_TEMPLATE).toBe('invalid draft template');
+    expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_WITH_PROMPT_ERRORS');
+    expect(wrapper.find('#status').classes()).toContain('status-warning');
+    expect(pushMock).toHaveBeenCalledWith({ name: 'prompt' });
+    expect(savedEventListener).not.toHaveBeenCalled();
+
+    window.removeEventListener('options-settings-saved', savedEventListener);
   });
 
   it('mixed validation errors (prompt + non-prompt) completely blocks save', async () => {

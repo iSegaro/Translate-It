@@ -75,15 +75,27 @@ const statusMessage = ref('')
 const statusType = ref('')
 const isSaving = ref(false)
 
-// Save all settings
-// Shared post-save notification/refresh helper
+// Shared best-effort post-save notification/refresh helper.
+// Persistence remains authoritative for save status and events.
 const postSaveNotify = async () => {
-  // Notify background that persisted settings changed.
-  await safeSendMessage({
-    action: MessageActions.SETTINGS_UPDATED,
-    timestamp: Date.now()
-  }, 'settings-notification')
-  logger.debug('All settings update notification sent to all tabs')
+  try {
+    // Notify background that persisted settings changed.
+    const response = await safeSendMessage({
+      action: MessageActions.SETTINGS_UPDATED,
+      timestamp: Date.now()
+    }, 'settings-notification')
+
+    if (response?.success !== true) {
+      logger.warn('Settings update notification was not confirmed')
+      return false
+    }
+
+    logger.debug('Settings update notification acknowledged by background')
+    return true
+  } catch (error) {
+    logger.warn('Failed to send settings update notification:', error)
+    return false
+  }
 }
 
 // Partial save helper for prompt-only validation errors
