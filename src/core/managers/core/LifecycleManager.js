@@ -125,7 +125,6 @@ class LifecycleManager {
       [MessageActions.OPEN_OPTIONS_PAGE]: Handlers.handleOpenOptionsPageLazy,
       'openURL': Handlers.handleOpenURLLazy,
       [MessageActions.LAUNCH_EXTENSION_APP]: Handlers.handleLaunchExtensionAppLazy,
-      [MessageActions.UPDATE_CONTEXT_MENU]: Handlers.handleRefreshContextMenusLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,

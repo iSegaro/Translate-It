@@ -42,6 +42,14 @@ describe('LifecycleManager translation text routing', () => {
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === MessageActions.TRANSLATE_TEXT)).toHaveLength(1)
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === 'translateText')).toHaveLength(1)
   })
+
+  it('keeps refresh action registered without an undefined action mapping', () => {
+    const manager = new LifecycleManager()
+    manager.registerMessageHandlers()
+
+    expect(registeredHandlers.get(MessageActions.REFRESH_CONTEXT_MENUS)).toEqual(expect.any(Function))
+    expect(registeredHandlers.has('undefined')).toBe(false)
+  })
 })
 
 describe('LifecycleManager context menu refresh failures', () => {

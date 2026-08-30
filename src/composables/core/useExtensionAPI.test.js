@@ -58,4 +58,8 @@ describe('useExtensionAPI.translateText', () => {
       errorCode: 'E_MODEL'
     });
   });
+
+  it('does not expose the removed uppercase context-menu action', () => {
+    expect(useExtensionAPI()).not.toHaveProperty('updateContextMenu');
+  });
 });

@@ -233,12 +233,6 @@ export function useExtensionAPI() {
     return await sendToContentScript("DESTROY_VUE_MICRO_APP", { instanceId });
   };
 
-  // Context menu and extension lifecycle
-  const updateContextMenu = async (options) => {
-    return await sendMessage("UPDATE_CONTEXT_MENU", options);
-  };
-
-
   // Cleanup on component unmount
   onUnmounted(() => {
     try {
@@ -293,7 +287,6 @@ export function useExtensionAPI() {
 
     // Extension features
     createNotification,
-    updateContextMenu,
 
     // Utility
     getbrowserAPI,
