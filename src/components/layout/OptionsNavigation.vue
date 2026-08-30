@@ -35,7 +35,6 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { settingsManager } from '@/shared/managers/SettingsManager.js'
 import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
@@ -79,10 +78,7 @@ const isSaving = ref(false)
 // Save all settings
 // Shared post-save notification/refresh helper
 const postSaveNotify = async () => {
-  // Refresh settings in all content scripts
-  await settingsManager.refreshSettings()
-
-  // Notify all tabs about settings change using cross-browser compatible approach
+  // Notify background that persisted settings changed.
   await safeSendMessage({
     action: MessageActions.SETTINGS_UPDATED,
     timestamp: Date.now()
