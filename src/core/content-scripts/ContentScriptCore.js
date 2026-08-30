@@ -2,6 +2,7 @@
 // Main Frame Content Script Core - Includes Vue and full feature set
 
 import { BaseContentScriptCore } from './BaseContentScriptCore.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 export function ContentScriptCore() {
   // Inherit from Base Core
@@ -33,6 +34,14 @@ export function ContentScriptCore() {
 
     this.messageHandler.registerHandler('loadFeatures', async () => {
       await this.loadFeatures();
+      return { success: true };
+    });
+
+    this.messageHandler.registerHandler(MessageActions.SPA_NAVIGATION, async () => {
+      const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+      const featureManager = FeatureManager.getInstance();
+      await featureManager.initialize();
+      await featureManager.checkForUrlChange();
       return { success: true };
     });
   };

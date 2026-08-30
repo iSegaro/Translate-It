@@ -30,6 +30,7 @@ export class FeatureManager extends ResourceTracker {
     this._evaluationInProgress = false;
     this._evaluationQueue = [];
     this._evaluationDebounceTimer = null;
+    this._lastDetectedUrl = window.location.href;
 
     // Store singleton instance
     featureManagerInstance = this;
@@ -525,15 +526,9 @@ export class FeatureManager extends ResourceTracker {
 
   setupUrlChangeDetection() {
     try {
-      let currentUrl = window.location.href;
-      
       // Use MutationObserver for SPA detection
       const observer = new MutationObserver(() => {
-        if (window.location.href !== currentUrl) {
-          const oldUrl = currentUrl;
-          currentUrl = window.location.href;
-          this.handleUrlChange(oldUrl, currentUrl);
-        }
+        void this.checkForUrlChange();
       });
       
       observer.observe(document, { 
@@ -548,11 +543,7 @@ export class FeatureManager extends ResourceTracker {
       
       // Also listen to popstate for history navigation
       const popstateHandler = () => {
-        if (window.location.href !== currentUrl) {
-          const oldUrl = currentUrl;
-          currentUrl = window.location.href;
-          this.handleUrlChange(oldUrl, currentUrl);
-        }
+        void this.checkForUrlChange();
       };
       
       this.addEventListener(window, 'popstate', popstateHandler);
@@ -562,6 +553,15 @@ export class FeatureManager extends ResourceTracker {
     } catch (error) {
       logger.error('Failed to setup URL change detection:', error);
     }
+  }
+
+  checkForUrlChange() {
+    const newUrl = window.location.href;
+    if (newUrl === this._lastDetectedUrl) return false;
+
+    const oldUrl = this._lastDetectedUrl;
+    this._lastDetectedUrl = newUrl;
+    return this.handleUrlChange(oldUrl, newUrl);
   }
 
   async handleUrlChange(oldUrl, newUrl) {

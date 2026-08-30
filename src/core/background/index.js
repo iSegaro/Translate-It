@@ -20,6 +20,7 @@ import "./listeners/onNotificationClicked.js";
 
 // Inject iframe-only content scripts after subframe DOM becomes available
 import "./listeners/onSubframeDOMContentLoaded.js";
+import "./listeners/onSpaNavigation.js";
 
 // Import Memory Garbage Collector
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
@@ -211,4 +212,3 @@ backgroundService.initialize().then(async () => {
 });
 
 export { backgroundService };
-

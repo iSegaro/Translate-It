@@ -102,6 +102,44 @@ describe('FeatureManager SPA auto page command transport', () => {
       data: { isAuto: true },
     }, { returnFailureResponse: true });
   });
+
+  it('deduplicates URL signals with a synchronous shared snapshot', async () => {
+    const manager = FeatureManager.getInstance();
+    const oldUrl = window.location.href;
+    const newUrl = new URL('/silent-spa-route', oldUrl).href;
+    manager._lastDetectedUrl = oldUrl;
+    const handleUrlChange = vi.spyOn(manager, 'handleUrlChange').mockResolvedValue(undefined);
+
+    window.history.replaceState({}, '', newUrl);
+
+    const firstChange = manager.checkForUrlChange();
+    expect(manager._lastDetectedUrl).toBe(newUrl);
+    expect(handleUrlChange).toHaveBeenCalledOnce();
+    expect(handleUrlChange).toHaveBeenCalledWith(oldUrl, newUrl);
+
+    manager.checkForUrlChange();
+    expect(handleUrlChange).toHaveBeenCalledOnce();
+    await firstChange;
+  });
+
+  it('preserves rapid consecutive URL transitions', async () => {
+    const manager = FeatureManager.getInstance();
+    const urlA = window.location.href;
+    const urlB = new URL('/route-b', urlA).href;
+    const urlC = new URL('/route-c', urlA).href;
+    manager._lastDetectedUrl = urlA;
+    const handleUrlChange = vi.spyOn(manager, 'handleUrlChange').mockResolvedValue(undefined);
+
+    window.history.replaceState({}, '', urlB);
+    const firstChange = manager.checkForUrlChange();
+    window.history.replaceState({}, '', urlC);
+    const secondChange = manager.checkForUrlChange();
+
+    expect(handleUrlChange).toHaveBeenNthCalledWith(1, urlA, urlB);
+    expect(handleUrlChange).toHaveBeenNthCalledWith(2, urlB, urlC);
+    expect(manager._lastDetectedUrl).toBe(urlC);
+    await Promise.all([firstChange, secondChange]);
+  });
 });
 
 describe('FeatureManager conflict resolution', () => {

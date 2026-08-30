@@ -153,6 +153,7 @@ export class MessageActions {
   static GET_SETTINGS = 'GET_SETTINGS';
   static SET_SETTINGS = 'SET_SETTINGS';
   static SETTINGS_UPDATED = 'SETTINGS_UPDATED';
+  static SPA_NAVIGATION = 'SPA_NAVIGATION';
   
   // Provider actions
   static TEST_PROVIDER_CONNECTION = 'TEST_PROVIDER_CONNECTION';
