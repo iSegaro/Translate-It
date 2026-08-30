@@ -356,6 +356,7 @@ class LifecycleManager {
       logger.error("[LifecycleManager] Failed to refresh context menus:", error);
       // Try one more direct approach as ultimate fallback if featureLoader failed
       await this.createContextMenuDirectly();
+      throw error;
     }
   }
 

@@ -43,3 +43,17 @@ describe('LifecycleManager translation text routing', () => {
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === 'translateText')).toHaveLength(1)
   })
 })
+
+describe('LifecycleManager context menu refresh failures', () => {
+  it('propagates context menu refresh failure after emergency fallback', async () => {
+    const manager = new LifecycleManager()
+    const error = new Error('context menu setup failed')
+    manager.featureLoader = {
+      loadContextMenuManager: vi.fn().mockRejectedValue(error)
+    }
+    manager.createContextMenuDirectly = vi.fn().mockResolvedValue(undefined)
+
+    await expect(manager.refreshContextMenus()).rejects.toBe(error)
+    expect(manager.createContextMenuDirectly).toHaveBeenCalledOnce()
+  })
+})
