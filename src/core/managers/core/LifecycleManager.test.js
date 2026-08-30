@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const registeredHandlers = new Map()
 const registerHandlerMock = vi.fn((action, handler) => registeredHandlers.set(action, handler))
 const translateTextHandler = vi.fn()
+const settingsUpdatedHandler = vi.fn()
 
 vi.mock('webextension-polyfill', () => ({ default: {} }))
 vi.mock('@/core/background/feature-loader.js', () => ({ featureLoader: {} }))
@@ -12,7 +13,8 @@ vi.mock('@/shared/messaging/core/MessageHandler.js', () => ({
 }))
 vi.mock('@/core/background/handlers/index.js', async (importOriginal) => ({
   ...await importOriginal(),
-  handleTranslateTextLazy: translateTextHandler
+  handleTranslateTextLazy: translateTextHandler,
+  handleSettingsUpdatedLazy: settingsUpdatedHandler
 }))
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
@@ -35,6 +37,7 @@ describe('LifecycleManager translation text routing', () => {
 
     expect(registeredHandlers.get(MessageActions.TRANSLATE_TEXT)).toBe(translateTextHandler)
     expect(registeredHandlers.get('translateText')).toBe(translateTextHandler)
+    expect(registeredHandlers.get(MessageActions.SETTINGS_UPDATED)).toBe(settingsUpdatedHandler)
     expect(registeredHandlers.get(MessageActions.IFRAME_SELECT_ELEMENT_FINISHED)).toEqual(expect.any(Function))
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === MessageActions.TRANSLATE_TEXT)).toHaveLength(1)
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === 'translateText')).toHaveLength(1)
