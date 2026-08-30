@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StorageCore } from './StorageCore.js';
+import { isContextError } from '@/core/contextCore.js';
 
 // Mock Dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -108,5 +109,57 @@ describe('StorageCore Synchronization', () => {
     
     expect(storage.cache.get('theme')).toBe('dark');
     expect(changeCallback).toHaveBeenCalledWith({ newValue: 'dark', oldValue: 'light' });
+  });
+});
+
+describe('StorageCore initialization failure classification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    browser.storage.local.get.mockReset();
+    browser.storage.local.get.mockResolvedValue({});
+    isContextError.mockReturnValue(false);
+  });
+
+  it('uses intentional memory fallback when storage API is unavailable', async () => {
+    const storageLocal = browser.storage.local;
+    browser.storage.local = undefined;
+
+    try {
+      const storage = new StorageCore();
+      await storage._readyPromise;
+
+      expect(storage._useInMemoryStorage).toBe(true);
+      expect(storage._isReady).toBe(true);
+
+      await storage.set({ theme: 'light' });
+      await expect(storage.get('theme')).resolves.toEqual({ theme: 'light' });
+    } finally {
+      browser.storage.local = storageLocal;
+    }
+  });
+
+  it('propagates ordinary probe failures without entering memory mode', async () => {
+    const probeError = new Error('temporary storage failure');
+    browser.storage.local.get.mockRejectedValueOnce(probeError);
+    const storage = new StorageCore();
+
+    await expect(storage._readyPromise).rejects.toThrow('temporary storage failure');
+    expect(storage._useInMemoryStorage).toBe(false);
+    expect(storage._isReady).toBe(false);
+  });
+
+  it('retries a context-error probe and initializes normally after recovery', async () => {
+    const contextError = new Error('Extension context invalidated');
+    isContextError.mockImplementation(error => error === contextError);
+    browser.storage.local.get
+      .mockRejectedValueOnce(contextError)
+      .mockResolvedValueOnce({});
+    const storage = new StorageCore();
+
+    await expect(storage._readyPromise).resolves.toBeUndefined();
+
+    expect(browser.storage.local.get).toHaveBeenCalledTimes(2);
+    expect(storage._useInMemoryStorage).toBe(false);
+    expect(storage._isReady).toBe(true);
   });
 });

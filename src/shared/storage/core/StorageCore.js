@@ -35,7 +35,9 @@ class StorageCore extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
     // StorageCore initialized - logged at TRACE level for detailed debugging
     // this.logger.init('StorageCore initialized');
-    this._initializeAsync();
+    this._initializeAsync().catch(() => {
+      // Keep rejected _readyPromise observable while handling fire-and-forget rejection.
+    });
   }
 
   /**
@@ -79,26 +81,23 @@ class StorageCore extends ResourceTracker {
   }
 
   async _initialize() {
-    try {
-      // Test browser storage availability
-      if (!browser?.storage?.local) {
-        throw new Error("Browser storage API not available");
-      }
-
-      // Test storage access
-      await browser.storage.local.get(["__storage_test__"]);
-
-      // Setup change listener for cache invalidation
-      this._setupChangeListener();
-
-      this._isReady = true;
-      this.logger.info('Storage core initialized successfully');
-    } catch (error) {
-      this.logger.debug('Standard browser storage not available, falling back to in-memory storage:', error.message);
+    // Keep memory fallback for environments without the storage API.
+    if (!browser?.storage?.local) {
+      this.logger.debug('Standard browser storage not available, falling back to in-memory storage: API unavailable');
       this._useInMemoryStorage = true;
       this._inMemoryData = {};
       this._isReady = true;
+      return;
     }
+
+    // Probe failures must reach the existing retry and context-error handling.
+    await browser.storage.local.get(["__storage_test__"]);
+
+    // Setup change listener for cache invalidation
+    this._setupChangeListener();
+
+    this._isReady = true;
+    this.logger.info('Storage core initialized successfully');
   }
 
   /**
