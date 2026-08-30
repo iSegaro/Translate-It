@@ -34,8 +34,11 @@ vi.mock('@/shared/proxy/ProxyManager.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve(3)),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOriginal) => {

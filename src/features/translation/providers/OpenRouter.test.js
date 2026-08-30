@@ -23,9 +23,12 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     ...actual,
     getOpenRouterApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
     getOpenRouterApiModelAsync: vi.fn().mockResolvedValue('openai/gpt-4o-mini'),
-    getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
+}));
 
 const OPENROUTER_RAW_RESPONSE_FIXTURES = Object.freeze({
   metadataRichResponse: Object.freeze({

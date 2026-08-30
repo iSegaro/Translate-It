@@ -18,8 +18,11 @@ vi.mock('@/shared/config/config.js', () => ({
   },
   getOpenAIApiKeysAsync: vi.fn().mockResolvedValue(['key-1', 'key-2']),
   getOpenAIModelAsync: vi.fn().mockResolvedValue('gpt-4o-mini'),
-  getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({

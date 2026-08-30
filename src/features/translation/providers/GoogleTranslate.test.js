@@ -41,7 +41,10 @@ vi.mock('@/shared/config/config.js', () => ({
   getDictionaryShowPosAsync: vi.fn(() => Promise.resolve(false)),
   getDictionaryShowDefinitionsAsync: vi.fn(() => Promise.resolve(false)),
   getDictionaryShowExamplesAsync: vi.fn(() => Promise.resolve(false)),
-  getSettingsAsync: vi.fn(() => Promise.resolve({}))
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOriginal) => ({

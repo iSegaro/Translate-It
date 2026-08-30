@@ -22,9 +22,12 @@ vi.mock('@/shared/logging/logger.js', () => ({
 
 vi.mock('@/shared/config/config.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getYandexTranslateUrlAsync: vi.fn(() => Promise.resolve('https://translate.yandex.net/api/v1/tr.json/translate')),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 describe('YandexTranslateProvider output contract', () => {

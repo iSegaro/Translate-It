@@ -27,7 +27,10 @@ vi.mock("@/shared/config/config.js", () => ({
   getMicrosoftEdgeAuthUrlAsync: vi.fn().mockResolvedValue('https://auth.edge.com'),
   getMicrosoftEdgeTranslateUrlAsync: vi.fn().mockResolvedValue('https://api.edge.com/translate'),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 // Partial mock for language constants

@@ -4,9 +4,9 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
+import { getProxySettingsAsync } from "@/shared/proxy/ProxySettings.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
-import { getSettingsAsync } from "@/shared/config/config.js";
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
@@ -40,12 +40,12 @@ export class BaseProvider {
   }
 
   /**
-   * Initialize proxy configuration from settings
+   * Initialize proxy configuration from proxy-owned keyed settings
    * @private
    */
   async _initializeProxy() {
     try {
-      const settings = await getSettingsAsync();
+      const settings = await getProxySettingsAsync();
 
       proxyManager.setConfig({
         enabled: settings.PROXY_ENABLED || false,

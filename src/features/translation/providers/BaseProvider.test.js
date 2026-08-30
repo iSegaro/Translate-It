@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BaseProvider } from './BaseProvider.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
+import { getProxySettingsAsync } from "@/shared/proxy/ProxySettings.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
-import { getSettingsAsync } from "@/shared/config/config.js";
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -23,6 +23,10 @@ vi.mock('@/shared/proxy/ProxyManager.js', () => ({
   }
 }));
 
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn(() => Promise.resolve({}))
+}));
+
 vi.mock('@/features/translation/providers/utils/ProviderRequestEngine.js', () => ({
   ProviderRequestEngine: {
     executeRequest: vi.fn(),
@@ -34,10 +38,6 @@ vi.mock('@/features/translation/core/ProviderCoordinator.js', () => ({
   providerCoordinator: {
     execute: vi.fn()
   }
-}));
-
-vi.mock('@/shared/config/config.js', () => ({
-  getSettingsAsync: vi.fn(() => Promise.resolve({}))
 }));
 
 // Mock for dynamic import
@@ -83,10 +83,13 @@ describe('BaseProvider', () => {
     });
 
     it('should call _initializeProxy on creation', async () => {
-      vi.mocked(getSettingsAsync).mockResolvedValue({
+      vi.mocked(getProxySettingsAsync).mockResolvedValue({
         PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
         PROXY_HOST: 'localhost',
-        PROXY_PORT: 9000
+        PROXY_PORT: 9000,
+        PROXY_USERNAME: 'user',
+        PROXY_PASSWORD: 'password'
       });
 
       // We need to re-instantiate because _initializeProxy is called in constructor
@@ -97,13 +100,15 @@ describe('BaseProvider', () => {
 
       expect(proxyManager.setConfig).toHaveBeenCalledWith(expect.objectContaining({
         enabled: true,
+        type: 'socks',
         host: 'localhost',
-        port: 9000
+        port: 9000,
+        auth: { username: 'user', password: 'password' }
       }));
     });
 
     it('should use defaults in _initializeProxy if settings are missing', async () => {
-      vi.mocked(getSettingsAsync).mockResolvedValue({});
+      vi.mocked(getProxySettingsAsync).mockResolvedValue({});
       provider = new MockProvider();
       await new Promise(resolve => setTimeout(resolve, 0));
 

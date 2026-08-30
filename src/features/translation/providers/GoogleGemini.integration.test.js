@@ -17,8 +17,11 @@ vi.mock('@/shared/config/config.js', () => ({
   getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-pro'),
   getGeminiThinkingModeAsync: vi.fn().mockResolvedValue('default'),
   getGeminiApiUrlAsync: vi.fn().mockResolvedValue(''),
-  getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({

@@ -25,9 +25,12 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getDeepSeekApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
     getDeepSeekApiUrlAsync: vi.fn().mockResolvedValue('https://api.deepseek.com/chat/completions'),
     getDeepSeekApiModelAsync: vi.fn().mockResolvedValue('deepseek-v4-flash'),
-    getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
+}));
 
 const DEEPSEEK_RAW_RESPONSE_FIXTURES = Object.freeze({
   metadataRich: Object.freeze({

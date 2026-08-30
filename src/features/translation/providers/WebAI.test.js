@@ -13,11 +13,14 @@ vi.mock('@/shared/config/config.js', () => ({
   getWebAIApiUrlAsync: vi.fn().mockResolvedValue('https://webai.example/api'),
   getWebAIApiModelAsync: vi.fn().mockResolvedValue('webai-model'),
   getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(true),
-  getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(3),
   TranslationMode: {
     Select_Element: 'select-element'
   }
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
