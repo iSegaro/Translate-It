@@ -585,6 +585,9 @@ export class FeatureManager extends ResourceTracker {
       
       // Re-evaluate features for new URL
       await this.reevaluateFeatures('url-change');
+
+      // Child frames own local URL/exclusion state; only the top frame owns page-wide auto-translation.
+      if (window !== window.top) return;
       
       // Check auto-translation rules for the new URL
       const { default: settingsManager } = await import('@/shared/managers/SettingsManager.js');

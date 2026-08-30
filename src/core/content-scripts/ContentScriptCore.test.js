@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const featureManagerMock = vi.hoisted(() => ({
   initialize: vi.fn().mockResolvedValue(undefined),
@@ -13,6 +13,10 @@ import { ContentScriptCore } from './ContentScriptCore.js';
 import { IFrameContentScriptCore } from './IFrameContentScriptCore.js';
 
 describe('Vue infrastructure frame contract', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => {
     delete window.translateItContentCore;
     delete window.featureManager;
@@ -46,6 +50,24 @@ describe('Vue infrastructure frame contract', () => {
     const core = IFrameContentScriptCore();
     expect(core.loadVueApp).toBeUndefined();
     expect(core.vueLoaded).toBe(false);
+  });
+
+  it('iframe content core registers and handles SPA navigation locally', async () => {
+    const core = IFrameContentScriptCore();
+    const messageHandler = { registerHandler: vi.fn() };
+    core.messageHandler = messageHandler;
+
+    core.registerCoreHandlers();
+
+    const registration = messageHandler.registerHandler.mock.calls.find(
+      ([action]) => action === 'SPA_NAVIGATION'
+    );
+    expect(registration).toBeDefined();
+
+    await registration[1]();
+
+    expect(featureManagerMock.initialize).toHaveBeenCalledOnce();
+    expect(featureManagerMock.checkForUrlChange).toHaveBeenCalledOnce();
   });
 
   it('iframe loadFeature("vue") resolves null without mounting Vue', async () => {

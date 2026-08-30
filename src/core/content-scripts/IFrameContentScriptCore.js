@@ -2,6 +2,7 @@
 // Lite infrastructure for iframe content scripts - No Vue/UI bloat
 
 import { BaseContentScriptCore } from './BaseContentScriptCore.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 /**
  * IFrameContentScriptCore - Specialized lite version for subframes.
@@ -9,12 +10,26 @@ import { BaseContentScriptCore } from './BaseContentScriptCore.js';
 export function IFrameContentScriptCore() {
   const core = BaseContentScriptCore();
 
+  core.registerCoreHandlers = function() {
+    if (!this.messageHandler) return;
+
+    this.messageHandler.registerHandler(MessageActions.SPA_NAVIGATION, async () => {
+      const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
+      const featureManager = FeatureManager.getInstance();
+      await featureManager.initialize();
+      await featureManager.checkForUrlChange();
+      return { success: true };
+    });
+  };
+
   // Iframe specific initialization
   core.initializeCritical = async function() {
     const success = await this.initializeBase();
     if (!success) return false;
 
     try {
+      this.registerCoreHandlers();
+
       const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
       await SettingsManager.initialize();
       void SettingsManager.warmup();

@@ -106,6 +106,30 @@ describe('FeatureManager SPA auto page command transport', () => {
     }, { returnFailureResponse: true });
   });
 
+  it('reevaluates child URL locally without triggering page-wide auto-translation', async () => {
+    const previousTop = window.top;
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+
+    try {
+      const manager = FeatureManager.getInstance();
+      manager.reevaluateFeatures = vi.fn().mockResolvedValue(undefined);
+
+      await manager.handleUrlChange(
+        'https://old.example/',
+        'https://new.example/'
+      );
+
+      expect(mocks.exclusionChecker.updateUrl).toHaveBeenCalledWith('https://new.example/');
+      expect(manager.reevaluateFeatures).toHaveBeenCalledWith('url-change');
+      expect(mocks.settingsManager.get).not.toHaveBeenCalledWith('WHOLE_PAGE_TRANSLATION_ENABLED', true);
+      expect(mocks.settingsManager.get).not.toHaveBeenCalledWith('WHOLE_PAGE_AUTO_TRANSLATE_RULES', []);
+      expect(mocks.loadFeature).not.toHaveBeenCalled();
+      expect(mocks.sendRegularMessage).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(window, 'top', { configurable: true, value: previousTop });
+    }
+  });
+
   it('deduplicates URL signals with a synchronous shared snapshot', async () => {
     const manager = FeatureManager.getInstance();
     const oldUrl = window.location.href;

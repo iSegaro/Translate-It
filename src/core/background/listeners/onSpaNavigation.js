@@ -6,22 +6,28 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'SpaNavigationListener');
 
 /**
- * Forward top-frame history updates to the core content script.
+ * Forward history updates to the matching frame content script.
  * @param {object} details - Browser navigation details.
  * @returns {Promise<void>}
  */
 export async function handleSpaNavigation(details) {
-  if (details?.frameId !== 0) return;
+  const tabId = details?.tabId;
+  const frameId = details?.frameId;
+
+  if (!Number.isInteger(tabId) || tabId < 0 || !Number.isInteger(frameId) || frameId < 0) {
+    return;
+  }
 
   try {
-    await browser.tabs.sendMessage(details.tabId, {
+    await browser.tabs.sendMessage(tabId, {
       action: MessageActions.SPA_NAVIGATION,
     }, {
-      frameId: 0,
+      frameId,
     });
   } catch (error) {
     logger.debug('SPA navigation message skipped', {
-      tabId: details?.tabId,
+      tabId,
+      frameId,
       error: error?.message || String(error),
     });
   }

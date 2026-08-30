@@ -55,8 +55,36 @@ describe('SPA navigation listener', () => {
     });
   });
 
-  it('ignores subframe navigation', async () => {
+  it('forwards child-frame navigation to the exact frame', async () => {
     await handleSpaNavigation({ tabId: 42, frameId: 3 });
+
+    expect(mocks.sendMessage).toHaveBeenCalledWith(42, {
+      action: MessageActions.SPA_NAVIGATION,
+    }, {
+      frameId: 3,
+    });
+  });
+
+  it('forwards nested-frame navigation without changing frame identity', async () => {
+    await handleSpaNavigation({ tabId: 42, frameId: 27 });
+
+    expect(mocks.sendMessage).toHaveBeenCalledWith(42, {
+      action: MessageActions.SPA_NAVIGATION,
+    }, {
+      frameId: 27,
+    });
+  });
+
+  it.each([
+    {},
+    { tabId: '42', frameId: 0 },
+    { tabId: -1, frameId: 0 },
+    { tabId: 42, frameId: undefined },
+    { tabId: 42, frameId: '3' },
+    { tabId: 42, frameId: -1 },
+    { tabId: 42, frameId: 1.5 },
+  ])('ignores invalid navigation details: %o', async (details) => {
+    await handleSpaNavigation(details);
 
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
