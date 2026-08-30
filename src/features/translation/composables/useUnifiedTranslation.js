@@ -1,5 +1,4 @@
 // Unified translation composable for both popup and sidepanel
-// Combines the logic from usePopupTranslation and useSidepanelTranslation
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useTranslationStore } from "@/features/translation/stores/translation.js";

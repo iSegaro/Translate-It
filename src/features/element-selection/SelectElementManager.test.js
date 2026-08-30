@@ -213,7 +213,6 @@ vi.mock('@/shared/constants/translation.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getSelectElementShowOriginalOnHoverAsync: vi.fn(() => Promise.resolve(true)),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),

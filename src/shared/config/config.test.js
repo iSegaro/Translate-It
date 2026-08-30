@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { 
   CONFIG, 
-  getSettingsAsync, 
-  getApiKeyAsync, 
+  getApiKeyAsync,
   getDebugModeAsync,
   TranslationMode,
   IsDebug,
@@ -223,21 +222,6 @@ describe('Config Module', () => {
   });
 
   describe('Async Getters', () => {
-    it('getSettingsAsync should merge storage data with CONFIG defaults', async () => {
-      const mockStoredItems = {
-        API_KEY: 'test-api-key',
-        DEBUG_MODE: true
-      };
-      storageManager.get.mockResolvedValue(mockStoredItems);
-
-      const settings = await getSettingsAsync();
-
-      expect(settings.API_KEY).toBe('test-api-key');
-      expect(settings.DEBUG_MODE).toBe(true);
-      // Verify defaults are still there
-      expect(settings.APP_NAME).toBe('Translate It');
-    });
-
     it('getGeminiThinkingModeAsync reads stored mode and uses CONFIG default', async () => {
       storageManager.get.mockResolvedValue({ GEMINI_THINKING_MODE: 'minimal' });
       await expect(getGeminiThinkingModeAsync()).resolves.toBe('minimal');
@@ -282,15 +266,6 @@ describe('Config Module', () => {
       const keys = await getOpenAIApiKeysAsync();
 
       expect(keys).toEqual(['key1', 'key2']);
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('getSettingsAsync should return defaults if storage returns null', async () => {
-      storageManager.get.mockResolvedValue(null);
-      const settings = await getSettingsAsync();
-      expect(settings.APP_NAME).toBe(CONFIG.APP_NAME);
-      expect(settings.THEME).toBe(CONFIG.THEME);
     });
   });
 

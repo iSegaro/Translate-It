@@ -712,25 +712,8 @@ export const state = {
   preventTextFieldIconCreation: false, // FIX FOR DISCORD: Prevent text field icon creation during selection window transition
 };
 
-// --- Settings Cache & Retrieval via StorageManager ---
+// --- Settings Retrieval via StorageManager ---
 // Note: StorageManager handles caching internally, no need for manual cache
-
-// Fetches all settings using StorageManager
-export const getSettingsAsync = async () => {
-  try {
-    // Get all settings with CONFIG defaults through StorageManager
-    const items = await storageManager.get(null);
-    // Combine fetched items with defaults to ensure all keys exist
-    return { ...CONFIG, ...items };
-  } catch (error) {
-    if (ExtensionContextManager.isContextError(error)) {
-      ExtensionContextManager.handleContextError(error, 'config-getSettings');
-    } else {
-      logger.error('config-getSettingsAsync error:', error);
-    }
-    return { ...CONFIG }; // Use defaults on error
-  }
-};
 
 export const initializeSettingsListener = async () => {
   // initializeSettingsListener called - logged at TRACE level for detailed debugging

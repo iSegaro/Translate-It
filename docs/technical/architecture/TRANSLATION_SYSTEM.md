@@ -301,12 +301,12 @@ identity and fragment contract, see
 
 ### 1. Popup Translation
 ```
-User Input → usePopupTranslation → handleTranslate.js → Provider → UI Update
+User Input → useUnifiedTranslation('popup') → handleTranslate.js → Provider → UI Update
 ```
 
 ### 2. Sidepanel Translation  
 ```
-User Input → useSidepanelTranslation → handleTranslate.js → Provider → UI Update
+User Input → useUnifiedTranslation('sidepanel') → handleTranslate.js → Provider → UI Update
 ```
 
 ### 3. Select Element Translation

@@ -2,7 +2,6 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
-import { getSettingsAsync } from '@/shared/config/config.js';
 
 /**
  * Extension-Only Proxy Manager
@@ -200,31 +199,6 @@ export class ProxyManager {
     }
 
     return new StrategyClass(this.config);
-  }
-
-  /**
-   * Initialize proxy configuration from settings
-   * @private
-   */
-  async _initializeProxy() {
-    try {
-      const settings = await getSettingsAsync();
-
-      if (settings.PROXY_ENABLED) {
-        this.setConfig({
-          enabled: settings.PROXY_ENABLED,
-          type: settings.PROXY_TYPE,
-          host: settings.PROXY_HOST,
-          port: settings.PROXY_PORT,
-          auth: {
-            username: settings.PROXY_USERNAME,
-            password: settings.PROXY_PASSWORD
-          }
-        });
-      }
-    } catch (error) {
-      this.logger.warn('Failed to initialize proxy from settings', error);
-    }
   }
 
   /**

@@ -35,7 +35,6 @@ vi.mock('@/shared/config/config.js', () => ({
   getProviderOptimizationLevelAsync: vi.fn(async (providerName) => {
     return mockRuntime.providerLevels.get(providerName) ?? 1;
   }),
-  getSettingsAsync: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', () => ({

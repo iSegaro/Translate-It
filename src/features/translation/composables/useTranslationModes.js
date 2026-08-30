@@ -1,11 +1,5 @@
 import { ref, onMounted, onUnmounted } from "vue";
-import { generateMessageId } from "@/utils/messaging/messageId.js";
-import { ProviderRegistryIds } from "@/features/translation/providers/ProviderConstants.js";
-import { isSingleWordOrShortPhrase } from "@/shared/utils/text/textAnalysis.js";
-import { TranslationMode, getSettingsAsync } from "@/shared/config/config.js";
 
-import { useLanguages } from "@/composables/shared/useLanguages.js";
-import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js';
 import browser from 'webextension-polyfill';
 import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
@@ -110,100 +104,6 @@ const _unregisterSelectStateListener = () => {
   }
   _selectStateListenerRegistered = false;
 };
-
-export function useSidepanelTranslation() {
-  const isLoading = ref(false);
-  const result = ref(null);
-  const error = ref(null);
-
-  const translateText = async (text, sourceLang, targetLang) => {
-    if (!text?.trim()) {
-      error.value = "Text is required for translation";
-      return null;
-    }
-
-    if (!targetLang || targetLang === AUTO_DETECT_VALUE) {
-      error.value = "Target language is required";
-      return null;
-    }
-
-    isLoading.value = true;
-    error.value = null;
-    result.value = null;
-
-    try {
-      const languages = useLanguages();
-      const sourceLangCode =
-        languages.getLanguagePromptName(sourceLang) || AUTO_DETECT_VALUE;
-      const targetLangCode = languages.getLanguagePromptName(targetLang);
-
-      logger.debug('Starting translation:', {
-        text: text.substring(0, 50) + "...",
-        sourceLangCode,
-        targetLangCode,
-      });
-
-      // Get current provider from settings
-      const settings = await getSettingsAsync();
-      const currentProvider = settings.TRANSLATION_API || ProviderRegistryIds.GOOGLE_V2;
-      const messageId = generateMessageId('sidepanel-translate');
-      
-      // Determine translation mode (same logic as TranslationService.sidepanelTranslate)
-      let mode = TranslationMode.Sidepanel_Translate;
-      const isDictionaryCandidate = isSingleWordOrShortPhrase(text);
-      if (settings.ENABLE_DICTIONARY && isDictionaryCandidate) {
-        mode = TranslationMode.Dictionary_Translation;
-      }
-      
-      const response = await sendMessage({
-        action: MessageActions.TRANSLATE,
-        messageId: messageId,
-        context: MessageContexts.SIDEPANEL,
-        timestamp: Date.now(),
-        data: {
-          text: text,
-          provider: currentProvider,
-          sourceLanguage: sourceLangCode,
-          targetLanguage: targetLangCode,
-          mode: mode,
-          options: {}
-        }
-      });
-
-      if (response?.success) {
-        result.value = response;
-        logger.init('Translation successful');
-        return response;
-      } else {
-        const errorMsg = response?.error || "Translation failed";
-        error.value = errorMsg;
-        logger.error('Translation failed:', errorMsg);
-        return null;
-      }
-    } catch (err) {
-      const errorMsg = err.message || "Translation error occurred";
-      error.value = errorMsg;
-      logger.error('Translation error:', err);
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
-  };
-
-  const clearState = () => {
-    result.value = null;
-    error.value = null;
-    isLoading.value = false;
-  };
-
-  return {
-    isLoading,
-    result,
-    error,
-    translateText,
-    clearState,
-  };
-}
 
 export function useSelectElementTranslation() {
   const isActivating = ref(false);
