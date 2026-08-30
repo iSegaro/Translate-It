@@ -322,6 +322,10 @@ class SettingsManager {
       await this.initialize()
     }
 
+    if (this._fallbackMode) {
+      this._assertFallbackSettingKeys([key])
+    }
+
     const oldValue = this.get(key)
 
     // In fallback mode, update storage directly
@@ -368,6 +372,7 @@ class SettingsManager {
 
     if (this._fallbackMode) {
       const updateKeys = Object.keys(updates)
+      this._assertFallbackSettingKeys(updateKeys, true)
       const oldValues = {}
       const pendingUpdates = {}
 
@@ -834,6 +839,19 @@ class SettingsManager {
     if (pendingUpdates.length === 0) {
       this._pendingUpdates.delete(key)
     }
+  }
+
+  _assertFallbackSettingKeys(keys, multiple = false) {
+    const unsupportedKeys = keys
+      .filter(key => !Object.prototype.hasOwnProperty.call(this._defaults, key))
+      .sort()
+
+    if (unsupportedKeys.length === 0) return
+
+    const label = multiple ? 'keys' : 'key'
+    throw new Error(
+      `SettingsManager fallback does not support setting ${label}: ${unsupportedKeys.join(', ')}`
+    )
   }
 }
 

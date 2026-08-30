@@ -63,6 +63,7 @@ function createSettingsStoreMock(overrides = {}) {
       STORE_ONLY_SETTING: 'store-value'
     },
     loadSettings: vi.fn().mockResolvedValue(undefined),
+    updateSettingAndPersist: vi.fn().mockResolvedValue(undefined),
     updateMultipleSettings: vi.fn().mockResolvedValue(undefined),
     resetSettings: vi.fn().mockResolvedValue(undefined),
     exportSettings: vi.fn().mockResolvedValue('exported-settings'),
@@ -347,6 +348,80 @@ describe('SettingsManager defaults', () => {
     expect(extensionChange).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['THEME', 'dark'],
+    ['OPENAI_API_KEY', 'secret'],
+    ['PROXY_PASSWORD', 'secret'],
+    ['UNKNOWN_SETTING', true]
+  ])('rejects unsupported fallback set key %s without side effects', async (key, value) => {
+    await settingsManager.initialize();
+    const onChange = vi.fn();
+    settingsManager.onChange(key, onChange);
+    const before = { ...settingsManager._settings.value };
+    storageManagerMock.set.mockClear();
+
+    await expect(settingsManager.set(key, value)).rejects.toThrow(
+      `SettingsManager fallback does not support setting key: ${key}`
+    );
+
+    expect(storageManagerMock.set).not.toHaveBeenCalled();
+    expect(settingsManager._settings.value).toEqual(before);
+    expect(settingsManager.has(key)).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(settingsManager._pendingUpdates.size).toBe(0);
+  });
+
+  it('rejects unsupported fallback writes instead of using a retained failed store', async () => {
+    const failedStore = createSettingsStoreMock({
+      loadSettings: vi.fn().mockRejectedValue(new Error('store unavailable'))
+    });
+    window.Vue = {};
+    useSettingsStore.mockReturnValue(failedStore);
+
+    await settingsManager.initialize();
+    storageManagerMock.set.mockClear();
+
+    await expect(settingsManager.set('THEME', 'dark')).rejects.toThrow(
+      'SettingsManager fallback does not support setting key: THEME'
+    );
+
+    expect(failedStore.updateSettingAndPersist).not.toHaveBeenCalled();
+    expect(storageManagerMock.set).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      {
+        EXTENSION_ENABLED: true,
+        OPENAI_API_KEY: 'secret',
+        THEME: 'dark'
+      },
+      'SettingsManager fallback does not support setting keys: OPENAI_API_KEY, THEME'
+    ],
+    [
+      {
+        OPENAI_API_KEY: 'secret',
+        PROXY_PASSWORD: 'secret'
+      },
+      'SettingsManager fallback does not support setting keys: OPENAI_API_KEY, PROXY_PASSWORD'
+    ]
+  ])('rejects invalid fallback batches atomically', async (updates, message) => {
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    await settingsManager.initialize();
+    const extensionChange = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', extensionChange);
+    const before = { ...settingsManager._settings.value };
+    storageManagerMock.set.mockClear();
+
+    await expect(settingsManager.setMultiple(updates)).rejects.toThrow(message);
+
+    expect(storageManagerMock.set).not.toHaveBeenCalled();
+    expect(settingsManager._settings.value).toEqual(before);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(false);
+    expect(extensionChange).not.toHaveBeenCalled();
+    expect(settingsManager._pendingUpdates.size).toBe(0);
+  });
+
   it('leaves fallback state and events unchanged when setMultiple fails', async () => {
     const storageEvents = createStorageEventMock();
     browser.storage.onChanged = storageEvents.onChanged;
@@ -431,12 +506,17 @@ describe('SettingsManager defaults', () => {
     expect(settingsManager.getAll()).toEqual(store.settings);
     expect(settingsManager.getAll()).not.toBe(store.settings);
 
-    const updates = { EXTENSION_ENABLED: true };
+    await settingsManager.set('STORE_ONLY_SETTING', 'updated');
+    const updates = {
+      EXTENSION_ENABLED: true,
+      STORE_ONLY_BATCH_SETTING: 'batch-value'
+    };
     await settingsManager.setMultiple(updates);
     await settingsManager.reset();
     await expect(settingsManager.export('password')).resolves.toBe('exported-settings');
     await settingsManager.import('settings-data', 'password');
 
+    expect(store.updateSettingAndPersist).toHaveBeenCalledWith('STORE_ONLY_SETTING', 'updated');
     expect(store.updateMultipleSettings).toHaveBeenCalledWith(updates);
     expect(store.resetSettings).toHaveBeenCalledTimes(1);
     expect(store.exportSettings).toHaveBeenCalledWith('password');
