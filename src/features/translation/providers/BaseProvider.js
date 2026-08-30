@@ -10,6 +10,8 @@ import { providerCoordinator } from "@/features/translation/core/ProviderCoordin
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
+let proxyInitializationGeneration = 0;
+let appliedProxyInitializationGeneration = 0;
 
 export function createOperationAbortError(signal, message = 'Translation operation aborted') {
   const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
@@ -41,11 +43,18 @@ export class BaseProvider {
 
   /**
    * Initialize proxy configuration from proxy-owned keyed settings
+   * Only generations newer than the latest successful commit may update shared proxy state.
    * @private
    */
   async _initializeProxy() {
+    const generation = ++proxyInitializationGeneration;
+
     try {
       const settings = await getProxySettingsAsync();
+
+      if (generation <= appliedProxyInitializationGeneration) {
+        return;
+      }
 
       proxyManager.setConfig({
         enabled: settings.PROXY_ENABLED || false,
@@ -57,6 +66,7 @@ export class BaseProvider {
           password: settings.PROXY_PASSWORD || ''
         }
       });
+      appliedProxyInitializationGeneration = generation;
     } catch (error) {
       logger.warn(`[${this.providerName}] Failed to initialize proxy:`, error);
     }

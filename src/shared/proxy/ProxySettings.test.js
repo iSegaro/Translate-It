@@ -11,6 +11,9 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn()
   })
 }));

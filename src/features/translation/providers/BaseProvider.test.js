@@ -60,12 +60,34 @@ class MockProvider extends BaseProvider {
   async _batchTranslate() { return []; }
 }
 
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+};
+
+const createProxySettings = (overrides = {}) => ({
+  PROXY_ENABLED: false,
+  PROXY_TYPE: 'http',
+  PROXY_HOST: '',
+  PROXY_PORT: 8080,
+  PROXY_USERNAME: '',
+  PROXY_PASSWORD: '',
+  ...overrides
+});
+
 describe('BaseProvider', () => {
   let provider;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     provider = new MockProvider();
+    await Promise.resolve();
+    vi.clearAllMocks();
   });
 
   describe('Constructor and Initialization', () => {
@@ -95,8 +117,8 @@ describe('BaseProvider', () => {
       // We need to re-instantiate because _initializeProxy is called in constructor
       provider = new MockProvider();
       
-      // Since it's async and not awaited in constructor, we wait a bit
-      await new Promise(resolve => setTimeout(resolve, 0));
+      // Drain constructor's async continuation.
+      await Promise.resolve();
 
       expect(proxyManager.setConfig).toHaveBeenCalledWith(expect.objectContaining({
         enabled: true,
@@ -110,7 +132,7 @@ describe('BaseProvider', () => {
     it('should use defaults in _initializeProxy if settings are missing', async () => {
       vi.mocked(getProxySettingsAsync).mockResolvedValue({});
       provider = new MockProvider();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await Promise.resolve();
 
       expect(proxyManager.setConfig).toHaveBeenCalledWith({
         enabled: false,
@@ -120,6 +142,310 @@ describe('BaseProvider', () => {
         auth: { username: '', password: '' }
       });
     });
+
+    it('should not let an older initialization overwrite a newer applied one', async () => {
+      const olderRead = createDeferred();
+      const newerRead = createDeferred();
+      const olderSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'old-proxy',
+        PROXY_PORT: 8001,
+        PROXY_USERNAME: 'old-user',
+        PROXY_PASSWORD: 'old-password'
+      });
+      const newerSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
+        PROXY_HOST: 'new-proxy',
+        PROXY_PORT: 9001,
+        PROXY_USERNAME: 'new-user',
+        PROXY_PASSWORD: 'new-password'
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockReturnValueOnce(olderRead.promise)
+        .mockReturnValueOnce(newerRead.promise);
+
+      const olderInitialization = provider._initializeProxy();
+      const newerInitialization = provider._initializeProxy();
+
+      newerRead.resolve(newerSettings);
+      await newerInitialization;
+      olderRead.resolve(olderSettings);
+      await olderInitialization;
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenCalledWith({
+        enabled: true,
+        type: 'socks',
+        host: 'new-proxy',
+        port: 9001,
+        auth: { username: 'new-user', password: 'new-password' }
+      });
+    });
+
+    it('should apply older settings while newer initialization is pending', async () => {
+      const olderRead = createDeferred();
+      const newerRead = createDeferred();
+      const olderSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_HOST: 'old-proxy',
+        PROXY_PORT: 8007
+      });
+      const newerSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
+        PROXY_HOST: 'new-proxy',
+        PROXY_PORT: 9007
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockReturnValueOnce(olderRead.promise)
+        .mockReturnValueOnce(newerRead.promise);
+
+      const olderInitialization = provider._initializeProxy();
+      const newerInitialization = provider._initializeProxy();
+
+      olderRead.resolve(olderSettings);
+      await olderInitialization;
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenNthCalledWith(1, {
+        enabled: true,
+        type: 'http',
+        host: 'old-proxy',
+        port: 8007,
+        auth: { username: '', password: '' }
+      });
+
+      newerRead.resolve(newerSettings);
+      await newerInitialization;
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(2);
+      expect(proxyManager.setConfig).toHaveBeenNthCalledWith(2, {
+        enabled: true,
+        type: 'socks',
+        host: 'new-proxy',
+        port: 9007,
+        auth: { username: '', password: '' }
+      });
+    });
+
+    it('should prevent constructor initialization from overwriting request initialization', async () => {
+      const constructorRead = createDeferred();
+      const requestRead = createDeferred();
+      const constructorSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'constructor-proxy',
+        PROXY_PORT: 8002
+      });
+      const requestSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'https',
+        PROXY_HOST: 'request-proxy',
+        PROXY_PORT: 9002
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockReturnValueOnce(constructorRead.promise)
+        .mockReturnValueOnce(requestRead.promise);
+
+      provider = new MockProvider();
+      const requestInitialization = provider._initializeProxy();
+
+      requestRead.resolve(requestSettings);
+      await requestInitialization;
+      constructorRead.resolve(constructorSettings);
+      await Promise.resolve();
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenCalledWith({
+        enabled: true,
+        type: 'https',
+        host: 'request-proxy',
+        port: 9002,
+        auth: { username: '', password: '' }
+      });
+    });
+
+    it('should share generation ordering across provider instances', async () => {
+      const providerARead = createDeferred();
+      const providerBRead = createDeferred();
+      const providerASettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'provider-a-proxy',
+        PROXY_PORT: 8003
+      });
+      const providerBSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
+        PROXY_HOST: 'provider-b-proxy',
+        PROXY_PORT: 9003
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockReturnValueOnce(providerARead.promise)
+        .mockReturnValueOnce(providerBRead.promise);
+
+      new MockProvider();
+      new MockProvider();
+
+      providerBRead.resolve(providerBSettings);
+      await Promise.resolve();
+      providerARead.resolve(providerASettings);
+      await Promise.resolve();
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenCalledWith({
+        enabled: true,
+        type: 'socks',
+        host: 'provider-b-proxy',
+        port: 9003,
+        auth: { username: '', password: '' }
+      });
+    });
+
+    it('should not restore stale enabled proxy after newer disable settings', async () => {
+      const olderRead = createDeferred();
+      const newerRead = createDeferred();
+      const olderSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
+        PROXY_HOST: 'old-proxy',
+        PROXY_PORT: 8004,
+        PROXY_USERNAME: 'old-user',
+        PROXY_PASSWORD: 'old-password'
+      });
+      const newerSettings = createProxySettings({
+        PROXY_ENABLED: false,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: '',
+        PROXY_PORT: 8080
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockReturnValueOnce(olderRead.promise)
+        .mockReturnValueOnce(newerRead.promise);
+
+      const olderInitialization = provider._initializeProxy();
+      const newerInitialization = provider._initializeProxy();
+
+      newerRead.resolve(newerSettings);
+      await newerInitialization;
+      olderRead.resolve(olderSettings);
+      await olderInitialization;
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenCalledWith({
+        enabled: false,
+        type: 'http',
+        host: '',
+        port: 8080,
+        auth: { username: '', password: '' }
+      });
+    });
+
+    it('should commit sequential initialization refreshes in order', async () => {
+      const firstSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'first-proxy',
+        PROXY_PORT: 8005
+      });
+      const secondSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'https',
+        PROXY_HOST: 'second-proxy',
+        PROXY_PORT: 9005
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockResolvedValueOnce(firstSettings)
+        .mockResolvedValueOnce(secondSettings);
+
+      await provider._initializeProxy();
+      await provider._initializeProxy();
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(2);
+      expect(proxyManager.setConfig).toHaveBeenNthCalledWith(1, {
+        enabled: true,
+        type: 'http',
+        host: 'first-proxy',
+        port: 8005,
+        auth: { username: '', password: '' }
+      });
+      expect(proxyManager.setConfig).toHaveBeenNthCalledWith(2, {
+        enabled: true,
+        type: 'https',
+        host: 'second-proxy',
+        port: 9005,
+        auth: { username: '', password: '' }
+      });
+    });
+
+    it('should preserve current config when newest initialization fails', async () => {
+      const existingSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'socks',
+        PROXY_HOST: 'existing-proxy',
+        PROXY_PORT: 8006,
+        PROXY_USERNAME: 'existing-user',
+        PROXY_PASSWORD: 'existing-password'
+      });
+
+      vi.mocked(getProxySettingsAsync).mockResolvedValueOnce(existingSettings);
+      await provider._initializeProxy();
+
+      vi.mocked(getProxySettingsAsync).mockRejectedValueOnce(new Error('settings unavailable'));
+      await expect(provider._initializeProxy()).resolves.toBeUndefined();
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenLastCalledWith({
+        enabled: true,
+        type: 'socks',
+        host: 'existing-proxy',
+        port: 8006,
+        auth: { username: 'existing-user', password: 'existing-password' }
+      });
+    });
+
+    it('should allow older settings to apply when newer initialization fails', async () => {
+      const olderRead = createDeferred();
+      const newerRead = createDeferred();
+      const olderSettings = createProxySettings({
+        PROXY_ENABLED: true,
+        PROXY_HOST: 'older-proxy',
+        PROXY_PORT: 8008
+      });
+
+      vi.mocked(getProxySettingsAsync)
+        .mockReturnValueOnce(olderRead.promise)
+        .mockReturnValueOnce(newerRead.promise);
+
+      const olderInitialization = provider._initializeProxy();
+      const newerInitialization = provider._initializeProxy();
+
+      newerRead.reject(new Error('newer settings unavailable'));
+      await newerInitialization;
+
+      expect(proxyManager.setConfig).not.toHaveBeenCalled();
+
+      olderRead.resolve(olderSettings);
+      await olderInitialization;
+
+      expect(proxyManager.setConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenCalledWith({
+        enabled: true,
+        type: 'http',
+        host: 'older-proxy',
+        port: 8008,
+        auth: { username: '', password: '' }
+      });
+    });
+
   });
 
   describe('Abstract Methods', () => {
