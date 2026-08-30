@@ -399,6 +399,31 @@ describe('ContextMenuManager keyed storage reads', () => {
     );
   });
 
+  it('persists provider selection without explicitly rebuilding menus', async () => {
+    const setupSpy = vi.spyOn(manager, 'setupDefaultMenus');
+
+    await manager.handleMenuClick({ menuItemId: 'api-provider-gemini' });
+
+    expect(mocks.storageManager.set).toHaveBeenCalledOnce();
+    expect(mocks.storageManager.set).toHaveBeenCalledWith({ TRANSLATION_API: 'gemini' });
+    expect(setupSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not rebuild menus when provider persistence fails', async () => {
+    const error = new Error('provider write failed');
+    mocks.storageManager.set.mockRejectedValue(error);
+    const setupSpy = vi.spyOn(manager, 'setupDefaultMenus');
+
+    await expect(manager.handleMenuClick({ menuItemId: 'api-provider-gemini' }))
+      .resolves.toBeUndefined();
+
+    expect(setupSpy).not.toHaveBeenCalled();
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      'Error setting new API provider:',
+      error
+    );
+  });
+
   it('keeps Select Element title failure local to its menu paths', async () => {
     mocks.getTranslationString.mockImplementation((key) => {
       if (key === 'context_menu_translate_with_selection') {

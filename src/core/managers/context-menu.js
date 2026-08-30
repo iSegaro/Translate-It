@@ -827,8 +827,6 @@ export class ContextMenuManager extends ResourceTracker {
         try {
           await storageManager.set({ TRANSLATION_API: newApiId });
           logger.info(`API Provider changed to: ${newApiId}`);
-          // Refresh context menus to update radio button states
-          await this.setupDefaultMenus();
         } catch (e) {
           logger.error(`Error setting new API provider:`, e);
         }
