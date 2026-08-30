@@ -232,7 +232,6 @@ src/
 │   │   └── handlers/               # ShortcutHandler
 │   ├── exclusion/
 │   │   ├── core/                   # ExclusionChecker
-│   │   └── composables/            # useExclusionChecker
 │   ├── text-actions/
 │   │   ├── composables/            # useCopyAction, usePasteAction
 │   │   └── components/             # ActionToolbar, CopyButton
