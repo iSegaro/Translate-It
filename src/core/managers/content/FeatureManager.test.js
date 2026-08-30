@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   exclusionChecker: {
     updateUrl: vi.fn(),
     isFeatureAllowed: vi.fn(),
+    refreshSettings: vi.fn(),
   },
   settingsManager: {
     get: vi.fn(),
@@ -175,5 +176,27 @@ describe('FeatureManager conflict resolution', () => {
 
   it('ignores unsupported conflict requesters', async () => {
     await expect(manager.resolveFeatureConflict('unknown')).resolves.toBe(false);
+  });
+});
+
+describe('FeatureManager settings refresh boundary', () => {
+  let manager;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    manager = FeatureManager.getInstance();
+    manager.reevaluateFeatures = vi.fn().mockResolvedValue(undefined);
+    mocks.exclusionChecker.refreshSettings.mockReset();
+  });
+
+  it('contains exclusion refresh failures before reevaluation', async () => {
+    const error = new Error('refresh failed');
+    mocks.exclusionChecker.refreshSettings.mockRejectedValue(error);
+
+    await expect(manager.handleSettingsChange('EXCLUDED_SITES', ['new.example']))
+      .resolves.toBeUndefined();
+
+    expect(mocks.exclusionChecker.refreshSettings).toHaveBeenCalledTimes(1);
+    expect(manager.reevaluateFeatures).not.toHaveBeenCalled();
   });
 });

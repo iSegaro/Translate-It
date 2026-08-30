@@ -74,9 +74,10 @@ export class ExclusionChecker {
 
   async refreshSettings() {
     try {
-      await settingsManager.initialize();
+      await settingsManager.refreshSettings();
     } catch (error) {
       logger.error('Error refreshing ExclusionChecker settings:', error);
+      throw error;
     }
   }
 
