@@ -47,7 +47,8 @@ export function ContentScriptCore() {
     try {
       // Pre-warm settings and DebugMode (Main frame specific)
       const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
-      void SettingsManager.initialize().then(() => SettingsManager.warmup());
+      await SettingsManager.initialize();
+      void SettingsManager.warmup();
 
       const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
       await debugModeBridge.initialize();

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   loadFeature: vi.fn(),
+  initializeCritical: vi.fn(),
+  interactionInitialize: vi.fn(),
   pageEventBus: { on: vi.fn() },
   topPostMessage: vi.fn(),
 }));
@@ -23,7 +25,7 @@ vi.mock('@/features/exclusion/utils/exclusion-utils.js', () => ({
 vi.mock('./IFrameContentScriptCore.js', () => ({
   IFrameContentScriptCore: class {
     async initializeCritical() {
-      return true;
+      return mocks.initializeCritical();
     }
 
     async injectMainDOMStyles() {}
@@ -36,7 +38,7 @@ vi.mock('./IFrameContentScriptCore.js', () => ({
 }));
 
 vi.mock('./InteractionCoordinator.js', () => ({
-  interactionCoordinator: { initialize: vi.fn().mockResolvedValue(undefined) },
+  interactionCoordinator: { initialize: mocks.interactionInitialize },
 }));
 
 vi.mock('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js', () => ({
@@ -61,6 +63,8 @@ describe('iframe page translation transport', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.loadFeature.mockClear();
+    mocks.initializeCritical.mockReset().mockResolvedValue(true);
+    mocks.interactionInitialize.mockReset().mockResolvedValue(undefined);
     mocks.pageEventBus.on.mockClear();
     mocks.topPostMessage.mockClear();
     mocks.loadFeature.mockResolvedValue(null);
@@ -99,5 +103,22 @@ describe('iframe page translation transport', () => {
       detail: { translatedCount: 999, totalCount: 999 },
     }));
     expect(mocks.topPostMessage).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(mocks.interactionInitialize).toHaveBeenCalledOnce());
+  });
+
+  it('waits for iframe core readiness before initializing the interaction coordinator', async () => {
+    let resolveCore;
+    mocks.initializeCritical.mockImplementation(() => new Promise((resolve) => {
+      resolveCore = resolve;
+    }));
+
+    await import('./index-iframe.js');
+
+    await vi.waitFor(() => expect(mocks.initializeCritical).toHaveBeenCalledOnce());
+    expect(mocks.interactionInitialize).not.toHaveBeenCalled();
+
+    resolveCore(true);
+
+    await vi.waitFor(() => expect(mocks.interactionInitialize).toHaveBeenCalledOnce());
   });
 });

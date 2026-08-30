@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sendRegularMessage: vi.fn(),
+  initializeCritical: vi.fn(),
+  interactionInitialize: vi.fn(),
+  isExtensionEnabled: vi.fn(),
+  firstCoordinatorEnabled: undefined,
+  runtimeEnabled: true,
   pageTranslationManager: {
     isActive: true,
     userRestoredOverride: false,
@@ -30,7 +35,7 @@ vi.mock('./ContentScriptCore.js', () => ({
     }
 
     async initializeCritical() {
-      return true;
+      return mocks.initializeCritical();
     }
 
     async loadVueApp() {}
@@ -68,7 +73,9 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('./InteractionCoordinator.js', () => ({
-  interactionCoordinator: { initialize: vi.fn().mockResolvedValue(undefined) },
+  interactionCoordinator: {
+    initialize: mocks.interactionInitialize,
+  },
 }));
 
 vi.mock('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js', () => ({
@@ -78,7 +85,7 @@ vi.mock('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js', ()
 vi.mock('@/shared/managers/SettingsManager.js', () => ({
   default: {
     initialize: vi.fn().mockResolvedValue(undefined),
-    isExtensionEnabled: vi.fn(() => true),
+    isExtensionEnabled: mocks.isExtensionEnabled,
     get: vi.fn((key, fallback) => key === 'WHOLE_PAGE_AUTO_TRANSLATE_RULES' ? [{ pattern: 'example.com' }] : fallback),
   },
 }));
@@ -113,6 +120,11 @@ describe('initial auto page command transport', () => {
     vi.resetModules();
     vi.clearAllMocks();
     mocks.sendRegularMessage.mockResolvedValue({ success: true });
+    mocks.initializeCritical.mockResolvedValue(true);
+    mocks.interactionInitialize.mockResolvedValue(undefined);
+    mocks.isExtensionEnabled.mockImplementation(() => mocks.runtimeEnabled);
+    mocks.firstCoordinatorEnabled = undefined;
+    mocks.runtimeEnabled = true;
     window.translateItContentCore = undefined;
     window.translateItContentScriptCore = undefined;
   });
@@ -126,5 +138,28 @@ describe('initial auto page command transport', () => {
       action: 'page-translate',
       data: { isAuto: true },
     }, { returnFailureResponse: true });
+  });
+
+  it('waits for core readiness before initializing the interaction coordinator', async () => {
+    let resolveCore;
+    mocks.initializeCritical.mockImplementation(() => new Promise((resolve) => {
+      resolveCore = resolve;
+    }));
+    mocks.interactionInitialize.mockImplementation(() => {
+      mocks.firstCoordinatorEnabled = mocks.isExtensionEnabled();
+      return Promise.resolve();
+    });
+
+    await import('./index-main.js');
+
+    await vi.waitFor(() => expect(mocks.initializeCritical).toHaveBeenCalledOnce());
+    expect(mocks.interactionInitialize).not.toHaveBeenCalled();
+    expect(mocks.firstCoordinatorEnabled).toBeUndefined();
+
+    mocks.runtimeEnabled = false;
+    resolveCore(true);
+
+    await vi.waitFor(() => expect(mocks.interactionInitialize).toHaveBeenCalledOnce());
+    expect(mocks.firstCoordinatorEnabled).toBe(false);
   });
 });

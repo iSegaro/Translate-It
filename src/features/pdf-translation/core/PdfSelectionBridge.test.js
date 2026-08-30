@@ -329,11 +329,46 @@ describe('PdfSelectionBridge', () => {
     }))
   })
 
-  it('registers and removes selection listeners on stop/destroy', () => {
+  it('waits for settings readiness before attaching selection listeners', async () => {
+    settingsManager.destroy()
+
+    let resolveSettings
+    storageManagerMock.get.mockReset().mockImplementation(() => new Promise((resolve) => {
+      resolveSettings = () => resolve({
+        selectionTranslationMode: SelectionTranslationMode.IMMEDIATE
+      })
+    }))
+
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+    const startPromise = bridge.start()
+
+    await vi.waitFor(() => expect(storageManagerMock.get).toHaveBeenCalled())
+    expect(bridge.isStarted).toBe(false)
+    expect(documentAddSpy).not.toHaveBeenCalled()
+    expect(emitMock).not.toHaveBeenCalled()
+
+    resolveSettings()
+
+    await expect(startPromise).resolves.toBe(true)
+    expect(bridge.isStarted).toBe(true)
+    expect(documentAddSpy).toHaveBeenCalledWith('selectionchange', bridge.handleSelectionChange, { capture: true })
+
+    bridge.handleSelectionChange()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      mode: SelectionTranslationMode.IMMEDIATE
+    }))
+
+    bridge.destroy()
+  })
+
+  it('registers and removes selection listeners on stop/destroy', async () => {
     const { viewerRoot } = createSelection('Destroy me')
     const bridge = new PdfSelectionBridge(ref(viewerRoot))
 
-    bridge.start()
+    await bridge.start()
 
     expect(documentAddSpy).toHaveBeenCalledWith('selectionchange', bridge.handleSelectionChange, { capture: true })
     expect(documentAddSpy).toHaveBeenCalledWith('pointerdown', bridge.handlePointerDown, { capture: true })

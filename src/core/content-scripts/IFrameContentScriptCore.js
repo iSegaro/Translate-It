@@ -11,7 +11,17 @@ export function IFrameContentScriptCore() {
 
   // Iframe specific initialization
   core.initializeCritical = async function() {
-    return await this.initializeBase();
+    const success = await this.initializeBase();
+    if (!success) return false;
+
+    try {
+      const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
+      await SettingsManager.initialize();
+      void SettingsManager.warmup();
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   core.loadFeature = async function(featureName) {
