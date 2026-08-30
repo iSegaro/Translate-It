@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   matchesAutoTranslateRule: vi.fn(),
   loadFeature: vi.fn(),
   sendRegularMessage: vi.fn(),
+  storageManagerOn: vi.fn(),
+  storageManagerOff: vi.fn(),
 }));
 
 vi.mock('@/features/exclusion/core/ExclusionChecker.js', () => ({
@@ -25,13 +27,14 @@ vi.mock('@/features/exclusion/core/ExclusionChecker.js', () => ({
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageManager: {
-    on: vi.fn(),
-    off: vi.fn(),
+    on: mocks.storageManagerOn,
+    off: mocks.storageManagerOff,
   },
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
+    init: vi.fn(),
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
@@ -139,6 +142,133 @@ describe('FeatureManager SPA auto page command transport', () => {
     expect(handleUrlChange).toHaveBeenNthCalledWith(2, urlB, urlC);
     expect(manager._lastDetectedUrl).toBe(urlC);
     await Promise.all([firstChange, secondChange]);
+  });
+});
+
+describe('FeatureManager initialization lifecycle', () => {
+  let manager;
+
+  const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+
+  beforeEach(() => {
+    manager = FeatureManager.getInstance();
+    manager.cleanup();
+    manager.initialized = false;
+    manager._initializationPromise = null;
+    mocks.exclusionChecker.initialize = vi.fn().mockResolvedValue(undefined);
+    mocks.storageManagerOn.mockReset();
+    mocks.storageManagerOff.mockReset();
+  });
+
+  afterEach(() => {
+    manager.cleanup();
+    manager.initialized = false;
+    manager._initializationPromise = null;
+    vi.restoreAllMocks();
+  });
+
+  it('shares one in-flight initialization attempt', async () => {
+    const exclusionInitialization = deferred();
+    mocks.exclusionChecker.initialize.mockReturnValue(exclusionInitialization.promise);
+    const evaluate = vi.spyOn(manager, 'evaluateAndRegisterFeatures').mockResolvedValue(undefined);
+    const setupSettings = vi.spyOn(manager, 'setupSettingsListener').mockImplementation(() => {});
+    const setupUrl = vi.spyOn(manager, 'setupUrlChangeDetection').mockImplementation(() => {});
+
+    const first = manager.initialize();
+    const second = manager.initialize();
+
+    expect(first).toBe(second);
+    expect(mocks.exclusionChecker.initialize).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+
+    exclusionInitialization.resolve();
+    await Promise.all([first, second]);
+
+    expect(evaluate).toHaveBeenCalledOnce();
+    expect(setupSettings).toHaveBeenCalledOnce();
+    expect(setupUrl).toHaveBeenCalledOnce();
+    expect(manager.initialized).toBe(true);
+  });
+
+  it('returns a resolved promise when already initialized', async () => {
+    manager.initialized = true;
+    const evaluate = vi.spyOn(manager, 'evaluateAndRegisterFeatures');
+
+    const result = manager.initialize();
+
+    expect(result).toBeInstanceOf(Promise);
+    await expect(result).resolves.toBeUndefined();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  it('shares initialization across concurrent early feature activations', async () => {
+    const exclusionInitialization = deferred();
+    mocks.exclusionChecker.initialize.mockReturnValue(exclusionInitialization.promise);
+    const evaluate = vi.spyOn(manager, 'evaluateAndRegisterFeatures').mockResolvedValue(undefined);
+    vi.spyOn(manager, 'setupSettingsListener').mockImplementation(() => {});
+    vi.spyOn(manager, 'setupUrlChangeDetection').mockImplementation(() => {});
+    vi.spyOn(manager, 'shouldActivateFeature').mockResolvedValue(true);
+    vi.spyOn(manager, 'activateFeature').mockResolvedValue(undefined);
+
+    const first = manager.requestFeatureActivation('textSelection');
+    const second = manager.requestFeatureActivation('selectElement');
+
+    expect(mocks.exclusionChecker.initialize).toHaveBeenCalledOnce();
+    exclusionInitialization.resolve();
+    await Promise.all([first, second]);
+
+    expect(evaluate).toHaveBeenCalledOnce();
+    expect(manager.initialized).toBe(true);
+  });
+
+  it('clears failed initialization so later calls retry', async () => {
+    const error = new Error('initialization failed');
+    mocks.exclusionChecker.initialize.mockResolvedValue(undefined);
+    const evaluate = vi.spyOn(manager, 'evaluateAndRegisterFeatures')
+      .mockRejectedValueOnce(error)
+      .mockResolvedValueOnce(undefined);
+    vi.spyOn(manager, 'setupSettingsListener').mockImplementation(() => {});
+    vi.spyOn(manager, 'setupUrlChangeDetection').mockImplementation(() => {});
+
+    const first = manager.initialize();
+    const second = manager.initialize();
+
+    expect(first).toBe(second);
+    await expect(first).rejects.toBe(error);
+    await expect(second).rejects.toBe(error);
+    expect(manager.initialized).toBe(false);
+    expect(manager._initializationPromise).toBeNull();
+
+    await manager.initialize();
+
+    expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(manager.initialized).toBe(true);
+  });
+
+  it('registers lifecycle side effects once after concurrent initialization', async () => {
+    const exclusionInitialization = deferred();
+    mocks.exclusionChecker.initialize.mockReturnValue(exclusionInitialization.promise);
+    vi.spyOn(manager, 'evaluateAndRegisterFeatures').mockResolvedValue(undefined);
+    const observe = vi.spyOn(MutationObserver.prototype, 'observe');
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+
+    const first = manager.initialize();
+    const second = manager.initialize();
+    exclusionInitialization.resolve();
+    await Promise.all([first, second]);
+
+    expect(mocks.storageManagerOn).toHaveBeenCalledTimes(1);
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(addEventListener).toHaveBeenCalledWith('popstate', expect.any(Function));
+    expect(addEventListener.mock.calls.filter(([event]) => event === 'popstate')).toHaveLength(1);
   });
 });
 

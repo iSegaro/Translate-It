@@ -27,6 +27,7 @@ export class FeatureManager extends ResourceTracker {
     this.exclusionChecker = ExclusionChecker.getInstance();
     this.initialized = false;
     this.settingsListener = null;
+    this._initializationPromise = null;
     this._evaluationInProgress = false;
     this._evaluationQueue = [];
     this._evaluationDebounceTimer = null;
@@ -72,37 +73,48 @@ export class FeatureManager extends ResourceTracker {
     }
   }
 
-  async initialize() {
-    if (this.initialized) return;
+  initialize() {
+    if (this.initialized) return Promise.resolve();
+    if (this._initializationPromise) return this._initializationPromise;
 
-    try {
-      logger.init('Initializing FeatureManager');
+    let initializationPromise;
+    initializationPromise = (async () => {
+      try {
+        logger.init('Initializing FeatureManager');
 
-      // Initialize exclusion checker
-      await this.exclusionChecker.initialize();
+        // Initialize exclusion checker
+        await this.exclusionChecker.initialize();
 
-      // Evaluate and register features
-      await this.evaluateAndRegisterFeatures();
+        // Evaluate and register features
+        await this.evaluateAndRegisterFeatures();
 
-      // Setup settings change listener
-      this.setupSettingsListener();
+        // Setup settings change listener
+        this.setupSettingsListener();
 
-      // Setup URL change detection for SPAs
-      this.setupUrlChangeDetection();
+        // Setup URL change detection for SPAs
+        this.setupUrlChangeDetection();
 
-      this.initialized = true;
-      logger.info('FeatureManager initialized successfully', {
-        activeFeatures: Array.from(this.activeFeatures)
-      });
+        this.initialized = true;
+        logger.info('FeatureManager initialized successfully', {
+          activeFeatures: Array.from(this.activeFeatures)
+        });
 
-    } catch (error) {
-      ErrorHandler.getInstance().handle(error, {
-        type: ErrorTypes.SERVICE,
-        context: 'FeatureManager-initialize',
-        showToast: false
-      });
-      throw error;
-    }
+      } catch (error) {
+        ErrorHandler.getInstance().handle(error, {
+          type: ErrorTypes.SERVICE,
+          context: 'FeatureManager-initialize',
+          showToast: false
+        });
+        throw error;
+      } finally {
+        if (this._initializationPromise === initializationPromise) {
+          this._initializationPromise = null;
+        }
+      }
+    })();
+
+    this._initializationPromise = initializationPromise;
+    return initializationPromise;
   }
 
   async evaluateAndRegisterFeatures() {
