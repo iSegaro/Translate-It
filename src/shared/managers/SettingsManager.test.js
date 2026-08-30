@@ -5,6 +5,7 @@ const { storageManagerMock } = vi.hoisted(() => ({
   storageManagerMock: {
     get: vi.fn().mockResolvedValue({}),
     set: vi.fn().mockResolvedValue(true),
+    clear: vi.fn().mockResolvedValue(true),
     on: vi.fn(),
     off: vi.fn(),
     hasCached: vi.fn().mockReturnValue(false),
@@ -52,6 +53,21 @@ function createStorageEventMock() {
     },
     getListener: () => listeners.values().next().value,
     getActiveListeners: () => [...listeners]
+  };
+}
+
+function createSettingsStoreMock(overrides = {}) {
+  return {
+    settings: {
+      EXTENSION_ENABLED: false,
+      STORE_ONLY_SETTING: 'store-value'
+    },
+    loadSettings: vi.fn().mockResolvedValue(undefined),
+    updateMultipleSettings: vi.fn().mockResolvedValue(undefined),
+    resetSettings: vi.fn().mockResolvedValue(undefined),
+    exportSettings: vi.fn().mockResolvedValue('exported-settings'),
+    importSettings: vi.fn().mockResolvedValue(undefined),
+    ...overrides
   };
 }
 
@@ -217,6 +233,214 @@ describe('SettingsManager defaults', () => {
 
     expect(settingsManager._fallbackMode).toBe(true);
     expect(storageEvents.onChanged.addListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns fallback settings instead of retained failed-store settings', async () => {
+    const failedStore = createSettingsStoreMock({
+      settings: {
+        EXTENSION_ENABLED: true,
+        STORE_ONLY_SETTING: 'stale-store-value'
+      },
+      loadSettings: vi.fn().mockRejectedValue(new Error('store unavailable'))
+    });
+    window.Vue = {};
+    useSettingsStore.mockReturnValue(failedStore);
+    storageManagerMock.get.mockResolvedValue({
+      EXTENSION_ENABLED: false,
+      OPENAI_API_KEY: 'secret'
+    });
+
+    await settingsManager.initialize();
+
+    expect(settingsManager._store).toBe(failedStore);
+    expect(settingsManager._fallbackMode).toBe(true);
+    expect(settingsManager.getSettings()).toBe(settingsManager._settings.value);
+    expect(settingsManager.getSettings()).not.toBe(failedStore.settings);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(false);
+    expect(settingsManager.has('STORE_ONLY_SETTING')).toBe(false);
+    expect(settingsManager.getAll()).not.toHaveProperty('STORE_ONLY_SETTING');
+    expect(settingsManager.getSettings()).not.toHaveProperty('OPENAI_API_KEY');
+  });
+
+  it('uses own fallback state for has and getAll', async () => {
+    const storageEvents = createStorageEventMock();
+    browser.storage.onChanged = storageEvents.onChanged;
+    storageManagerMock.get.mockResolvedValue({
+      EXTENSION_ENABLED: false,
+      OPENAI_API_KEY: 'secret',
+      PROXY_PASSWORD: 'secret'
+    });
+
+    await settingsManager.initialize();
+
+    expect(settingsManager.has('EXTENSION_ENABLED')).toBe(true);
+    expect(settingsManager.has('NOT_EXPOSED')).toBe(false);
+    expect(settingsManager.has('OPENAI_API_KEY')).toBe(false);
+    expect(settingsManager.has('toString')).toBe(false);
+
+    storageManagerMock.get.mockClear();
+    const allSettings = settingsManager.getAll();
+
+    expect(allSettings).not.toBe(settingsManager._settings.value);
+    expect(allSettings).toEqual(settingsManager._settings.value);
+    expect(allSettings.MODE_PROVIDERS).toBe(settingsManager._settings.value.MODE_PROVIDERS);
+    expect(allSettings).not.toHaveProperty('OPENAI_API_KEY');
+    expect(allSettings).not.toHaveProperty('GEMINI_API_KEY');
+    expect(allSettings).not.toHaveProperty('PROXY_USERNAME');
+    expect(allSettings).not.toHaveProperty('PROXY_PASSWORD');
+    expect(storageManagerMock.get).not.toHaveBeenCalled();
+  });
+
+  it('sets multiple fallback values once and suppresses matching storage events', async () => {
+    const storageEvents = createStorageEventMock();
+    browser.storage.onChanged = storageEvents.onChanged;
+    const failedStore = createSettingsStoreMock({
+      loadSettings: vi.fn().mockRejectedValue(new Error('store unavailable'))
+    });
+    window.Vue = {};
+    useSettingsStore.mockReturnValue(failedStore);
+    storageManagerMock.get.mockResolvedValue({
+      EXTENSION_ENABLED: false,
+      TRANSLATE_ON_TEXT_FIELDS: false,
+      TRANSLATE_ON_TEXT_SELECTION: false
+    });
+    await settingsManager.initialize();
+
+    const extensionChange = vi.fn();
+    const fieldChange = vi.fn();
+    const selectionChange = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', extensionChange);
+    settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', fieldChange);
+    settingsManager.onChange('TRANSLATE_ON_TEXT_SELECTION', selectionChange);
+    storageManagerMock.get.mockClear();
+    const updates = {
+      EXTENSION_ENABLED: true,
+      TRANSLATE_ON_TEXT_FIELDS: false,
+      TRANSLATE_ON_TEXT_SELECTION: true
+    };
+    storageManagerMock.set.mockImplementation(async () => {
+      storageEvents.dispatch({
+        EXTENSION_ENABLED: { oldValue: false, newValue: true },
+        TRANSLATE_ON_TEXT_FIELDS: { oldValue: false, newValue: false },
+        TRANSLATE_ON_TEXT_SELECTION: { oldValue: false, newValue: true }
+      }, 'local');
+    });
+
+    await settingsManager.setMultiple(updates);
+
+    expect(storageManagerMock.set).toHaveBeenCalledTimes(1);
+    expect(storageManagerMock.set).toHaveBeenCalledWith(updates);
+    expect(storageManagerMock.get).not.toHaveBeenCalled();
+    expect(failedStore.updateMultipleSettings).not.toHaveBeenCalled();
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(true);
+    expect(settingsManager.get('TRANSLATE_ON_TEXT_FIELDS')).toBe(false);
+    expect(settingsManager.get('TRANSLATE_ON_TEXT_SELECTION')).toBe(true);
+    expect(extensionChange).toHaveBeenCalledTimes(1);
+    expect(extensionChange).toHaveBeenCalledWith(true, false, 'EXTENSION_ENABLED');
+    expect(fieldChange).not.toHaveBeenCalled();
+    expect(selectionChange).toHaveBeenCalledTimes(1);
+    expect(selectionChange).toHaveBeenCalledWith(true, false, 'TRANSLATE_ON_TEXT_SELECTION');
+
+    storageEvents.dispatch({
+      EXTENSION_ENABLED: { oldValue: false, newValue: true }
+    }, 'local');
+    expect(extensionChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves fallback state and events unchanged when setMultiple fails', async () => {
+    const storageEvents = createStorageEventMock();
+    browser.storage.onChanged = storageEvents.onChanged;
+    storageManagerMock.get.mockResolvedValue({
+      EXTENSION_ENABLED: false,
+      TRANSLATE_ON_TEXT_FIELDS: false
+    });
+    await settingsManager.initialize();
+
+    const extensionChange = vi.fn();
+    const fieldChange = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', extensionChange);
+    settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', fieldChange);
+    const error = new Error('storage unavailable');
+    storageManagerMock.set.mockImplementation(async () => {
+      storageEvents.dispatch({
+        EXTENSION_ENABLED: { oldValue: false, newValue: true },
+        TRANSLATE_ON_TEXT_FIELDS: { oldValue: false, newValue: true }
+      }, 'local');
+      throw error;
+    });
+
+    await expect(settingsManager.setMultiple({
+      EXTENSION_ENABLED: true,
+      TRANSLATE_ON_TEXT_FIELDS: true
+    })).rejects.toBe(error);
+
+    expect(storageManagerMock.set).toHaveBeenCalledTimes(1);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(false);
+    expect(settingsManager.get('TRANSLATE_ON_TEXT_FIELDS')).toBe(false);
+    expect(extensionChange).not.toHaveBeenCalled();
+    expect(fieldChange).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported fallback operations without using retained store or storage', async () => {
+    const failedStore = createSettingsStoreMock({
+      loadSettings: vi.fn().mockRejectedValue(new Error('store unavailable'))
+    });
+    window.Vue = {};
+    useSettingsStore.mockReturnValue(failedStore);
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+
+    await settingsManager.initialize();
+    storageManagerMock.get.mockClear();
+    storageManagerMock.set.mockClear();
+    storageManagerMock.clear.mockClear();
+
+    await expect(settingsManager.reset()).rejects.toThrow(
+      'SettingsManager reset is unavailable in fallback mode'
+    );
+    await expect(settingsManager.export()).rejects.toThrow(
+      'SettingsManager export is unavailable in fallback mode'
+    );
+    await expect(settingsManager.import('settings-data')).rejects.toThrow(
+      'SettingsManager import is unavailable in fallback mode'
+    );
+
+    expect(failedStore.resetSettings).not.toHaveBeenCalled();
+    expect(failedStore.exportSettings).not.toHaveBeenCalled();
+    expect(failedStore.importSettings).not.toHaveBeenCalled();
+    expect(storageManagerMock.get).not.toHaveBeenCalled();
+    expect(storageManagerMock.set).not.toHaveBeenCalled();
+    expect(storageManagerMock.clear).not.toHaveBeenCalled();
+  });
+
+  it('preserves normal store delegation for the supported SettingsManager APIs', async () => {
+    const store = createSettingsStoreMock({
+      settings: {
+        EXTENSION_ENABLED: false,
+        STORE_ONLY_SETTING: 'store-value'
+      }
+    });
+    window.Vue = {};
+    useSettingsStore.mockReturnValue(store);
+
+    await settingsManager.initialize();
+
+    expect(settingsManager._fallbackMode).toBe(false);
+    expect(settingsManager.getSettings()).toBe(store.settings);
+    expect(settingsManager.has('STORE_ONLY_SETTING')).toBe(true);
+    expect(settingsManager.has('toString')).toBe(false);
+    expect(settingsManager.getAll()).toEqual(store.settings);
+    expect(settingsManager.getAll()).not.toBe(store.settings);
+
+    const updates = { EXTENSION_ENABLED: true };
+    await settingsManager.setMultiple(updates);
+    await settingsManager.reset();
+    await expect(settingsManager.export('password')).resolves.toBe('exported-settings');
+    await settingsManager.import('settings-data', 'password');
+
+    expect(store.updateMultipleSettings).toHaveBeenCalledWith(updates);
+    expect(store.resetSettings).toHaveBeenCalledTimes(1);
+    expect(store.exportSettings).toHaveBeenCalledWith('password');
+    expect(store.importSettings).toHaveBeenCalledWith('settings-data', 'password');
   });
 
   it('uses fallback defaults for removed settings and ignores irrelevant changes', async () => {

@@ -268,6 +268,10 @@ class SettingsManager {
       return ref({})
     }
 
+    if (this._fallbackMode) {
+      return this._settings.value
+    }
+
     return this._store.settings
   }
 
@@ -362,6 +366,40 @@ class SettingsManager {
       await this.initialize()
     }
 
+    if (this._fallbackMode) {
+      const updateKeys = Object.keys(updates)
+      const oldValues = {}
+      const pendingUpdates = {}
+
+      for (const key of updateKeys) {
+        oldValues[key] = this.get(key)
+        pendingUpdates[key] = this._trackPendingUpdate(key, updates[key])
+      }
+
+      try {
+        await storageManager.set(updates)
+
+        for (const key of updateKeys) {
+          this._settings.value[key] = updates[key]
+          this._emitChangeEvent(key, updates[key], oldValues[key])
+        }
+
+        logger.debug('Multiple settings updated (fallback mode):', updates)
+        return
+      } catch (error) {
+        if (ExtensionContextManager.isContextError(error)) {
+          ExtensionContextManager.handleContextError(error, 'settings-manager-set-multiple-fallback')
+        } else {
+          logger.error('Failed to update multiple settings in fallback mode:', error)
+        }
+        throw error
+      } finally {
+        for (const key of updateKeys) {
+          this._clearPendingUpdate(key, pendingUpdates[key])
+        }
+      }
+    }
+
     const oldValues = {}
     for (const key in updates) {
       oldValues[key] = this.get(key)
@@ -386,7 +424,8 @@ class SettingsManager {
       return false
     }
 
-    return key in this._store.settings
+    const currentSettings = this._fallbackMode ? this._settings.value : this._store.settings
+    return Object.prototype.hasOwnProperty.call(currentSettings, key)
   }
 
   /**
@@ -395,6 +434,14 @@ class SettingsManager {
   getAll() {
     if (!this._initialized) {
       return { ...this._defaults }
+    }
+
+    if (this._fallbackMode) {
+      return Object.fromEntries(
+        Object.entries(this._settings.value).filter(([key]) => (
+          Object.prototype.hasOwnProperty.call(this._defaults, key)
+        ))
+      )
     }
 
     return { ...this._store.settings }
@@ -493,6 +540,10 @@ class SettingsManager {
       await this.initialize()
     }
 
+    if (this._fallbackMode) {
+      throw new Error('SettingsManager reset is unavailable in fallback mode')
+    }
+
     await this._store.resetSettings()
     logger.info('All settings reset to defaults')
   }
@@ -505,6 +556,10 @@ class SettingsManager {
       await this.initialize()
     }
 
+    if (this._fallbackMode) {
+      throw new Error('SettingsManager export is unavailable in fallback mode')
+    }
+
     return await this._store.exportSettings(password)
   }
 
@@ -514,6 +569,10 @@ class SettingsManager {
   async import(settingsData, password = '') {
     if (!this._initialized) {
       await this.initialize()
+    }
+
+    if (this._fallbackMode) {
+      throw new Error('SettingsManager import is unavailable in fallback mode')
     }
 
     await this._store.importSettings(settingsData, password)
