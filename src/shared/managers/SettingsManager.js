@@ -36,6 +36,7 @@ const FALLBACK_SETTING_KEYS = Object.freeze([
   'TARGET_LANGUAGE',
   'TRANSLATION_API',
   'MODE_PROVIDERS',
+  'AI_CONTEXT_TRANSLATION_ENABLED',
   'ENABLE_DICTIONARY',
   'EXCLUDED_SITES',
   'ENHANCED_TRIPLE_CLICK_DRAG',
@@ -45,6 +46,7 @@ const FALLBACK_SETTING_KEYS = Object.freeze([
   'SELECT_ELEMENT_MAX_CHARS',
   'MOBILE_UI_MODE',
   'SHOW_DESKTOP_FAB',
+  'TEXT_FIELD_SHORTCUT',
   'WINDOW_IS_PINNED',
   'WINDOW_DOCK_MODE',
   'WINDOW_DOCKED_WIDTH',
@@ -74,6 +76,24 @@ const FALLBACK_SETTING_KEYS = Object.freeze([
   'MOUSE_HOVER_TIMER_DURATION',
   'MOUSE_HOVER_SHOW_CONTAINER_BORDER'
 ]);
+
+function areSettingValuesEqual(left, right) {
+  if (Object.is(left, right)) return true;
+  if (
+    left === null
+    || right === null
+    || typeof left !== 'object'
+    || typeof right !== 'object'
+  ) {
+    return false;
+  }
+
+  try {
+    return JSON.stringify(left) === JSON.stringify(right);
+  } catch {
+    return false;
+  }
+}
 
 function getFallbackDefaults() {
   const persistedDefaults = getPersistedDefaultSettings();
@@ -107,8 +127,11 @@ class SettingsManager {
     // Internal state
     this._store = null
     this._initialized = false
+    this._initializationPromise = null
     this._fallbackMode = false
     this._storageListenerSetup = false
+    this._storageListener = null
+    this._storageListenerTarget = null
     this._eventListeners = new Map()
     this._pendingUpdates = new Map()
     this._reactiveCache = new Map()
@@ -125,37 +148,30 @@ class SettingsManager {
   /**
    * Initialize the SettingsManager
    */
-  async initialize() {
+  initialize() {
     if (this._initialized) {
       logger.debug('SettingsManager already initialized')
-      return this
+      return Promise.resolve(this)
     }
 
+    if (this._initializationPromise) {
+      logger.debug('SettingsManager initialization already in progress')
+      return this._initializationPromise
+    }
+
+    this._initializationPromise = this._initializeInternal().finally(() => {
+      this._initializationPromise = null
+    })
+
+    return this._initializationPromise
+  }
+
+  async _initializeInternal() {
     try {
       // Check if Vue is available
       if (typeof window === 'undefined' || !window.Vue) {
         logger.debug('Vue not available, SettingsManager will use storage directly')
-        this._fallbackMode = true
-
-        // Load settings directly from storage
-        try {
-          const settings = await storageManager.get(Object.keys(this._defaults))
-          this._settings.value = { ...this._defaults, ...settings }
-          logger.debug('Settings loaded from storage in fallback mode')
-        } catch (error) {
-          if (ExtensionContextManager.isContextError(error)) {
-            ExtensionContextManager.handleContextError(error, 'settings-manager-fallback-load');
-          } else {
-            logger.error('Failed to load settings from storage:', error)
-          }
-          this._settings.value = { ...this._defaults }
-        }
-
-        // Setup storage listener for real-time updates
-        this._setupStorageListener()
-
-        this._initialized = true
-        return this
+        return this._initializeFallback('settings-manager-fallback-load')
       }
 
       // Initialize the settings store
@@ -166,23 +182,7 @@ class SettingsManager {
         await this._store.loadSettings()
       } else {
         logger.warn('Settings store not available, using storage directly')
-        this._fallbackMode = true
-
-        // Load settings directly from storage
-        try {
-          const settings = await storageManager.get(Object.keys(this._defaults))
-          this._settings.value = { ...this._defaults, ...settings }
-        } catch (error) {
-          if (ExtensionContextManager.isContextError(error)) {
-            ExtensionContextManager.handleContextError(error, 'settings-manager-no-store-load');
-          } else {
-            logger.error('Failed to load settings from storage:', error)
-          }
-          this._settings.value = { ...this._defaults }
-        }
-
-        this._initialized = true
-        return this
+        return this._initializeFallback('settings-manager-no-store-load')
       }
 
       // Initialize reactive cache
@@ -207,27 +207,36 @@ class SettingsManager {
         logger.error('Failed to initialize SettingsManager:', error)
       }
       // Use fallback mode on error
-      this._fallbackMode = true
-
-      // Try to load from storage as fallback
-      try {
-        const settings = await storageManager.get(Object.keys(this._defaults))
-        this._settings.value = { ...this._defaults, ...settings }
-      } catch (storageError) {
-        if (ExtensionContextManager.isContextError(storageError)) {
-          ExtensionContextManager.handleContextError(storageError, 'settings-manager-fallback-init-load');
-        } else {
-          logger.error('Failed to load settings from storage in fallback:', storageError)
-        }
-        this._settings.value = { ...this._defaults }
-      }
-
-      // Setup storage listener for real-time updates
-      this._setupStorageListener()
-
-      this._initialized = true
-      return this
+      return this._initializeFallback('settings-manager-fallback-init-load')
     }
+  }
+
+  async _initializeFallback(errorContext) {
+    this._fallbackMode = true
+
+    try {
+      const settings = await storageManager.get(Object.keys(this._defaults))
+      const loadedSettings = Object.fromEntries(
+        Object.keys(this._defaults)
+          .filter(key => settings?.[key] !== undefined)
+          .map(key => [key, settings[key]])
+      )
+      this._settings.value = { ...this._defaults, ...loadedSettings }
+      logger.debug('Settings loaded from storage in fallback mode')
+    } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, errorContext)
+      } else {
+        logger.error('Failed to load settings from storage in fallback mode:', error)
+      }
+      this._settings.value = { ...this._defaults }
+    }
+
+    // Setup storage listener for real-time updates
+    this._setupStorageListener()
+
+    this._initialized = true
+    return this
   }
 
   /**
@@ -313,6 +322,8 @@ class SettingsManager {
 
     // In fallback mode, update storage directly
     if (this._fallbackMode) {
+      const pendingUpdate = this._trackPendingUpdate(key, value)
+
       try {
         await storageManager.set({ [key]: value })
         this._settings.value[key] = value
@@ -329,6 +340,8 @@ class SettingsManager {
           logger.error('Failed to update setting in fallback mode:', error)
         }
         throw error
+      } finally {
+        this._clearPendingUpdate(key, pendingUpdate)
       }
     }
 
@@ -559,9 +572,14 @@ class SettingsManager {
     }
 
     // Use cross-browser compatible approach for storage API
-    const browserAPI = typeof browser !== "undefined" ? browser : chrome;
+    const browserAPI = typeof browser !== "undefined"
+      ? browser
+      : (typeof chrome !== "undefined" ? chrome : null);
 
-    if (!browserAPI?.storage || !browserAPI.storage.onChanged) {
+    if (
+      !browserAPI?.storage?.onChanged
+      || typeof browserAPI.storage.onChanged.addListener !== 'function'
+    ) {
       logger.debug('Storage API not available, cannot setup storage listener')
       return
     }
@@ -570,26 +588,49 @@ class SettingsManager {
     // Registered only when _fallbackMode is true (Vue/Pinia unavailable).
     // StorageCore is the sole browser.storage.onChanged owner during normal runtime.
     // The two listeners are never active simultaneously.
-    browserAPI.storage.onChanged.addListener((changes, areaName) => {
-      logger.debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes))
+    this._storageListener = (changes, areaName) => {
+      logger.debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes || {}))
 
       if (areaName !== 'local') return
 
-      for (const [key, change] of Object.entries(changes)) {
+      for (const [key, change = {}] of Object.entries(changes || {})) {
         if (Object.prototype.hasOwnProperty.call(this._defaults, key)) {
+          const newValue = change.newValue === undefined
+            ? this._defaults[key]
+            : change.newValue
+          const oldValue = this._settings.value[key] === undefined
+            ? this._defaults[key]
+            : this._settings.value[key]
+
+          // Local writes emit immediately; their matching browser event is acknowledgement only.
+          if (this._consumePendingUpdate(key, newValue)) {
+            continue
+          }
+
+          if (areSettingValuesEqual(newValue, oldValue)) {
+            continue
+          }
+
           // Update internal settings
-          this._settings.value[key] = change.newValue
+          this._settings.value[key] = newValue
 
           // Emit change event
-          this._emitChangeEvent(key, change.newValue, change.oldValue)
+          this._emitChangeEvent(key, newValue, oldValue)
 
-          logger.info(`Setting changed (storage listener): ${key} =`, change.newValue)
+          logger.info(`Setting changed (storage listener): ${key} =`, newValue)
         }
       }
-    })
+    }
 
-    this._storageListenerSetup = true
-    logger.debug('Storage listener setup complete')
+    try {
+      browserAPI.storage.onChanged.addListener(this._storageListener)
+      this._storageListenerTarget = browserAPI.storage.onChanged
+      this._storageListenerSetup = true
+      logger.debug('Storage listener setup complete')
+    } catch (error) {
+      this._storageListener = null
+      logger.warn('Failed to setup storage listener:', error)
+    }
   }
 
   /**
@@ -601,22 +642,25 @@ class SettingsManager {
     }
 
     try {
-      const currentSettings = await storageManager.get(Object.keys(this._defaults))
+      const fallbackKeys = Object.keys(this._defaults)
+      const currentSettings = await storageManager.get(fallbackKeys)
 
-      for (const key in currentSettings) {
-        if (Object.prototype.hasOwnProperty.call(this._defaults, key)) {
-          const newValue = currentSettings[key]
-          const oldValue = this._settings.value[key]
+      for (const key of fallbackKeys) {
+        const newValue = currentSettings?.[key] === undefined
+          ? this._defaults[key]
+          : currentSettings[key]
+        const oldValue = this._settings.value[key] === undefined
+          ? this._defaults[key]
+          : this._settings.value[key]
 
-          if (newValue !== oldValue) {
-            logger.debug(`Manual refresh detected change: ${key} =`, newValue)
+        if (!areSettingValuesEqual(newValue, oldValue)) {
+          logger.debug(`Manual refresh detected change: ${key} =`, newValue)
 
-            // Update internal settings
-            this._settings.value[key] = newValue
+          // Update internal settings
+          this._settings.value[key] = newValue
 
-            // Emit change event
-            this._emitChangeEvent(key, newValue, oldValue)
-          }
+          // Emit change event
+          this._emitChangeEvent(key, newValue, oldValue)
         }
       }
 
@@ -634,7 +678,7 @@ class SettingsManager {
    * Emit change event
    */
   _emitChangeEvent(key, newValue, oldValue) {
-    if (newValue === oldValue) {
+    if (areSettingValuesEqual(newValue, oldValue)) {
       return
     }
 
@@ -675,11 +719,62 @@ class SettingsManager {
    * Cleanup resources
    */
   destroy() {
+    if (this._storageListener && this._storageListenerTarget?.removeListener) {
+      try {
+        this._storageListenerTarget.removeListener(this._storageListener)
+      } catch (error) {
+        logger.warn('Failed to remove storage listener:', error)
+      }
+    }
+
     this._eventListeners.clear()
+    this._pendingUpdates.clear()
     this._reactiveCache.clear()
+    this._store = null
     this._initialized = false
+    this._initializationPromise = null
+    this._fallbackMode = false
+    this._storageListenerSetup = false
+    this._storageListener = null
+    this._storageListenerTarget = null
+    this._settings.value = {}
     SettingsManager.instance = null
     logger.debug('SettingsManager destroyed')
+  }
+
+  _trackPendingUpdate(key, value) {
+    const pendingUpdates = this._pendingUpdates.get(key) || []
+    const pendingUpdate = { value }
+    pendingUpdates.push(pendingUpdate)
+    this._pendingUpdates.set(key, pendingUpdates)
+    return pendingUpdate
+  }
+
+  _consumePendingUpdate(key, value) {
+    const pendingUpdates = this._pendingUpdates.get(key)
+    if (!pendingUpdates) return false
+
+    const index = pendingUpdates.findIndex(update => areSettingValuesEqual(update.value, value))
+    if (index === -1) return false
+
+    pendingUpdates.splice(index, 1)
+    if (pendingUpdates.length === 0) {
+      this._pendingUpdates.delete(key)
+    }
+    return true
+  }
+
+  _clearPendingUpdate(key, pendingUpdate) {
+    const pendingUpdates = this._pendingUpdates.get(key)
+    if (!pendingUpdates) return
+
+    const index = pendingUpdates.indexOf(pendingUpdate)
+    if (index !== -1) {
+      pendingUpdates.splice(index, 1)
+    }
+    if (pendingUpdates.length === 0) {
+      this._pendingUpdates.delete(key)
+    }
   }
 }
 
