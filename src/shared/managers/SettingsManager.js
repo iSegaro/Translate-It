@@ -550,7 +550,7 @@ class SettingsManager {
 
     try {
       const trackedKeys = Object.keys(this._defaults)
-      const currentSettings = await storageManager.get(trackedKeys)
+      const currentSettings = await storageManager.getFresh(trackedKeys)
 
       for (const key of trackedKeys) {
         const newValue = currentSettings?.[key] === undefined

@@ -5,6 +5,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 const { storageManagerMock } = vi.hoisted(() => ({
   storageManagerMock: {
     get: vi.fn().mockResolvedValue({}),
+    getFresh: vi.fn().mockResolvedValue({}),
     set: vi.fn().mockResolvedValue(true),
     clear: vi.fn().mockResolvedValue(true),
     on: vi.fn(),
@@ -62,6 +63,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   settingsManager.destroy();
   storageManagerMock.get.mockReset().mockResolvedValue({});
+  storageManagerMock.getFresh.mockReset().mockResolvedValue({});
   storageManagerMock.set.mockReset().mockResolvedValue(true);
   originalStorageOnChanged = browser.storage.onChanged;
   browser.storage.onChanged = undefined;
@@ -469,9 +471,8 @@ describe('SettingsManager defaults', () => {
   it('restores defaults when refresh finds removed fallback keys', async () => {
     const storageEvents = createStorageEventMock();
     browser.storage.onChanged = storageEvents.onChanged;
-    storageManagerMock.get
-      .mockResolvedValueOnce({ EXTENSION_ENABLED: false })
-      .mockResolvedValueOnce({});
+    storageManagerMock.get.mockResolvedValueOnce({ EXTENSION_ENABLED: false });
+    storageManagerMock.getFresh.mockResolvedValueOnce({});
     await settingsManager.initialize();
 
     const onChange = vi.fn();
@@ -480,6 +481,7 @@ describe('SettingsManager defaults', () => {
 
     await expect(settingsManager.refreshSettings()).resolves.toBeUndefined();
 
+    expect(storageManagerMock.getFresh).toHaveBeenCalledWith(Object.keys(settingsManager._defaults));
     expect(settingsManager.get('EXTENSION_ENABLED')).toBe(defaultValue);
     expect(onChange).toHaveBeenCalledWith(defaultValue, false, 'EXTENSION_ENABLED');
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -498,7 +500,7 @@ describe('SettingsManager defaults', () => {
     settingsManager.onChange('TRANSLATE_ON_TEXT_FIELDS', onFieldChange);
     const before = { ...settingsManager._settings.value };
     const error = new Error('refresh failed');
-    storageManagerMock.get.mockRejectedValue(error);
+    storageManagerMock.getFresh.mockRejectedValue(error);
 
     await expect(settingsManager.refreshSettings()).rejects.toBe(error);
 
@@ -509,6 +511,7 @@ describe('SettingsManager defaults', () => {
 
   it('resolves without emitting when refresh values are unchanged', async () => {
     storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    storageManagerMock.getFresh.mockResolvedValue({ EXTENSION_ENABLED: false });
     await settingsManager.initialize();
 
     const onChange = vi.fn();
@@ -523,7 +526,7 @@ describe('SettingsManager defaults', () => {
   });
 
   it('rethrows context refresh failures after context handling', async () => {
-    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    storageManagerMock.getFresh.mockResolvedValue({ EXTENSION_ENABLED: false });
     await settingsManager.initialize();
 
     const error = new Error('Extension context invalidated');
@@ -533,7 +536,7 @@ describe('SettingsManager defaults', () => {
     const handleContextError = vi
       .spyOn(ExtensionContextManager, 'handleContextError')
       .mockReturnValue({ handled: true, silent: true });
-    storageManagerMock.get.mockRejectedValue(error);
+    storageManagerMock.getFresh.mockRejectedValue(error);
 
     try {
       await expect(settingsManager.refreshSettings()).rejects.toBe(error);
@@ -553,7 +556,7 @@ describe('SettingsManager defaults', () => {
     const onChange = vi.fn();
     settingsManager.onChange('EXTENSION_ENABLED', onChange);
     const error = new Error('refresh failed');
-    storageManagerMock.get.mockRejectedValue(error);
+    storageManagerMock.getFresh.mockRejectedValue(error);
 
     await expect(settingsManager.refreshSettings()).rejects.toBe(error);
 
@@ -567,6 +570,19 @@ describe('SettingsManager defaults', () => {
     expect(settingsManager.get('EXTENSION_ENABLED')).toBe(true);
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledWith(true, false, 'EXTENSION_ENABLED');
+  });
+
+  it('applies browser storage value when cache-backed value is stale', async () => {
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    await settingsManager.initialize();
+
+    storageManagerMock.getFresh.mockResolvedValue({ EXTENSION_ENABLED: true });
+
+    await settingsManager.refreshSettings();
+
+    expect(storageManagerMock.getFresh).toHaveBeenCalledWith(Object.keys(settingsManager._defaults));
+    expect(storageManagerMock.get).toHaveBeenCalledTimes(1);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(true);
   });
 
   it('removes fallback storage listener during destroy', async () => {
