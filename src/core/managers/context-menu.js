@@ -41,6 +41,27 @@ const HELP_MENU_ID = "open-help-page";
 const API_PROVIDER_PARENT_ID = "api-provider-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 
+// Settings required to build context menus and filter available providers.
+const CONTEXT_MENU_SETTING_KEYS = [
+  'EXTENSION_ENABLED',
+  'TRANSLATE_WITH_SELECT_ELEMENT',
+  'ENABLE_SCREEN_CAPTURE',
+  'CONTEXT_MENU_VISIBILITY',
+  'TRANSLATION_API',
+  'DEBUG_MODE',
+  'HIDDEN_PROVIDERS',
+  'DEEPL_API_KEY',
+  'LINGVA_API_URL',
+  'GEMINI_API_KEY',
+  'OPENAI_API_KEY',
+  'OPENROUTER_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'CUSTOM_API_URL',
+  'CUSTOM_API_MODEL',
+  'WEBAI_API_URL',
+  'WEBAI_API_MODEL'
+];
+
 // --- Get API Providers from Registry ---
 async function getApiProviders(settings = {}) {
   try {
@@ -399,7 +420,7 @@ export class ContextMenuManager extends ResourceTracker {
       logger.debug("[ContextMenuManager] Cleared existing menus and verified");
 
       // Get settings for feature enablement - Force fresh fetch to ensure cache consistency
-      const settings = await storageManager.get(null, false); 
+      const settings = await storageManager.get(CONTEXT_MENU_SETTING_KEYS, false);
       
       const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
       
