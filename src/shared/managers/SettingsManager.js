@@ -1,8 +1,7 @@
 /**
- * SettingsManager - Unified settings management system
+ * SettingsManager - Runtime settings facade
  *
- * Provides a centralized, reactive way to access and modify settings
- * across the entire extension with immediate updates and proper caching.
+ * Provides centralized access to tracked runtime settings backed by StorageCore.
  */
 
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -10,15 +9,14 @@ import browser from 'webextension-polyfill'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js'
-import { ref, computed, watchEffect } from 'vue'
+import { ref, computed } from 'vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsManager');
 
 /**
- * Settings needed by SettingsManager fallback consumers.
- * Keep fallback storage reads narrower than the complete persisted schema.
+ * Settings needed by SettingsManager runtime consumers.
+ * Keep runtime storage reads narrower than the complete persisted schema.
  */
 const FALLBACK_SETTING_KEYS = Object.freeze([
   'APPLICATION_LOCALIZE',
@@ -114,7 +112,7 @@ function getFallbackDefaults() {
 }
 
 /**
- * SettingsManager - Unified settings management system
+ * Runtime settings facade for content, iframe, and background consumers.
  */
 class SettingsManager {
   constructor() {
@@ -125,21 +123,18 @@ class SettingsManager {
     SettingsManager.instance = this
 
     // Internal state
-    this._store = null
     this._initialized = false
     this._initializationPromise = null
-    this._fallbackMode = false
     this._storageListenerSetup = false
     this._storageListener = null
     this._storageListenerTarget = null
     this._eventListeners = new Map()
     this._pendingUpdates = new Map()
-    this._reactiveCache = new Map()
 
-    // Create a reactive settings object for non-Vue contexts
+    // Keep runtime settings reactive for existing consumers.
     this._settings = ref({})
 
-    // Canonical values restricted to fallback consumers; loaded settings override these values.
+    // Canonical values restricted to tracked runtime consumers; loaded settings override these values.
     this._defaults = getFallbackDefaults()
 
     logger.debug('SettingsManager singleton created')
@@ -159,61 +154,14 @@ class SettingsManager {
       return this._initializationPromise
     }
 
-    this._initializationPromise = this._initializeInternal().finally(() => {
+    this._initializationPromise = this._initializeRuntime().finally(() => {
       this._initializationPromise = null
     })
 
     return this._initializationPromise
   }
 
-  async _initializeInternal() {
-    try {
-      // Check if Vue is available
-      if (typeof window === 'undefined' || !window.Vue) {
-        logger.debug('Vue not available, SettingsManager will use storage directly')
-        return this._initializeFallback('settings-manager-fallback-load')
-      }
-
-      // Initialize the settings store
-      this._store = useSettingsStore()
-
-      // Wait for settings to load
-      if (this._store && typeof this._store.loadSettings === 'function') {
-        await this._store.loadSettings()
-      } else {
-        logger.warn('Settings store not available, using storage directly')
-        return this._initializeFallback('settings-manager-no-store-load')
-      }
-
-      // Initialize reactive cache
-      this._initializeReactiveCache()
-
-      // Setup store watcher
-      this._setupStoreWatcher()
-
-      // Setup storage listener for fallback mode
-      if (this._fallbackMode) {
-        this._setupStorageListener()
-      }
-
-      this._initialized = true
-      logger.debug('SettingsManager initialized successfully')
-
-      return this
-    } catch (error) {
-      if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'settings-manager-init');
-      } else {
-        logger.error('Failed to initialize SettingsManager:', error)
-      }
-      // Use fallback mode on error
-      return this._initializeFallback('settings-manager-fallback-init-load')
-    }
-  }
-
-  async _initializeFallback(errorContext) {
-    this._fallbackMode = true
-
+  async _initializeRuntime() {
     try {
       const settings = await storageManager.get(Object.keys(this._defaults))
       const loadedSettings = Object.fromEntries(
@@ -222,12 +170,12 @@ class SettingsManager {
           .map(key => [key, settings[key]])
       )
       this._settings.value = { ...this._defaults, ...loadedSettings }
-      logger.debug('Settings loaded from storage in fallback mode')
+      logger.debug('Settings loaded from storage for runtime facade')
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, errorContext)
+        ExtensionContextManager.handleContextError(error, 'settings-manager-runtime-load')
       } else {
-        logger.error('Failed to load settings from storage in fallback mode:', error)
+        logger.error('Failed to load settings from storage for runtime facade:', error)
       }
       this._settings.value = { ...this._defaults }
     }
@@ -236,6 +184,7 @@ class SettingsManager {
     this._setupStorageListener()
 
     this._initialized = true
+    logger.debug('SettingsManager runtime facade initialized successfully')
     return this
   }
 
@@ -260,7 +209,7 @@ class SettingsManager {
   }
 
   /**
-   * Get all settings as a reactive object (for Vue components)
+   * Get all tracked runtime settings
    */
   getSettings() {
     if (!this._initialized) {
@@ -268,11 +217,7 @@ class SettingsManager {
       return ref({})
     }
 
-    if (this._fallbackMode) {
-      return this._settings.value
-    }
-
-    return this._store.settings
+    return this._settings.value
   }
 
   /**
@@ -284,22 +229,7 @@ class SettingsManager {
       return defaultValue
     }
 
-    // In fallback mode, check loaded settings first
-    if (this._fallbackMode) {
-      const value = this._settings.value[key] !== undefined ? this._settings.value[key] : (this._defaults[key] !== undefined ? this._defaults[key] : defaultValue)
-      if (key === 'TRANSLATE_ON_TEXT_SELECTION') {
-        logger.debug(`TRANSLATE_ON_TEXT_SELECTION value:`, value, `(fallback mode: ${this._fallbackMode})`)
-      }
-      return value
-    }
-
-    // Check reactive cache first
-    if (this._reactiveCache.has(key)) {
-      return this._reactiveCache.get(key).value
-    }
-
-    // Fall back to store
-    const value = this._store?.settings?.[key]
+    const value = this._settings.value[key]
     return value !== undefined ? value : (this._defaults[key] !== undefined ? this._defaults[key] : defaultValue)
   }
 
@@ -322,44 +252,30 @@ class SettingsManager {
       await this.initialize()
     }
 
-    if (this._fallbackMode) {
-      this._assertFallbackSettingKeys([key])
-    }
+    this._assertRuntimeSettingKeys([key])
 
     const oldValue = this.get(key)
 
-    // In fallback mode, update storage directly
-    if (this._fallbackMode) {
-      const pendingUpdate = this._trackPendingUpdate(key, value)
+    const pendingUpdate = this._trackPendingUpdate(key, value)
 
-      try {
-        await storageManager.set({ [key]: value })
-        this._settings.value[key] = value
+    try {
+      await storageManager.set({ [key]: value })
+      this._settings.value[key] = value
 
-        // Emit change event
-        this._emitChangeEvent(key, value, oldValue)
+      // Emit change event
+      this._emitChangeEvent(key, value, oldValue)
 
-        logger.debug(`Setting updated (fallback mode): ${key} =`, value)
-        return
-      } catch (error) {
-        if (ExtensionContextManager.isContextError(error)) {
-          ExtensionContextManager.handleContextError(error, `settings-manager-set-fallback-${key}`);
-        } else {
-          logger.error('Failed to update setting in fallback mode:', error)
-        }
-        throw error
-      } finally {
-        this._clearPendingUpdate(key, pendingUpdate)
+      logger.debug(`Setting updated (runtime): ${key} =`, value)
+    } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, `settings-manager-set-runtime-${key}`);
+      } else {
+        logger.error('Failed to update setting in runtime facade:', error)
       }
+      throw error
+    } finally {
+      this._clearPendingUpdate(key, pendingUpdate)
     }
-
-    // Update through store
-    await this._store.updateSettingAndPersist(key, value)
-
-    // Emit change event
-    this._emitChangeEvent(key, value, oldValue)
-
-    logger.debug(`Setting updated: ${key} =`, value)
   }
 
   /**
@@ -370,55 +286,37 @@ class SettingsManager {
       await this.initialize()
     }
 
-    if (this._fallbackMode) {
-      const updateKeys = Object.keys(updates)
-      this._assertFallbackSettingKeys(updateKeys, true)
-      const oldValues = {}
-      const pendingUpdates = {}
+    const updateKeys = Object.keys(updates)
+    this._assertRuntimeSettingKeys(updateKeys, true)
+    const oldValues = {}
+    const pendingUpdates = {}
+
+    for (const key of updateKeys) {
+      oldValues[key] = this.get(key)
+      pendingUpdates[key] = this._trackPendingUpdate(key, updates[key])
+    }
+
+    try {
+      await storageManager.set(updates)
 
       for (const key of updateKeys) {
-        oldValues[key] = this.get(key)
-        pendingUpdates[key] = this._trackPendingUpdate(key, updates[key])
+        this._settings.value[key] = updates[key]
+        this._emitChangeEvent(key, updates[key], oldValues[key])
       }
 
-      try {
-        await storageManager.set(updates)
-
-        for (const key of updateKeys) {
-          this._settings.value[key] = updates[key]
-          this._emitChangeEvent(key, updates[key], oldValues[key])
-        }
-
-        logger.debug('Multiple settings updated (fallback mode):', updates)
-        return
-      } catch (error) {
-        if (ExtensionContextManager.isContextError(error)) {
-          ExtensionContextManager.handleContextError(error, 'settings-manager-set-multiple-fallback')
-        } else {
-          logger.error('Failed to update multiple settings in fallback mode:', error)
-        }
-        throw error
-      } finally {
-        for (const key of updateKeys) {
-          this._clearPendingUpdate(key, pendingUpdates[key])
-        }
+      logger.debug('Multiple settings updated (runtime):', updates)
+    } catch (error) {
+      if (ExtensionContextManager.isContextError(error)) {
+        ExtensionContextManager.handleContextError(error, 'settings-manager-set-multiple-runtime')
+      } else {
+        logger.error('Failed to update multiple settings in runtime facade:', error)
+      }
+      throw error
+    } finally {
+      for (const key of updateKeys) {
+        this._clearPendingUpdate(key, pendingUpdates[key])
       }
     }
-
-    const oldValues = {}
-    for (const key in updates) {
-      oldValues[key] = this.get(key)
-    }
-
-    // Update through store
-    await this._store.updateMultipleSettings(updates)
-
-    // Emit change events
-    for (const key in updates) {
-      this._emitChangeEvent(key, updates[key], oldValues[key])
-    }
-
-    logger.debug('Multiple settings updated:', updates)
   }
 
   /**
@@ -429,8 +327,7 @@ class SettingsManager {
       return false
     }
 
-    const currentSettings = this._fallbackMode ? this._settings.value : this._store.settings
-    return Object.prototype.hasOwnProperty.call(currentSettings, key)
+    return Object.prototype.hasOwnProperty.call(this._settings.value, key)
   }
 
   /**
@@ -441,15 +338,11 @@ class SettingsManager {
       return { ...this._defaults }
     }
 
-    if (this._fallbackMode) {
-      return Object.fromEntries(
-        Object.entries(this._settings.value).filter(([key]) => (
-          Object.prototype.hasOwnProperty.call(this._defaults, key)
-        ))
-      )
-    }
-
-    return { ...this._store.settings }
+    return Object.fromEntries(
+      Object.entries(this._settings.value).filter(([key]) => (
+        Object.prototype.hasOwnProperty.call(this._defaults, key)
+      ))
+    )
   }
 
   /**
@@ -545,88 +438,39 @@ class SettingsManager {
       await this.initialize()
     }
 
-    if (this._fallbackMode) {
-      throw new Error('SettingsManager reset is unavailable in fallback mode')
-    }
-
-    await this._store.resetSettings()
-    logger.info('All settings reset to defaults')
+    throw new Error('SettingsManager reset is unavailable in fallback mode')
   }
 
   /**
    * Export settings
    */
   async export(password = '') {
+    void password
+
     if (!this._initialized) {
       await this.initialize()
     }
 
-    if (this._fallbackMode) {
-      throw new Error('SettingsManager export is unavailable in fallback mode')
-    }
-
-    return await this._store.exportSettings(password)
+    throw new Error('SettingsManager export is unavailable in fallback mode')
   }
 
   /**
    * Import settings
    */
   async import(settingsData, password = '') {
+    void settingsData
+    void password
+
     if (!this._initialized) {
       await this.initialize()
     }
 
-    if (this._fallbackMode) {
-      throw new Error('SettingsManager import is unavailable in fallback mode')
-    }
-
-    await this._store.importSettings(settingsData, password)
-    logger.info('Settings imported successfully')
-  }
-
-  /**
-   * Initialize reactive cache for frequently accessed settings
-   */
-  _initializeReactiveCache() {
-    const frequentlyAccessed = [
-      'APPLICATION_LOCALIZE',
-      'EXTENSION_ENABLED',
-      'TRANSLATE_ON_TEXT_FIELDS',
-      'ENABLE_SHORTCUT_FOR_TEXT_FIELDS',
-      'TRANSLATE_ON_TEXT_SELECTION',
-      'REQUIRE_CTRL_FOR_TEXT_SELECTION',
-      'TRANSLATE_WITH_SELECT_ELEMENT',
-      'ACTIVE_SELECTION_ICON_ON_TEXTFIELDS',
-      'ENABLE_DICTIONARY',
-      'ENHANCED_TRIPLE_CLICK_DRAG',
-      'SHOW_DESKTOP_FAB',
-      'MOBILE_UI_MODE',
-      'MOUSE_HOVER_TRANSLATION_ENABLED'
-    ]
-
-    for (const key of frequentlyAccessed) {
-      this._reactiveCache.set(key, ref(this._store.settings[key]))
-    }
-  }
-
-  /**
-   * Setup watcher for store changes
-   */
-  _setupStoreWatcher() {
-    if (typeof window !== 'undefined' && window.Vue) {
-      // Vue 3 watch setup
-      watchEffect(() => {
-        // Update reactive cache
-        for (const [key, ref] of this._reactiveCache) {
-          ref.value = this._store.settings[key]
-        }
-      })
-    }
+    throw new Error('SettingsManager import is unavailable in fallback mode')
   }
 
   
   /**
-   * Setup chrome.storage listener for fallback mode
+   * Setup chrome.storage listener for runtime settings
    */
   _setupStorageListener() {
     // Only setup listener once
@@ -648,10 +492,8 @@ class SettingsManager {
       return
     }
 
-    // Fallback-only storage listener.
-    // Registered only when _fallbackMode is true (Vue/Pinia unavailable).
-    // StorageCore is the sole browser.storage.onChanged owner during normal runtime.
-    // The two listeners are never active simultaneously.
+    // Runtime-only storage listener.
+    // StorageCore remains the persistence and cache authority for all writes.
     this._storageListener = (changes, areaName) => {
       logger.debug(`Storage onChanged triggered for area: ${areaName}`, Object.keys(changes || {}))
 
@@ -706,10 +548,10 @@ class SettingsManager {
     }
 
     try {
-      const fallbackKeys = Object.keys(this._defaults)
-      const currentSettings = await storageManager.get(fallbackKeys)
+      const trackedKeys = Object.keys(this._defaults)
+      const currentSettings = await storageManager.get(trackedKeys)
 
-      for (const key of fallbackKeys) {
+      for (const key of trackedKeys) {
         const newValue = currentSettings?.[key] === undefined
           ? this._defaults[key]
           : currentSettings[key]
@@ -744,11 +586,6 @@ class SettingsManager {
   _emitChangeEvent(key, newValue, oldValue) {
     if (areSettingValuesEqual(newValue, oldValue)) {
       return
-    }
-
-    // Update reactive cache
-    if (this._reactiveCache.has(key)) {
-      this._reactiveCache.get(key).value = newValue
     }
 
     // Notify listeners
@@ -793,11 +630,8 @@ class SettingsManager {
 
     this._eventListeners.clear()
     this._pendingUpdates.clear()
-    this._reactiveCache.clear()
-    this._store = null
     this._initialized = false
     this._initializationPromise = null
-    this._fallbackMode = false
     this._storageListenerSetup = false
     this._storageListener = null
     this._storageListenerTarget = null
@@ -841,7 +675,7 @@ class SettingsManager {
     }
   }
 
-  _assertFallbackSettingKeys(keys, multiple = false) {
+  _assertRuntimeSettingKeys(keys, multiple = false) {
     const unsupportedKeys = keys
       .filter(key => !Object.prototype.hasOwnProperty.call(this._defaults, key))
       .sort()

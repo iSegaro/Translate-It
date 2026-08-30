@@ -107,10 +107,10 @@ Settings and storage layers have separate responsibilities:
 | --- | --- |
 | `CONFIG` | Setting default values. |
 | `getPersistedDefaultSettings()` | Persisted settings schema and canonical persisted defaults materialized from `CONFIG`. |
-| `SettingsManager` | `FALLBACK_SETTING_KEYS` allowlist only; fallback values derive from `getPersistedDefaultSettings()` without duplicating defaults. |
+| `SettingsManager` | Runtime facade limited to `FALLBACK_SETTING_KEYS`; values derive from `getPersistedDefaultSettings()` without duplicating defaults. |
 | `StorageCore` | Storage read/write, cache, and change-event mechanics. |
 
-Adding a persisted setting does not automatically require adding it to `FALLBACK_SETTING_KEYS`. Add it only when `SettingsManager` fallback mode must read or react to that setting. Fallback consumers should request only required keys; keeping this allowlist narrow avoids unnecessary access to unrelated or sensitive persisted settings.
+Adding a persisted setting does not automatically require adding it to `FALLBACK_SETTING_KEYS`. Add it only when runtime contexts must read or react to that setting. Runtime consumers should request only required keys; keeping this allowlist narrow avoids unnecessary access to unrelated or sensitive persisted settings.
 
 ### Maintainability
 - **Storage Mechanics Authority**: All storage logic is encapsulated within `StorageCore`.

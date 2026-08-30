@@ -648,15 +648,19 @@ const activeProvider = providers.getActiveProvider()
 ```
 
 ### Store Integration with Storage Manager
-The settings store is a Pinia setup store. It delegates its default values to `getPersistedDefaultSettings()`, which is the single authority for the persisted settings schema. Components and features never import `settingsDefaults.js` directly; the settings store, InstallHandler, migrations, and SettingsManager fallback defaults consume the builder.
+UI applications use the settings Pinia setup store. Content scripts, iframe contexts, and background handlers use the runtime `SettingsManager` facade; it reads and writes only its tracked runtime keys through `StorageCore`. Both paths delegate default values to `getPersistedDefaultSettings()`, which is the single authority for the persisted settings schema. Components and features never import `settingsDefaults.js` directly; the settings store, InstallHandler, migrations, and SettingsManager consume the builder.
 
 `CONFIG` owns default values; `getPersistedDefaultSettings()` in `src/shared/config/settingsDefaults.js` owns persisted key membership and drives fresh install, reset, import defaults, and migration fill. The store handles load (merge persisted settings into reactive state), save (persist to `browser.storage`), and reset (restore canonical persisted defaults).
 
 ### Reactive Data Flow
 ```
 Vue Component → Pinia Store → Storage Manager → browser.storage
-     ↓              ↓              ↓
-  Reactive UI → Computed → Event System → Cross-Tab Sync
+      ↓              ↓              ↓
+   Reactive UI → Computed → Event System → Cross-Tab Sync
+
+Content/IFrame/Background → SettingsManager → StorageCore → browser.storage
+                                    ↓
+                              Runtime listeners
 ```
 
 </details>
