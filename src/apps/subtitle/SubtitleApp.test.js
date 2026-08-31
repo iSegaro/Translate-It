@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { reactive, ref, nextTick } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import SubtitleApp from './SubtitleApp.vue';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
-const { openOptionsPageMock } = vi.hoisted(() => ({
+const { openOptionsPageMock, useSubtitleTranslationMock } = vi.hoisted(() => ({
   openOptionsPageMock: vi.fn(),
+  useSubtitleTranslationMock: vi.fn(),
 }));
 
 const { loggerErrorMock } = vi.hoisted(() => ({
@@ -27,17 +29,7 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 vi.mock('@/features/subtitle-translation/composables/useSubtitleTranslation.js', () => ({
-  useSubtitleTranslation: () => ({
-    status: ref('idle'),
-    progress: ref({}),
-    error: ref(''),
-    currentFile: ref(null),
-    cues: ref([]),
-    startTranslation: vi.fn(),
-    cancelTranslation: vi.fn(),
-    downloadResult: vi.fn(),
-    cleanup: vi.fn(),
-  }),
+  useSubtitleTranslation: useSubtitleTranslationMock,
 }));
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
@@ -138,9 +130,24 @@ vi.mock('@iconify/vue', () => ({
 }));
 
 describe('SubtitleApp', () => {
+  let subtitleState;
+
   beforeEach(() => {
     vi.clearAllMocks();
     loggerErrorMock.mockReset();
+    subtitleState = {
+      status: ref('idle'),
+      progress: ref({}),
+      error: ref(''),
+      errorAction: ref(null),
+      currentFile: ref(null),
+      cues: ref([]),
+      startTranslation: vi.fn(),
+      cancelTranslation: vi.fn(),
+      downloadResult: vi.fn(),
+      cleanup: vi.fn(),
+    };
+    useSubtitleTranslationMock.mockReturnValue(subtitleState);
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       value: vi.fn(() => ({
@@ -198,5 +205,36 @@ describe('SubtitleApp', () => {
 
     expect(openOptionsPageMock).toHaveBeenCalledWith('providers');
     expect(loggerErrorMock).toHaveBeenCalledWith('Failed to open provider settings:', 'failed to open');
+  });
+
+  it.each([
+    [null, false],
+    [PublicTranslationErrorActions.OPEN_SETTINGS, false],
+    [PublicTranslationErrorActions.RETRY_LATER, false],
+    [PublicTranslationErrorActions.RETRY, true],
+  ])('shows Try Again only for public retry action %s', async (action, shouldShowRetry) => {
+    subtitleState.status.value = 'error';
+    subtitleState.error.value = 'Safe subtitle error';
+    subtitleState.errorAction.value = action;
+
+    const wrapper = mount(SubtitleApp, {
+      global: {
+        stubs: {
+          transition: false,
+        },
+      },
+    });
+
+    await nextTick();
+
+    const retryButton = wrapper.find('.step-error button.primary-btn');
+    expect(retryButton.exists()).toBe(shouldShowRetry);
+
+    if (shouldShowRetry) {
+      await retryButton.trigger('click');
+      expect(subtitleState.status.value).toBe('idle');
+    }
+
+    wrapper.unmount();
   });
 });

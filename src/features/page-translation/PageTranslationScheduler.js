@@ -700,7 +700,11 @@ export class PageTranslationScheduler extends ResourceTracker {
     // Page Translation Specific: If a batch fails PERMANENTLY (after all internal retries)
     // due to network or server issues, we treat it as fatal for the session to prevent
     // continuous failing requests in Auto-translate mode and avoid Circuit Breaker deadlock.
-    let isFatal = isFatalError(errorType) || 
+    const fatalityInput = error && typeof error === 'object'
+      && (error.type || error.originalType || error.statusCode !== undefined)
+      ? error
+      : errorType;
+    let isFatal = isFatalError(fatalityInput) || 
                   errorType === 'NETWORK_ERROR' || 
                   errorType === 'SERVER_ERROR';
 

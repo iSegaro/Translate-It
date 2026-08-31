@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSubtitleTranslation } from './useSubtitleTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
 const { subscribeMock, sendToBackgroundMock, presentSubtitleTranslationErrorMock } = vi.hoisted(() => ({
   subscribeMock: vi.fn(),
@@ -76,6 +77,30 @@ describe('useSubtitleTranslation error presentation', () => {
     expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails });
     expect(presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0]).not.toHaveProperty('error');
     expect(state.error.value).toBe('Safe subtitle error');
+  });
+
+  it.each([
+    PublicTranslationErrorActions.RETRY,
+    PublicTranslationErrorActions.OPEN_SETTINGS,
+    undefined,
+  ])('preserves terminal public action %s', async (action) => {
+    const state = useSubtitleTranslation();
+    presentSubtitleTranslationErrorMock.mockResolvedValueOnce({
+      kind: 'display',
+      message: 'Safe subtitle error',
+      action,
+    });
+
+    await onMessage({
+      action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
+      data: {
+        jobId: state.jobId.value,
+        errorDetails: { message: 'raw diagnostic', type: 'HTTP_ERROR', statusCode: 409 },
+      },
+    });
+    await Promise.resolve();
+
+    expect(state.errorAction.value).toBe(action ?? null);
   });
 
   it('uses safe generic presentation for string-only failures', async () => {

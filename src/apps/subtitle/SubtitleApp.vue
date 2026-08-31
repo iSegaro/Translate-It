@@ -174,6 +174,7 @@
             <h3>{{ t('subtitle_error_title', 'Oops! Something went wrong') }}</h3>
             <p>{{ error }}</p>
             <button
+              v-if="errorAction === PublicTranslationErrorActions.RETRY"
               class="primary-btn"
               @click="status = 'idle'"
             >
@@ -211,6 +212,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { openOptionsPage } from '@/core/helpers.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
 // --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleApp');
@@ -226,6 +228,7 @@ const {
   status,
   progress,
   error,
+  errorAction,
   currentFile,
   cues,
   startTranslation,

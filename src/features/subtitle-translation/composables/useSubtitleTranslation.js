@@ -46,6 +46,7 @@ export function useSubtitleTranslation() {
   
   const translatedContent = ref('');
   const error = ref(null);
+  const errorAction = ref(null);
   const errorDetails = ref(null);
   const currentFile = ref(null);
   const cues = ref([]);
@@ -107,17 +108,20 @@ export function useSubtitleTranslation() {
     if (presentation.kind === 'silent') {
       status.value = 'idle';
       error.value = null;
+      errorAction.value = null;
       return;
     }
 
     status.value = 'error';
     error.value = presentation.kind === 'display' ? presentation.message : null;
+    errorAction.value = presentation.kind === 'display' ? presentation.action ?? null : null;
   };
 
   const startTranslation = async (fileContent, filename, config) => {
     presentationVersion++;
     status.value = 'translating';
     error.value = null;
+    errorAction.value = null;
     errorDetails.value = null;
     translatedContent.value = '';
     
@@ -188,6 +192,7 @@ export function useSubtitleTranslation() {
     status,
     progress,
     error,
+    errorAction,
     errorDetails,
     currentFile,
     cues,

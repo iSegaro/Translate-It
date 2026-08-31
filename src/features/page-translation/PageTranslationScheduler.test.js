@@ -94,8 +94,10 @@ describe('PageTranslationScheduler', () => {
       if (err?.errorType) return err.errorType;
       return 'UNKNOWN';
     });
-    isFatalError.mockImplementation((type) => {
-      return type === 'EXTENSION_CONTEXT_INVALIDATED';
+    isFatalError.mockImplementation((errorOrType) => {
+      const type = typeof errorOrType === 'string' ? errorOrType : errorOrType?.type;
+      return type === 'EXTENSION_CONTEXT_INVALIDATED'
+        || (typeof errorOrType === 'object' && [401, 402, 403, 404].includes(errorOrType?.statusCode));
     });
 
     onFatalError = vi.fn();
@@ -655,6 +657,39 @@ describe('PageTranslationScheduler', () => {
       expect(scheduler.fatalErrorOccurred).toBe(false);
       expect(onFatalError).not.toHaveBeenCalled();
       emitSpy.mockRestore();
+    });
+
+    it.each([
+      [400, false],
+      [404, true],
+      [422, false],
+      [409, false],
+      [500, false],
+    ])('passes structured HTTP %s to fatality evaluation', async (statusCode, expectedFatal) => {
+      const mockItem = { text: 'HTTP failure', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: false,
+        error: 'HTTP failure',
+        errorType: 'HTTP_ERROR',
+        errorDetails: {
+          message: 'HTTP failure',
+          type: 'HTTP_ERROR',
+          statusCode,
+        },
+      });
+
+      await scheduler.flush();
+
+      expect(isFatalError).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'HTTP_ERROR',
+        statusCode,
+      }));
+      expect(scheduler.fatalErrorOccurred).toBe(expectedFatal);
+      expect(onFatalError).toHaveBeenCalledTimes(expectedFatal ? 1 : 0);
+      expectSettlement(mockItem.resolve, 'HTTP failure');
     });
 
     it('reconstructs canonical Page batch error identity from transport DTO', async () => {
