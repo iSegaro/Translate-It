@@ -173,9 +173,9 @@ describe('QueueManager', () => {
       expect(request).toHaveBeenCalledTimes(3);
     });
 
-    it('should retry a failed request with exponential backoff', async () => {
+    it.each([429, 529])('should retry a RATE_LIMIT_REACHED request with exponential backoff for HTTP %s', async (statusCode) => {
       // RATE_LIMIT_REACHED: baseDelay 2000. Jittered (0.75x) = 1500ms.
-      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode: 429, message: 'Rate limit' };
+      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode, message: 'Rate limit' };
       
       const mockRequest = vi.fn()
         .mockRejectedValueOnce(mockError)

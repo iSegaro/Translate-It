@@ -45,6 +45,12 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     this.providerSettingKey = 'DEEPL_API_KEY';
   }
 
+  classifyProviderHttpError(errorInfo) {
+    return Number(errorInfo?.statusCode) === 529
+      ? ErrorTypes.RATE_LIMIT_REACHED
+      : null;
+  }
+
   /**
    * Get configuration using project's existing config system
    * Uses StorageManager's built-in caching and config.js helpers

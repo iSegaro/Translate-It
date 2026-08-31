@@ -627,6 +627,36 @@ describe('PageTranslationScheduler', () => {
       emitSpy.mockRestore();
     });
 
+    it('does not treat DeepL HTTP 529 rate limits as session-fatal', async () => {
+      const mockItem = { text: 'Rate limited Text', resolve: vi.fn(), score: 1 };
+      scheduler.queue.push(mockItem);
+
+      PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [mockItem], remainingItems: [] });
+      vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'deepl', targetLanguage: 'fa' });
+      safeSendMessage.mockResolvedValue({
+        success: false,
+        error: 'Too Many Requests',
+        errorType: 'RATE_LIMIT_REACHED',
+        errorDetails: {
+          message: 'Too Many Requests',
+          type: 'RATE_LIMIT_REACHED',
+          statusCode: 529,
+        },
+      });
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      await scheduler.flush();
+
+      expectSettlement(mockItem.resolve, 'Rate limited Text');
+      const internalError = emitSpy.mock.calls.find(([event]) => event === 'page-translation-internal-error')?.[1];
+      expect(internalError.error).toMatchObject({ type: 'RATE_LIMIT_REACHED', statusCode: 529 });
+      expect(internalError.errorType).toBe('RATE_LIMIT_REACHED');
+      expect(internalError.isFatal).toBe(false);
+      expect(scheduler.fatalErrorOccurred).toBe(false);
+      expect(onFatalError).not.toHaveBeenCalled();
+      emitSpy.mockRestore();
+    });
+
     it('reconstructs canonical Page batch error identity from transport DTO', async () => {
       const mockItem = { text: 'Failed Text', resolve: vi.fn(), score: 1 };
       scheduler.queue.push(mockItem);

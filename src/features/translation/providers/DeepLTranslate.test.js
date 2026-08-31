@@ -16,6 +16,7 @@ describe('DeepLTranslateProvider response contract', () => {
   let provider;
 
   beforeEach(() => {
+    proxyFetch.mockReset();
     provider = new DeepLTranslateProvider();
     vi.spyOn(provider, '_getConfig').mockResolvedValue({ apiKey: 'key', apiUrl: 'https://api.deepl.test' });
   });
@@ -99,6 +100,29 @@ describe('DeepLTranslateProvider response contract', () => {
 
     await expect(provider._translateChunk(['source'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
       .rejects.toMatchObject({ type });
+  });
+
+  it.each([
+    [529, ErrorTypes.RATE_LIMIT_REACHED, 'Too Many Requests'],
+    [500, ErrorTypes.SERVER_ERROR, 'Internal Server Error'],
+    [400, ErrorTypes.HTTP_ERROR, 'Bad Request'],
+  ])('classifies DeepL HTTP %s as %s while preserving request metadata', async (statusCode, type, statusText) => {
+    proxyFetch.mockResolvedValue({
+      ok: false,
+      status: statusCode,
+      statusText,
+      headers: { get: () => 'application/json' },
+      clone() { return this; },
+      json: async () => ({ message: statusText }),
+    });
+
+    await expect(provider._translateChunk(['source'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+      .rejects.toMatchObject({
+        type,
+        statusCode,
+        context: 'deepltranslate-translate-chunk',
+        providerName: 'DeepLTranslate',
+      });
   });
 
   it('rejects the parent when a recursive HTTP-400 split child fails', async () => {

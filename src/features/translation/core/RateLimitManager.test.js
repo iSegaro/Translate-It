@@ -1153,10 +1153,13 @@ describe('RateLimitManager', () => {
       expect(state.consecutiveFailures).toBe(1);
     });
 
-    it('retains existing behavior for RATE_LIMIT_REACHED', async () => {
+    it('retains existing rate-limit health behavior for DeepL HTTP 529', async () => {
       isLocalDeterministicValidationError.mockReturnValue(false);
       const state = manager.providerStates.get('TestProvider');
-      const rateLimitError = Object.assign(new Error('rate limit'), { type: 'RATE_LIMIT_REACHED' });
+      const rateLimitError = Object.assign(new Error('rate limit'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        statusCode: 529,
+      });
 
       try {
         await manager.executeWithRateLimit('TestProvider', () => Promise.reject(rateLimitError));
