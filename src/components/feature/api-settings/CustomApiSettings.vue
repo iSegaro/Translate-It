@@ -24,7 +24,7 @@
       v-model="customApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('custom_api_key_placeholder') || 'Enter your API keys (one per line)'"
-      provider-name="Custom"
+      :provider-id="ProviderRegistryIds.CUSTOM"
       :testing="testingKeys"
       :test-result="testResult"
       :allow-empty-test="true"
@@ -50,6 +50,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
 
@@ -76,7 +77,7 @@ const customApiModel = computed({
 const testingKeys = ref(false)
 const testResult = ref(null)
 
-const testKeys = async (providerName) => {
+const testKeys = async (providerId) => {
   testingKeys.value = true
   testResult.value = null
 
@@ -102,7 +103,7 @@ const testKeys = async (providerName) => {
     // Test keys directly from textbox value, passing current URL and Model context
     const result = await ApiKeyManager.testKeysDirect(
       customApiKey.value,
-      providerName,
+      providerId,
       {
         apiUrl: testApiUrl,
         apiModel: customApiModel.value

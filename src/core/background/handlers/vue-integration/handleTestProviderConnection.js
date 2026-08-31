@@ -2,21 +2,6 @@
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 
-const PROVIDER_VALIDATION_NAMES = Object.freeze({
-  openai: 'OpenAI',
-  gemini: 'Gemini',
-  deepseek: 'DeepSeek',
-  openrouter: 'OpenRouter',
-  deepl: 'DeepL',
-  custom: 'Custom',
-});
-
-function resolveProviderName(provider) {
-  if (typeof provider !== 'string') return provider;
-  const normalizedProvider = provider.trim();
-  return PROVIDER_VALIDATION_NAMES[normalizedProvider.toLowerCase()] || normalizedProvider;
-}
-
 function getProviderTestInput(config) {
   if (typeof config === 'string') {
     return { keys: config, context: {} };
@@ -35,7 +20,7 @@ function getProviderTestInput(config) {
   };
 }
 
-function createValidationResponse(provider, providerName, testResult) {
+function createValidationResponse(providerId, testResult) {
   const result = testResult && typeof testResult === 'object'
     ? testResult
     : { allInvalid: true };
@@ -46,8 +31,8 @@ function createValidationResponse(provider, providerName, testResult) {
     success,
     data: {
       ...result,
-      provider,
-      providerName,
+      provider: providerId,
+      providerId,
       success,
       message,
       testResult: result,
@@ -57,28 +42,27 @@ function createValidationResponse(provider, providerName, testResult) {
 }
 
 export async function handleTestProviderConnection(message) {
-  const provider = message?.data?.provider;
-  const providerName = resolveProviderName(provider);
+  const providerId = message?.data?.provider;
 
   try {
     const { keys, context } = getProviderTestInput(message?.data?.config);
-    const testResult = await ApiKeyManager.testKeysDirect(keys, providerName, context);
-    return createValidationResponse(provider, providerName, testResult);
+    const testResult = await ApiKeyManager.testKeysDirect(keys, providerId, context);
+    return createValidationResponse(providerId, testResult);
   } catch (error) {
     const errorResponse = MessageFormat.createErrorResponse(
       error,
       message?.messageId || null,
       {
         context: error?.context || 'provider-test',
-        providerName: error?.providerName || providerName,
+        providerId: error?.providerId || providerId,
       }
     );
 
     return {
       ...errorResponse,
       data: {
-        provider,
-        providerName,
+        provider: providerId,
+        providerId,
         success: false,
         message: errorResponse.errorDetails.message || 'Connection failed',
         error: errorResponse.error,

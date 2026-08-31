@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiKeyManager } from './ApiKeyManager.js';
+import { ProviderRegistryIds } from './ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 const { mockProxyFetch, mockResolveProxyConfig, mockProxyManager } = vi.hoisted(() => {
@@ -133,7 +134,7 @@ describe('ApiKeyManager', () => {
         return key === 'valid_key';
       });
 
-      const result = await ApiKeyManager.testAndReorderKeys('GEMINI_KEY', 'Gemini');
+      const result = await ApiKeyManager.testAndReorderKeys('GEMINI_KEY', ProviderRegistryIds.GEMINI);
 
       expect(result.valid).toEqual(['valid_key']);
       expect(result.invalid).toEqual(['invalid_key']);
@@ -141,6 +142,51 @@ describe('ApiKeyManager', () => {
       // Check storage: valid should be first now
       expect(mockStorage.get('GEMINI_KEY')).toBe('valid_key\ninvalid_key');
     });
+  });
+
+  describe('Provider ID Dispatch', () => {
+    it.each([
+      [ProviderRegistryIds.OPENAI, '_testOpenAIKey', ['secret-key', {}]],
+      [ProviderRegistryIds.GEMINI, '_testGeminiKey', ['secret-key', {}]],
+      [ProviderRegistryIds.DEEPSEEK, '_testDeepSeekKey', ['secret-key', {}]],
+      [ProviderRegistryIds.OPENROUTER, '_testOpenRouterKey', ['secret-key', {}]],
+      [ProviderRegistryIds.DEEPL, '_testDeepLKey', ['secret-key']]
+    ])('dispatches %s to its validator', async (providerId, validator, expectedArgs) => {
+      const testValidator = vi.spyOn(ApiKeyManager, validator).mockResolvedValue(true);
+
+      const result = await ApiKeyManager.testKeysDirect('secret-key', providerId);
+
+      expect(testValidator).toHaveBeenCalledWith(...expectedArgs);
+      expect(result).toMatchObject({
+        valid: ['secret-key'],
+        invalid: [],
+        allInvalid: false
+      });
+      testValidator.mockRestore();
+    });
+
+    it('dispatches custom registry ID to custom validation', async () => {
+      const testCustomKeys = vi.spyOn(ApiKeyManager, '_testCustomKeys')
+        .mockResolvedValue({ allInvalid: false });
+      const context = { apiUrl: 'https://example.com/v1/chat/completions', apiModel: 'local-model' };
+
+      await ApiKeyManager.testKeysDirect('', ProviderRegistryIds.CUSTOM, context);
+
+      expect(testCustomKeys).toHaveBeenCalledWith([], context);
+      testCustomKeys.mockRestore();
+    });
+
+    it.each(['unknown-provider', 'OpenAI', 'Gemini', 'DeepSeek', 'OpenRouter', 'DeepL', 'Custom'])('returns unknown-provider result for unsupported provider ID %s', async (providerId) => {
+        const result = await ApiKeyManager.testKeysDirect('secret-key', providerId);
+
+        expect(result).toMatchObject({
+          valid: [],
+          invalid: ['secret-key'],
+          allInvalid: true,
+          messageKey: 'api_test_unknown_provider',
+          params: { provider: providerId }
+        });
+      });
   });
 
   describe('Proxy Snapshot Validation', () => {
@@ -245,7 +291,7 @@ describe('ApiKeyManager', () => {
     it('tests anonymous Custom connectivity without Authorization', async () => {
       mockProxyFetch.mockResolvedValue(modelsResponse({ data: [{ id: 'local-model' }] }));
 
-      const result = await ApiKeyManager.testKeysDirect('', 'Custom', context);
+      const result = await ApiKeyManager.testKeysDirect('', ProviderRegistryIds.CUSTOM, context);
 
       expect(result).toMatchObject({ allInvalid: false, messageKey: 'api_test_custom_connection_success' });
       expect(mockProxyFetch).toHaveBeenCalledWith(
@@ -258,14 +304,14 @@ describe('ApiKeyManager', () => {
     it('sends Authorization when testing a configured Custom key', async () => {
       mockProxyFetch.mockResolvedValue(modelsResponse({ data: [{ id: 'local-model' }] }));
 
-      const result = await ApiKeyManager.testKeysDirect('secret-key', 'Custom', context);
+      const result = await ApiKeyManager.testKeysDirect('secret-key', ProviderRegistryIds.CUSTOM, context);
 
       expect(result.allInvalid).toBe(false);
       expect(mockProxyFetch.mock.calls[0][1].headers).toEqual({ Authorization: 'Bearer secret-key' });
     });
 
     it('requires configured URL and model before making a remote request', async () => {
-      const result = await ApiKeyManager.testKeysDirect('', 'Custom', { apiUrl: '', apiModel: '' });
+      const result = await ApiKeyManager.testKeysDirect('', ProviderRegistryIds.CUSTOM, { apiUrl: '', apiModel: '' });
 
       expect(result).toMatchObject({ allInvalid: true, messageKey: 'api_test_custom_config_missing' });
       expect(mockProxyFetch).not.toHaveBeenCalled();
@@ -274,7 +320,7 @@ describe('ApiKeyManager', () => {
     it('requires exact configured model membership from a standard models response', async () => {
       mockProxyFetch.mockResolvedValue(modelsResponse({ data: [{ id: 'local-model-v2' }] }));
 
-      const result = await ApiKeyManager.testKeysDirect('', 'Custom', context);
+      const result = await ApiKeyManager.testKeysDirect('', ProviderRegistryIds.CUSTOM, context);
 
       expect(result).toMatchObject({ allInvalid: true, messageKey: 'api_test_custom_model_not_found' });
       expect(mockProxyFetch).toHaveBeenCalledTimes(1);
@@ -290,7 +336,7 @@ describe('ApiKeyManager', () => {
         .mockResolvedValueOnce(modelsFailure)
         .mockResolvedValueOnce(chatResponse());
 
-      const result = await ApiKeyManager.testKeysDirect('', 'Custom', context);
+      const result = await ApiKeyManager.testKeysDirect('', ProviderRegistryIds.CUSTOM, context);
       const chatRequest = mockProxyFetch.mock.calls[1];
 
       expect(result.allInvalid).toBe(false);
@@ -308,7 +354,7 @@ describe('ApiKeyManager', () => {
     it('does not fall back after genuine authentication failure', async () => {
       mockProxyFetch.mockResolvedValue({ ok: false, status: 401, json: vi.fn() });
 
-      const result = await ApiKeyManager.testKeysDirect('secret-key', 'Custom', context);
+      const result = await ApiKeyManager.testKeysDirect('secret-key', ProviderRegistryIds.CUSTOM, context);
 
       expect(result.allInvalid).toBe(true);
       expect(mockProxyFetch).toHaveBeenCalledTimes(1);

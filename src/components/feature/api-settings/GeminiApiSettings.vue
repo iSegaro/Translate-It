@@ -19,7 +19,7 @@
       v-model="geminiApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('gemini_api_key_placeholder') || 'Enter your API keys (one per line)'"
-      provider-name="Gemini"
+      :provider-id="ProviderRegistryIds.GEMINI"
       :testing="testingKeys"
       :test-result="testResult"
       @test="testKeys"
@@ -75,6 +75,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
 
 const { t } = useI18n()
@@ -135,7 +136,7 @@ const geminiModelOptions = computed(() => {
 const testingKeys = ref(false)
 const testResult = ref(null)
 
-const testKeys = async (providerName) => {
+const testKeys = async (providerId) => {
   testingKeys.value = true
   testResult.value = null
 
@@ -143,7 +144,7 @@ const testKeys = async (providerName) => {
     // Test keys directly from textbox value, passing current URL and Model context
     const result = await ApiKeyManager.testKeysDirect(
       geminiApiKey.value, 
-      providerName,
+      providerId,
       {
         apiUrl: geminiApiUrl.value,
         apiModel: geminiModel.value

@@ -14,6 +14,7 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js';
+import { ProviderRegistryIds } from './ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ApiKeyManager');
 
@@ -188,13 +189,13 @@ class ApiKeyManager {
   /**
    * Test all keys for validity and reorder them
    * @param {string} providerSettingKey - Settings key
-   * @param {string} providerName - Provider name for testing
+   * @param {string} providerId - Provider registry ID for testing
    * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
    */
-  static async testAndReorderKeys(providerSettingKey, providerName) {
+  static async testAndReorderKeys(providerSettingKey, providerId) {
     const keys = await this.getKeys(providerSettingKey);
 
-    if (providerName === 'Custom') {
+    if (providerId === ProviderRegistryIds.CUSTOM) {
       const result = await this._testCustomKeys(keys);
       if (result.reorderedString !== undefined) {
         await storageManager.set({ [providerSettingKey]: result.reorderedString });
@@ -213,22 +214,22 @@ class ApiKeyManager {
 
     // Import provider classes dynamically
     const providerTests = {
-      'OpenAI': async (key) => await this._testOpenAIKey(key),
-      'Gemini': async (key) => await this._testGeminiKey(key),
-      'DeepSeek': async (key) => await this._testDeepSeekKey(key),
-      'OpenRouter': async (key) => await this._testOpenRouterKey(key),
-      'DeepL': async (key) => await this._testDeepLKey(key),
-      'Custom': async (key) => await this._testCustomKey(key)
+      [ProviderRegistryIds.OPENAI]: async (key) => await this._testOpenAIKey(key),
+      [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key),
+      [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key),
+      [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key),
+      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key),
+      [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key)
     };
 
-    const testFunc = providerTests[providerName];
+    const testFunc = providerTests[providerId];
     if (!testFunc) {
       return {
         valid: [],
         invalid: keys,
         allInvalid: true,
         messageKey: 'api_test_unknown_provider',
-        params: { provider: providerName }
+        params: { provider: providerId }
       };
     }
 
@@ -238,7 +239,7 @@ class ApiKeyManager {
         const isValid = await testFunc(key);
         return { key, isValid };
       } catch (error) {
-        logger.debug(`[ApiKeyManager] Key test failed for ${providerName}:`, error.message);
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}:`, error.message);
         return { key, isValid: false };
       }
     });
@@ -272,15 +273,15 @@ class ApiKeyManager {
   /**
    * Test keys directly from provided value (without reading from storage)
    * @param {string} keysString - Keys string (one per line)
-   * @param {string} providerName - Provider name for testing
+   * @param {string} providerId - Provider registry ID for testing
    * @param {Object} [context={}] - Optional additional context (e.g., custom URL/Model)
    * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
    */
-  static async testKeysDirect(keysString, providerName, context = {}) {
+  static async testKeysDirect(keysString, providerId, context = {}) {
     // Parse keys from string
     const keys = this.parseKeys(keysString);
 
-    if (providerName === 'Custom') {
+    if (providerId === ProviderRegistryIds.CUSTOM) {
       return this._testCustomKeys(keys, context);
     }
 
@@ -295,22 +296,22 @@ class ApiKeyManager {
 
     // Import provider classes dynamically
     const providerTests = {
-      'OpenAI': async (key) => await this._testOpenAIKey(key, context),
-      'Gemini': async (key) => await this._testGeminiKey(key, context),
-      'DeepSeek': async (key) => await this._testDeepSeekKey(key, context),
-      'OpenRouter': async (key) => await this._testOpenRouterKey(key, context),
-      'DeepL': async (key) => await this._testDeepLKey(key),
-      'Custom': async (key) => await this._testCustomKey(key, context)
+      [ProviderRegistryIds.OPENAI]: async (key) => await this._testOpenAIKey(key, context),
+      [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key, context),
+      [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key, context),
+      [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key, context),
+      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key),
+      [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key, context)
     };
 
-    const testFunc = providerTests[providerName];
+    const testFunc = providerTests[providerId];
     if (!testFunc) {
       return {
         valid: [],
         invalid: keys,
         allInvalid: true,
         messageKey: 'api_test_unknown_provider',
-        params: { provider: providerName }
+        params: { provider: providerId }
       };
     }
 
@@ -320,7 +321,7 @@ class ApiKeyManager {
         const isValid = await testFunc(key);
         return { key, isValid };
       } catch (error) {
-        logger.debug(`[ApiKeyManager] Key test failed for ${providerName}:`, error.message);
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}:`, error.message);
         return { key, isValid: false };
       }
     });

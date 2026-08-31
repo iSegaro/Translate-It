@@ -20,7 +20,7 @@
       v-model="openaiApiKey"
       :label="t('custom_api_settings_api_key_label') || 'API Keys'"
       :placeholder="t('openai_api_key_placeholder') || 'Enter your API keys (one per line)'"
-      provider-name="OpenAI"
+      :provider-id="ProviderRegistryIds.OPENAI"
       :testing="testingKeys"
       :test-result="testResult"
       @test="testKeys"
@@ -59,6 +59,7 @@ import BaseSelect from '@/components/base/BaseSelect.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
 
 const { t } = useI18n()
@@ -115,7 +116,7 @@ const openaiApiModelOptions = computed(() => {
 const testingKeys = ref(false)
 const testResult = ref(null)
 
-const testKeys = async (providerName) => {
+const testKeys = async (providerId) => {
   if (!openaiApiKey.value.trim()) return
 
   testingKeys.value = true
@@ -125,7 +126,7 @@ const testKeys = async (providerName) => {
     // Test keys directly from textbox value, passing current Model context
     const result = await ApiKeyManager.testKeysDirect(
       openaiApiKey.value, 
-      providerName,
+      providerId,
       {
         apiModel: openaiApiModel.value === 'custom' ? openaiCustomModel.value : openaiApiModel.value
       }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { handleTestProviderConnection } from './handleTestProviderConnection.js';
 
 const mocks = vi.hoisted(() => ({
@@ -43,7 +44,7 @@ describe('handleTestProviderConnection', () => {
 
     expect(mocks.testKeysDirect).toHaveBeenCalledWith(
       'secret-key',
-      'Custom',
+      ProviderRegistryIds.CUSTOM,
       {
         apiUrl: 'https://example.com/v1/chat/completions',
         apiModel: 'local-model',
@@ -53,7 +54,7 @@ describe('handleTestProviderConnection', () => {
       success: true,
       data: {
         provider: 'custom',
-        providerName: 'Custom',
+        providerId: 'custom',
         success: true,
         message: 'Connection successful',
         testResult,
@@ -64,18 +65,19 @@ describe('handleTestProviderConnection', () => {
   });
 
   it.each([
-    ['deepl', 'DeepL'],
-    ['openai', 'OpenAI'],
-  ])('normalizes registry provider %s to %s', async (provider, expectedProviderName) => {
+    ProviderRegistryIds.DEEPL,
+    ProviderRegistryIds.OPENAI,
+    ProviderRegistryIds.CUSTOM,
+  ])('passes registry provider %s unchanged', async (providerId) => {
     mocks.testKeysDirect.mockResolvedValue({ allInvalid: false });
 
     await handleTestProviderConnection({
-      data: { provider, config: { apiKey: 'secret-key' } },
+      data: { provider: providerId, config: { apiKey: 'secret-key' } },
     });
 
     expect(mocks.testKeysDirect).toHaveBeenCalledWith(
       'secret-key',
-      expectedProviderName,
+      providerId,
       {}
     );
   });
@@ -93,7 +95,7 @@ describe('handleTestProviderConnection', () => {
 
     const response = await handleTestProviderConnection({
       data: {
-        provider: 'OpenAI',
+        provider: ProviderRegistryIds.OPENAI,
         config: { apiKey: 'bad-key' },
       },
     });
@@ -151,6 +153,7 @@ describe('handleTestProviderConnection', () => {
       data: {
         success: false,
         errorDetails: expect.objectContaining({ statusCode: 404 }),
+        providerId: 'custom',
       },
     });
   });
