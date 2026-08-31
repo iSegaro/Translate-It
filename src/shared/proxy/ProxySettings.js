@@ -53,3 +53,23 @@ export async function getProxySettingsAsync() {
     return proxyDefaults;
   }
 }
+
+/**
+ * Resolve current proxy settings into a detached request configuration.
+ *
+ * @returns {Promise<Object>} Request-local proxy configuration snapshot.
+ */
+export async function resolveProxyConfig() {
+  const settings = await getProxySettingsAsync();
+
+  return {
+    enabled: settings.PROXY_ENABLED || false,
+    type: settings.PROXY_TYPE || 'http',
+    host: settings.PROXY_HOST || '',
+    port: settings.PROXY_PORT || 8080,
+    auth: {
+      username: settings.PROXY_USERNAME || '',
+      password: settings.PROXY_PASSWORD || ''
+    }
+  };
+}

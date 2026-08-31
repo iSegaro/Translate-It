@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '@/shared/config/config.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getProxySettingsAsync, PROXY_SETTING_KEYS } from './ProxySettings.js';
+import { getProxySettingsAsync, resolveProxyConfig, PROXY_SETTING_KEYS } from './ProxySettings.js';
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageManager: {
@@ -76,5 +76,30 @@ describe('getProxySettingsAsync', () => {
       PROXY_USERNAME: CONFIG.PROXY_USERNAME,
       PROXY_PASSWORD: CONFIG.PROXY_PASSWORD
     });
+  });
+
+  it('maps settings into detached canonical proxy configuration', async () => {
+    vi.mocked(storageManager.get).mockResolvedValue({
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'socks',
+      PROXY_HOST: 'proxy.test',
+      PROXY_PORT: 9050,
+      PROXY_USERNAME: 'user',
+      PROXY_PASSWORD: 'password'
+    });
+
+    const firstConfig = await resolveProxyConfig();
+    const secondConfig = await resolveProxyConfig();
+
+    expect(firstConfig).toEqual({
+      enabled: true,
+      type: 'socks',
+      host: 'proxy.test',
+      port: 9050,
+      auth: { username: 'user', password: 'password' }
+    });
+    expect(secondConfig).not.toBe(firstConfig);
+    expect(secondConfig.auth).not.toBe(firstConfig.auth);
+    expect(storageManager.get).toHaveBeenCalledWith(PROXY_SETTING_KEYS);
   });
 });

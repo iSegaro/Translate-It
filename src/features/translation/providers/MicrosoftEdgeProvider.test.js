@@ -30,7 +30,8 @@ vi.mock("@/shared/config/config.js", () => ({
 }));
 
 vi.mock('@/shared/proxy/ProxySettings.js', () => ({
-  getProxySettingsAsync: vi.fn().mockResolvedValue({})
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 // Partial mock for language constants

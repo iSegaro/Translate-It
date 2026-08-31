@@ -13,6 +13,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ApiKeyManager');
 
@@ -169,6 +170,19 @@ class ApiKeyManager {
       return false;
     }
     return FAILOVER_ERROR_TYPES.has(error.type);
+  }
+
+  /**
+   * Execute one validation request with a fresh proxy configuration snapshot.
+   * @param {string} url - Request URL
+   * @param {Object} options - Fetch options
+   * @returns {Promise<Response>} - Validation response
+   * @private
+   */
+  static async _fetchWithCurrentProxy(url, options = {}) {
+    const proxyConfig = await resolveProxyConfig();
+    const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
+    return proxyManager.fetch(url, options, proxyConfig);
   }
 
   /**
@@ -409,8 +423,7 @@ class ApiKeyManager {
   static async _testOpenAIKey(key, context = {}) {
     try {
       const apiUrl = context.apiUrl || 'https://api.openai.com/v1/models';
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(apiUrl, {
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`
@@ -451,8 +464,7 @@ class ApiKeyManager {
       const urlObj = new URL(apiUrl);
       urlObj.searchParams.set('key', key);
       
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(urlObj.toString(), { method: 'GET' });
+      const response = await this._fetchWithCurrentProxy(urlObj.toString(), { method: 'GET' });
       return response.ok;
     } catch {
       return false;
@@ -469,8 +481,7 @@ class ApiKeyManager {
   static async _testDeepSeekKey(key, context = {}) {
     try {
       const apiUrl = context.apiUrl || 'https://api.deepseek.com/models';
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(apiUrl, {
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`
@@ -494,8 +505,7 @@ class ApiKeyManager {
       // Use auth/key endpoint instead of models to properly validate the key
       // models endpoint is public and may return 200 even for invalid keys
       const apiUrl = context.apiUrl || 'https://openrouter.ai/api/v1/auth/key';
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(apiUrl, {
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`,
@@ -517,8 +527,7 @@ class ApiKeyManager {
    */
   static async _testDeepLKey(key) {
     try {
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch('https://api-free.deepl.com/v2/usage', {
+      const response = await this._fetchWithCurrentProxy('https://api-free.deepl.com/v2/usage', {
         method: 'POST',
         headers: {
           'Authorization': `DeepL-Auth-Key ${key}`
@@ -526,7 +535,7 @@ class ApiKeyManager {
       });
       // Also check pro endpoint
       if (!response.ok) {
-        const proResponse = await proxyManager.fetch('https://api.deepl.com/v2/usage', {
+        const proResponse = await this._fetchWithCurrentProxy('https://api.deepl.com/v2/usage', {
           method: 'POST',
           headers: {
             'Authorization': `DeepL-Auth-Key ${key}`
@@ -579,7 +588,6 @@ class ApiKeyManager {
         modelsUrl = apiUrl.replace('/v1/chat/completions', '/v1/models');
       }
 
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
       const headers = {};
       if (key?.trim()) {
         headers.Authorization = `Bearer ${key}`;
@@ -587,7 +595,7 @@ class ApiKeyManager {
 
       try {
         // Try models endpoint first
-        const response = await proxyManager.fetch(modelsUrl, {
+        const response = await this._fetchWithCurrentProxy(modelsUrl, {
           method: 'GET',
           headers
         });
@@ -615,7 +623,7 @@ class ApiKeyManager {
         }
 
         // Missing or nonstandard model metadata cannot prove model membership.
-        const chatResponse = await proxyManager.fetch(apiUrl, {
+        const chatResponse = await this._fetchWithCurrentProxy(apiUrl, {
           method: 'POST',
           headers: {
             ...headers,

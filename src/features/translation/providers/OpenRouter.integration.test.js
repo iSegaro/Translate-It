@@ -19,7 +19,8 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => ({
 }));
 
 vi.mock('@/shared/proxy/ProxySettings.js', () => ({
-  getProxySettingsAsync: vi.fn().mockResolvedValue({})
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({

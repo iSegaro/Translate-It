@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ApiKeyManager } from './ApiKeyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const { mockProxyFetch } = vi.hoisted(() => ({
-  mockProxyFetch: vi.fn()
-}));
+const { mockProxyFetch, mockResolveProxyConfig, mockProxyManager } = vi.hoisted(() => {
+  const mockProxyFetch = vi.fn();
+  return {
+    mockProxyFetch,
+    mockResolveProxyConfig: vi.fn(),
+    mockProxyManager: { config: null, fetch: mockProxyFetch }
+  };
+});
 
 // Mock storageManager
 const mockStorage = new Map();
@@ -37,15 +42,28 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
-  proxyManager: {
-    fetch: mockProxyFetch
-  }
+  proxyManager: mockProxyManager
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  resolveProxyConfig: mockResolveProxyConfig
 }));
 
 describe('ApiKeyManager', () => {
+  const createProxyConfig = (overrides = {}) => ({
+    enabled: false,
+    type: 'http',
+    host: '',
+    port: 8080,
+    auth: { username: '', password: '' },
+    ...overrides
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockStorage.clear();
+    mockProxyManager.config = null;
+    mockResolveProxyConfig.mockResolvedValue(createProxyConfig());
   });
 
   describe('Key Parsing and Stringifying', () => {
@@ -125,6 +143,87 @@ describe('ApiKeyManager', () => {
     });
   });
 
+  describe('Proxy Snapshot Validation', () => {
+    it('passes current enabled settings when global proxy config is unset', async () => {
+      const currentProxy = createProxyConfig({
+        enabled: true,
+        type: 'socks',
+        host: 'proxy-b',
+        port: 9000,
+        auth: { username: 'user-b', password: 'password-b' }
+      });
+      mockProxyManager.config = null;
+      mockResolveProxyConfig.mockResolvedValue(currentProxy);
+      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      await expect(ApiKeyManager._testOpenAIKey('secret-key')).resolves.toBe(true);
+
+      expect(mockResolveProxyConfig).toHaveBeenCalledTimes(1);
+      expect(mockProxyFetch).toHaveBeenCalledWith(
+        'https://api.openai.com/v1/models',
+        expect.objectContaining({ method: 'GET' }),
+        currentProxy
+      );
+    });
+
+    it('passes persisted proxy settings instead of stale global config', async () => {
+      const staleProxy = createProxyConfig({ enabled: true, host: 'proxy-a', port: 8000 });
+      const currentProxy = createProxyConfig({ enabled: true, host: 'proxy-b', port: 9000 });
+      mockProxyManager.config = staleProxy;
+      mockResolveProxyConfig.mockResolvedValue(currentProxy);
+      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      await expect(ApiKeyManager._testOpenAIKey('secret-key')).resolves.toBe(true);
+
+      expect(mockProxyFetch.mock.calls[0][2]).toBe(currentProxy);
+      expect(mockProxyFetch.mock.calls[0][2]).not.toBe(staleProxy);
+    });
+
+    it('passes disabled persisted settings instead of stale enabled config', async () => {
+      const staleProxy = createProxyConfig({ enabled: true, host: 'proxy-a', port: 8000 });
+      const disabledProxy = createProxyConfig();
+      mockProxyManager.config = staleProxy;
+      mockResolveProxyConfig.mockResolvedValue(disabledProxy);
+      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      await expect(ApiKeyManager._testOpenAIKey('secret-key')).resolves.toBe(true);
+
+      expect(mockProxyFetch.mock.calls[0][2]).toBe(disabledProxy);
+      expect(mockProxyFetch.mock.calls[0][2]).not.toBe(staleProxy);
+    });
+
+    it('resolves current settings after a normal provider updates global config', async () => {
+      const providerProxy = createProxyConfig({ enabled: true, host: 'provider-proxy', port: 8000 });
+      const currentProxy = createProxyConfig({ enabled: true, host: 'current-proxy', port: 9000 });
+      mockProxyManager.config = providerProxy;
+      mockResolveProxyConfig.mockResolvedValue(currentProxy);
+      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      await expect(ApiKeyManager._testDeepSeekKey('secret-key')).resolves.toBe(true);
+
+      expect(mockResolveProxyConfig).toHaveBeenCalledTimes(1);
+      expect(mockProxyFetch.mock.calls[0][2]).toBe(currentProxy);
+    });
+
+    it('resolves a fresh snapshot for each DeepL fallback request', async () => {
+      const firstProxy = createProxyConfig({ enabled: true, host: 'proxy-first', port: 8000 });
+      const secondProxy = createProxyConfig({ enabled: true, host: 'proxy-second', port: 9000 });
+      mockResolveProxyConfig
+        .mockResolvedValueOnce(firstProxy)
+        .mockResolvedValueOnce(secondProxy);
+      mockProxyFetch
+        .mockResolvedValueOnce({ ok: false, status: 500 })
+        .mockResolvedValueOnce({ ok: true, status: 200 });
+
+      await expect(ApiKeyManager._testDeepLKey('secret-key')).resolves.toBe(true);
+
+      expect(mockResolveProxyConfig).toHaveBeenCalledTimes(2);
+      expect(mockProxyFetch).toHaveBeenCalledTimes(2);
+      expect(mockProxyFetch.mock.calls[0][2]).toBe(firstProxy);
+      expect(mockProxyFetch.mock.calls[1][2]).toBe(secondProxy);
+    });
+  });
+
   describe('Custom Provider Testing', () => {
     const context = {
       apiUrl: 'https://example.com/v1/chat/completions',
@@ -151,7 +250,8 @@ describe('ApiKeyManager', () => {
       expect(result).toMatchObject({ allInvalid: false, messageKey: 'api_test_custom_connection_success' });
       expect(mockProxyFetch).toHaveBeenCalledWith(
         'https://example.com/v1/models',
-        expect.objectContaining({ method: 'GET', headers: {} })
+        expect.objectContaining({ method: 'GET', headers: {} }),
+        expect.objectContaining({ enabled: false, type: 'http', host: '', port: 8080 })
       );
     });
 
@@ -212,6 +312,24 @@ describe('ApiKeyManager', () => {
 
       expect(result.allInvalid).toBe(true);
       expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves a fresh snapshot for each Custom fallback request', async () => {
+      const firstProxy = createProxyConfig({ enabled: true, host: 'proxy-first', port: 8000 });
+      const secondProxy = createProxyConfig({ enabled: true, host: 'proxy-second', port: 9000 });
+      mockResolveProxyConfig
+        .mockResolvedValueOnce(firstProxy)
+        .mockResolvedValueOnce(secondProxy);
+      mockProxyFetch
+        .mockResolvedValueOnce({ ok: false, status: 404, json: vi.fn().mockResolvedValue({}) })
+        .mockResolvedValueOnce({ ok: true, status: 200, json: vi.fn().mockResolvedValue({}) });
+
+      await expect(ApiKeyManager._testCustomConnection('', context)).resolves.toMatchObject({ valid: true });
+
+      expect(mockResolveProxyConfig).toHaveBeenCalledTimes(2);
+      expect(mockProxyFetch).toHaveBeenCalledTimes(2);
+      expect(mockProxyFetch.mock.calls[0][2]).toBe(firstProxy);
+      expect(mockProxyFetch.mock.calls[1][2]).toBe(secondProxy);
     });
   });
 });

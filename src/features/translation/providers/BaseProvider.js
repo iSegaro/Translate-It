@@ -4,7 +4,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
-import { getProxySettingsAsync } from "@/shared/proxy/ProxySettings.js";
+import { resolveProxyConfig } from "@/shared/proxy/ProxySettings.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
 import { rateLimitManager, TranslationPriority } from "@/features/translation/core/RateLimitManager.js";
@@ -12,19 +12,6 @@ import { rateLimitManager, TranslationPriority } from "@/features/translation/co
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'BaseProvider');
 let proxyInitializationGeneration = 0;
 let appliedProxyInitializationGeneration = 0;
-
-function createProxyConfig(settings) {
-  return {
-    enabled: settings.PROXY_ENABLED || false,
-    type: settings.PROXY_TYPE || 'http',
-    host: settings.PROXY_HOST || '',
-    port: settings.PROXY_PORT || 8080,
-    auth: {
-      username: settings.PROXY_USERNAME || '',
-      password: settings.PROXY_PASSWORD || ''
-    }
-  };
-}
 
 function cloneProxyConfig(config) {
   if (!config || typeof config !== 'object') return config;
@@ -76,8 +63,7 @@ export class BaseProvider {
     const generation = ++proxyInitializationGeneration;
 
     try {
-      const settings = await getProxySettingsAsync();
-      const config = createProxyConfig(settings);
+      const config = await resolveProxyConfig();
 
       if (generation <= appliedProxyInitializationGeneration) {
         return cloneProxyConfig(config);

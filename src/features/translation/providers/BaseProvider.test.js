@@ -2,9 +2,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BaseProvider } from './BaseProvider.js';
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { proxyManager } from "@/shared/proxy/ProxyManager.js";
-import { getProxySettingsAsync } from "@/shared/proxy/ProxySettings.js";
+import { getProxySettingsAsync, resolveProxyConfig } from "@/shared/proxy/ProxySettings.js";
 import { ProviderRequestEngine } from "@/features/translation/providers/utils/ProviderRequestEngine.js";
 import { providerCoordinator } from "@/features/translation/core/ProviderCoordinator.js";
+
+const { mockGetProxySettingsAsync, mockResolveProxyConfig } = vi.hoisted(() => {
+  const mockGetProxySettingsAsync = vi.fn(() => Promise.resolve({}));
+  const mockResolveProxyConfig = vi.fn(async () => {
+    const settings = await mockGetProxySettingsAsync();
+    return {
+      enabled: settings.PROXY_ENABLED || false,
+      type: settings.PROXY_TYPE || 'http',
+      host: settings.PROXY_HOST || '',
+      port: settings.PROXY_PORT || 8080,
+      auth: {
+        username: settings.PROXY_USERNAME || '',
+        password: settings.PROXY_PASSWORD || ''
+      }
+    };
+  });
+  return { mockGetProxySettingsAsync, mockResolveProxyConfig };
+});
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -24,7 +42,8 @@ vi.mock('@/shared/proxy/ProxyManager.js', () => ({
 }));
 
 vi.mock('@/shared/proxy/ProxySettings.js', () => ({
-  getProxySettingsAsync: vi.fn(() => Promise.resolve({}))
+  getProxySettingsAsync: mockGetProxySettingsAsync,
+  resolveProxyConfig: mockResolveProxyConfig
 }));
 
 vi.mock('@/features/translation/providers/utils/ProviderRequestEngine.js', () => ({
@@ -87,6 +106,7 @@ describe('BaseProvider', () => {
     vi.clearAllMocks();
     provider = new MockProvider();
     await Promise.resolve();
+    await Promise.resolve();
     vi.clearAllMocks();
   });
 
@@ -119,6 +139,7 @@ describe('BaseProvider', () => {
       
       // Drain constructor's async continuation.
       await Promise.resolve();
+      await Promise.resolve();
 
       expect(proxyManager.setConfig).toHaveBeenCalledWith(expect.objectContaining({
         enabled: true,
@@ -132,6 +153,7 @@ describe('BaseProvider', () => {
     it('should use defaults in _initializeProxy if settings are missing', async () => {
       vi.mocked(getProxySettingsAsync).mockResolvedValue({});
       provider = new MockProvider();
+      await Promise.resolve();
       await Promise.resolve();
 
       expect(proxyManager.setConfig).toHaveBeenCalledWith({
@@ -163,6 +185,25 @@ describe('BaseProvider', () => {
 
       snapshot.auth.password = 'changed';
       expect(committedConfig.auth.password).toBe('password');
+    });
+
+    it('should use the shared resolver output for provider snapshots', async () => {
+      const sharedConfig = {
+        enabled: true,
+        type: 'https',
+        host: 'shared-proxy',
+        port: 9443,
+        auth: { username: 'user', password: 'password' }
+      };
+      mockResolveProxyConfig.mockResolvedValueOnce(sharedConfig);
+
+      const snapshot = await provider._initializeProxy();
+
+      expect(resolveProxyConfig).toHaveBeenCalledTimes(1);
+      expect(proxyManager.setConfig).toHaveBeenCalledWith(sharedConfig);
+      expect(snapshot).toEqual(sharedConfig);
+      expect(snapshot).not.toBe(sharedConfig);
+      expect(snapshot.auth).not.toBe(sharedConfig.auth);
     });
 
     it('should not let an older initialization overwrite a newer applied one', async () => {
