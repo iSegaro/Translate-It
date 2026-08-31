@@ -69,6 +69,8 @@ describe('ProviderRequestEngine', () => {
     vi.clearAllMocks();
     mockProvider._initializeProxy.mockReset().mockResolvedValue(createProxyConfig());
     delete mockProvider.classifyProviderHttpError;
+    delete mockProvider.shouldFailoverApiKey;
+    delete mockProvider.isApiKeyCandidateEligible;
   });
 
   describe('HTTP error classification hook', () => {
@@ -543,6 +545,7 @@ describe('ProviderRequestEngine', () => {
       
       // Check if updateApiKey was called with the second key
       expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+      expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
       
       // Check if the working key was promoted
       expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
@@ -551,6 +554,98 @@ describe('ProviderRequestEngine', () => {
       expect(statsManager.recordError).toHaveBeenCalledTimes(1);
       expect(statsManager.recordRequest.mock.calls.every(([, , , , purpose]) => purpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', null, TranslationCallPurpose.STRUCTURED_RECOVERY);
+    });
+
+    it('uses provider failover eligibility when provider supplies a hook', async () => {
+      const firstError = Object.assign(new Error('Invalid key'), {
+        type: ErrorTypes.API_KEY_INVALID,
+        statusCode: 401,
+      });
+      const shouldFailoverApiKey = vi.fn(error => error.statusCode === 401);
+      mockProvider.shouldFailoverApiKey = shouldFailoverApiKey;
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(firstError)
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(shouldFailoverApiKey).toHaveBeenCalledWith(firstError);
+        expect(ApiKeyManager.shouldFailover).not.toHaveBeenCalled();
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('filters candidates before rotation and promotes filtered-list key actually used', async () => {
+      mockProvider.isApiKeyCandidateEligible = vi.fn((key, context) => context.apiTier === 'pro' && !key.endsWith(':fx'));
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'free-key:fx', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('Invalid key'), {
+          type: ErrorTypes.API_KEY_INVALID,
+          statusCode: 401,
+        }))
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+          apiKeyFailoverContext: { apiTier: 'pro' },
+        })).resolves.toBe('translated');
+
+        expect(mockProvider.isApiKeyCandidateEligible).toHaveBeenCalledWith('free-key:fx', { apiTier: 'pro' });
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      [403, ErrorTypes.FORBIDDEN_ERROR],
+      [456, ErrorTypes.DEEPL_QUOTA_EXCEEDED],
+      [429, ErrorTypes.RATE_LIMIT_REACHED],
+      [529, ErrorTypes.RATE_LIMIT_REACHED],
+      [400, ErrorTypes.HTTP_ERROR],
+      [422, ErrorTypes.HTTP_ERROR],
+      [500, ErrorTypes.SERVER_ERROR],
+    ])('does not rotate when provider hook rejects HTTP %s', async (statusCode, type) => {
+      mockProvider.shouldFailoverApiKey = vi.fn(() => false);
+      ApiKeyManager.getKeys.mockResolvedValue(['first-key', 'second-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const error = Object.assign(new Error(`HTTP ${statusCode}`), { statusCode, type });
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockRejectedValue(error);
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).rejects.toBe(error);
+
+        expect(apiCallSpy).toHaveBeenCalledTimes(1);
+        expect(mockProvider.shouldFailoverApiKey).toHaveBeenCalledWith(error);
+        expect(ApiKeyManager.shouldFailover).not.toHaveBeenCalled();
+        expect(updateApiKey).not.toHaveBeenCalled();
+      } finally {
+        apiCallSpy.mockRestore();
+      }
     });
 
     it('should capture a fresh proxy snapshot for each physical failover attempt', async () => {

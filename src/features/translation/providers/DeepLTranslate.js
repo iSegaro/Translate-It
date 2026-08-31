@@ -51,6 +51,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       : null;
   }
 
+  shouldFailoverApiKey(error) {
+    return Number(error?.statusCode) === 401
+      && error?.type === ErrorTypes.API_KEY_INVALID;
+  }
+
+  isApiKeyCandidateEligible(key, context = {}) {
+    return context.apiTier !== 'pro'
+      || (typeof key === 'string' && !key.endsWith(':fx'));
+  }
+
   /**
    * Get configuration using project's existing config system
    * Uses StorageManager's built-in caching and config.js helpers
@@ -63,18 +73,20 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         getDeeplApiTierAsync(),
       ]);
 
-      // Get first available key
-      const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
+      const normalizedTier = apiTier === 'pro' ? 'pro' : 'free';
+
+      // Select the first key compatible with the configured global tier.
+      const apiKey = apiKeys.find(key => this.isApiKeyCandidateEligible(key, { apiTier: normalizedTier })) || '';
 
       // Get API endpoint based on tier
-      const apiUrl = apiTier === 'pro'
+      const apiUrl = normalizedTier === 'pro'
         ? await getDeeplProApiUrlAsync()
         : await getDeeplFreeApiUrlAsync();
 
       // Configuration loaded successfully
-      logger.info(`[DeepL] Using tier: ${apiTier}`);
+      logger.info(`[DeepL] Using tier: ${normalizedTier}`);
 
-      return { apiKey, apiTier, apiUrl };
+      return { apiKey, apiTier: normalizedTier, apiUrl };
     } catch (error) {
       logger.error(`[DeepL] Error loading configuration:`, error);
       throw error;
@@ -197,7 +209,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     const tl = this._getLangCode(targetLang, true);
 
     // Get configuration and validate API key
-    const { apiKey, apiUrl } = await this._getConfig();
+    const { apiKey, apiUrl, apiTier } = await this._getConfig();
 
     // Validate configuration
     this._validateConfig(
@@ -515,7 +527,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         charCount: validTexts.join('').length,
         sessionId: options.sessionId,
         originalCharCount: options.originalCharCount || originalCharCount,
-        callPurpose: options.callPurpose
+        callPurpose: options.callPurpose,
+        apiKeyFailoverContext: Object.freeze({ apiTier }),
+        updateApiKey: (newKey, options) => {
+          if (options?.headers) {
+            options.headers.Authorization = `DeepL-Auth-Key ${newKey}`;
+          }
+        }
       });
 
       const finalResult = result;

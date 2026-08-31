@@ -89,6 +89,51 @@ function classifyProviderHttpError(provider, errorInfo) {
   }
 }
 
+function getApiKeyCandidates(provider, keys, apiKeyFailoverContext) {
+  if (typeof provider?.isApiKeyCandidateEligible !== 'function') return keys;
+
+  return keys.filter((key) => {
+    try {
+      return provider.isApiKeyCandidateEligible(key, apiKeyFailoverContext) === true;
+    } catch (error) {
+      logger.debug(`[${provider.providerName}] API key candidate check failed; excluding key`, error);
+      return false;
+    }
+  });
+}
+
+function shouldFailoverApiKey(provider, error) {
+  if (typeof provider?.shouldFailoverApiKey !== 'function') {
+    return ApiKeyManager.shouldFailover(error);
+  }
+
+  try {
+    return provider.shouldFailoverApiKey(error) === true;
+  } catch (hookError) {
+    logger.debug(`[${provider.providerName}] Provider API key failover check failed`, hookError);
+    return false;
+  }
+}
+
+function createOperationAbortError(signal) {
+  const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
+  const error = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
+  error.name = 'AbortError';
+
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
+  }
+
+  return error;
+}
+
 function parseRetryAt(response, now = Date.now()) {
   const header = response?.headers?.get?.('Retry-After')
     ?? response?.headers?.get?.('retry-after');
@@ -141,14 +186,19 @@ export const ProviderRequestEngine = {
   /**
    * UNIFIED API REQUEST HANDLER
    */
-  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose }) {
+  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose, apiKeyFailoverContext }) {
     const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
+    let apiKeyCandidates = null;
     if (provider.providerSettingKey && updateApiKey) {
       try {
         const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
-        availableKeysCount = Math.min(Math.max(1, keys.length), 10);
+        const candidates = getApiKeyCandidates(provider, keys, apiKeyFailoverContext);
+        availableKeysCount = Math.min(Math.max(1, candidates.length), 10);
+        if (typeof provider.isApiKeyCandidateEligible === 'function') {
+          apiKeyCandidates = candidates;
+        }
       } catch (e) {
         logger.warn(`[${provider.providerName}] Failed to count keys for failover:`, e);
       }
@@ -158,6 +208,19 @@ export const ProviderRequestEngine = {
     let currentUrl = url;
 
     for (let attempt = 0; attempt < availableKeysCount; attempt++) {
+      if (abortController?.signal?.aborted) {
+        const abortError = createOperationAbortError(abortController.signal);
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PROVIDER_CANCELLED',
+          stage: 'provider-request',
+          provider: provider.providerName,
+          reason: abortError.message,
+          code: abortError.type || abortError.cancellationReason,
+          cancelled: true,
+        });
+        throw abortError;
+      }
+
       try {
         // 2. Perform actual API call
         const result = await this.executeApiCall(provider, { 
@@ -175,7 +238,9 @@ export const ProviderRequestEngine = {
         // 3. Success! Promote the working key
         if (attempt > 0 && provider.providerSettingKey) {
           // Get the key actually used in THIS successful attempt
-          const currentKey = (await ApiKeyManager.getKeys(provider.providerSettingKey))[attempt];
+          const currentKey = apiKeyCandidates
+            ? apiKeyCandidates[attempt]
+            : (await ApiKeyManager.getKeys(provider.providerSettingKey))[attempt];
           
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
@@ -207,9 +272,22 @@ export const ProviderRequestEngine = {
           throw error;
         }
 
+        if (abortController?.signal?.aborted) {
+          const abortError = createOperationAbortError(abortController.signal);
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PROVIDER_CANCELLED',
+            stage: 'provider-request',
+            provider: provider.providerName,
+            reason: abortError.message,
+            code: abortError.type || abortError.cancellationReason,
+            cancelled: true,
+          });
+          throw abortError;
+        }
+
         // 5. Handle Failover
-        if (attempt < availableKeysCount - 1 && ApiKeyManager.shouldFailover(error)) {
-          const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
+        if (attempt < availableKeysCount - 1 && shouldFailoverApiKey(provider, error)) {
+          const keys = apiKeyCandidates || await ApiKeyManager.getKeys(provider.providerSettingKey);
           if (keys.length > attempt + 1) {
             logger.warn(`[${provider.providerName}] Key error, attempting failover (${attempt + 1}/${availableKeysCount})`);
             appendTranslationDiagnostic(executionContext, {
