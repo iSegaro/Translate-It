@@ -209,6 +209,90 @@ describe('ProviderRequestEngine', () => {
       expect(classifyProviderHttpError.mock.calls[0][0]).not.toHaveProperty('arbitrary');
     });
 
+    it('preserves top-level provider message and code on the canonical error', async () => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        message: 'Request size limit exceeded',
+        code: 'some_code',
+      }));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        message: 'Request size limit exceeded',
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 400,
+        code: 'some_code',
+      });
+    });
+
+    it.each([400, 422])('does not use a top-level classification-looking message for generic HTTP %s classification', async (statusCode) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ message: 'Invalid API key' }, statusCode, 'Bad Request'));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+        message: 'Invalid API key',
+      });
+    });
+
+    it.each([
+      ['object', { message: { secret: true } }],
+      ['overlong string', { message: 'x'.repeat(2049) }],
+    ])('does not expose unsafe top-level %s provider messages', async (_label, body) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.message).toBe('Bad Request');
+    });
+
+    it.each([
+      ['nested error message', {
+        error: { message: 'Nested provider failure', code: 'nested-code' },
+      }, 'Nested provider failure'],
+      ['detail precedence', {
+        detail: 'Detailed provider failure',
+        message: 'Top-level provider failure',
+        error: { message: 'Nested provider failure', code: 'nested-code' },
+      }, 'Detailed provider failure'],
+    ])('preserves existing %s handling', async (_label, body, message) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({ message, code: 'nested-code' });
+    });
+
+    it.each([
+      ['overlong string', { code: 'x'.repeat(129) }],
+      ['object', { code: { unsafe: true } }],
+      ['array', { code: ['unsafe'] }],
+      ['unsafe number', { code: Number.MAX_SAFE_INTEGER + 1 }],
+    ])('drops %s provider code from the canonical error', async (_label, body) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).not.toHaveProperty('code');
+    });
+
     it('excludes absent, non-scalar, and overlong provider fields', async () => {
       const classifyProviderHttpError = vi.fn(() => null);
       mockProvider.classifyProviderHttpError = classifyProviderHttpError;
@@ -300,7 +384,7 @@ describe('ProviderRequestEngine', () => {
       });
     });
 
-    it('does not attach extracted provider fields to thrown error', async () => {
+    it('attaches only canonical provider code to the thrown error', async () => {
       mockProvider.classifyProviderHttpError = vi.fn(() => ErrorTypes.HTTP_ERROR);
       proxyManager.fetch.mockResolvedValue(httpErrorResponse({
         code: 'provider-code',
@@ -318,16 +402,18 @@ describe('ProviderRequestEngine', () => {
         type: ErrorTypes.HTTP_ERROR,
         statusCode: 400,
         providerName: 'TestProvider',
+        code: 'nested-code',
       });
       expect(error).not.toHaveProperty('topLevelCode');
       expect(error).not.toHaveProperty('nestedErrorCode');
       expect(error).not.toHaveProperty('providerErrorInfo');
-      expect(error).not.toHaveProperty('code');
       expect(error).not.toHaveProperty('errorCode');
     });
 
     it('keeps providers without hook on existing ErrorMatcher path', async () => {
-      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: { message: 'Invalid API key' } }, 401, 'Unauthorized'));
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        error: { message: 'Invalid API key', code: 'invalid_api_key' },
+      }, 401, 'Unauthorized'));
 
       await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
         url: 'https://api.test.com',
@@ -339,6 +425,7 @@ describe('ProviderRequestEngine', () => {
         statusCode: 401,
         context: 'existing-path',
         providerName: 'TestProvider',
+        code: 'invalid_api_key',
       });
     });
 
@@ -556,7 +643,7 @@ describe('ProviderRequestEngine', () => {
         fetchOptions: { headers: {} },
         extractResponse: mockExtractResponse,
         updateApiKey: vi.fn()
-      })).rejects.toThrow('Bad Request');
+      })).rejects.toThrow('Fatal Error');
 
       expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
     });

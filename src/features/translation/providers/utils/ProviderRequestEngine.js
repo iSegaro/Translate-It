@@ -34,6 +34,7 @@ function isAuthoritativeErrorType(error) {
 }
 
 const PROVIDER_ERROR_FIELD_MAX_LENGTH = 128;
+const PROVIDER_ERROR_MESSAGE_MAX_LENGTH = 2048;
 
 function getBoundedProviderErrorField(value) {
   if (typeof value === 'number') return Number.isSafeInteger(value) ? value : undefined;
@@ -42,6 +43,14 @@ function getBoundedProviderErrorField(value) {
   const normalized = value.trim();
   return normalized.length > 0 && normalized.length <= PROVIDER_ERROR_FIELD_MAX_LENGTH
     ? normalized
+    : undefined;
+}
+
+function getBoundedProviderErrorMessage(value) {
+  if (typeof value !== 'string') return undefined;
+
+  return value.trim().length > 0 && value.length <= PROVIDER_ERROR_MESSAGE_MAX_LENGTH
+    ? value
     : undefined;
 }
 
@@ -354,7 +363,15 @@ export const ProviderRequestEngine = {
           } catch { /* ignore */ }
         }
         
-        const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
+        const classificationMessage = getBoundedProviderErrorMessage(body?.detail)
+          ?? getBoundedProviderErrorMessage(body?.error?.message)
+          ?? getBoundedProviderErrorMessage(response.statusText)
+          ?? `HTTP ${response.status}`;
+        const message = getBoundedProviderErrorMessage(body?.detail)
+          ?? getBoundedProviderErrorMessage(body?.error?.message)
+          ?? getBoundedProviderErrorMessage(body?.message)
+          ?? getBoundedProviderErrorMessage(response.statusText)
+          ?? `HTTP ${response.status}`;
         const logLevel = 'warn'; // Providers only warn, upper layers handle errors
         
         let sanitizedUrl = url;
@@ -367,7 +384,7 @@ export const ProviderRequestEngine = {
 
         logger[logLevel](`[${provider.providerName}] executeApiCall HTTP error (${response.status})`, {
           status: response.status,
-          message: msg,
+          message,
           url: sanitizedUrl,
         });
 
@@ -378,15 +395,17 @@ export const ProviderRequestEngine = {
         const providerErrorType = classifyProviderHttpError(provider, providerErrorInfo);
         const errorType = providerErrorType || matchErrorToType({
           statusCode: response.status,
-          message: msg,
+          message: classificationMessage,
           providerType: provider.constructor.type,
         });
 
-        const err = new Error(msg);
+        const err = new Error(message);
         err.type = errorType;
         err.statusCode = response.status;
         err.context = context;
         err.providerName = provider.providerName;
+        const providerCode = providerErrorInfo.nestedErrorCode ?? providerErrorInfo.topLevelCode;
+        if (providerCode !== undefined) err.code = providerCode;
         if (errorType === ErrorTypes.RATE_LIMIT_REACHED && retryAt !== undefined) {
           err.retryAt = retryAt;
         }

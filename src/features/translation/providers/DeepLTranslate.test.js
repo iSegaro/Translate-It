@@ -204,7 +204,7 @@ describe('DeepLTranslateProvider response contract', () => {
     expect(calls).toBe(1);
   });
 
-  it('recovers from a request-size response classified by ProviderRequestEngine', async () => {
+  it.each([400, 422])('recovers from a top-level request-size message on HTTP %s', async (statusCode) => {
     const response = (status, body, statusText) => ({
       ok: status >= 200 && status < 300,
       status,
@@ -215,7 +215,7 @@ describe('DeepLTranslateProvider response contract', () => {
     });
 
     proxyFetch
-      .mockResolvedValueOnce(response(400, { error: { message: 'HTTP 400: request is too long' } }, 'Bad Request'))
+      .mockResolvedValueOnce(response(statusCode, { message: 'HTTP request is too long' }, 'Bad Request'))
       .mockResolvedValue(response(200, { translations: [{ text: 'translated' }] }, 'OK'));
 
     await expect(provider._translateChunk(
