@@ -14,9 +14,12 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js';
+import { CONFIG, getDeeplApiTierAsync } from '@/shared/config/config.js';
 import { ProviderRegistryIds } from './ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ApiKeyManager');
+const DEEPL_FREE_USAGE_URL = 'https://api-free.deepl.com/v2/usage';
+const DEEPL_PRO_USAGE_URL = 'https://api.deepl.com/v2/usage';
 
 /**
  * Settings key mapping for each provider
@@ -212,13 +215,17 @@ class ApiKeyManager {
       };
     }
 
+    const deepLContext = providerId === ProviderRegistryIds.DEEPL
+      ? { apiTier: await getDeeplApiTierAsync() }
+      : {};
+
     // Import provider classes dynamically
     const providerTests = {
       [ProviderRegistryIds.OPENAI]: async (key) => await this._testOpenAIKey(key),
       [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key),
       [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key),
       [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key),
-      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key),
+      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key, deepLContext),
       [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key)
     };
 
@@ -274,7 +281,7 @@ class ApiKeyManager {
    * Test keys directly from provided value (without reading from storage)
    * @param {string} keysString - Keys string (one per line)
    * @param {string} providerId - Provider registry ID for testing
-   * @param {Object} [context={}] - Optional additional context (e.g., custom URL/Model)
+   * @param {Object} [context={}] - Optional additional context (e.g., custom URL/Model or DeepL API tier)
    * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
    */
   static async testKeysDirect(keysString, providerId, context = {}) {
@@ -300,7 +307,7 @@ class ApiKeyManager {
       [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key, context),
       [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key, context),
       [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key, context),
-      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key),
+      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key, context),
       [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key, context)
     };
 
@@ -523,27 +530,31 @@ class ApiKeyManager {
   /**
    * Test DeepL API key
    * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional validation context with API tier
    * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testDeepLKey(key) {
+  static async _testDeepLKey(key, context = {}) {
     try {
-      const response = await this._fetchWithCurrentProxy('https://api-free.deepl.com/v2/usage', {
+      const requestedTier = context?.apiTier;
+      const configuredTier = requestedTier === undefined
+        ? await getDeeplApiTierAsync()
+        : requestedTier;
+      const apiTier = configuredTier === 'free' || configuredTier === 'pro'
+        ? configuredTier
+        : CONFIG.DEEPL_API_TIER;
+      const apiUrl = typeof key === 'string' && key.endsWith(':fx')
+        ? DEEPL_FREE_USAGE_URL
+        : apiTier === 'pro'
+          ? DEEPL_PRO_USAGE_URL
+          : DEEPL_FREE_USAGE_URL;
+
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `DeepL-Auth-Key ${key}`
         }
       });
-      // Also check pro endpoint
-      if (!response.ok) {
-        const proResponse = await this._fetchWithCurrentProxy('https://api.deepl.com/v2/usage', {
-          method: 'GET',
-          headers: {
-            'Authorization': `DeepL-Auth-Key ${key}`
-          }
-        });
-        return proResponse.ok;
-      }
       return response.ok;
     } catch {
       return false;

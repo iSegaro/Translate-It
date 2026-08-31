@@ -118,8 +118,12 @@ const testKeys = async (providerId) => {
   testResult.value = null
 
   try {
-    // Test keys directly from textbox value (not from storage)
-    const result = await ApiKeyManager.testKeysDirect(deeplApiKey.value, providerId)
+    // Test keys directly from textbox value and current unsaved tier (not storage)
+    const result = await ApiKeyManager.testKeysDirect(
+      deeplApiKey.value,
+      providerId,
+      { apiTier: deeplApiTier.value }
+    )
 
     // Store messageKey and params for reactive translation in ApiKeyInput
     testResult.value = {

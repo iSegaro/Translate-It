@@ -150,7 +150,7 @@ describe('ApiKeyManager', () => {
       [ProviderRegistryIds.GEMINI, '_testGeminiKey', ['secret-key', {}]],
       [ProviderRegistryIds.DEEPSEEK, '_testDeepSeekKey', ['secret-key', {}]],
       [ProviderRegistryIds.OPENROUTER, '_testOpenRouterKey', ['secret-key', {}]],
-      [ProviderRegistryIds.DEEPL, '_testDeepLKey', ['secret-key']]
+       [ProviderRegistryIds.DEEPL, '_testDeepLKey', ['secret-key', {}]]
     ])('dispatches %s to its validator', async (providerId, validator, expectedArgs) => {
       const testValidator = vi.spyOn(ApiKeyManager, validator).mockResolvedValue(true);
 
@@ -174,6 +174,15 @@ describe('ApiKeyManager', () => {
 
       expect(testCustomKeys).toHaveBeenCalledWith([], context);
       testCustomKeys.mockRestore();
+    });
+
+    it('passes DeepL tier context to direct validation', async () => {
+      const testValidator = vi.spyOn(ApiKeyManager, '_testDeepLKey').mockResolvedValue(true);
+
+      await ApiKeyManager.testKeysDirect('secret-key', ProviderRegistryIds.DEEPL, { apiTier: 'pro' });
+
+      expect(testValidator).toHaveBeenCalledWith('secret-key', { apiTier: 'pro' });
+      testValidator.mockRestore();
     });
 
     it.each(['unknown-provider', 'OpenAI', 'Gemini', 'DeepSeek', 'OpenRouter', 'DeepL', 'Custom'])('returns unknown-provider result for unsupported provider ID %s', async (providerId) => {
@@ -251,69 +260,90 @@ describe('ApiKeyManager', () => {
       expect(mockProxyFetch.mock.calls[0][2]).toBe(currentProxy);
     });
 
-    it('resolves a fresh snapshot for each DeepL fallback request', async () => {
-      const firstProxy = createProxyConfig({ enabled: true, host: 'proxy-first', port: 8000 });
-      const secondProxy = createProxyConfig({ enabled: true, host: 'proxy-second', port: 9000 });
-      mockResolveProxyConfig
-        .mockResolvedValueOnce(firstProxy)
-        .mockResolvedValueOnce(secondProxy);
-      mockProxyFetch
-        .mockResolvedValueOnce({ ok: false, status: 500 })
-        .mockResolvedValueOnce({ ok: true, status: 200 });
+    it('resolves a current proxy snapshot for one DeepL validation request', async () => {
+      const staleProxy = createProxyConfig({ enabled: true, host: 'proxy-stale', port: 8000 });
+      const currentProxy = createProxyConfig({ enabled: true, host: 'proxy-current', port: 9000 });
+      mockProxyManager.config = staleProxy;
+      mockResolveProxyConfig.mockResolvedValue(currentProxy);
+      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
 
-      await expect(ApiKeyManager._testDeepLKey('secret-key')).resolves.toBe(true);
+      await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(true);
 
-      expect(mockResolveProxyConfig).toHaveBeenCalledTimes(2);
-      expect(mockProxyFetch).toHaveBeenCalledTimes(2);
-      expect(mockProxyFetch.mock.calls[0][2]).toBe(firstProxy);
-      expect(mockProxyFetch.mock.calls[1][2]).toBe(secondProxy);
+      expect(mockResolveProxyConfig).toHaveBeenCalledTimes(1);
+      expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      expect(mockProxyFetch.mock.calls[0][0]).toBe('https://api.deepl.com/v2/usage');
+      expect(mockProxyFetch.mock.calls[0][2]).toBe(currentProxy);
+      expect(mockProxyFetch.mock.calls[0][2]).not.toBe(staleProxy);
     });
 
     describe('DeepL usage validation', () => {
-      it('uses GET with the Free usage endpoint and auth header', async () => {
+      it.each([
+        ['Free suffix overrides selected Pro tier', 'abc:fx', 'pro', 'https://api-free.deepl.com/v2/usage'],
+        ['selected Free tier', 'free-key', 'free', 'https://api-free.deepl.com/v2/usage'],
+        ['selected Pro tier', 'pro-key', 'pro', 'https://api.deepl.com/v2/usage'],
+      ])('selects endpoint for %s', async (_label, key, apiTier, expectedUrl) => {
         mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
 
-        await expect(ApiKeyManager._testDeepLKey('free-key')).resolves.toBe(true);
+        await expect(ApiKeyManager._testDeepLKey(key, { apiTier })).resolves.toBe(true);
 
         expect(mockProxyFetch).toHaveBeenCalledTimes(1);
         const [url, options] = mockProxyFetch.mock.calls[0];
-        expect(url).toBe('https://api-free.deepl.com/v2/usage');
+        expect(url).toBe(expectedUrl);
         expect(options).toMatchObject({
           method: 'GET',
-          headers: { 'Authorization': 'DeepL-Auth-Key free-key' }
+          headers: { 'Authorization': `DeepL-Auth-Key ${key}` }
         });
         expect(options).not.toHaveProperty('body');
       });
 
-      it('uses GET with the Pro usage endpoint after Free endpoint failure', async () => {
-        mockProxyFetch
-          .mockResolvedValueOnce({ ok: false, status: 403 })
-          .mockResolvedValueOnce({ ok: true, status: 200 });
+      it('uses the canonical Free default for an invalid tier', async () => {
+        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
 
-        await expect(ApiKeyManager._testDeepLKey('pro-key')).resolves.toBe(true);
+        await expect(ApiKeyManager._testDeepLKey('unknown-tier-key', { apiTier: 'enterprise' }))
+          .resolves.toBe(true);
 
-        expect(mockProxyFetch).toHaveBeenCalledTimes(2);
-        const [freeRequest, proRequest] = mockProxyFetch.mock.calls;
-        expect(freeRequest[0]).toBe('https://api-free.deepl.com/v2/usage');
-        expect(freeRequest[1]).toMatchObject({
-          method: 'GET',
-          headers: { 'Authorization': 'DeepL-Auth-Key pro-key' }
-        });
-        expect(freeRequest[1]).not.toHaveProperty('body');
-        expect(proRequest[0]).toBe('https://api.deepl.com/v2/usage');
-        expect(proRequest[1]).toMatchObject({
-          method: 'GET',
-          headers: { 'Authorization': 'DeepL-Auth-Key pro-key' }
-        });
-        expect(proRequest[1]).not.toHaveProperty('body');
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+        expect(mockProxyFetch.mock.calls[0][0]).toBe('https://api-free.deepl.com/v2/usage');
       });
 
-      it('returns false when both usage endpoints fail', async () => {
-        mockProxyFetch
-          .mockResolvedValueOnce({ ok: false, status: 403 })
-          .mockResolvedValueOnce({ ok: false, status: 403 });
+      it.each([400, 429, 456, 500, 529])('does not probe alternate endpoint after HTTP %s', async (status) => {
+        mockProxyFetch.mockResolvedValue({ ok: false, status });
 
-        await expect(ApiKeyManager._testDeepLKey('invalid-key')).resolves.toBe(false);
+        await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(false);
+
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+        expect(mockProxyFetch.mock.calls[0][0]).toBe('https://api.deepl.com/v2/usage');
+      });
+
+      it('returns false when the selected endpoint request throws', async () => {
+        mockProxyFetch.mockRejectedValue(new Error('network failure'));
+
+        await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(false);
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      });
+
+      it('uses persisted tier for testAndReorderKeys', async () => {
+        mockStorage.set('DEEPL_API_KEY', 'pro-key');
+        mockStorage.set('DEEPL_API_TIER', 'pro');
+        const testValidator = vi.spyOn(ApiKeyManager, '_testDeepLKey').mockResolvedValue(true);
+
+        const result = await ApiKeyManager.testAndReorderKeys('DEEPL_API_KEY', ProviderRegistryIds.DEEPL);
+
+        expect(testValidator).toHaveBeenCalledWith('pro-key', { apiTier: 'pro' });
+        expect(result).toMatchObject({ valid: ['pro-key'], invalid: [], allInvalid: false });
+        testValidator.mockRestore();
+      });
+
+      it('keeps :fx override through testAndReorderKeys', async () => {
+        mockStorage.set('DEEPL_API_KEY', 'abc:fx');
+        mockStorage.set('DEEPL_API_TIER', 'pro');
+        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+        await expect(ApiKeyManager.testAndReorderKeys('DEEPL_API_KEY', ProviderRegistryIds.DEEPL))
+          .resolves.toMatchObject({ valid: ['abc:fx'], allInvalid: false });
+
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+        expect(mockProxyFetch.mock.calls[0][0]).toBe('https://api-free.deepl.com/v2/usage');
       });
     });
   });

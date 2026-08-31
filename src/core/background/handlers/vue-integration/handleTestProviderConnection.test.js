@@ -82,6 +82,26 @@ describe('handleTestProviderConnection', () => {
     );
   });
 
+  it('preserves unsaved DeepL tier in provider test context', async () => {
+    mocks.testKeysDirect.mockResolvedValue({ allInvalid: false });
+
+    await handleTestProviderConnection({
+      data: {
+        provider: ProviderRegistryIds.DEEPL,
+        config: {
+          apiKey: 'secret-key',
+          apiTier: 'pro',
+        },
+      },
+    });
+
+    expect(mocks.testKeysDirect).toHaveBeenCalledWith(
+      'secret-key',
+      ProviderRegistryIds.DEEPL,
+      { apiTier: 'pro' }
+    );
+  });
+
   it('reports invalid validation without contradictory success flags', async () => {
     const testResult = {
       valid: [],

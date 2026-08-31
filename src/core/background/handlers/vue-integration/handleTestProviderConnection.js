@@ -10,12 +10,14 @@ function getProviderTestInput(config) {
   const values = config && typeof config === 'object' ? config : {};
   const apiUrl = values.apiUrl ?? values.customUrl;
   const apiModel = values.apiModel ?? values.model;
+  const apiTier = values.apiTier;
 
   return {
     keys: typeof values.apiKey === 'string' ? values.apiKey : '',
     context: {
       ...(apiUrl !== undefined && { apiUrl }),
       ...(apiModel !== undefined && { apiModel }),
+      ...(apiTier !== undefined && { apiTier }),
     },
   };
 }
