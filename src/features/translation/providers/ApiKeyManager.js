@@ -529,7 +529,7 @@ class ApiKeyManager {
   static async _testDeepLKey(key) {
     try {
       const response = await this._fetchWithCurrentProxy('https://api-free.deepl.com/v2/usage', {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Authorization': `DeepL-Auth-Key ${key}`
         }
@@ -537,7 +537,7 @@ class ApiKeyManager {
       // Also check pro endpoint
       if (!response.ok) {
         const proResponse = await this._fetchWithCurrentProxy('https://api.deepl.com/v2/usage', {
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Authorization': `DeepL-Auth-Key ${key}`
           }

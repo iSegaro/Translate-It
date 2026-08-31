@@ -268,6 +268,54 @@ describe('ApiKeyManager', () => {
       expect(mockProxyFetch.mock.calls[0][2]).toBe(firstProxy);
       expect(mockProxyFetch.mock.calls[1][2]).toBe(secondProxy);
     });
+
+    describe('DeepL usage validation', () => {
+      it('uses GET with the Free usage endpoint and auth header', async () => {
+        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+        await expect(ApiKeyManager._testDeepLKey('free-key')).resolves.toBe(true);
+
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+        const [url, options] = mockProxyFetch.mock.calls[0];
+        expect(url).toBe('https://api-free.deepl.com/v2/usage');
+        expect(options).toMatchObject({
+          method: 'GET',
+          headers: { 'Authorization': 'DeepL-Auth-Key free-key' }
+        });
+        expect(options).not.toHaveProperty('body');
+      });
+
+      it('uses GET with the Pro usage endpoint after Free endpoint failure', async () => {
+        mockProxyFetch
+          .mockResolvedValueOnce({ ok: false, status: 403 })
+          .mockResolvedValueOnce({ ok: true, status: 200 });
+
+        await expect(ApiKeyManager._testDeepLKey('pro-key')).resolves.toBe(true);
+
+        expect(mockProxyFetch).toHaveBeenCalledTimes(2);
+        const [freeRequest, proRequest] = mockProxyFetch.mock.calls;
+        expect(freeRequest[0]).toBe('https://api-free.deepl.com/v2/usage');
+        expect(freeRequest[1]).toMatchObject({
+          method: 'GET',
+          headers: { 'Authorization': 'DeepL-Auth-Key pro-key' }
+        });
+        expect(freeRequest[1]).not.toHaveProperty('body');
+        expect(proRequest[0]).toBe('https://api.deepl.com/v2/usage');
+        expect(proRequest[1]).toMatchObject({
+          method: 'GET',
+          headers: { 'Authorization': 'DeepL-Auth-Key pro-key' }
+        });
+        expect(proRequest[1]).not.toHaveProperty('body');
+      });
+
+      it('returns false when both usage endpoints fail', async () => {
+        mockProxyFetch
+          .mockResolvedValueOnce({ ok: false, status: 403 })
+          .mockResolvedValueOnce({ ok: false, status: 403 });
+
+        await expect(ApiKeyManager._testDeepLKey('invalid-key')).resolves.toBe(false);
+      });
+    });
   });
 
   describe('Custom Provider Testing', () => {
