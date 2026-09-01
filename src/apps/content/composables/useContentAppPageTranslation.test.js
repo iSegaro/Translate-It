@@ -559,7 +559,125 @@ describe('useContentAppPageTranslation', () => {
     }));
     expect(mobileStore.setPageTranslation).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'error',
+      errorMessage: null,
     }));
+  });
+
+  it('stores localized structured cause for zero-result completion', async () => {
+    const errorDetails = {
+      message: 'Too Many Requests',
+      type: ErrorTypes.RATE_LIMIT_REACHED,
+      statusCode: 429,
+    };
+    getPageTranslationErrorPresentationMock.mockResolvedValueOnce(
+      Object.assign(new Error('Localized rate limit'), { type: ErrorTypes.RATE_LIMIT_REACHED })
+    );
+
+    await listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      isAggregated: true,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+      errorDetails,
+    });
+
+    expect(getPageTranslationErrorPresentationMock).toHaveBeenCalledWith(expect.objectContaining({ errorDetails }));
+    expect(mobileStore.setPageTranslation).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: 'error',
+      errorMessage: 'Localized rate limit',
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+    }));
+  });
+
+  it('discards pending zero-result cause after reset', async () => {
+    const decision = createDeferred();
+    getPageTranslationErrorPresentationMock.mockReturnValueOnce(decision.promise);
+
+    const completion = listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      isAggregated: true,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+      errorDetails: { type: ErrorTypes.MODEL_OVERLOADED, message: 'overloaded' },
+    });
+    listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
+
+    decision.resolve(new Error('stale presentation'));
+    await completion;
+
+    expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
+  });
+
+  it('keeps newer partial completion when an older zero-result presentation resolves', async () => {
+    const decision = createDeferred();
+    getPageTranslationErrorPresentationMock.mockReturnValueOnce(decision.promise);
+
+    const staleCompletion = listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      isAggregated: true,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+      errorDetails: { type: ErrorTypes.MODEL_OVERLOADED, message: 'overloaded' },
+    });
+    await listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      isAggregated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      totalCount: 3,
+    });
+
+    decision.resolve(new Error('stale presentation'));
+    await staleCompletion;
+
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      status: 'completed',
+      isTranslated: true,
+      translatedCount: 2,
+      failedCount: 1,
+      errorMessage: null,
+    });
+  });
+
+  it.each([
+    [MessageActions.PAGE_TRANSLATE_START, {}, {
+      status: 'translating',
+      isTranslating: true,
+      translatedCount: 0,
+    }],
+    [MessageActions.PAGE_TRANSLATE_PROGRESS, {
+      isAggregated: true,
+      translatedCount: 1,
+      failedCount: 0,
+      totalCount: 2,
+      isTranslating: true,
+    }, {
+      status: 'translating',
+      isTranslating: true,
+      translatedCount: 1,
+    }],
+  ])('discards pending zero-result presentation after newer %s', async (action, data, expectedState) => {
+    const decision = createDeferred();
+    getPageTranslationErrorPresentationMock.mockReturnValueOnce(decision.promise);
+    mobileStore.pageTranslationData.errorMessage = null;
+
+    const staleCompletion = listeners.get(MessageActions.PAGE_TRANSLATE_COMPLETE)({
+      isAggregated: true,
+      translatedCount: 0,
+      failedCount: 3,
+      totalCount: 3,
+      errorDetails: { type: ErrorTypes.MODEL_OVERLOADED, message: 'overloaded' },
+    });
+    listeners.get(action)(data);
+
+    decision.resolve(new Error('stale presentation'));
+    await staleCompletion;
+
+    expect(mobileStore.pageTranslationData).toMatchObject({
+      ...expectedState,
+      errorMessage: null,
+    });
   });
 
   it('does not surface structured cancellation/context errors', async () => {

@@ -608,6 +608,40 @@ describe('trusted frame lifecycle relay', () => {
     }, { frameId: 0 });
   });
 
+  it('relays structured completion details unchanged', async () => {
+    const errorDetails = {
+      message: 'Rate limited',
+      type: 'RATE_LIMIT_REACHED',
+      statusCode: 429,
+    };
+    const data = {
+      sessionId: 'session-a',
+      translatedCount: 0,
+      failedCount: 2,
+      totalCount: 2,
+      errorDetails,
+    };
+
+    const result = await handlePageTranslation({
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+        data,
+      },
+    }, { tab: { id: 42 }, frameId: 7 });
+
+    expect(result).toEqual({ success: true, aggregated: true });
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(42, {
+      action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,
+      data: {
+        frameId: 7,
+        action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+        data,
+      },
+      context: 'page-translation-frame-lifecycle-relay',
+    }, { frameId: 0 });
+  });
+
   it('relays retirement with sender frame identity and top-frame targeting', async () => {
     const result = await handlePageTranslation({
       action: MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE,

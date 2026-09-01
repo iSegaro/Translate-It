@@ -32,6 +32,7 @@ import { safeSendMessage, sendRegularMessage } from '@/shared/messaging/core/Uni
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ActionReasons, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 
 // 3. Mock other dependencies
@@ -172,10 +173,20 @@ describe('PageTranslationScheduler', () => {
     it('should reset state correctly', () => {
       scheduler.translatedCount = 10;
       scheduler.totalTasks = 20;
+      scheduler.lastNonFatalError = { message: 'stale failure', type: 'RATE_LIMIT_REACHED' };
       scheduler.reset();
       expect(scheduler.translatedCount).toBe(0);
       expect(scheduler.totalTasks).toBe(0);
       expect(scheduler.isTranslated).toBe(false);
+      expect(scheduler.lastNonFatalError).toBeNull();
+    });
+
+    it('clears retained non-fatal error when a new session starts', () => {
+      scheduler.lastNonFatalError = { message: 'stale failure', type: 'RATE_LIMIT_REACHED' };
+
+      scheduler.setTranslationState(true, 'new-session', { pageTitle: 'New Page' });
+
+      expect(scheduler.lastNonFatalError).toBeNull();
     });
   });
 
@@ -392,8 +403,88 @@ describe('PageTranslationScheduler', () => {
 
       expect(scheduler.failedCount).toBe(1);
       expect(scheduler.translatedCount).toBe(1);
-      expect(emitSpy.mock.calls.filter(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE)).toHaveLength(1);
+      const completion = emitSpy.mock.calls.find(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE)?.[1];
+      expect(completion).toMatchObject({ translatedCount: 1, failedCount: 1 });
+      expect(completion).not.toHaveProperty('errorDetails');
       emitSpy.mockRestore();
+    });
+
+    it('emits latest non-fatal structured cause for zero-result completion', async () => {
+      vi.useFakeTimers();
+      try {
+        const emitSpy = vi.spyOn(pageEventBus, 'emit');
+        const firstItem = { text: 'First', resolve: vi.fn(), score: 1 };
+        const lastItem = { text: 'Last', resolve: vi.fn(), score: 1 };
+        scheduler.totalTasks = 2;
+
+        await scheduler._handleBatchError(
+          Object.assign(new Error('Too many requests'), {
+            type: ErrorTypes.RATE_LIMIT_REACHED,
+            statusCode: 429,
+          }),
+          [firstItem],
+          ErrorTypes.RATE_LIMIT_REACHED
+        );
+        await scheduler._handleBatchError(
+          Object.assign(new Error('Model overloaded'), {
+            type: ErrorTypes.MODEL_OVERLOADED,
+          }),
+          [lastItem],
+          ErrorTypes.MODEL_OVERLOADED
+        );
+
+        scheduler._checkCompletion();
+        await vi.runAllTimersAsync();
+
+        const completion = emitSpy.mock.calls.find(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE)?.[1];
+        expect(completion).toMatchObject({
+          translatedCount: 0,
+          failedCount: 2,
+          errorDetails: {
+            message: 'Model overloaded',
+            type: ErrorTypes.MODEL_OVERLOADED,
+          },
+        });
+        expect(completion.errorDetails).not.toHaveProperty('statusCode');
+        emitSpy.mockRestore();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('retains retryable HTTP metadata for zero-result completion', async () => {
+      vi.useFakeTimers();
+      try {
+        const item = { text: 'HTTP failure', resolve: vi.fn(), score: 1 };
+        scheduler.queue.push(item);
+        scheduler.totalTasks = 1;
+        PageTranslationFluidFilter.process.mockReturnValue({ batchItems: [item], remainingItems: [] });
+        vi.spyOn(scheduler, '_getBatchConfig').mockResolvedValue({ providerRegistryId: 'google', targetLanguage: 'fa' });
+        safeSendMessage.mockResolvedValue({
+          success: false,
+          error: 'Conflict',
+          errorType: ErrorTypes.HTTP_ERROR,
+          errorDetails: {
+            message: 'Conflict',
+            type: ErrorTypes.HTTP_ERROR,
+            statusCode: 409,
+          },
+        });
+
+        await scheduler.flush();
+        await vi.runAllTimersAsync();
+
+        const completion = pageEventBus.emit.mock.calls
+          .find(([event]) => event === MessageActions.PAGE_TRANSLATE_COMPLETE)?.[1];
+        expect(completion?.errorDetails).toEqual({
+          message: 'Conflict',
+          type: ErrorTypes.HTTP_ERROR,
+          statusCode: 409,
+        });
+        expect(scheduler.fatalErrorOccurred).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should process a successful batch translation', async () => {

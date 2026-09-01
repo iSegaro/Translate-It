@@ -4,6 +4,7 @@
  */
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -13,6 +14,7 @@ export class MainFrameAggregator {
   constructor(MessageActions) {
     this.MessageActions = MessageActions;
     this.frameProgressMap = new Map();
+    this.terminalCauseSequence = 0;
     
     // Bind methods to ensure correct 'this' context
     this.updateFrameData = this.updateFrameData.bind(this);
@@ -39,6 +41,34 @@ export class MainFrameAggregator {
    */
   clearAll() {
     this.frameProgressMap.clear();
+    this.terminalCauseSequence = 0;
+  }
+
+  recordTerminalCause(frameId, errorDetails) {
+    if (!isStructuredTranslationError(errorDetails)) return;
+
+    const progress = this.frameProgressMap.get(frameId);
+    if (!progress) return;
+
+    progress.terminalErrorDetails = errorDetails;
+    progress.terminalCauseSequence = ++this.terminalCauseSequence;
+  }
+
+  getLatestTerminalCause() {
+    let latestCause = null;
+    let latestSequence = -1;
+
+    for (const progress of this.frameProgressMap.values()) {
+      if (
+        isStructuredTranslationError(progress.terminalErrorDetails)
+        && progress.terminalCauseSequence > latestSequence
+      ) {
+        latestCause = progress.terminalErrorDetails;
+        latestSequence = progress.terminalCauseSequence;
+      }
+    }
+
+    return latestCause;
   }
 
   /**
@@ -110,6 +140,14 @@ export class MainFrameAggregator {
           action === this.MessageActions.PAGE_AUTO_RESTORE_COMPLETE) {
         payload.isTranslated = status.translatedCount > 0;
         payload.url = window.location.href;
+
+        if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE) {
+          delete payload.errorDetails;
+          if (!status.isTranslating && status.translatedCount === 0 && status.failedCount > 0) {
+            const terminalCause = this.getLatestTerminalCause();
+            if (terminalCause) payload.errorDetails = terminalCause;
+          }
+        }
       } else if (action === this.MessageActions.PAGE_RESTORE_COMPLETE) {
         // For restore complete, force clean state regardless of frame data
         payload.isTranslated = false;

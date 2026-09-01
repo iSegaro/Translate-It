@@ -43,6 +43,8 @@ export class PageTranslationScheduler extends ResourceTracker {
     this.totalTasks = 0;
     this.activeFlushes = 0;
     this.fatalErrorOccurred = false;
+    // Keep latest non-fatal terminal cause for zero-result completion.
+    this.lastNonFatalError = null;
     this.isFirstBatch = true;
     this.isTranslated = false;
     this.translationSessionId = null;
@@ -102,6 +104,7 @@ export class PageTranslationScheduler extends ResourceTracker {
     if (!isTranslated) {
       this.stop('cancelled', cancellationReason);
     } else {
+      this.lastNonFatalError = null;
       this.isTranslated = isTranslated;
       this.translationSessionId = sessionId;
       this.sessionContext = sessionContext;
@@ -127,6 +130,7 @@ export class PageTranslationScheduler extends ResourceTracker {
   stop(settlementOutcome = 'cancelled', cancellationReason = INTERNAL_CANCELLATION_REASON) {
     const wasTranslating = this.isTranslated;
     this.isTranslated = false;
+    this.lastNonFatalError = null;
     this.sessionContext = null;
     this._reportPending = false;
     this.isScrolling = false;
@@ -710,6 +714,13 @@ export class PageTranslationScheduler extends ResourceTracker {
 
     if (isFatal) {
       this.fatalErrorOccurred = true;
+    } else {
+      // Intermediate failures stay silent but remain available for terminal UI.
+      const errorTypeForDetails = error?.type || errorType;
+      this.lastNonFatalError = MessageFormat.serializeTranslationError(
+        error,
+        errorTypeForDetails ? { type: errorTypeForDetails } : {}
+      );
     }
 
     // Resolve current batch items with original text to unblock domtranslator
@@ -804,7 +815,12 @@ export class PageTranslationScheduler extends ResourceTracker {
             translatedCount: this.translatedCount,
             totalCount: this.totalTasks,
             failedCount: this.failedCount,
-            isAutoTranslating: false
+            isAutoTranslating: false,
+            ...(this.translatedCount === 0
+              && this.failedCount > 0
+              && this.lastNonFatalError
+              ? { errorDetails: this.lastNonFatalError }
+              : {})
           });
         }
         this.isWaitingForVisibility = false;

@@ -265,6 +265,35 @@ describe('PageTranslationEventManager', () => {
       });
     });
 
+    it('presents structured terminal cause instead of generic zero-result error', async () => {
+      const callback = mockBus.on.mock.calls.find(c => c[0] === MessageActions.PAGE_TRANSLATE_COMPLETE)[1];
+      const errorDetails = {
+        message: 'Too Many Requests',
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        statusCode: 429,
+      };
+
+      callback({
+        isAggregated: true,
+        isTranslating: false,
+        isAutoTranslating: false,
+        translatedCount: 0,
+        failedCount: 3,
+        totalCount: 3,
+        errorDetails,
+      });
+      await vi.waitFor(() => expect(ErrorHandler.getInstance().handle).toHaveBeenCalledTimes(1));
+
+      expect(ErrorHandler.getInstance().handle.mock.calls[0][0]).toMatchObject({
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+      });
+      expect(ErrorHandler.getInstance().handle.mock.calls[0][1]).toMatchObject({
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        context: 'page-translation-zero-result',
+        showToast: true,
+      });
+    });
+
     it.each([ErrorTypes.USER_CANCELLED, ErrorTypes.TRANSLATION_CANCELLED, ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED])(
       'does not present silent translation error %s', async (type) => {
         const callback = mockBus.on.mock.calls.find(c => c[0] === 'page-translation-internal-error')[1];
