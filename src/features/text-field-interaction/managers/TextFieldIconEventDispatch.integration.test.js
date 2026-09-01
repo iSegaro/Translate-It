@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createApp } from 'vue';
 
 const mockStore = {
   activeIcons: [],
@@ -157,6 +158,20 @@ describe('TextFieldIconManager event dispatch characterization', () => {
   let manager;
   let executeFromEvent;
   let executeTranslation;
+  const apps = [];
+
+  function withSetup(composable) {
+    let result;
+    const app = createApp({
+      setup() {
+        result = composable();
+        return () => null;
+      },
+    });
+    app.mount(document.createElement('div'));
+    apps.push(app);
+    return result;
+  }
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -168,6 +183,7 @@ describe('TextFieldIconManager event dispatch characterization', () => {
   });
 
   afterEach(() => {
+    apps.splice(0).forEach(app => app.unmount());
     executeFromEvent?.mockRestore();
     executeTranslation?.mockRestore();
     TextFieldIconManager.resetInstance();
@@ -180,7 +196,7 @@ describe('TextFieldIconManager event dispatch characterization', () => {
 
   it('characterizes Vue text-field producer dispatch count', async () => {
     registerIcon('icon-vue');
-    const icon = useTextFieldIcon();
+    const icon = withSetup(() => useTextFieldIcon());
     icon.initialize(pageEventBus);
 
     icon.handleIconClick('icon-vue');
@@ -194,7 +210,7 @@ describe('TextFieldIconManager event dispatch characterization', () => {
 
   it('characterizes ContentApp producer dispatch count', async () => {
     registerIcon('icon-content-app');
-    const icon = useContentAppTextFieldIcons({ addEventListener: vi.fn() });
+    const icon = withSetup(() => useContentAppTextFieldIcons({ addEventListener: vi.fn() }));
 
     icon.onIconClick('icon-content-app');
     await new Promise(resolve => setTimeout(resolve, 0));
