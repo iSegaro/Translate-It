@@ -750,6 +750,31 @@ describe('SubtitleTranslationCoordinator Source-Preservation Contract', () => {
     expect(progress.failed).toBe(1);
   });
 
+  it('continues after a formatting-token failure and counts translated and failed cues separately', async () => {
+    const batch = [
+      cue('format-valid-a', '<i>Hello</i>', 1),
+      cue('format-corrupt-b', '{\\an8}Styled', 2),
+      cue('format-valid-c', 'Line 1\nLine 2', 3)
+    ];
+    const tracker = makeJob(batch);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [
+        { id: batch[0].id, text: '@@SUB_TAG_0@@Hola@@SUB_TAG_1@@' },
+        { id: batch[1].id, text: 'Estilo perdido' },
+        { id: batch[2].id, text: 'Linea 1@@SUB_NL_0@@Linea 2' }
+      ]
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(result.success).toBe(true);
+    expect(batch[0]).toMatchObject({ status: 'translated', translatedText: '<i>Hola</i>' });
+    expect(batch[1]).toMatchObject({ status: 'failed', translatedText: '', text: '{\\an8}Styled' });
+    expect(batch[2]).toMatchObject({ status: 'translated', translatedText: 'Linea 1\nLinea 2' });
+    expect(tracker.getProgress()).toMatchObject({ translated: 2, failed: 1, processed: 3 });
+  });
+
   it('keeps all cues original and fails every cue when the entire batch is unresolved', async () => {
     const batch = [cue('e1', 'One'), cue('e2', 'Two')];
     const tracker = makeJob(batch);
