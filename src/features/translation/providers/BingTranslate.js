@@ -378,10 +378,11 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           throw createInvalidBingTokenResponseError('Bing token response parameters are incomplete');
         }
 
-        const [_key, _token, interval] = params;
-        const tokenExpiryInterval = Number(interval);
-        if (!IG || !IID || typeof _key !== 'string' || !_key
+        const [_key, _token, tokenExpiryInterval] = params;
+        if (!IG || !IID
+          || typeof _key !== 'number' || !Number.isFinite(_key) || _key <= 0
           || typeof _token !== 'string' || !_token
+          || typeof tokenExpiryInterval !== 'number'
           || !Number.isFinite(tokenExpiryInterval) || tokenExpiryInterval <= 0) {
           throw createInvalidBingTokenResponseError('Bing token response contains unusable token data');
         }

@@ -76,7 +76,7 @@ describe('BingTranslateProvider', () => {
     // Mock _getBingAccessToken to avoid real fetch
     vi.spyOn(provider, '_getBingAccessToken').mockResolvedValue({
       token: 'mock-token',
-      key: 'mock-key',
+      key: 1234567890,
       IG: 'mock-IG',
       IID: 'mock-IID'
     });
@@ -174,7 +174,7 @@ describe('BingTranslateProvider', () => {
       const controller = new AbortController();
       provider._getBingAccessToken.mockImplementation(async () => {
         controller.abort(reason);
-        return { token: 'token', key: 'key', IG: 'ig', IID: 'iid' };
+        return { token: 'token', key: 1234567890, IG: 'ig', IID: 'iid' };
       });
 
       let caughtError;
@@ -369,7 +369,9 @@ describe('BingTranslateProvider', () => {
       text: vi.fn().mockResolvedValue(body),
     });
 
-    const validTokenPage = 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["internal-key","token-value",3600000];';
+    const validTokenKey = 1234567890;
+    const createTokenPage = (params) => `IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ${params};`;
+    const validTokenPage = createTokenPage(`[${validTokenKey},"token-value",3600000]`);
 
     beforeEach(() => {
       provider._getBingAccessToken.mockRestore();
@@ -431,9 +433,41 @@ describe('BingTranslateProvider', () => {
     it.each([
       ['missing markers', 'not a token page'],
       ['malformed params JSON', 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["key",;'],
-      ['missing token value', 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["key","",3600000];'],
+      ['missing token value', createTokenPage(`[${validTokenKey},"",3600000]`)],
     ])('classifies %s successful response as API_RESPONSE_INVALID and does not cache it', async (_label, body) => {
       proxyFetch.mockResolvedValue(createResponse(200, body));
+
+      await expect(provider._getBingAccessToken()).rejects.toMatchObject({
+        type: ErrorTypes.API_RESPONSE_INVALID,
+        context: 'bingtranslate-token-fetch',
+      });
+      expect(BingTranslateProvider.bingAccessToken).toBeNull();
+    });
+
+    it.each([
+      ['missing key', '["token-value",3600000]'],
+      ['null key', '[null,"token-value",3600000]'],
+      ['non-finite key', '[1e309,"token-value",3600000]'],
+      ['zero key', '[0,"token-value",3600000]'],
+      ['negative key', '[-1,"token-value",3600000]'],
+    ])('rejects %s token key', async (_label, params) => {
+      proxyFetch.mockResolvedValue(createResponse(200, createTokenPage(params)));
+
+      await expect(provider._getBingAccessToken()).rejects.toMatchObject({
+        type: ErrorTypes.API_RESPONSE_INVALID,
+        context: 'bingtranslate-token-fetch',
+      });
+      expect(BingTranslateProvider.bingAccessToken).toBeNull();
+    });
+
+    it.each([
+      ['missing expiry', `[${validTokenKey},"token-value"]`],
+      ['non-finite expiry', `[${validTokenKey},"token-value",1e309]`],
+      ['zero expiry', `[${validTokenKey},"token-value",0]`],
+      ['negative expiry', `[${validTokenKey},"token-value",-1]`],
+      ['string expiry', `[${validTokenKey},"token-value","3600000"]`],
+    ])('rejects %s token expiry interval', async (_label, params) => {
+      proxyFetch.mockResolvedValue(createResponse(200, createTokenPage(params)));
 
       await expect(provider._getBingAccessToken()).rejects.toMatchObject({
         type: ErrorTypes.API_RESPONSE_INVALID,
@@ -448,7 +482,7 @@ describe('BingTranslateProvider', () => {
       await expect(provider._getBingAccessToken()).resolves.toMatchObject({
         IG: 'ig-value',
         IID: 'iid-value',
-        key: 'internal-key',
+        key: validTokenKey,
         token: 'token-value',
         tokenExpiryInterval: 3600000,
       });
