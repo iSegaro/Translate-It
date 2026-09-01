@@ -1,6 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { BlockGroupReconstructor, BlockGroupMutationFailure } from './BlockGroupReconstructor.js';
 import { TranslationUnit } from '@/features/translation/ir/TranslationUnit.js';
+
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+let pseudoStyleSpy;
+
+const enablePseudoElementStyles = () => {
+  pseudoStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    if (pseudo) return { content: 'none' };
+    return nativeGetComputedStyle(element, pseudo);
+  });
+};
 
 
 // Mock logger
@@ -72,6 +82,11 @@ describe('BlockGroupReconstructor', () => {
     units[0].node = textNodes[0];
     units[1].node = textNodes[1];
     units[2].node = textNodes[2];
+  });
+
+  afterEach(() => {
+    pseudoStyleSpy?.mockRestore();
+    pseudoStyleSpy = null;
   });
 
   describe('injectMarkers', () => {
@@ -165,6 +180,7 @@ describe('BlockGroupReconstructor', () => {
   });
 
   it('restores a translation font with its transaction', () => {
+    enablePseudoElementStyles();
     const owner = document.createElement('span');
     owner.style.fontFamily = 'serif';
     const text = document.createTextNode('Hello');
