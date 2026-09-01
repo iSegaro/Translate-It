@@ -794,6 +794,69 @@ export const PROVIDER_CONFIGURATIONS = {
   }
 };
 
+const PROVIDER_NAME_MAPPING = {
+  'gemini': ProviderNames.GEMINI,
+  'google-gemini': ProviderNames.GEMINI,
+  'googlegemini': ProviderNames.GEMINI,
+  'openai': ProviderNames.OPENAI,
+  'gpt': ProviderNames.OPENAI,
+  'chatgpt': ProviderNames.OPENAI,
+  'deepseek': ProviderNames.DEEPSEEK,
+  'openrouter': ProviderNames.OPENROUTER,
+  'webai': ProviderNames.WEBAI,
+  'googletranslate': ProviderNames.GOOGLE_TRANSLATE,
+  'google-translate': ProviderNames.GOOGLE_TRANSLATE,
+  'googletranslatev2': ProviderNames.GOOGLE_TRANSLATE_V2,
+  'googlev2': ProviderNames.GOOGLE_TRANSLATE_V2,
+  'google-v2': ProviderNames.GOOGLE_TRANSLATE_V2,
+  'google-robust': ProviderNames.GOOGLE_TRANSLATE_V2,
+  'yandextranslate': ProviderNames.YANDEX_TRANSLATE,
+  'yandex-translate': ProviderNames.YANDEX_TRANSLATE,
+  'yandex': ProviderNames.YANDEX_TRANSLATE,
+  'deepl': ProviderNames.DEEPL_TRANSLATE,
+  'deepltranslate': ProviderNames.DEEPL_TRANSLATE,
+  'deep-l': ProviderNames.DEEPL_TRANSLATE,
+  'bingtranslate': ProviderNames.BING_TRANSLATE,
+  'bing-translate': ProviderNames.BING_TRANSLATE,
+  'bing': ProviderNames.BING_TRANSLATE,
+  'edge': ProviderNames.MICROSOFT_EDGE,
+  'microsoftedge': ProviderNames.MICROSOFT_EDGE,
+  'microsoft-edge': ProviderNames.MICROSOFT_EDGE,
+  'lingva': ProviderNames.LINGVA,
+  'lingvatranslate': ProviderNames.LINGVA,
+  'lingva-translate': ProviderNames.LINGVA,
+  // Browser provider name differs from its configuration key.
+  'browser': 'BrowserAPI',
+  'browserapi': 'BrowserAPI',
+  'browsertranslate': 'BrowserAPI',
+  'browserranslate': 'BrowserAPI',
+  'vajehyab': ProviderNames.VAJEHYAB,
+  'mock': ProviderNames.MOCK,
+  'mockprovider': ProviderNames.MOCK,
+  'custom': ProviderNames.CUSTOM,
+  'custom-openai': ProviderNames.CUSTOM
+};
+
+/**
+ * Normalize provider name only when it matches a known provider alias.
+ * @param {string} providerName - Provider name or registry alias
+ * @returns {string|null} - Canonical provider name or null when unknown
+ */
+function normalizeKnownProviderName(providerName) {
+  if (!providerName || typeof providerName !== 'string') return null;
+  return PROVIDER_NAME_MAPPING[providerName.toLowerCase()] || null;
+}
+
+/**
+ * Resolve a provider configuration without applying Custom fallback semantics.
+ * @param {string} providerName - Provider name or registry alias
+ * @returns {object|null} - Known provider configuration or null when unknown
+ */
+export function resolveKnownProviderConfiguration(providerName) {
+  const normalizedName = normalizeKnownProviderName(providerName);
+  return normalizedName ? PROVIDER_CONFIGURATIONS[normalizedName] || null : null;
+}
+
 /**
  * Get configuration for a specific provider
  * @param {string} providerName - Name of the provider
@@ -802,9 +865,7 @@ export const PROVIDER_CONFIGURATIONS = {
  */
 export function getProviderConfiguration(providerName, level = 3) {
   // Normalize provider name (handle case variations)
-  const normalizedName = normalizeProviderName(providerName);
-
-  const baseConfig = PROVIDER_CONFIGURATIONS[normalizedName];
+  const baseConfig = resolveKnownProviderConfiguration(providerName);
   if (!baseConfig) {
     logger.warn(`[ProviderConfigurations] No configuration found for provider: ${providerName}, using Custom defaults`);
     return applyOptimizationLevel(PROVIDER_CONFIGURATIONS.Custom, level);
@@ -958,59 +1019,13 @@ function applyOptimizationLevel(config, level) {
 }
 
 /**
- * Normalize provider name to match configuration keys
+ * Normalize provider name to match configuration keys while preserving the
+ * existing Custom fallback for unknown values.
  * @param {string} providerName - Provider name
  * @returns {string} - Normalized provider name
  */
 function normalizeProviderName(providerName) {
-  if (!providerName || typeof providerName !== 'string') {
-    return ProviderNames.CUSTOM;
-  }
-
-  const name = providerName.toLowerCase();
-
-  // Map common variations to standard names using ProviderNames constants
-  const nameMapping = {
-    'gemini': ProviderNames.GEMINI,
-    'google-gemini': ProviderNames.GEMINI,
-    'googlegemini': ProviderNames.GEMINI,
-    'openai': ProviderNames.OPENAI,
-    'gpt': ProviderNames.OPENAI,
-    'chatgpt': ProviderNames.OPENAI,
-    'deepseek': ProviderNames.DEEPSEEK,
-    'openrouter': ProviderNames.OPENROUTER,
-    'webai': ProviderNames.WEBAI,
-    'googletranslate': ProviderNames.GOOGLE_TRANSLATE,
-    'google-translate': ProviderNames.GOOGLE_TRANSLATE,
-    'googletranslatev2': ProviderNames.GOOGLE_TRANSLATE_V2,
-    'googlev2': ProviderNames.GOOGLE_TRANSLATE_V2,
-    'google-v2': ProviderNames.GOOGLE_TRANSLATE_V2,
-    'google-robust': ProviderNames.GOOGLE_TRANSLATE_V2,
-    'yandextranslate': ProviderNames.YANDEX_TRANSLATE,
-    'yandex-translate': ProviderNames.YANDEX_TRANSLATE,
-    'yandex': ProviderNames.YANDEX_TRANSLATE,
-    'deepl': ProviderNames.DEEPL_TRANSLATE,
-    'deepltranslate': ProviderNames.DEEPL_TRANSLATE,
-    'deep-l': ProviderNames.DEEPL_TRANSLATE,
-    'bingtranslate': ProviderNames.BING_TRANSLATE,
-    'bing-translate': ProviderNames.BING_TRANSLATE,
-    'bing': ProviderNames.BING_TRANSLATE,
-    'edge': ProviderNames.MICROSOFT_EDGE,
-    'microsoftedge': ProviderNames.MICROSOFT_EDGE,
-    'microsoft-edge': ProviderNames.MICROSOFT_EDGE,
-    'lingva': ProviderNames.LINGVA,
-    'lingvatranslate': ProviderNames.LINGVA,
-    'lingva-translate': ProviderNames.LINGVA,
-    'browser': ProviderNames.BROWSER_API,
-    'browserranslate': ProviderNames.BROWSER_API,
-    'vajehyab': ProviderNames.VAJEHYAB,
-    'mock': ProviderNames.MOCK,
-    'mockprovider': ProviderNames.MOCK,
-    'custom': ProviderNames.CUSTOM,
-    'custom-openai': ProviderNames.CUSTOM
-  };
-
-  return nameMapping[name] || ProviderNames.CUSTOM;
+  return normalizeKnownProviderName(providerName) || ProviderNames.CUSTOM;
 }
 
 /**

@@ -14,9 +14,36 @@ import {
   getProviderConfiguration,
   getProviderBatching,
   getProviderRateLimit,
+  resolveKnownProviderConfiguration,
 } from './ProviderConfigurations.js';
 
 describe('ProviderConfigurations optimization scaling', () => {
+  it('resolves registry aliases and canonical names without falling back to Custom', () => {
+    for (const [providerId, canonicalName] of [
+      ['deepl', 'DeepLTranslate'],
+      ['googlev2', 'GoogleTranslateV2'],
+      ['edge', 'MicrosoftEdge'],
+      ['bing', 'BingTranslate'],
+      ['gemini', 'Gemini'],
+      ['browser', 'BrowserAPI'],
+      ['custom', 'Custom'],
+      ['custom-openai', 'Custom'],
+    ]) {
+      expect(resolveKnownProviderConfiguration(providerId))
+        .toBe(PROVIDER_CONFIGURATIONS[canonicalName]);
+      expect(resolveKnownProviderConfiguration(canonicalName))
+        .toBe(PROVIDER_CONFIGURATIONS[canonicalName]);
+    }
+  });
+
+  it('returns null for unknown or invalid providers while keeping getProviderConfiguration fallback', () => {
+    for (const providerName of ['unknown-provider', '', null, undefined, 42, {}]) {
+      expect(resolveKnownProviderConfiguration(providerName)).toBeNull();
+    }
+
+    expect(getProviderConfiguration('unknown-provider')).toBe(PROVIDER_CONFIGURATIONS.Custom);
+  });
+
   it('configures explicit traditional network Queue budgets without affecting BrowserAPI', () => {
     for (const providerName of [
       'GoogleTranslate',
