@@ -141,6 +141,25 @@ describe('ProxyManager request-local configuration', () => {
     }));
   });
 
+  it('forwards response policy only to proxy strategies', async () => {
+    const manager = createManager();
+    const execute = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    manager.strategies.set('http', class {
+      async execute(...args) {
+        return execute(...args);
+      }
+    });
+
+    const responsePolicy = { allowHtmlResponse: true };
+    await manager.fetch('https://target.test/token', {}, createConfig(), responsePolicy);
+
+    expect(execute).toHaveBeenCalledWith(
+      'https://target.test/token',
+      {},
+      responsePolicy,
+    );
+  });
+
   it('uses request config in failure metadata after global replacement', async () => {
     const manager = createManager();
     const requestError = new Error('proxy failed');
@@ -202,7 +221,12 @@ describe('ProxyManager request-local configuration', () => {
     vi.stubGlobal('fetch', directFetch);
     manager.setConfig(createConfig({ host: 'proxy-global' }));
 
-    await manager.fetch('https://target.test/direct', { method: 'GET' }, createConfig({ enabled: false }));
+    await manager.fetch(
+      'https://target.test/direct',
+      { method: 'GET' },
+      createConfig({ enabled: false }),
+      { allowHtmlResponse: true },
+    );
 
     expect(directFetch).toHaveBeenCalledWith('https://target.test/direct', { method: 'GET' });
   });

@@ -120,9 +120,10 @@ export class ProxyManager {
    * @param {string} url - Target URL
    * @param {Object} options - Fetch options
    * @param {Object|null} requestConfig - Optional request-local proxy configuration
+   * @param {Object} responsePolicy - Optional request-local response handling policy
    * @returns {Promise<Response>}
    */
-  async fetch(url, options = {}, requestConfig) {
+  async fetch(url, options = {}, requestConfig, responsePolicy) {
     const config = this._cloneConfig(requestConfig === undefined ? this.config : requestConfig);
 
     // Check extension context first
@@ -147,7 +148,7 @@ export class ProxyManager {
       });
 
       const strategy = await this._getStrategy(config);
-      const result = await strategy.execute(url, options);
+      const result = await strategy.execute(url, options, responsePolicy);
 
       const duration = Date.now() - startTime;
       this.logger.info(`[Proxy] Request successful: ${this._sanitizeUrl(url)} (${duration}ms via ${config.type})`);

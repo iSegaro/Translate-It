@@ -42,9 +42,10 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
    * Execute request through SOCKS proxy
    * @param {string} url - Target URL
    * @param {Object} options - Fetch options
+   * @param {Object} responsePolicy - Request-local response handling policy
    * @returns {Promise<Response>}
    */
-  async execute(url, options = {}) {
+  async execute(url, options = {}, responsePolicy = {}) {
     if (!this._validateConfig()) {
       throw new Error('Invalid SOCKS proxy configuration');
     }
@@ -58,7 +59,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
     // SOCKS proxy implementation is complex in browser environment
     // We provide a simplified approach that may work with some SOCKS proxies
     try {
-      return await this._socksProxy(url, options);
+      return await this._socksProxy(url, options, responsePolicy);
     } catch (error) {
       if (error?.type || error?.transportFailure || error?.operationAborted || error?.name === 'AbortError') {
         throw error;
@@ -84,7 +85,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
    * @param {Object} options - Fetch options
    * @returns {Promise<Response>}
    */
-  async _socksProxy(url, options) {
+  async _socksProxy(url, options, responsePolicy) {
     // Note: True SOCKS implementation requires binary protocol handling
     // Some SOCKS proxies support HTTP-over-SOCKS which we can attempt
 
@@ -149,7 +150,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       }
 
       // If we can reach the proxy, continue with proxy attempt
-      return await this._attemptProxyRequest(url, options, proxyUrl);
+      return await this._attemptProxyRequest(url, options, proxyUrl, responsePolicy);
 
     } catch (error) {
       if (error?.transportFailure === SOCKS_TIMEOUT_FAILURE || error?.type || isAbortError(error, options.signal)) {
@@ -166,7 +167,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
    * Attempt to make the actual proxy request
    * @private
    */
-  async _attemptProxyRequest(url, options, proxyUrl) {
+  async _attemptProxyRequest(url, options, proxyUrl, responsePolicy) {
     const proxyOptions = {
       ...options,
       headers: this._addProxyHeaders(options.headers)
@@ -198,7 +199,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       }
       // For HTTPS URLs through SOCKS, we need a different approach
       else if (url.startsWith('https://')) {
-        return await this._socksHttpsConnect(url, proxyOptions);
+        return await this._socksHttpsConnect(url, proxyOptions, responsePolicy);
       }
 
       throw new Error('Unsupported URL scheme for SOCKS proxy');
@@ -219,7 +220,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
    * @param {Object} options - Fetch options
    * @returns {Promise<Response>}
    */
-  async _socksHttpsConnect(url, options) {
+  async _socksHttpsConnect(url, options, responsePolicy = {}) {
     const targetUrl = new URL(url);
     const proxyUrl = `http://${this.config.host}:${this.config.port}`;
 
@@ -251,7 +252,7 @@ export class SocksProxyStrategy extends BaseProxyStrategy {
       const contentType = response.headers.get('content-type');
 
       // If we get HTML content, it's likely an error page from the proxy
-      if (contentType && contentType.includes('text/html')) {
+      if (contentType && contentType.includes('text/html') && responsePolicy.allowHtmlResponse !== true) {
         throw new Error('SOCKS proxy returned HTML error page instead of target response');
       }
 

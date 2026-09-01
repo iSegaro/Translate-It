@@ -330,7 +330,7 @@ describe('BingTranslateProvider', () => {
       [500, ErrorTypes.SERVER_ERROR],
       [503, ErrorTypes.SERVER_ERROR],
     ])('classifies token HTTP %s without API-key semantics', async (status, type) => {
-      fetch.mockResolvedValue(createResponse(status));
+      proxyFetch.mockResolvedValue(createResponse(status));
 
       await expect(provider._getBingAccessToken())
         .rejects.toMatchObject({
@@ -338,16 +338,17 @@ describe('BingTranslateProvider', () => {
           statusCode: status,
           context: 'bingtranslate-token-fetch',
         });
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
     });
 
     it('classifies ordinary token fetch rejection as NETWORK_ERROR', async () => {
-      fetch.mockRejectedValue(new TypeError('Failed to fetch'));
+      proxyFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
       await expect(provider._getBingAccessToken()).rejects.toMatchObject({
         type: ErrorTypes.NETWORK_ERROR,
         context: 'bingtranslate-token-fetch',
       });
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
     });
 
     it.each([
@@ -358,12 +359,12 @@ describe('BingTranslateProvider', () => {
       controller.abort(reason);
 
       await expect(provider._getBingAccessToken(controller)).rejects.toMatchObject(expectedError);
-      expect(fetch).not.toHaveBeenCalled();
+      expect(proxyFetch).not.toHaveBeenCalled();
     });
 
     it('normalizes an in-flight user abort without API_ERROR', async () => {
       const controller = new AbortController();
-      fetch.mockImplementation(async () => {
+      proxyFetch.mockImplementation(async () => {
         controller.abort('user-cancelled');
         throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
       });
@@ -378,7 +379,7 @@ describe('BingTranslateProvider', () => {
       ['malformed params JSON', 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["key",;'],
       ['missing token value', 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["key","",3600000];'],
     ])('classifies %s successful response as API_RESPONSE_INVALID and does not cache it', async (_label, body) => {
-      fetch.mockResolvedValue(createResponse(200, body));
+      proxyFetch.mockResolvedValue(createResponse(200, body));
 
       await expect(provider._getBingAccessToken()).rejects.toMatchObject({
         type: ErrorTypes.API_RESPONSE_INVALID,
@@ -388,7 +389,7 @@ describe('BingTranslateProvider', () => {
     });
 
     it('extracts and caches valid token-page data', async () => {
-      fetch.mockResolvedValue(createResponse(200, validTokenPage));
+      proxyFetch.mockResolvedValue(createResponse(200, validTokenPage));
 
       await expect(provider._getBingAccessToken()).resolves.toMatchObject({
         IG: 'ig-value',
@@ -399,7 +400,33 @@ describe('BingTranslateProvider', () => {
       });
       await provider._getBingAccessToken();
 
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses proxy transport with request-local HTML policy', async () => {
+      const controller = new AbortController();
+      proxyFetch.mockResolvedValue(createResponse(200, validTokenPage));
+
+      await provider._getBingAccessToken(controller);
+
+      expect(proxyFetch).toHaveBeenCalledWith(
+        BingTranslateProvider.bingTokenUrl,
+        { signal: controller.signal },
+        {},
+        { allowHtmlResponse: true },
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('continues translation after proxied token acquisition', async () => {
+      proxyFetch.mockResolvedValue(createResponse(200, validTokenPage));
+
+      await expect(provider._translateChunk(['Hello'], 'en', 'fa'))
+        .resolves.toEqual(['translated-1\n[[---]]\ntranslated-2']);
+
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
     });
   });
 });

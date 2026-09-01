@@ -13,6 +13,7 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getProviderConfiguration } from "@/features/translation/core/ProviderConfigurations.js";
 import { getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
+import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
 const BING_TOKEN_CONTEXT = 'bingtranslate-token-fetch';
@@ -322,9 +323,13 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         
         let response;
         try {
-          response = await fetch(BingTranslateProvider.bingTokenUrl, {
-            signal: abortController?.signal
-          });
+          const proxyConfig = await this._initializeProxy();
+          response = await proxyManager.fetch(
+            BingTranslateProvider.bingTokenUrl,
+            { signal: abortController?.signal },
+            proxyConfig,
+            { allowHtmlResponse: true },
+          );
         } catch (fetchError) {
           throw normalizeBingTokenFetchError(fetchError, abortController);
         }
