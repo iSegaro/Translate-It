@@ -21,6 +21,16 @@ const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ApiKeyManager');
 const DEEPL_FREE_USAGE_URL = 'https://api-free.deepl.com/v2/usage';
 const DEEPL_PRO_USAGE_URL = 'https://api.deepl.com/v2/usage';
 
+function isValidDeepLUsagePayload(payload) {
+  return payload !== null
+    && typeof payload === 'object'
+    && !Array.isArray(payload)
+    && Number.isInteger(payload.character_count)
+    && payload.character_count >= 0
+    && Number.isInteger(payload.character_limit)
+    && payload.character_limit >= 0;
+}
+
 /**
  * Settings key mapping for each provider
  */
@@ -555,7 +565,9 @@ class ApiKeyManager {
           'Authorization': `DeepL-Auth-Key ${key}`
         }
       });
-      return response.ok;
+      if (!response.ok) return false;
+
+      return isValidDeepLUsagePayload(await response.json());
     } catch {
       return false;
     }

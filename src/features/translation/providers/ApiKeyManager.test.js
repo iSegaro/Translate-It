@@ -60,6 +60,18 @@ describe('ApiKeyManager', () => {
     ...overrides
   });
 
+  const createDeepLUsageResponse = (body = { character_count: 0, character_limit: 500000 }) => ({
+    ok: true,
+    status: 200,
+    json: vi.fn().mockResolvedValue(body)
+  });
+
+  const createDeepLUsageParseFailureResponse = (status = 200, message = 'Unexpected end of JSON input') => ({
+    ok: true,
+    status,
+    json: vi.fn().mockRejectedValue(new SyntaxError(message))
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockStorage.clear();
@@ -265,7 +277,7 @@ describe('ApiKeyManager', () => {
       const currentProxy = createProxyConfig({ enabled: true, host: 'proxy-current', port: 9000 });
       mockProxyManager.config = staleProxy;
       mockResolveProxyConfig.mockResolvedValue(currentProxy);
-      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+      mockProxyFetch.mockResolvedValue(createDeepLUsageResponse());
 
       await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(true);
 
@@ -282,7 +294,7 @@ describe('ApiKeyManager', () => {
         ['selected Free tier', 'free-key', 'free', 'https://api-free.deepl.com/v2/usage'],
         ['selected Pro tier', 'pro-key', 'pro', 'https://api.deepl.com/v2/usage'],
       ])('selects endpoint for %s', async (_label, key, apiTier, expectedUrl) => {
-        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+        mockProxyFetch.mockResolvedValue(createDeepLUsageResponse());
 
         await expect(ApiKeyManager._testDeepLKey(key, { apiTier })).resolves.toBe(true);
 
@@ -297,7 +309,7 @@ describe('ApiKeyManager', () => {
       });
 
       it('uses the canonical Free default for an invalid tier', async () => {
-        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+        mockProxyFetch.mockResolvedValue(createDeepLUsageResponse());
 
         await expect(ApiKeyManager._testDeepLKey('unknown-tier-key', { apiTier: 'enterprise' }))
           .resolves.toBe(true);
@@ -306,7 +318,49 @@ describe('ApiKeyManager', () => {
         expect(mockProxyFetch.mock.calls[0][0]).toBe('https://api-free.deepl.com/v2/usage');
       });
 
-      it.each([400, 429, 456, 500, 529])('does not probe alternate endpoint after HTTP %s', async (status) => {
+      it.each([
+        ['minimum usage object', { character_count: 0, character_limit: 500000 }],
+        ['usage object with optional fields', {
+          character_count: 123,
+          character_limit: 1000000,
+          products: [{ product: 'text', count: 123 }],
+          api_key_character_count: 123,
+        }],
+      ])('accepts %s', async (_label, body) => {
+        mockProxyFetch.mockResolvedValue(createDeepLUsageResponse(body));
+
+        await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(true);
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      });
+
+      it.each([
+        ['empty object', {}],
+        ['array', []],
+        ['null', null],
+        ['string count', { character_count: '123', character_limit: 1000000 }],
+        ['fractional count', { character_count: 123.5, character_limit: 1000000 }],
+        ['negative count', { character_count: -1, character_limit: 1000000 }],
+        ['missing limit', { character_count: 123 }],
+        ['non-number limit', { character_count: 123, character_limit: null }],
+      ])('rejects invalid successful payload: %s', async (_label, body) => {
+        mockProxyFetch.mockResolvedValue(createDeepLUsageResponse(body));
+
+        await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(false);
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      });
+
+      it.each([
+        ['malformed JSON', 200, 'Unexpected token { in JSON at position 0'],
+        ['HTML response', 200, 'Unexpected token < in JSON at position 0'],
+        ['empty 204 response', 204, 'Unexpected end of JSON input'],
+      ])('rejects %s', async (_label, status, message) => {
+        mockProxyFetch.mockResolvedValue(createDeepLUsageParseFailureResponse(status, message));
+
+        await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(false);
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      });
+
+      it.each([400, 401, 429, 456, 500, 529])('does not probe alternate endpoint after HTTP %s', async (status) => {
         mockProxyFetch.mockResolvedValue({ ok: false, status });
 
         await expect(ApiKeyManager._testDeepLKey('pro-key', { apiTier: 'pro' })).resolves.toBe(false);
@@ -337,7 +391,7 @@ describe('ApiKeyManager', () => {
       it('keeps :fx override through testAndReorderKeys', async () => {
         mockStorage.set('DEEPL_API_KEY', 'abc:fx');
         mockStorage.set('DEEPL_API_TIER', 'pro');
-        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+        mockProxyFetch.mockResolvedValue(createDeepLUsageResponse());
 
         await expect(ApiKeyManager.testAndReorderKeys('DEEPL_API_KEY', ProviderRegistryIds.DEEPL))
           .resolves.toMatchObject({ valid: ['abc:fx'], allInvalid: false });
