@@ -14,12 +14,18 @@ import { MessageActions } from './MessageActions.js';
 import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingResponseHandler');
+const TERMINAL_STREAM_TTL_MS = 60_000;
+const BUFFERED_MESSAGE_TTL_MS = 60_000;
+const MAX_BUFFERED_STREAM_IDS = 100;
+const MAX_BUFFERED_MESSAGES_PER_STREAM = 50;
+const MAX_TERMINAL_STREAM_IDS = 1_000;
 
 export class StreamingResponseHandler {
   constructor(coordinator) {
     this.coordinator = coordinator;
     this.activeHandlers = new Map();
     this.messageBuffer = new Map();
+    this.terminalStreams = new Map();
   }
 
   /**
@@ -28,6 +34,8 @@ export class StreamingResponseHandler {
    * @param {object} callbacks - Response callback functions
    */
   registerHandler(messageId, callbacks = {}) {
+    this._pruneExpiredState();
+
     const {
       onStreamUpdate = () => {},
       onStreamEnd = () => {},
@@ -36,6 +44,8 @@ export class StreamingResponseHandler {
     } = callbacks;
 
     logger.debug('[StreamingResponseHandler] Registering handler for:', messageId);
+    // Explicit registration starts a new ownership window for this message ID.
+    this.terminalStreams.delete(messageId);
 
     const handler = {
       messageId,
@@ -69,10 +79,17 @@ export class StreamingResponseHandler {
       return false;
     }
 
+    this._pruneExpiredState();
+
     // Check if we have a handler for this messageId
     const handler = this.activeHandlers.get(messageId);
 
     if (!handler) {
+      if (this.terminalStreams.has(messageId)) {
+        logger.debug(`Discarded late streaming message for terminal ${messageId}`);
+        return false;
+      }
+
       // Buffer the message in case handler is registered later
       this._bufferMessage(messageId, message);
       return false;
@@ -140,6 +157,7 @@ export class StreamingResponseHandler {
     const { messageId, data } = message;
 
     handler.isCompleted = true;
+    this._markTerminal(messageId);
 
     // Call handler callback
     try {
@@ -193,6 +211,7 @@ export class StreamingResponseHandler {
     }
 
     handler.isCompleted = true;
+    this._markTerminal(messageId);
 
     // Call handler callback
     try {
@@ -239,6 +258,7 @@ export class StreamingResponseHandler {
     }
 
     handler.isCompleted = true;
+    this._markTerminal(messageId);
 
     // Call error callback
     try {
@@ -259,7 +279,18 @@ export class StreamingResponseHandler {
    * @private
    */
   _bufferMessage(messageId, message) {
+    this._pruneExpiredState();
+
+    if (this.terminalStreams.has(messageId)) {
+      return;
+    }
+
     if (!this.messageBuffer.has(messageId)) {
+      while (this.messageBuffer.size >= MAX_BUFFERED_STREAM_IDS) {
+        const oldestMessageId = this.messageBuffer.keys().next().value;
+        if (oldestMessageId === undefined) break;
+        this.messageBuffer.delete(oldestMessageId);
+      }
       this.messageBuffer.set(messageId, []);
     }
 
@@ -270,7 +301,7 @@ export class StreamingResponseHandler {
     });
 
     // Limit buffer size to prevent memory issues
-    if (buffer.length > 50) {
+    if (buffer.length > MAX_BUFFERED_MESSAGES_PER_STREAM) {
       buffer.shift(); // Remove oldest message
     }
 
@@ -285,6 +316,7 @@ export class StreamingResponseHandler {
    * @private
    */
   _processBufferedMessages(messageId) {
+    this._pruneExpiredState();
     const buffer = this.messageBuffer.get(messageId);
     if (!buffer || buffer.length === 0) {
       return;
@@ -311,6 +343,45 @@ export class StreamingResponseHandler {
   _cleanupHandler(messageId) {
     this.activeHandlers.delete(messageId);
     this.messageBuffer.delete(messageId);
+  }
+
+  /**
+   * Mark a stream terminal before its handler and buffer are removed.
+   * @private
+   */
+  _markTerminal(messageId) {
+    const now = Date.now();
+    this._pruneExpiredState(now);
+    this.terminalStreams.delete(messageId);
+    this.terminalStreams.set(messageId, now + TERMINAL_STREAM_TTL_MS);
+
+    while (this.terminalStreams.size > MAX_TERMINAL_STREAM_IDS) {
+      const oldestMessageId = this.terminalStreams.keys().next().value;
+      if (oldestMessageId === undefined) break;
+      this.terminalStreams.delete(oldestMessageId);
+    }
+  }
+
+  /**
+   * Remove expired terminal markers and pre-registration messages.
+   * @param {number} now - Current timestamp
+   * @private
+   */
+  _pruneExpiredState(now = Date.now()) {
+    for (const [messageId, expiresAt] of this.terminalStreams) {
+      if (expiresAt <= now) {
+        this.terminalStreams.delete(messageId);
+      }
+    }
+
+    for (const [messageId, buffer] of this.messageBuffer) {
+      const activeMessages = buffer.filter(({ timestamp }) => timestamp + BUFFERED_MESSAGE_TTL_MS > now);
+      if (activeMessages.length === 0) {
+        this.messageBuffer.delete(messageId);
+      } else if (activeMessages.length !== buffer.length) {
+        this.messageBuffer.set(messageId, activeMessages);
+      }
+    }
   }
 
   /**
@@ -359,6 +430,8 @@ export class StreamingResponseHandler {
    * @returns {object} - Status information
    */
   getStatus() {
+    this._pruneExpiredState();
+
     const activeHandlers = Array.from(this.activeHandlers.values()).map(handler => ({
       messageId: handler.messageId,
       duration: Date.now() - handler.registeredAt,
@@ -392,6 +465,7 @@ export class StreamingResponseHandler {
     // Clear all maps
     this.activeHandlers.clear();
     this.messageBuffer.clear();
+    this.terminalStreams.clear();
   }
 }
 
