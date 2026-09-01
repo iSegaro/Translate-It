@@ -180,6 +180,20 @@
             >
               {{ t('subtitle_try_again_btn', 'Try Again') }}
             </button>
+            <button
+              v-if="errorAction === PublicTranslationErrorActions.OPEN_SETTINGS"
+              class="secondary-btn"
+              @click="goToProviderSettings"
+            >
+              {{ t('configure_providers_tooltip', 'Configure Providers') }}
+            </button>
+            <button
+              v-if="errorAction !== PublicTranslationErrorActions.RETRY"
+              class="secondary-btn"
+              @click="backToSetup"
+            >
+              {{ t('subtitle_back_to_setup_btn', 'Back to Setup') }}
+            </button>
           </div>
         </section>
       </div>
@@ -249,6 +263,13 @@ const goToProviderSettings = async () => {
   } catch (err) {
     logger.error('Failed to open provider settings:', err);
   }
+};
+
+/**
+ * Returns to setup without clearing the loaded subtitle state.
+ */
+const backToSetup = () => {
+  status.value = 'idle';
 };
 
 /**

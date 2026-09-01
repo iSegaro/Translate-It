@@ -132,6 +132,15 @@ vi.mock('@iconify/vue', () => ({
 describe('SubtitleApp', () => {
   let subtitleState;
 
+  const mountSubtitleApp = () => mount(SubtitleApp, {
+    attachTo: document.body,
+    global: {
+      stubs: {
+        transition: false,
+      },
+    },
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     loggerErrorMock.mockReset();
@@ -161,14 +170,7 @@ describe('SubtitleApp', () => {
 
   it('opens provider settings through the anchor-aware options helper', async () => {
     openOptionsPageMock.mockResolvedValue({ success: true });
-    const wrapper = mount(SubtitleApp, {
-      attachTo: document.body,
-      global: {
-        stubs: {
-          transition: false,
-        },
-      },
-    });
+    const wrapper = mountSubtitleApp();
 
     await flushPromises();
     await nextTick();
@@ -185,14 +187,7 @@ describe('SubtitleApp', () => {
 
   it('logs when provider settings opening fails', async () => {
     openOptionsPageMock.mockResolvedValue({ success: false, error: 'failed to open' });
-    const wrapper = mount(SubtitleApp, {
-      attachTo: document.body,
-      global: {
-        stubs: {
-          transition: false,
-        },
-      },
-    });
+    const wrapper = mountSubtitleApp();
 
     await flushPromises();
     await nextTick();
@@ -207,33 +202,70 @@ describe('SubtitleApp', () => {
     expect(loggerErrorMock).toHaveBeenCalledWith('Failed to open provider settings:', 'failed to open');
   });
 
+  it('shows only Try Again for RETRY and preserves retry behavior', async () => {
+    subtitleState.status.value = 'error';
+    subtitleState.error.value = 'Safe subtitle error';
+    subtitleState.errorAction.value = PublicTranslationErrorActions.RETRY;
+
+    const wrapper = mountSubtitleApp();
+
+    await nextTick();
+
+    expect(wrapper.findAll('.step-error button').map(button => button.text())).toEqual(['Try Again']);
+
+    await wrapper.find('.step-error button.primary-btn').trigger('click');
+    expect(subtitleState.status.value).toBe('idle');
+
+    wrapper.unmount();
+  });
+
+  it('shows provider settings and Back to Setup for OPEN_SETTINGS', async () => {
+    const selectedFile = { name: 'sample.srt' };
+    const parsedCues = [{ index: 1, text: 'Hello' }];
+    subtitleState.status.value = 'error';
+    subtitleState.error.value = 'Provider configuration required';
+    subtitleState.errorAction.value = PublicTranslationErrorActions.OPEN_SETTINGS;
+    subtitleState.currentFile.value = selectedFile;
+    subtitleState.cues.value = parsedCues;
+    openOptionsPageMock.mockResolvedValue({ success: true });
+
+    const wrapper = mountSubtitleApp();
+
+    await nextTick();
+
+    const buttons = wrapper.findAll('.step-error button');
+    expect(buttons.map(button => button.text())).toEqual(['Configure Providers', 'Back to Setup']);
+
+    await buttons[0].trigger('click');
+    expect(openOptionsPageMock).toHaveBeenCalledWith('providers');
+
+    await buttons[1].trigger('click');
+    expect(subtitleState.status.value).toBe('idle');
+    expect(subtitleState.currentFile.value).toEqual(selectedFile);
+    expect(subtitleState.cues.value).toEqual(parsedCues);
+    expect(subtitleState.cleanup).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
   it.each([
-    [null, false],
-    [PublicTranslationErrorActions.OPEN_SETTINGS, false],
-    [PublicTranslationErrorActions.RETRY_LATER, false],
-    [PublicTranslationErrorActions.RETRY, true],
-  ])('shows Try Again only for public retry action %s', async (action, shouldShowRetry) => {
+    [PublicTranslationErrorActions.RETRY_LATER],
+    [null],
+  ])('shows only Back to Setup for %s', async (action) => {
     subtitleState.status.value = 'error';
     subtitleState.error.value = 'Safe subtitle error';
     subtitleState.errorAction.value = action;
 
-    const wrapper = mount(SubtitleApp, {
-      global: {
-        stubs: {
-          transition: false,
-        },
-      },
-    });
+    const wrapper = mountSubtitleApp();
 
     await nextTick();
 
-    const retryButton = wrapper.find('.step-error button.primary-btn');
-    expect(retryButton.exists()).toBe(shouldShowRetry);
+    const buttons = wrapper.findAll('.step-error button');
+    expect(buttons.map(button => button.text())).toEqual(['Back to Setup']);
+    expect(wrapper.find('.step-error button.primary-btn').exists()).toBe(false);
 
-    if (shouldShowRetry) {
-      await retryButton.trigger('click');
-      expect(subtitleState.status.value).toBe('idle');
-    }
+    await buttons[0].trigger('click');
+    expect(subtitleState.status.value).toBe('idle');
 
     wrapper.unmount();
   });
