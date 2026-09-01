@@ -76,12 +76,22 @@ export function useSubtitleTranslation() {
         }
         break;
 
-      case MessageActions.SUBTITLE_TRANSLATE_COMPLETE:
+      case MessageActions.SUBTITLE_TRANSLATE_COMPLETE: {
         presentationVersion++;
+        Object.assign(progress, data.stats);
+        const translatedCount = Number(data.stats?.translated) || 0;
+        const failedCount = Number(data.stats?.failed) || 0;
+        const terminalErrorDetails = data.errorDetails || progress.terminalErrorDetails || null;
+
+        if (translatedCount === 0 && failedCount > 0) {
+          translatedContent.value = '';
+          void applyTranslationError({ errorDetails: terminalErrorDetails });
+          break;
+        }
+
         status.value = 'completed';
         translatedContent.value = data.content;
-        Object.assign(progress, data.stats);
-        errorDetails.value = data.errorDetails || progress.terminalErrorDetails || null;
+        errorDetails.value = terminalErrorDetails;
         
         // Final status update for any remaining cues if needed
         // (Coordinator handles serialization, but we want UI to reflect completion)
@@ -93,6 +103,7 @@ export function useSubtitleTranslation() {
           });
         }
         break;
+      }
 
       case MessageActions.SUBTITLE_TRANSLATE_ERROR:
         void applyTranslationError({ errorDetails: data.errorDetails });
