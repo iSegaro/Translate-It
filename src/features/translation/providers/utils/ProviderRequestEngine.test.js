@@ -56,6 +56,25 @@ const createProxyConfig = (host = 'proxy.test') => ({
   auth: { username: `${host}-user`, password: `${host}-password` },
 });
 
+const createMalformedJsonResponse = (status = 200, withClone = true) => {
+  const createResponse = () => {
+    const response = {
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: status === 200 ? 'OK' : `HTTP ${status}`,
+      headers: new Map([['content-type', 'application/json']]),
+      json: vi.fn(async () => {
+        throw new SyntaxError('Unexpected token in JSON');
+      }),
+    };
+
+    if (withClone) response.clone = createResponse;
+    return response;
+  };
+
+  return createResponse();
+};
+
 describe('ProviderRequestEngine', () => {
   const mockProvider = {
     providerName: 'TestProvider',
@@ -71,6 +90,51 @@ describe('ProviderRequestEngine', () => {
     delete mockProvider.classifyProviderHttpError;
     delete mockProvider.shouldFailoverApiKey;
     delete mockProvider.isApiKeyCandidateEligible;
+  });
+
+  describe('successful JSON response classification', () => {
+    it.each([true, false])('classifies malformed successful JSON with clone=%s', async (withClone) => {
+      proxyManager.fetch.mockResolvedValue(createMalformedJsonResponse(200, withClone));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        context: 'json-parse-test',
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        message: 'Provider response contains invalid JSON',
+        type: ErrorTypes.JSON_PARSING_ERROR,
+        statusCode: 200,
+        context: 'json-parse-test',
+        providerName: 'TestProvider',
+      });
+      expect(mockExtractResponse).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [400, ErrorTypes.HTTP_ERROR],
+      [401, ErrorTypes.API_KEY_INVALID],
+      [429, ErrorTypes.RATE_LIMIT_REACHED],
+      [500, ErrorTypes.SERVER_ERROR],
+    ])('preserves HTTP %s classification with malformed JSON body', async (status, type) => {
+      proxyManager.fetch.mockResolvedValue(createMalformedJsonResponse(status));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        context: 'malformed-http-body-test',
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        type,
+        statusCode: status,
+        context: 'malformed-http-body-test',
+        providerName: 'TestProvider',
+      });
+    });
   });
 
   describe('HTTP error classification hook', () => {

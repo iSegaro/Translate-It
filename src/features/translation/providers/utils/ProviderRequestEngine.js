@@ -527,7 +527,18 @@ export const ProviderRequestEngine = {
       // Fallback: If we didn't parse for logging or parsing failed, try reading now
       const contentTypeSuccess = response.headers.get('content-type');
       if (contentTypeSuccess && contentTypeSuccess.includes('application/json')) {
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          if (parseError?.name === 'AbortError') throw parseError;
+          const error = new Error('Provider response contains invalid JSON');
+          error.type = ErrorTypes.JSON_PARSING_ERROR;
+          error.statusCode = response.status;
+          error.context = context;
+          error.providerName = provider.providerName;
+          throw error;
+        }
         return await extractResponse(data, response.status);
       }
 

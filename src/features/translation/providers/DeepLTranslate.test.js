@@ -49,6 +49,21 @@ const createJsonResponse = (status, body, statusText = `HTTP ${status}`) => ({
   json: async () => body,
 });
 
+const createMalformedJsonResponse = () => {
+  const createResponse = () => ({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Map([['content-type', 'application/json']]),
+    clone: createResponse,
+    json: async () => {
+      throw new SyntaxError('Unexpected token in JSON');
+    },
+  });
+
+  return createResponse();
+};
+
 describe('DeepLTranslateProvider response contract', () => {
   let provider;
 
@@ -454,6 +469,23 @@ describe('DeepLTranslateProvider response contract', () => {
 
     await expect(provider._translateChunk(['source'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
       .rejects.toMatchObject({ type });
+  });
+
+  it('rejects malformed successful JSON without key failover or source substitution', async () => {
+    await runWithRuntime(['bad-key', 'good-key'], 'free', async ({ promoteKeySpy, executeRequestSpy }) => {
+      proxyFetch.mockResolvedValue(createMalformedJsonResponse());
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({
+          type: ErrorTypes.JSON_PARSING_ERROR,
+          statusCode: 200,
+          providerName: 'DeepLTranslate',
+        });
+
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+      expect(executeRequestSpy).toHaveBeenCalledTimes(1);
+      expect(promoteKeySpy).not.toHaveBeenCalled();
+    });
   });
 
   it.each([
