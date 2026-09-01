@@ -6,9 +6,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import {
-  getPageTranslationErrorDecision,
-} from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
+import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppPageTranslation');
 
@@ -164,7 +162,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       if (isMainFrame && detail.isAggregated !== true) return;
 
       const revision = errorPresentationRevision;
-      const presentation = await getPageTranslationErrorDecision(detail);
+      const presentation = await getPageTranslationErrorPresentation(detail);
       if (revision !== errorPresentationRevision) return;
       if (!presentation) return;
 
@@ -191,7 +189,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         isTranslated: hasCommittedContent,
         ...(translatedCount !== null && { translatedCount }),
         status: TRANSLATION_STATUS.ERROR,
-        errorMessage: presentation.displayError.message,
+        errorMessage: presentation.message,
       });
     });
 

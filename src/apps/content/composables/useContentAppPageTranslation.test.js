@@ -17,18 +17,18 @@ vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-const getPageTranslationErrorDecisionMock = vi.hoisted(() => vi.fn());
+const getPageTranslationErrorPresentationMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/features/page-translation/utils/PageTranslationErrorPresenter.js', async (importOriginal) => {
   const actual = await importOriginal();
-  getPageTranslationErrorDecisionMock.mockImplementation(actual.getPageTranslationErrorDecision);
-  return { ...actual, getPageTranslationErrorDecision: getPageTranslationErrorDecisionMock };
+  getPageTranslationErrorPresentationMock.mockImplementation(actual.getPageTranslationErrorPresentation);
+  return { ...actual, getPageTranslationErrorPresentation: getPageTranslationErrorPresentationMock };
 });
 
 import { useContentAppPageTranslation } from './useContentAppPageTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { getPageTranslationErrorDecision } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
+import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 const createDeferred = () => {
   let resolve;
@@ -370,9 +370,9 @@ describe('useContentAppPageTranslation', () => {
     });
   });
 
-  it('discards a pending error decision after reset', async () => {
+  it('discards a pending error presentation after reset', async () => {
     const decision = createDeferred();
-    getPageTranslationErrorDecision.mockReturnValueOnce(decision.promise);
+    getPageTranslationErrorPresentation.mockReturnValueOnce(decision.promise);
     mobileStore.pageTranslationData = {
       isTranslating: true,
       isAutoTranslating: false,
@@ -391,7 +391,7 @@ describe('useContentAppPageTranslation', () => {
     });
     listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
 
-    decision.resolve({ displayError: new Error('stale failure') });
+    decision.resolve(new Error('stale failure'));
     await errorPromise;
 
     expect(mobileStore.pageTranslationData).toMatchObject({
@@ -401,10 +401,10 @@ describe('useContentAppPageTranslation', () => {
     expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
   });
 
-  it('keeps a later error authoritative after reset invalidates an earlier one', async () => {
+  it('keeps a later error presentation authoritative after reset invalidates an earlier one', async () => {
     const firstDecision = createDeferred();
     const secondDecision = createDeferred();
-    getPageTranslationErrorDecision
+    getPageTranslationErrorPresentation
       .mockReturnValueOnce(firstDecision.promise)
       .mockReturnValueOnce(secondDecision.promise);
     mobileStore.pageTranslationData = {
@@ -430,9 +430,9 @@ describe('useContentAppPageTranslation', () => {
       isAggregated: true,
     });
 
-    secondDecision.resolve({ displayError: new Error('error B') });
+    secondDecision.resolve(new Error('error B'));
     await secondError;
-    firstDecision.resolve({ displayError: new Error('error A') });
+    firstDecision.resolve(new Error('error A'));
     await firstError;
 
     expect(mobileStore.pageTranslationData).toMatchObject({

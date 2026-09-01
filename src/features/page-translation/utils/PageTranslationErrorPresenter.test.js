@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPageTranslationErrorDecision, getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
+import { getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
@@ -128,21 +128,4 @@ describe('getPageTranslationErrorPresentation', () => {
     expect(mapCanonicalTranslationError).not.toHaveBeenCalled();
   });
 
-  it('suppresses Retry when fatal Whole Page output already has committed content', async () => {
-    const result = await getPageTranslationErrorDecision({
-      errorDetails: { message: 'network failure', type: ErrorTypes.NETWORK_ERROR },
-      translatedCount: 1,
-    });
-
-    expect(result.canRetry).toBe(false);
-  });
-
-  it('keeps Retry available when fatal Whole Page output has zero commits', async () => {
-    const result = await getPageTranslationErrorDecision({
-      errorDetails: { message: 'network failure', type: ErrorTypes.NETWORK_ERROR },
-      translatedCount: 0,
-    });
-
-    expect(result.canRetry).toBe(true);
-  });
 });
