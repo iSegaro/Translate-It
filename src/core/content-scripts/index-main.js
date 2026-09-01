@@ -170,9 +170,16 @@ async function initializeLogger(subComponent = 'Main') {
                   const isAllowed = await exclusionChecker.isFeatureAllowed('pageTranslation');
                   if (isAllowed) {
                     scriptLogger.info('Current URL matches auto-translate rules. Starting auto page translation...');
-                    await featureLoader.loadFeature('pageTranslation', 'INTERACTIVE');
+                    await featureLoader.loadFeature('contentMessageHandler', 'ESSENTIAL');
                     const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-                    const manager = FeatureManager.getInstance().getFeatureHandler('pageTranslation');
+                    const featureManager = FeatureManager.getInstance();
+                    const contentMessageHandler = featureManager.getFeatureHandler('contentMessageHandler');
+                    if (!featureManager.isFeatureActive('contentMessageHandler') || !contentMessageHandler?.isActive) {
+                      throw new Error('ContentMessageHandler not ready for auto page translation');
+                    }
+
+                    await featureLoader.loadFeature('pageTranslation', 'INTERACTIVE');
+                    const manager = featureManager.getFeatureHandler('pageTranslation');
                     if (manager) {
                       if (!manager.isActive) {
                         await manager.activate();
