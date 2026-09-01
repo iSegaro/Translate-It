@@ -15,4 +15,15 @@ describe('mobile store', () => {
 
     expect(store.pageTranslationData.failedCount).toBe(0);
   });
+
+  it('does not expose Mobile Whole Page retry state', () => {
+    const store = useMobileStore();
+
+    expect(store.pageTranslationData).not.toHaveProperty('canRetry');
+
+    store.setPageTranslation({ status: 'error' });
+    store.resetPageTranslation();
+
+    expect(store.pageTranslationData).not.toHaveProperty('canRetry');
+  });
 });

@@ -51,7 +51,6 @@ describe('useContentAppPageTranslation', () => {
         isTranslated: false,
         status: 'translating',
         errorMessage: 'stale error',
-        canRetry: true,
       },
       setPageTranslation: vi.fn((state) => Object.assign(mobileStore.pageTranslationData, state)),
       resetPageTranslation: vi.fn(),
@@ -86,7 +85,7 @@ describe('useContentAppPageTranslation', () => {
     expect(state.isTranslating).toBe(false);
   });
 
-  it('suppresses Retry and preserves translated state after fatal partial output', async () => {
+  it('preserves translated state after fatal partial output', async () => {
     mobileStore.pageTranslationData.isTranslated = true;
     mobileStore.pageTranslationData.translatedCount = 1;
 
@@ -100,7 +99,6 @@ describe('useContentAppPageTranslation', () => {
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
       isTranslated: true,
       translatedCount: 1,
-      canRetry: false,
       status: 'error',
     }));
   });
@@ -115,7 +113,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 3,
       status: 'error',
       errorMessage: 'fatal failure',
-      canRetry: false,
     };
 
     listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
@@ -127,7 +124,6 @@ describe('useContentAppPageTranslation', () => {
       isTranslated: true,
       status: 'completed',
       errorMessage: null,
-      canRetry: false,
     });
     expect(mobileStore.pageTranslationData).toMatchObject({
       isTranslated: true,
@@ -136,11 +132,10 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 3,
       status: 'completed',
       errorMessage: null,
-      canRetry: false,
     });
   });
 
-  it('keeps Retry available for fatal zero-commit output', async () => {
+  it('keeps fatal zero-commit error presentation without Mobile retry state', async () => {
     await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
       errorDetails: { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
       translatedCount: 0,
@@ -150,9 +145,9 @@ describe('useContentAppPageTranslation', () => {
 
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
       isTranslated: false,
-      canRetry: true,
       status: 'error',
     }));
+    expect(mobileStore.pageTranslationData).not.toHaveProperty('canRetry');
   });
 
   it('ignores raw main fatal errors until aggregate delivery', async () => {
@@ -183,7 +178,6 @@ describe('useContentAppPageTranslation', () => {
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
       translatedCount: 3,
       isTranslated: true,
-      canRetry: false,
       isTranslating: true,
       isAutoTranslating: true,
       status: 'error',
@@ -203,7 +197,6 @@ describe('useContentAppPageTranslation', () => {
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
       translatedCount: 5,
       isTranslated: true,
-      canRetry: false,
       status: 'error',
     }));
   });
@@ -218,7 +211,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 4,
       status: 'translating',
       errorMessage: null,
-      canRetry: false,
     };
     const before = { ...mobileStore.pageTranslationData };
 
@@ -239,7 +231,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 4,
       status: 'translating',
       errorMessage: null,
-      canRetry: false,
     };
     const before = { ...mobileStore.pageTranslationData };
 
@@ -260,7 +251,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 3,
       status: 'error',
       errorMessage: 'fatal failure',
-      canRetry: false,
     };
 
     listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
@@ -279,7 +269,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 3,
       status,
       errorMessage: status === 'error' ? 'fatal failure' : null,
-      canRetry: false,
     };
 
     listeners.get(MessageActions.PAGE_RESTORE_COMPLETE)();
@@ -377,7 +366,6 @@ describe('useContentAppPageTranslation', () => {
     expect(mobileStore.pageTranslationData).toMatchObject({
       translatedCount: 3,
       isTranslated: true,
-      canRetry: false,
       status: 'error',
     });
   });
@@ -394,7 +382,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 4,
       status: 'translating',
       errorMessage: null,
-      canRetry: false,
     };
 
     const errorPromise = listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
@@ -404,13 +391,12 @@ describe('useContentAppPageTranslation', () => {
     });
     listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
 
-    decision.resolve({ displayError: new Error('stale failure'), canRetry: true });
+    decision.resolve({ displayError: new Error('stale failure') });
     await errorPromise;
 
     expect(mobileStore.pageTranslationData).toMatchObject({
       status: 'translating',
       errorMessage: null,
-      canRetry: false,
     });
     expect(mobileStore.setPageTranslation).not.toHaveBeenCalled();
   });
@@ -430,7 +416,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 4,
       status: 'translating',
       errorMessage: null,
-      canRetry: false,
     };
 
     const firstError = listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
@@ -445,15 +430,14 @@ describe('useContentAppPageTranslation', () => {
       isAggregated: true,
     });
 
-    secondDecision.resolve({ displayError: new Error('error B'), canRetry: true });
+    secondDecision.resolve({ displayError: new Error('error B') });
     await secondError;
-    firstDecision.resolve({ displayError: new Error('error A'), canRetry: true });
+    firstDecision.resolve({ displayError: new Error('error A') });
     await firstError;
 
     expect(mobileStore.pageTranslationData).toMatchObject({
       status: 'error',
       errorMessage: 'error B',
-      canRetry: true,
     });
   });
 
@@ -468,7 +452,6 @@ describe('useContentAppPageTranslation', () => {
         totalCount: 0,
         status: 'idle',
         errorMessage: null,
-        canRetry: false,
       });
     });
     mobileStore.pageTranslationData = {
@@ -480,7 +463,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 2,
       status: 'error',
       errorMessage: 'fatal failure',
-      canRetry: true,
     };
 
     listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
@@ -505,7 +487,6 @@ describe('useContentAppPageTranslation', () => {
       totalCount: 3,
       status: 'error',
       errorMessage: 'fatal failure',
-      canRetry: false,
     };
 
     listeners.get(MessageActions.PAGE_TRANSLATE_RESET_ERROR)();
@@ -518,7 +499,6 @@ describe('useContentAppPageTranslation', () => {
       failedCount: 1,
       totalCount: 3,
       errorMessage: null,
-      canRetry: false,
     });
   });
 
@@ -534,17 +514,16 @@ describe('useContentAppPageTranslation', () => {
     expect(mobileStore.pageTranslationData).toEqual(before);
   });
 
-  it('clears stale retry state when translation starts', () => {
+  it('clears stale error state when translation starts', () => {
     listeners.get(MessageActions.PAGE_TRANSLATE_START)({});
 
     expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({
       errorMessage: null,
-      canRetry: false,
       failedCount: 0,
     }));
   });
 
-  it('clears stale retry state after partial completion', async () => {
+  it('clears stale error state after partial completion', async () => {
     await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
       errorDetails: { type: 'HTTP_ERROR', statusCode: 409, message: 'retryable' },
       isFatal: false,
@@ -557,7 +536,6 @@ describe('useContentAppPageTranslation', () => {
 
     expect(mobileStore.setPageTranslation).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'completed',
-      canRetry: false,
     }));
   });
 
@@ -581,7 +559,6 @@ describe('useContentAppPageTranslation', () => {
     }));
     expect(mobileStore.setPageTranslation).toHaveBeenLastCalledWith(expect.objectContaining({
       status: 'error',
-      canRetry: false,
     }));
   });
 
@@ -606,16 +583,19 @@ describe('useContentAppPageTranslation', () => {
   });
 
   it.each([
-    [{ type: 'HTTP_ERROR', statusCode: 404, message: 'HTTP 404' }, false],
-    [{ type: 'HTTP_ERROR', statusCode: 409, message: 'HTTP 409' }, true],
-    [{ type: ErrorTypes.API_KEY_INVALID, message: 'invalid key' }, false],
-  ])('stores public retry decision for %s', async (errorDetails, canRetry) => {
+    { type: ErrorTypes.NETWORK_ERROR, message: 'network failure' },
+    { type: ErrorTypes.RATE_LIMIT_REACHED, message: 'rate limited' },
+    { type: ErrorTypes.API_KEY_INVALID, message: 'invalid key' },
+    { type: ErrorTypes.FORBIDDEN_ERROR, message: 'forbidden' },
+  ])('does not store Mobile retry state for %s', async (errorDetails) => {
     await listeners.get(MessageActions.PAGE_TRANSLATE_ERROR)({
       errorDetails,
       isFatal: true,
       isAggregated: true,
     });
 
-    expect(mobileStore.setPageTranslation).toHaveBeenCalledWith(expect.objectContaining({ canRetry }));
+    const state = mobileStore.setPageTranslation.mock.lastCall[0];
+    expect(state).not.toHaveProperty('canRetry');
+    expect(mobileStore.pageTranslationData).not.toHaveProperty('canRetry');
   });
 });

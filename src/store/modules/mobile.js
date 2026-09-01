@@ -35,8 +35,7 @@ export const useMobileStore = defineStore('mobile', () => {
     failedCount: 0,
     totalCount: 0,
     status: TRANSLATION_STATUS.IDLE, // 'idle' | 'translating' | 'completed' | 'error'
-    errorMessage: null,
-    canRetry: false
+    errorMessage: null
   })
 
   // Select Element State
@@ -140,9 +139,8 @@ export const useMobileStore = defineStore('mobile', () => {
       translatedCount: 0,
       failedCount: 0,
       totalCount: 0,
-        status: TRANSLATION_STATUS.IDLE,
-        errorMessage: null,
-        canRetry: false
+      status: TRANSLATION_STATUS.IDLE,
+      errorMessage: null
     }
   }
 

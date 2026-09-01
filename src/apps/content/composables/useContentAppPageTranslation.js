@@ -67,7 +67,6 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         failedCount: 0,
         totalCount: 0,
         errorMessage: null,
-        canRetry: false,
       });
 
       if (deviceDetector.isMobile()) {
@@ -155,7 +154,6 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         failedCount,
         totalCount,
         errorMessage: null,
-        canRetry: false,
       });
     });
 
@@ -194,7 +192,6 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         ...(translatedCount !== null && { translatedCount }),
         status: TRANSLATION_STATUS.ERROR,
         errorMessage: presentation.displayError.message,
-        canRetry: presentation.canRetry && !hasCommittedContent,
       });
     });
 
@@ -213,7 +210,6 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
           isTranslated: true,
           status: TRANSLATION_STATUS.COMPLETED,
           errorMessage: null,
-          canRetry: false,
         });
         return;
       }
