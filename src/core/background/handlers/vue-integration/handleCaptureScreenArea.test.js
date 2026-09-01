@@ -24,7 +24,11 @@ vi.mock('@/features/tts/services/TTSStateManager.js', () => ({
 }));
 
 vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
-  ErrorHandler: vi.fn(() => ({ handle: mocks.errorHandler }))
+  ErrorHandler: class {
+    handle(...args) {
+      return mocks.errorHandler(...args);
+    }
+  }
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
