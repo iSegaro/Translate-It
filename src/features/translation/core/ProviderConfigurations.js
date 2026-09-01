@@ -69,13 +69,13 @@ export const BASE_CHARACTER_LIMITS = {
 };
 
 /**
- * Baseline Max Segments per request
+ * Baseline Max Segments per request (optimization preference)
  */
 export const BASE_MAX_CHUNKS_PER_BATCH = {
   GOOGLE: 150,
   BING: 10,
   YANDEX: 100,
-  DEEPL: 150,
+  DEEPL: 50,
   EDGE: 100,
   BROWSER: 50,
   LINGVA: 30,
@@ -481,6 +481,7 @@ export const PROVIDER_CONFIGURATIONS = {
       characterLimit: BASE_CHARACTER_LIMITS.DEEPL,
       optimalSize: 50,
       maxChunksPerBatch: BASE_MAX_CHUNKS_PER_BATCH.DEEPL,
+      maxSegmentsPerRequest: 50,
       delimiter: null // DeepL uses array format
     },
     streaming: {
@@ -1033,14 +1034,27 @@ export function getProviderRateLimit(providerName, level = 3) {
 export function getProviderBatching(providerName, translateMode = null, level = 3) {
   const config = getProviderConfiguration(providerName, level);
 
-  if (!translateMode || !config.batching.modeOverrides || !config.batching.modeOverrides[translateMode]) {
-    return config.batching;
+  const batching = !translateMode || !config.batching.modeOverrides || !config.batching.modeOverrides[translateMode]
+    ? config.batching
+    : {
+      ...config.batching,
+      ...config.batching.modeOverrides[translateMode]
+    };
+
+  return applyBatchingHardLimits(batching);
+}
+
+function applyBatchingHardLimits(batching) {
+  const { maxChunksPerBatch, maxSegmentsPerRequest } = batching;
+  const hasValidValue = value => typeof value === 'number' && Number.isFinite(value) && value > 0;
+
+  if (!hasValidValue(maxChunksPerBatch) || !hasValidValue(maxSegmentsPerRequest)) {
+    return batching;
   }
 
-  // Merge base config with mode-specific overrides
   return {
-    ...config.batching,
-    ...config.batching.modeOverrides[translateMode]
+    ...batching,
+    maxChunksPerBatch: Math.min(maxChunksPerBatch, maxSegmentsPerRequest)
   };
 }
 

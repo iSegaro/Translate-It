@@ -58,6 +58,14 @@ describe('TraditionalTextProcessor', () => {
       expect(chunks.length).toBe(4); // 3 + 3 + 3 + 1
       expect(chunks[0].texts.length).toBe(3);
     });
+
+    it('should keep physical chunks within the configured segment limit', () => {
+      const chunks = TraditionalTextProcessor.createChunks(
+        Array(51).fill('a'), 'DeepLTranslate', 'character_limit', 5000, 50
+      );
+
+      expect(chunks.map(chunk => chunk.texts.length)).toEqual([50, 1]);
+    });
   });
 
   describe('calculateTraditionalCharCount', () => {

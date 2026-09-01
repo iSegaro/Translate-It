@@ -132,4 +132,22 @@ describe('ProviderConfigurations optimization scaling', () => {
     expect(getProviderBatching('BingTranslate', null, 5).characterLimit).toBe(2400);
     expect(getProviderRateLimit('GoogleTranslate', 5).delayBetweenRequests).toBe(0);
   });
+
+  it('caps DeepL segment batches at its physical request limit', () => {
+    const levels = [1, 2, 3, 4, 5];
+    const batching = levels.map(level => getProviderBatching('DeepLTranslate', null, level));
+
+    expect(getProviderConfiguration('DeepLTranslate', 1).batching.maxChunksPerBatch).toBe(75);
+    expect(batching.map(config => config.maxChunksPerBatch)).toEqual([50, 50, 50, 40, 40]);
+    expect(batching.map(config => config.maxSegmentsPerRequest)).toEqual([50, 50, 50, 50, 50]);
+  });
+
+  it('keeps traditional segment scaling unchanged without a hard ceiling', () => {
+    const levels = [1, 2, 3, 4, 5];
+
+    expect(levels.map(level => getProviderBatching('GoogleTranslate', null, level).maxChunksPerBatch))
+      .toEqual([225, 180, 150, 120, 120]);
+    expect(levels.map(level => getProviderBatching('YandexTranslate', null, level).maxChunksPerBatch))
+      .toEqual([150, 120, 100, 80, 80]);
+  });
 });
