@@ -284,6 +284,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return results;
           } catch (retryError) {
             logger.error(`[Bing] Adaptive chunking failed for ${error.name}:`, retryError.message);
+            throw retryError;
           }
         }
 

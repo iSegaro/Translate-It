@@ -280,6 +280,60 @@ describe('BingTranslateProvider', () => {
       expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
     });
 
+    it('preserves child user cancellation during adaptive recovery', async () => {
+      const childError = Object.assign(new Error('Translation cancelled by user'), {
+        name: 'AbortError',
+        type: ErrorTypes.USER_CANCELLED,
+      });
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'text/html' },
+          text: async () => '<html>blocked</html>',
+        }))
+        .mockRejectedValueOnce(childError);
+
+      await expect(provider._translateChunk(['a', 'b'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(childError);
+    });
+
+    it('preserves child lifecycle abort during adaptive recovery', async () => {
+      const childError = Object.assign(new Error('Translation operation aborted'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'document-replaced',
+      });
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'text/html' },
+          text: async () => '<html>blocked</html>',
+        }))
+        .mockRejectedValueOnce(childError);
+
+      await expect(provider._translateChunk(['a', 'b'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(childError);
+      expect(childError).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'document-replaced',
+      });
+    });
+
+    it('preserves child rate-limit errors during adaptive recovery', async () => {
+      const childError = Object.assign(new Error('Too many requests'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        statusCode: 429,
+      });
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'text/html' },
+          text: async () => '<html>blocked</html>',
+        }))
+        .mockRejectedValueOnce(childError);
+
+      await expect(provider._translateChunk(['a', 'b'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(childError);
+      expect(childError.type).toBe(ErrorTypes.RATE_LIMIT_REACHED);
+    });
+
     it('keeps default adaptive retry behavior when maxRetries is absent', async () => {
       provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
         headers: { get: () => 'application/json' },
