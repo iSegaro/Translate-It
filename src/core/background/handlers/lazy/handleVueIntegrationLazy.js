@@ -19,7 +19,6 @@ async function loadVueIntegrationHandlers() {
   logger.debug('Loading Vue integration handlers lazily');
 
   const [
-    providerStatusModule,
     testProviderModule,
     saveProviderModule,
     getProviderModule,
@@ -31,7 +30,6 @@ async function loadVueIntegrationHandlers() {
     syncOCRLanguagesModule,
     vueBridgeModule
   ] = await Promise.all([
-    import('../vue-integration/handleProviderStatus.js'),
     import('../vue-integration/handleTestProviderConnection.js'),
     import('../vue-integration/handleSaveProviderConfig.js'),
     import('../vue-integration/handleGetProviderConfig.js'),
@@ -45,7 +43,6 @@ async function loadVueIntegrationHandlers() {
   ]);
 
   vueIntegrationHandlers = {
-    handleProviderStatus: providerStatusModule.handleProviderStatus,
     handleTestProviderConnection: testProviderModule.handleTestProviderConnection,
     handleSaveProviderConfig: saveProviderModule.handleSaveProviderConfig,
     handleGetProviderConfig: getProviderModule.handleGetProviderConfig,
@@ -61,14 +58,6 @@ async function loadVueIntegrationHandlers() {
   logger.debug('Vue integration handlers loaded successfully');
   return vueIntegrationHandlers;
 }
-
-/**
- * Lazy handler for PROVIDER_STATUS
- */
-export const handleProviderStatusLazy = async (message, sender, sendResponse) => {
-  const { handleProviderStatus } = await loadVueIntegrationHandlers();
-  return await handleProviderStatus(message, sender, sendResponse);
-};
 
 /**
  * Lazy handler for TEST_PROVIDER_CONNECTION

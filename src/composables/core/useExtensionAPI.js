@@ -193,10 +193,6 @@ export function useExtensionAPI() {
     return await sendMessage(MessageActions.GET_PROVIDER_CONFIG, { provider });
   };
 
-  const getProviderStatus = async (provider) => {
-    return await sendMessage(MessageActions.GET_PROVIDER_STATUS, { provider });
-  };
-
   // Translation methods
   const translateText = async (text, options = {}) => {
     return await sendMessage(MessageActions.TRANSLATE_TEXT, { text, ...options });
@@ -272,7 +268,6 @@ export function useExtensionAPI() {
     testProviderConnection,
     saveProviderConfig,
     getProviderConfig,
-    getProviderStatus,
 
     // Translation methods
     translateText,

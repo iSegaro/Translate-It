@@ -39,6 +39,7 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.get('translateText')).toBe(translateTextHandler)
     expect(registeredHandlers.get(MessageActions.SETTINGS_UPDATED)).toBe(settingsUpdatedHandler)
     expect(registeredHandlers.get(MessageActions.IFRAME_SELECT_ELEMENT_FINISHED)).toEqual(expect.any(Function))
+    expect(registeredHandlers.has('providerStatus')).toBe(false)
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === MessageActions.TRANSLATE_TEXT)).toHaveLength(1)
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === 'translateText')).toHaveLength(1)
   })

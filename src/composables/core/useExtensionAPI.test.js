@@ -62,4 +62,8 @@ describe('useExtensionAPI.translateText', () => {
   it('does not expose the removed uppercase context-menu action', () => {
     expect(useExtensionAPI()).not.toHaveProperty('updateContextMenu');
   });
+
+  it('does not expose the removed provider status API', () => {
+    expect(useExtensionAPI()).not.toHaveProperty('getProviderStatus');
+  });
 });
