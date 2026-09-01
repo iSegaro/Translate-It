@@ -3,6 +3,7 @@ import { DeepLTranslateProvider } from './DeepLTranslate.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ApiKeyManager } from './ApiKeyManager.js';
 import { ProviderRequestEngine } from './utils/ProviderRequestEngine.js';
+import { getProviderLanguageCode } from '@/shared/config/languageConstants.js';
 
 const deeplConfigMocks = vi.hoisted(() => ({
   getApiKeys: vi.fn(),
@@ -106,6 +107,75 @@ describe('DeepLTranslateProvider response contract', () => {
       executeRequestSpy.mockRestore();
     }
   };
+
+  describe('language mapping', () => {
+    it.each([
+      ['zh', 'ZH'],
+      ['zh-cn', 'ZH'],
+      ['zh-tw', 'ZH'],
+      ['zh-Hans', 'ZH'],
+      ['zh-Hant', 'ZH'],
+    ])('maps Chinese source %s to %s in the request body', async (sourceLang, expectedSource) => {
+      await runWithRuntime(['key'], 'free', async () => {
+        proxyFetch.mockResolvedValue(createJsonResponse(200, { translations: [{ text: 'translated' }] }, 'OK'));
+
+        await expect(provider._translateChunk(['source'], sourceLang, 'en', 'selection', null, 0, 1, 0, 1, {}))
+          .resolves.toEqual(['translated']);
+
+        const body = proxyFetch.mock.calls[0][1].body;
+        expect(body.get('source_lang')).toBe(expectedSource);
+      });
+    });
+
+    it.each([
+      ['zh', 'ZH'],
+      ['zh-cn', 'ZH-HANS'],
+      ['zh-tw', 'ZH-HANT'],
+    ])('maps Chinese target %s to %s in the request body', async (targetLang, expectedTarget) => {
+      await runWithRuntime(['key'], 'free', async () => {
+        proxyFetch.mockResolvedValue(createJsonResponse(200, { translations: [{ text: 'translated' }] }, 'OK'));
+
+        await expect(provider._translateChunk(['source'], 'en', targetLang, 'selection', null, 0, 1, 0, 1, {}))
+          .resolves.toEqual(['translated']);
+
+        const body = proxyFetch.mock.calls[0][1].body;
+        expect(body.get('target_lang')).toBe(expectedTarget);
+      });
+    });
+
+    it.each([
+      ['en', 'de'],
+      ['fa', 'en'],
+      ['ar', 'en'],
+      ['de', 'en'],
+    ])('preserves pre-directional mapping for %s to %s', async (sourceLang, targetLang) => {
+      const expectedSource = getProviderLanguageCode(sourceLang, 'DEEPL');
+      const expectedTarget = getProviderLanguageCode(targetLang, 'DEEPL');
+
+      await runWithRuntime(['key'], 'free', async () => {
+        proxyFetch.mockResolvedValue(createJsonResponse(200, { translations: [{ text: 'translated' }] }, 'OK'));
+
+        await expect(provider._translateChunk(['source'], sourceLang, targetLang, 'selection', null, 0, 1, 0, 1, {}))
+          .resolves.toEqual(['translated']);
+
+        const body = proxyFetch.mock.calls[0][1].body;
+        expect(body.get('source_lang')).toBe(expectedSource);
+        expect(body.get('target_lang')).toBe(expectedTarget);
+      });
+    });
+
+    it('omits source_lang for auto-detection', async () => {
+      await runWithRuntime(['key'], 'free', async () => {
+        proxyFetch.mockResolvedValue(createJsonResponse(200, { translations: [{ text: 'translated' }] }, 'OK'));
+
+        await expect(provider._translateChunk(['source'], 'auto', 'en', 'selection', null, 0, 1, 0, 1, {}))
+          .resolves.toEqual(['translated']);
+
+        const body = proxyFetch.mock.calls[0][1].body;
+        expect(body.has('source_lang')).toBe(false);
+      });
+    });
+  });
 
   describe('runtime key policy', () => {
     it('selects first Pro-compatible key without changing endpoint tier', async () => {
@@ -509,6 +579,37 @@ describe('DeepLTranslateProvider response contract', () => {
         context: 'deepltranslate-translate-chunk',
         providerName: 'DeepLTranslate',
       });
+  });
+
+  it.each([
+    ['source_lang', "Bad request. Reason: Value for 'source_lang' not supported."],
+    ['target_lang', "Bad request. Reason: Value for 'target_lang' not supported."],
+  ])('classifies unsupported %s as LANGUAGE_PAIR_NOT_SUPPORTED without fallback', async (_languageField, message) => {
+    await runWithRuntime(['first-key', 'second-key'], 'free', async ({ promoteKeySpy }) => {
+      proxyFetch.mockResolvedValue(createJsonResponse(400, { detail: message }, 'Bad Request'));
+
+      await expect(provider._translateChunk(
+        ['first', 'second'],
+        'en',
+        'de',
+        'selection',
+        null,
+        0,
+        2,
+        0,
+        1,
+        {},
+      )).rejects.toMatchObject({
+        type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED,
+        statusCode: 400,
+        context: 'deepltranslate-translate-chunk',
+        providerName: 'DeepLTranslate',
+        message,
+      });
+
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+      expect(promoteKeySpy).not.toHaveBeenCalled();
+    });
   });
 
   it('rejects the parent when a recursive HTTP-400 split child fails', async () => {

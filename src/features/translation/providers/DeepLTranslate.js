@@ -24,6 +24,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
+const DEEPL_SOURCE_CHINESE_VARIANTS = new Set(['zh', 'zh-cn', 'zh-tw', 'zh-hans', 'zh-hant']);
 
 export class DeepLTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -49,6 +50,12 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     return Number(errorInfo?.statusCode) === 529
       ? ErrorTypes.RATE_LIMIT_REACHED
       : null;
+  }
+
+  _isUnsupportedLanguageError(error) {
+    return Number(error?.statusCode) === 400
+      && typeof error?.message === 'string'
+      && /value\s+for\s+['"](?:source_lang|target_lang)['"]\s+(?:is\s+)?not\s+supported/i.test(error.message);
   }
 
   shouldFailoverApiKey(error) {
@@ -94,13 +101,28 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
-   * Convert language code to DeepL uppercase format
+   * Convert source language to DeepL code.
    * @param {string} lang - Language code or name
-   * @returns {string} DeepL language code (uppercase)
+   * @returns {string} DeepL source language code
    */
-  _getLangCode(lang) {
+  _getSourceLangCode(lang) {
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
     if (normalized === AUTO_DETECT_VALUE) return ''; // DeepL auto-detect uses empty string
+    if (DEEPL_SOURCE_CHINESE_VARIANTS.has(normalized)) return 'ZH';
+
+    return getProviderLanguageCode(normalized, 'DEEPL');
+  }
+
+  /**
+   * Convert target language to DeepL code.
+   * @param {string} lang - Language code or name
+   * @returns {string} DeepL target language code
+   */
+  _getTargetLangCode(lang) {
+    const normalized = LanguageSwappingService._normalizeLangValue(lang);
+    if (normalized === AUTO_DETECT_VALUE) return '';
+    if (normalized === 'zh-cn' || normalized === 'zh-hans') return 'ZH-HANS';
+    if (normalized === 'zh-tw' || normalized === 'zh-hant') return 'ZH-HANT';
 
     return getProviderLanguageCode(normalized, 'DEEPL');
   }
@@ -204,9 +226,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     const sessionId = options.sessionId || abortController?.sessionId;
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
-    // Normalize language codes
-    const sl = this._getLangCode(sourceLang, true); // Enable beta for normalization
-    const tl = this._getLangCode(targetLang, true);
+    // Normalize language codes with explicit source/target semantics.
+    const sl = this._getSourceLangCode(sourceLang);
+    const tl = this._getTargetLangCode(targetLang);
 
     // Get configuration and validate API key
     const { apiKey, apiUrl, apiTier } = await this._getConfig();
@@ -553,6 +575,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
       return finalResult;
     } catch (error) {
+      if (this._isUnsupportedLanguageError(error)) {
+        error.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
+        throw error;
+      }
+
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
         error.type = ErrorTypes.API_RESPONSE_INVALID;
