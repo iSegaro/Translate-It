@@ -207,11 +207,6 @@ export class SubtitleTranslationCoordinator {
             await unifiedTranslationService.handleTimeout(message.messageId);
           } catch (error) {
             logger.warn(`Batch timeout cleanup failed for ${message.messageId}:`, error);
-            try {
-              await unifiedTranslationService.cancelRequest(message.messageId, 'timeout');
-            } catch (fallbackError) {
-              logger.warn(`Batch timeout fallback cancel failed for ${message.messageId}:`, fallbackError);
-            }
           }
           reject(timeoutError);
         }, BATCH_TIMEOUT_MS);

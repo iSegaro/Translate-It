@@ -394,7 +394,7 @@ beforeEach(() => {
   });
 
   describe('streaming terminal errors', () => {
-    it('emits one terminal error after a provider batch failure', async () => {
+    it('leaves terminal error publication to the service after a provider batch failure', async () => {
       const messageId = 'ai-stream-failure';
       const engine = { isCancelled: vi.fn().mockReturnValue(false) };
       const error = Object.assign(new Error('Provider failed'), {
@@ -402,7 +402,6 @@ beforeEach(() => {
       });
       const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
       const updateSpy = vi.spyOn(AIStreamManager, 'streamErrorResults').mockResolvedValue(undefined);
-      const endSpy = vi.spyOn(AIStreamManager, 'sendStreamEnd').mockResolvedValue(undefined);
       const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
         strategy: 'single',
         optimalSize: 10,
@@ -417,13 +416,10 @@ beforeEach(() => {
         )).rejects.toBe(error);
 
         expect(updateSpy).toHaveBeenCalledWith('MockAI', error, 0, messageId, engine);
-        expect(endSpy).toHaveBeenCalledWith('MockAI', messageId, engine, { error });
-        expect(endSpy).toHaveBeenCalledTimes(1);
         expect(batchSpy).toHaveBeenCalledTimes(1);
       } finally {
         activeSpy.mockRestore();
         updateSpy.mockRestore();
-        endSpy.mockRestore();
         batchingSpy.mockRestore();
         batchSpy.mockRestore();
       }
@@ -437,7 +433,6 @@ beforeEach(() => {
       const engine = { isCancelled: vi.fn().mockReturnValue(false) };
       const activeSpy = vi.spyOn(AIStreamManager, 'isStreamActive').mockReturnValue(true);
       const updateSpy = vi.spyOn(AIStreamManager, 'streamErrorResults').mockResolvedValue(undefined);
-      const endSpy = vi.spyOn(AIStreamManager, 'sendStreamEnd').mockResolvedValue(undefined);
       const batchingSpy = vi.spyOn(provider, 'getBatchingConfig').mockResolvedValue({
         strategy: 'single',
         optimalSize: 10,
@@ -453,12 +448,10 @@ beforeEach(() => {
         )).rejects.toBe(error);
 
         expect(updateSpy).toHaveBeenCalledTimes(1);
-        expect(endSpy).not.toHaveBeenCalled();
         expect(batchSpy).toHaveBeenCalledTimes(1);
       } finally {
         activeSpy.mockRestore();
         updateSpy.mockRestore();
-        endSpy.mockRestore();
         batchingSpy.mockRestore();
         batchSpy.mockRestore();
       }

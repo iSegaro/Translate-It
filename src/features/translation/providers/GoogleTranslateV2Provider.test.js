@@ -72,8 +72,7 @@ vi.mock('@/features/translation/core/StreamingManager.js', () => ({
 vi.mock('./utils/TraditionalStreamManager.js', () => ({
   TraditionalStreamManager: {
     streamChunkResults: vi.fn(),
-    streamChunkError: vi.fn(),
-    sendStreamEnd: vi.fn()
+    streamChunkError: vi.fn()
   }
 }));
 

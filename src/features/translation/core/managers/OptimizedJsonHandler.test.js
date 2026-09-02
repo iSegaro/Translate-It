@@ -687,8 +687,7 @@ describe('OptimizedJsonHandler', () => {
       const updates = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
       const ends = messages.filter((message) => message.action === MessageActions.TRANSLATION_STREAM_END);
       expect(updates).toHaveLength(1);
-      expect(ends).toHaveLength(1);
-      expect(ends[0].data).toMatchObject({ success: true });
+       expect(ends).toHaveLength(0);
       expect(JSON.stringify(messages)).toContain(marker(39));
     });
 
@@ -1175,8 +1174,7 @@ describe('OptimizedJsonHandler', () => {
       const ends = browser.tabs.sendMessage.mock.calls
         .map(([, m]) => m)
         .filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
-      expect(ends).toHaveLength(1);
-      expect(ends[0].data.success).toBe(true);
+       expect(ends).toHaveLength(0);
     });
 
     it('preserves results when the second parent recovery fails', async () => {
@@ -1245,8 +1243,7 @@ describe('OptimizedJsonHandler', () => {
       const ends = browser.tabs.sendMessage.mock.calls
         .map(([, m]) => m)
         .filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
-      expect(ends).toHaveLength(1);
-      expect(ends[0].data.success).toBe(false);
+       expect(ends).toHaveLength(0);
     });
 
     it('stops after two parent recovery lifecycles and preserves the accumulated prefix', async () => {
@@ -2735,7 +2732,7 @@ describe('OptimizedJsonHandler', () => {
       });
     });
 
-    it('should emit a failing stream end when a batch fails', async () => {
+    it('should leave failing stream-end publication to the service', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();
 
@@ -2752,9 +2749,7 @@ describe('OptimizedJsonHandler', () => {
 
       const messages = browser.tabs.sendMessage.mock.calls.map(c => c[1]);
       const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
-      expect(ends).toHaveLength(1);
-      expect(ends[0].data.success).toBe(false);
-      expect(ends[0].data.error).toBeDefined();
+       expect(ends).toHaveLength(0);
     });
 
     it('should fail the batch and emit no stream update when a mapped item is null', async () => {
@@ -2819,9 +2814,8 @@ describe('OptimizedJsonHandler', () => {
       expect(updates).toHaveLength(2);
       expect(updates.map(u => u.data.data)).toEqual([['t1'], ['t2']]);
 
-      const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
-      expect(ends).toHaveLength(1);
-      expect(ends[0].data.success).toBe(true);
+       const ends = messages.filter(m => m.action === MessageActions.TRANSLATION_STREAM_END);
+       expect(ends).toHaveLength(0);
     });
 
     it('should abort other batches on fatal error without streaming original content', async () => {
@@ -4965,7 +4959,7 @@ describe('OptimizedJsonHandler', () => {
       sessionId: 'sess-1'
     };
 
-    it('targets the originating iframe for update and end sends', async () => {
+    it('targets the originating iframe for updates', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();
 
@@ -4981,9 +4975,8 @@ describe('OptimizedJsonHandler', () => {
       expect(result.success).toBe(true);
       const calls = browser.tabs.sendMessage.mock.calls;
       const update = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_UPDATE);
-      const end = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END);
       expect(update).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_UPDATE }), { frameId: 3 }]);
-      expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
+      expect(calls.some(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END)).toBe(false);
     });
 
     it('propagates acceptance metadata through optimized stream and final result', async () => {
@@ -5006,9 +4999,7 @@ describe('OptimizedJsonHandler', () => {
 
       const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
       const update = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_UPDATE);
-      const end = messages.find(message => message.action === MessageActions.TRANSLATION_STREAM_END);
       expect(update.data).toHaveProperty('conversationAcceptance', true);
-      expect(end.data).toHaveProperty('conversationAcceptance', true);
       expect(result).toHaveProperty('conversationAcceptance', true);
     });
 
@@ -5035,7 +5026,7 @@ describe('OptimizedJsonHandler', () => {
       expect(result).not.toHaveProperty('conversationAcceptance');
     });
 
-    it('targets the originating iframe for error sends', async () => {
+    it('does not publish terminal errors from the optimized handler', async () => {
       const browser = (await import('webextension-polyfill')).default;
       browser.tabs.sendMessage.mockClear();
 
@@ -5053,65 +5044,8 @@ describe('OptimizedJsonHandler', () => {
       expect(result.success).toBe(false);
       expect(result.errorDetails).toEqual(result.error);
       expect(result.errorDetails).toMatchObject({ message: 'provider down', type: 'NETWORK_ERROR' });
-      const calls = browser.tabs.sendMessage.mock.calls;
-      const end = calls.find(([, m]) => m.action === MessageActions.TRANSLATION_STREAM_END);
-      expect(end).toEqual([123, expect.objectContaining({ action: MessageActions.TRANSLATION_STREAM_END }), { frameId: 3 }]);
-    });
-
-    it('serializes optimized stream errors with canonical identity fields', async () => {
-      const browser = (await import('webextension-polyfill')).default;
-      browser.tabs.sendMessage.mockClear();
-      const error = new Error('structured provider failure');
-      Object.assign(error, {
-        type: 'PROVIDER_ERROR',
-        originalType: 'HTTP_ERROR',
-        statusCode: 503,
-        context: 'select-element-stream',
-        providerName: 'Provider',
-        providerId: 'provider-id',
-        code: 'UPSTREAM_FAILURE',
-        errorCode: 'E_UPSTREAM',
-        cause: new Error('private cause'),
-        arbitrary: { ignored: true }
-      });
-
-      await handler._sendStreamError(123, 'msg-optimized-error', error, 'fa', 'en', 'select_element');
-
-      const message = browser.tabs.sendMessage.mock.calls[0][1];
-      expect(message).toMatchObject({
-        action: MessageActions.TRANSLATION_STREAM_END,
-        data: {
-          success: false,
-          sourceLanguage: 'en',
-          targetLanguage: 'fa',
-          translationMode: 'select_element',
-          error: {
-            message: 'structured provider failure',
-            type: 'PROVIDER_ERROR',
-            originalType: 'HTTP_ERROR',
-            statusCode: 503,
-            context: 'select-element-stream',
-            providerName: 'Provider',
-            providerId: 'provider-id',
-            code: 'UPSTREAM_FAILURE',
-            errorCode: 'E_UPSTREAM'
-          }
-        }
-      });
-      expect(message.data.error).not.toHaveProperty('cause');
-      expect(message.data.error).not.toHaveProperty('arbitrary');
-      expect(message.data.errorDetails).toEqual(message.data.error);
-      expect(message.data.errorDetails).toMatchObject({
-        message: 'structured provider failure',
-        type: 'PROVIDER_ERROR',
-        originalType: 'HTTP_ERROR',
-        statusCode: 503,
-        context: 'select-element-stream',
-        providerName: 'Provider',
-        providerId: 'provider-id',
-        code: 'UPSTREAM_FAILURE',
-        errorCode: 'E_UPSTREAM'
-      });
+      const messages = browser.tabs.sendMessage.mock.calls.map(([, message]) => message);
+      expect(messages.some(message => message.action === MessageActions.TRANSLATION_STREAM_END)).toBe(false);
     });
 
     it('targets the top frame explicitly with frameId 0', async () => {

@@ -168,12 +168,10 @@ export class BaseTranslateProvider extends BaseProvider {
         else logger.debug(`[${this.providerName}] Streaming chunk ${chunkIndex + 1} failed:`, error);
 
         await TraditionalStreamManager.streamChunkError(this.providerName, error, chunkIndex, messageId);
-        await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { error });
         throw error;
       }
     }
 
-    await TraditionalStreamManager.sendStreamEnd(this.providerName, messageId, { sourceLanguage: sourceLang, targetLanguage: targetLang });
     return allResults;
   }
 

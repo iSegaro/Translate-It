@@ -144,7 +144,6 @@ class LifecycleManager {
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
       [MessageActions.CANCEL_SESSION]: Handlers.handleCancelSessionLazy,
       [MessageActions.PARENT_ACCEPTANCE_ACK]: Handlers.handleParentAcceptanceAckLazy,
-      [MessageActions.TRANSLATION_RESULT_UPDATE]: Handlers.handleTranslationResultLazy,
       'CHECK_TRANSLATION_STATUS': Handlers.handleCheckTranslationStatusLazy,
       [MessageActions.BATCH_TRANSLATE]: Handlers.handleBatchTranslateLazy,
 

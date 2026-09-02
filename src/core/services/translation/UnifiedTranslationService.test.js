@@ -30,7 +30,16 @@ const backgroundLeaseMock = vi.hoisted(() => {
   };
 });
 
+const streamingManagerMock = vi.hoisted(() => ({
+  initializeStream: vi.fn(),
+  getStreamInfo: vi.fn(),
+  completeStream: vi.fn(),
+}));
+
 vi.mock('./BackgroundOperationLease.js', () => backgroundLeaseMock);
+vi.mock('@/features/translation/core/StreamingManager.js', () => ({
+  streamingManager: streamingManagerMock,
+}));
 
 // 1. Mocks first
 vi.mock('./TranslationRequestTracker.js', () => ({
@@ -38,6 +47,7 @@ vi.mock('./TranslationRequestTracker.js', () => ({
     getRequest: vi.fn(),
     isRequestActive: vi.fn(),
     createRequest: vi.fn(),
+    setActiveExpiryHandler: vi.fn(),
     updateRequest: vi.fn(),
     completeRequest: vi.fn(),
     failRequest: vi.fn(),
@@ -47,7 +57,8 @@ vi.mock('./TranslationRequestTracker.js', () => ({
   },
   RequestStatus: {
     COMPLETED: 'completed',
-    FAILED: 'failed'
+    FAILED: 'failed',
+    TIMEOUT: 'timeout'
   }
 }));
 
@@ -91,7 +102,12 @@ vi.mock('../../../shared/config/config.js', () => ({
 vi.mock('../../../shared/messaging/core/MessagingCore.js', () => ({
   MessageFormat: {
     validate: vi.fn().mockReturnValue(true),
-    createErrorResponse: vi.fn((err) => ({ success: false, error: err.message || err }))
+    createErrorResponse: vi.fn((err) => ({ success: false, error: err.message || err })),
+    serializeTranslationError: vi.fn((error, options = {}) => ({
+      message: error?.message || String(error),
+      ...(options.type || error?.type ? { type: options.type || error.type } : {}),
+      ...(options.providerName || error?.providerName ? { providerName: options.providerName || error.providerName } : {}),
+    }))
   },
   MessageContexts: {
     POPUP: 'popup',
@@ -166,6 +182,7 @@ import { translationRequestTracker } from './TranslationRequestTracker.js';
 import { createTranslationOperation, finalizeTranslationOperation } from '../../../features/translation/ir/TranslationOperation.js';
 import { createRequestUnitManifest } from '../../../features/translation/ir/RequestUnitManifest.js';
 import { TerminalExecutionRouter } from '../../../features/translation/ir/TerminalExecutionRouter.js';
+import { AIConversationHelper } from '../../../features/translation/providers/utils/AIConversationHelper.js';
 import { ActionReasons } from '../../../shared/messaging/core/MessagingCore.js';
 import { statsManager } from '../../../features/translation/core/TranslationStatsManager.js';
 import { translationSessionManager } from '../../../features/translation/core/TranslationSessionManager.js';
@@ -182,6 +199,10 @@ describe('UnifiedTranslationService', () => {
       .mockReset()
       .mockImplementation(backgroundLeaseMock.runWithLease);
     translationRequestTracker.getRequest.mockReset();
+    translationRequestTracker.isRequestActive.mockReset();
+    streamingManagerMock.initializeStream.mockReset();
+    streamingManagerMock.getStreamInfo.mockReset().mockReturnValue(null);
+    streamingManagerMock.completeStream.mockReset().mockResolvedValue(undefined);
     service = new UnifiedTranslationService();
     mockEngine = { cancelTranslation: vi.fn() };
     mockBackground = { translationEngine: mockEngine };
@@ -857,6 +878,31 @@ describe('UnifiedTranslationService', () => {
       expect(translationRequestTracker.completeRequest).toHaveBeenCalledTimes(1);
     });
 
+    it('does not mutate a frozen provider result while normalizing transport metadata', async () => {
+      const message = {
+        messageId: 'm-frozen-result',
+        data: { text: 'hello', mode: 'selection' },
+        context: 'content',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'selection' };
+      const providerResult = Object.freeze({
+        success: true,
+        translatedText: 'bonjour',
+        conversationAcceptance: false,
+      });
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue(providerResult);
+
+      const result = await service.handleTranslationRequest(message);
+
+      expect(result).not.toBe(providerResult);
+      expect(result).not.toHaveProperty('conversationAcceptance');
+      expect(providerResult.conversationAcceptance).toBe(false);
+      expect(service.resultDispatcher.dispatchResult).toHaveBeenCalledWith(expect.objectContaining({
+        result: expect.not.objectContaining({ conversationAcceptance: expect.anything() }),
+      }));
+    });
+
     it('does not fail a request when registration itself throws', async () => {
       const message = { messageId: 'm-setup', data: { text: 'hello', mode: 'selection' }, context: 'content' };
       translationRequestTracker.createRequest.mockImplementation(() => { throw new Error('setup failed') });
@@ -1019,6 +1065,313 @@ describe('UnifiedTranslationService', () => {
 
       expect(result.success).toBe(true);
       expect(service.modeCoordinator.processRequest).toHaveBeenCalledWith(mockRequest, expect.any(Object));
+    });
+
+    it('does not start execution after cancellation wins during setup', async () => {
+      let releaseParticipation;
+      const participation = new Promise(resolve => { releaseParticipation = resolve; });
+      const participationSpy = vi.spyOn(AIConversationHelper, 'getConversationParticipation')
+        .mockReturnValue(participation);
+      const message = {
+        messageId: 'm-setup-cancelled',
+        data: { text: 'hello', mode: 'selection', provider: 'google' },
+        context: 'content'
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'selection' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.isRequestActive.mockReturnValue(false);
+
+      try {
+        const requestPromise = service.handleTranslationRequest(message);
+        releaseParticipation(false);
+        const result = await requestPromise;
+
+        expect(result).toMatchObject({ success: false, suppressed: true, reason: 'already_terminal' });
+        expect(service.modeCoordinator.processRequest).not.toHaveBeenCalled();
+      } finally {
+        participationSpy.mockRestore();
+      }
+    });
+
+    it('sees the attached operation when cancellation wins during setup', async () => {
+      let releaseParticipation;
+      const participation = new Promise(resolve => { releaseParticipation = resolve; });
+      const participationSpy = vi.spyOn(AIConversationHelper, 'getConversationParticipation')
+        .mockReturnValue(participation);
+      const message = {
+        messageId: 'm-setup-cancelled-owned',
+        data: { text: 'hello', mode: 'selection', provider: 'google' },
+        context: 'content'
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'selection' };
+      let terminalStatus = null;
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockImplementation(() => request);
+      translationRequestTracker.isRequestActive.mockImplementation(() => terminalStatus === null);
+      translationRequestTracker.cancelRequest.mockImplementation(() => {
+        terminalStatus = 'cancelled';
+        request.status = terminalStatus;
+        return { accepted: true, status: terminalStatus, request };
+      });
+
+      try {
+        const pending = service.handleTranslationRequest(message);
+        await vi.waitFor(() => expect(participationSpy).toHaveBeenCalledTimes(1));
+
+        await expect(service.cancelRequest(message.messageId, ActionReasons.USER_CANCELLED))
+          .resolves.toMatchObject({ handled: true, success: true });
+
+        releaseParticipation(false);
+        const result = await pending;
+
+        expect(result).toMatchObject({ success: false, cancelled: true });
+        expect(service.modeCoordinator.processRequest).not.toHaveBeenCalled();
+        expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+        expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
+        expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledWith(
+          expect.any(Object),
+          { status: 'cancelled' },
+        );
+      } finally {
+        participationSpy.mockRestore();
+      }
+    });
+
+    it('does not start execution after timeout wins during setup', async () => {
+      let releaseParticipation;
+      const participation = new Promise(resolve => { releaseParticipation = resolve; });
+      const participationSpy = vi.spyOn(AIConversationHelper, 'getConversationParticipation')
+        .mockReturnValue(participation);
+      const message = {
+        messageId: 'm-setup-timeout',
+        data: { text: 'hello', mode: 'selection', provider: 'google' },
+        context: 'content'
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'selection' };
+      let terminalStatus = null;
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockImplementation(() => request);
+      translationRequestTracker.isRequestActive.mockImplementation(() => terminalStatus === null);
+      translationRequestTracker.markTimeout.mockImplementation(() => {
+        terminalStatus = 'timeout';
+        request.status = terminalStatus;
+        return { accepted: true, status: terminalStatus, request };
+      });
+
+      try {
+        const pending = service.handleTranslationRequest(message);
+        await vi.waitFor(() => expect(participationSpy).toHaveBeenCalledTimes(1));
+
+        await expect(service.handleTimeout(
+          message.messageId,
+          'No progress',
+          ErrorTypes.PROGRESS_TIMEOUT,
+        )).resolves.toEqual({ handled: true, success: true });
+
+        releaseParticipation(false);
+        const result = await pending;
+
+        expect(result).toMatchObject({ success: false, timedOut: true });
+        expect(service.modeCoordinator.processRequest).not.toHaveBeenCalled();
+        expect(service.conversationAcceptanceCoordinator.lookup(message.messageId)).toBeNull();
+        expect(mockEngine.cancelTranslation).toHaveBeenCalledWith(
+          message.messageId,
+          true,
+          ErrorTypes.PROGRESS_TIMEOUT,
+          'No progress',
+        );
+        const report = finalizeTranslationOperation.mock.results.at(-1).value;
+        expect(report.entries.at(-1).type).toBe('OPERATION_TIMEOUT');
+      } finally {
+        participationSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['success', false],
+      ['error', true],
+    ])('publishes only cancellation winner when late stream %s settles', async (lateOutcome, isError) => {
+      const messageId = `m-stream-cancel-race-${lateOutcome}`;
+      const message = {
+        messageId,
+        data: {
+          text: JSON.stringify([{ i: 'n1', t: 'Hello' }]),
+          mode: 'select-element',
+          provider: 'google',
+          options: { rawJsonPayload: true },
+        },
+        context: 'select-element'
+      };
+      const sender = { tab: { id: 7 }, frameId: 3 };
+      const request = { messageId, data: message.data, mode: 'select-element', sender };
+      let terminalStatus = null;
+      let settleExecution;
+
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockReturnValue(request);
+      translationRequestTracker.isRequestActive.mockImplementation(() => terminalStatus === null);
+      const acceptTerminal = status => {
+        if (terminalStatus) return { accepted: false, status: terminalStatus, reason: 'already_terminal' };
+        terminalStatus = status;
+        request.status = status;
+        return { accepted: true, status, request };
+      };
+      translationRequestTracker.cancelRequest.mockImplementation(() => acceptTerminal('cancelled'));
+      translationRequestTracker.completeRequest.mockImplementation((_id, result) => acceptTerminal(result?.success === true ? 'completed' : 'failed'));
+      translationRequestTracker.failRequest.mockImplementation(() => acceptTerminal('failed'));
+      streamingManagerMock.getStreamInfo.mockReturnValue({ providerName: 'Google', processedSegments: 0 });
+      service.modeCoordinator.processRequest.mockReturnValue(new Promise((resolve, reject) => {
+        settleExecution = value => isError ? reject(value) : resolve(value);
+      }));
+
+      const inFlight = service.handleTranslationRequest(message, sender);
+      await vi.waitFor(() => expect(service.modeCoordinator.processRequest).toHaveBeenCalledTimes(1));
+      await service.cancelRequest(messageId, 'user_cancelled');
+      settleExecution(isError ? new Error('late stream failure') : { success: true, translatedText: 'late' });
+      const result = await inFlight;
+
+      expect(result).toMatchObject({ success: false, cancelled: true });
+      expect(streamingManagerMock.completeStream).toHaveBeenCalledTimes(1);
+      expect(streamingManagerMock.completeStream).toHaveBeenCalledWith(
+        messageId,
+        false,
+        expect.objectContaining({ cancelled: true, reason: 'user_cancelled' }),
+      );
+    });
+
+    it.each([
+      ['success', false],
+      ['error', true],
+    ])('publishes only timeout winner when late stream %s settles', async (lateOutcome, isError) => {
+      const messageId = `m-stream-timeout-race-${lateOutcome}`;
+      const message = {
+        messageId,
+        data: {
+          text: JSON.stringify([{ i: 'n1', t: 'Hello' }]),
+          mode: 'select-element',
+          provider: 'google',
+          options: { rawJsonPayload: true },
+        },
+        context: 'select-element'
+      };
+      const sender = { tab: { id: 8 }, frameId: 4 };
+      const request = { messageId, data: message.data, mode: 'select-element', sender };
+      let terminalStatus = null;
+      let settleExecution;
+
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockReturnValue(request);
+      translationRequestTracker.isRequestActive.mockImplementation(() => terminalStatus === null);
+      const acceptTerminal = status => {
+        if (terminalStatus) return { accepted: false, status: terminalStatus, reason: 'already_terminal' };
+        terminalStatus = status;
+        request.status = status;
+        return { accepted: true, status, request };
+      };
+      translationRequestTracker.markTimeout.mockImplementation(() => acceptTerminal('timeout'));
+      translationRequestTracker.completeRequest.mockImplementation((_id, result) => acceptTerminal(result?.success === true ? 'completed' : 'failed'));
+      translationRequestTracker.failRequest.mockImplementation(() => acceptTerminal('failed'));
+      streamingManagerMock.getStreamInfo.mockReturnValue({ providerName: 'Google', processedSegments: 0 });
+      service.modeCoordinator.processRequest.mockReturnValue(new Promise((resolve, reject) => {
+        settleExecution = value => isError ? reject(value) : resolve(value);
+      }));
+
+      const inFlight = service.handleTranslationRequest(message, sender);
+      await vi.waitFor(() => expect(service.modeCoordinator.processRequest).toHaveBeenCalledTimes(1));
+      await service.handleTimeout(messageId, 'No progress', ErrorTypes.PROGRESS_TIMEOUT);
+      settleExecution(isError ? new Error('late stream failure') : { success: true, translatedText: 'late' });
+      const result = await inFlight;
+
+      expect(result).toMatchObject({ success: false, timedOut: true });
+      expect(streamingManagerMock.completeStream).toHaveBeenCalledTimes(1);
+      expect(streamingManagerMock.completeStream).toHaveBeenCalledWith(
+        messageId,
+        false,
+        expect.objectContaining({
+          timedOut: true,
+          cancelled: false,
+          timeoutType: ErrorTypes.PROGRESS_TIMEOUT,
+        }),
+      );
+    });
+
+    it('owns structured stream terminal publication after accepted completion', async () => {
+      const message = {
+        messageId: 'm-structured-stream',
+        data: {
+          text: JSON.stringify([{ i: 'n1', t: 'Hello' }]),
+          mode: 'select-element',
+          provider: 'google',
+          sessionId: 'session-1',
+          options: { rawJsonPayload: true },
+        },
+        context: 'select-element'
+      };
+      const sender = { tab: { id: 7 }, frameId: 3 };
+      const request = {
+        messageId: message.messageId,
+        data: message.data,
+        mode: 'select-element',
+        sender,
+        sessionId: 'session-1',
+      };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      streamingManagerMock.getStreamInfo.mockReturnValue({
+        providerName: 'Google',
+        processedSegments: 0,
+      });
+      service.modeCoordinator.processRequest.mockResolvedValue({
+        success: true,
+        streaming: true,
+        results: [{ i: 'n1', t: 'Bonjour' }],
+      });
+
+      await service.handleTranslationRequest(message, sender);
+
+      expect(streamingManagerMock.initializeStream).toHaveBeenCalledWith(
+        message.messageId,
+        sender,
+        expect.objectContaining({ providerName: expect.any(String) }),
+        [{ i: 'n1', t: 'Hello' }],
+        'session-1',
+        false,
+      );
+      expect(streamingManagerMock.completeStream).toHaveBeenCalledWith(
+        message.messageId,
+        true,
+        expect.objectContaining({
+          translationMode: 'select-element',
+          processedSegments: 1,
+        }),
+      );
+    });
+
+    it('forwards timeout subtype through service-owned stream completion', async () => {
+      const messageId = 'm-service-timeout';
+      const request = { messageId, mode: 'select-element', data: { mode: 'select-element' } };
+      translationRequestTracker.getRequest.mockReturnValue(request);
+      translationRequestTracker.markTimeout.mockReturnValue({ accepted: true, status: 'timeout' });
+      streamingManagerMock.getStreamInfo.mockReturnValue({ providerName: 'Google', processedSegments: 1 });
+
+      await service.handleTimeout(messageId, 'No progress', ErrorTypes.PROGRESS_TIMEOUT);
+
+      expect(streamingManagerMock.completeStream).toHaveBeenCalledWith(
+        messageId,
+        false,
+        expect.objectContaining({
+          timedOut: true,
+          timeoutType: ErrorTypes.PROGRESS_TIMEOUT,
+          errorDetails: expect.objectContaining({ message: 'No progress' }),
+        }),
+      );
     });
 
     it('passes the exact manifest instance to TranslationOperation', async () => {
@@ -1195,6 +1548,10 @@ describe('UnifiedTranslationService', () => {
         'PROGRESS_TIMEOUT',
         'Streaming translation timed out'
       );
+      expect(TerminalExecutionRouter.routeTerminalExecution).toHaveBeenCalledWith(
+        expect.any(Object),
+        { status: 'timeout' },
+      );
     });
 
     it('does no terminal work when timeout transition is rejected', async () => {
@@ -1284,6 +1641,23 @@ describe('UnifiedTranslationService', () => {
       translationRequestTracker.cleanup.mockReturnValue(5);
       service.cleanup();
       expect(translationRequestTracker.cleanup).toHaveBeenCalled();
+    });
+
+    it('registers active expiry with the canonical timeout owner', async () => {
+      const expiryHandler = translationRequestTracker.setActiveExpiryHandler.mock.calls.at(-1)[0];
+      const request = { messageId: 'stale-service-request' };
+      translationRequestTracker.getRequest.mockReturnValue(request);
+
+      expiryHandler(request.messageId);
+      await vi.waitFor(() => expect(translationRequestTracker.markTimeout).toHaveBeenCalledWith(request.messageId));
+
+      expect(mockEngine.cancelTranslation).toHaveBeenCalledWith(
+        request.messageId,
+        true,
+        ErrorTypes.FINAL_TIMEOUT,
+        'Translation request expired',
+      );
+      expect(finalizeTranslationOperation).toHaveBeenCalledTimes(1);
     });
   });
 });

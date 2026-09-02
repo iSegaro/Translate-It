@@ -33,7 +33,7 @@ export async function handleCancelTranslation(request, sender) {
       };
     }
 
-    // Cancel operations with proper order: Engine → Streaming → RateLimit
+    // Cancel operations with service ownership first, then engine/stream fallback and cleanup.
     const { cancelAll, reason, context, sessionId, timeout, timeoutType } = request.data || {};
     const tabId = sender?.tab?.id;
     
@@ -76,17 +76,32 @@ export async function handleCancelTranslation(request, sender) {
 
     const results = await Promise.allSettled(messageIdsToCancel.map(async (id) => {
       let cancelled = false;
+      let serviceHandled = false;
 
       if (timeout) {
+        let timeoutResult;
         try {
-          const timeoutResult = await unifiedTranslationService.handleTimeout(
+          timeoutResult = await unifiedTranslationService.handleTimeout(
             id,
             resolvedReason,
             timeoutType
           );
+        } catch { /* fall back to engine-owned timeout cleanup */ }
+
+        if (timeoutResult?.handled) {
+          serviceHandled = true;
           cancelled = timeoutResult.success;
-          if (timeoutResult.handled && !timeoutResult.success) return false;
-        } catch { /* continue remaining exact-ID cleanup */ }
+          if (!timeoutResult.success) return false;
+        } else {
+          try {
+            cancelled = await translationEngine.cancelTranslation(
+              id,
+              true,
+              timeoutType,
+              resolvedReason,
+            );
+          } catch { /* continue remaining exact-ID cleanup */ }
+        }
       } else {
         // Delegate service ownership first; fall back only when unhandled.
         let delegatedResult;
@@ -100,6 +115,7 @@ export async function handleCancelTranslation(request, sender) {
         }
 
         if (delegatedResult.handled) {
+          serviceHandled = true;
           cancelled = delegatedResult.success;
           if (!delegatedResult.success) {
             // Preserve abort-always behavior; never touch tracker/dispatch again.
@@ -122,10 +138,12 @@ export async function handleCancelTranslation(request, sender) {
       }
 
       await Promise.allSettled([
-        Promise.resolve().then(() => streamingManager.cancelStream(
-          id,
-          resolvedReason
-        )),
+        Promise.resolve().then(() => {
+          if (!serviceHandled && timeout) {
+            return streamingManager.cancelStream(id, resolvedReason, true, timeoutType);
+          }
+          return streamingManager.cancelStream(id, resolvedReason);
+        }),
         Promise.resolve().then(() => rateLimitManager.clearPendingRequests(id)),
         Promise.resolve().then(() => queueManager.cancelByMessageId(id))
       ]);

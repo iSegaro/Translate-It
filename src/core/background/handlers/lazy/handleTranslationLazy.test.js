@@ -66,7 +66,6 @@ describe('handleTranslateTextLazy', () => {
 
 describe.each([
   ['handleTranslateLazy', '@/features/translation/handlers/handleTranslate.js', 'handleTranslate', 'Failed to load translation functionality'],
-  ['handleTranslationResultLazy', '../translation/handleTranslationResult.js', 'handleTranslationResult', 'Failed to load translation result functionality'],
   ['handleRevertTranslationLazy', '@/features/translation/handlers/handleRevertTranslation.js', 'handleRevertTranslation', 'Failed to load revert translation functionality'],
   ['handleCancelTranslationLazy', '@/features/translation/handlers/handleCancelTranslation.js', 'handleCancelTranslation', 'Failed to load cancel translation functionality'],
   ['handleCancelSessionLazy', '@/features/translation/handlers/handleCancelSession.js', 'handleCancelSession', 'Failed to load cancel session functionality'],

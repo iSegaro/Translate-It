@@ -53,7 +53,6 @@ vi.mock('./utils/TraditionalStreamManager.js', () => ({
   TraditionalStreamManager: {
     streamChunkResults: vi.fn(),
     streamChunkError: vi.fn(),
-    sendStreamEnd: vi.fn(),
   },
 }));
 
@@ -217,7 +216,6 @@ describe('BaseTranslateProvider', () => {
         'msg-1', expect.anything(), provider, texts, 'session-1'
       );
       expect(TraditionalStreamManager.streamChunkResults).toHaveBeenCalled();
-      expect(TraditionalStreamManager.sendStreamEnd).toHaveBeenCalled();
       expect(result).toEqual(['translated-Hello']);
     });
 
@@ -291,18 +289,16 @@ describe('BaseTranslateProvider', () => {
       expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
     });
 
-    it('preserves metadata when stream-end delivery fails', async () => {
+    it('keeps provider metadata independent from terminal delivery', async () => {
       const operation = createTranslationOperation('streaming-end-delivery-failure');
       vi.spyOn(provider, '_translateChunk').mockImplementation(async (texts, ...args) => {
         args[8].providerMetadataRef.metadata.detectedLanguage = 'en';
         return texts.map(text => `translated-${text}`);
       });
-      TraditionalStreamManager.sendStreamEnd.mockRejectedValueOnce(new Error('stream end delivery failed'));
-
       await expect(provider._streamingBatchTranslate(
         ['Hello'], 'en', 'fa', TranslationMode.Popup, null, null, null, 1, 'session-1', undefined,
         { executionContext: { operation } },
-      )).rejects.toThrow('stream end delivery failed');
+      )).resolves.toEqual(['translated-Hello']);
 
       expect(operation.snapshotAggregatedProviderMetadata()).toEqual({ detectedLanguage: 'en' });
     });
@@ -318,9 +314,6 @@ describe('BaseTranslateProvider', () => {
       )).rejects.toThrow('API Fail');
 
       expect(TraditionalStreamManager.streamChunkError).toHaveBeenCalled();
-      expect(TraditionalStreamManager.sendStreamEnd).toHaveBeenCalledWith(
-        'TestProvider', 'msg-1', expect.objectContaining({ error: expect.anything() })
-      );
     });
 
     it('should detect explicit user cancellation via AbortController', async () => {

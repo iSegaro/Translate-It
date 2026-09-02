@@ -4,6 +4,7 @@ import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
 import { sendRegularMessage } from './UnifiedMessaging.js';
 import { MessageActions } from './MessageActions.js';
 import { TRANSLATION_BATCH_EXECUTION_TIMEOUT_MS } from '@/shared/constants/translation.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
 // Mock dependencies
 vi.mock('./StreamingTimeoutManager.js', () => ({
@@ -249,6 +250,57 @@ describe('UnifiedTranslationCoordinator', () => {
         data: expect.objectContaining({ messageId, timeout: true, timeoutType: 'PROGRESS_TIMEOUT' })
       }));
       expect(coordinator.activeTranslations.has(messageId)).toBe(false);
+    });
+
+    it.each([ErrorTypes.PROGRESS_TIMEOUT, ErrorTypes.FINAL_TIMEOUT])('forwards timeout subtype from registered callback: %s', async (timeoutType) => {
+      const messageId = `callback-${timeoutType}`;
+      const message = {
+        action: MessageActions.TRANSLATE,
+        messageId,
+        context: 'select-element',
+        data: { text: 'a'.repeat(300), mode: 'select-element' }
+      };
+      let callbacks;
+      let resolveStreaming;
+
+      streamingTimeoutManager.registerStreamingOperation.mockImplementation((_id, _timeout, options) => {
+        callbacks = options;
+        return new Promise(resolve => { resolveStreaming = resolve; });
+      });
+      sendRegularMessage.mockImplementation(async request => {
+        if (request.action === MessageActions.CANCEL_TRANSLATION) return { success: true };
+
+        const timeoutError = Object.assign(new Error('Streaming translation timed out'), {
+          type: ErrorTypes.TRANSLATION_TIMEOUT,
+          timeoutType,
+        });
+        callbacks.onTimeout(timeoutError);
+        resolveStreaming({
+          success: false,
+          error: timeoutError,
+          type: ErrorTypes.TRANSLATION_TIMEOUT,
+          timedOut: true,
+          cancelled: false,
+          timeoutType,
+        });
+        return { success: true, streaming: true };
+      });
+
+      await expect(coordinator.coordinateTranslation(message)).rejects.toMatchObject({
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        timeoutType,
+      });
+
+      expect(streamingTimeoutManager.cancelStreaming).toHaveBeenCalledWith(
+        messageId,
+        'Streaming translation timed out',
+        true,
+        timeoutType
+      );
+      expect(sendRegularMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: MessageActions.CANCEL_TRANSLATION,
+        data: expect.objectContaining({ messageId, timeout: true, timeoutType })
+      }));
     });
   });
 });

@@ -37,6 +37,7 @@ import { ConversationAcceptanceCoordinator } from '@/features/translation/conver
 import {
   withBackgroundOperationLease,
 } from './BackgroundOperationLease.js';
+import { streamingManager } from '@/features/translation/core/StreamingManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -51,6 +52,10 @@ export class UnifiedTranslationService {
     this.backgroundService = null;
     this._operations = new WeakMap();
     this._diagnosticReports = new WeakMap();
+
+    this.requestTracker.setActiveExpiryHandler?.((messageId) => {
+      this._handleActiveRequestExpiry(messageId);
+    });
 
     logger.info('UnifiedTranslationService initialized');
   }
@@ -197,6 +202,7 @@ export class UnifiedTranslationService {
 
       const requestUnitManifest = createRequestUnitManifest(data?.text);
       const operation = createTranslationOperation(messageId, requestUnitManifest);
+      this._setOperation(request, operation);
       const parentMetadata = Array.isArray(data?.conversationParents) ? data.conversationParents : [];
       const providerName = registryIdToName(data?.provider);
       const participates = await AIConversationHelper.getConversationParticipation({
@@ -216,18 +222,31 @@ export class UnifiedTranslationService {
           conversationParticipates: participates,
         })));
       }
+
+      // Cancellation can win while conversation participation is resolving.
+      // Never register acceptance or start engine work after that terminal state.
+      if (this.requestTracker.isRequestActive(messageId) === false) {
+        this.conversationAcceptanceCoordinator.remove(messageId);
+        this._clearOperation(request);
+        return this._createSuppressedResponse(messageId, {
+          accepted: false,
+          status: this.requestTracker.getRequest(messageId)?.status || request.status,
+          reason: 'already_terminal',
+        });
+      }
+
       const executionContext = {
         operation,
         manifestView: createManifestView(requestUnitManifest),
         onTerminalUnitsAccepted: TerminalExecutionRouter.createTerminalUnitsObserver(operation),
       };
-      this._setOperation(request, executionContext.operation);
       // Authoritative participation decision: true only when a
       // ConversationAcceptanceHandle was actually registered for this request.
       // The consuming feature gates parent acceptance ACK emission on this value.
       const conversationAcceptanceRegistered = this._registerConversationAcceptance(request, executionContext, providerName, participates);
       // Transport-only handoff metadata. Keep this outside operation metadata and history.
       executionContext.conversationAcceptanceRegistered = conversationAcceptanceRegistered;
+      this._initializeStructuredStreaming(request, providerName, conversationAcceptanceRegistered);
 
       let result;
       try {
@@ -238,7 +257,13 @@ export class UnifiedTranslationService {
         });
       } catch (error) {
         logger.debug('Request failed:', error.message);
-        const isTimeout = error.type === ErrorTypes.TRANSLATION_TIMEOUT || error.type === 'TIMEOUT';
+        const timeoutType = error.timeoutType
+          || (error.type === ErrorTypes.PROGRESS_TIMEOUT ? ErrorTypes.PROGRESS_TIMEOUT : null)
+          || (error.type === ErrorTypes.FINAL_TIMEOUT ? ErrorTypes.FINAL_TIMEOUT : null);
+        const isTimeout = error.type === ErrorTypes.TRANSLATION_TIMEOUT
+          || error.type === ErrorTypes.OPERATION_TIMEOUT
+          || error.type === 'TIMEOUT'
+          || Boolean(timeoutType);
         const transition = isTimeout
           ? this.requestTracker.markTimeout(messageId)
           : this.requestTracker.failRequest(messageId, error);
@@ -246,9 +271,15 @@ export class UnifiedTranslationService {
           this.conversationAcceptanceCoordinator.remove(messageId);
           return this._createSuppressedResponse(messageId, transition);
         }
+        await this._completeStreaming(request, messageId, {
+          success: false,
+          error,
+          timedOut: isTimeout,
+          timeoutType,
+        });
         this.conversationAcceptanceCoordinator.remove(messageId);
         if (isTimeout) {
-          await this._finalizeAcceptedTimeout(request, messageId, error.message);
+          await this._finalizeAcceptedTimeout(request, messageId, error.message, timeoutType);
         } else {
           this._finalizeDiagnostics(request, executionContext, {
             type: 'OPERATION_FAILED',
@@ -262,32 +293,40 @@ export class UnifiedTranslationService {
 
       // Propagate only a positive registration decision. Missing metadata means
       // the requesting feature must not emit a parent acceptance ACK.
-      if (result && typeof result === 'object') {
-        delete result.conversationAcceptance;
-        if (conversationAcceptanceRegistered) result.conversationAcceptance = true;
+      let resultForDispatch = result;
+      if (result && typeof result === 'object'
+        && (conversationAcceptanceRegistered || Object.prototype.hasOwnProperty.call(result, 'conversationAcceptance'))) {
+        resultForDispatch = { ...result };
+        delete resultForDispatch.conversationAcceptance;
+        if (conversationAcceptanceRegistered) resultForDispatch.conversationAcceptance = true;
       }
 
-      const transition = this.requestTracker.completeRequest(messageId, result);
+      const transition = this.requestTracker.completeRequest(messageId, resultForDispatch);
       if (!transition.accepted) {
         this.conversationAcceptanceCoordinator.remove(messageId);
         return this._createSuppressedResponse(messageId, transition);
       }
+      await this._completeStreaming(request, messageId, {
+        success: resultForDispatch?.success === true,
+        result: resultForDispatch,
+        error: resultForDispatch?.success === false ? resultForDispatch.errorDetails || resultForDispatch.error : null,
+      });
       TerminalExecutionRouter.routeTerminalExecution(executionContext.operation, { status: transition.status });
       this._finalizeDiagnostics(request, executionContext, {
         type: transition.status === RequestStatus.FAILED ? 'OPERATION_FAILED' : 'OPERATION_COMPLETED',
         stage: 'service',
         ...(transition.status === RequestStatus.FAILED && {
-          reason: typeof result.error === 'object' ? result.error?.message : result.error,
-          code: typeof result.error === 'object' ? result.error?.type : undefined,
+          reason: typeof resultForDispatch?.error === 'object' ? resultForDispatch.error?.message : resultForDispatch?.error,
+          code: typeof resultForDispatch?.error === 'object' ? resultForDispatch.error?.type : undefined,
         }),
       });
 
       // Special handling for Field mode (direct return)
-      if (request.mode === TranslationMode.Field) return result;
+      if (request.mode === TranslationMode.Field) return resultForDispatch;
 
       try {
-        await this.resultDispatcher.dispatchResult({ messageId, result, request, originalMessage: message });
-        if (conversationAcceptanceRegistered && result?.success === true) {
+        await this.resultDispatcher.dispatchResult({ messageId, result: resultForDispatch, request, originalMessage: message });
+        if (conversationAcceptanceRegistered && resultForDispatch?.success === true) {
           this.conversationAcceptanceCoordinator.activate(messageId);
         } else if (conversationAcceptanceRegistered) {
           this.conversationAcceptanceCoordinator.remove(messageId);
@@ -299,9 +338,9 @@ export class UnifiedTranslationService {
       }
 
       // Post-processing stats logging
-      this._logSessionStats(request, result, messageId);
+      this._logSessionStats(request, resultForDispatch, messageId);
 
-      return result;
+      return resultForDispatch;
 
     } catch (error) {
       logger.debug('Request setup failed:', error.message);
@@ -370,6 +409,11 @@ export class UnifiedTranslationService {
     const cancellation = this.requestTracker.cancelRequest(messageId, reason);
     if (!cancellation.accepted) return { handled: true, success: false, error: cancellation.reason };
 
+    await this._completeStreaming(request, messageId, {
+      success: false,
+      cancelled: true,
+      reason,
+    });
     this.conversationAcceptanceCoordinator.remove(messageId);
     const operation = this._getOperation(request);
     TerminalExecutionRouter.routeTerminalExecution(operation, { status: cancellation.status });
@@ -392,6 +436,16 @@ export class UnifiedTranslationService {
     if (!request) return { handled: false, success: false, error: 'Request not found' };
     const timeout = this.requestTracker.markTimeout(messageId);
     if (!timeout.accepted) return { handled: true, success: false, error: timeout.reason };
+    await this._completeStreaming(request, messageId, {
+      success: false,
+      timedOut: true,
+      timeoutType,
+      error: {
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        message: reason,
+        ...(timeoutType && { timeoutType }),
+      },
+    });
     this.conversationAcceptanceCoordinator.remove(messageId);
     await this._finalizeAcceptedTimeout(request, messageId, reason, timeoutType);
     return { handled: true, success: true };
@@ -399,6 +453,7 @@ export class UnifiedTranslationService {
 
   async _finalizeAcceptedTimeout(request, messageId, reason, timeoutType) {
     const operation = this._getOperation(request);
+    TerminalExecutionRouter.routeTerminalExecution(operation, { status: RequestStatus.TIMEOUT });
     this._finalizeDiagnostics(request, { operation }, {
       type: 'OPERATION_TIMEOUT',
       stage: 'service',
@@ -410,6 +465,80 @@ export class UnifiedTranslationService {
     } catch (error) {
       logger.debug('Timeout cancellation failed:', error.message);
     }
+  }
+
+  _initializeStructuredStreaming(request, providerName, conversationAcceptanceRegistered) {
+    const isStructuredSelect = request.mode === TranslationMode.Select_Element
+      && request.data?.options?.rawJsonPayload === true;
+    const isStructuredPdf = request.mode === TranslationMode.PDF;
+    if (!isStructuredSelect && !isStructuredPdf) return;
+
+    let segments = [request.data?.text || ''];
+    if (typeof request.data?.text === 'string') {
+      try {
+        const parsed = JSON.parse(request.data.text);
+        if (Array.isArray(parsed)) segments = parsed;
+      } catch { /* keep single raw segment */ }
+    }
+
+    streamingManager.initializeStream(
+      request.messageId,
+      request.sender,
+      { providerName: providerName || request.data?.provider || 'unknown' },
+      segments,
+      request.sessionId || request.data?.sessionId,
+      conversationAcceptanceRegistered,
+    );
+  }
+
+  async _completeStreaming(request, messageId, {
+    success,
+    result = null,
+    error = null,
+    cancelled = false,
+    timedOut = false,
+    timeoutType,
+    reason,
+  }) {
+    const streamInfo = streamingManager.getStreamInfo(messageId);
+    if (!streamInfo) return;
+
+    const completionData = {
+      ...(request?.mode && { translationMode: request.mode }),
+      ...(result?.sourceLanguage && { sourceLanguage: result.sourceLanguage }),
+      ...(result?.targetLanguage && { targetLanguage: result.targetLanguage }),
+      ...(cancelled && { cancelled: true, reason, terminalStatus: 'cancelled' }),
+      ...(timedOut && {
+        timedOut: true,
+        cancelled: false,
+        type: ErrorTypes.TRANSLATION_TIMEOUT,
+        ...(timeoutType && { timeoutType }),
+      }),
+    };
+
+    if (Array.isArray(result?.results) && streamInfo.processedSegments === 0) {
+      completionData.processedSegments = result.results.length;
+    }
+
+    if (error) {
+      const serializedError = MessageFormat.serializeTranslationError(error, {
+        type: error.type || (timedOut ? ErrorTypes.TRANSLATION_TIMEOUT : undefined),
+        providerName: error.providerName || streamInfo.providerName,
+      });
+      completionData.error = serializedError;
+      completionData.errorDetails = serializedError;
+    }
+
+    try {
+      await streamingManager.completeStream(messageId, success, completionData);
+    } catch (streamError) {
+      logger.debug(`Streaming terminal publication failed for ${messageId}:`, streamError.message);
+    }
+  }
+
+  _handleActiveRequestExpiry(messageId) {
+    this.handleTimeout(messageId, 'Translation request expired', ErrorTypes.FINAL_TIMEOUT)
+      .catch(error => logger.debug(`Active request expiry handling failed for ${messageId}:`, error.message));
   }
 
   _createCancelledResponse(messageId) {

@@ -127,7 +127,7 @@ UI / workflow creates messageId
 | `RateLimitManager` | Limiter admission and pending request cleanup | UI delivery |
 | `StreamingManager` | Sender routing, chunk transport, local stream terminal suppression, delayed stream retention | Translation workflow lifecycle |
 | `UnifiedResultDispatcher` | Accepted result and cancellation delivery; per-instance result deduplication | Tracker state mutation |
-| Terminal execution router | Completed and cancelled terminal routing; one stable terminal outcome per request | Semantic success, recovery strategy, tracker state mutation |
+| Terminal execution router | Completed and cancelled terminal routing; failed/timeout no-op boundary; one stable terminal outcome per request | Semantic success, recovery strategy, tracker state mutation |
 | Execution foundation | Request unit manifest, validation facts, preserved diagnostics | Semantic success, recovery strategy, tracker terminal transition |
 | `V3IntervalParser` | Shared structural V3 marker and interval parsing | Semantic validity and recovery policy |
 | `TranslationContractValidator` | Canonical provider-contract validity, including V3 marker ownership | Recovery policy and feature mutation |
@@ -163,29 +163,31 @@ Late provider results, errors, timeout callbacks, and duplicate result messages 
 ```text
 CANCEL_TRANSLATION { messageId }
   -> tracker cancel transition
+  -> service-owned stream terminal delivery
   -> cancellation delivery for accepted cancellation
   -> lifecycle abort and tombstone
-  -> stream cancellation
   -> rate-limit cleanup
   -> queue/retry cleanup
 
 Timeout for messageId
   -> CANCEL_TRANSLATION { messageId, timeout: true }
   -> tracker timeout transition, only while active
-  -> same exact-ID cleanup sequence
+  -> service-owned timeout stream terminal delivery
+  -> lifecycle abort and tombstone
+  -> exact-ID fallback cleanup for unowned requests
   -> late duplicate timeout skips all cleanup
 ```
 
-Timeout callbacks act only for their original request ID. A rejected timeout transition means that completion, failure, cancellation, or an earlier timeout already won; no additional cleanup is attempted.
+Timeout callbacks act only for their original request ID. A rejected service timeout transition means that completion, failure, cancellation, or an earlier timeout already won; no additional service cleanup is attempted.
 
 ### Cleanup Matrix
 
 | Terminal Path | Tracker | Lifecycle / Provider | Queue / Rate Limit | Stream / Delivery |
 |---|---|---|---|---|
-| Success | Completed record retained; active indexes removed | Unregister after execution | Provider completion | Accepted result delivery; stream ends if present |
-| Failure | Failed record retained; active indexes removed | Unregister after execution | Retry/reject cleanup | Error terminal delivery if stream exists |
-| Cancellation | Cancelled record retained; active indexes removed | Abort and tombstone | Exact-ID removal | One cancellation/end delivery; late chunks ignored |
-| Timeout | Timed-out record retained; active indexes removed | Exact-ID abort | Exact-ID removal | Timeout prevents later normal delivery |
+| Success | Completed record retained; active indexes removed | Unregister after execution | Provider completion | Service accepts tracker transition, then stream ends if present |
+| Failure | Failed record retained; active indexes removed | Unregister after execution | Retry/reject cleanup | Service publishes error terminal delivery if stream exists |
+| Cancellation | Cancelled record retained; active indexes removed | Abort and tombstone | Exact-ID removal | Service publishes one cancellation/end delivery; late chunks ignored |
+| Timeout | Timed-out record retained; active indexes removed | Exact-ID abort | Exact-ID removal | Service publishes timeout terminal delivery; later normal delivery is rejected |
 | Empty batch | Normal service terminal handling | Batch executor allocates no lifecycle controller or provider work | None | Immediate empty success |
 | Retention cleanup | Terminal lifecycle record deleted | None | None | None |
 
@@ -257,7 +259,7 @@ Currently adopted terminal paths:
 - **Completed**: accepted completion routes through the terminal execution router before normal result delivery.
 - **Cancelled**: accepted cancellation routes through the terminal execution router before cancellation delivery.
 
-Failed and timed-out states do not yet route through the terminal execution router; their lifecycle handling is unchanged. Terminal routing is structural foundation, not provider/key failover, which remains owned by the operation lifecycle.
+Failed and timed-out states reach the terminal execution router boundary, whose current policy is a no-op; their lifecycle handling is unchanged. Terminal routing is structural foundation, not provider/key failover, which remains owned by the operation lifecycle.
 
 ### Execution Foundation and Diagnostics
 
@@ -523,7 +525,7 @@ These are distinct mechanisms; do not label QueueManager retry, key failover, or
 - `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
 - `src/core/services/translation/UnifiedResultDispatcher.js` - Intelligent result routing
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
-- `src/core/background/handlers/translation/handleTranslationResult.js` - Translation result processor
+- `src/features/translation/core/StreamingManager.js` - Central streaming terminal delivery
 - `src/features/translation/core/translation-engine.js` - Provider coordination
 
 ### Execution Foundation (Translation Pipeline Foundation)

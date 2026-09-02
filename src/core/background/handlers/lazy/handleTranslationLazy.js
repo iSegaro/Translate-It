@@ -39,18 +39,6 @@ export async function handleTranslateTextLazy(message, sender, sendResponse) {
     }
 }
 
-export async function handleTranslationResultLazy(message, sender, sendResponse) {
-    try {
-        logger.debug('Loading TranslationResult handler');
-        const { handleTranslationResult } = await import('../translation/handleTranslationResult.js');
-        logger.debug('TranslationResult handler loaded successfully');
-        return handleTranslationResult(message, sender, sendResponse);
-    } catch (error) {
-        logger.error('Failed to load TranslationResult handler:', error);
-        return importFailureResponse('Failed to load translation result functionality', error);
-    }
-}
-
 export async function handleRevertTranslationLazy(message, sender, sendResponse) {
     try {
         logger.debug('Loading RevertTranslation handler');

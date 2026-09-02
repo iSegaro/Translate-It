@@ -1085,7 +1085,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
     }
   });
 
-  it('keeps TRANSLATION_TIMEOUT primary and falls back to cancelRequest when cleanup fails', async () => {
+  it('keeps TRANSLATION_TIMEOUT primary when canonical cleanup fails', async () => {
     vi.useFakeTimers();
     try {
       const jobId = 'job-cleanup-fallback';
@@ -1107,11 +1107,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
       expect(result.errorDetails.message).toMatch(/timed out/);
-      expect(unifiedTranslationService.cancelRequest).toHaveBeenCalled();
-      expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith(
-        expect.any(String),
-        'timeout'
-      );
+      expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

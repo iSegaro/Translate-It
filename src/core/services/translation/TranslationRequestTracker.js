@@ -69,6 +69,7 @@ export class TranslationRequestTracker {
 
     // Cleanup
     this.cleanupInterval = null;
+    this.activeExpiryHandler = null;
     this.startCleanup();
 
     logger.debug('TranslationRequestTracker initialized');
@@ -138,6 +139,14 @@ export class TranslationRequestTracker {
    */
   getRequest(messageId) {
     return this.requests.get(messageId);
+  }
+
+  /**
+   * Register the service-owned handler for stale active requests.
+   * @param {Function|null} handler - Called before an expired active record is removed
+   */
+  setActiveExpiryHandler(handler) {
+    this.activeExpiryHandler = typeof handler === 'function' ? handler : null;
   }
 
   _setDiagnosticReport(request, report) {
@@ -486,16 +495,30 @@ export class TranslationRequestTracker {
 
     for (const [messageId, request] of this.requests.entries()) {
       const age = now - request.updatedAt;
+      const isActiveExpiry = this.isRequestActive(messageId) && age > activeMaxAge;
       const shouldRemove = (
         (request.status === RequestStatus.COMPLETED && age > maxAge) ||
         (request.status === RequestStatus.FAILED && age > maxAge) ||
         (request.status === RequestStatus.CANCELLED && age > maxAge) ||
         (request.status === RequestStatus.TIMEOUT && age > maxAge) ||
-        (this.isRequestActive(messageId) && age > activeMaxAge)
+        isActiveExpiry
       );
 
       if (shouldRemove) {
-        // Remove retained terminal or expired active records from all indexes.
+        if (isActiveExpiry) {
+          if (this.activeExpiryHandler) {
+            try {
+              this.activeExpiryHandler(messageId, request);
+            } catch (error) {
+              logger.warn(`[RequestTracker] Active expiry handler failed for ${messageId}:`, error);
+            }
+          }
+
+          // Active records require canonical terminalization before retention cleanup.
+          continue;
+        }
+
+        // Remove retained terminal records from all indexes.
         this.requests.delete(messageId);
         this.requestTimes.delete(messageId);
         this._removeFromActiveIndexes(request);

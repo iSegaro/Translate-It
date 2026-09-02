@@ -31,6 +31,27 @@ describe('StreamingTimeoutManager', () => {
     expect(promise).toBeInstanceOf(Promise);
   });
 
+  it('rejects duplicate registration before replacing active state', async () => {
+    const messageId = 'duplicate-stream';
+    const firstPromise = manager.registerStreamingOperation(messageId, 5000);
+    const firstState = manager.activeStreams.get(messageId);
+    const firstController = manager.abortControllers.get(messageId);
+    const firstTimeouts = manager.timeoutHandles.get(messageId);
+    const firstProgress = manager.progressTrackers.get(messageId);
+
+    await expect(manager.registerStreamingOperation(messageId, 5000)).rejects.toMatchObject({
+      type: 'already_executing',
+    });
+    expect(manager.isStreaming(messageId)).toBe(true);
+    expect(manager.activeStreams.get(messageId)).toBe(firstState);
+    expect(manager.abortControllers.get(messageId)).toBe(firstController);
+    expect(manager.timeoutHandles.get(messageId)).toBe(firstTimeouts);
+    expect(manager.progressTrackers.get(messageId)).toBe(firstProgress);
+
+    manager.cancelStreaming(messageId);
+    await expect(firstPromise).resolves.toMatchObject({ cancelled: true });
+  });
+
   it('should resolve the promise when streaming completes', async () => {
     const messageId = 'msg-2';
     const promise = manager.registerStreamingOperation(messageId, 5000);
