@@ -5,6 +5,17 @@ import { MessagingContexts, MessageFormat } from '@/shared/messaging/core/Messag
 
 // In-memory per-tab select element state
 const selectElementStateByTab = new Map();
+// A new background module instance establishes a new Select Element authority epoch.
+const backgroundActivationEpoch = (() => {
+  try {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID();
+    }
+  } catch {
+    // Fall through to the local opaque fallback.
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+})();
 // Each frame keeps its own accepted activation generation.
 const selectElementParticipantsByTab = new Map();
 // Latest accepted generation; older frame ownership may remain during reactivation.
@@ -39,6 +50,10 @@ function createActivationGeneration(tabId) {
 
 function getCurrentGeneration(tabId) {
   return currentGenerationByTab.get(tabId);
+}
+
+function getActivationEpoch() {
+  return backgroundActivationEpoch;
 }
 
 function getActivationAttemptToken(tabId) {
@@ -216,6 +231,7 @@ async function compensateInvalidatedActivationAttempts(tabId, invalidatedAttempt
             mode: 'normal',
             active: false,
             fromBackground: true,
+            activationEpoch: backgroundActivationEpoch,
             activationGeneration: generation,
             isExplicitDeactivation: true,
           },
@@ -411,6 +427,7 @@ export {
   clearStateForTab,
   createActivationGeneration,
   getCurrentGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
   isActivationAttemptCurrent,
   recordActivationAttemptFrames,

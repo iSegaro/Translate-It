@@ -21,6 +21,10 @@ function isSelectElementGeneration(value) {
   return Number.isInteger(value) && value > 0;
 }
 
+function isSelectElementEpoch(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function getSelectElementActiveState(manager) {
   if (typeof manager?.isSelectElementActive === 'function') {
     return manager.isSelectElementActive() === true;
@@ -44,7 +48,11 @@ export class ContentMessageHandler extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
     // Generation is local to this content frame; tab-wide authority stays in Background.
+    // Epoch separates generation ordering across background module lifetimes.
+    this.acceptedSelectElementEpoch = null;
+    this.retiredSelectElementEpochs = new Set();
     this.acceptedSelectElementGeneration = null;
+    this.invalidatedSelectElementEpoch = null;
     this.invalidatedSelectElementGeneration = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
@@ -80,6 +88,32 @@ export class ContentMessageHandler extends ResourceTracker {
       activate: options => manager?.activateSelectElementMode(options),
       deactivate: options => manager?.deactivate(options),
     });
+  }
+
+  _admitSelectElementEpoch(requestedEpoch) {
+    if (!isSelectElementEpoch(requestedEpoch)) {
+      return { accepted: true, legacy: true };
+    }
+
+    if (this.acceptedSelectElementEpoch === null) {
+      this.acceptedSelectElementEpoch = requestedEpoch;
+      return { accepted: true, newEpoch: true };
+    }
+
+    if (requestedEpoch === this.acceptedSelectElementEpoch) {
+      return { accepted: true };
+    }
+
+    if (this.retiredSelectElementEpochs.has(requestedEpoch)) {
+      return { accepted: false, staleEpoch: true };
+    }
+
+    this.retiredSelectElementEpochs.add(this.acceptedSelectElementEpoch);
+    this.acceptedSelectElementEpoch = requestedEpoch;
+    this.acceptedSelectElementGeneration = null;
+    this.invalidatedSelectElementEpoch = null;
+    this.invalidatedSelectElementGeneration = null;
+    return { accepted: true, newEpoch: true };
   }
 
   setScreenCaptureManager(manager) {
@@ -366,11 +400,33 @@ export class ContentMessageHandler extends ResourceTracker {
       }
 
       return await this._enqueueSelectElementLifecycle(async ({ activate }) => {
+        const requestedEpoch = message?.data?.activationEpoch;
+        const epochAdmission = this._admitSelectElementEpoch(requestedEpoch);
+        if (!epochAdmission.accepted) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleEpoch: true,
+          };
+        }
+
         const requestedGeneration = message?.data?.activationGeneration;
         if (
           isSelectElementGeneration(requestedGeneration)
+          && this.invalidatedSelectElementEpoch === this.acceptedSelectElementEpoch
           && this.invalidatedSelectElementGeneration !== null
           && requestedGeneration <= this.invalidatedSelectElementGeneration
+        ) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleGeneration: true,
+          };
+        }
+        if (
+          isSelectElementGeneration(requestedGeneration)
+          && this.acceptedSelectElementGeneration !== null
+          && requestedGeneration < this.acceptedSelectElementGeneration
         ) {
           return {
             success: false,
@@ -412,6 +468,9 @@ export class ContentMessageHandler extends ResourceTracker {
           && requestedGeneration === this.acceptedSelectElementGeneration
         ) {
           response.activationGeneration = requestedGeneration;
+          if (isSelectElementEpoch(requestedEpoch)) {
+            response.activationEpoch = this.acceptedSelectElementEpoch;
+          }
         }
         return response;
       });
@@ -444,9 +503,26 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async _handleDeactivateSelectElementMode(message, lifecycle) {
     if (this.selectElementManager) {
+      const requestedEpoch = message?.data?.activationEpoch;
+      if (isSelectElementEpoch(requestedEpoch)) {
+        if (
+          this.acceptedSelectElementEpoch !== null
+          && requestedEpoch !== this.acceptedSelectElementEpoch
+        ) {
+          return {
+            success: false,
+            cleanupCompleted: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleEpoch: true,
+          };
+        }
+        this.acceptedSelectElementEpoch = requestedEpoch;
+      }
+
       const requestedGeneration = message?.data?.activationGeneration;
       const currentGeneration = this.acceptedSelectElementGeneration;
       if (isSelectElementGeneration(requestedGeneration)) {
+        this.invalidatedSelectElementEpoch = this.acceptedSelectElementEpoch;
         this.invalidatedSelectElementGeneration = Math.max(
           this.invalidatedSelectElementGeneration || 0,
           requestedGeneration,

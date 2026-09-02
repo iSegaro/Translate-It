@@ -1,6 +1,7 @@
 import {
   compensateInvalidatedActivationAttempts,
   getCompatibilityFrames,
+  getActivationEpoch,
   getParticipants,
   getProvisionalCleanupFrames,
   invalidateActivationAttempts,
@@ -74,14 +75,15 @@ export async function handleDeactivateSelectElementMode(message, sender) {
     const participantCleanup = Promise.all(participantFrameIds.map(async ([frameId, generation]) => {
       let response;
       const deactivationMessage = MessageFormat.create(
-        MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-        {
-          mode: 'normal',
-          active: false,
-          fromBackground: true,
-          activationGeneration: generation,
-          // Mark this as an explicit deactivation request
-          isExplicitDeactivation: true
+          MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+          {
+            mode: 'normal',
+            active: false,
+            fromBackground: true,
+            activationEpoch: getActivationEpoch(),
+            activationGeneration: generation,
+            // Mark this as an explicit deactivation request
+            isExplicitDeactivation: true
         },
         MessagingContexts.CONTENT
       );

@@ -34,6 +34,9 @@ import { AIConversationHelper } from '@/features/translation/providers/utils/AIC
 import { ConversationAcceptanceHandoff } from '@/features/translation/conversation/ConversationAcceptanceHandoff.js';
 import { ConversationAcceptanceHandle } from '@/features/translation/conversation/ConversationAcceptanceHandle.js';
 import { ConversationAcceptanceCoordinator } from '@/features/translation/conversation/ConversationAcceptanceCoordinator.js';
+import {
+  withBackgroundOperationLease,
+} from './BackgroundOperationLease.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedTranslationService');
 
@@ -98,6 +101,14 @@ export class UnifiedTranslationService {
    * Main entry point for all incoming translation requests.
    */
   async handleTranslationRequest(message, sender) {
+    const operationId = message?.messageId || message?.data?.messageId;
+    return withBackgroundOperationLease(
+      operationId,
+      () => this._handleTranslationRequest(message, sender),
+    );
+  }
+
+  async _handleTranslationRequest(message, sender) {
     const { messageId, data, context } = message;
     logger.debug(`[UnifiedTranslationService] Received request: ${messageId}, context: ${context}, sessionId: ${data?.sessionId}`);
 

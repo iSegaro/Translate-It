@@ -8,6 +8,8 @@ import {
   contextState, 
   isValidSync as coreIsValidSync, 
   isContextError as coreIsContextError,
+  isPermanentContextInvalidation as coreIsPermanentContextInvalidation,
+  isTransientMessagingError as coreIsTransientMessagingError,
   ENVIRONMENTS as CORE_ENVIRONMENTS,
   getActiveEnvironment as coreGetActiveEnvironment
 } from "./contextCore.js";
@@ -149,6 +151,24 @@ export class ExtensionContextManager {
   }
 
   /**
+   * Determines whether an error proves that this extension context is gone.
+   * @param {Error|string} error
+   * @returns {boolean}
+   */
+  static isPermanentContextInvalidation(error) {
+    return coreIsPermanentContextInvalidation(error);
+  }
+
+  /**
+   * Determines whether an error only describes failed message transport.
+   * @param {Error|string} error
+   * @returns {boolean}
+   */
+  static isTransientMessagingError(error) {
+    return coreIsTransientMessagingError(error);
+  }
+
+  /**
    * Handles context-related errors by logging and notifying the user.
    * @param {Error|string} error - The error to handle
    * @param {string} [context="unknown"] - Description of where the error occurred
@@ -272,18 +292,16 @@ export class ExtensionContextManager {
     if (!lastError) return null;
 
     const errorMessage = lastError.message || "";
-    // Manual check to avoid circular dependency with ErrorMatcher
-    const isContext = 
-      errorMessage.includes("extension context invalidated") ||
-      errorMessage.includes("message channel closed") ||
-      errorMessage.includes("receiving end does not exist") ||
-      errorMessage.includes("could not establish connection") ||
-      errorMessage.includes("message port closed");
+    const isContext = coreIsContextError(lastError);
 
     if (isContext) {
       ExtensionContextManager.handleContextError(errorMessage, context);
       void browser.runtime?.lastError;
-      return { handledSilently: true, isContextError: true };
+      return {
+        handledSilently: true,
+        isContextError: true,
+        isPermanentContextInvalidation: coreIsPermanentContextInvalidation(lastError),
+      };
     } else {
       logger.warn(`[${context}] Runtime lastError:`, errorMessage);
       void browser.runtime?.lastError;
@@ -296,6 +314,8 @@ export class ExtensionContextManager {
 export const isExtensionContextValid = ExtensionContextManager.isValidSync;
 export const isExtensionContextValidAsync = ExtensionContextManager.isValidAsync;
 export const isContextError = ExtensionContextManager.isContextError;
+export const isPermanentContextInvalidation = ExtensionContextManager.isPermanentContextInvalidation;
+export const isTransientMessagingError = ExtensionContextManager.isTransientMessagingError;
 export const handleContextError = ExtensionContextManager.handleContextError;
 
 export default ExtensionContextManager;

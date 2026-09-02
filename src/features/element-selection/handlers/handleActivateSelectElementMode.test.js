@@ -21,6 +21,7 @@ vi.mock('./selectElementStateManager.js', () => ({
   compensateInvalidatedActivationAttempts: vi.fn(() => Promise.resolve([])),
   setStateForTab: vi.fn(),
   createActivationGeneration: vi.fn(() => 1),
+  getActivationEpoch: vi.fn(() => 'epoch-1'),
   getActivationAttemptToken: vi.fn(() => ({})),
   invalidateOlderActivationAttempts: vi.fn(() => []),
   isActivationAttemptCurrent: vi.fn(() => true),
@@ -81,6 +82,7 @@ import { tabPermissionChecker } from '@/core/tabPermissions.js';
 import {
   compensateInvalidatedActivationAttempts,
   createActivationGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
   invalidateOlderActivationAttempts,
   isActivationAttemptCurrent,
@@ -96,6 +98,7 @@ describe('handleActivateSelectElementMode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createActivationGeneration.mockReturnValue(1);
+    getActivationEpoch.mockReturnValue('epoch-1');
     getActivationAttemptToken.mockReturnValue({});
     invalidateOlderActivationAttempts.mockReturnValue([]);
     isActivationAttemptCurrent.mockReturnValue(true);
@@ -125,7 +128,44 @@ describe('handleActivateSelectElementMode', () => {
     }), { frameId: 0 });
     expect(browser.tabs.sendMessage.mock.calls[0][1].data).not.toHaveProperty('activate');
     expect(browser.tabs.sendMessage.mock.calls[0][1].data.activationGeneration).toBe(1);
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data.activationEpoch).toBe('epoch-1');
     expect(setStateForTab).toHaveBeenCalledWith(1, true);
+  });
+
+  it('registers strict authority when content echoes epoch and generation', async () => {
+    browser.tabs.sendMessage.mockImplementation(async (_tabId, contentMessage) => ({
+      success: true,
+      activated: true,
+      activationEpoch: contentMessage.data.activationEpoch,
+      activationGeneration: contentMessage.data.activationGeneration,
+    }));
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response).toMatchObject({ success: true, activated: true });
+    expect(registerParticipant).toHaveBeenCalledWith(1, 0, 1);
+    expect(setStateForTab).toHaveBeenCalledWith(1, true);
+  });
+
+  it('rejects an activation ACK from a different epoch', async () => {
+    browser.tabs.sendMessage.mockResolvedValue({
+      success: true,
+      activated: true,
+      activationEpoch: 'old-epoch',
+      activationGeneration: 1,
+    });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
   });
 
   it('should find active tab if no tabId provided', async () => {

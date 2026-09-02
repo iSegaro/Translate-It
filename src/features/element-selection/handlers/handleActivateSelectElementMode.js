@@ -12,6 +12,7 @@ import {
   completeActivationAttempt,
   compensateInvalidatedActivationAttempts,
   createActivationGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
   invalidateOlderActivationAttempts,
   isActivationAttemptCurrent,
@@ -131,6 +132,7 @@ export async function handleActivateSelectElementMode(message, sender) {
       ? { ...message.data }
       : {};
     delete contentData.activate;
+    const activationEpoch = getActivationEpoch();
     const activationGeneration = createActivationGeneration(targetTabId);
     const activationAttemptToken = getActivationAttemptToken(targetTabId);
 
@@ -152,6 +154,7 @@ export async function handleActivateSelectElementMode(message, sender) {
           ...contentData,
           mode: modeForContentScript,
           active: isActivating,
+          activationEpoch,
           activationGeneration,
         },
         MessagingContexts.CONTENT // Context for content script
@@ -205,10 +208,16 @@ export async function handleActivateSelectElementMode(message, sender) {
         && typeof frameResponse === 'object'
         && Object.prototype.hasOwnProperty.call(frameResponse, 'activationGeneration')
       );
+      const hasEpochEcho = frameResponse => (
+        frameResponse
+        && typeof frameResponse === 'object'
+        && Object.prototype.hasOwnProperty.call(frameResponse, 'activationEpoch')
+      );
       const strictResults = frameResults.filter(({ response: frameResponse }) => (
         frameResponse?.success === true
         && frameResponse?.activated === true
         && frameResponse?.activationGeneration === activationGeneration
+        && (!hasEpochEcho(frameResponse) || frameResponse.activationEpoch === activationEpoch)
       ));
       const compatibilityFrameIds = frameResults
         .filter(({ response: frameResponse }) => (

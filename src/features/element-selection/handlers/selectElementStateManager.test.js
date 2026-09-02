@@ -38,6 +38,7 @@ import {
   getStateForTab,
   clearStateForTab,
   createActivationGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
   getCurrentGeneration,
   invalidateActivationAttempts,
@@ -60,11 +61,16 @@ const onRemovedListener = browser.tabs.onRemoved.addListener.mock.calls[0][0];
 const onCommittedListener = browser.webNavigation.onCommitted.addListener.mock.calls[0][0];
 
 describe('selectElementStateManager', () => {
-  it('should register listeners on load', () => {
-    expect(browser.tabs.onRemoved.addListener).toHaveBeenCalled();
-    expect(browser.tabs.onActivated.addListener).toHaveBeenCalled();
-    expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalled();
-  });
+    it('should register listeners on load', () => {
+      expect(browser.tabs.onRemoved.addListener).toHaveBeenCalled();
+      expect(browser.tabs.onActivated.addListener).toHaveBeenCalled();
+      expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalled();
+    });
+
+    it('exposes one opaque epoch for this background module lifetime', () => {
+      expect(getActivationEpoch()).toEqual(expect.any(String));
+      expect(getActivationEpoch()).toBe(getActivationEpoch());
+    });
 
   describe('Core Functionality', () => {
     beforeEach(() => {
@@ -273,6 +279,7 @@ describe('selectElementStateManager', () => {
         expect.objectContaining({
           action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
           data: expect.objectContaining({
+            activationEpoch: getActivationEpoch(),
             activationGeneration: generation,
             fromBackground: true,
             isExplicitDeactivation: true,

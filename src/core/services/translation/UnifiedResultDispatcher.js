@@ -12,19 +12,16 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { RequestStatus } from './TranslationRequestTracker.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import browser from 'webextension-polyfill';
+import { isPermanentContextInvalidation } from '@/core/contextCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'UnifiedResultDispatcher');
 
 function createSelectElementDeliveryError(messageId, cause = null, reason = 'transport_failure') {
   const causeMessage = String(cause?.message || cause || '').toLowerCase();
   const contextError = cause && (
-    ExtensionContextManager.isContextError(cause)
+    isPermanentContextInvalidation(cause)
     || cause.type === ErrorTypes.EXTENSION_CONTEXT_INVALIDATED
     || causeMessage.includes('extension context invalidated')
-    || causeMessage.includes('message channel closed')
-    || causeMessage.includes('receiving end does not exist')
-    || causeMessage.includes('could not establish connection')
-    || causeMessage.includes('message port closed')
   );
   const error = new Error(contextError ? 'Extension context invalidated' : 'Select Element result delivery failed');
   error.type = contextError ? ErrorTypes.EXTENSION_CONTEXT_INVALIDATED : ErrorTypes.CONNECTION_LOST;

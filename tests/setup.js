@@ -51,6 +51,8 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock('@/core/contextCore.js', () => ({
   isValidSync: vi.fn().mockReturnValue(true),
   isContextError: vi.fn().mockReturnValue(false),
+  isPermanentContextInvalidation: vi.fn().mockReturnValue(false),
+  isTransientMessagingError: vi.fn().mockReturnValue(false),
   getActiveEnvironment: vi.fn().mockReturnValue('background'),
   contextState: {
     isInvalidated: false,

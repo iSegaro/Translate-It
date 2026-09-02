@@ -427,10 +427,15 @@ export function matchErrorToType(rawOrError = "") {
 
   if (msg.includes("extension context invalidated") || 
       (msg.includes("extension context") && msg.includes("invalidated")) ||
-      msg.includes("extension context invalid before operation") ||
-      msg.includes("receiving end does not exist") ||
+      msg.includes("extension context invalid before operation")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+
+  if (msg.includes("receiving end does not exist") ||
+      msg.includes("could not establish connection") ||
+      msg.includes("no receiving end") ||
+      msg.includes("no receiver") ||
       msg.includes("message channel closed") ||
-      msg.includes("listener indicated an asynchronous response")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+      msg.includes("message port closed") ||
+      msg.includes("listener indicated an asynchronous response")) return ErrorTypes.CONNECTION_LOST;
   
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
 

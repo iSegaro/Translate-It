@@ -178,6 +178,15 @@ describe('ErrorMatcher', () => {
       expect(matchErrorToType('extension context invalidated')).toBe(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED);
     });
 
+    it.each([
+      'Receiving end does not exist',
+      'Could not establish connection',
+      'Message port closed',
+      'Message channel closed',
+    ])('classifies %s as transport loss', (message) => {
+      expect(matchErrorToType(message)).toBe(ErrorTypes.CONNECTION_LOST);
+    });
+
     it('should match complex provider-specific messages', () => {
       expect(matchErrorToType('resource has been exhausted')).toBe(ErrorTypes.QUOTA_EXCEEDED); // Gemini
       expect(matchErrorToType('location is not supported')).toBe(ErrorTypes.GEMINI_QUOTA_REGION); // Gemini Region

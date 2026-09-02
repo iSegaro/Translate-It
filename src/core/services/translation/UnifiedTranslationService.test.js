@@ -7,6 +7,31 @@ globalThis.backgroundService = {
   }
 };
 
+const backgroundLeaseMock = vi.hoisted(() => {
+  const state = { activeOperationCount: 0 };
+  const runWithLease = async (_operationId, operation) => {
+    state.activeOperationCount += 1;
+    try {
+      return await operation();
+    } finally {
+      state.activeOperationCount -= 1;
+    }
+  };
+
+  return {
+    state,
+    runWithLease,
+    getStatus: () => ({
+      activeOperationCount: state.activeOperationCount,
+      timer: state.activeOperationCount > 0 ? {} : null,
+      timerActive: state.activeOperationCount > 0,
+    }),
+    withBackgroundOperationLease: vi.fn(runWithLease),
+  };
+});
+
+vi.mock('./BackgroundOperationLease.js', () => backgroundLeaseMock);
+
 // 1. Mocks first
 vi.mock('./TranslationRequestTracker.js', () => ({
   translationRequestTracker: {
@@ -152,6 +177,10 @@ describe('UnifiedTranslationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    backgroundLeaseMock.state.activeOperationCount = 0;
+    backgroundLeaseMock.withBackgroundOperationLease
+      .mockReset()
+      .mockImplementation(backgroundLeaseMock.runWithLease);
     translationRequestTracker.getRequest.mockReset();
     service = new UnifiedTranslationService();
     mockEngine = { cancelTranslation: vi.fn() };
@@ -164,6 +193,78 @@ describe('UnifiedTranslationService', () => {
   });
 
   describe('handleTranslationRequest', () => {
+    it('wraps complete requests in a background operation lease', async () => {
+      const message = {
+        messageId: 'lease-request',
+        data: { text: 'source', mode: 'selection', provider: 'google' },
+        context: 'content',
+      };
+      const request = { messageId: message.messageId, data: message.data, mode: 'selection' };
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      service.modeCoordinator.processRequest.mockResolvedValue({ success: true, translatedText: 'translated' });
+
+      await service.handleTranslationRequest(message);
+
+      expect(backgroundLeaseMock.withBackgroundOperationLease).toHaveBeenCalledWith(
+        message.messageId,
+        expect.any(Function),
+      );
+    });
+
+    it.each([
+      ['cancellation', 'lease-cancel'],
+      ['timeout', 'lease-timeout'],
+    ])('keeps lease owned by wrapped operation during terminal %s unwind', async (transitionType, messageId) => {
+      const message = {
+        messageId,
+        data: { text: 'source', mode: 'selection', provider: 'google' },
+        context: 'content',
+      };
+      const request = { messageId, data: message.data, mode: 'selection' };
+      let settleExecution;
+      const execution = new Promise(resolve => {
+        settleExecution = resolve;
+      });
+
+      translationRequestTracker.createRequest.mockReturnValue(request);
+      translationRequestTracker.getRequest
+        .mockReturnValueOnce(null)
+        .mockReturnValue(request);
+      translationRequestTracker.completeRequest.mockReturnValue({
+        accepted: false,
+        status: transitionType === 'timeout' ? 'timeout' : 'cancelled',
+        reason: 'already_terminal',
+      });
+      service.modeCoordinator.processRequest.mockReturnValue(execution);
+
+      const wrappedRequest = service.handleTranslationRequest(message);
+      await vi.waitFor(() => expect(service.modeCoordinator.processRequest).toHaveBeenCalledTimes(1));
+      expect(backgroundLeaseMock.getStatus()).toMatchObject({
+        activeOperationCount: 1,
+        timerActive: true,
+      });
+
+      if (transitionType === 'timeout') {
+        await service.handleTimeout(messageId);
+      } else {
+        await service.cancelRequest(messageId);
+      }
+
+      expect(backgroundLeaseMock.getStatus()).toMatchObject({
+        activeOperationCount: 1,
+        timerActive: true,
+      });
+
+      settleExecution({ success: true, translatedText: 'translated' });
+      await wrappedRequest;
+
+      expect(backgroundLeaseMock.getStatus()).toMatchObject({
+        activeOperationCount: 0,
+        timer: null,
+        timerActive: false,
+      });
+    });
+
     it('registers immutable conversation handoff before execution and preserves handle after operation finalization', async () => {
       const message = {
         messageId: 'handoff-runtime',

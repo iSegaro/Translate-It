@@ -270,7 +270,7 @@ describe('UnifiedResultDispatcher', () => {
         messageId: 'm-gone',
         data: { chunk: '..' },
         request,
-      })).rejects.toMatchObject({ type: ErrorTypes.EXTENSION_CONTEXT_INVALIDATED });
+      })).rejects.toMatchObject({ type: ErrorTypes.CONNECTION_LOST });
 
       expect(browser.tabs.query).not.toHaveBeenCalled();
       expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);

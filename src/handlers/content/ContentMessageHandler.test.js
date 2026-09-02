@@ -177,6 +177,129 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     expect(handler.acceptedSelectElementGeneration).toBe(7);
   });
 
+  it('rejects lower generations within the same background epoch', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    handler.setSelectElementManager({ isInitialized: true, activateSelectElementMode });
+
+    await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-a', activationGeneration: 4 },
+    });
+    const staleResponse = await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-a', activationGeneration: 3 },
+    });
+
+    expect(staleResponse).toMatchObject({ success: false, staleGeneration: true });
+    expect(activateSelectElementMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('simulates background restart across the content message boundary', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => true,
+    });
+    handler.registerHandler(
+      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      handler.handleActivateSelectElementMode.bind(handler),
+    );
+    handler.registerHandler(
+      MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+      handler.handleDeactivateSelectElementMode.bind(handler),
+    );
+    const sendBackgroundMessage = async (action, data) => {
+      let response;
+      await handler.handleMessage(
+        { action, data },
+        { tab: { id: 1 } },
+        value => { response = value.data; },
+      );
+      return response;
+    };
+
+    await sendBackgroundMessage(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, {
+      activationEpoch: 'epoch-a',
+      activationGeneration: 4,
+    });
+    await sendBackgroundMessage(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, {
+      activationEpoch: 'epoch-a',
+      activationGeneration: 4,
+      fromBackground: true,
+      isExplicitDeactivation: true,
+    });
+
+    const response = await sendBackgroundMessage(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, {
+      activationEpoch: 'epoch-b',
+      activationGeneration: 1,
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      activated: true,
+      activationEpoch: 'epoch-b',
+      activationGeneration: 1,
+    });
+    expect(handler.acceptedSelectElementEpoch).toBe('epoch-b');
+    expect(handler.acceptedSelectElementGeneration).toBe(1);
+    expect(handler.invalidatedSelectElementGeneration).toBeNull();
+  });
+
+  it('ignores old-epoch deactivation after newer epoch activation', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => true,
+    });
+
+    await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-b', activationGeneration: 1 },
+    });
+    deactivate.mockClear();
+
+    const response = await handler.handleDeactivateSelectElementMode({
+      data: {
+        activationEpoch: 'epoch-a',
+        activationGeneration: 4,
+        fromBackground: true,
+        isExplicitDeactivation: true,
+      },
+    });
+
+    expect(response).toMatchObject({ success: false, staleEpoch: true, activated: true });
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(handler.acceptedSelectElementEpoch).toBe('epoch-b');
+    expect(handler.acceptedSelectElementGeneration).toBe(1);
+    expect(handler.invalidatedSelectElementGeneration).toBeNull();
+  });
+
+  it('performs normal cleanup for current-epoch deactivation', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({ isInitialized: true, activateSelectElementMode, deactivate });
+
+    await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-b', activationGeneration: 1 },
+    });
+    const response = await handler.handleDeactivateSelectElementMode({
+      data: {
+        activationEpoch: 'epoch-b',
+        activationGeneration: 1,
+        fromBackground: true,
+        isExplicitDeactivation: true,
+      },
+    });
+
+    expect(response).toMatchObject({ success: true, cleanupCompleted: true, activated: false });
+    expect(deactivate).toHaveBeenCalledTimes(1);
+    expect(handler.acceptedSelectElementEpoch).toBe('epoch-b');
+    expect(handler.acceptedSelectElementGeneration).toBeNull();
+  });
+
   it('does not replace accepted generation when newer activation fails', async () => {
     const activateSelectElementMode = vi.fn()
       .mockResolvedValueOnce({ isActive: true })

@@ -24,6 +24,7 @@ const registry = vi.hoisted(() => {
       authorities,
       compatibilityFrames,
       compensateInvalidatedActivationAttempts: vi.fn(() => Promise.resolve([])),
+      getActivationEpoch: vi.fn(() => 'epoch-1'),
       getCompatibilityFrames: vi.fn(tabId => new Map(compatibilityFrames.get(tabId) || [])),
       provisionalFrames,
       getProvisionalCleanupFrames: vi.fn(tabId => [...(provisionalFrames.get(tabId) || [])]),
@@ -57,6 +58,7 @@ vi.mock('webextension-polyfill', () => ({
 
 vi.mock('./selectElementStateManager.js', () => ({
   compensateInvalidatedActivationAttempts: registry.compensateInvalidatedActivationAttempts,
+  getActivationEpoch: registry.getActivationEpoch,
   getCompatibilityFrames: registry.getCompatibilityFrames,
   getProvisionalCleanupFrames: registry.getProvisionalCleanupFrames,
   setStateForTab: registry.setStateForTab,
@@ -128,6 +130,7 @@ describe('handleDeactivateSelectElementMode', () => {
         data: expect.objectContaining({
           active: false,
           fromBackground: true,
+          activationEpoch: 'epoch-1',
           activationGeneration: 1,
           isExplicitDeactivation: true,
         }),
