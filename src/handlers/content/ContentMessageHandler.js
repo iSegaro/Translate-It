@@ -44,6 +44,11 @@ export class ContentMessageHandler extends ResourceTracker {
 
     this.handlers = new Map();
     this.initialized = false;
+    this._handlersPrepared = false;
+    this._externallyRegistered = false;
+    this._externalMessageHandler = null;
+    this._registeredActions = new Set();
+    this.isActive = false;
     this.context = MessagingContexts.CONTENT;
     this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
@@ -152,20 +157,22 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   initialize() {
-    if (this.initialized) return;
+    if (this._handlersPrepared) return;
     this.registerHandlers();
+    this._handlersPrepared = true;
     this.initialized = true;
     this.logger.init('Content message handler initialized');
   }
 
   async activate() {
-    if (this.initialized) {
-      // logger.trace('ContentMessageHandler already active');
+    if (this.isActive && this._externallyRegistered) {
       return true;
     }
 
     try {
-      this.initialize();
+      if (!this._handlersPrepared) {
+        this.initialize();
+      }
 
       // Get the existing message handler from ContentScriptCore
       // ContentScriptCore should be available globally or through window
@@ -189,82 +196,127 @@ export class ContentMessageHandler extends ResourceTracker {
       // Use ContentScriptCore's message handler if available
       const messageHandler = contentScriptCore ? contentScriptCore.messageHandler : this.messageHandler;
 
-      // Register all handlers with the message handler
-      if (messageHandler && typeof messageHandler.registerHandler === 'function') {
-        for (const [action, handler] of this.handlers.entries()) {
-          messageHandler.registerHandler(action, (message, sender, sendResponse) => {
-            try {
-              // Call handler and return result directly (preserve Promise nature)
-              const result = handler.call(this, message, sender, sendResponse);
-              return result;
-            } catch (error) {
-              this.logger.error(`Error in content handler for ${action}:`, error);
-              throw error;
-            }
-          });
-        }
-
-        // Register DebugModeBridge handlers
-        try {
-          const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
-          const debugHandlers = debugModeBridge.getHandlerMappings();
-          for (const [action, handler] of Object.entries(debugHandlers)) {
-            messageHandler.registerHandler(action, handler);
+      const attemptActions = new Set();
+      let attemptOwnListenerStarted = false;
+      try {
+        // Register all handlers with the message handler
+        if (messageHandler && typeof messageHandler.registerHandler === 'function') {
+          for (const [action, handler] of this.handlers.entries()) {
+            messageHandler.registerHandler(action, (message, sender, sendResponse) => {
+              try {
+                // Call handler and return result directly (preserve Promise nature)
+                const result = handler.call(this, message, sender, sendResponse);
+                return result;
+              } catch (error) {
+                this.logger.error(`Error in content handler for ${action}:`, error);
+                throw error;
+              }
+            });
+            attemptActions.add(action);
           }
-          this.logger.info('Registered DebugModeBridge handlers');
-        } catch (error) {
-          this.logger.warn('Failed to register DebugModeBridge handlers:', error);
+
+          // Register DebugModeBridge handlers
+          try {
+            const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
+            const debugHandlers = debugModeBridge.getHandlerMappings();
+            for (const [action, handler] of Object.entries(debugHandlers)) {
+              messageHandler.registerHandler(action, handler);
+              attemptActions.add(action);
+            }
+            this.logger.info('Registered DebugModeBridge handlers');
+          } catch (error) {
+            this.logger.warn('Failed to register DebugModeBridge handlers:', error);
+          }
+
+          // Store reference to message handler
+          this.messageHandler = messageHandler;
+          this._externalMessageHandler = messageHandler;
+
+          this.logger.info(`ContentMessageHandler registered ${this.handlers.size} handlers`);
+        } else {
+          throw new Error('No valid message handler available');
         }
 
-        // Store reference to message handler
-        this.messageHandler = messageHandler;
+        // Activate the message listener if we created our own
+        if (!contentScriptCore && this.messageHandler && !this.messageHandler.isListenerActive) {
+          this.messageHandler.listen();
+          attemptOwnListenerStarted = true;
+          this.logger.info('ContentMessageHandler message listener activated');
+        }
 
-        this.logger.info(`ContentMessageHandler registered ${this.handlers.size} handlers`);
-      } else {
-        throw new Error('No valid message handler available');
+        // If using ContentScriptCore's message handler, it should already be listening
+        if (contentScriptCore) {
+          // logger.trace('Using ContentScriptCore message listener');
+        }
+
+        // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
+        this.trackResource('messageHandler', () => {
+          this.logger.debug('Message handler is protected from cleanup and remains active');
+        }, { isCritical: true });
+
+        for (const action of attemptActions) {
+          this._registeredActions.add(action);
+        }
+        this._externallyRegistered = true;
+        this.isActive = true;
+        this.initialized = true;
+        this.logger.info('ContentMessageHandler activated successfully with smart message handling');
+        return true;
+      } catch (error) {
+        for (const action of attemptActions) {
+          try {
+            if (messageHandler && typeof messageHandler.unregisterHandler === 'function') {
+              messageHandler.unregisterHandler(action);
+            }
+          } catch { /* ignore */ }
+        }
+        if (attemptOwnListenerStarted && this.messageHandler && typeof this.messageHandler.stopListening === 'function') {
+          try { this.messageHandler.stopListening(); } catch { /* ignore */ }
+        }
+        this.logger.error('Failed to activate ContentMessageHandler:', error);
+        this._externallyRegistered = false;
+        this.isActive = false;
+        // Keep handlersPrepared so retry can re-attempt external registration without rebuilding handlers
+        return false;
       }
-
-      // Activate the message listener if we created our own
-      if (!contentScriptCore && this.messageHandler && !this.messageHandler.isListenerActive) {
-        this.messageHandler.listen();
-        this.logger.info('ContentMessageHandler message listener activated');
-      }
-
-      // If using ContentScriptCore's message handler, it should already be listening
-      if (contentScriptCore) {
-        // logger.trace('Using ContentScriptCore message listener');
-      }
-
-      // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
-      this.trackResource('messageHandler', () => {
-        // logger.trace('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
-        // This callback is called but the actual cleanup is skipped by MemoryManager
-        // because this resource is marked as critical. This is the expected behavior.
-        this.logger.debug('Message handler is protected from cleanup and remains active');
-      }, { isCritical: true });
-
-      this.isActive = true;
-      this.logger.info('ContentMessageHandler activated successfully with smart message handling');
-      return true;
     } catch (error) {
       this.logger.error('Failed to activate ContentMessageHandler:', error);
+      this._externallyRegistered = false;
+      this.isActive = false;
       return false;
     }
   }
 
   async deactivate() {
-    if (!this.initialized) {
-      // logger.trace('ContentMessageHandler not active');
+    if (!this._handlersPrepared && !this._externallyRegistered && !this.isActive) {
       return true;
     }
 
     try {
-      // Unregister all handlers to prevent duplicate registrations
-      this.unregisterAllHandlers();
+      if (this._externalMessageHandler && this._registeredActions.size > 0) {
+        for (const action of Array.from(this._registeredActions)) {
+          try {
+            if (typeof this._externalMessageHandler.unregisterHandler === 'function') {
+              this._externalMessageHandler.unregisterHandler(action);
+            }
+          } catch { /* ignore */ }
+        }
+        this._registeredActions.clear();
+      } else if (this.messageHandler && this._registeredActions.size > 0) {
+        for (const action of Array.from(this._registeredActions)) {
+          try {
+            if (typeof this.messageHandler.unregisterHandler === 'function') {
+              this.messageHandler.unregisterHandler(action);
+            }
+          } catch { /* ignore */ }
+        }
+        this._registeredActions.clear();
+      }
 
-      // Cleanup will handle message handler through ResourceTracker
-      this.cleanup();
+      this._externallyRegistered = false;
       this.isActive = false;
+      this.initialized = false;
+      // Keep handlersPrepared and handler map for retryable reactivation
       this.logger.info('ContentMessageHandler deactivated successfully');
       return true;
     } catch (error) {
@@ -1070,11 +1122,26 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async cleanup() {
+    if (this._externalMessageHandler && this._registeredActions.size > 0) {
+      for (const action of Array.from(this._registeredActions)) {
+        try {
+          if (typeof this._externalMessageHandler.unregisterHandler === 'function') {
+            this._externalMessageHandler.unregisterHandler(action);
+          }
+        } catch { /* ignore */ }
+      }
+      this._registeredActions.clear();
+    }
     this.handlers.clear();
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
     this.childFrameRetirementListenerInstalled = false;
+    this._handlersPrepared = false;
+    this._externallyRegistered = false;
+    this._externalMessageHandler = null;
+    this.isActive = false;
+    this.initialized = false;
 
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();

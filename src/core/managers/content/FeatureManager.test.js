@@ -142,7 +142,7 @@ describe('FeatureManager SPA auto page command transport', () => {
     const firstChange = manager.checkForUrlChange();
     expect(manager._lastDetectedUrl).toBe(newUrl);
     expect(handleUrlChange).toHaveBeenCalledOnce();
-    expect(handleUrlChange).toHaveBeenCalledWith(oldUrl, newUrl);
+    expect(handleUrlChange).toHaveBeenCalledWith(oldUrl, newUrl, expect.any(Number));
 
     manager.checkForUrlChange();
     expect(handleUrlChange).toHaveBeenCalledOnce();
@@ -162,7 +162,7 @@ describe('FeatureManager SPA auto page command transport', () => {
 
     expect(manager._lastDetectedUrl).toBe(newUrl);
     expect(handleUrlChange).toHaveBeenCalledOnce();
-    expect(handleUrlChange).toHaveBeenCalledWith(oldUrl, newUrl);
+    expect(handleUrlChange).toHaveBeenCalledWith(oldUrl, newUrl, expect.any(Number));
 
     manager.checkForUrlChange();
 
@@ -183,8 +183,8 @@ describe('FeatureManager SPA auto page command transport', () => {
     window.history.replaceState({}, '', urlC);
     const secondChange = manager.checkForUrlChange();
 
-    expect(handleUrlChange).toHaveBeenNthCalledWith(1, urlA, urlB);
-    expect(handleUrlChange).toHaveBeenNthCalledWith(2, urlB, urlC);
+    expect(handleUrlChange).toHaveBeenNthCalledWith(1, urlA, urlB, expect.any(Number));
+    expect(handleUrlChange).toHaveBeenNthCalledWith(2, urlB, urlC, expect.any(Number));
     expect(manager._lastDetectedUrl).toBe(urlC);
     await Promise.all([firstChange, secondChange]);
   });

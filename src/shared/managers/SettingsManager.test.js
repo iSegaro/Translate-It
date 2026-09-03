@@ -178,14 +178,20 @@ describe('SettingsManager defaults', () => {
     expect(storageEvents.getListener()).toEqual(expect.any(Function));
   });
 
-  it('uses canonical defaults when storage loading fails', async () => {
-    const defaultValue = settingsManager._defaults.EXTENSION_ENABLED;
-    storageManagerMock.get.mockRejectedValue(new Error('storage unavailable'));
+  it('propagates storage failure and remains retryable without publishing fallback state', async () => {
+    const error = new Error('storage unavailable');
+    storageManagerMock.get.mockRejectedValue(error);
 
-    await settingsManager.initialize();
+    await expect(settingsManager.initialize()).rejects.toBe(error);
 
-    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(defaultValue);
-    expect(settingsManager.getSettings()).toEqual(settingsManager._defaults);
+    expect(settingsManager._initialized).toBe(false);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBeUndefined();
+    expect(settingsManager._settings.value).toEqual({});
+
+    storageManagerMock.get.mockResolvedValue({ EXTENSION_ENABLED: false });
+    await expect(settingsManager.initialize()).resolves.toBeDefined();
+    expect(settingsManager._initialized).toBe(true);
+    expect(settingsManager.get('EXTENSION_ENABLED')).toBe(false);
   });
 
   it('uses own runtime state for has and getAll', async () => {

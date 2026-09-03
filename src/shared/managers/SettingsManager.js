@@ -162,25 +162,27 @@ class SettingsManager {
   }
 
   async _initializeRuntime() {
+    let settings
     try {
-      const settings = await storageManager.get(Object.keys(this._defaults))
-      const loadedSettings = Object.fromEntries(
-        Object.keys(this._defaults)
-          .filter(key => settings?.[key] !== undefined)
-          .map(key => [key, settings[key]])
-      )
-      this._settings.value = { ...this._defaults, ...loadedSettings }
-      logger.debug('Settings loaded from storage for runtime facade')
+      settings = await storageManager.get(Object.keys(this._defaults))
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'settings-manager-runtime-load')
       } else {
         logger.error('Failed to load settings from storage for runtime facade:', error)
       }
-      this._settings.value = { ...this._defaults }
+      throw error
     }
 
-    // Setup storage listener for real-time updates
+    const loadedSettings = Object.fromEntries(
+      Object.keys(this._defaults)
+        .filter(key => settings?.[key] !== undefined)
+        .map(key => [key, settings[key]])
+    )
+    this._settings.value = { ...this._defaults, ...loadedSettings }
+    logger.debug('Settings loaded from storage for runtime facade')
+
+    // Setup storage listener for real-time updates only after success
     this._setupStorageListener()
 
     this._initialized = true

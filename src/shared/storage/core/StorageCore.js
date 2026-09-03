@@ -49,7 +49,13 @@ class StorageCore extends ResourceTracker {
       return this._readyPromise;
     }
 
-    this._readyPromise = this._initializeWithRetry();
+    const promise = this._initializeWithRetry().catch(error => {
+      if (this._readyPromise === promise) {
+        this._readyPromise = null;
+      }
+      throw error;
+    });
+    this._readyPromise = promise;
     return this._readyPromise;
   }
 
@@ -168,7 +174,11 @@ class StorageCore extends ResourceTracker {
    */
   async _ensureReady() {
     if (this._isReady) return;
-    await this._readyPromise;
+    if (this._readyPromise) {
+      await this._readyPromise;
+      return;
+    }
+    await this._initializeAsync();
   }
 
   /**

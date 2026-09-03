@@ -32,10 +32,37 @@ export class FeatureManager extends ResourceTracker {
     this._evaluationQueue = [];
     this._evaluationDebounceTimer = null;
     this._lastDetectedUrl = window.location.href;
+    this._featureRevisions = new Map();
+    this._activationPromises = new Map();
+    this._navigationRevision = 0;
+    this._lifecycleRevision = 0;
+    this._evaluationToken = 0;
+    this._activeEvaluationToken = null;
+    this._isCleaningUp = false;
+    this._cleanupPromise = null;
+    this._activeEvaluationPromise = null;
 
     // Store singleton instance
     featureManagerInstance = this;
     logger.debug('FeatureManager singleton created');
+  }
+
+  _getFeatureRevision(featureName) {
+    return this._featureRevisions.get(featureName) || 0;
+  }
+
+  _incrementFeatureRevision(featureName) {
+    const next = this._getFeatureRevision(featureName) + 1;
+    this._featureRevisions.set(featureName, next);
+    return next;
+  }
+
+  _isActivationStale(featureName, capturedRevision) {
+    return capturedRevision !== this._getFeatureRevision(featureName) || this._isCleaningUp;
+  }
+
+  _isNavigationStale(capturedRevision) {
+    return capturedRevision !== this._navigationRevision;
   }
 
   // Static method to get singleton instance
@@ -74,6 +101,9 @@ export class FeatureManager extends ResourceTracker {
   }
 
   initialize() {
+    if (this._cleanupPromise) {
+      return this._cleanupPromise.then(() => this.initialize(), () => this.initialize());
+    }
     if (this.initialized) return Promise.resolve();
     if (this._initializationPromise) return this._initializationPromise;
 
@@ -171,6 +201,9 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async shouldActivateFeature(featureName) {
+    if (featureName === 'contentMessageHandler') {
+      return true;
+    }
     try {
       const allowed = await this.exclusionChecker.isFeatureAllowed(featureName);
       logger.debug(`Feature ${featureName} evaluation:`, allowed ? 'ALLOWED' : 'BLOCKED');
@@ -184,86 +217,153 @@ export class FeatureManager extends ResourceTracker {
   async activateFeature(featureName) {
     logger.debug(`Request to activate feature: ${featureName}`);
     if (this.activeFeatures.has(featureName)) {
-      // logger.trace(`Feature ${featureName} already active`);
       return;
     }
+
+    if (this._isCleaningUp) {
+      logger.debug(`Feature ${featureName} activation skipped: cleanup in progress`);
+      return;
+    }
+
+    // Serialize per-feature: wait for stale activation to settle, dedupe same generation
+    while (this._activationPromises.has(featureName)) {
+      const existing = this._activationPromises.get(featureName);
+      if (existing.revision === this._getFeatureRevision(featureName)) {
+        return existing.promise;
+      }
+      try { await existing.promise; } catch { /* ignore stale */ }
+    }
+
+    if (this.activeFeatures.has(featureName)) {
+      return;
+    }
+
+    if (this._isCleaningUp) {
+      logger.debug(`Feature ${featureName} activation skipped: cleanup in progress`);
+      return;
+    }
+
+    const capturedRevision = this._getFeatureRevision(featureName);
+    let activationPromise;
+    activationPromise = (async () => {
 
     // Check if handler already exists (protection against double creation)
     if (this.featureHandlers.has(featureName)) {
       logger.warn(`Feature ${featureName} handler already exists but not marked as active - cleaning up`);
       const existingHandler = this.featureHandlers.get(featureName);
       if (existingHandler && typeof existingHandler.deactivate === 'function') {
-        await existingHandler.deactivate();
+        await existingHandler.deactivate().catch(() => {});
       }
       this.featureHandlers.delete(featureName);
+      try {
+        const { notifyFeatureDeactivated } = await import('@/core/content-scripts/chunks/lazy-features.js');
+        notifyFeatureDeactivated(featureName);
+      } catch { /* ignore */ }
+      if (this._isActivationStale(featureName, capturedRevision)) {
+        return;
+      }
     }
 
+    let handler = null;
     try {
-      // Load and initialize feature handler
-      let handler;
       logger.debug(`Loading handler for: ${featureName}`);
       if (featureName === 'textSelection') {
-        // Use singleton pattern for SimpleTextSelectionHandler
         const { SimpleTextSelectionHandler } = await import('@/features/text-selection/handlers/SimpleTextSelectionHandler.js');
+        if (this._isActivationStale(featureName, capturedRevision)) {
+          return;
+        }
         handler = SimpleTextSelectionHandler.getInstance({ featureManager: this });
       } else if (featureName === 'contentMessageHandler') {
-        // Use singleton pattern for ContentMessageHandler
         const { contentMessageHandler } = await import('@/handlers/content/ContentMessageHandler.js');
+        if (this._isActivationStale(featureName, capturedRevision)) {
+          return;
+        }
         handler = contentMessageHandler;
       } else {
         handler = await this.loadFeatureHandler(featureName);
+        if (this._isActivationStale(featureName, capturedRevision)) {
+          if (handler && typeof handler.deactivate === 'function') {
+            await handler.deactivate().catch(() => {});
+          }
+          return;
+        }
       }
 
-      if (handler) {
-        logger.debug(`Executing .activate() for: ${featureName}`);
-        const success = await handler.activate();
-        if (success !== false) { // Consider true or undefined as success
-          this.featureHandlers.set(featureName, handler);
-          this.activeFeatures.add(featureName);
-          logger.info(`Feature '${featureName}' activated successfully`);
-          if (featureName === 'selectElement') {
-            try {
-              const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
-              if (contentMessageHandler && typeof contentMessageHandler.setSelectElementManager === 'function') {
-                contentMessageHandler.setSelectElementManager(handler);
-                logger.debug('SelectElementManager integrated with ContentMessageHandler');
-              }
-            } catch (integrationError) {
-              logger.warn('Failed to integrate SelectElementManager with ContentMessageHandler:', integrationError);
-            }
-          } else if (featureName === 'contentMessageHandler') {
-            // If ContentMessageHandler is activated after SelectElementManager or ScreenCaptureHandler, connect them
-            try {
-              const selectElementManager = this.featureHandlers.get('selectElement');
-              if (selectElementManager && typeof handler.setSelectElementManager === 'function') {
-                handler.setSelectElementManager(selectElementManager);
-                logger.debug('ContentMessageHandler integrated with existing SelectElementManager');
-              }
-              
-              const screenCaptureManager = this.featureHandlers.get('screenCapture');
-              if (screenCaptureManager && typeof handler.setScreenCaptureManager === 'function') {
-                handler.setScreenCaptureManager(screenCaptureManager);
-                logger.debug('ContentMessageHandler integrated with existing ScreenCaptureHandler');
-              }
-            } catch (integrationError) {
-              logger.warn('Failed to integrate ContentMessageHandler with managers:', integrationError);
-            }
-          } else if (featureName === 'screenCapture') {
-            try {
-              const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
-              if (contentMessageHandler && typeof contentMessageHandler.setScreenCaptureManager === 'function') {
-                contentMessageHandler.setScreenCaptureManager(handler);
-                logger.debug('ScreenCaptureHandler integrated with ContentMessageHandler');
-              }
-            } catch (integrationError) {
-              logger.warn('Failed to integrate ScreenCaptureHandler with ContentMessageHandler:', integrationError);
-            }
-          }
+      if (!handler) {
+        return;
+      }
 
-          logger.debug(`Feature ${featureName} activated successfully`);
-        } else {
-          logger.warn(`Feature ${featureName} activation returned false - not registering`);
+      if (featureName !== 'contentMessageHandler') {
+        const stillAllowed = await this.shouldActivateFeature(featureName);
+        if (this._isActivationStale(featureName, capturedRevision) || !stillAllowed) {
+          logger.debug(`Feature ${featureName} activation aborted: stale or no longer allowed`);
+          return;
         }
+      }
+
+      logger.debug(`Executing .activate() for: ${featureName}`);
+      const success = await handler.activate();
+      if (this._isActivationStale(featureName, capturedRevision)) {
+        if (success !== false) {
+          await handler.deactivate().catch(() => {});
+        }
+        logger.debug(`Feature ${featureName} stale after activate, cleaned up`);
+        return;
+      }
+
+      if (featureName !== 'contentMessageHandler') {
+        const allowedFinal = await this.shouldActivateFeature(featureName);
+        if (this._isActivationStale(featureName, capturedRevision) || !allowedFinal) {
+          await handler.deactivate().catch(() => {});
+          logger.debug(`Feature ${featureName} no longer allowed after activate, deactivated`);
+          return;
+        }
+      }
+
+      if (success !== false) {
+        this.featureHandlers.set(featureName, handler);
+        this.activeFeatures.add(featureName);
+        logger.info(`Feature '${featureName}' activated successfully`);
+        if (featureName === 'selectElement') {
+          try {
+            const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
+            if (contentMessageHandler && typeof contentMessageHandler.setSelectElementManager === 'function') {
+              contentMessageHandler.setSelectElementManager(handler);
+              logger.debug('SelectElementManager integrated with ContentMessageHandler');
+            }
+          } catch (integrationError) {
+            logger.warn('Failed to integrate SelectElementManager with ContentMessageHandler:', integrationError);
+          }
+        } else if (featureName === 'contentMessageHandler') {
+          try {
+            const selectElementManager = this.featureHandlers.get('selectElement');
+            if (selectElementManager && typeof handler.setSelectElementManager === 'function') {
+              handler.setSelectElementManager(selectElementManager);
+              logger.debug('ContentMessageHandler integrated with existing SelectElementManager');
+            }
+            const screenCaptureManager = this.featureHandlers.get('screenCapture');
+            if (screenCaptureManager && typeof handler.setScreenCaptureManager === 'function') {
+              handler.setScreenCaptureManager(screenCaptureManager);
+              logger.debug('ContentMessageHandler integrated with existing ScreenCaptureHandler');
+            }
+          } catch (integrationError) {
+            logger.warn('Failed to integrate ContentMessageHandler with managers:', integrationError);
+          }
+        } else if (featureName === 'screenCapture') {
+          try {
+            const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
+            if (contentMessageHandler && typeof contentMessageHandler.setScreenCaptureManager === 'function') {
+              contentMessageHandler.setScreenCaptureManager(handler);
+              logger.debug('ScreenCaptureHandler integrated with ContentMessageHandler');
+            }
+          } catch (integrationError) {
+            logger.warn('Failed to integrate ScreenCaptureHandler with ContentMessageHandler:', integrationError);
+          }
+        }
+
+        logger.debug(`Feature ${featureName} activated successfully`);
+      } else {
+        logger.warn(`Feature ${featureName} activation returned false - not registering`);
       }
       
     } catch (error) {
@@ -273,12 +373,29 @@ export class FeatureManager extends ResourceTracker {
         context: `FeatureManager-activateFeature-${featureName}`,
         showToast: false
       });
+      if (handler && typeof handler.deactivate === 'function') {
+        try { await handler.deactivate(); } catch { /* ignore */ }
+      }
+    }
+    })();
+
+    this._activationPromises.set(featureName, { promise: activationPromise, revision: capturedRevision });
+    try {
+      await activationPromise;
+    } finally {
+      if (this._activationPromises.get(featureName)?.promise === activationPromise) {
+        this._activationPromises.delete(featureName);
+      }
     }
   }
 
   async deactivateFeature(featureName) {
-    if (!this.activeFeatures.has(featureName)) {
-      logger.debug(`Feature ${featureName} not active`);
+    this._incrementFeatureRevision(featureName);
+
+    const wasActive = this.activeFeatures.has(featureName);
+    const hadHandler = this.featureHandlers.has(featureName);
+    if (!wasActive && !hadHandler) {
+      logger.debug(`Feature ${featureName} not active (revision invalidated for pending)`);
       return;
     }
 
@@ -475,10 +592,9 @@ export class FeatureManager extends ResourceTracker {
   }
 
   async _processEvaluationQueue() {
-    // Prevent multiple concurrent evaluations
-    if (this._evaluationInProgress) {
+    if (this._activeEvaluationPromise) {
       logger.debug('Feature evaluation already in progress, queueing...');
-      return;
+      return this._activeEvaluationPromise;
     }
 
     if (this._evaluationQueue.length === 0) {
@@ -492,48 +608,106 @@ export class FeatureManager extends ResourceTracker {
     const reasons = requests.map(r => r.reason).join(', ');
     logger.debug(`Processing ${requests.length} queued feature evaluation requests (reasons: ${reasons})`);
 
+    const capturedLifecycle = this._lifecycleRevision;
+    const evaluationToken = ++this._evaluationToken;
+    this._activeEvaluationToken = evaluationToken;
     this._evaluationInProgress = true;
 
-    try {
-      // Re-evaluate only features that have been requested by the loader
-      const features = Array.from(this.requestedFeatures);
+    const isEvaluationStale = () => capturedLifecycle !== this._lifecycleRevision || evaluationToken !== this._activeEvaluationToken;
 
-      logger.debug('Re-evaluating requested features', { features });
+    const evaluationPromise = Promise.resolve().then(async () => {
+      try {
+        // Re-evaluate only features that have been requested by the loader
+        const features = Array.from(this.requestedFeatures);
 
-      for (const feature of features) {
-        const shouldBeActive = await this.shouldActivateFeature(feature);
-        const isCurrentlyActive = this.activeFeatures.has(feature);
+        logger.debug('Re-evaluating requested features', { features });
 
-        logger.debug(`Feature ${feature}: shouldBeActive=${shouldBeActive}, isCurrentlyActive=${isCurrentlyActive}`);
+        for (const feature of features) {
+          if (isEvaluationStale()) break;
+          if (feature === 'contentMessageHandler') {
+            const shouldBeActive = await this.shouldActivateFeature(feature);
+            if (isEvaluationStale()) break;
+            const isCurrentlyActive = this.activeFeatures.has(feature);
+            if (shouldBeActive && !isCurrentlyActive) {
+              await this.activateFeature(feature);
+              if (isEvaluationStale()) break;
+            }
+            continue;
+          }
 
-        if (shouldBeActive && !isCurrentlyActive) {
-          await this.activateFeature(feature);
-        } else if (!shouldBeActive && isCurrentlyActive) {
-          logger.debug(`About to deactivate feature: ${feature}`);
-          await this.deactivateFeature(feature);
+          const shouldBeActive = await this.shouldActivateFeature(feature);
+          if (isEvaluationStale()) break;
+          const isCurrentlyActive = this.activeFeatures.has(feature);
+
+          logger.debug(`Feature ${feature}: shouldBeActive=${shouldBeActive}, isCurrentlyActive=${isCurrentlyActive}`);
+
+          if (shouldBeActive && !isCurrentlyActive) {
+            await this.activateFeature(feature);
+            if (isEvaluationStale()) break;
+          } else if (!shouldBeActive && isCurrentlyActive) {
+            logger.debug(`About to deactivate feature: ${feature}`);
+            await this.deactivateFeature(feature);
+            if (isEvaluationStale()) break;
+          } else if (!shouldBeActive && !isCurrentlyActive) {
+            this._incrementFeatureRevision(feature);
+            if (this.featureHandlers.has(feature)) {
+              const staleHandler = this.featureHandlers.get(feature);
+              if (staleHandler && typeof staleHandler.deactivate === 'function') {
+                await staleHandler.deactivate().catch(() => {});
+                if (isEvaluationStale()) break;
+              }
+              this.featureHandlers.delete(feature);
+              try {
+                const { notifyFeatureDeactivated } = await import('@/core/content-scripts/chunks/lazy-features.js');
+                if (isEvaluationStale()) break;
+                notifyFeatureDeactivated(feature);
+              } catch { /* ignore */ }
+              if (isEvaluationStale()) break;
+            }
+          }
+        }
+
+        if (isEvaluationStale()) {
+          logger.debug('Evaluation stale: lifecycle invalidated, settling as cancelled', { reasons });
+          const staleError = new Error('Evaluation cancelled: lifecycle invalidated');
+          staleError.name = 'EvaluationStaleError';
+          requests.forEach(request => {
+            try { request.reject(staleError); } catch { /* ignore */ }
+          });
+          return;
+        }
+
+        logger.debug('Feature re-evaluation complete', {
+          activeFeatures: Array.from(this.activeFeatures),
+          processedRequests: requests.length
+        });
+
+        // Resolve all pending requests
+        requests.forEach(request => {
+          try { request.resolve(); } catch { /* ignore */ }
+        });
+
+      } catch (error) {
+        logger.error('Feature re-evaluation failed:', error);
+        // Reject all pending requests
+        requests.forEach(request => {
+          try { request.reject(error); } catch { /* ignore */ }
+        });
+      } finally {
+        if (this._activeEvaluationToken === evaluationToken) {
+          this._activeEvaluationToken = null;
+          this._activeEvaluationPromise = null;
+          this._evaluationInProgress = false;
+          // Process any new requests that came in during evaluation
+          if (this._evaluationQueue.length > 0) {
+            setTimeout(() => this._processEvaluationQueue(), 50);
+          }
         }
       }
+    });
 
-      logger.debug('Feature re-evaluation complete', {
-        activeFeatures: Array.from(this.activeFeatures),
-        processedRequests: requests.length
-      });
-
-      // Resolve all pending requests
-      requests.forEach(request => request.resolve());
-
-    } catch (error) {
-      logger.error('Feature re-evaluation failed:', error);
-      // Reject all pending requests
-      requests.forEach(request => request.reject(error));
-    } finally {
-      this._evaluationInProgress = false;
-
-      // Process any new requests that came in during evaluation
-      if (this._evaluationQueue.length > 0) {
-        setTimeout(() => this._processEvaluationQueue(), 50);
-      }
-    }
+    this._activeEvaluationPromise = evaluationPromise;
+    return evaluationPromise;
   }
 
   setupUrlChangeDetection() {
@@ -573,58 +747,82 @@ export class FeatureManager extends ResourceTracker {
 
     const oldUrl = this._lastDetectedUrl;
     this._lastDetectedUrl = newUrl;
-    return this.handleUrlChange(oldUrl, newUrl);
+    this._navigationRevision += 1;
+    const capturedRevision = this._navigationRevision;
+    return this.handleUrlChange(oldUrl, newUrl, capturedRevision);
   }
 
-  async handleUrlChange(oldUrl, newUrl) {
+  async handleUrlChange(oldUrl, newUrl, expectedRevision = null) {
+    let capturedRevision;
+    if (expectedRevision !== null) {
+      capturedRevision = expectedRevision;
+    } else {
+      this._navigationRevision += 1;
+      capturedRevision = this._navigationRevision;
+      this._lastDetectedUrl = newUrl;
+    }
+    if (this._lastDetectedUrl !== newUrl) {
+      this._lastDetectedUrl = newUrl;
+    }
     logger.debug('URL changed:', { oldUrl, newUrl });
-    
-    try {
-      // Update exclusion checker with new URL
-      this.exclusionChecker.updateUrl(newUrl);
-      
-      // Re-evaluate features for new URL
-      await this.reevaluateFeatures('url-change');
 
-      // Child frames own local URL/exclusion state; only the top frame owns page-wide auto-translation.
+    const isStale = () => this._isNavigationStale(capturedRevision);
+
+    try {
+      this.exclusionChecker.updateUrl(newUrl);
+
+      await this.reevaluateFeatures('url-change');
+      if (isStale()) {
+        logger.debug('Stale navigation after reevaluation, aborting', { newUrl });
+        return;
+      }
+
       if (window !== window.top) return;
-      
-      // Check auto-translation rules for the new URL
+
       const { default: settingsManager } = await import('@/shared/managers/SettingsManager.js');
+      if (isStale()) return;
       const isEnabled = settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true);
-      if (isEnabled && settingsManager.isExtensionEnabled()) {
-        const autoRules = settingsManager.get('WHOLE_PAGE_AUTO_TRANSLATE_RULES', []);
-        if (autoRules.length > 0) {
-          const { matchesAutoTranslateRule } = await import('@/utils/ui/exclusion.js');
-          const isMatch = autoRules.some(rule => matchesAutoTranslateRule(newUrl, rule));
-          if (isMatch) {
-            const isAllowed = await this.exclusionChecker.isFeatureAllowed('pageTranslation');
-            if (isAllowed) {
-              const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
-              const manager = await loadFeature('pageTranslation');
-              if (manager) {
-                // Ensure override is reset if URL actually changed
-                if (manager.currentUrl !== newUrl) {
-                  manager.userRestoredOverride = false;
-                }
-                if (!manager.isActive) {
-                  await manager.activate();
-                }
-                if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(newUrl)) {
-                  logger.info('Auto-translate rule matched on SPA URL change. Triggering translation...');
-                  const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
-                  const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-                  const response = await sendRegularMessage({
-                    action: MessageActions.PAGE_TRANSLATE,
-                    data: { isAuto: true },
-                  }, { returnFailureResponse: true });
-                  if (response?.success === false) {
-                    logger.debug('SPA auto page translation command rejected', response);
-                  }
-                }
-              }
-            }
-          }
+      if (!isEnabled || !settingsManager.isExtensionEnabled()) return;
+      if (isStale()) return;
+      const autoRules = settingsManager.get('WHOLE_PAGE_AUTO_TRANSLATE_RULES', []);
+      if (autoRules.length === 0) return;
+      if (isStale()) return;
+
+      const { matchesAutoTranslateRule } = await import('@/utils/ui/exclusion.js');
+      if (isStale()) return;
+      const isMatch = autoRules.some(rule => matchesAutoTranslateRule(newUrl, rule));
+      if (!isMatch) return;
+      if (isStale()) return;
+
+      const isAllowed = await this.exclusionChecker.isFeatureAllowed('pageTranslation');
+      if (isStale() || !isAllowed) return;
+
+      const { loadFeature } = await import('@/core/content-scripts/chunks/lazy-features.js');
+      if (isStale()) return;
+      const manager = await loadFeature('pageTranslation');
+      if (isStale() || !manager) return;
+
+      if (manager.currentUrl !== newUrl) {
+        manager.userRestoredOverride = false;
+      }
+      if (isStale()) return;
+      if (!manager.isActive) {
+        await manager.activate();
+        if (isStale()) return;
+      }
+      if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(newUrl)) {
+        if (isStale()) return;
+        logger.info('Auto-translate rule matched on SPA URL change. Triggering translation...');
+        const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+        if (isStale()) return;
+        const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+        if (isStale()) return;
+        const response = await sendRegularMessage({
+          action: MessageActions.PAGE_TRANSLATE,
+          data: { isAuto: true },
+        }, { returnFailureResponse: true });
+        if (response?.success === false) {
+          logger.debug('SPA auto page translation command rejected', response);
         }
       }
     } catch (error) {
@@ -702,37 +900,131 @@ export class FeatureManager extends ResourceTracker {
     }
   }
 
-  // Override cleanup to handle settings listener (for full shutdown)
-  cleanup() {
-    try {
-      // Clear debounce timer
-      if (this._evaluationDebounceTimer) {
-        clearTimeout(this._evaluationDebounceTimer);
-        this._evaluationDebounceTimer = null;
-      }
-
-      // Clear evaluation queue
-      this._evaluationQueue = [];
-
-      if (this.settingsListener) {
-        storageManager.off('change', this.settingsListener);
-        this.settingsListener = null;
-      }
-
-      // Deactivate all features (full cleanup, not smart cleanup)
-      const activeFeatures = Array.from(this.activeFeatures);
-      for (const feature of activeFeatures) {
-        this.deactivateFeature(feature).catch(error => {
-          logger.error(`Error deactivating feature ${feature} during cleanup:`, error);
-        });
-      }
-
-      super.cleanup();
-      logger.debug('FeatureManager full cleanup completed');
-
-    } catch (error) {
-      logger.error('Error during FeatureManager cleanup:', error);
+  async cleanupAsync() {
+    if (this._cleanupPromise) {
+      return this._cleanupPromise;
     }
+
+    let cleanupPromise;
+    cleanupPromise = (async () => {
+      const alreadySync = this._isCleaningUp;
+      if (!alreadySync) {
+        this._isCleaningUp = true;
+
+        for (const feature of new Set([...this.requestedFeatures, ...this.activeFeatures])) {
+          this._incrementFeatureRevision(feature);
+        }
+        this._navigationRevision += 1;
+        this._lifecycleRevision += 1;
+
+        if (this._evaluationDebounceTimer) {
+          clearTimeout(this._evaluationDebounceTimer);
+          this._evaluationDebounceTimer = null;
+        }
+
+        const queued = [...this._evaluationQueue];
+        this._evaluationQueue = [];
+        if (queued.length > 0) {
+          const cleanupError = new Error('FeatureManager cleanup');
+          for (const req of queued) {
+            try { req.reject(cleanupError); } catch { /* ignore */ }
+          }
+        }
+
+        if (this.settingsListener) {
+          try { storageManager.off('change', this.settingsListener); } catch { /* ignore */ }
+          this.settingsListener = null;
+        }
+      }
+
+      // Wait for stale activation attempts to settle (identity-safe, do not delete)
+      const pendingActivations = [...this._activationPromises.values()];
+      if (pendingActivations.length > 0) {
+        await Promise.allSettled(pendingActivations.map(entry => entry.promise));
+      }
+      // Wait for in-flight evaluation to settle
+      if (this._activeEvaluationPromise) {
+        try { await this._activeEvaluationPromise; } catch { /* ignore */ }
+      }
+
+      const toDeactivate = Array.from(this.activeFeatures);
+      for (const feature of toDeactivate) {
+        try {
+          await this.deactivateFeature(feature);
+        } catch (error) {
+          logger.error(`Error deactivating feature ${feature} during cleanup:`, error);
+        }
+      }
+
+      for (const feature of Array.from(this.requestedFeatures)) {
+        if (this.featureHandlers.has(feature)) {
+          const handler = this.featureHandlers.get(feature);
+          if (handler && typeof handler.deactivate === 'function') {
+            try { await handler.deactivate(); } catch { /* ignore */ }
+          }
+          this.featureHandlers.delete(feature);
+          try {
+            const { notifyFeatureDeactivated } = await import('@/core/content-scripts/chunks/lazy-features.js');
+            notifyFeatureDeactivated(feature);
+          } catch { /* ignore */ }
+        }
+      }
+
+      try {
+        super.cleanup();
+      } catch (error) {
+        logger.error('Error during FeatureManager super cleanup:', error);
+      }
+
+      this.initialized = false;
+      this._isCleaningUp = false;
+      logger.debug('FeatureManager full cleanup completed');
+    })();
+
+    this._cleanupPromise = cleanupPromise;
+    try {
+      await cleanupPromise;
+    } finally {
+      if (this._cleanupPromise === cleanupPromise) {
+        this._cleanupPromise = null;
+      }
+    }
+  }
+
+  // Override cleanup to handle settings listener (for full shutdown)
+  // Preserves sync-call compatibility: callers not awaiting still trigger authoritative teardown.
+  cleanup() {
+    // Synchronous invalidation for immediate staleness and queue settlement
+    for (const feature of new Set([...this.requestedFeatures, ...this.activeFeatures])) {
+      this._incrementFeatureRevision(feature);
+    }
+    this._navigationRevision += 1;
+    this._lifecycleRevision += 1;
+    this._isCleaningUp = true;
+
+    if (this._evaluationDebounceTimer) {
+      clearTimeout(this._evaluationDebounceTimer);
+      this._evaluationDebounceTimer = null;
+    }
+
+    if (this._evaluationQueue.length > 0) {
+      const queued = [...this._evaluationQueue];
+      this._evaluationQueue = [];
+      const cleanupError = new Error('FeatureManager cleanup');
+      for (const req of queued) {
+        try { req.reject(cleanupError); } catch { /* ignore */ }
+      }
+    }
+
+    if (this.settingsListener) {
+      try { storageManager.off('change', this.settingsListener); } catch { /* ignore */ }
+      this.settingsListener = null;
+    }
+
+    // Defer remaining async teardown (feature deactivation) without blocking caller
+    void this.cleanupAsync().catch(error => {
+      logger.error('Error during FeatureManager cleanup:', error);
+    });
   }
 }
 

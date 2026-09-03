@@ -67,8 +67,7 @@ export class ExclusionChecker {
         showToast: false
       });
 
-      this.initialized = true;
-      logger.warn('ExclusionChecker initialized with fallback defaults due to error');
+      throw error;
     }
   }
 
