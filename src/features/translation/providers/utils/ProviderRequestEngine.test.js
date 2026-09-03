@@ -554,6 +554,86 @@ describe('ProviderRequestEngine', () => {
   });
 
   describe('executeRequest - Failover Logic', () => {
+    it.each([
+      ['invalid key', 'API_ERROR: Invalid API key', ErrorTypes.API_KEY_INVALID],
+      ['insufficient balance', 'API_ERROR: Insufficient balance', ErrorTypes.INSUFFICIENT_BALANCE],
+      ['quota exceeded', 'API_ERROR: Quota exceeded', ErrorTypes.QUOTA_EXCEEDED],
+    ])('normalizes an untyped %s envelope before failover', async (_label, message, type) => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key-a', 'key-b']);
+      ApiKeyManager.shouldFailover.mockImplementation(error => error.type === type);
+      const firstError = new Error(message);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(firstError)
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(firstError.type).toBe(type);
+        expect(apiCallSpy).toHaveBeenCalledTimes(2);
+        expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(firstError);
+        expect(updateApiKey).toHaveBeenCalledWith('key-b', expect.any(Object));
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'key-b');
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('does not rotate keys for an untyped generic API error envelope', async () => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key-a', 'key-b']);
+      ApiKeyManager.shouldFailover.mockReturnValue(false);
+      const error = new Error('API_ERROR: Unknown provider failure');
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockRejectedValue(error);
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).rejects.toBe(error);
+
+        expect(error.type).toBe(ErrorTypes.TRANSLATION_ERROR);
+        expect(apiCallSpy).toHaveBeenCalledTimes(1);
+        expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(error);
+        expect(updateApiKey).not.toHaveBeenCalled();
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('passes normalized type to a provider failover hook', async () => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key-a', 'key-b']);
+      const shouldFailoverApiKey = vi.fn(error => error.type === ErrorTypes.API_KEY_INVALID);
+      mockProvider.shouldFailoverApiKey = shouldFailoverApiKey;
+      const error = new Error('API_ERROR: Invalid API key');
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce('translated');
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey: vi.fn(),
+        })).resolves.toBe('translated');
+
+        expect(shouldFailoverApiKey).toHaveBeenCalledWith(expect.objectContaining({
+          type: ErrorTypes.API_KEY_INVALID,
+        }));
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
     it.each([undefined, 'INVALID_PURPOSE'])('normalizes %p purpose to primary before physical accounting', async (callPurpose) => {
       const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockResolvedValue('translated');
       try {

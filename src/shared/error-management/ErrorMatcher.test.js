@@ -62,6 +62,11 @@ describe('ErrorMatcher', () => {
       })).toBe(ErrorTypes.RATE_LIMIT_REACHED);
     });
 
+    it('classifies invalid API key wording from an HTTP-200 provider envelope', () => {
+      expect(matchErrorToType(new Error('API_ERROR: Invalid API key')))
+        .toBe(ErrorTypes.API_KEY_INVALID);
+    });
+
     it('should keep generic typed AbortError generic without stronger evidence', () => {
       expect(matchErrorToType({
         name: 'AbortError',

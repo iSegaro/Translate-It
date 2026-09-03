@@ -285,6 +285,8 @@ export const ProviderRequestEngine = {
           throw abortError;
         }
 
+        if (!error.type && errorType) error.type = errorType;
+
         // 5. Handle Failover
         if (attempt < availableKeysCount - 1 && shouldFailoverApiKey(provider, error)) {
           const keys = apiKeyCandidates || await ApiKeyManager.getKeys(provider.providerSettingKey);
@@ -312,7 +314,6 @@ export const ProviderRequestEngine = {
           }
         }
 
-        if (!error.type) error.type = errorType;
         appendTranslationDiagnostic(executionContext, {
           type: 'PROVIDER_REQUEST_FAILURE',
           stage: 'provider-request',
@@ -539,7 +540,16 @@ export const ProviderRequestEngine = {
           error.providerName = provider.providerName;
           throw error;
         }
-        return await extractResponse(data, response.status);
+        const result = await extractResponse(data, response.status);
+        if (result === undefined) {
+          const error = new Error(ErrorTypes.API_RESPONSE_INVALID);
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          error.statusCode = response.status;
+          error.context = context;
+          error.providerName = provider.providerName;
+          throw error;
+        }
+        return result;
       }
 
       const responseText = await response.text();
