@@ -163,13 +163,17 @@ export async function handleActivateSelectElementMode(message, sender) {
       // Send activation explicitly so each reachable frame can establish its own ACK.
       const statusText = 'activated';
       let response;
-      const frames = browser.webNavigation?.getAllFrames
+      const rawFrames = browser.webNavigation?.getAllFrames
         ? await browser.webNavigation.getAllFrames({ tabId: targetTabId }).catch(() => [{ frameId: 0 }])
         : [{ frameId: 0 }];
-      const frameIds = [...new Set([
-        0,
-        ...(Array.isArray(frames) ? frames.map(frame => frame?.frameId) : [])
-      ])].filter(frameId => Number.isInteger(frameId) && frameId >= 0);
+      const frameDetails = new Map();
+      for (const f of Array.isArray(rawFrames) ? rawFrames : []) {
+        if (Number.isInteger(f?.frameId) && f.frameId >= 0) {
+          frameDetails.set(f.frameId, f.documentId && typeof f.documentId === 'string' && f.documentId.trim() ? f.documentId : null);
+        }
+      }
+      if (!frameDetails.has(0)) frameDetails.set(0, null);
+      const frameIds = [...frameDetails.keys()];
       if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
         return {
           success: false,
@@ -181,15 +185,21 @@ export async function handleActivateSelectElementMode(message, sender) {
 
       const frameResults = await Promise.all(frameIds.map(async frameId => {
         try {
+          const documentId = frameDetails.get(frameId) || null;
+          const target = documentId ? { frameId, documentId } : { frameId };
           // Only a dispatched request can leave cleanup ownership behind.
-          recordActivationAttemptFrames(targetTabId, activationGeneration, [frameId]);
+          if (documentId) {
+            recordActivationAttemptFrames(targetTabId, activationGeneration, [frameId], new Map([[frameId, documentId]]));
+          } else {
+            recordActivationAttemptFrames(targetTabId, activationGeneration, [frameId]);
+          }
           const frameResponse = await browser.tabs.sendMessage(
             targetTabId,
             contentMessage,
-            { frameId }
+            target
           );
           logger.debug(`Message sent to frame ${frameId} in tab ${targetTabId}, response:`, frameResponse);
-          return { frameId, response: frameResponse };
+          return { frameId, documentId, response: frameResponse };
         } catch (error) {
           if (isProvenNoSelectElementReceiver(error)) {
             settleActivationAttemptFrame(targetTabId, activationGeneration, frameId);
@@ -199,7 +209,7 @@ export async function handleActivateSelectElementMode(message, sender) {
           } else {
             logger.error(`Failed to send activation to frame ${frameId} in tab ${targetTabId}:`, error);
           }
-          return { frameId, error };
+          return { frameId, documentId: frameDetails.get(frameId) || null, error };
         }
       }));
 
@@ -216,18 +226,23 @@ export async function handleActivateSelectElementMode(message, sender) {
       const strictResults = frameResults.filter(({ response: frameResponse }) => (
         frameResponse?.success === true
         && frameResponse?.activated === true
+        && hasGenerationEcho(frameResponse)
+        && hasEpochEcho(frameResponse)
         && frameResponse?.activationGeneration === activationGeneration
-        && (!hasEpochEcho(frameResponse) || frameResponse.activationEpoch === activationEpoch)
+        && frameResponse?.activationEpoch === activationEpoch
       ));
+      const isCompatibilityResponse = frameResponse => {
+        if (frameResponse === true) return true;
+        if (frameResponse?.success === true && frameResponse?.activated === true) {
+          const hasGen = hasGenerationEcho(frameResponse);
+          const hasEpoch = hasEpochEcho(frameResponse);
+          if (!hasGen) return true;
+          if (hasGen && !hasEpoch && frameResponse.activationGeneration === activationGeneration) return true;
+        }
+        return false;
+      };
       const compatibilityFrameIds = frameResults
-        .filter(({ response: frameResponse }) => (
-          frameResponse === true
-          || (
-            frameResponse?.success === true
-            && frameResponse?.activated === true
-            && !hasGenerationEcho(frameResponse)
-          )
-        ))
+        .filter(({ response: frameResponse }) => isCompatibilityResponse(frameResponse))
         .map(({ frameId }) => frameId);
       for (const { frameId, response: frameResponse } of frameResults) {
         if (
@@ -249,9 +264,10 @@ export async function handleActivateSelectElementMode(message, sender) {
           };
         }
 
-        const registeredResults = strictResults.filter(({ frameId }) => (
-          registerParticipant(targetTabId, frameId, activationGeneration)
-        ));
+        const registeredResults = strictResults.filter(({ frameId, documentId }) => {
+          const doc = documentId || frameDetails.get(frameId) || null;
+          return doc ? registerParticipant(targetTabId, frameId, activationGeneration, doc) : registerParticipant(targetTabId, frameId, activationGeneration);
+        });
         for (const { frameId } of registeredResults) {
           settleActivationAttemptFrame(targetTabId, activationGeneration, frameId);
         }
@@ -277,14 +293,7 @@ export async function handleActivateSelectElementMode(message, sender) {
         };
       }
 
-      const compatibilityResult = frameResults.find(({ response: frameResponse }) => (
-        frameResponse === true
-        || (
-          frameResponse?.success === true
-          && frameResponse?.activated === true
-          && !hasGenerationEcho(frameResponse)
-        )
-      ));
+      const compatibilityResult = frameResults.find(({ response: frameResponse }) => isCompatibilityResponse(frameResponse));
       if (compatibilityResult) {
         retainCompatibilityFrames(
           targetTabId,

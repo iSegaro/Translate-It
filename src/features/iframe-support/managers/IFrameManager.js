@@ -7,7 +7,6 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import SmartCache from '@/core/memory/SmartCache.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { getSelectElementActivationErrorMessage } from '@/features/element-selection/utils/activationError.js';
 
 /**
  * Enhanced IFrame Manager with full integration to existing systems
@@ -207,10 +206,6 @@ export class IFrameManager extends ResourceTracker {
           await this._handleFrameRegistration(event);
           break;
           
-        case 'TRANSLATE_IT_SELECT_ELEMENT':
-          await this._handleSelectElementRequest(data);
-          break;
-          
         case 'TRANSLATE_IT_TEXT_FIELD':
           await this._handleTextFieldRequest(data);
           break;
@@ -245,9 +240,6 @@ export class IFrameManager extends ResourceTracker {
       }
 
       switch (message.action) {
-        case MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT:
-          return await this._activateSelectElementMode(message.data);
-          
         case MessageActions.IFRAME_GET_FRAME_INFO:
           return this._getFrameInfo();
           
@@ -325,35 +317,6 @@ export class IFrameManager extends ResourceTracker {
         error: error.message,
         src: iframe?.src || 'unknown'
       });
-    }
-  }
-
-  /**
-   * Activate select element mode across frames
-   */
-  async _activateSelectElementMode(data) {
-    try {
-      // Activate in current frame
-      if (window.selectElementManagerInstance) {
-        await window.selectElementManagerInstance.activate();
-      }
-      
-      // Broadcast to other frames
-      this._broadcastToAllFrames({
-        type: 'TRANSLATE_IT_SELECT_ELEMENT',
-        action: 'activate',
-        data
-      });
-      
-      return { success: true, frameId: this.frameId };
-      
-    } catch (error) {
-      await this.errorHandler.handle(error, {
-        context: 'iframe-activate-select-element',
-        showToast: false
-      });
-      const message = await getSelectElementActivationErrorMessage();
-      return { success: false, message, error: message };
     }
   }
 

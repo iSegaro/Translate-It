@@ -5,7 +5,6 @@ import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { 
   getDebugModeAsync, 
   getTargetLanguageAsync,
@@ -196,32 +195,33 @@ async function getApiProviders(settings = {}) {
 }
 
 /**
- * Sends a message to all tabs to deactivate the "Select Element" mode.
- * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
+ * Canonical bulk deactivation: routes each accessible tab through authoritative Background handler.
  */
 async function deactivateSelectElementModeInAllTabs() {
   try {
     const tabs = await browser.tabs.query({});
     let processedTabs = 0;
 
+    const { handleDeactivateSelectElementModeLazy } = await import('@/core/background/handlers/lazy/handleElementSelectionLazy.js');
+
     for (const tab of tabs) {
       if (tab.id) {
         try {
-          // Check if tab is accessible before sending message
           const tabAccess = await tabPermissionChecker.checkTabAccess(tab.id);
 
           if (tabAccess.isAccessible) {
-            // We send the message but don't wait for a response.
-            // A try-catch block handles cases where content scripts aren't injected.
-            browser.tabs
-              .sendMessage(tab.id, MessageFormat.create(
-                MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-                { forceDeactivate: true },
-                'context-menu'
-              ))
-              .catch(() => {
-                // It's normal for this to fail on tabs without the content script; ignore the error.
-              });
+            try {
+              await handleDeactivateSelectElementModeLazy(
+                { action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, data: { tabId: tab.id, active: false } },
+                { tab: { id: tab.id } }
+              );
+            } catch (handlerError) {
+              if (ExtensionContextManager.isContextError(handlerError)) {
+                ExtensionContextManager.handleContextError(handlerError, `context-menu:deactivate:tab-${tab.id}`);
+              } else {
+                logger.debug(`Canonical deactivation failed for tab ${tab.id}:`, handlerError);
+              }
+            }
             processedTabs++;
           } else {
             logger.debug(`Skipping deactivation for restricted tab ${tab.id}: ${tabAccess.errorMessage}`);
@@ -233,7 +233,7 @@ async function deactivateSelectElementModeInAllTabs() {
     }
 
     logger.info(
-      "Sent deactivation signal for Select Element mode to accessible tabs",
+      "Sent canonical deactivation for Select Element mode to accessible tabs",
       {
         totalTabs: tabs.length,
         processedTabs,

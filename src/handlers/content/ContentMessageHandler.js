@@ -276,6 +276,7 @@ export class ContentMessageHandler extends ResourceTracker {
   registerHandlers() {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
+    this.registerHandler(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE, this.handleGetSelectElementFrameState.bind(this));
     
     // Screen capture handlers
     this.registerHandler(MessageActions.START_SCREEN_CAPTURE, this.handleStartScreenCapture.bind(this));
@@ -288,10 +289,8 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
 
-    // IFrame support handlers
-    this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
+    // IFrame support handlers (Select Element authority is via Background frame-targeted messaging)
     this.registerHandler(MessageActions.IFRAME_GET_FRAME_INFO, this.handleIFrameGetFrameInfo.bind(this));
-    this.registerHandler(MessageActions.IFRAME_COORDINATE_OPERATION, this.handleIFrameCoordinateOperation.bind(this));
     this.registerHandler(MessageActions.IFRAME_DETECT_TEXT_FIELDS, this.handleIFrameDetectTextFields.bind(this));
     this.registerHandler(MessageActions.IFRAME_INSERT_TEXT, this.handleIFrameInsertText.bind(this));
     this.registerHandler(MessageActions.IFRAME_SYNC_REQUEST, this.handleIFrameSyncRequest.bind(this));
@@ -401,6 +400,14 @@ export class ContentMessageHandler extends ResourceTracker {
 
       return await this._enqueueSelectElementLifecycle(async ({ activate }) => {
         const requestedEpoch = message?.data?.activationEpoch;
+        // P9: epoch-less activation cannot supersede strict epoch-owned session
+        if (!isSelectElementEpoch(requestedEpoch) && this.acceptedSelectElementEpoch !== null) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleEpoch: true,
+          };
+        }
         const epochAdmission = this._admitSelectElementEpoch(requestedEpoch);
         if (!epochAdmission.accepted) {
           return {
@@ -504,6 +511,15 @@ export class ContentMessageHandler extends ResourceTracker {
   async _handleDeactivateSelectElementMode(message, lifecycle) {
     if (this.selectElementManager) {
       const requestedEpoch = message?.data?.activationEpoch;
+      const currentGenerationBefore = this.acceptedSelectElementGeneration;
+      if (!isSelectElementEpoch(requestedEpoch) && this.acceptedSelectElementEpoch !== null && currentGenerationBefore !== null && getSelectElementActiveState(this.selectElementManager)) {
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: getSelectElementActiveState(this.selectElementManager),
+          staleEpoch: true,
+        };
+      }
       if (isSelectElementEpoch(requestedEpoch)) {
         if (
           this.acceptedSelectElementEpoch !== null
@@ -600,6 +616,17 @@ export class ContentMessageHandler extends ResourceTracker {
         error: 'Select Element manager unavailable',
       };
     }
+  }
+
+  async handleGetSelectElementFrameState() {
+    // P1: read-only, no epoch adoption, no manager mutation
+    const active = getSelectElementActiveState(this.selectElementManager);
+    return {
+      active,
+      activationEpoch: this.acceptedSelectElementEpoch,
+      activationGeneration: this.acceptedSelectElementGeneration,
+      hasManager: !!this.selectElementManager,
+    };
   }
 
   async handleStartScreenCapture(message) {
@@ -782,45 +809,6 @@ export class ContentMessageHandler extends ResourceTracker {
     }
   }
 
-  // IFrame support handlers
-  async handleIFrameActivateSelectElement(/* data */) {
-    return this._enqueueSelectElementLifecycle(
-      lifecycle => this._handleIFrameActivateSelectElement(lifecycle),
-    );
-  }
-
-  async _handleIFrameActivateSelectElement(lifecycle) {
-    this.logger.info('IFrame activate select element request');
-    try {
-      if (this.selectElementManager) {
-        // Initialize if not already initialized
-        if (!this.selectElementManager.isInitialized) {
-          await this.selectElementManager.initialize();
-        }
-
-        const result = await lifecycle.activate();
-        return { success: true, activated: result.isActive, managerId: result.instanceId };
-      }
-
-      const safeMessage = await getSelectElementActivationErrorMessage();
-      return {
-        success: false,
-        message: safeMessage,
-        error: safeMessage,
-        errorType: ErrorTypes.SELECT_ELEMENT,
-      };
-    } catch (error) {
-      this.logger.warn('IFrame Select Element activation failed:', error);
-      const safeMessage = await getSelectElementActivationErrorMessage();
-      return {
-        success: false,
-        message: safeMessage,
-        error: safeMessage,
-        errorType: ErrorTypes.SELECT_ELEMENT,
-      };
-    }
-  }
-
   async handleIFrameGetFrameInfo(/* data */) {
     this.logger.info('IFrame get frame info request');
     if (this.iFrameManager) {
@@ -832,12 +820,8 @@ export class ContentMessageHandler extends ResourceTracker {
     return { success: false, error: 'IFrameManager not available' };
   }
 
-  async handleIFrameCoordinateOperation(data) {
-    this.logger.info('IFrame coordinate operation request');
-    // Delegate to appropriate manager based on operation type
-    if (data.operation === TranslationMode.Select_Element && this.selectElementManager) {
-      return await this.handleIFrameActivateSelectElement(data);
-    }
+  async handleIFrameCoordinateOperation() {
+    this.logger.info('IFrame coordinate operation request (Select Element removed)');
     return { success: false, error: 'Unsupported operation or manager not available' };
   }
 

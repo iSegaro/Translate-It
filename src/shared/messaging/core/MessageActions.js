@@ -35,6 +35,8 @@ export class MessageActions {
 
   // Select Element
   static GET_SELECT_ELEMENT_STATE = 'getSelectElementState';
+  static GET_SELECT_ELEMENT_FRAME_STATE = 'getSelectElementFrameState';
+  static SELECT_ELEMENT_FRAME_READY = 'selectElementFrameReady';
   static SET_SELECT_ELEMENT_STATE = 'setSelectElementState';
   static SELECT_ELEMENT_STATE_CHANGED = 'selectElementStateChanged';
   static PROCESS_SELECTED_ELEMENT = 'PROCESS_SELECTED_ELEMENT';
@@ -80,7 +82,6 @@ export class MessageActions {
   ]);
 
   // IFrame Support actions
-  static IFRAME_ACTIVATE_SELECT_ELEMENT = 'IFRAME_ACTIVATE_SELECT_ELEMENT';
   static IFRAME_GET_FRAME_INFO = 'IFRAME_GET_FRAME_INFO';
   static IFRAME_COORDINATE_OPERATION = 'IFRAME_COORDINATE_OPERATION';
   static IFRAME_DETECT_TEXT_FIELDS = 'IFRAME_DETECT_TEXT_FIELDS';

@@ -295,7 +295,7 @@ export class ExtensionContextManager {
     const isContext = coreIsContextError(lastError);
 
     if (isContext) {
-      ExtensionContextManager.handleContextError(errorMessage, context);
+      ExtensionContextManager.handleContextError(lastError, context);
       void browser.runtime?.lastError;
       return {
         handledSilently: true,

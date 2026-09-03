@@ -3,14 +3,18 @@ import browser from 'webextension-polyfill';
 
 /**
  * Handle getting select element state for a tab
+ * For Content-originated requests, sender.tab.id is authoritative.
+ * For trusted extension/internal requests without sender tab, explicit data.tabId is allowed.
  */
 export async function handleGetSelectElementState(message, sender) {
-  const requestedTabId = message?.data?.tabId;
-  let tabId = requestedTabId;
+  const senderTabId = sender?.tab?.id;
+  const payloadTabId = message?.data?.tabId;
+  let tabId = null;
 
-  if (!tabId) {
-    // Try to find sender.tab or active tab if not provided
-    tabId = sender?.tab?.id;
+  if (Number.isInteger(senderTabId)) {
+    tabId = senderTabId;
+  } else if (Number.isInteger(payloadTabId)) {
+    tabId = payloadTabId;
   }
 
   if (!tabId) {
@@ -30,4 +34,3 @@ export async function handleGetSelectElementState(message, sender) {
   const state = getStateForTab(tabId);
   return { success: true, tabId, active: !!state.active, updatedAt: state.updatedAt };
 }
-

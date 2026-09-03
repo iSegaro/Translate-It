@@ -4,13 +4,17 @@ const mocks = vi.hoisted(() => ({
   loadFeature: vi.fn(),
   initializeCritical: vi.fn(),
   interactionInitialize: vi.fn(),
+  frameReady: vi.fn(),
   pageEventBus: { on: vi.fn() },
   topPostMessage: vi.fn(),
 }));
 
 vi.mock('webextension-polyfill', () => ({
   default: {
-    runtime: { getURL: (path) => `moz-extension://test/${path}` },
+    runtime: {
+      getURL: (path) => `moz-extension://test/${path}`,
+      sendMessage: mocks.frameReady,
+    },
   },
 }));
 
@@ -31,8 +35,7 @@ vi.mock('./IFrameContentScriptCore.js', () => ({
     async injectMainDOMStyles() {}
 
     async loadFeature(feature) {
-      mocks.loadFeature(feature);
-      return null;
+      return mocks.loadFeature(feature);
     }
   },
 }));
@@ -53,6 +56,7 @@ vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
     PAGE_TRANSLATE: 'PAGE_TRANSLATE',
     PAGE_RESTORE: 'PAGE_RESTORE',
     PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO',
+    SELECT_ELEMENT_FRAME_READY: 'selectElementFrameReady',
   },
 }));
 
@@ -65,6 +69,7 @@ describe('iframe page translation transport', () => {
     mocks.loadFeature.mockClear();
     mocks.initializeCritical.mockReset().mockResolvedValue(true);
     mocks.interactionInitialize.mockReset().mockResolvedValue(undefined);
+    mocks.frameReady.mockReset().mockResolvedValue({ success: true });
     mocks.pageEventBus.on.mockClear();
     mocks.topPostMessage.mockClear();
     mocks.loadFeature.mockResolvedValue(null);
@@ -120,5 +125,36 @@ describe('iframe page translation transport', () => {
     resolveCore(true);
 
     await vi.waitFor(() => expect(mocks.interactionInitialize).toHaveBeenCalledOnce());
+  });
+
+  it('announces FRAME_READY only after the content receiver feature is loaded', async () => {
+    let receiverRegistered = false;
+    let releaseContentReceiver;
+    mocks.loadFeature.mockImplementation(async feature => {
+      if (feature === 'contentMessageHandler') {
+        await new Promise(resolve => {
+          releaseContentReceiver = () => {
+            receiverRegistered = true;
+            resolve();
+          };
+        });
+      }
+      return null;
+    });
+
+    await import('./index-iframe.js');
+    await vi.waitFor(() => expect(mocks.loadFeature).toHaveBeenCalledWith('contentMessageHandler'));
+    expect(mocks.frameReady).not.toHaveBeenCalled();
+    expect(releaseContentReceiver).toEqual(expect.any(Function));
+    releaseContentReceiver();
+
+    await vi.waitFor(() => expect(mocks.frameReady).toHaveBeenCalledWith({
+      action: 'selectElementFrameReady',
+      data: {},
+    }));
+    expect(receiverRegistered).toBe(true);
+    expect(mocks.frameReady.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.loadFeature.mock.invocationCallOrder[2],
+    );
   });
 });

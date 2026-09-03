@@ -1,6 +1,7 @@
 import browser from 'webextension-polyfill';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessagingContexts, MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { checkUrlExclusionAsync } from '@/features/exclusion/utils/exclusion-utils.js';
 // import { tabPermissionChecker } from '@/core/tabPermissions.js';
 
 // In-memory per-tab select element state
@@ -16,9 +17,9 @@ const backgroundActivationEpoch = (() => {
   }
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 })();
-// Each frame keeps its own accepted activation generation.
-const selectElementParticipantsByTab = new Map();
-// Latest accepted generation; older frame ownership may remain during reactivation.
+// Each frame keeps its own accepted activation generation, bound to document identity.
+const selectElementParticipantsByTab = new Map(); // tabId -> Map<frameId, { generation, documentId }>
+ // Latest accepted generation; older frame ownership may remain during reactivation.
 const currentGenerationByTab = new Map();
 const nextActivationGenerationByTab = new Map();
 const activationAttemptsByTab = new Map();
@@ -26,7 +27,51 @@ const currentActivationAttemptByTab = new Map();
 // Legacy activation ACKs cannot establish authority but must remain cleanable.
 const compatibilityFramesByTab = new Map();
 // Sent activation requests without conclusive settlement remain cleanup debt.
-const provisionalCleanupFramesByTab = new Map();
+const provisionalCleanupFramesByTab = new Map(); // tabId -> Map<frameId, Map<generation, documentId>>
+// Join authority revision: bumped on activation and before deactivation to prevent late join resurrection
+const activeSessionRevisionByTab = new Map();
+function getActiveSessionRevision(tabId) {
+  return activeSessionRevisionByTab.get(tabId) || 0;
+}
+function bumpActiveSessionRevision(tabId) {
+  const next = getActiveSessionRevision(tabId) + 1;
+  activeSessionRevisionByTab.set(tabId, next);
+  return next;
+}
+function invalidateJoinAuthority(tabId) {
+  return bumpActiveSessionRevision(tabId);
+}
+
+function isValidDocumentId(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+const FrameStateKind = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  NO_RECEIVER: 'NO_RECEIVER',
+  UNKNOWN: 'UNKNOWN',
+};
+
+function isNoReceiverTransportError(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  return message.includes('receiving end does not exist')
+    || message.includes('no receiving end')
+    || message.includes('no receiver');
+}
+
+function classifyFrameQueryError(error) {
+  return {
+    kind: FrameStateKind.UNKNOWN,
+    reason: isNoReceiverTransportError(error) ? 'no-receiver' : 'transient',
+  };
+}
+
+function getParticipantInfo(tabId, frameId) {
+  const participants = selectElementParticipantsByTab.get(tabId);
+  if (!participants) return null;
+  return participants.get(frameId) || null;
+}
 
 function createActivationGeneration(tabId) {
   if (!Number.isInteger(tabId)) return null;
@@ -37,7 +82,7 @@ function createActivationGeneration(tabId) {
     getCurrentGeneration(tabId) || 0,
   ) + 1;
   nextActivationGenerationByTab.set(tabId, generation);
-  const attempt = { generation, token: {}, provisionalFrameIds: new Set() };
+  const attempt = { generation, token: {}, provisionalFrameIds: new Set(), expectedDocumentIds: new Map() };
   let attempts = activationAttemptsByTab.get(tabId);
   if (!attempts) {
     attempts = new Map();
@@ -65,26 +110,53 @@ function isActivationAttemptCurrent(tabId, generation, token) {
   return attempt?.generation === generation && attempt.token === token;
 }
 
-function recordActivationAttemptFrames(tabId, generation, frameIds) {
+function recordActivationAttemptFrames(tabId, generation, frameIds, frameDocumentIds = null) {
   const attempt = activationAttemptsByTab.get(tabId)?.get(generation);
   if (!attempt || currentActivationAttemptByTab.get(tabId) !== attempt) return false;
 
-  for (const frameId of frameIds || []) {
+  const ids = frameIds || [];
+  for (const entry of ids) {
+    let frameId;
+    let documentId = null;
+    if (entry && typeof entry === 'object' && 'frameId' in entry) {
+      frameId = entry.frameId;
+      documentId = entry.documentId || null;
+    } else {
+      frameId = entry;
+      if (frameDocumentIds && frameDocumentIds instanceof Map) {
+        documentId = frameDocumentIds.get(frameId) || null;
+      }
+    }
     if (Number.isInteger(frameId) && frameId >= 0) {
       attempt.provisionalFrameIds.add(frameId);
+      if (isValidDocumentId(documentId)) {
+        attempt.expectedDocumentIds.set(frameId, documentId);
+      }
+    }
+  }
+  // If frameDocumentIds provided separately, fill missing
+  if (frameDocumentIds instanceof Map) {
+    for (const [fid, docId] of frameDocumentIds.entries()) {
+      if (attempt.provisionalFrameIds.has(fid) && isValidDocumentId(docId) && !attempt.expectedDocumentIds.has(fid)) {
+        attempt.expectedDocumentIds.set(fid, docId);
+      }
     }
   }
   return true;
 }
 
 function toInvalidatedAttempt(attempt) {
-  return {
+  const base = {
     generation: attempt.generation,
     frameIds: [...attempt.provisionalFrameIds],
   };
+  if (attempt.expectedDocumentIds && attempt.expectedDocumentIds.size > 0) {
+    base.documentIds = new Map(attempt.expectedDocumentIds);
+  }
+  return base;
 }
 
-function retainProvisionalCleanupFrame(tabId, frameId, generation) {
+function retainProvisionalCleanupFrame(tabId, frameId, generation, documentId = null) {
   if (!Number.isInteger(frameId) || frameId < 0 || !Number.isInteger(generation)) return;
   let frames = provisionalCleanupFramesByTab.get(tabId);
   if (!frames) {
@@ -93,33 +165,51 @@ function retainProvisionalCleanupFrame(tabId, frameId, generation) {
   }
   let generations = frames.get(frameId);
   if (!generations) {
-    generations = new Set();
+    generations = new Map();
     frames.set(frameId, generations);
   }
-  generations.add(generation);
+  // generations is Map<generation, documentId>
+  if (!generations.has(generation)) {
+    generations.set(generation, isValidDocumentId(documentId) ? documentId : null);
+  } else if (isValidDocumentId(documentId) && !isValidDocumentId(generations.get(generation))) {
+    generations.set(generation, documentId);
+  }
 }
 
 function retainAttemptProvisionalFrames(tabId, attempt) {
   for (const frameId of attempt.provisionalFrameIds) {
-    retainProvisionalCleanupFrame(tabId, frameId, attempt.generation);
+    const docId = attempt.expectedDocumentIds?.get(frameId) || null;
+    retainProvisionalCleanupFrame(tabId, frameId, attempt.generation, docId);
   }
 }
 
 function settleActivationAttemptFrame(tabId, generation, frameId) {
   activationAttemptsByTab.get(tabId)?.get(generation)?.provisionalFrameIds.delete(frameId);
+  activationAttemptsByTab.get(tabId)?.get(generation)?.expectedDocumentIds?.delete(frameId);
   removeProvisionalCleanupFrame(tabId, frameId, generation);
 }
 
 function getProvisionalCleanupFrames(tabId) {
-  return [...(provisionalCleanupFramesByTab.get(tabId) || [])].flatMap(([frameId, generations]) => (
-    [...generations].map(generation => ({ frameId, generation }))
-  ));
+  const frames = provisionalCleanupFramesByTab.get(tabId);
+  if (!frames) return [];
+  const out = [];
+  for (const [frameId, generations] of frames.entries()) {
+    for (const [generation, documentId] of generations.entries()) {
+      if (isValidDocumentId(documentId)) {
+        out.push({ frameId, generation, documentId });
+      } else {
+        out.push({ frameId, generation });
+      }
+    }
+  }
+  return out;
 }
 
 function removeProvisionalCleanupFrame(tabId, frameId, generation) {
   const frames = provisionalCleanupFramesByTab.get(tabId);
   const generations = frames?.get(frameId);
-  if (!generations?.delete(generation)) return false;
+  if (!generations?.has(generation)) return false;
+  generations.delete(generation);
   if (generations.size === 0) frames.delete(frameId);
   if (frames.size === 0) provisionalCleanupFramesByTab.delete(tabId);
   return true;
@@ -208,21 +298,49 @@ function clearCompatibilityFrames(tabId) {
   compatibilityFramesByTab.delete(tabId);
 }
 
+function buildDocumentAwareMessageTarget(frameId, documentId) {
+  if (isValidDocumentId(documentId)) {
+    return { frameId, documentId };
+  }
+  return { frameId };
+}
+
+function isStructurallyNonInjectableFrame(frame) {
+  const url = typeof frame?.url === 'string' ? frame.url.trim().toLowerCase() : '';
+  if (!url) return false;
+
+  return url.startsWith('javascript:')
+    || url.startsWith('chrome://')
+    || url.startsWith('chrome-extension://')
+    || url.startsWith('moz-extension://')
+    || url.startsWith('about:')
+    || url.startsWith('edge://')
+    || url.startsWith('opera://')
+    || url.startsWith('vivaldi://')
+    || url.startsWith('brave://');
+}
+
 async function compensateInvalidatedActivationAttempts(tabId, invalidatedAttempts = []) {
   if (!browser.tabs?.sendMessage) return [];
 
   const requests = new Map();
   for (const attempt of invalidatedAttempts) {
     for (const frameId of attempt.frameIds || []) {
-      requests.set(`${frameId}:${attempt.generation}`, {
-        frameId,
-        generation: attempt.generation,
-      });
+      const docId = attempt.documentIds instanceof Map ? attempt.documentIds.get(frameId) : null;
+      const key = `${frameId}:${attempt.generation}:${docId || ''}`;
+      if (!requests.has(key)) {
+        requests.set(key, {
+          frameId,
+          generation: attempt.generation,
+          documentId: isValidDocumentId(docId) ? docId : null,
+        });
+      }
     }
   }
 
-  return Promise.all([...requests.values()].map(async ({ frameId, generation }) => {
+  return Promise.all([...requests.values()].map(async ({ frameId, generation, documentId }) => {
     try {
+      const target = buildDocumentAwareMessageTarget(frameId, documentId);
       const response = await Promise.resolve().then(() => browser.tabs.sendMessage(
         tabId,
         MessageFormat.create(
@@ -237,7 +355,7 @@ async function compensateInvalidatedActivationAttempts(tabId, invalidatedAttempt
           },
           MessagingContexts.CONTENT,
         ),
-        { frameId },
+        target,
       ));
       const settled = response?.success === true
         && response?.cleanupCompleted === true
@@ -246,16 +364,17 @@ async function compensateInvalidatedActivationAttempts(tabId, invalidatedAttempt
       return {
         generation,
         frameId,
+        documentId,
         settled,
         response,
       };
     } catch (error) {
-      return { generation, frameId, settled: false, error };
+      return { generation, frameId, documentId, settled: false, error };
     }
   }));
 }
 
-function registerParticipant(tabId, frameId, generation) {
+function registerParticipant(tabId, frameId, generation, documentId = null) {
   if (
     !Number.isInteger(tabId)
     || !Number.isInteger(frameId)
@@ -275,6 +394,14 @@ function registerParticipant(tabId, frameId, generation) {
     selectElementParticipantsByTab.set(tabId, participants);
   }
 
+  // Document-aware validation: if we have expected document for this attempt/frame, require match.
+  const attempt = activationAttemptsByTab.get(tabId)?.get(generation);
+  const expectedDoc = attempt?.expectedDocumentIds?.get(frameId) || null;
+  if (isValidDocumentId(expectedDoc) && isValidDocumentId(documentId) && expectedDoc !== documentId) {
+    return false;
+  }
+  const effectiveDoc = isValidDocumentId(documentId) ? documentId : (isValidDocumentId(expectedDoc) ? expectedDoc : getParticipantInfo(tabId, frameId)?.documentId || null);
+
   if (currentGeneration === undefined || generation > currentGeneration) {
     nextActivationGenerationByTab.set(
       tabId,
@@ -285,32 +412,53 @@ function registerParticipant(tabId, frameId, generation) {
     return false;
   }
 
-  participants.set(frameId, generation);
+  participants.set(frameId, { generation, documentId: isValidDocumentId(effectiveDoc) ? effectiveDoc : null });
   removeCompatibilityFrame(tabId, frameId);
-  removeProvisionalCleanupFramesForFrame(tabId, frameId);
+  // A newer document must not erase cleanup debt belonging to an older document.
+  removeProvisionalCleanupFrame(tabId, frameId, generation);
   return true;
 }
 
-function removeParticipant(tabId, frameId, generation) {
+function removeParticipant(tabId, frameId, generation, expectedDocumentId = null) {
   const participants = selectElementParticipantsByTab.get(tabId);
   if (!participants || !participants.has(frameId)) return false;
+  const info = participants.get(frameId);
   if (
     !Number.isInteger(generation)
-    || participants.get(frameId) !== generation
+    || info.generation !== generation
   ) {
     return false;
   }
-
+  // If caller supplies documentId, require it matches stored when both present
+  if (isValidDocumentId(expectedDocumentId) && isValidDocumentId(info.documentId) && expectedDocumentId !== info.documentId) {
+    return false;
+  }
   participants.delete(frameId);
+  if (participants.size === 0) selectElementParticipantsByTab.delete(tabId);
   return true;
 }
 
 function getParticipants(tabId) {
-  return new Map(selectElementParticipantsByTab.get(tabId) || []);
+  const participants = selectElementParticipantsByTab.get(tabId);
+  if (!participants) return new Map();
+  const out = new Map();
+  for (const [frameId, info] of participants.entries()) {
+    out.set(frameId, info.generation);
+  }
+  return out;
+}
+
+function getParticipantsWithDocuments(tabId) {
+  const participants = selectElementParticipantsByTab.get(tabId);
+  if (!participants) return new Map();
+  return new Map(participants);
 }
 
 function clearParticipants(tabId) {
   selectElementParticipantsByTab.get(tabId)?.clear();
+  if (selectElementParticipantsByTab.get(tabId)?.size === 0) {
+    selectElementParticipantsByTab.delete(tabId);
+  }
 }
 
 function clearTabParticipants(tabId) {
@@ -322,12 +470,244 @@ function clearTabParticipants(tabId) {
   clearProvisionalCleanupFrames(tabId);
 }
 
-function retireFrameCleanupOwnership(tabId, frameId) {
+function retireFrameCleanupOwnership(tabId, frameId, documentId = null) {
   for (const attempt of activationAttemptsByTab.get(tabId)?.values() || []) {
     attempt.provisionalFrameIds.delete(frameId);
+    attempt.expectedDocumentIds?.delete(frameId);
   }
   removeCompatibilityFrame(tabId, frameId);
-  removeProvisionalCleanupFramesForFrame(tabId, frameId);
+  // Only clear provisional cleanup for that generation's document if documentId provided.
+  // Legacy fallback clears whole frame entry when unknown.
+  if (isValidDocumentId(documentId)) {
+    const frames = provisionalCleanupFramesByTab.get(tabId);
+    const gens = frames?.get(frameId);
+    if (gens) {
+      for (const [, doc] of [...gens.entries()]) {
+        if (isValidDocumentId(doc) && doc === documentId) {
+          // Keep other doc generations; this one corresponds to committed doc so remove stale?
+          // For provisional debt, committed doc's debt should be settled via ACK, not nav removal alone.
+          // Do not blindly remove; navigation retirement for provisional is handled via attempt invalidation.
+        }
+      }
+    }
+  } else {
+    removeProvisionalCleanupFramesForFrame(tabId, frameId);
+  }
+}
+
+function removeParticipantForNavigation(tabId, frameId, documentId) {
+  const info = getParticipantInfo(tabId, frameId);
+  if (!info) return false;
+  // P4: stale navigation must never remove newer document ownership.
+  // If stored doc is valid and event doc is valid:
+  // - stored != event => old ownership was for previous doc; removal of old doc is safe only if map still holds old doc.
+  //   But map entry for frameId currently holds either old or new doc. If it holds old, stored != event means map has old, event is new doc commit -> remove old participation is desired? But new doc hasn't been registered yet, so we should remove old.
+  //   If map holds new doc (ACK before commit), stored == event => keep.
+  // So removal when stored != event would remove old correctly, but also would keep new correctly when equal.
+  // Need to distinguish: we should remove old ownership when stored document is not the newly committed one? Actually old doc's removal is needed before new registration, but if map already has new doc, we keep.
+  // In both cases stored vs event equality tells us whether map holds new doc (equal) or old doc (not equal). So:
+  // stored == event => map already updated to new doc -> keep.
+  // stored != event => map still holds old doc -> remove stale old doc.
+  // This matches desired behavior.
+  if (isValidDocumentId(info.documentId) && isValidDocumentId(documentId)) {
+    if (info.documentId === documentId) {
+      return false;
+    }
+    // stored != event => stale old doc ownership -> remove it
+    const participants = selectElementParticipantsByTab.get(tabId);
+    participants.delete(frameId);
+    if (participants.size === 0) selectElementParticipantsByTab.delete(tabId);
+    return true;
+  }
+  // Fallback when documentIds missing: use frameId removal (old behavior) but only if event is for that frame.
+  // We keep bounded protection: still remove by frameId when no document awareness.
+  return removeParticipant(tabId, frameId, info.generation);
+}
+
+// P1: narrow read-only frame state query with explicit result kinds
+async function queryFrameSelectElementState(tabId, frameId, documentId = null) {
+  const res = await queryFrameStateWithKind(tabId, frameId, documentId);
+  if (res.kind === FrameStateKind.ACTIVE || res.kind === FrameStateKind.INACTIVE) return res.state;
+  return null;
+}
+
+async function queryFrameStateWithKind(tabId, frameId, documentId = null) {
+  if (!browser.tabs?.sendMessage || !Number.isInteger(tabId) || !Number.isInteger(frameId)) {
+    return { kind: FrameStateKind.UNKNOWN, error: new Error('invalid target') };
+  }
+  try {
+    const target = buildDocumentAwareMessageTarget(frameId, documentId);
+    const resp = await browser.tabs.sendMessage(
+      tabId,
+      MessageFormat.create(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE, {}, MessagingContexts.CONTENT),
+      target,
+    );
+    let state = null;
+    if (resp && typeof resp === 'object' && 'active' in resp) state = resp;
+    else if (resp && resp.data && typeof resp.data === 'object' && 'active' in resp.data) state = resp.data;
+    if (state && typeof state === 'object' && 'active' in state) {
+      return { kind: state.active === true ? FrameStateKind.ACTIVE : FrameStateKind.INACTIVE, state };
+    }
+    return { kind: FrameStateKind.UNKNOWN, error: new Error('malformed state response') };
+  } catch (error) {
+    return { ...classifyFrameQueryError(error), error };
+  }
+}
+
+async function isFrameDocumentLive(tabId, frameId, documentId = null) {
+  try {
+    const frames = await browser.webNavigation.getAllFrames({ tabId });
+    if (!Array.isArray(frames)) return true;
+    if (isValidDocumentId(documentId)) {
+      return frames.some(f => f?.frameId === frameId && f?.documentId === documentId);
+    }
+    return frames.some(f => f?.frameId === frameId);
+  } catch {
+    return true;
+  }
+}
+
+async function isFrameStillAliveForDebt(tabId, frameId, documentId = null) {
+  // F4: when documentId exists, liveness requires exact document match
+  return isFrameDocumentLive(tabId, frameId, documentId);
+}
+
+async function isFrameKnownTooSmall(tabId, frameId) {
+  if (!Number.isInteger(frameId) || frameId <= 0) {
+    return false;
+  }
+  if (typeof browser.scripting?.executeScript !== 'function') return false;
+
+  try {
+    const results = await browser.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      func: () => ({ width: window.innerWidth, height: window.innerHeight }),
+    });
+    const dimensions = Array.isArray(results) ? results[0]?.result : results?.result;
+    return Number.isFinite(dimensions?.width)
+      && Number.isFinite(dimensions?.height)
+      && dimensions.width > 0
+      && dimensions.height > 0
+      && (dimensions.width < 80 || dimensions.height < 80);
+  } catch {
+    return false;
+  }
+}
+
+async function isNoReceiverSafeForFrame(frame, tabId) {
+  if (isStructurallyNonInjectableFrame(frame)) return true;
+  const url = typeof frame?.url === 'string' ? frame.url.trim() : '';
+  if (url) {
+    try {
+      if (await checkUrlExclusionAsync(url)) return true;
+    } catch {
+      return false;
+    }
+  }
+  const frameId = frame?.frameId;
+  if (Number.isInteger(frameId) && frameId > 0) {
+    try {
+      if (await isFrameKnownTooSmall(tabId, frameId)) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+async function discoverAndReconcileActiveFrames(tabId) {
+  if (!browser.webNavigation?.getAllFrames) {
+    return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
+  }
+  let frames = [];
+  try {
+    frames = await browser.webNavigation.getAllFrames({ tabId });
+  } catch {
+    return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
+  }
+  if (!Array.isArray(frames)) {
+    return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
+  }
+  const results = [];
+  for (const frame of frames) {
+    const frameId = frame?.frameId;
+    const documentId = frame?.documentId || null;
+    if (!Number.isInteger(frameId) || frameId < 0) continue;
+    if (isStructurallyNonInjectableFrame(frame)) continue;
+    const res = await queryFrameStateWithKind(tabId, frameId, isValidDocumentId(documentId) ? documentId : null);
+    const kind = res.kind;
+    const state = res.state;
+    const reason = res.reason;
+    if (kind === FrameStateKind.ACTIVE) {
+      results.push({ frameId, documentId: isValidDocumentId(documentId) ? documentId : (state?.documentId || null), state });
+    } else if (kind === FrameStateKind.UNKNOWN) {
+      if (reason === 'no-receiver' && await isNoReceiverSafeForFrame(frame, tabId)) continue;
+      results.push({ frameId, documentId: isValidDocumentId(documentId) ? documentId : null, state: null, kind: FrameStateKind.UNKNOWN });
+    }
+  }
+  return {
+    status: 'known',
+    discoveredCount: results.length,
+    fullyCleaned: results.every(result => result.kind !== FrameStateKind.UNKNOWN),
+    activeFrames: results.filter(result => result.kind === FrameStateKind.ACTIVE),
+  };
+}
+
+async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
+  const capturedRevision = getActiveSessionRevision(tabId);
+  const capturedGen = getCurrentGeneration(tabId);
+  const state = getStateForTab(tabId);
+  if (!state.active || !Number.isInteger(capturedGen)) return false;
+  if (!Number.isInteger(frameId) || frameId < 0) return false;
+  // Do not re-activate if already participant for this document
+  const existing = getParticipantInfo(tabId, frameId);
+  if (existing && isValidDocumentId(documentId) && isValidDocumentId(existing.documentId) && existing.documentId === documentId) {
+    return false;
+  }
+  try {
+    const target = buildDocumentAwareMessageTarget(frameId, documentId);
+    const contentMessage = MessageFormat.create(
+      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      {
+        mode: 'select',
+        active: true,
+        activationEpoch: backgroundActivationEpoch,
+        activationGeneration: capturedGen,
+      },
+      MessagingContexts.CONTENT,
+    );
+    const resp = await browser.tabs.sendMessage(tabId, contentMessage, target);
+    // F5: strict ACK requires BOTH generation and epoch
+    const hasGen = resp && typeof resp === 'object' && 'activationGeneration' in resp;
+    const hasEpoch = resp && typeof resp === 'object' && 'activationEpoch' in resp;
+    const ok = resp?.success === true && resp?.activated === true && hasGen && hasEpoch
+      && resp.activationGeneration === capturedGen && resp.activationEpoch === backgroundActivationEpoch;
+    // F2: revalidate authority before registration
+    const currentGenNow = getCurrentGeneration(tabId);
+    const currentRevNow = getActiveSessionRevision(tabId);
+    const stillActive = getStateForTab(tabId).active === true;
+    if (currentRevNow !== capturedRevision || currentGenNow !== capturedGen || !stillActive) {
+      return false;
+    }
+    if (ok) {
+      let participants = selectElementParticipantsByTab.get(tabId);
+      if (!participants) {
+        participants = new Map();
+        selectElementParticipantsByTab.set(tabId, participants);
+      }
+      participants.set(frameId, { generation: capturedGen, documentId: isValidDocumentId(documentId) ? documentId : null });
+      return true;
+    }
+    // F5: generation/epoch incomplete ACK -> compatibility only
+    if (resp === true || (resp?.success === true && resp?.activated === true && (!hasGen || !hasEpoch))) {
+      // Only retain compatibility if generation matches current or is at least provided; use capturedGen for ownership
+      retainCompatibilityFrames(tabId, capturedGen, [frameId]);
+      return false;
+    }
+  } catch {
+    // transient failure: do not register
+  }
+  return false;
 }
 
 function setStateForTab(tabId, active) {
@@ -337,6 +717,8 @@ function setStateForTab(tabId, active) {
   if (currentState?.active === canonicalActive) return;
 
   selectElementStateByTab.set(tabId, { active: canonicalActive, updatedAt: Date.now() });
+  // F2: bump join authority revision on every active state transition
+  bumpActiveSessionRevision(tabId);
 
   // Notify all parts of the extension about the state change
   (async () => {
@@ -387,25 +769,63 @@ try {
     }
 
     if (browser.webNavigation?.onCommitted) {
-      browser.webNavigation.onCommitted.addListener(({ tabId, frameId }) => {
+      browser.webNavigation.onCommitted.addListener(({ tabId, frameId, documentId }) => {
         if (!Number.isInteger(tabId) || !Number.isInteger(frameId)) return;
 
-        retireFrameCleanupOwnership(tabId, frameId);
-        const invalidatedAttempts = invalidateActivationAttempts(tabId);
-        if (frameId === 0) {
-          clearCompatibilityFrames(tabId);
-          clearProvisionalCleanupFrames(tabId);
+        const isTop = frameId === 0;
+        // P4: document-aware retirement
+        if (isValidDocumentId(documentId)) {
+          // Invalidate attempts for this tab (navigation breaks pending dispatch)
+          const invalidatedAttempts = invalidateActivationAttempts(tabId);
+          if (!isTop) {
+            void compensateInvalidatedActivationAttempts(tabId, invalidatedAttempts);
+          } else {
+            // top navigation retires provisional debt without broadcast
+          }
+          retireFrameCleanupOwnership(tabId, frameId, documentId);
+          if (isTop) {
+            clearCompatibilityFrames(tabId);
+            clearProvisionalCleanupFrames(tabId);
+            // Clear participants whose document is not the newly committed top document.
+            // If top document changed, old top participant should be retired.
+            const topInfo = getParticipantInfo(tabId, 0);
+            if (topInfo && isValidDocumentId(topInfo.documentId) && topInfo.documentId !== documentId) {
+              removeParticipant(tabId, 0, topInfo.generation, topInfo.documentId);
+            } else if (topInfo && !isValidDocumentId(topInfo.documentId)) {
+              // Fallback: clear all when no doc awareness
+              clearParticipants(tabId);
+            } else if (!topInfo) {
+              clearParticipants(tabId);
+            }
+            // Also clear any child participants bound to previous top document lifecycle? Keep child entries but they will be re-evaluated.
+            // For strict top nav, clear all participants.
+            if (getParticipants(tabId).size !== 0 && !getParticipantInfo(tabId, 0)) {
+              // If top had no participant but children did, top nav still invalidates children
+              selectElementParticipantsByTab.delete(tabId);
+            }
+          } else {
+            const didRemove = removeParticipantForNavigation(tabId, frameId, documentId);
+            // If navigation was for a document that was old and we removed stale participant, we're done.
+            // If map still holds new doc equality, keep.
+            void didRemove;
+          }
         } else {
-          void compensateInvalidatedActivationAttempts(tabId, invalidatedAttempts);
-        }
-        // onCommitted has no activation generation. Event ordering assumes
-        // retirement is observed before replacement-frame activation ACK.
-        if (frameId === 0) {
-          clearParticipants(tabId);
-        } else {
-          const participantGeneration = getParticipants(tabId).get(frameId);
-          if (participantGeneration !== undefined) {
-            removeParticipant(tabId, frameId, participantGeneration);
+          // Fallback when documentId unavailable
+          retireFrameCleanupOwnership(tabId, frameId);
+          const invalidatedAttempts = invalidateActivationAttempts(tabId);
+          if (isTop) {
+            clearCompatibilityFrames(tabId);
+            clearProvisionalCleanupFrames(tabId);
+          } else {
+            void compensateInvalidatedActivationAttempts(tabId, invalidatedAttempts);
+          }
+          if (isTop) {
+            clearParticipants(tabId);
+          } else {
+            const participantGeneration = getParticipants(tabId).get(frameId);
+            if (participantGeneration !== undefined) {
+              removeParticipant(tabId, frameId, participantGeneration);
+            }
           }
         }
 
@@ -446,5 +866,21 @@ export {
   registerParticipant,
   removeParticipant,
   getParticipants,
+  getParticipantsWithDocuments,
+  getParticipantInfo,
   clearParticipants,
+  clearTabParticipants,
+  queryFrameSelectElementState,
+  queryFrameStateWithKind,
+  FrameStateKind,
+  isFrameDocumentLive,
+  isFrameStillAliveForDebt,
+  isStructurallyNonInjectableFrame,
+  isNoReceiverSafeForFrame,
+  isFrameKnownTooSmall,
+  getActiveSessionRevision,
+  invalidateJoinAuthority,
+  discoverAndReconcileActiveFrames,
+  reconcileNewFrameIfActive,
+  isValidDocumentId,
 };

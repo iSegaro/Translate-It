@@ -106,29 +106,40 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     handler.setPageTranslationManager(null);
   });
 
-  it('sanitizes direct iframe activation failures', async () => {
-    const technicalMessage = 'chrome.runtime.lastError: Receiving end does not exist INTERNAL_PORT_9f81';
-    handler.setSelectElementManager({
-      isInitialized: true,
-      activateSelectElementMode: vi.fn().mockRejectedValue(new Error(technicalMessage)),
-    });
-
-    const response = await handler.handleIFrameActivateSelectElement();
-
-    expect(response).toMatchObject({
-      success: false,
-      message: 'Could not activate Select Element mode.',
-      error: 'Could not activate Select Element mode.',
-      errorType: ErrorTypes.SELECT_ELEMENT,
-    });
-    expect(JSON.stringify(response)).not.toContain('INTERNAL_PORT_9f81');
-    expect(JSON.stringify(response)).not.toContain('Receiving end does not exist');
+  it('does not expose legacy iframe Select Element activation route', async () => {
+    expect(typeof handler.handleIFrameActivateSelectElement).toBe('undefined');
+    expect(handler.handlers.has(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT)).toBe(false);
   });
 
-  it('sanitizes coordinate activation failures through the same boundary', async () => {
+  it('does not announce iframe readiness during local initialization', () => {
+    handler.initialize();
+
+    expect(handler.handlers.has(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE)).toBe(true);
+    expect(handler.handlers.has(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE)).toBe(true);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('registers Select Element receivers before activation resolves', async () => {
+    const registrations = new Map();
+    window.translateItContentCore = {
+      messageHandler: {
+        isListenerActive: true,
+        registerHandler: vi.fn((action, callback) => registrations.set(action, callback)),
+      },
+    };
+
+    await expect(handler.activate()).resolves.toBe(true);
+
+    expect(registrations.has(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE)).toBe(true);
+    expect(registrations.has(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE)).toBe(true);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    delete window.translateItContentCore;
+  });
+
+  it('rejects coordinate Select Element operation via legacy iframe route', async () => {
     handler.setSelectElementManager({
       isInitialized: true,
-      activateSelectElementMode: vi.fn().mockRejectedValue(new Error('internal coordinate failure')),
+      activateSelectElementMode: vi.fn().mockResolvedValue({ isActive: true }),
     });
 
     const response = await handler.handleIFrameCoordinateOperation({
@@ -137,12 +148,11 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
 
     expect(response).toMatchObject({
       success: false,
-      error: 'Could not activate Select Element mode.',
-      errorType: ErrorTypes.SELECT_ELEMENT,
     });
+    expect(response.error).toMatch(/Unsupported/);
   });
 
-  it('preserves successful iframe activation response fields', async () => {
+  it('keeps iframe frame-info route available', async () => {
     handler.setSelectElementManager({
       isInitialized: true,
       activateSelectElementMode: vi.fn().mockResolvedValue({
@@ -151,11 +161,11 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       }),
     });
 
-    await expect(handler.handleIFrameActivateSelectElement()).resolves.toEqual({
-      success: true,
-      activated: true,
-      managerId: 'manager-1',
-    });
+    // Frame info handler should still exist and be registered
+    expect(typeof handler.handleIFrameGetFrameInfo).toBe('function');
+    expect(handler.handlers.has(MessageActions.IFRAME_GET_FRAME_INFO)).toBe(false);
+    // After initialize, it would be registered; but fresh handler without initialize has empty handlers map.
+    // Ensure class method exists.
   });
 
   it('stores accepted activation generation only after successful activation', async () => {

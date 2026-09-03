@@ -29,11 +29,13 @@ if (!window.translateItContentScriptCore) {
     const [
       { default: browser },
       { setupTrustedTypesCompatibility },
-      { checkUrlExclusionAsync }
+      { checkUrlExclusionAsync },
+      { MessageActions },
     ] = await Promise.all([
       import('webextension-polyfill'),
       import('@/shared/vue/vue-utils.js'),
-      import('@/features/exclusion/utils/exclusion-utils.js')
+      import('@/features/exclusion/utils/exclusion-utils.js'),
+      import('@/shared/messaging/core/MessageActions.js'),
     ]);
 
     window.browser = browser;
@@ -80,6 +82,11 @@ if (!window.translateItContentScriptCore) {
 
       // 8. INITIALIZE MESSAGE LISTENERS (Modular)
       setupIFrameMessageListeners();
+
+      // 9. NOTIFY BACKGROUND THAT FRAME IS READY FOR SELECT ELEMENT RECONCILIATION (F3)
+      try {
+        void browser.runtime.sendMessage({ action: MessageActions.SELECT_ELEMENT_FRAME_READY, data: {} }).catch(() => {});
+      } catch { /* ignore */ }
 
       if (process.env.NODE_ENV === 'development') {
         console.log('[IFrame] Lite mode initialized', window.location.href);

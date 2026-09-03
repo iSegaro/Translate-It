@@ -441,7 +441,7 @@ describe('selectElementStateManager', () => {
       expect(getProvisionalCleanupFrames(tabId)).toEqual([]);
     });
 
-    it('replaces stale provisional cleanup with newer strict authority', () => {
+    it('retains older document cleanup debt beside newer strict authority', () => {
       const tabId = 122;
       const generationOne = createActivationGeneration(tabId);
       const tokenOne = getActivationAttemptToken(tabId);
@@ -452,7 +452,7 @@ describe('selectElementStateManager', () => {
       expect(registerParticipant(tabId, 3, generationTwo)).toBe(true);
 
       expect(getParticipants(tabId)).toEqual(new Map([[3, generationTwo]]));
-      expect(getProvisionalCleanupFrames(tabId)).toEqual([]);
+      expect(getProvisionalCleanupFrames(tabId)).toEqual([{ frameId: 3, generation: generationOne }]);
     });
 
     it('retires persisted provisional cleanup on frame navigation and tab removal', () => {

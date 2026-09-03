@@ -113,6 +113,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
     handleDeactivateSelectElementMode.mockResolvedValue({ success: true, tabId: 1, active: false });
   });
@@ -214,7 +215,7 @@ describe('handleActivateSelectElementMode', () => {
       if (frameId === 3) {
         return Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
       }
-      return Promise.resolve({ success: true, activated: true, activationGeneration: 1 });
+      return Promise.resolve({ success: true, activated: true, activationGeneration: 1, activationEpoch: 'epoch-1' });
     });
 
     const response = await handleActivateSelectElementMode({ data: { tabId: 1, active: true } }, {});
@@ -281,6 +282,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
 
     const response = await handleActivateSelectElementMode(
@@ -300,7 +302,7 @@ describe('handleActivateSelectElementMode', () => {
     browser.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0 }, { frameId: 3 }]);
     browser.tabs.sendMessage.mockImplementation((_tabId, _message, { frameId }) => {
       if (frameId === 0) {
-        return Promise.resolve({ success: true, activated: true, activationGeneration: 1 });
+        return Promise.resolve({ success: true, activated: true, activationGeneration: 1, activationEpoch: 'epoch-1' });
       }
       return new Promise(resolve => {
         resolveFrameThree = resolve;
@@ -336,6 +338,7 @@ describe('handleActivateSelectElementMode', () => {
         success: true,
         activated: true,
         activationGeneration: 2,
+        activationEpoch: 'epoch-1',
       });
     });
     isActivationAttemptCurrent.mockImplementation((_tabId, generation) => (
@@ -359,6 +362,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
 
     const [firstResponse, secondResponse] = await Promise.all([firstActivation, secondActivation]);
@@ -472,6 +476,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
 
     const response = await handleActivateSelectElementMode(
@@ -495,7 +500,7 @@ describe('handleActivateSelectElementMode', () => {
       { frameId: 4 },
     ]);
     browser.tabs.sendMessage
-      .mockResolvedValueOnce({ success: true, activated: true, activationGeneration: 1 })
+      .mockResolvedValueOnce({ success: true, activated: true, activationGeneration: 1, activationEpoch: 'epoch-1' })
       .mockResolvedValueOnce({ success: false, error: 'Frame unavailable' });
 
     const response = await handleActivateSelectElementMode(

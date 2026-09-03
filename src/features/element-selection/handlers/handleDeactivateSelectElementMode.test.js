@@ -41,6 +41,27 @@ const registry = vi.hoisted(() => {
       }),
     removeParticipant,
     setStateForTab: vi.fn(),
+    invalidateJoinAuthority: vi.fn(),
+    isFrameDocumentLive: vi.fn(async (tabId, frameId, documentId) => {
+      const frames = await browser.webNavigation.getAllFrames({ tabId });
+      if (!Array.isArray(frames)) return true;
+      if (typeof documentId === 'string' && documentId.trim()) {
+        return frames.some(f => f?.frameId === frameId && f?.documentId === documentId);
+      }
+      return frames.some(f => f?.frameId === frameId);
+    }),
+    isStructurallyNonInjectableFrame: vi.fn(() => false),
+    queryFrameStateWithKind: vi.fn(async () => {
+      return { kind: 'UNKNOWN', state: null };
+    }),
+    getParticipantsWithDocuments: vi.fn(tabId => {
+      const auth = authorities.get(tabId);
+      if (!auth) return new Map();
+      return new Map([...auth.participants.entries()].map(([fid, gen]) => [fid, { generation: gen, documentId: null }]));
+    }),
+    isValidDocumentId: vi.fn(v => typeof v === 'string' && v.trim().length > 0),
+    getStateForTab: vi.fn(() => ({ active: false })),
+    FrameStateKind: { ACTIVE: 'ACTIVE', INACTIVE: 'INACTIVE', NO_RECEIVER: 'NO_RECEIVER', UNKNOWN: 'UNKNOWN' },
   };
 });
 
@@ -63,11 +84,19 @@ vi.mock('./selectElementStateManager.js', () => ({
   getProvisionalCleanupFrames: registry.getProvisionalCleanupFrames,
   setStateForTab: registry.setStateForTab,
   getParticipants: registry.getParticipants,
+  getParticipantsWithDocuments: registry.getParticipantsWithDocuments,
   getCurrentGeneration: registry.getCurrentGeneration,
   invalidateActivationAttempts: registry.invalidateActivationAttempts,
   removeCompatibilityFrame: registry.removeCompatibilityFrame,
   removeProvisionalCleanupFrame: registry.removeProvisionalCleanupFrame,
   removeParticipant: registry.removeParticipant,
+  isValidDocumentId: registry.isValidDocumentId,
+  getStateForTab: registry.getStateForTab,
+  isFrameDocumentLive: registry.isFrameDocumentLive,
+  isStructurallyNonInjectableFrame: registry.isStructurallyNonInjectableFrame,
+  queryFrameStateWithKind: registry.queryFrameStateWithKind,
+  FrameStateKind: registry.FrameStateKind,
+  invalidateJoinAuthority: registry.invalidateJoinAuthority,
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -331,7 +360,7 @@ describe('handleDeactivateSelectElementMode', () => {
     expect(response.success).toBe(true);
     expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
       128,
-      expect.objectContaining({ data: expect.not.objectContaining({ activationGeneration: expect.anything() }) }),
+      expect.objectContaining({ data: expect.objectContaining({ activationGeneration: 1 }) }),
       { frameId: 0 },
     );
     expect(registry.removeCompatibilityFrame).toHaveBeenCalledWith(128, 0);
