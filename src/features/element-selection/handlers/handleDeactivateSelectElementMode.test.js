@@ -61,6 +61,7 @@ const registry = vi.hoisted(() => {
     }),
     isValidDocumentId: vi.fn(v => typeof v === 'string' && v.trim().length > 0),
     getStateForTab: vi.fn(() => ({ active: false })),
+    invalidateRetainedSessionRecovery: vi.fn(),
     FrameStateKind: { ACTIVE: 'ACTIVE', INACTIVE: 'INACTIVE', NO_RECEIVER: 'NO_RECEIVER', UNKNOWN: 'UNKNOWN' },
   };
 });
@@ -97,6 +98,7 @@ vi.mock('./selectElementStateManager.js', () => ({
   queryFrameStateWithKind: registry.queryFrameStateWithKind,
   FrameStateKind: registry.FrameStateKind,
   invalidateJoinAuthority: registry.invalidateJoinAuthority,
+  invalidateRetainedSessionRecovery: registry.invalidateRetainedSessionRecovery,
   markDeactivationPending: vi.fn(),
   clearDeactivationPending: vi.fn(),
   isDeactivationPending: vi.fn(() => false),
@@ -174,6 +176,20 @@ describe('handleDeactivateSelectElementMode', () => {
       expect.anything(),
       { frameId: 3 },
     );
+  });
+
+  it('invalidates retained recovery before asynchronous cleanup begins', async () => {
+    registry.authorities.set(124, {
+      generation: 1,
+      participants: new Map([[0, 1]]),
+    });
+
+    const response = await handleDeactivateSelectElementMode({ data: { tabId: 124 } }, {});
+
+    expect(response.success).toBe(true);
+    expect(registry.invalidateRetainedSessionRecovery).toHaveBeenCalledWith(124);
+    expect(registry.invalidateRetainedSessionRecovery.mock.invocationCallOrder[0])
+      .toBeLessThan(registry.invalidateActivationAttempts.mock.invocationCallOrder[0]);
   });
 
   it('should not publish inactive state when a participant remains unresolved', async () => {

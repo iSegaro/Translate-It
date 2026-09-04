@@ -28,7 +28,47 @@ const currentActivationAttemptByTab = new Map();
 const compatibilityFramesByTab = new Map();
 // Sent activation requests without conclusive settlement remain cleanup debt.
 const provisionalCleanupFramesByTab = new Map(); // tabId -> Map<frameId, Map<generation, documentId>>
+let nextRetainedRecoveryToken = 1;
+const retainedSessionRecoveryByTab = new Map(); // tabId -> { token, promise }
 const RECONCILE_LIVENESS_TIMEOUT_MS = 350;
+const RETAINED_SESSION_DISCOVERY_TIMEOUT_MS = 150;
+
+function beginRetainedSessionRecovery(tabId) {
+  if (!Number.isInteger(tabId)) return null;
+  if (retainedSessionRecoveryByTab.has(tabId)) return null;
+  const token = nextRetainedRecoveryToken++;
+  retainedSessionRecoveryByTab.set(tabId, { token, promise: null });
+  return token;
+}
+
+function getRetainedSessionRecoveryRecord(tabId) {
+  return retainedSessionRecoveryByTab.get(tabId) || null;
+}
+
+function isRetainedSessionRecoveryCurrent(tabId, token) {
+  return retainedSessionRecoveryByTab.get(tabId)?.token === token;
+}
+
+function setRetainedSessionRecoveryPromise(tabId, token, promise) {
+  const rec = retainedSessionRecoveryByTab.get(tabId);
+  if (!rec || rec.token !== token) return false;
+  rec.promise = promise;
+  return true;
+}
+
+function invalidateRetainedSessionRecovery(tabId) {
+  if (!Number.isInteger(tabId)) return false;
+  return retainedSessionRecoveryByTab.delete(tabId);
+}
+
+function clearRetainedSessionRecovery(tabId, token) {
+  if (!Number.isInteger(tabId)) return false;
+  const rec = retainedSessionRecoveryByTab.get(tabId);
+  if (!rec) return false;
+  if (rec.token !== token) return false;
+  retainedSessionRecoveryByTab.delete(tabId);
+  return true;
+}
 // Join authority revision: bumped on activation and before deactivation to prevent late join resurrection
 const activeSessionRevisionByTab = new Map();
 function getActiveSessionRevision(tabId) {
@@ -507,6 +547,7 @@ function clearTabParticipants(tabId) {
   currentGenerationByTab.delete(tabId);
   nextActivationGenerationByTab.delete(tabId);
   invalidateActivationAttempts(tabId);
+  invalidateRetainedSessionRecovery(tabId);
   clearCompatibilityFrames(tabId);
   clearProvisionalCleanupFrames(tabId);
   clearDeactivationPending(tabId);
@@ -661,13 +702,32 @@ async function isNoReceiverSafeForFrame(frame, tabId) {
   return false;
 }
 
-async function discoverAndReconcileActiveFrames(tabId) {
+async function discoverAndReconcileActiveFrames(tabId, { deadlineAt = null } = {}) {
+  const remainingTime = () => (
+    Number.isFinite(deadlineAt) ? deadlineAt - Date.now() : null
+  );
+  const awaitWithinDeadline = async promise => {
+    const remaining = remainingTime();
+    if (remaining !== null && remaining <= 0) throw new Error('retained session discovery timeout');
+    let timeoutId;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          if (remaining === null) return;
+          timeoutId = setTimeout(() => reject(new Error('retained session discovery timeout')), remaining);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
   if (!browser.webNavigation?.getAllFrames) {
     return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
   }
   let frames = [];
   try {
-    frames = await browser.webNavigation.getAllFrames({ tabId });
+    frames = await awaitWithinDeadline(browser.webNavigation.getAllFrames({ tabId }));
   } catch {
     return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
   }
@@ -680,19 +740,32 @@ async function discoverAndReconcileActiveFrames(tabId) {
     const documentId = frame?.documentId || null;
     if (!Number.isInteger(frameId) || frameId < 0) continue;
     if (isStructurallyNonInjectableFrame(frame)) continue;
-    const res = await queryFrameStateWithKind(tabId, frameId, isValidDocumentId(documentId) ? documentId : null);
+    let res;
+    try {
+      res = await awaitWithinDeadline(queryFrameStateWithKind(tabId, frameId, isValidDocumentId(documentId) ? documentId : null));
+    } catch {
+      return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
+    }
     const kind = res.kind;
     const state = res.state;
     const reason = res.reason;
     if (kind === FrameStateKind.ACTIVE) {
       results.push({ frameId, documentId: isValidDocumentId(documentId) ? documentId : (state?.documentId || null), state });
     } else if (kind === FrameStateKind.UNKNOWN) {
-      if (reason === 'no-receiver' && await isNoReceiverSafeForFrame(frame, tabId)) continue;
+      let safeNoReceiver = false;
+      if (reason === 'no-receiver') {
+        try {
+          safeNoReceiver = await awaitWithinDeadline(isNoReceiverSafeForFrame(frame, tabId));
+        } catch {
+          return { status: 'unknown', discoveredCount: 0, fullyCleaned: false, activeFrames: [] };
+        }
+      }
+      if (safeNoReceiver) continue;
       results.push({ frameId, documentId: isValidDocumentId(documentId) ? documentId : null, state: null, kind: FrameStateKind.UNKNOWN });
     }
   }
   return {
-    status: 'known',
+    status: results.some(result => result.kind === FrameStateKind.UNKNOWN) ? 'unknown' : 'known',
     discoveredCount: results.length,
     fullyCleaned: results.every(result => result.kind !== FrameStateKind.UNKNOWN),
     activeFrames: results.filter(result => result.kind === FrameStateKind.ACTIVE),
@@ -941,6 +1014,7 @@ function getStateForTab(tabId) {
 function clearStateForTab(tabId) {
   if (!tabId) return;
   selectElementStateByTab.delete(tabId);
+  invalidateRetainedSessionRecovery(tabId);
   clearDeactivationPending(tabId);
 }
 
@@ -954,6 +1028,7 @@ try {
       browser.tabs.onRemoved.addListener((tabId) => {
         clearStateForTab(tabId);
         clearTabParticipants(tabId);
+        invalidateRetainedSessionRecovery(tabId);
         if (_lastActiveTabId === tabId) _lastActiveTabId = null;
       });
     }
@@ -970,6 +1045,7 @@ try {
         if (!Number.isInteger(tabId) || !Number.isInteger(frameId)) return;
 
         const isTop = frameId === 0;
+        if (isTop) invalidateRetainedSessionRecovery(tabId);
         // P4: document-aware retirement
         if (isValidDocumentId(documentId)) {
           // Invalidate attempts for this tab (navigation breaks pending dispatch)
@@ -1047,6 +1123,7 @@ export {
   clearStateForTab,
   reconcileStaleOwnershipForRead,
   RECONCILE_LIVENESS_TIMEOUT_MS,
+  RETAINED_SESSION_DISCOVERY_TIMEOUT_MS,
   getOwnershipRevision,
   createActivationGeneration,
   getCurrentGeneration,
@@ -1089,4 +1166,10 @@ export {
   markDeactivationPending,
   isDeactivationPending,
   clearDeactivationPending,
+  beginRetainedSessionRecovery,
+  getRetainedSessionRecoveryRecord,
+  isRetainedSessionRecoveryCurrent,
+  setRetainedSessionRecoveryPromise,
+  invalidateRetainedSessionRecovery,
+  clearRetainedSessionRecovery,
 };

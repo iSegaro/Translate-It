@@ -55,9 +55,11 @@ import {
   clearStateForTab,
   getActiveSessionRevision,
   RECONCILE_LIVENESS_TIMEOUT_MS,
+  RETAINED_SESSION_DISCOVERY_TIMEOUT_MS,
   getOwnershipRevision,
   removeCompatibilityFrame,
   removeParticipant,
+  discoverAndReconcileActiveFrames,
 } from './selectElementStateManager.js';
 
 const TAB = 9001;
@@ -297,12 +299,20 @@ describe('handleGetSelectElementState liveness reconciliation', () => {
     expect(res.active).toBe(false);
   });
 
-  it('does not reconcile when active false', async () => {
-    setStateForTab(TAB, false);
-    browser.webNavigation.getAllFrames.mockClear();
-    const res = await handleGetSelectElementState({ data: { tabId: TAB } }, {});
-    expect(res.active).toBe(false);
-    expect(browser.webNavigation.getAllFrames).not.toHaveBeenCalled();
+  it('R8 retained-content discovery deadline returns unknown without late mutation', async () => {
+    vi.useFakeTimers();
+    try {
+      browser.webNavigation.getAllFrames.mockReturnValue(new Promise(() => {}));
+      const pending = discoverAndReconcileActiveFrames(TAB, { deadlineAt: Date.now() + RETAINED_SESSION_DISCOVERY_TIMEOUT_MS });
+      await vi.advanceTimersByTimeAsync(RETAINED_SESSION_DISCOVERY_TIMEOUT_MS + 1);
+
+      await expect(pending).resolves.toMatchObject({ status: 'unknown', activeFrames: [] });
+      expect(getStateForTab(TAB).active).toBe(false);
+      expect(getParticipants(TAB).size).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('handles missing documentId conservatively', async () => {

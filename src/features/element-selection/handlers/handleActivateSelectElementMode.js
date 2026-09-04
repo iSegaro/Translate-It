@@ -14,9 +14,14 @@ import {
   createActivationGeneration,
   getActivationEpoch,
   getActivationAttemptToken,
+  getActiveSessionRevision,
+  getCurrentGeneration,
+  getStateForTab,
   invalidateOlderActivationAttempts,
+  invalidateRetainedSessionRecovery,
   isActivationAttemptCurrent,
   isDeactivationPending,
+  isRetainedSessionRecoveryCurrent,
   recordActivationAttemptFrames,
   retainCompatibilityFrames,
   registerParticipant,
@@ -44,9 +49,29 @@ function isProvenNoSelectElementReceiver(error) {
  * This activates element selection mode in each reachable frame of a specific tab.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
+ * @param {Object} internalOptions - Optional in-memory recovery ownership checks; never sent to content.
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleActivateSelectElementMode(message, sender) {
+export async function handleActivateSelectElementMode(message, sender, internalOptions = {}) {
+  const recoveryToken = Number.isInteger(internalOptions?.recoveryToken) ? internalOptions.recoveryToken : null;
+  const expectedRevision = internalOptions?.expectedRevision;
+  const expectedGeneration = internalOptions?.expectedGeneration;
+  const isRecoveryActivation = recoveryToken !== null;
+
+  const isRecoveryValidForTab = (tabId, ownActivationAttemptToken = null) => {
+    if (!isRecoveryActivation) return true;
+    if (!isRetainedSessionRecoveryCurrent(tabId, recoveryToken)) return false;
+    if (getStateForTab(tabId).active !== false) return false;
+    if (Number.isInteger(expectedRevision) && getActiveSessionRevision(tabId) !== expectedRevision) return false;
+    if (ownActivationAttemptToken === null
+      && expectedGeneration !== undefined
+      && getCurrentGeneration(tabId) !== expectedGeneration) return false;
+    const currentAttemptToken = getActivationAttemptToken(tabId);
+    if (currentAttemptToken != null && currentAttemptToken !== ownActivationAttemptToken) return false;
+    if (isDeactivationPending(tabId)) return false;
+    return true;
+  };
+
   logger.debug('Starting activation handler:', {
     messageData: message.data,
     senderTab: sender?.tab?.id,
@@ -109,9 +134,28 @@ export async function handleActivateSelectElementMode(message, sender) {
       };
     }
 
+    if (!isRecoveryActivation) {
+      invalidateRetainedSessionRecovery(targetTabId);
+    } else if (!isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
+
     // Check tab permissions before proceeding
     logger.debug('Checking tab access for:', targetTabId);
     const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    if (isRecoveryActivation && !isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
     logger.debug('Tab access result:', access);
     if (!access.isAccessible) {
       logger.debug(`Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
@@ -138,6 +182,15 @@ export async function handleActivateSelectElementMode(message, sender) {
       }
     }
 
+    if (isRecoveryActivation && !isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
+
     const action = MessageActions.ACTIVATE_SELECT_ELEMENT_MODE;
     
     logger.debug(`Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
@@ -146,6 +199,14 @@ export async function handleActivateSelectElementMode(message, sender) {
       ? { ...message.data }
       : {};
     delete contentData.activate;
+    if (isRecoveryActivation && !isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
     const activationEpoch = getActivationEpoch();
     const activationGeneration = createActivationGeneration(targetTabId);
     const activationAttemptToken = getActivationAttemptToken(targetTabId);
@@ -153,7 +214,8 @@ export async function handleActivateSelectElementMode(message, sender) {
     try {
       const supersededAttempts = invalidateOlderActivationAttempts(targetTabId, activationGeneration);
       await compensateInvalidatedActivationAttempts(targetTabId, supersededAttempts);
-      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
+      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)
+        || (isRecoveryActivation && !isRecoveryValidForTab(targetTabId, activationAttemptToken))) {
         return {
           success: false,
           message: 'Select Element activation was superseded',
@@ -188,7 +250,8 @@ export async function handleActivateSelectElementMode(message, sender) {
       }
       if (!frameDetails.has(0)) frameDetails.set(0, null);
       const frameIds = [...frameDetails.keys()];
-      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
+      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)
+        || (isRecoveryActivation && !isRecoveryValidForTab(targetTabId, activationAttemptToken))) {
         return {
           success: false,
           message: 'Select Element activation was superseded',
@@ -268,7 +331,8 @@ export async function handleActivateSelectElementMode(message, sender) {
       }
 
       if (strictResults.length > 0) {
-        if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
+        if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)
+          || (isRecoveryActivation && !isRecoveryValidForTab(targetTabId, activationAttemptToken))) {
           return {
             success: false,
             message: 'Select Element activation was superseded',

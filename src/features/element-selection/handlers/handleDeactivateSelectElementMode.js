@@ -6,6 +6,7 @@ import {
   getParticipantsWithDocuments,
   getProvisionalCleanupFrames,
   invalidateActivationAttempts,
+  invalidateRetainedSessionRecovery,
   removeCompatibilityFrame,
   removeProvisionalCleanupFrame,
   removeParticipant,
@@ -43,6 +44,8 @@ export async function handleDeactivateSelectElementMode(message, sender) {
   if (!tabId) {
     return { success: false, error: 'No tabId available' };
   }
+
+  invalidateRetainedSessionRecovery(tabId);
 
   try {
     markDeactivationPending(tabId);

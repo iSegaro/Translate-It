@@ -41,6 +41,12 @@ import {
   getActivationEpoch,
   getActivationAttemptToken,
   getCurrentGeneration,
+  beginRetainedSessionRecovery,
+  getRetainedSessionRecoveryRecord,
+  isRetainedSessionRecoveryCurrent,
+  setRetainedSessionRecoveryPromise,
+  clearRetainedSessionRecovery,
+  invalidateRetainedSessionRecovery,
   invalidateActivationAttempts,
   invalidateOlderActivationAttempts,
   compensateInvalidatedActivationAttempts,
@@ -67,9 +73,42 @@ describe('selectElementStateManager', () => {
       expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalled();
     });
 
-    it('exposes one opaque epoch for this background module lifetime', () => {
+  it('exposes one opaque epoch for this background module lifetime', () => {
       expect(getActivationEpoch()).toEqual(expect.any(String));
       expect(getActivationEpoch()).toBe(getActivationEpoch());
+    });
+
+    it('invalidates retained recovery by identity across lifecycle changes', () => {
+      const tabId = 117;
+      const token = beginRetainedSessionRecovery(tabId);
+      const promise = Promise.resolve();
+
+      expect(token).toEqual(expect.any(Number));
+      expect(setRetainedSessionRecoveryPromise(tabId, token, promise)).toBe(true);
+      expect(getRetainedSessionRecoveryRecord(tabId)).toEqual({ token, promise });
+      expect(isRetainedSessionRecoveryCurrent(tabId, token)).toBe(true);
+
+      invalidateRetainedSessionRecovery(tabId);
+      expect(isRetainedSessionRecoveryCurrent(tabId, token)).toBe(false);
+      expect(clearRetainedSessionRecovery(tabId, token)).toBe(false);
+
+      const replacementToken = beginRetainedSessionRecovery(tabId);
+      expect(replacementToken).toBeGreaterThan(token);
+      expect(clearRetainedSessionRecovery(tabId, token)).toBe(false);
+      expect(isRetainedSessionRecoveryCurrent(tabId, replacementToken)).toBe(true);
+    });
+
+    it('invalidates retained recovery on top navigation and tab removal', () => {
+      const navigationTabId = 118;
+      const removalTabId = 119;
+      const navigationToken = beginRetainedSessionRecovery(navigationTabId);
+      const removalToken = beginRetainedSessionRecovery(removalTabId);
+
+      onCommittedListener({ tabId: navigationTabId, frameId: 0, documentId: 'new-document' });
+      onRemovedListener(removalTabId);
+
+      expect(isRetainedSessionRecoveryCurrent(navigationTabId, navigationToken)).toBe(false);
+      expect(isRetainedSessionRecoveryCurrent(removalTabId, removalToken)).toBe(false);
     });
 
   describe('Core Functionality', () => {
