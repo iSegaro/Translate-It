@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   initializeSettings: vi.fn(),
   warmupSettings: vi.fn(),
-  initializeDebugMode: vi.fn()
+  initializeDebugMode: vi.fn(),
+  featureInit: vi.fn().mockResolvedValue(undefined),
+  onPolicyChanged: vi.fn(() => () => {}),
+  checkExclusion: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('./BaseContentScriptCore.js', () => ({
@@ -26,6 +29,21 @@ vi.mock('@/shared/logging/DebugModeBridge.js', () => ({
   }
 }))
 
+vi.mock('@/core/managers/content/FeatureManager.js', () => ({
+  FeatureManager: {
+    getInstance: () => ({
+      get initialized() { return true; },
+      initialize: mocks.featureInit,
+      onPolicyChanged: mocks.onPolicyChanged,
+      requestedFeatures: new Set(),
+    }),
+  },
+}))
+
+vi.mock('@/features/exclusion/utils/exclusion-utils.js', () => ({
+  checkUrlExclusionAsync: mocks.checkExclusion,
+}))
+
 import { ContentScriptCore } from './ContentScriptCore.js'
 import { IFrameContentScriptCore } from './IFrameContentScriptCore.js'
 
@@ -34,6 +52,9 @@ describe('content core settings readiness', () => {
     vi.clearAllMocks()
     mocks.warmupSettings.mockResolvedValue(undefined)
     mocks.initializeDebugMode.mockResolvedValue(undefined)
+    mocks.featureInit.mockResolvedValue(undefined)
+    mocks.onPolicyChanged.mockReturnValue(() => {})
+    mocks.checkExclusion.mockResolvedValue(true)
   })
 
   it('does not complete main core initialization before settings are ready', async () => {

@@ -42,6 +42,7 @@ export class FeatureManager extends ResourceTracker {
     this._cleanupPromise = null;
     this._activeEvaluationPromise = null;
     this._selectElementAuthorityCleanupPending = false;
+    this._policyChangeCallbacks = new Set();
 
     // Store singleton instance
     featureManagerInstance = this;
@@ -74,6 +75,18 @@ export class FeatureManager extends ResourceTracker {
       return response?.success === true;
     } catch {
       return false;
+    }
+  }
+
+  onPolicyChanged(callback) {
+    if (typeof callback !== 'function') return () => {};
+    this._policyChangeCallbacks.add(callback);
+    return () => this._policyChangeCallbacks.delete(callback);
+  }
+
+  _notifyPolicyChanged(reason = 'unknown') {
+    for (const cb of Array.from(this._policyChangeCallbacks)) {
+      try { cb(reason); } catch (e) { logger.debug('Policy change callback error', e); }
     }
   }
 
@@ -636,6 +649,7 @@ export class FeatureManager extends ResourceTracker {
       
       // Re-evaluate all features
       await this.reevaluateFeatures(`settings-change:${key}`);
+      this._notifyPolicyChanged(`settings-change:${key}`);
       
     } catch (error) {
       logger.error('Error handling settings change:', error);
@@ -845,6 +859,7 @@ export class FeatureManager extends ResourceTracker {
       this.exclusionChecker.updateUrl(newUrl);
 
       await this.reevaluateFeatures('url-change');
+      this._notifyPolicyChanged('url-change');
       if (isStale()) {
         logger.debug('Stale navigation after reevaluation, aborting', { newUrl });
         return;
@@ -920,6 +935,7 @@ export class FeatureManager extends ResourceTracker {
     logger.debug('Manual refresh requested');
     await this.exclusionChecker.refreshSettings();
     await this.reevaluateFeatures('manual-refresh');
+    this._notifyPolicyChanged('manual-refresh');
   }
 
   async getStatus() {
@@ -1008,6 +1024,7 @@ export class FeatureManager extends ResourceTracker {
           try { storageManager.off('change', this.settingsListener); } catch { /* ignore */ }
           this.settingsListener = null;
         }
+        this._policyChangeCallbacks.clear();
       }
 
       // Wait for stale activation attempts to settle (identity-safe, do not delete)
@@ -1098,6 +1115,7 @@ export class FeatureManager extends ResourceTracker {
       try { storageManager.off('change', this.settingsListener); } catch { /* ignore */ }
       this.settingsListener = null;
     }
+    this._policyChangeCallbacks.clear();
 
     // Defer remaining async teardown (feature deactivation) without blocking caller
     void this.cleanupAsync().catch(error => {

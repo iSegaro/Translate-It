@@ -1,160 +1,84 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  loadFeature: vi.fn(),
-  initializeCritical: vi.fn(),
-  interactionInitialize: vi.fn(),
-  frameReady: vi.fn(),
-  pageEventBus: { on: vi.fn() },
-  topPostMessage: vi.fn(),
+  coreCtor: vi.fn(),
+  initContentCore: vi.fn().mockResolvedValue(true),
+  setupTrusted: vi.fn(),
+  getURL: vi.fn((p) => `moz-extension://test/${p}`),
 }));
 
 vi.mock('webextension-polyfill', () => ({
-  default: {
-    runtime: {
-      getURL: (path) => `moz-extension://test/${path}`,
-      sendMessage: mocks.frameReady,
-    },
-  },
+  default: { runtime: { getURL: mocks.getURL } },
 }));
-
 vi.mock('@/shared/vue/vue-utils.js', () => ({
-  setupTrustedTypesCompatibility: vi.fn(),
+  setupTrustedTypesCompatibility: mocks.setupTrusted,
 }));
-
-vi.mock('@/features/exclusion/utils/exclusion-utils.js', () => ({
-  checkUrlExclusionAsync: vi.fn().mockResolvedValue(false),
-}));
-
 vi.mock('./IFrameContentScriptCore.js', () => ({
   IFrameContentScriptCore: class {
-    async initializeCritical() {
-      return mocks.initializeCritical();
-    }
-
-    async injectMainDOMStyles() {}
-
-    async loadFeature(feature) {
-      return mocks.loadFeature(feature);
-    }
+    constructor() { mocks.coreCtor(); this.initialized = false; }
   },
 }));
-
-vi.mock('./InteractionCoordinator.js', () => ({
-  interactionCoordinator: { initialize: mocks.interactionInitialize },
+vi.mock('./contentStartup.js', () => ({
+  initializeContentCore: mocks.initContentCore,
 }));
 
-vi.mock('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js', () => ({
-  getTextSelectionWindowRelay: vi.fn(),
-}));
-
-vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
-  MessageActions: {
-    PAGE_TRANSLATE_PROGRESS: 'PAGE_TRANSLATE_PROGRESS',
-    PAGE_TRANSLATE_COMPLETE: 'PAGE_TRANSLATE_COMPLETE',
-    PAGE_AUTO_RESTORE_COMPLETE: 'PAGE_AUTO_RESTORE_COMPLETE',
-    PAGE_TRANSLATE: 'PAGE_TRANSLATE',
-    PAGE_RESTORE: 'PAGE_RESTORE',
-    PAGE_TRANSLATE_STOP_AUTO: 'PAGE_TRANSLATE_STOP_AUTO',
-    SELECT_ELEMENT_FRAME_READY: 'selectElementFrameReady',
-  },
-}));
-
-describe('iframe page translation transport', () => {
-  let previousTop;
-
+describe('index-iframe entry', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    mocks.loadFeature.mockClear();
-    mocks.initializeCritical.mockReset().mockResolvedValue(true);
-    mocks.interactionInitialize.mockReset().mockResolvedValue(undefined);
-    mocks.frameReady.mockReset().mockResolvedValue({ success: true });
-    mocks.pageEventBus.on.mockClear();
-    mocks.topPostMessage.mockClear();
-    mocks.loadFeature.mockResolvedValue(null);
-
-    previousTop = window.top;
-    Object.defineProperty(window, 'top', {
-      configurable: true,
-      value: { postMessage: mocks.topPostMessage },
-    });
-    window.pageEventBus = mocks.pageEventBus;
+    mocks.coreCtor.mockClear();
+    mocks.initContentCore.mockResolvedValue(true);
+    mocks.getURL.mockImplementation((p) => `moz-extension://test/${p}`);
     delete window.translateItContentCore;
     delete window.translateItContentScriptCore;
     delete window.translateItContentScriptLoaded;
-    delete window._translateItProgressForwarderSet;
-  });
-
-  afterEach(() => {
-    Object.defineProperty(window, 'top', {
+    delete window._translateItBootstrapPromise;
+    window.translateItContentScriptInitializing = false;
+    Object.defineProperty(window, 'top', { configurable: true, value: {} });
+    Object.defineProperty(window, 'location', {
       configurable: true,
-      value: previousTop,
+      value: { href: 'https://example.com/frame.html', protocol: 'https:', host: 'example.com' },
     });
+    document.documentElement.classList.remove('translate-it-ui-frame');
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 500 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 500 });
   });
 
-  it('does not install page-visible lifecycle forwarders', async () => {
+  it('does not run when window === top (not iframe)', async () => {
+    Object.defineProperty(window, 'top', { configurable: true, value: window });
     await import('./index-iframe.js');
-
-    expect(mocks.pageEventBus.on).not.toHaveBeenCalledWith(
-      'PAGE_TRANSLATE_PROGRESS',
-      expect.any(Function)
-    );
-    expect(mocks.pageEventBus.on).not.toHaveBeenCalledWith(
-      'PAGE_TRANSLATE_COMPLETE',
-      expect.any(Function)
-    );
-    window.dispatchEvent(new CustomEvent('page-translate-progress', {
-      detail: { translatedCount: 999, totalCount: 999 },
-    }));
-    expect(mocks.topPostMessage).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(mocks.interactionInitialize).toHaveBeenCalledOnce());
+    expect(mocks.coreCtor).not.toHaveBeenCalled();
   });
 
-  it('waits for iframe core readiness before initializing the interaction coordinator', async () => {
-    let resolveCore;
-    mocks.initializeCritical.mockImplementation(() => new Promise((resolve) => {
-      resolveCore = resolve;
-    }));
-
+  it('does not run for tiny frames', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 50 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 50 });
     await import('./index-iframe.js');
-
-    await vi.waitFor(() => expect(mocks.initializeCritical).toHaveBeenCalledOnce());
-    expect(mocks.interactionInitialize).not.toHaveBeenCalled();
-
-    resolveCore(true);
-
-    await vi.waitFor(() => expect(mocks.interactionInitialize).toHaveBeenCalledOnce());
+    expect(mocks.coreCtor).not.toHaveBeenCalled();
   });
 
-  it('announces FRAME_READY only after the content receiver feature is loaded', async () => {
-    let receiverRegistered = false;
-    let releaseContentReceiver;
-    mocks.loadFeature.mockImplementation(async feature => {
-      if (feature === 'contentMessageHandler') {
-        await new Promise(resolve => {
-          releaseContentReceiver = () => {
-            receiverRegistered = true;
-            resolve();
-          };
-        });
-      }
-      return null;
+  it('does not run when isExtensionFrame', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: 'moz-extension://abc/frame.html', protocol: 'moz-extension:', host: 'abc' },
     });
-
     await import('./index-iframe.js');
-    await vi.waitFor(() => expect(mocks.loadFeature).toHaveBeenCalledWith('contentMessageHandler'));
-    expect(mocks.frameReady).not.toHaveBeenCalled();
-    expect(releaseContentReceiver).toEqual(expect.any(Function));
-    releaseContentReceiver();
+    await new Promise((r) => setTimeout(r, 10));
+    expect(mocks.coreCtor).not.toHaveBeenCalled();
+  });
 
-    await vi.waitFor(() => expect(mocks.frameReady).toHaveBeenCalledWith({
-      action: 'selectElementFrameReady',
-      data: {},
-    }));
-    expect(receiverRegistered).toBe(true);
-    expect(mocks.frameReady.mock.invocationCallOrder[0]).toBeGreaterThan(
-      mocks.loadFeature.mock.invocationCallOrder[2],
-    );
+  it('does not run when already loaded', async () => {
+    window.translateItContentScriptLoaded = true;
+    await import('./index-iframe.js');
+    expect(mocks.coreCtor).not.toHaveBeenCalled();
+  });
+
+  it('creates core and routes to initializeContentCore when allowed', async () => {
+    await import('./index-iframe.js');
+    await vi.waitFor(() => expect(mocks.coreCtor).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(mocks.initContentCore).toHaveBeenCalledOnce());
+    const coreArg = mocks.initContentCore.mock.calls[0][0];
+    expect(coreArg).toBeTruthy();
+    expect(window.translateItContentCore).toBe(coreArg);
   });
 });
