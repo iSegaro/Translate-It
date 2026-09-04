@@ -158,9 +158,12 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             logger.debug(`[Bing] Received HTML response instead of JSON. Chunk size: ${chunkTexts.length}`);
             const htmlError = new Error('Bing returned HTML response instead of JSON');
             htmlError.name = 'BingHtmlResponseError';
+            htmlError.type = ErrorTypes.API_RESPONSE_INVALID;
+            htmlError.retryable = false;
             htmlError.context = context;
             htmlError.chunkSize = chunkTexts.length;
             htmlError.retryAttempt = retryAttempt;
+            htmlError.providerName = this.providerName;
             throw htmlError;
           }
 
@@ -176,9 +179,12 @@ export class BingTranslateProvider extends BaseTranslateProvider {
               logger.debug(`[Bing] Response appears to be HTML despite content-type`);
               const htmlError = new Error('Bing returned HTML response (detected after parsing)');
               htmlError.name = 'BingHtmlResponseError';
+              htmlError.type = ErrorTypes.API_RESPONSE_INVALID;
+              htmlError.retryable = false;
               htmlError.context = context;
               htmlError.chunkSize = chunkTexts.length;
               htmlError.retryAttempt = retryAttempt;
+              htmlError.providerName = this.providerName;
               throw htmlError;
             }
 
@@ -241,9 +247,18 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
     } catch (error) {
       const errorType = error.type || matchErrorToType(error);
-      
-      // Handle HTML response and JSON parsing errors with existing adaptive recovery.
-      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
+
+      // HTML responses are terminal: normalize to API_RESPONSE_INVALID and do not adaptively split.
+      if (error.name === 'BingHtmlResponseError') {
+        if (!error.type) error.type = ErrorTypes.API_RESPONSE_INVALID;
+        error.retryable = false;
+        if (!error.providerName) error.providerName = this.providerName;
+        if (!error.context) error.context = context;
+        throw error;
+      }
+
+      // Handle JSON parsing errors with existing adaptive recovery.
+      if (error.name === 'BingJsonParseError') {
         const maxRetries = providerConfig?.batching?.maxRetries ?? 3;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking ?? true;
 

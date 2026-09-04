@@ -1001,5 +1001,41 @@ describe('QueueManager', () => {
       expect(queueManager.getQueueStatus('bound-test-provider').total).toBe(0);
       expect(queueManager.retryTimeouts.size).toBe(0);
     });
+
+    it('does not retry when error explicitly sets retryable=false', async () => {
+      const terminalError = Object.assign(new Error('terminal invalid response'), {
+        type: ErrorTypes.API_RESPONSE_INVALID,
+        retryable: false,
+      });
+      const request = vi.fn().mockRejectedValue(terminalError);
+      const promise = queueManager.enqueue('explicit-non-retryable', request, 0, 'context', {
+        messageId: 'explicit-non-retryable',
+      });
+      const caught = promise.catch(e => e);
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(10000);
+      const error = await caught;
+      expect(error).toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID, retryable: false });
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.getQueueStatus('explicit-non-retryable').total).toBe(0);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
+    it('preserves normal retry behavior when retryable policy is unspecified', async () => {
+      const genericError = Object.assign(new Error('generic invalid response'), {
+        type: ErrorTypes.API_RESPONSE_INVALID,
+      });
+      const request = vi.fn()
+        .mockRejectedValueOnce(genericError)
+        .mockResolvedValueOnce('recovered');
+      const promise = queueManager.enqueue('explicit-retryable-control', request, 0, 'context', {
+        messageId: 'explicit-retryable-control',
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(2000);
+      await expect(promise).resolves.toBe('recovered');
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(queueManager.getQueueStatus('explicit-retryable-control').total).toBe(0);
+    });
   });
 });

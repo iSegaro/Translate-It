@@ -276,8 +276,8 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
-        .rejects.toMatchObject({ name: 'BingHtmlResponseError' });
-      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
     });
 
     it('preserves child user cancellation during adaptive recovery', async () => {
@@ -287,8 +287,8 @@ describe('BingTranslateProvider', () => {
       });
       provider._executeApiCall
         .mockImplementationOnce(async (request) => request.extractResponse({
-          headers: { get: () => 'text/html' },
-          text: async () => '<html>blocked</html>',
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
         }))
         .mockRejectedValueOnce(childError);
 
@@ -304,8 +304,8 @@ describe('BingTranslateProvider', () => {
       });
       provider._executeApiCall
         .mockImplementationOnce(async (request) => request.extractResponse({
-          headers: { get: () => 'text/html' },
-          text: async () => '<html>blocked</html>',
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
         }))
         .mockRejectedValueOnce(childError);
 
@@ -324,8 +324,8 @@ describe('BingTranslateProvider', () => {
       });
       provider._executeApiCall
         .mockImplementationOnce(async (request) => request.extractResponse({
-          headers: { get: () => 'text/html' },
-          text: async () => '<html>blocked</html>',
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
         }))
         .mockRejectedValueOnce(childError);
 
@@ -343,6 +343,39 @@ describe('BingTranslateProvider', () => {
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
         .rejects.toMatchObject({ name: 'BingJsonParseError' });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not adaptively split on HTML content-type (T1)', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'text/html; charset=utf-8' },
+        text: async () => '<html><body>blocked</body></html>',
+      }));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID, retryable: false });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not adaptively split on HTML body with misleading content-type (T2)', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => '<html>challenge page</html>',
+      }));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID, retryable: false });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('malformed JSON still adapts for multiple texts (T3)', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => 'not-json-at-all',
+      }));
+
+      await expect(provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ name: 'BingJsonParseError' });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
     });
 
     it('keeps transport HTTP 400 canonical identity', async () => {

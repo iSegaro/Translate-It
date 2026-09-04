@@ -175,6 +175,9 @@ class QueueItem {
     // Local deterministic validation errors (e.g., TEXT_TOO_LONG) must never be retried
     if (isLocalDeterministicValidationError(this.lastError)) return false;
 
+    // Explicit per-error retry policy wins before generic classification.
+    if (this.lastError?.retryable === false) return false;
+
     // 1. If we have a fatal error (like invalid API key), do NOT retry
     if (this.lastError && isFatalError(this.lastError)) {
       // CIRCUIT_BREAKER_OPEN is considered fatal in ErrorMatcher.
