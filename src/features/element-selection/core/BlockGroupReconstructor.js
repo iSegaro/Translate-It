@@ -281,7 +281,7 @@ export class BlockGroupReconstructor {
           kind: 'hover',
           restore: () => {
             if (value === undefined) hoverPreviewLookup.delete(node);
-            else hoverPreviewLookup.add(node, value);
+            else hoverPreviewLookup.add(node, value, node?.nodeValue);
           },
           createFailure: (error) => ({ kind: 'hover', node, error }),
         })),
@@ -301,14 +301,15 @@ export class BlockGroupReconstructor {
       }
 
       for (const task of commitPlan) {
-        hoverPreviewLookup.add(task.unit.node, task.originalText);
-
         const parentElement = task.unit.node.parentElement;
         if (parentElement && parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL) !== 'true') {
           parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, 'true');
         }
 
         task.unit.node.nodeValue = task.finalValue;
+        // Register only after the DOM write so cache validation reflects the value actually applied.
+        hoverPreviewLookup.add(task.unit.node, task.originalText, task.unit.node.nodeValue);
+
         if (translationFontFamily) {
           const fontTarget = getTranslationFontTarget(task.unit.node);
           if (fontTarget && !fontParents.has(fontTarget)) {

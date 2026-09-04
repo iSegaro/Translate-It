@@ -194,7 +194,7 @@ describe('PageTranslationBridge', () => {
       
       nodesTranslator.translate(mockTextNode);
       
-      expect(hoverPreviewLookup.add).toHaveBeenCalledWith(mockTextNode, 'Original Text');
+      expect(hoverPreviewLookup.add).toHaveBeenCalledWith(mockTextNode, 'Original Text', 'Original Text');
     });
 
     it('should capture currentNode during translate and update', async () => {

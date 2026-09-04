@@ -3,7 +3,7 @@ import { HoverTranslationManager } from './HoverTranslationManager.js';
 import { HoverTextDetector } from './HoverTextDetector.js';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
-import { contentScriptIntegration } from '@/shared/messaging/core/ContentScriptIntegration.js';
+import { contentScriptIntegration, registerTranslation } from '@/shared/messaging/core/ContentScriptIntegration.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js';
@@ -120,6 +120,43 @@ describe('HoverTranslationManager', () => {
     expect(manager.isActive).toBe(false);
     expect(cleanupSpy).toHaveBeenCalled();
     expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP');
+  });
+
+  it('clears transient hover state before deactivation and allows a fresh hover after reactivation', async () => {
+    await manager.activate();
+    const element = document.createElement('div');
+    element.classList.add('ti-hover-container-highlight');
+    manager.currentText = 'old text';
+    manager.currentElement = element;
+    manager.currentRect = { top: 0, left: 0, bottom: 100, right: 100 };
+    manager.borderedElement = element;
+    manager.currentMessageId = 'old-request';
+    manager.lastPosition = { x: 100, y: 100 };
+    manager.lastMouseEvent = { target: element };
+    manager.hoverTimer = manager.setTimeout(vi.fn(), 1000);
+
+    await manager.deactivate();
+
+    expect(manager.currentText).toBeNull();
+    expect(manager.currentElement).toBeNull();
+    expect(manager.currentRect).toBeNull();
+    expect(manager.borderedElement).toBeNull();
+    expect(manager.hoverTimer).toBeNull();
+    expect(manager.currentMessageId).toBeNull();
+    expect(manager.lastMouseEvent).toBeNull();
+    expect(manager.lastPosition).toEqual({ x: 0, y: 0 });
+    expect(element.classList.contains('ti-hover-container-highlight')).toBe(false);
+
+    await manager.activate();
+    settingsManager.get.mockImplementation((key, def) => {
+      if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+      if (key === 'MOUSE_HOVER_DELAY') return 300;
+      return def;
+    });
+    manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+    vi.advanceTimersByTime(300);
+
+    expect(HoverTextDetector.detect).toHaveBeenCalledWith(100, 100, 'sentence');
   });
 
   describe('handleMouseMove', () => {
@@ -713,6 +750,36 @@ describe('HoverTranslationManager', () => {
       expect(manager.currentText).toBeNull();
       expect(manager.currentElement).toBeNull();
       expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+    });
+
+    it('does not show a late streaming result after the request is cancelled', async () => {
+      await manager.activate();
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'Hello world',
+        rect: { top: 10, left: 10, bottom: 20, right: 100 },
+        element: document.createElement('p')
+      });
+
+      let streamCallbacks;
+      let resolveRequest;
+      registerTranslation.mockImplementationOnce((_id, callbacks) => {
+        streamCallbacks = callbacks;
+      });
+      contentScriptIntegration.sendTranslationRequest.mockImplementationOnce(
+        () => new Promise(resolve => { resolveRequest = resolve; })
+      );
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+      const processPromise = manager._processHover({ clientX: 15, clientY: 15 });
+
+      await vi.waitFor(() => expect(streamCallbacks).toBeDefined());
+      manager._cancelPendingHover();
+      streamCallbacks.onStreamUpdate({ data: 'late translation' });
+
+      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_READY', expect.anything());
+
+      resolveRequest({ translatedText: 'late translation' });
+      await processPromise;
+      emitSpy.mockRestore();
     });
 
     it('should not clean up highlight or caches if a stale failed request finishes after a new hover started', async () => {

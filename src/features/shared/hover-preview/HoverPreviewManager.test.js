@@ -11,6 +11,10 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/core/PageEventBus.js', () => ({
+  pageEventBus: {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn()
+  },
   PageTranslationEvents: {
     showTooltip: vi.fn(),
     hideTooltip: vi.fn(),
@@ -171,6 +175,18 @@ describe('HoverPreviewManager', () => {
     
     expect(PageTranslationEvents.hideTooltip).toHaveBeenCalled();
     expect(manager.currentElement).toBeNull();
+  });
+
+  it('should hide and reset on the existing translation hide lifecycle', () => {
+    const el = document.createElement('div');
+    manager.currentElement = el;
+    manager.currentText = 'original';
+
+    manager.handleTranslationHide({ element: el });
+
+    expect(PageTranslationEvents.hideTooltip).toHaveBeenCalled();
+    expect(manager.currentElement).toBeNull();
+    expect(manager.currentText).toBeNull();
   });
 
   it('should gather original text from multiple nodes and handle BR tags', () => {

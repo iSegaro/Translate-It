@@ -4129,7 +4129,7 @@ describe('DomTranslatorAdapter', () => {
 
       // RTL mark (\u200f) should be present
       expect(textNode.nodeValue).toContain('\u200fسلام\u200f');
-      expect(hoverPreviewLookup.add).toHaveBeenCalledWith(textNode, originalText);
+      expect(hoverPreviewLookup.add).toHaveBeenCalledWith(textNode, originalText, textNode.nodeValue);
       expect(testElement.getAttribute('data-has-original')).toBe('true');
     });
 

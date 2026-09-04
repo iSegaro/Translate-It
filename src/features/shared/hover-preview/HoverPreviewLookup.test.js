@@ -12,8 +12,28 @@ describe('HoverPreviewLookup', () => {
     const node = document.createTextNode('translated');
     const originalText = 'original';
     
-    lookup.add(node, originalText);
+    lookup.add(node, originalText, 'translated');
     expect(lookup.get(node)).toBe(originalText);
+  });
+
+  it('rejects stale records after the same node is changed', () => {
+    const node = document.createTextNode('B');
+
+    lookup.add(node, 'A', 'B');
+    node.nodeValue = 'C';
+
+    expect(lookup.get(node)).toBeUndefined();
+    expect(lookup.lookup.has(node)).toBe(false);
+  });
+
+  it('rejects a record after the node is reverted', () => {
+    const node = document.createTextNode('A');
+
+    lookup.add(node, 'A', 'B');
+    node.nodeValue = 'A';
+
+    expect(lookup.get(node)).toBeUndefined();
+    expect(lookup.lookup.has(node)).toBe(false);
   });
 
   it('should return undefined for non-existent nodes', () => {
@@ -34,7 +54,7 @@ describe('HoverPreviewLookup', () => {
 
   it('should clear all entries', () => {
     const node = document.createTextNode('test');
-    lookup.add(node, 'original');
+    lookup.add(node, 'original', 'test');
     
     lookup.clear();
     expect(lookup.get(node)).toBeUndefined();
@@ -45,7 +65,10 @@ describe('HoverPreviewLookup', () => {
     el.setAttribute('title', 'translated title');
     const attr = el.getAttributeNode('title');
     
-    lookup.add(attr, 'original title');
+    lookup.add(attr, 'original title', 'translated title');
     expect(lookup.get(attr)).toBe('original title');
+
+    el.setAttribute('title', 'changed title');
+    expect(lookup.get(attr)).toBeUndefined();
   });
 });
