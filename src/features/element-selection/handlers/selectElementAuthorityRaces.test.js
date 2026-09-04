@@ -97,7 +97,7 @@ function establishProvisionalDebt(tabId, frameId, documentId) {
 describe('Select Element authority races', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    for (const tabId of [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118]) {
+    for (const tabId of [101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]) {
       clearStateForTab(tabId);
       clearTabParticipants(tabId);
     }
@@ -321,6 +321,47 @@ describe('Select Element authority races', () => {
     expect(await joinPromise).toBe(false);
     expect(getParticipants(tabId).has(5)).toBe(false);
     expect(getStateForTab(tabId).active).toBe(false);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
+      tabId,
+      expect.objectContaining({
+        action: 'deactivateSelectElementMode',
+        data: expect.objectContaining({
+          fromBackground: true,
+          activationGeneration: generation,
+          activationEpoch: getActivationEpoch(),
+        }),
+      }),
+      { frameId: 5, documentId: 'doc-5-107' },
+    );
+    expect(getProvisionalCleanupFrames(tabId)).toEqual([]);
+  });
+
+  it('clears join cleanup debt only after a strict ACK becomes a participant', async () => {
+    const tabId = 119;
+    const generation = establishActiveSession(tabId, 0, 'doc-top-119');
+    let resolveActivation;
+    browser.tabs.sendMessage.mockImplementation((_tabId, message) => {
+      if (message.action === 'activateSelectElementMode') {
+        return new Promise(resolve => { resolveActivation = resolve; });
+      }
+      return { success: true, cleanupCompleted: true, activated: false };
+    });
+
+    const joinPromise = reconcileNewFrameIfActive(tabId, 5, 'doc-5-119');
+    await vi.waitFor(() => expect(getProvisionalCleanupFrames(tabId)).toEqual([
+      { frameId: 5, generation, documentId: 'doc-5-119' },
+    ]));
+    resolveActivation({
+      success: true,
+      activated: true,
+      activationGeneration: generation,
+      activationEpoch: getActivationEpoch(),
+    });
+
+    await expect(joinPromise).resolves.toBe(true);
+    expect(getParticipants(tabId).get(5)).toBe(generation);
+    expect(getProvisionalCleanupFrames(tabId)).toEqual([]);
+    expect(browser.tabs.sendMessage).toHaveBeenCalledTimes(1);
   });
 
   it('removes D1 cleanup debt while preserving live D2 participant ownership', async () => {

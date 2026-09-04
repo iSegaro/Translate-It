@@ -41,6 +41,7 @@ export class FeatureManager extends ResourceTracker {
     this._isCleaningUp = false;
     this._cleanupPromise = null;
     this._activeEvaluationPromise = null;
+    this._selectElementAuthorityCleanupPending = false;
 
     // Store singleton instance
     featureManagerInstance = this;
@@ -63,6 +64,17 @@ export class FeatureManager extends ResourceTracker {
 
   _isNavigationStale(capturedRevision) {
     return capturedRevision !== this._navigationRevision;
+  }
+
+  async _requestSelectElementGlobalDeactivation() {
+    try {
+      const { sendMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
+      const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js');
+      const response = await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
+      return response?.success === true;
+    } catch {
+      return false;
+    }
   }
 
   // Static method to get singleton instance
@@ -394,6 +406,25 @@ export class FeatureManager extends ResourceTracker {
 
     const wasActive = this.activeFeatures.has(featureName);
     const hadHandler = this.featureHandlers.has(featureName);
+
+    if (featureName === 'selectElement' && !wasActive && !hadHandler) {
+      const ok = await this._requestSelectElementGlobalDeactivation();
+      this._selectElementAuthorityCleanupPending = !ok;
+      if (!ok) {
+        logger.warn('Select Element local cleanup completed, but Background authority remains unconfirmed');
+      }
+      this.activeFeatures.delete(featureName);
+      this.featureHandlers.delete(featureName);
+      try {
+        const { notifyFeatureDeactivated } = await import('@/core/content-scripts/chunks/lazy-features.js');
+        notifyFeatureDeactivated(featureName);
+      } catch {
+        // Maybe in iframe or other context where lazy-features isn't used
+      }
+      logger.info(`Feature ${featureName} deactivated successfully`);
+      return;
+    }
+
     if (!wasActive && !hadHandler) {
       logger.debug(`Feature ${featureName} not active (revision invalidated for pending)`);
       return;
@@ -428,9 +459,43 @@ export class FeatureManager extends ResourceTracker {
 
       const handler = this.featureHandlers.get(featureName);
       if (handler && typeof handler.deactivate === 'function') {
-        const success = await handler.deactivate();
+        const success = featureName === 'selectElement'
+          ? await handler.deactivate({
+            reason: 'manual',
+            requestGlobalDeactivation: true,
+          })
+          : await handler.deactivate();
+        if (featureName === 'selectElement') {
+          let ok = null;
+          if (success && typeof success === 'object') {
+            if (success.globalDeactivationRequested === true) {
+              ok = success.globalDeactivationSucceeded === true;
+            } else if (success.alreadyInactive === true) {
+              ok = await this._requestSelectElementGlobalDeactivation();
+            } else if (success.globalDeactivationSucceeded === false) {
+              ok = false;
+            } else if (success.globalDeactivationSucceeded === true) {
+              ok = true;
+            }
+          }
+          if (ok !== null) {
+            this._selectElementAuthorityCleanupPending = !ok;
+            if (!ok) {
+              logger.warn('Select Element local cleanup completed, but Background authority remains unconfirmed');
+            }
+          } else if (success?.globalDeactivationSucceeded === false) {
+            this._selectElementAuthorityCleanupPending = true;
+            logger.warn('Select Element local cleanup completed, but Background authority remains unconfirmed');
+          }
+        }
         if (success === false) {
           logger.warn(`Feature ${featureName} deactivation returned false, but proceeding with cleanup`);
+        }
+      } else if (featureName === 'selectElement') {
+        const ok = await this._requestSelectElementGlobalDeactivation();
+        this._selectElementAuthorityCleanupPending = !ok;
+        if (!ok) {
+          logger.warn('Select Element local cleanup completed, but Background authority remains unconfirmed');
         }
       }
 
@@ -448,6 +513,9 @@ export class FeatureManager extends ResourceTracker {
       logger.info(`Feature ${featureName} deactivated successfully`);
 
     } catch (error) {
+      if (featureName === 'selectElement') {
+        this._selectElementAuthorityCleanupPending = true;
+      }
       logger.error(`Failed to deactivate feature ${featureName}:`, error);
       ErrorHandler.getInstance().handle(error, {
         type: ErrorTypes.SERVICE,
@@ -649,6 +717,11 @@ export class FeatureManager extends ResourceTracker {
             await this.deactivateFeature(feature);
             if (isEvaluationStale()) break;
           } else if (!shouldBeActive && !isCurrentlyActive) {
+            if (feature === 'selectElement' && this._selectElementAuthorityCleanupPending) {
+              const ok = await this._requestSelectElementGlobalDeactivation();
+              if (ok) this._selectElementAuthorityCleanupPending = false;
+              if (isEvaluationStale()) break;
+            }
             this._incrementFeatureRevision(feature);
             if (this.featureHandlers.has(feature)) {
               const staleHandler = this.featureHandlers.get(feature);
@@ -968,6 +1041,11 @@ export class FeatureManager extends ResourceTracker {
             notifyFeatureDeactivated(feature);
           } catch { /* ignore */ }
         }
+      }
+
+      if (this._selectElementAuthorityCleanupPending) {
+        const ok = await this._requestSelectElementGlobalDeactivation();
+        if (ok) this._selectElementAuthorityCleanupPending = false;
       }
 
       try {

@@ -195,10 +195,8 @@ export const ProviderRequestEngine = {
       try {
         const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
         const candidates = getApiKeyCandidates(provider, keys, apiKeyFailoverContext);
-        availableKeysCount = Math.min(Math.max(1, candidates.length), 10);
-        if (typeof provider.isApiKeyCandidateEligible === 'function') {
-          apiKeyCandidates = candidates;
-        }
+        apiKeyCandidates = candidates.slice(0, 10);
+        availableKeysCount = Math.max(1, apiKeyCandidates.length);
       } catch (e) {
         logger.warn(`[${provider.providerName}] Failed to count keys for failover:`, e);
       }
@@ -238,9 +236,7 @@ export const ProviderRequestEngine = {
         // 3. Success! Promote the working key
         if (attempt > 0 && provider.providerSettingKey) {
           // Get the key actually used in THIS successful attempt
-          const currentKey = apiKeyCandidates
-            ? apiKeyCandidates[attempt]
-            : (await ApiKeyManager.getKeys(provider.providerSettingKey))[attempt];
+          const currentKey = apiKeyCandidates?.[attempt];
           
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
@@ -289,8 +285,7 @@ export const ProviderRequestEngine = {
 
         // 5. Handle Failover
         if (attempt < availableKeysCount - 1 && shouldFailoverApiKey(provider, error)) {
-          const keys = apiKeyCandidates || await ApiKeyManager.getKeys(provider.providerSettingKey);
-          if (keys.length > attempt + 1) {
+          if (apiKeyCandidates?.length > attempt + 1) {
             logger.warn(`[${provider.providerName}] Key error, attempting failover (${attempt + 1}/${availableKeysCount})`);
             appendTranslationDiagnostic(executionContext, {
               type: 'PROVIDER_KEY_FAILOVER_ATTEMPT',
@@ -300,7 +295,7 @@ export const ProviderRequestEngine = {
               reason: error.message,
               code: errorType,
             });
-            const nextKey = keys[attempt + 1];
+            const nextKey = apiKeyCandidates[attempt + 1];
             await updateApiKey(nextKey, fetchOptions);
             
             if (fetchOptions.url && fetchOptions.url !== currentUrl) {

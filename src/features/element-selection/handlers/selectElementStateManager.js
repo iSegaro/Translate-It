@@ -42,6 +42,19 @@ function invalidateJoinAuthority(tabId) {
   return bumpActiveSessionRevision(tabId);
 }
 
+// Background authority barrier: blocks new joins while deactivation remains unresolved
+const selectElementDeactivationPendingByTab = new Map();
+function markDeactivationPending(tabId) {
+  if (!Number.isInteger(tabId)) return;
+  selectElementDeactivationPendingByTab.set(tabId, true);
+}
+function isDeactivationPending(tabId) {
+  return selectElementDeactivationPendingByTab.get(tabId) === true;
+}
+function clearDeactivationPending(tabId) {
+  selectElementDeactivationPendingByTab.delete(tabId);
+}
+
 function isValidDocumentId(value) {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -468,6 +481,7 @@ function clearTabParticipants(tabId) {
   invalidateActivationAttempts(tabId);
   clearCompatibilityFrames(tabId);
   clearProvisionalCleanupFrames(tabId);
+  clearDeactivationPending(tabId);
 }
 
 function retireFrameCleanupOwnership(tabId, frameId, documentId = null) {
@@ -658,6 +672,7 @@ async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
   const capturedGen = getCurrentGeneration(tabId);
   const state = getStateForTab(tabId);
   if (!state.active || !Number.isInteger(capturedGen)) return false;
+  if (isDeactivationPending(tabId)) return false;
   if (!Number.isInteger(frameId) || frameId < 0) return false;
   // Do not re-activate if already participant for this document
   const existing = getParticipantInfo(tabId, frameId);
@@ -666,6 +681,9 @@ async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
   }
   try {
     const target = buildDocumentAwareMessageTarget(frameId, documentId);
+    // A successful activation must be owned or explicitly cleaned up. Retain
+    // document-scoped debt before sending so a concurrent deactivation can see it.
+    retainProvisionalCleanupFrame(tabId, frameId, capturedGen, documentId);
     const contentMessage = MessageFormat.create(
       MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
       {
@@ -682,11 +700,39 @@ async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
     const hasEpoch = resp && typeof resp === 'object' && 'activationEpoch' in resp;
     const ok = resp?.success === true && resp?.activated === true && hasGen && hasEpoch
       && resp.activationGeneration === capturedGen && resp.activationEpoch === backgroundActivationEpoch;
+    const activationReportedSuccess = ok
+      || resp === true
+      || (resp?.success === true && resp?.activated === true);
     // F2: revalidate authority before registration
     const currentGenNow = getCurrentGeneration(tabId);
     const currentRevNow = getActiveSessionRevision(tabId);
     const stillActive = getStateForTab(tabId).active === true;
     if (currentRevNow !== capturedRevision || currentGenNow !== capturedGen || !stillActive) {
+      if (activationReportedSuccess) {
+        const cleanupResponse = await browser.tabs.sendMessage(
+          tabId,
+          MessageFormat.create(
+            MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+            {
+              mode: 'normal',
+              active: false,
+              fromBackground: true,
+              activationEpoch: backgroundActivationEpoch,
+              activationGeneration: capturedGen,
+              isExplicitDeactivation: true,
+            },
+            MessagingContexts.CONTENT,
+          ),
+          target,
+        ).catch(() => null);
+        if (
+          cleanupResponse?.success === true
+          && cleanupResponse?.cleanupCompleted === true
+          && cleanupResponse?.activated === false
+        ) {
+          removeProvisionalCleanupFrame(tabId, frameId, capturedGen);
+        }
+      }
       return false;
     }
     if (ok) {
@@ -696,16 +742,19 @@ async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
         selectElementParticipantsByTab.set(tabId, participants);
       }
       participants.set(frameId, { generation: capturedGen, documentId: isValidDocumentId(documentId) ? documentId : null });
+      removeProvisionalCleanupFrame(tabId, frameId, capturedGen);
       return true;
     }
     // F5: generation/epoch incomplete ACK -> compatibility only
     if (resp === true || (resp?.success === true && resp?.activated === true && (!hasGen || !hasEpoch))) {
       // Only retain compatibility if generation matches current or is at least provided; use capturedGen for ownership
       retainCompatibilityFrames(tabId, capturedGen, [frameId]);
+      removeProvisionalCleanupFrame(tabId, frameId, capturedGen);
       return false;
     }
+    removeProvisionalCleanupFrame(tabId, frameId, capturedGen);
   } catch {
-    // transient failure: do not register
+    // Unknown send state remains cleanup debt until authoritative cleanup settles it.
   }
   return false;
 }
@@ -745,6 +794,7 @@ function getStateForTab(tabId) {
 function clearStateForTab(tabId) {
   if (!tabId) return;
   selectElementStateByTab.delete(tabId);
+  clearDeactivationPending(tabId);
 }
 
 // Track last active tab so we can deactivate select-mode when the user switches
@@ -883,4 +933,7 @@ export {
   discoverAndReconcileActiveFrames,
   reconcileNewFrameIfActive,
   isValidDocumentId,
+  markDeactivationPending,
+  isDeactivationPending,
+  clearDeactivationPending,
 };

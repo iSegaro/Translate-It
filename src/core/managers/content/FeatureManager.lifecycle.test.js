@@ -47,6 +47,15 @@ vi.mock('@/features/windows/managers/WindowsManager.js', () => ({
   WindowsManager: { resetInstance: vi.fn() },
 }));
 
+vi.mock('@/shared/messaging/core/UnifiedMessaging.js', () => ({
+  sendMessage: vi.fn().mockResolvedValue({ success: true }),
+  sendRegularMessage: vi.fn(),
+}));
+
+vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
+  MessageActions: { DEACTIVATE_SELECT_ELEMENT_MODE: 'DEACTIVATE_SELECT_ELEMENT_MODE' },
+}));
+
 function deferred() {
   let resolve, reject;
   const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
@@ -81,6 +90,7 @@ describe('FeatureManager lifecycle regressions', () => {
     manager.activeFeatures.clear();
     manager.requestedFeatures.clear();
     manager.featureHandlers.clear();
+    manager._selectElementAuthorityCleanupPending = false;
     manager.initialized = true;
     // ensure exclusionChecker is set
     manager.exclusionChecker = mocks.exclusionChecker;
@@ -116,6 +126,24 @@ describe('FeatureManager lifecycle regressions', () => {
     expect(manager.isFeatureActive('selectElement')).toBe(false);
     expect(manager.getFeatureHandler('selectElement')).toBeUndefined();
     expect(handler.deactivate).toHaveBeenCalled();
+  });
+
+  it('requests authoritative Select Element shutdown before releasing its handler', async () => {
+    const handler = {
+      deactivate: vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true }),
+    };
+    manager.featureHandlers.set('selectElement', handler);
+    manager.activeFeatures.add('selectElement');
+
+    await manager.deactivateFeature('selectElement');
+
+    expect(handler.deactivate).toHaveBeenCalledOnce();
+    expect(handler.deactivate).toHaveBeenCalledWith({
+      reason: 'manual',
+      requestGlobalDeactivation: true,
+    });
+    expect(manager.isFeatureActive('selectElement')).toBe(false);
+    expect(manager.getFeatureHandler('selectElement')).toBeUndefined();
   });
 
   it('concurrent activation dedupes to one effective activation', async () => {

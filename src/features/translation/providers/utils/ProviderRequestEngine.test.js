@@ -56,6 +56,12 @@ const createProxyConfig = (host = 'proxy.test') => ({
   auth: { username: `${host}-user`, password: `${host}-password` },
 });
 
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
 const createMalformedJsonResponse = (status = 200, withClone = true) => {
   const createResponse = () => {
     const response = {
@@ -757,6 +763,95 @@ describe('ProviderRequestEngine', () => {
       } finally {
         apiCallSpy.mockRestore();
       }
+    });
+
+    it('uses admission-time keys when settings change during failover', async () => {
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const firstAttempt = deferred();
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockImplementationOnce(() => firstAttempt.promise)
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        const request = ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        });
+        await vi.waitFor(() => expect(apiCallSpy).toHaveBeenCalledTimes(1));
+        ApiKeyManager.getKeys.mockResolvedValue(['new-key']);
+        firstAttempt.reject(Object.assign(new Error('Invalid key'), { type: ErrorTypes.API_KEY_INVALID }));
+
+        await expect(request).resolves.toBe('translated');
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
+        expect(ApiKeyManager.getKeys).toHaveBeenCalledTimes(1);
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('preserves three-key failover order after settings change', async () => {
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['key-A', 'key-B', 'key-C']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('A failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockRejectedValueOnce(Object.assign(new Error('B failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn((key) => {
+        if (key === 'key-B') ApiKeyManager.getKeys.mockResolvedValue(['new-key']);
+      });
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(updateApiKey.mock.calls.map(([key]) => key)).toEqual(['key-B', 'key-C']);
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'key-C');
+        expect(ApiKeyManager.getKeys).toHaveBeenCalledTimes(1);
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('next request captures new keys after settings change', async () => {
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['old-bad', 'old-good']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const firstSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('old-bad failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockResolvedValueOnce('first');
+      const firstUpdate = vi.fn();
+      await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: firstUpdate,
+      })).resolves.toBe('first');
+      expect(firstUpdate).toHaveBeenCalledWith('old-good', expect.any(Object));
+      firstSpy.mockRestore();
+      vi.clearAllMocks();
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['new-bad', 'new-good']);
+      const secondSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('new-bad failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockResolvedValueOnce('second');
+      const secondUpdate = vi.fn();
+      await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: secondUpdate,
+      })).resolves.toBe('second');
+      expect(secondUpdate).toHaveBeenCalledWith('new-good', expect.any(Object));
+      expect(ApiKeyManager.promoteKey).toHaveBeenLastCalledWith('test_key_setting', 'new-good');
+      secondSpy.mockRestore();
     });
 
     it.each([

@@ -2246,6 +2246,19 @@ describe('explicit tab-wide deactivation ownership', () => {
     expect(sendMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('reports unconfirmed Background authority when the global request fails', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+    sendMessage.mockRejectedValueOnce(new Error('Background unavailable'));
+
+    await expect(manager.deactivate({ reason: 'manual', requestGlobalDeactivation: true })).resolves.toMatchObject({
+      success: true,
+      cleanupCompleted: true,
+      globalDeactivationRequested: true,
+      globalDeactivationSucceeded: false,
+    });
+  });
+
   it('releases local lifecycle cleanup before waiting for global deactivation', async () => {
     await activateManager(true);
     let resolveGlobalRequest;

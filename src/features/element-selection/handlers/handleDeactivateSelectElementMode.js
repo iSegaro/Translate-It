@@ -16,6 +16,8 @@ import {
   isStructurallyNonInjectableFrame,
   isNoReceiverSafeForFrame,
   invalidateJoinAuthority,
+  markDeactivationPending,
+  clearDeactivationPending,
 } from './selectElementStateManager.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
@@ -43,6 +45,7 @@ export async function handleDeactivateSelectElementMode(message, sender) {
   }
 
   try {
+    markDeactivationPending(tabId);
     if (typeof invalidateJoinAuthority === 'function') {
       try { invalidateJoinAuthority(tabId); } catch { /* ignore */ }
     }
@@ -118,6 +121,7 @@ export async function handleDeactivateSelectElementMode(message, sender) {
         return { success: false, error: 'Could not deactivate Select Element mode.' };
       }
       setStateForTab(tabId, false);
+      clearDeactivationPending(tabId);
       return { success: true, tabId, active: false };
     }
 
@@ -244,6 +248,7 @@ export async function handleDeactivateSelectElementMode(message, sender) {
     }
 
     setStateForTab(tabId, false);
+    clearDeactivationPending(tabId);
     return { success: true, tabId, active: false };
   } catch (err) {
     return { success: false, error: err?.message || String(err) };

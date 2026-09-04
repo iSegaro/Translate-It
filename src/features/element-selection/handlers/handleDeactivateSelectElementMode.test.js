@@ -97,6 +97,9 @@ vi.mock('./selectElementStateManager.js', () => ({
   queryFrameStateWithKind: registry.queryFrameStateWithKind,
   FrameStateKind: registry.FrameStateKind,
   invalidateJoinAuthority: registry.invalidateJoinAuthority,
+  markDeactivationPending: vi.fn(),
+  clearDeactivationPending: vi.fn(),
+  isDeactivationPending: vi.fn(() => false),
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({

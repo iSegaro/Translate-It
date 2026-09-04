@@ -16,6 +16,7 @@ import {
   getActivationAttemptToken,
   invalidateOlderActivationAttempts,
   isActivationAttemptCurrent,
+  isDeactivationPending,
   recordActivationAttemptFrames,
   retainCompatibilityFrames,
   registerParticipant,
@@ -124,6 +125,19 @@ export async function handleActivateSelectElementMode(message, sender) {
       };
     }
     
+    if (isDeactivationPending(targetTabId)) {
+      logger.debug('Deactivation pending, attempting cleanup before fresh activation for tab', targetTabId);
+      const cleanupResult = await handleDeactivateSelectElementMode({ data: { tabId: targetTabId } }, sender);
+      if (!cleanupResult.success) {
+        return {
+          success: false,
+          message: 'Select Element previous session cleanup pending',
+          tabId: targetTabId,
+          activated: false,
+        };
+      }
+    }
+
     const action = MessageActions.ACTIVATE_SELECT_ELEMENT_MODE;
     
     logger.debug(`Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
