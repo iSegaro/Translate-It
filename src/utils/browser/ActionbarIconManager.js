@@ -282,7 +282,9 @@ export class ActionbarIconManager {
   }
 
   destroy() {
-    this.resourceTracker.destroy();
+    this.resourceTracker?.destroy();
+    this.resourceTracker = null;
+    this.isInitialized = false;
   }
 
 

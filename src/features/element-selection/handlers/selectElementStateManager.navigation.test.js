@@ -47,21 +47,25 @@ describe('A5-06 navigation retirement via onCommitted',()=>{
     const g1=createActivationGeneration(tabId);
     recordActivationAttemptFrames(tabId,g1,[{frameId:5,documentId:'D1'}]);
     completeActivationAttempt(tabId,g1,getActivationAttemptToken(tabId));
+    const g2Debt=createActivationGeneration(tabId);
+    recordActivationAttemptFrames(tabId,g2Debt,[{frameId:5,documentId:'D2'}]);
+    completeActivationAttempt(tabId,g2Debt,getActivationAttemptToken(tabId));
     const g2=createActivationGeneration(tabId);
     registerParticipant(tabId,5,g2,'D2');
     // unrelated debt frame 9 DX
     const g3=createActivationGeneration(tabId);
     recordActivationAttemptFrames(tabId,g3,[{frameId:9,documentId:'DX'}]);
     completeActivationAttempt(tabId,g3,getActivationAttemptToken(tabId));
-    // unrelated generation for same frame but different generation? Add extra debt D1-like for same frame diff gen to ensure only D1 removed
     const before=getProvisionalCleanupFrames(tabId);
     expect(before.some(e=>e.frameId===5 && e.documentId==='D1')).toBe(true);
+    expect(before.some(e=>e.frameId===5 && e.documentId==='D2')).toBe(true);
     expect(before.some(e=>e.frameId===9 && e.documentId==='DX')).toBe(true);
 
     onCommittedListener({tabId, frameId:5, documentId:'D2'});
 
     const after=getProvisionalCleanupFrames(tabId);
     expect(after.some(e=>e.frameId===5 && e.documentId==='D1')).toBe(false);
+    expect(after.some(e=>e.frameId===5 && e.documentId==='D2')).toBe(true);
     expect(getParticipants(tabId).get(5)).toBe(g2);
     expect(after.some(e=>e.frameId===9 && e.documentId==='DX')).toBe(true);
   });

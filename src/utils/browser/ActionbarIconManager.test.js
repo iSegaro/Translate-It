@@ -58,5 +58,10 @@ describe('ActionbarIconManager A5-10',()=>{
     expect(mgr.isInitialized).toBe(true);
     expect(mgr.currentProvider).toBe('google_v2');
     expect(storageListeners.size).toBe(0);
+    expect(mgr.resourceTracker).toBe(null);
+    expect(()=>mgr.destroy()).not.toThrow();
+    expect(mgr.resourceTracker).toBe(null);
+    expect(mgr.isInitialized).toBe(false);
+    expect(()=>mgr.destroy()).not.toThrow();
   });
 });
