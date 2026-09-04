@@ -23,6 +23,14 @@ export class ActionbarIconManager {
   async initialize() {
     if (this.isInitialized) return;
 
+    if (this.resourceTracker) {
+      try {
+        this.resourceTracker.destroy();
+      } catch {
+        // ignore cleanup during retry
+      }
+      this.resourceTracker = null;
+    }
     this.resourceTracker = new ResourceTracker('actionbar-icon-manager');
 
     try {
@@ -47,6 +55,12 @@ export class ActionbarIconManager {
       this.isInitialized = true;
 
     } catch (error) {
+      try {
+        this.resourceTracker.destroy();
+      } catch {
+        // ignore
+      }
+      this.resourceTracker = null;
       // Use centralized context error detection
       if (ExtensionContextManager.isContextError(error)) {
         ExtensionContextManager.handleContextError(error, 'actionbar-icon-manager', {
@@ -55,9 +69,11 @@ export class ActionbarIconManager {
             this.isInitialized = true;
           }
         });
+        if (this.isInitialized) return;
       } else {
         logger.error('Failed to initialize ActionbarIconManager:', error);
       }
+      throw error;
     }
   }
 
@@ -276,7 +292,10 @@ let instance = null;
 export async function getActionbarIconManager() {
   if (!instance) {
     instance = new ActionbarIconManager();
-    await instance.initialize();
+  }
+  await instance.initialize();
+  if (!instance.isInitialized) {
+    throw new Error('ActionbarIconManager failed to initialize');
   }
   return instance;
 }

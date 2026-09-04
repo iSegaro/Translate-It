@@ -490,19 +490,19 @@ function retireFrameCleanupOwnership(tabId, frameId, documentId = null) {
     attempt.expectedDocumentIds?.delete(frameId);
   }
   removeCompatibilityFrame(tabId, frameId);
-  // Only clear provisional cleanup for that generation's document if documentId provided.
-  // Legacy fallback clears whole frame entry when unknown.
   if (isValidDocumentId(documentId)) {
     const frames = provisionalCleanupFramesByTab.get(tabId);
     const gens = frames?.get(frameId);
     if (gens) {
-      for (const [, doc] of [...gens.entries()]) {
-        if (isValidDocumentId(doc) && doc === documentId) {
-          // Keep other doc generations; this one corresponds to committed doc so remove stale?
-          // For provisional debt, committed doc's debt should be settled via ACK, not nav removal alone.
-          // Do not blindly remove; navigation retirement for provisional is handled via attempt invalidation.
+      for (const [generation, doc] of [...gens.entries()]) {
+        if (isValidDocumentId(doc) && doc !== documentId) {
+          gens.delete(generation);
+        } else if (!isValidDocumentId(doc)) {
+          // Conservative: keep unknown-document debt when live document is known
         }
       }
+      if (gens.size === 0) frames.delete(frameId);
+      if (frames?.size === 0) provisionalCleanupFramesByTab.delete(tabId);
     }
   } else {
     removeProvisionalCleanupFramesForFrame(tabId, frameId);

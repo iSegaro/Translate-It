@@ -145,10 +145,14 @@ class LifecycleManager {
   }
 
   async initializeDynamicIconManager() {
-    if (this._dynamicIconInitialized && this.dynamicIconManager) return;
+    if (this._dynamicIconInitialized && this.dynamicIconManager?.isInitialized) return;
     logger.info('Initializing ActionbarIconManager...');
     const { getActionbarIconManager } = await utilsFactory.getBrowserUtils();
-    this.dynamicIconManager = await getActionbarIconManager();
+    const manager = await getActionbarIconManager();
+    if (manager.isInitialized === false) {
+      throw new Error('ActionbarIconManager not initialized');
+    }
+    this.dynamicIconManager = manager;
     this._dynamicIconInitialized = true;
     logger.info('ActionbarIconManager initialized');
   }
