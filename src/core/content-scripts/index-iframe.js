@@ -55,7 +55,8 @@ if (!window.translateItContentScriptCore) {
     window.translateItContentCore = contentScriptCore;
     window.translateItContentScriptCore = contentScriptCore;
     
-    const initialized = await contentScriptCore.initializeCritical();
+    const { initializeContentCore } = await import('./contentStartup.js');
+    const initialized = await initializeContentCore(contentScriptCore);
 
     if (initialized) {
       // Inject Styles

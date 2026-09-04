@@ -141,7 +141,13 @@ class StorageCore extends ResourceTracker {
       // Use tracked event listener
       this.addEventListener(browser.storage.onChanged, 'change', this._changeListener);
     } catch (error) {
-      this.logger.warn('Failed to setup change listener', error);
+      try {
+        browser.storage.onChanged.removeListener?.(this._changeListener);
+      } catch {
+        // Registration ownership was not established.
+      }
+      this._changeListener = null;
+      throw error;
     }
   }
 

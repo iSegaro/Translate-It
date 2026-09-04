@@ -178,6 +178,29 @@ describe('SettingsManager defaults', () => {
     expect(storageEvents.getListener()).toEqual(expect.any(Function));
   });
 
+  it('remains retryable when required storage listener registration fails', async () => {
+    const storageEvents = createStorageEventMock();
+    const listenerError = new Error('listener unavailable');
+    browser.storage.onChanged = storageEvents.onChanged;
+    storageEvents.onChanged.addListener
+      .mockImplementationOnce(() => { throw listenerError; });
+
+    await expect(settingsManager.initialize()).rejects.toBe(listenerError);
+    expect(settingsManager._initialized).toBe(false);
+    expect(settingsManager._storageListenerSetup).toBe(false);
+
+    // Restore normal event registration for retry.
+    const recoveredEvents = createStorageEventMock();
+    browser.storage.onChanged = recoveredEvents.onChanged;
+    await settingsManager.initialize();
+    expect(recoveredEvents.onChanged.addListener).toHaveBeenCalledOnce();
+
+    const reaction = vi.fn();
+    settingsManager.onChange('EXTENSION_ENABLED', reaction);
+    recoveredEvents.dispatch({ EXTENSION_ENABLED: { oldValue: true, newValue: false } }, 'local');
+    expect(reaction).toHaveBeenCalledOnce();
+  });
+
   it('propagates storage failure and remains retryable without publishing fallback state', async () => {
     const error = new Error('storage unavailable');
     storageManagerMock.get.mockRejectedValue(error);

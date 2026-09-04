@@ -24,19 +24,27 @@ export function IFrameContentScriptCore() {
 
   // Iframe specific initialization
   core.initializeCritical = async function() {
-    const success = await this.initializeBase();
-    if (!success) return false;
+    if (this.initialized) return true;
+    if (this._criticalInitializationPromise) return this._criticalInitializationPromise;
 
-    try {
+    const initialization = (async () => {
+      const success = await this.initializeBase();
+      if (!success) return false;
+
       this.registerCoreHandlers();
 
       const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
       await SettingsManager.initialize();
       void SettingsManager.warmup();
+      this.initialized = true;
       return true;
-    } catch {
-      return false;
-    }
+    })().catch(() => false);
+    this._criticalInitializationPromise = initialization;
+    return initialization.finally(() => {
+      if (this._criticalInitializationPromise === initialization) {
+        this._criticalInitializationPromise = null;
+      }
+    });
   };
 
   core.loadFeature = async function(featureName) {

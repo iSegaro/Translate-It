@@ -95,6 +95,56 @@ describe('QueueManager', () => {
   });
 
   describe('Retry Logic', () => {
+    it('settles user cancellation immediately during retry wait', async () => {
+      const controller = new AbortController();
+      const retryAt = Date.now() + 60_000;
+      const request = vi.fn().mockRejectedValue({
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        message: 'rate limited',
+        retryAt,
+      });
+      const promise = queueManager.enqueue('retry-cancel-provider', request, 0, 'unknown', {
+        abortController: controller,
+      });
+
+      await vi.advanceTimersByTimeAsync(150);
+      const item = queueManager.queues.get('retry-cancel-provider')[0];
+      expect(item.status).toBe('retrying');
+      expect(queueManager.retryTimeouts.has(item.id)).toBe(true);
+
+      controller.abort('user-cancelled');
+
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      expect(queueManager.retryTimeouts.has(item.id)).toBe(false);
+      expect(queueManager.queues.get('retry-cancel-provider')).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(request).toHaveBeenCalledOnce();
+    });
+
+    it('settles internal abort immediately during retry wait', async () => {
+      const controller = new AbortController();
+      const request = vi.fn().mockRejectedValue({
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        message: 'rate limited',
+        retryAt: Date.now() + 60_000,
+      });
+      const promise = queueManager.enqueue('retry-operation-abort-provider', request, 0, 'unknown', {
+        abortController: controller,
+      });
+
+      await vi.advanceTimersByTimeAsync(150);
+      const item = queueManager.queues.get('retry-operation-abort-provider')[0];
+      controller.abort('operation-abort');
+
+      await expect(promise).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(queueManager.retryTimeouts.has(item.id)).toBe(false);
+      expect(queueManager.queues.get('retry-operation-abort-provider')).toHaveLength(0);
+      expect(request).toHaveBeenCalledOnce();
+    });
+
     it('does not claim a strategy denominator for initial processing', async () => {
       const request = vi.fn().mockResolvedValue('Success');
       const promise = queueManager.enqueue('initial-attempt-provider', request);

@@ -498,7 +498,9 @@ export class QueueManager {
     if (index > -1 && (item.status === QueueStatus.COMPLETED || item.status === QueueStatus.FAILED)) {
       queue.splice(index, 1);
     }
-    this._detachAbortSignal(item);
+    if (item.status === QueueStatus.COMPLETED || item.status === QueueStatus.FAILED) {
+      this._detachAbortSignal(item);
+    }
   }
 
   _attachAbortSignal(item) {

@@ -60,6 +60,19 @@ describe('content core settings readiness', () => {
     expect(mocks.warmupSettings).toHaveBeenCalledOnce()
   })
 
+  it('retries critical settings initialization without duplicating completed base setup', async () => {
+    mocks.initializeSettings
+      .mockRejectedValueOnce(new Error('settings unavailable'))
+      .mockResolvedValueOnce(undefined)
+
+    const core = ContentScriptCore()
+    await expect(core.initializeCritical()).resolves.toBe(false)
+    await expect(core.initializeCritical()).resolves.toBe(true)
+
+    expect(mocks.initializeSettings).toHaveBeenCalledTimes(2)
+    expect(mocks.initializeDebugMode).toHaveBeenCalledOnce()
+  })
+
   it('does not complete iframe core initialization before settings are ready', async () => {
     let resolveSettings
     mocks.initializeSettings.mockImplementation(() => new Promise((resolve) => {

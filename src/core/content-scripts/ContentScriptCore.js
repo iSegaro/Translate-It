@@ -50,10 +50,13 @@ export function ContentScriptCore() {
    * CRITICAL: Initialize method for Main Frame
    */
   core.initializeCritical = async function() {
-    const success = await this.initializeBase();
-    if (!success) return false;
+    if (this.initialized) return true;
+    if (this._criticalInitializationPromise) return this._criticalInitializationPromise;
 
-    try {
+    const initialization = (async () => {
+      const success = await this.initializeBase();
+      if (!success) return false;
+
       // Pre-warm settings and DebugMode (Main frame specific)
       const { default: SettingsManager } = await import('@/shared/managers/SettingsManager.js');
       await SettingsManager.initialize();
@@ -64,9 +67,13 @@ export function ContentScriptCore() {
 
       this.initialized = true;
       return true;
-    } catch {
-      return false;
-    }
+    })().catch(() => false);
+    this._criticalInitializationPromise = initialization;
+    return initialization.finally(() => {
+      if (this._criticalInitializationPromise === initialization) {
+        this._criticalInitializationPromise = null;
+      }
+    });
   };
 
   // --- VUE LOADING (Heavy) ---

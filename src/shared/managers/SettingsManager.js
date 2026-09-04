@@ -537,7 +537,8 @@ class SettingsManager {
       logger.debug('Storage listener setup complete')
     } catch (error) {
       this._storageListener = null
-      logger.warn('Failed to setup storage listener:', error)
+      this._storageListenerTarget = null
+      throw error
     }
   }
 

@@ -77,4 +77,27 @@ describe('StorageCore lifecycle behavioral', () => {
     await storage.get('b');
     expect(globalThis.browser.storage.onChanged.addListener).toHaveBeenCalledTimes(1);
   });
+
+  it('does not become ready until a required change listener is installed', async () => {
+    const listenerError = new Error('listener unavailable');
+    let registeredListener;
+    globalThis.browser.storage.local.get.mockResolvedValue({});
+    globalThis.browser.storage.onChanged.addListener
+      .mockImplementationOnce(() => { throw listenerError; })
+      .mockImplementation(listener => { registeredListener = listener; });
+
+    const storage = new StorageCore();
+    await expect(storage.get('a')).rejects.toBe(listenerError);
+    expect(storage._isReady).toBe(false);
+    expect(storage._changeListener).toBeNull();
+
+    const onChange = vi.fn();
+    storage.on('change', onChange);
+    await storage.get('a');
+
+    expect(storage._isReady).toBe(true);
+    expect(globalThis.browser.storage.onChanged.addListener).toHaveBeenCalledTimes(2);
+    registeredListener({ a: { oldValue: 1, newValue: 2 } }, 'local');
+    expect(onChange).toHaveBeenCalledWith({ key: 'a', oldValue: 1, newValue: 2 });
+  });
 });
