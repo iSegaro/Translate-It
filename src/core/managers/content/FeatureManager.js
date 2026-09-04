@@ -99,27 +99,30 @@ export class FeatureManager extends ResourceTracker {
   }
 
   // Method to reset singleton (for testing or cleanup)
-  static resetInstance() {
-    if (featureManagerInstance) {
-      featureManagerInstance.cleanup();
+  static async resetInstance() {
+    const instance = featureManagerInstance;
+    if (instance) {
       featureManagerInstance = null;
+      try {
+        await instance.cleanupAsync();
+      } catch {
+        // tolerant reset even if cleanup fails
+      }
     }
     // Also reset other singletons
     ExclusionChecker.resetInstance();
     // Reset ContentMessageHandler singleton
     try {
-      import('@/handlers/content/ContentMessageHandler.js').then((module) => {
-        module.default.resetInstance();
-      });
+      const module = await import('@/handlers/content/ContentMessageHandler.js');
+      await module.default.resetInstance();
     } catch {
       // Import might not be available
     }
 
     // Reset WindowsManager singleton
     try {
-      import('@/features/windows/managers/WindowsManager.js').then(({ WindowsManager }) => {
-        WindowsManager.resetInstance();
-      });
+      const { WindowsManager } = await import('@/features/windows/managers/WindowsManager.js');
+      await WindowsManager.resetInstance();
     } catch {
       // Import might not be available
     }

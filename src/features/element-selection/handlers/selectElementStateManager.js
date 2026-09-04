@@ -28,6 +28,7 @@ const currentActivationAttemptByTab = new Map();
 const compatibilityFramesByTab = new Map();
 // Sent activation requests without conclusive settlement remain cleanup debt.
 const provisionalCleanupFramesByTab = new Map(); // tabId -> Map<frameId, Map<generation, documentId>>
+const RECONCILE_LIVENESS_TIMEOUT_MS = 350;
 // Join authority revision: bumped on activation and before deactivation to prevent late join resurrection
 const activeSessionRevisionByTab = new Map();
 function getActiveSessionRevision(tabId) {
@@ -40,6 +41,18 @@ function bumpActiveSessionRevision(tabId) {
 }
 function invalidateJoinAuthority(tabId) {
   return bumpActiveSessionRevision(tabId);
+}
+
+const ownershipRevisionByTab = new Map();
+let nextOwnershipRevision = 0;
+function getOwnershipRevision(tabId) {
+  return ownershipRevisionByTab.get(tabId) || 0;
+}
+function bumpOwnershipRevision(tabId) {
+  if (!Number.isInteger(tabId)) return 0;
+  const next = ++nextOwnershipRevision;
+  ownershipRevisionByTab.set(tabId, next);
+  return next;
 }
 
 // Background authority barrier: blocks new joins while deactivation remains unresolved
@@ -184,8 +197,10 @@ function retainProvisionalCleanupFrame(tabId, frameId, generation, documentId = 
   // generations is Map<generation, documentId>
   if (!generations.has(generation)) {
     generations.set(generation, isValidDocumentId(documentId) ? documentId : null);
+    bumpOwnershipRevision(tabId);
   } else if (isValidDocumentId(documentId) && !isValidDocumentId(generations.get(generation))) {
     generations.set(generation, documentId);
+    bumpOwnershipRevision(tabId);
   }
 }
 
@@ -225,6 +240,7 @@ function removeProvisionalCleanupFrame(tabId, frameId, generation) {
   generations.delete(generation);
   if (generations.size === 0) frames.delete(frameId);
   if (frames.size === 0) provisionalCleanupFramesByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
   return true;
 }
 
@@ -232,11 +248,14 @@ function removeProvisionalCleanupFramesForFrame(tabId, frameId) {
   const frames = provisionalCleanupFramesByTab.get(tabId);
   if (!frames?.delete(frameId)) return false;
   if (frames.size === 0) provisionalCleanupFramesByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
   return true;
 }
 
 function clearProvisionalCleanupFrames(tabId) {
+  if (!provisionalCleanupFramesByTab.has(tabId)) return;
   provisionalCleanupFramesByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
 }
 
 function invalidateOlderActivationAttempts(tabId, generation) {
@@ -287,13 +306,16 @@ function retainCompatibilityFrames(tabId, generation, frameIds) {
     compatibilityFramesByTab.set(tabId, frames);
   }
   const participants = selectElementParticipantsByTab.get(tabId);
+  let didChange = false;
   for (const frameId of frameIds || []) {
     if (Number.isInteger(frameId) && frameId >= 0) {
       if (participants?.has(frameId)) continue;
+      if (!frames.has(frameId) || frames.get(frameId) !== generation) didChange = true;
       frames.set(frameId, generation);
       removeProvisionalCleanupFrame(tabId, frameId, generation);
     }
   }
+  if (didChange) bumpOwnershipRevision(tabId);
 }
 
 function getCompatibilityFrames(tabId) {
@@ -304,11 +326,14 @@ function removeCompatibilityFrame(tabId, frameId) {
   const frames = compatibilityFramesByTab.get(tabId);
   if (!frames?.delete(frameId)) return false;
   if (frames.size === 0) compatibilityFramesByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
   return true;
 }
 
 function clearCompatibilityFrames(tabId) {
+  if (!compatibilityFramesByTab.has(tabId)) return;
   compatibilityFramesByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
 }
 
 function buildDocumentAwareMessageTarget(frameId, documentId) {
@@ -429,6 +454,7 @@ function registerParticipant(tabId, frameId, generation, documentId = null) {
   removeCompatibilityFrame(tabId, frameId);
   // A newer document must not erase cleanup debt belonging to an older document.
   removeProvisionalCleanupFrame(tabId, frameId, generation);
+  bumpOwnershipRevision(tabId);
   return true;
 }
 
@@ -448,6 +474,7 @@ function removeParticipant(tabId, frameId, generation, expectedDocumentId = null
   }
   participants.delete(frameId);
   if (participants.size === 0) selectElementParticipantsByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
   return true;
 }
 
@@ -468,14 +495,15 @@ function getParticipantsWithDocuments(tabId) {
 }
 
 function clearParticipants(tabId) {
-  selectElementParticipantsByTab.get(tabId)?.clear();
-  if (selectElementParticipantsByTab.get(tabId)?.size === 0) {
-    selectElementParticipantsByTab.delete(tabId);
-  }
+  const participants = selectElementParticipantsByTab.get(tabId);
+  if (!participants || participants.size === 0) return;
+  participants.clear();
+  selectElementParticipantsByTab.delete(tabId);
+  bumpOwnershipRevision(tabId);
 }
 
 function clearTabParticipants(tabId) {
-  selectElementParticipantsByTab.delete(tabId);
+  clearParticipants(tabId);
   currentGenerationByTab.delete(tabId);
   nextActivationGenerationByTab.delete(tabId);
   invalidateActivationAttempts(tabId);
@@ -494,15 +522,18 @@ function retireFrameCleanupOwnership(tabId, frameId, documentId = null) {
     const frames = provisionalCleanupFramesByTab.get(tabId);
     const gens = frames?.get(frameId);
     if (gens) {
+      let didDelete = false;
       for (const [generation, doc] of [...gens.entries()]) {
         if (isValidDocumentId(doc) && doc !== documentId) {
           gens.delete(generation);
+          didDelete = true;
         } else if (!isValidDocumentId(doc)) {
           // Conservative: keep unknown-document debt when live document is known
         }
       }
       if (gens.size === 0) frames.delete(frameId);
       if (frames?.size === 0) provisionalCleanupFramesByTab.delete(tabId);
+      if (didDelete) bumpOwnershipRevision(tabId);
     }
   } else {
     removeProvisionalCleanupFramesForFrame(tabId, frameId);
@@ -531,6 +562,7 @@ function removeParticipantForNavigation(tabId, frameId, documentId) {
     const participants = selectElementParticipantsByTab.get(tabId);
     participants.delete(frameId);
     if (participants.size === 0) selectElementParticipantsByTab.delete(tabId);
+    bumpOwnershipRevision(tabId);
     return true;
   }
   // Fallback when documentIds missing: use frameId removal (old behavior) but only if event is for that frame.
@@ -742,6 +774,7 @@ async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
         selectElementParticipantsByTab.set(tabId, participants);
       }
       participants.set(frameId, { generation: capturedGen, documentId: isValidDocumentId(documentId) ? documentId : null });
+      bumpOwnershipRevision(tabId);
       removeProvisionalCleanupFrame(tabId, frameId, capturedGen);
       return true;
     }
@@ -757,6 +790,120 @@ async function reconcileNewFrameIfActive(tabId, frameId, documentId) {
     // Unknown send state remains cleanup debt until authoritative cleanup settles it.
   }
   return false;
+}
+
+async function reconcileStaleOwnershipForRead(tabId) {
+  if (!Number.isInteger(tabId)) return;
+  const initialState = getStateForTab(tabId);
+  if (!initialState.active) return;
+
+  const capturedRevision = getActiveSessionRevision(tabId);
+  const capturedGen = getCurrentGeneration(tabId);
+  const capturedOwnershipRevision = getOwnershipRevision(tabId);
+
+  // Snapshot current ownership before async live check to avoid deleting
+  // concurrent new ownership that appears after the snapshot.
+  const capturedParticipants = new Map(selectElementParticipantsByTab.get(tabId) || []);
+  const capturedCompat = new Map(compatibilityFramesByTab.get(tabId) || []);
+  const capturedProvisional = new Map();
+  for (const [fid, genMap] of provisionalCleanupFramesByTab.get(tabId) || []) {
+    capturedProvisional.set(fid, new Map(genMap));
+  }
+
+  let liveFrames;
+  let timeoutId;
+  try {
+    if (!browser.webNavigation?.getAllFrames) return;
+    const framesPromise = browser.webNavigation.getAllFrames({ tabId });
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        const err = new Error('liveness reconciliation timeout');
+        err.isReconciliationTimeout = true;
+        reject(err);
+      }, RECONCILE_LIVENESS_TIMEOUT_MS);
+    });
+    liveFrames = await Promise.race([framesPromise, timeoutPromise]);
+  } catch {
+    return;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!Array.isArray(liveFrames)) return;
+
+  if (getOwnershipRevision(tabId) !== capturedOwnershipRevision) return;
+
+  const isLive = (frameId, docId) => {
+    const live = liveFrames.find(f => f?.frameId === frameId);
+    if (!live) return false;
+    if (isValidDocumentId(docId)) {
+      if (!isValidDocumentId(live.documentId)) return true;
+      return live.documentId === docId;
+    }
+    return true;
+  };
+
+  for (const [fid, info] of capturedParticipants.entries()) {
+    if (!isLive(fid, info.documentId)) {
+      const current = selectElementParticipantsByTab.get(tabId)?.get(fid);
+      if (current && current.generation === info.generation && current.documentId === info.documentId) {
+        removeParticipant(tabId, fid, info.generation, info.documentId);
+      }
+    }
+  }
+
+  for (const [fid, gen] of capturedCompat.entries()) {
+    if (!isLive(fid, null)) {
+      const currentGen = compatibilityFramesByTab.get(tabId)?.get(fid);
+      if (currentGen === gen) {
+        removeCompatibilityFrame(tabId, fid);
+      }
+    }
+  }
+
+  for (const [fid, genMap] of capturedProvisional.entries()) {
+    for (const [gen, docId] of genMap.entries()) {
+      if (!isLive(fid, docId)) {
+        const currentGenMap = provisionalCleanupFramesByTab.get(tabId)?.get(fid);
+        if (currentGenMap && currentGenMap.get(gen) === docId) {
+          removeProvisionalCleanupFrame(tabId, fid, gen);
+        }
+      }
+    }
+  }
+
+  const hasParticipants = (selectElementParticipantsByTab.get(tabId)?.size || 0) > 0;
+  const hasCompat = (compatibilityFramesByTab.get(tabId)?.size || 0) > 0;
+  const hasProvisional = (() => {
+    const frames = provisionalCleanupFramesByTab.get(tabId);
+    if (!frames) return false;
+    for (const m of frames.values()) if (m.size > 0) return true;
+    return false;
+  })();
+
+  if (hasParticipants || hasCompat || hasProvisional) return;
+
+  const currentState = getStateForTab(tabId);
+  const currentRevision = getActiveSessionRevision(tabId);
+  const currentGenNow = getCurrentGeneration(tabId);
+  const currentHasParticipants = (selectElementParticipantsByTab.get(tabId)?.size || 0) > 0;
+  const currentHasCompat = (compatibilityFramesByTab.get(tabId)?.size || 0) > 0;
+  const currentHasProvisional = (() => {
+    const frames = provisionalCleanupFramesByTab.get(tabId);
+    if (!frames) return false;
+    for (const m of frames.values()) if (m.size > 0) return true;
+    return false;
+  })();
+
+  if (
+    currentState.active === true &&
+    currentRevision === capturedRevision &&
+    currentGenNow === capturedGen &&
+    !currentHasParticipants &&
+    !currentHasCompat &&
+    !currentHasProvisional
+  ) {
+    setStateForTab(tabId, false);
+  }
 }
 
 function setStateForTab(tabId, active) {
@@ -851,7 +998,10 @@ try {
             // For strict top nav, clear all participants.
             if (getParticipants(tabId).size !== 0 && !getParticipantInfo(tabId, 0)) {
               // If top had no participant but children did, top nav still invalidates children
-              selectElementParticipantsByTab.delete(tabId);
+              if (selectElementParticipantsByTab.has(tabId)) {
+                selectElementParticipantsByTab.delete(tabId);
+                bumpOwnershipRevision(tabId);
+              }
             }
           } else {
             const didRemove = removeParticipantForNavigation(tabId, frameId, documentId);
@@ -895,6 +1045,9 @@ export {
   setStateForTab,
   getStateForTab,
   clearStateForTab,
+  reconcileStaleOwnershipForRead,
+  RECONCILE_LIVENESS_TIMEOUT_MS,
+  getOwnershipRevision,
   createActivationGeneration,
   getCurrentGeneration,
   getActivationEpoch,

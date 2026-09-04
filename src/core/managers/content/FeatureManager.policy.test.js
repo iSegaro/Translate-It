@@ -25,8 +25,8 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
 import { FeatureManager } from './FeatureManager.js';
 
 describe('FeatureManager policy hook', () => {
-  beforeEach(() => {
-    FeatureManager.resetInstance();
+  beforeEach(async () => {
+    await FeatureManager.resetInstance();
     vi.clearAllMocks();
   });
 

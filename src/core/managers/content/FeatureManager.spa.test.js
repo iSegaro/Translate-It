@@ -29,9 +29,9 @@ function deferred() {
 
 describe('SPA navigation behavioral deterministic', () => {
   let manager;
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    FeatureManager.resetInstance();
+    await FeatureManager.resetInstance();
     manager = new FeatureManager();
     manager._lifecycleRevision = 0;
     manager._navigationRevision = 0;

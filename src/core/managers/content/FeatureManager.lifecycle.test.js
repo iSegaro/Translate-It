@@ -66,12 +66,12 @@ import { FeatureManager } from './FeatureManager.js';
 
 describe('FeatureManager lifecycle regressions', () => {
   let manager;
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mocks.exclusionChecker.isFeatureAllowed.mockResolvedValue(true);
     mocks.exclusionChecker.refreshSettings.mockResolvedValue(undefined);
     // reset singleton
-    FeatureManager.resetInstance();
+    await FeatureManager.resetInstance();
     // need to handle async cleanup from resetInstance
     manager = new FeatureManager();
     manager._lifecycleRevision = 0;
@@ -96,9 +96,9 @@ describe('FeatureManager lifecycle regressions', () => {
     manager.exclusionChecker = mocks.exclusionChecker;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     manager.cleanup();
-    FeatureManager.resetInstance();
+    await FeatureManager.resetInstance();
     vi.restoreAllMocks();
   });
 

@@ -1,4 +1,4 @@
-import { getStateForTab } from './selectElementStateManager.js';
+import { getStateForTab, reconcileStaleOwnershipForRead } from './selectElementStateManager.js';
 import browser from 'webextension-polyfill';
 
 /**
@@ -31,6 +31,14 @@ export async function handleGetSelectElementState(message, sender) {
     return { success: false, error: 'Could not determine tabId' };
   }
 
-  const state = getStateForTab(tabId);
+  let state = getStateForTab(tabId);
+  if (state.active) {
+    try {
+      await reconcileStaleOwnershipForRead(tabId);
+      state = getStateForTab(tabId);
+    } catch {
+      // Fail closed: keep previous active state on reconciliation error
+    }
+  }
   return { success: true, tabId, active: !!state.active, updatedAt: state.updatedAt };
 }

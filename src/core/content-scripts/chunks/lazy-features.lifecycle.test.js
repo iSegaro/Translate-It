@@ -18,12 +18,12 @@ function deferred() {
 }
 
 describe('lazy-features behavioral', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     // reset lazy state
     lazy.notifyFeatureDeactivated('testLazy');
     // ensure FeatureManager singleton clean
-    FeatureManager.resetInstance();
+    await FeatureManager.resetInstance();
   });
 
   it('stale A finalizer does not delete B and C dedupes onto B', async () => {
@@ -45,7 +45,7 @@ describe('lazy-features behavioral', () => {
 
     // Need to track which call is which: use call count
     let callCount = 0;
-    fm.requestFeatureActivation.mockImplementation((name) => {
+    fm.requestFeatureActivation.mockImplementation(() => {
       callCount++;
       if (callCount === 1) return deferredA.promise.then(() => handlerA);
       if (callCount === 2) return deferredB.promise.then(() => handlerB);
