@@ -1,3 +1,22 @@
+#### v1.19.0 – Released on September 05, 2026
+
+##### Added
+
+- Added font customization for [Select Element](#/appearance?highlight=SELECT_ELEMENT_USE_TRANSLATION_FONT) and [Page Translation](#/appearance?highlight=WHOLE_PAGE_USE_TRANSLATION_FONT) in the Settings page.
+- `Popup` and `Sidepanel` now remember your last translation while the browser is open.
+
+##### Changed
+
+- Updated AI provider models.
+- Changed the `Select Element` revert shortcut from `Esc` to **double `Esc`**.
+
+##### Fixed
+
+- Fixed various issues and improved the overall reliability of `Select Element`, including better compatibility with AI models with limited or no JSON support.
+- Fixed various issues and improved the overall reliability of `Page Translation` and other translation features.
+
+---
+
 #### v1.18.0 – Released on August 01, 2026
 
 ##### Added
