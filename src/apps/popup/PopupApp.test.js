@@ -6,13 +6,17 @@ import PopupApp from './PopupApp.vue'
 let mockSettingsStore
 let mockUnifiedTranslation
 let mockLanguageDefaults
+const useUnifiedTranslationMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => mockSettingsStore
 }))
 
 vi.mock('@/features/translation/composables/useUnifiedTranslation.js', () => ({
-  useUnifiedTranslation: () => mockUnifiedTranslation
+  useUnifiedTranslation: (...args) => {
+    useUnifiedTranslationMock(...args)
+    return mockUnifiedTranslation
+  }
 }))
 
 vi.mock('@/features/settings/composables/useLanguageDefaults.js', () => ({
@@ -120,7 +124,7 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
 vi.mock('@/components/popup/TranslationForm.vue', () => ({
   default: {
     name: 'TranslationForm',
-    props: ['sourceLanguage', 'targetLanguage', 'provider'],
+    props: ['sourceLanguage', 'targetLanguage', 'provider', 'translation'],
     template: '<div class="translation-form-stub" />'
   }
 }))
@@ -152,8 +156,10 @@ describe('PopupApp', () => {
       sourceText: ref('hello'),
       translatedText: ref('bonjour'),
       clearTranslation: vi.fn().mockResolvedValue(undefined),
+      initializeSessionState: vi.fn().mockResolvedValue(undefined),
       lastTranslation: ref({ source: 'hello' })
     }
+    useUnifiedTranslationMock.mockClear()
 
     mockLanguageDefaults = {
       savedSourceLanguage: ref('fr'),
@@ -186,6 +192,15 @@ describe('PopupApp', () => {
     expect(selector.props('defaultActionsEnabled')).toBe(true)
     expect(selector.props('sourceIsSavedDefault')).toBe(true)
     expect(selector.props('targetIsSavedDefault')).toBe(false)
+  })
+
+  it('creates one popup translation owner and passes it to TranslationForm', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(useUnifiedTranslationMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.findComponent({ name: 'TranslationForm' }).props('translation')).toBe(mockUnifiedTranslation)
   })
 
   it('persists current source and target when stars are clicked', async () => {

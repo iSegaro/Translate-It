@@ -95,6 +95,7 @@
         <div class="translation-container">
           <TranslationForm
             ref="translationFormRef"
+            :translation="translation"
             :source-language="sourceLanguage"
             :target-language="targetLanguage"
             :provider="currentProvider"
@@ -154,12 +155,14 @@ const settingsStore = useSettingsStore()
 const { sendMessage } = useMessaging(MessageContexts.POPUP)
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
+const currentProvider = ref('')
+const translation = useUnifiedTranslation('popup', { provider: currentProvider });
 const { 
   sourceLanguage,
   targetLanguage,
   clearTranslation,
   lastTranslation
-} = useUnifiedTranslation('popup');
+} = translation;
 const {
   savedSourceLanguage,
   savedTargetLanguage,
@@ -185,7 +188,6 @@ const hasError = ref(false)
 const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
-const currentProvider = ref('')
 
 // Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {
@@ -289,6 +291,7 @@ const initialize = async () => {
     if (!currentProvider.value) {
       currentProvider.value = settings.TRANSLATION_API
     }
+    await translation.initializeSessionState()
 
     // Step 5: Global Event Listeners (e.g., clearing fields from other components)
     tracker.addEventListener(document, 'clear-storage', async () => {

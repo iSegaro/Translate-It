@@ -32,7 +32,7 @@ const mockUnifiedTranslation = {
   getSettingsCallback: vi.fn(() => vi.fn()),
   cancelTranslation: vi.fn(),
   clearTranslation: vi.fn(),
-  loadLastTranslation: vi.fn().mockResolvedValue(undefined),
+  initializeSessionState: vi.fn().mockResolvedValue(undefined),
 };
 
 const mockLanguageDefaults = {

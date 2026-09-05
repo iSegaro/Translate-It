@@ -22,7 +22,7 @@ const mockTranslation = {
   getSettingsCallback: vi.fn(() => mockSettingsCallback),
   cancelTranslation: vi.fn(),
   clearTranslation: vi.fn(),
-  loadLastTranslation: vi.fn().mockResolvedValue(undefined),
+  revertTranslation: vi.fn(),
 };
 
 vi.mock('@/features/translation/composables/useUnifiedTranslation.js', () => ({
@@ -96,6 +96,7 @@ describe('TranslationForm.vue', () => {
       sourceLanguage: 'en',
       targetLanguage: 'fr',
       provider: 'openai',
+      translation: mockTranslation,
     },
   });
 

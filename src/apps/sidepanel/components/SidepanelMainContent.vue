@@ -177,6 +177,23 @@ const settingsStore = useSettingsStore()
 
 // Composables
 const { t } = useUnifiedI18n();
+
+// Props
+const props = defineProps({
+  provider: {
+    type: String,
+    default: ''
+  }
+})
+
+// Emits
+const emit = defineEmits(['can-translate-change', 'update:provider'])
+
+const currentProviderLocal = computed({
+  get: () => props.provider,
+  set: (value) => emit('update:provider', value)
+})
+
 const {
   sourceText,
   translatedText,
@@ -197,8 +214,8 @@ const {
   getSettingsCallback,
   cancelTranslation,
   clearTranslation,
-  loadLastTranslation
-} = useUnifiedTranslation('sidepanel');
+  initializeSessionState
+} = useUnifiedTranslation('sidepanel', { provider: currentProviderLocal });
 const {
   savedSourceLanguage,
   savedTargetLanguage,
@@ -215,23 +232,6 @@ const { handleError } = useErrorHandler()
 // Refs
 const sourceInputRef = ref(null)
 const translationResultRef = ref(null)
-
-// Props
-const props = defineProps({
-  provider: {
-    type: String,
-    default: ''
-  }
-})
-
-// Emits
-const emit = defineEmits(['can-translate-change', 'update:provider'])
-
-// State
-const currentProviderLocal = computed({
-  get: () => props.provider,
-  set: (value) => emit('update:provider', value)
-})
 
 const retryTranslation = getRetryCallback(() => triggerTranslation(
   sourceLanguage.value,
@@ -370,16 +370,14 @@ const handleSetDefaultTarget = async () => {
 // Expose methods and refs to the parent component
 defineExpose({
   clearFields,
-  sourceInputRef
+  sourceInputRef,
+  initializeSessionState
 });
 
 
 // Event listeners
 onMounted(async () => {
   logger.debug("[SidepanelMainContent] Component mounting...");
-  // Language initialization is now handled by useUnifiedTranslation.
-  // Load last translation if any
-  await loadLastTranslation()
 
   // Setup resize observer for responsive layout
   // Use setTimeout to ensure DOM is ready and initial width is calculated

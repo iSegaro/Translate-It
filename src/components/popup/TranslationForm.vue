@@ -53,7 +53,6 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useUnifiedTranslation } from '@/features/translation/composables/useUnifiedTranslation.js'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
@@ -85,6 +84,10 @@ const props = defineProps({
   provider: {
     type: String,
     default: ''
+  },
+  translation: {
+    type: Object,
+    required: true
   }
 })
 
@@ -94,8 +97,6 @@ const settingsStore = useSettingsStore()
 // Emits
 const emit = defineEmits(['can-translate-change'])
 
-// Composables (lightweight popup version)
-const translation = useUnifiedTranslation('popup')
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
 
@@ -122,8 +123,8 @@ const {
   getSettingsCallback,
   cancelTranslation,
   clearTranslation,
-  loadLastTranslation
-} = translation
+  revertTranslation: revertCurrentTranslation
+} = props.translation
 
 const retryTranslation = getRetryCallback(() => triggerTranslation(
   props.sourceLanguage,
@@ -198,18 +199,10 @@ const clearStorage = () => {
 }
 
 const revertTranslation = () => {
-  if (lastTranslation.value) {
-    sourceText.value = lastTranslation.value.target || ''
-    translatedText.value = lastTranslation.value.source || ''
-    
-    // Swap languages too
-    const tempSource = lastTranslation.value.targetLanguage
-    const tempTarget = lastTranslation.value.sourceLanguage
-    
-    if (tempSource && tempTarget) {
-      settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', tempSource)
-      settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', tempTarget)
-    }
+  const languages = revertCurrentTranslation()
+  if (languages?.sourceLanguage && languages?.targetLanguage) {
+    settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', languages.sourceLanguage)
+    settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', languages.targetLanguage)
   }
 }
 
@@ -226,8 +219,6 @@ onMounted(async () => {
     // Text content should remain in their respective fields
   })
   
-  // Initialize translation data
-  await loadLastTranslation()
 })
 
 // Expose methods and state to parent
