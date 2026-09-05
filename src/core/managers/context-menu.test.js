@@ -11,11 +11,13 @@ const mocks = vi.hoisted(() => {
       })
     },
     commands: {
-      getAll: vi.fn().mockResolvedValue([])
+      getAll: vi.fn().mockResolvedValue([]),
+      openShortcutSettings: vi.fn().mockResolvedValue(undefined)
     },
     runtime: {
       sendMessage: vi.fn(),
-      getURL: vi.fn((path) => path)
+      getURL: vi.fn((path) => path),
+      getBrowserInfo: vi.fn().mockResolvedValue({ name: 'Chrome' })
     },
     storage: {
       onChanged: {
@@ -48,6 +50,9 @@ const mocks = vi.hoisted(() => {
     getEffectiveProviderAsync: vi.fn().mockResolvedValue('googlev2'),
     getDebugModeAsync: vi.fn().mockResolvedValue(false),
     getTranslationString: vi.fn((key) => key),
+    tabPermissionChecker: {
+      checkTabAccess: vi.fn().mockResolvedValue({ isAccessible: true })
+    },
     utilsFactory: {
       getI18nUtils: vi.fn()
     }
@@ -110,9 +115,7 @@ vi.mock('@/core/extensionContext.js', () => ({
 }));
 
 vi.mock('@/core/tabPermissions.js', () => ({
-  tabPermissionChecker: {
-    checkTabAccess: vi.fn().mockResolvedValue({ isAccessible: true })
-  }
+  tabPermissionChecker: mocks.tabPermissionChecker
 }));
 
 vi.mock('@/core/ExtensionAppLauncher.js', () => ({
@@ -124,6 +127,7 @@ vi.mock('@/core/background/handlers/lazy/handleElementSelectionLazy.js', () => (
 }));
 
 import { ContextMenuManager } from './context-menu.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 const CONTEXT_MENU_SETTING_KEYS = [
   'EXTENSION_ENABLED',
@@ -190,6 +194,9 @@ describe('ContextMenuManager keyed storage reads', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete globalThis.backgroundService;
+    mocks.browser.commands.openShortcutSettings.mockResolvedValue(undefined);
+    mocks.browser.runtime.getBrowserInfo.mockResolvedValue({ name: 'Chrome' });
     mocks.getTranslationString.mockImplementation((key) => key);
     mocks.utilsFactory.getI18nUtils.mockResolvedValue({
       getTranslationString: mocks.getTranslationString
@@ -547,6 +554,72 @@ describe('ContextMenuManager keyed storage reads', () => {
       'Error setting new API provider:',
       error
     );
+  });
+
+  it('routes Help through the canonical Options handler', async () => {
+    const openOptionsHandler = vi.fn().mockResolvedValue({ success: true });
+    const getHandlerForMessage = vi.fn().mockReturnValue(openOptionsHandler);
+    globalThis.backgroundService = {
+      messageHandler: { getHandlerForMessage }
+    };
+
+    await manager.handleMenuClick({ menuItemId: 'open-help-page' });
+
+    expect(getHandlerForMessage).toHaveBeenCalledWith(MessageActions.OPEN_OPTIONS_PAGE);
+    expect(openOptionsHandler).toHaveBeenCalledWith(
+      {
+        action: MessageActions.OPEN_OPTIONS_PAGE,
+        data: { anchor: 'help' }
+      },
+      { tab: null },
+      expect.any(Function)
+    );
+    expect(mocks.browser.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(mocks.browser.runtime.getURL).not.toHaveBeenCalled();
+  });
+
+  it('falls back to messaging for canonical Help navigation', async () => {
+    await manager.handleMenuClick({ menuItemId: 'open-help-page' });
+
+    expect(mocks.browser.runtime.sendMessage).toHaveBeenCalledWith({
+      action: MessageActions.OPEN_OPTIONS_PAGE,
+      data: { anchor: 'help' }
+    });
+    expect(mocks.browser.runtime.getURL).not.toHaveBeenCalled();
+  });
+
+  it('opens native Firefox shortcut settings without checking the active tab', async () => {
+    mocks.browser.runtime.getBrowserInfo.mockResolvedValue({ name: 'Firefox' });
+
+    await manager.handleMenuClick({ menuItemId: 'open-shortcuts-page' });
+
+    expect(mocks.browser.commands.openShortcutSettings).toHaveBeenCalledOnce();
+    expect(mocks.browser.tabs.create).not.toHaveBeenCalled();
+    expect(mocks.tabPermissionChecker.checkTabAccess).not.toHaveBeenCalled();
+  });
+
+  it('opens Chrome shortcut settings URL outside Firefox', async () => {
+    await manager.handleMenuClick({ menuItemId: 'open-shortcuts-page' });
+
+    expect(mocks.browser.tabs.create).toHaveBeenCalledWith({
+      url: 'chrome://extensions/shortcuts'
+    });
+    expect(mocks.browser.commands.openShortcutSettings).not.toHaveBeenCalled();
+  });
+
+  it('logs Firefox shortcut API failures without opening the Help page', async () => {
+    const error = new Error('shortcut settings unavailable');
+    mocks.browser.runtime.getBrowserInfo.mockResolvedValue({ name: 'Firefox' });
+    mocks.browser.commands.openShortcutSettings.mockRejectedValue(error);
+
+    await manager.handleMenuClick({ menuItemId: 'open-shortcuts-page' });
+
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      'Could not open Firefox shortcut settings:',
+      error
+    );
+    expect(mocks.browser.tabs.create).not.toHaveBeenCalled();
+    expect(mocks.browser.runtime.sendMessage).not.toHaveBeenCalled();
   });
 
   it('keeps Select Element title failure local to its menu paths', async () => {

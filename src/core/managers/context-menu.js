@@ -922,81 +922,54 @@ export class ContextMenuManager extends ResourceTracker {
 
         case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
           try {
-            let url;
-
-            // Check if current tab is accessible and determine appropriate shortcuts URL
-            const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
-            if (activeTab) {
-              // Check if current tab is accessible before determining shortcuts URL
-              const tabAccess = await tabPermissionChecker.checkTabAccess(activeTab.id);
-
-              if (!tabAccess.isAccessible) {
-                logger.debug(`Current tab is restricted (${tabAccess.errorMessage}), using fallback shortcuts URL`);
+            let browserName = null;
+            if (typeof browser.runtime?.getBrowserInfo === 'function') {
+              try {
+                browserName = (await browser.runtime.getBrowserInfo())?.name;
+              } catch (browserInfoError) {
+                logger.debug("Browser info not available, using default Chrome shortcuts URL", browserInfoError);
               }
-
-              if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
-                try {
-                  const browserInfo = await browser.runtime.getBrowserInfo();
-                  if (browserInfo.name === "Firefox") {
-                    // Use extension's options page for Firefox with query param
-                    url = browser.runtime.getURL("src/html/options.html?tab=shortcuts");
-                  } else {
-                    // Use Chrome shortcuts page
-                    url = "chrome://extensions/shortcuts";
-                  }
-                } catch (browserInfoError) {
-                  logger.debug("Browser info not available, using default Chrome shortcuts URL", browserInfoError);
-                  url = "chrome://extensions/shortcuts";
-                }
-              } else {
-                // Fallback to Chrome shortcuts
-                url = "chrome://extensions/shortcuts";
-              }
-            } else {
-              // No active tab, use default behavior
-              url = "chrome://extensions/shortcuts";
             }
 
-            await browser.tabs.create({ url });
+            if (browserName === "Firefox") {
+              if (typeof browser.commands?.openShortcutSettings === 'function') {
+                try {
+                  await browser.commands.openShortcutSettings();
+                } catch (error) {
+                  logger.error("Could not open Firefox shortcut settings:", error);
+                }
+              } else {
+                logger.error("Firefox shortcut settings API unavailable");
+              }
+            } else {
+              await browser.tabs.create({ url: "chrome://extensions/shortcuts" });
+            }
           } catch (e) {
             if (ExtensionContextManager.isContextError(e)) {
               ExtensionContextManager.handleContextError(e, 'context-menu:open-shortcuts');
             } else {
               logger.error("Could not open shortcuts page:", e);
             }
-            // Final fallback - try to open options page instead
-            try {
-              await browser.tabs.create({ url: browser.runtime.getURL("src/html/options.html?tab=shortcuts") });
-            } catch (fallbackError) {
-              if (!ExtensionContextManager.isContextError(fallbackError)) {
-                logger.error("Failed to open fallback shortcuts page:", fallbackError);
-              }
-            }
           }
           break;
 
-        case HELP_MENU_ID:
-          // Check browser type for proper help navigation
-          if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
-            try {
-              const browserInfo = await browser.runtime.getBrowserInfo();
-              if (browserInfo.name === "Firefox") {
-                // Use query parameter for Firefox to ensure proper tab selection
-                await focusOrCreateTab(browser.runtime.getURL("src/html/options.html?tab=help"));
-              } else {
-                // Use hash for Chrome and other browsers
-                await focusOrCreateTab(browser.runtime.getURL("src/html/options.html#help"));
-              }
-            } catch (browserInfoError) {
-              logger.debug("Browser info not available, using default hash URL", browserInfoError);
-              await focusOrCreateTab(browser.runtime.getURL("src/html/options.html#help"));
-            }
+        case HELP_MENU_ID: {
+          const message = {
+            action: MessageActions.OPEN_OPTIONS_PAGE,
+            data: { anchor: 'help' }
+          };
+          const backgroundService = globalThis.backgroundService;
+          const handler = backgroundService?.messageHandler?.getHandlerForMessage?.(
+            MessageActions.OPEN_OPTIONS_PAGE
+          );
+
+          if (handler) {
+            await handler(message, { tab: null }, () => {});
           } else {
-            // Fallback to hash URL
-            await focusOrCreateTab(browser.runtime.getURL("src/html/options.html#help"));
+            await browser.runtime.sendMessage(message);
           }
           break;
+        }
 
 
         default:

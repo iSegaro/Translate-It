@@ -84,20 +84,26 @@ const fetchShortcuts = async () => {
 
 const openShortcutSettings = async () => {
   try {
-    let url = "chrome://extensions/shortcuts";
-    
-    // Check if we are on Firefox
-    if (browserAPI.value && typeof browserAPI.value.runtime?.getBrowserInfo === 'function') {
+    let browserName = null;
+    if (typeof browserAPI.value?.runtime?.getBrowserInfo === 'function') {
       try {
-        const browserInfo = await browserAPI.value.runtime.getBrowserInfo();
-        if (browserInfo.name === "Firefox") {
-          url = browserAPI.value.runtime.getURL("src/html/options.html?tab=shortcuts");
-        }
+        browserName = (await browserAPI.value.runtime.getBrowserInfo())?.name;
       } catch (e) {
         logger.debug("Failed to get browser info, using default shortcuts URL", e);
       }
     }
-    
+
+    if (browserName === 'Firefox') {
+      if (typeof browserAPI.value?.commands?.openShortcutSettings !== 'function') {
+        logger.error("Firefox shortcut settings API unavailable");
+        return;
+      }
+
+      await browserAPI.value.commands.openShortcutSettings();
+      return;
+    }
+
+    const url = "chrome://extensions/shortcuts";
     if (browserAPI.value?.tabs) {
       await browserAPI.value.tabs.create({ url });
     } else {
@@ -105,10 +111,6 @@ const openShortcutSettings = async () => {
     }
   } catch (err) {
     logger.error("Failed to open shortcuts page:", err);
-    const fallbackUrl = browserAPI.value?.runtime?.getURL 
-      ? browserAPI.value.runtime.getURL("src/html/options.html?tab=shortcuts") 
-      : "src/html/options.html?tab=shortcuts";
-    window.open(fallbackUrl, '_blank');
   }
 }
 
