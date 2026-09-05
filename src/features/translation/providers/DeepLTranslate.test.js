@@ -3,6 +3,7 @@ import { DeepLTranslateProvider } from './DeepLTranslate.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ApiKeyManager } from './ApiKeyManager.js';
 import { ProviderRequestEngine } from './utils/ProviderRequestEngine.js';
+import { QueueManager } from '@/features/translation/core/QueueManager.js';
 import { getProviderLanguageCode } from '@/shared/config/languageConstants.js';
 
 const deeplConfigMocks = vi.hoisted(() => ({
@@ -582,9 +583,15 @@ describe('DeepLTranslateProvider response contract', () => {
   });
 
   it.each([
-    ['source_lang', "Bad request. Reason: Value for 'source_lang' not supported."],
-    ['target_lang', "Bad request. Reason: Value for 'target_lang' not supported."],
-  ])('classifies unsupported %s as LANGUAGE_PAIR_NOT_SUPPORTED without fallback', async (_languageField, message) => {
+    ['current source wording', "Bad request. Reason: Value for 'source_lang' not supported."],
+    ['current target wording', "Bad request. Reason: Value for 'target_lang' not supported."],
+    ['alternate source token wording', 'source_lang is not supported'],
+    ['alternate target token wording', 'target_lang is not supported'],
+    ['human-readable source wording', 'Unsupported source language'],
+    ['human-readable target wording', 'Unsupported target language'],
+    ['normalized case and punctuation', 'SOURCE_LANG   IS NOT SUPPORTED!'],
+    ['double-quoted target wording', 'Value for "target_lang" is not supported.'],
+  ])('classifies %s as LANGUAGE_PAIR_NOT_SUPPORTED without fallback', async (_caseName, message) => {
     await runWithRuntime(['first-key', 'second-key'], 'free', async ({ promoteKeySpy }) => {
       proxyFetch.mockResolvedValue(createJsonResponse(400, { detail: message }, 'Bad Request'));
 
@@ -609,6 +616,54 @@ describe('DeepLTranslateProvider response contract', () => {
 
       expect(proxyFetch).toHaveBeenCalledTimes(1);
       expect(promoteKeySpy).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each([
+    ['unsupported response_format', 'Unsupported response_format'],
+    ['unsupported option', 'Unsupported option'],
+    ['invalid target language', 'Invalid target language'],
+    ['language detection failure', 'Language detection failed'],
+    ['generic unsupported request', 'Request not supported'],
+  ])('keeps %s as generic HTTP_ERROR', async (_caseName, message) => {
+    await runWithRuntime(['key'], 'free', async ({ promoteKeySpy }) => {
+      proxyFetch.mockResolvedValue(createJsonResponse(400, { detail: message }, 'Bad Request'));
+
+      await expect(provider._translateChunk(['source'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({
+          type: ErrorTypes.HTTP_ERROR,
+          statusCode: 400,
+        });
+
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+      expect(promoteKeySpy).not.toHaveBeenCalled();
+    });
+  });
+
+  it('keeps unsupported language terminal through QueueManager', async () => {
+    await runWithRuntime(['key'], 'free', async () => {
+      proxyFetch.mockResolvedValue(createJsonResponse(400, { detail: 'source_lang is not supported' }, 'Bad Request'));
+
+      const queueManager = QueueManager.getInstance();
+      const request = vi.fn(() => provider._translateChunk(
+        ['source'],
+        'en',
+        'fa',
+        'selection',
+        null,
+        0,
+        1,
+        0,
+        1,
+        {},
+      ));
+
+      await expect(queueManager.enqueue('deepl-language-pair-test', request))
+        .rejects.toMatchObject({ type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED });
+
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+      expect(queueManager.retryTimeouts.size).toBe(0);
     });
   });
 

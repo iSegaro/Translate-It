@@ -53,9 +53,15 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   _isUnsupportedLanguageError(error) {
-    return Number(error?.statusCode) === 400
-      && typeof error?.message === 'string'
-      && /value\s+for\s+['"](?:source_lang|target_lang)['"]\s+(?:is\s+)?not\s+supported/i.test(error.message);
+    if (Number(error?.statusCode) !== 400 || typeof error?.message !== 'string') return false;
+
+    const normalizedMessage = error.message
+      .toLowerCase()
+      .replace(/[\s"'`.,!?;:()\x5b\x5d{}-]+/g, ' ')
+      .trim();
+
+    return /\b(?:source_lang|target_lang|source language|target language)\b(?:\s+is)?\s+(?:not supported|unsupported)\b/.test(normalizedMessage)
+      || /\b(?:not supported|unsupported)\b\s+(?:source_lang|target_lang|source language|target language)\b/.test(normalizedMessage);
   }
 
   shouldFailoverApiKey(error) {
