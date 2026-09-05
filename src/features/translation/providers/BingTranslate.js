@@ -191,6 +191,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             // Regular JSON parsing error
             const jsonError = new Error(`JSON parsing failed: ${parseError.message}`);
             jsonError.name = 'BingJsonParseError';
+            jsonError.type = ErrorTypes.JSON_PARSING_ERROR;
             jsonError.context = context;
             jsonError.chunkSize = chunkTexts.length;
             jsonError.retryAttempt = retryAttempt;
@@ -303,6 +304,7 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           }
         }
 
+        error.retryable = false;
         throw error;
       }
 

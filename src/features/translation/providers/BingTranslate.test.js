@@ -3,6 +3,7 @@ import { BingTranslateProvider } from './BingTranslate.js';
 import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
+import { queueManager } from '@/features/translation/core/QueueManager.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -341,8 +342,52 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
-        .rejects.toMatchObject({ name: 'BingJsonParseError' });
+        .rejects.toMatchObject({
+          name: 'BingJsonParseError',
+          type: ErrorTypes.JSON_PARSING_ERROR,
+          retryable: false,
+        });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
+    });
+
+    it('succeeds when adaptive JSON recovery receives valid responses', async () => {
+      const createResponse = (text) => ({
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify([{ translations: [{ text }] }]),
+      });
+
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
+        }))
+        .mockImplementation(async (request) => request.extractResponse(createResponse('translated')));
+
+      await expect(provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .resolves.toEqual(['translated', 'translated']);
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not retry the whole batch after adaptive JSON recovery exhausts', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => 'not-json',
+      }));
+
+      const queuedRequest = vi.fn(() => provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1));
+      const queuedBatch = queueManager.enqueue(
+        provider.providerName,
+        queuedRequest,
+        0,
+        'selection'
+      );
+
+      await expect(queuedBatch).rejects.toMatchObject({
+        type: ErrorTypes.JSON_PARSING_ERROR,
+        retryable: false,
+      });
+      expect(queuedRequest).toHaveBeenCalledTimes(1);
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
     });
 
     it('does not adaptively split on HTML content-type (T1)', async () => {
@@ -374,7 +419,11 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
-        .rejects.toMatchObject({ name: 'BingJsonParseError' });
+        .rejects.toMatchObject({
+          name: 'BingJsonParseError',
+          type: ErrorTypes.JSON_PARSING_ERROR,
+          retryable: false,
+        });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
     });
 
