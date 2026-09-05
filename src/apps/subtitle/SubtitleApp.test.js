@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { reactive, ref, nextTick } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 import SubtitleApp from './SubtitleApp.vue';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
-const { openOptionsPageMock } = vi.hoisted(() => ({
+const { openOptionsPageMock, useSubtitleTranslationMock } = vi.hoisted(() => ({
   openOptionsPageMock: vi.fn(),
+  useSubtitleTranslationMock: vi.fn(),
 }));
 
 const { loggerErrorMock } = vi.hoisted(() => ({
@@ -27,17 +29,7 @@ vi.mock('webextension-polyfill', () => ({
 }));
 
 vi.mock('@/features/subtitle-translation/composables/useSubtitleTranslation.js', () => ({
-  useSubtitleTranslation: () => ({
-    status: ref('idle'),
-    progress: ref({}),
-    error: ref(''),
-    currentFile: ref(null),
-    cues: ref([]),
-    startTranslation: vi.fn(),
-    cancelTranslation: vi.fn(),
-    downloadResult: vi.fn(),
-    cleanup: vi.fn(),
-  }),
+  useSubtitleTranslation: useSubtitleTranslationMock,
 }));
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
@@ -138,9 +130,33 @@ vi.mock('@iconify/vue', () => ({
 }));
 
 describe('SubtitleApp', () => {
+  let subtitleState;
+
+  const mountSubtitleApp = () => mount(SubtitleApp, {
+    attachTo: document.body,
+    global: {
+      stubs: {
+        transition: false,
+      },
+    },
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     loggerErrorMock.mockReset();
+    subtitleState = {
+      status: ref('idle'),
+      progress: ref({}),
+      error: ref(''),
+      errorAction: ref(null),
+      currentFile: ref(null),
+      cues: ref([]),
+      startTranslation: vi.fn(),
+      cancelTranslation: vi.fn(),
+      downloadResult: vi.fn(),
+      cleanup: vi.fn(),
+    };
+    useSubtitleTranslationMock.mockReturnValue(subtitleState);
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       value: vi.fn(() => ({
@@ -154,14 +170,7 @@ describe('SubtitleApp', () => {
 
   it('opens provider settings through the anchor-aware options helper', async () => {
     openOptionsPageMock.mockResolvedValue({ success: true });
-    const wrapper = mount(SubtitleApp, {
-      attachTo: document.body,
-      global: {
-        stubs: {
-          transition: false,
-        },
-      },
-    });
+    const wrapper = mountSubtitleApp();
 
     await flushPromises();
     await nextTick();
@@ -178,14 +187,7 @@ describe('SubtitleApp', () => {
 
   it('logs when provider settings opening fails', async () => {
     openOptionsPageMock.mockResolvedValue({ success: false, error: 'failed to open' });
-    const wrapper = mount(SubtitleApp, {
-      attachTo: document.body,
-      global: {
-        stubs: {
-          transition: false,
-        },
-      },
-    });
+    const wrapper = mountSubtitleApp();
 
     await flushPromises();
     await nextTick();
@@ -198,5 +200,73 @@ describe('SubtitleApp', () => {
 
     expect(openOptionsPageMock).toHaveBeenCalledWith('providers');
     expect(loggerErrorMock).toHaveBeenCalledWith('Failed to open provider settings:', 'failed to open');
+  });
+
+  it('shows only Try Again for RETRY and preserves retry behavior', async () => {
+    subtitleState.status.value = 'error';
+    subtitleState.error.value = 'Safe subtitle error';
+    subtitleState.errorAction.value = PublicTranslationErrorActions.RETRY;
+
+    const wrapper = mountSubtitleApp();
+
+    await nextTick();
+
+    expect(wrapper.findAll('.step-error button').map(button => button.text())).toEqual(['Try Again']);
+
+    await wrapper.find('.step-error button.primary-btn').trigger('click');
+    expect(subtitleState.status.value).toBe('idle');
+
+    wrapper.unmount();
+  });
+
+  it('shows provider settings and Back to Setup for OPEN_SETTINGS', async () => {
+    const selectedFile = { name: 'sample.srt' };
+    const parsedCues = [{ index: 1, text: 'Hello' }];
+    subtitleState.status.value = 'error';
+    subtitleState.error.value = 'Provider configuration required';
+    subtitleState.errorAction.value = PublicTranslationErrorActions.OPEN_SETTINGS;
+    subtitleState.currentFile.value = selectedFile;
+    subtitleState.cues.value = parsedCues;
+    openOptionsPageMock.mockResolvedValue({ success: true });
+
+    const wrapper = mountSubtitleApp();
+
+    await nextTick();
+
+    const buttons = wrapper.findAll('.step-error button');
+    expect(buttons.map(button => button.text())).toEqual(['Configure Providers', 'Back to Setup']);
+
+    await buttons[0].trigger('click');
+    expect(openOptionsPageMock).toHaveBeenCalledWith('providers');
+
+    await buttons[1].trigger('click');
+    expect(subtitleState.status.value).toBe('idle');
+    expect(subtitleState.currentFile.value).toEqual(selectedFile);
+    expect(subtitleState.cues.value).toEqual(parsedCues);
+    expect(subtitleState.cleanup).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
+  it.each([
+    [PublicTranslationErrorActions.RETRY_LATER],
+    [null],
+  ])('shows only Back to Setup for %s', async (action) => {
+    subtitleState.status.value = 'error';
+    subtitleState.error.value = 'Safe subtitle error';
+    subtitleState.errorAction.value = action;
+
+    const wrapper = mountSubtitleApp();
+
+    await nextTick();
+
+    const buttons = wrapper.findAll('.step-error button');
+    expect(buttons.map(button => button.text())).toEqual(['Back to Setup']);
+    expect(wrapper.find('.step-error button.primary-btn').exists()).toBe(false);
+
+    await buttons[0].trigger('click');
+    expect(subtitleState.status.value).toBe('idle');
+
+    wrapper.unmount();
   });
 });

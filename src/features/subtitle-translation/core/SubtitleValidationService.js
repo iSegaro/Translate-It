@@ -63,6 +63,11 @@ export class SubtitleValidationService {
         if (missing.length > 0) {
           cue.warnings.push(`Missing formatting tokens: ${missing.join(', ')}`);
           logger.warn(`Cue ${cue.id} is missing tokens:`, missing);
+
+          cue.status = 'failed';
+          cue.translatedText = '';
+          validatedCues.push(cue);
+          return;
         }
 
         // 2. Restore tokens

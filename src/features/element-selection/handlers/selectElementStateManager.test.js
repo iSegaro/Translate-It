@@ -38,8 +38,15 @@ import {
   getStateForTab,
   clearStateForTab,
   createActivationGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
   getCurrentGeneration,
+  beginRetainedSessionRecovery,
+  getRetainedSessionRecoveryRecord,
+  isRetainedSessionRecoveryCurrent,
+  setRetainedSessionRecoveryPromise,
+  clearRetainedSessionRecovery,
+  invalidateRetainedSessionRecovery,
   invalidateActivationAttempts,
   invalidateOlderActivationAttempts,
   compensateInvalidatedActivationAttempts,
@@ -60,11 +67,49 @@ const onRemovedListener = browser.tabs.onRemoved.addListener.mock.calls[0][0];
 const onCommittedListener = browser.webNavigation.onCommitted.addListener.mock.calls[0][0];
 
 describe('selectElementStateManager', () => {
-  it('should register listeners on load', () => {
-    expect(browser.tabs.onRemoved.addListener).toHaveBeenCalled();
-    expect(browser.tabs.onActivated.addListener).toHaveBeenCalled();
-    expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalled();
-  });
+    it('should register listeners on load', () => {
+      expect(browser.tabs.onRemoved.addListener).toHaveBeenCalled();
+      expect(browser.tabs.onActivated.addListener).toHaveBeenCalled();
+      expect(browser.webNavigation.onCommitted.addListener).toHaveBeenCalled();
+    });
+
+  it('exposes one opaque epoch for this background module lifetime', () => {
+      expect(getActivationEpoch()).toEqual(expect.any(String));
+      expect(getActivationEpoch()).toBe(getActivationEpoch());
+    });
+
+    it('invalidates retained recovery by identity across lifecycle changes', () => {
+      const tabId = 117;
+      const token = beginRetainedSessionRecovery(tabId);
+      const promise = Promise.resolve();
+
+      expect(token).toEqual(expect.any(Number));
+      expect(setRetainedSessionRecoveryPromise(tabId, token, promise)).toBe(true);
+      expect(getRetainedSessionRecoveryRecord(tabId)).toEqual({ token, promise });
+      expect(isRetainedSessionRecoveryCurrent(tabId, token)).toBe(true);
+
+      invalidateRetainedSessionRecovery(tabId);
+      expect(isRetainedSessionRecoveryCurrent(tabId, token)).toBe(false);
+      expect(clearRetainedSessionRecovery(tabId, token)).toBe(false);
+
+      const replacementToken = beginRetainedSessionRecovery(tabId);
+      expect(replacementToken).toBeGreaterThan(token);
+      expect(clearRetainedSessionRecovery(tabId, token)).toBe(false);
+      expect(isRetainedSessionRecoveryCurrent(tabId, replacementToken)).toBe(true);
+    });
+
+    it('invalidates retained recovery on top navigation and tab removal', () => {
+      const navigationTabId = 118;
+      const removalTabId = 119;
+      const navigationToken = beginRetainedSessionRecovery(navigationTabId);
+      const removalToken = beginRetainedSessionRecovery(removalTabId);
+
+      onCommittedListener({ tabId: navigationTabId, frameId: 0, documentId: 'new-document' });
+      onRemovedListener(removalTabId);
+
+      expect(isRetainedSessionRecoveryCurrent(navigationTabId, navigationToken)).toBe(false);
+      expect(isRetainedSessionRecoveryCurrent(removalTabId, removalToken)).toBe(false);
+    });
 
   describe('Core Functionality', () => {
     beforeEach(() => {
@@ -273,6 +318,7 @@ describe('selectElementStateManager', () => {
         expect.objectContaining({
           action: 'DEACTIVATE_SELECT_ELEMENT_MODE',
           data: expect.objectContaining({
+            activationEpoch: getActivationEpoch(),
             activationGeneration: generation,
             fromBackground: true,
             isExplicitDeactivation: true,
@@ -434,7 +480,7 @@ describe('selectElementStateManager', () => {
       expect(getProvisionalCleanupFrames(tabId)).toEqual([]);
     });
 
-    it('replaces stale provisional cleanup with newer strict authority', () => {
+    it('retains older document cleanup debt beside newer strict authority', () => {
       const tabId = 122;
       const generationOne = createActivationGeneration(tabId);
       const tokenOne = getActivationAttemptToken(tabId);
@@ -445,7 +491,7 @@ describe('selectElementStateManager', () => {
       expect(registerParticipant(tabId, 3, generationTwo)).toBe(true);
 
       expect(getParticipants(tabId)).toEqual(new Map([[3, generationTwo]]));
-      expect(getProvisionalCleanupFrames(tabId)).toEqual([]);
+      expect(getProvisionalCleanupFrames(tabId)).toEqual([{ frameId: 3, generation: generationOne }]);
     });
 
     it('retires persisted provisional cleanup on frame navigation and tab removal', () => {

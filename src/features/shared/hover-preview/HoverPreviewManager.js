@@ -3,7 +3,7 @@ import { hoverPreviewLookup } from './HoverPreviewLookup.js';
 import { PAGE_TRANSLATION_ATTRIBUTES } from '@/features/page-translation/PageTranslationConstants.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { PageTranslationEvents } from '@/core/PageEventBus.js';
+import { pageEventBus, PageTranslationEvents } from '@/core/PageEventBus.js';
 import { stripBiDiMarks } from '@/utils/dom/DomDirectionManager.js';
 
 /**
@@ -23,6 +23,7 @@ export class HoverPreviewManager extends ResourceTracker {
     this.handleMouseOver = this.handleMouseOver.bind(this);
     this.handleMouseOut = this.handleMouseOut.bind(this);
     this.handleMouseMove = this.handleMouseMove.bind(this);
+    this.handleTranslationHide = this.handleTranslationHide.bind(this);
   }
 
   initialize() {
@@ -31,6 +32,7 @@ export class HoverPreviewManager extends ResourceTracker {
     // Use ResourceTracker's addEventListener for automatic cleanup
     this.addEventListener(document, 'mouseover', this.handleMouseOver, { capture: true });
     this.addEventListener(document, 'mouseout', this.handleMouseOut, { capture: true });
+    this.addEventListener(pageEventBus, 'hide-translation', this.handleTranslationHide);
     
     this.isActive = true;
     this.logger.init('Hover preview manager initialized (Shadow DOM Mode)');
@@ -60,34 +62,37 @@ export class HoverPreviewManager extends ResourceTracker {
     const element = target.closest(`[${HAS_ORIGINAL}="true"]`);
     if (!element) return;
 
-    if (this.currentElement === element) return;
-    this.currentElement = element;
-
     // SMART DETECTION: Find the specific text node under the cursor
     const x = event.clientX;
     const y = event.clientY;
     const specificNode = this._getSpecificNodeAt(x, y);
 
     const originalText = this._getOriginalText(element, specificNode);
-    if (originalText) {
-      this.currentText = originalText;
-      this.logger.debug('Hover detected, emitting showTooltip event');
-      PageTranslationEvents.showTooltip({
-        text: originalText,
-        position: { x, y }
-      });
-      // Track mousemove only while hovering using ResourceTracker
-      this.addEventListener(document, 'mousemove', this.handleMouseMove, true);
+    if (this.currentElement === element && originalText === this.currentText) return;
+
+    if (!originalText) {
+      const hadPreview = Boolean(this.currentElement || this.currentText);
+      this._resetPreviewState();
+      if (hadPreview) PageTranslationEvents.hideTooltip();
+      return;
     }
+
+    this.currentElement = element;
+    this.currentText = originalText;
+    this.logger.debug('Hover detected, emitting showTooltip event');
+    PageTranslationEvents.showTooltip({
+      text: originalText,
+      position: { x, y }
+    });
+    // Track mousemove only while hovering using ResourceTracker
+    this.addEventListener(document, 'mousemove', this.handleMouseMove, true);
   }
 
   handleMouseOut(event) {
     if (this.currentElement && !this.currentElement.contains(event.relatedTarget)) {
       this.logger.debug('Mouse out, emitting hideTooltip event');
       PageTranslationEvents.hideTooltip();
-      this.removeEventListener(document, 'mousemove', this.handleMouseMove, true);
-      this.currentElement = null;
-      this.currentText = null;
+      this._resetPreviewState();
     }
   }
 
@@ -113,6 +118,33 @@ export class HoverPreviewManager extends ResourceTracker {
         });
       }
     }
+  }
+
+  /**
+   * Hide preview when an existing translation lifecycle changes its target.
+   * @param {Object} detail - Existing hide-translation event detail
+   * @private
+   */
+  handleTranslationHide(detail) {
+    if (!this.currentElement && !this.currentText) return;
+
+    const element = detail?.element;
+    if (
+      element
+      && this.currentElement
+      && element !== this.currentElement
+      && !element.contains?.(this.currentElement)
+      && !this.currentElement.contains?.(element)
+    ) return;
+
+    this._resetPreviewState();
+    PageTranslationEvents.hideTooltip();
+  }
+
+  _resetPreviewState() {
+    this.removeEventListener(document, 'mousemove', this.handleMouseMove, true);
+    this.currentElement = null;
+    this.currentText = null;
   }
 
   /**

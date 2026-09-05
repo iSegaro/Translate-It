@@ -1127,21 +1127,10 @@ export class BaseAIProvider extends BaseProvider {
         if (engine && messageId) {
           await AIStreamManager.streamErrorResults(this.providerName, error, batchIndex, messageId, engine);
 
-          const isLifecycleError = isCancellationError(error)
-            || error?.type === ErrorTypes.TRANSLATION_TIMEOUT
-            || error?.type === ErrorTypes.OPERATION_TIMEOUT;
-          if (!isLifecycleError) {
-            await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { error });
-          }
         }
 
         throw error;
       }
-    }
-
-    // Send stream end notification
-    if (engine && messageId) {
-      await AIStreamManager.sendStreamEnd(this.providerName, messageId, engine, { targetLanguage: targetLang });
     }
 
     return allResults;

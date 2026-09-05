@@ -193,10 +193,6 @@ export function useExtensionAPI() {
     return await sendMessage(MessageActions.GET_PROVIDER_CONFIG, { provider });
   };
 
-  const getProviderStatus = async (provider) => {
-    return await sendMessage(MessageActions.GET_PROVIDER_STATUS, { provider });
-  };
-
   // Translation methods
   const translateText = async (text, options = {}) => {
     return await sendMessage(MessageActions.TRANSLATE_TEXT, { text, ...options });
@@ -232,12 +228,6 @@ export function useExtensionAPI() {
   const destroyVueMicroApp = async (instanceId) => {
     return await sendToContentScript("DESTROY_VUE_MICRO_APP", { instanceId });
   };
-
-  // Context menu and extension lifecycle
-  const updateContextMenu = async (options) => {
-    return await sendMessage("UPDATE_CONTEXT_MENU", options);
-  };
-
 
   // Cleanup on component unmount
   onUnmounted(() => {
@@ -278,7 +268,6 @@ export function useExtensionAPI() {
     testProviderConnection,
     saveProviderConfig,
     getProviderConfig,
-    getProviderStatus,
 
     // Translation methods
     translateText,
@@ -293,7 +282,6 @@ export function useExtensionAPI() {
 
     // Extension features
     createNotification,
-    updateContextMenu,
 
     // Utility
     getbrowserAPI,

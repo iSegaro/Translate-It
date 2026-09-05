@@ -16,6 +16,12 @@ const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 class LifecycleManager {
   constructor() {
     this.initialized = false;
+    this._initializationPromise = null;
+    this._handlersRegistered = false;
+    this._browserApiInitialized = false;
+    this._translationEngineInitialized = false;
+    this._dynamicIconInitialized = false;
+    this._errorHandlersInitialized = false;
     this.browser = null;
     this.translationEngine = null;
     this.featureLoader = featureLoader;
@@ -24,36 +30,59 @@ class LifecycleManager {
     // Note: messageHandler.listen() will be called after handlers are registered
   }
 
-  async initialize() {
+  initialize() {
+    if (this._cleanupPromise) {
+      return this._cleanupPromise.then(() => this.initialize(), () => this.initialize());
+    }
     if (this.initialized) {
       return;
     }
 
-    // Register message handlers FIRST to prevent race conditions
-    this.registerMessageHandlers();
-
-    // Activate message listener AFTER handlers are registered
-    if (!this.messageHandler.isListenerActive) {
-      this.messageHandler.listen();
+    if (this._initializationPromise) {
+      return this._initializationPromise;
     }
 
-    await this.initializebrowserAPI();
+    let initializationPromise;
+    initializationPromise = (async () => {
+      // Register message handlers FIRST to prevent race conditions
+      // Only register once per instance to avoid duplicates on retry
+      if (!this._handlersRegistered) {
+        this.registerMessageHandlers();
+        this._handlersRegistered = true;
+      }
 
-    await this.initializeTranslationEngine();
+      // Activate message listener AFTER handlers are registered
+      if (!this.messageHandler.isListenerActive) {
+        this.messageHandler.listen();
+      }
 
-    await this.initializeDynamicIconManager();
+      await this.initializebrowserAPI();
 
-    await this.initializeErrorHandlers();
+      await this.initializeTranslationEngine();
 
-    await this.preloadFeatures();
+      await this.initializeDynamicIconManager();
 
-    await this.refreshContextMenus();
+      await this.initializeErrorHandlers();
 
-    // Initialize TTS voice cache in background
-    this.initializeTTSVoiceCache();
+      await this.preloadFeatures();
 
-    this.initialized = true;
-    logger.info("[LifecycleManager] Background service initialized successfully");
+      await this.refreshContextMenus();
+
+      // Initialize TTS voice cache in background
+      this.initializeTTSVoiceCache();
+
+      this.initialized = true;
+      logger.info("[LifecycleManager] Background service initialized successfully");
+    })();
+
+    this._initializationPromise = initializationPromise;
+    const clearInitializationPromise = () => {
+      if (this._initializationPromise === initializationPromise) {
+        this._initializationPromise = null;
+      }
+    };
+    void initializationPromise.then(clearInitializationPromise, clearInitializationPromise);
+    return initializationPromise;
   }
 
   /**
@@ -88,28 +117,43 @@ class LifecycleManager {
   }
 
   async initializebrowserAPI() {
+    if (this._browserApiInitialized) return;
     this.browser = browser;
     globalThis.browser = browser;
     await initializeSettingsListener(browser);
+    this._browserApiInitialized = true;
   }
 
   async initializeTranslationEngine() {
+    if (this._translationEngineInitialized && this.translationEngine) return;
+    if (this.translationEngine) {
+      this.translationEngine = null;
+    }
     try {
       logger.info('[LifecycleManager] Creating TranslationEngine...');
       this.translationEngine = new TranslationEngine();
       logger.info('[LifecycleManager] Initializing TranslationEngine...');
       await this.translationEngine.initialize();
+      this._translationEngineInitialized = true;
       logger.info('[LifecycleManager] TranslationEngine initialized successfully');
     } catch (error) {
+      this.translationEngine = null;
+      this._translationEngineInitialized = false;
       logger.error('[LifecycleManager] Failed to initialize TranslationEngine:', error);
       throw error;
     }
   }
 
   async initializeDynamicIconManager() {
+    if (this._dynamicIconInitialized && this.dynamicIconManager?.isInitialized) return;
     logger.info('Initializing ActionbarIconManager...');
     const { getActionbarIconManager } = await utilsFactory.getBrowserUtils();
-    this.dynamicIconManager = await getActionbarIconManager();
+    const manager = await getActionbarIconManager();
+    if (manager.isInitialized === false) {
+      throw new Error('ActionbarIconManager not initialized');
+    }
+    this.dynamicIconManager = manager;
+    this._dynamicIconInitialized = true;
     logger.info('ActionbarIconManager initialized');
   }
 
@@ -125,7 +169,6 @@ class LifecycleManager {
       [MessageActions.OPEN_OPTIONS_PAGE]: Handlers.handleOpenOptionsPageLazy,
       'openURL': Handlers.handleOpenURLLazy,
       [MessageActions.LAUNCH_EXTENSION_APP]: Handlers.handleLaunchExtensionAppLazy,
-      [MessageActions.UPDATE_CONTEXT_MENU]: Handlers.handleRefreshContextMenusLazy,
       'showOSNotification': Handlers.handleShowOSNotification,
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
@@ -145,7 +188,6 @@ class LifecycleManager {
       'CANCEL_TRANSLATION': Handlers.handleCancelTranslationLazy,
       [MessageActions.CANCEL_SESSION]: Handlers.handleCancelSessionLazy,
       [MessageActions.PARENT_ACCEPTANCE_ACK]: Handlers.handleParentAcceptanceAckLazy,
-      [MessageActions.TRANSLATION_RESULT_UPDATE]: Handlers.handleTranslationResultLazy,
       'CHECK_TRANSLATION_STATUS': Handlers.handleCheckTranslationStatusLazy,
       [MessageActions.BATCH_TRANSLATE]: Handlers.handleBatchTranslateLazy,
 
@@ -165,7 +207,7 @@ class LifecycleManager {
       'setSelectElementState': Handlers.handleSetSelectElementStateLazy,
       'getSelectElementState': Handlers.handleGetSelectElementStateLazy,
       [MessageActions.IFRAME_SELECT_ELEMENT_FINISHED]: Handlers.handleIframeSelectElementFinishedLazy,
-      'SELECT_ELEMENT_STATE_CHANGED': Handlers.handleSelectElement,
+      [MessageActions.SELECT_ELEMENT_FRAME_READY]: Handlers.handleSelectElementFrameReadyLazy,
       'clearElementSelectionHandlerCache': Handlers.clearElementSelectionHandlerCache,
       'getElementSelectionHandlerStats': Handlers.getElementSelectionHandlerStats,
       
@@ -202,7 +244,6 @@ class LifecycleManager {
       'openSidePanel': Handlers.handleOpenSidePanel,
       
       // Vue integration handlers - Lazy loaded for better performance
-      'providerStatus': Handlers.handleProviderStatusLazy,
       'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
       'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
       'getProviderConfig': Handlers.handleGetProviderConfigLazy,
@@ -312,6 +353,7 @@ class LifecycleManager {
    * @private
    */
   async initializeErrorHandlers() {
+    if (this._errorHandlersInitialized) return;
     logger.info("Initializing error handlers...");
 
     try {
@@ -322,6 +364,7 @@ class LifecycleManager {
 
       // TTS error handling now integrated into handleGoogleTTS directly
 
+      this._errorHandlersInitialized = true;
       logger.info("Error handlers initialization completed");
     } catch (error) {
       logger.error("Failed to initialize error handlers:", error);
@@ -356,6 +399,7 @@ class LifecycleManager {
       logger.error("[LifecycleManager] Failed to refresh context menus:", error);
       // Try one more direct approach as ultimate fallback if featureLoader failed
       await this.createContextMenuDirectly();
+      throw error;
     }
   }
 
@@ -403,8 +447,15 @@ class LifecycleManager {
 
   cleanup() {
     this.initialized = false;
+    this._initializationPromise = null;
+    this._handlersRegistered = false;
+    this._browserApiInitialized = false;
+    this._translationEngineInitialized = false;
+    this._dynamicIconInitialized = false;
+    this._errorHandlersInitialized = false;
     this.browser = null;
     this.translationEngine = null;
+    this.dynamicIconManager = null;
     
     logger.debug('LifecycleManager cleanup completed');
   }

@@ -1,4 +1,4 @@
-import { PROVIDER_CONFIGURATIONS, BASE_CHARACTER_LIMITS, BASE_MAX_CHUNKS_PER_BATCH, AI_BATCHING_LIMITS } from '@/features/translation/core/ProviderConfigurations.js';
+import { resolveKnownProviderConfiguration, BASE_CHARACTER_LIMITS, BASE_MAX_CHUNKS_PER_BATCH, AI_BATCHING_LIMITS } from '@/features/translation/core/ProviderConfigurations.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -16,7 +16,7 @@ export class SubtitleProviderLimitsResolver {
    * @returns {Object} { characterLimit, maxChunks, strategy }
    */
   static resolve(providerId) {
-    const config = PROVIDER_CONFIGURATIONS[providerId];
+    const config = resolveKnownProviderConfiguration(providerId);
     if (!config) {
       logger.warn(`No configuration found for provider ${providerId}, using safe defaults.`);
       return this.getSafeDefaults();

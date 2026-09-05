@@ -1,35 +1,74 @@
 // Handler for testing provider connection from Vue apps
+import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
+import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+
+function getProviderTestInput(config) {
+  if (typeof config === 'string') {
+    return { keys: config, context: {} };
+  }
+
+  const values = config && typeof config === 'object' ? config : {};
+  const apiUrl = values.apiUrl ?? values.customUrl;
+  const apiModel = values.apiModel ?? values.model;
+  const apiTier = values.apiTier;
+
+  return {
+    keys: typeof values.apiKey === 'string' ? values.apiKey : '',
+    context: {
+      ...(apiUrl !== undefined && { apiUrl }),
+      ...(apiModel !== undefined && { apiModel }),
+      ...(apiTier !== undefined && { apiTier }),
+    },
+  };
+}
+
+function createValidationResponse(providerId, testResult) {
+  const result = testResult && typeof testResult === 'object'
+    ? testResult
+    : { allInvalid: true };
+  const success = result.allInvalid === false;
+  const message = success ? 'Connection successful' : 'Connection failed';
+
+  return {
+    success,
+    data: {
+      ...result,
+      provider: providerId,
+      providerId,
+      success,
+      message,
+      testResult: result,
+    },
+    ...(!success && { message }),
+  };
+}
 
 export async function handleTestProviderConnection(message) {
-  const { provider, config } = message.data;
+  const providerId = message?.data?.provider;
 
   try {
-    const backgroundService = globalThis.backgroundService;
-    if (!backgroundService || !backgroundService.translationEngine) {
-      throw new Error(
-        "Background service or translation engine not initialized."
-      );
-    }
-
-    const testResult = await backgroundService.translationEngine.testProvider(
-      provider,
-      config
+    const { keys, context } = getProviderTestInput(message?.data?.config);
+    const testResult = await ApiKeyManager.testKeysDirect(keys, providerId, context);
+    return createValidationResponse(providerId, testResult);
+  } catch (error) {
+    const errorResponse = MessageFormat.createErrorResponse(
+      error,
+      message?.messageId || null,
+      {
+        context: error?.context || 'provider-test',
+        providerId: error?.providerId || providerId,
+      }
     );
 
     return {
-      success: true,
+      ...errorResponse,
       data: {
-        success: true,
-        message: "Connection successful",
-        testResult: testResult,
-      },
-    };
-  } catch (error) {
-    return {
-      success: true,
-      data: {
+        provider: providerId,
+        providerId,
         success: false,
-        message: error.message || "Connection failed",
+        message: errorResponse.errorDetails.message || 'Connection failed',
+        error: errorResponse.error,
+        errorDetails: errorResponse.errorDetails,
       },
     };
   }

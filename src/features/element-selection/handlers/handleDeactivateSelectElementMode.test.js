@@ -24,6 +24,7 @@ const registry = vi.hoisted(() => {
       authorities,
       compatibilityFrames,
       compensateInvalidatedActivationAttempts: vi.fn(() => Promise.resolve([])),
+      getActivationEpoch: vi.fn(() => 'epoch-1'),
       getCompatibilityFrames: vi.fn(tabId => new Map(compatibilityFrames.get(tabId) || [])),
       provisionalFrames,
       getProvisionalCleanupFrames: vi.fn(tabId => [...(provisionalFrames.get(tabId) || [])]),
@@ -40,6 +41,28 @@ const registry = vi.hoisted(() => {
       }),
     removeParticipant,
     setStateForTab: vi.fn(),
+    invalidateJoinAuthority: vi.fn(),
+    isFrameDocumentLive: vi.fn(async (tabId, frameId, documentId) => {
+      const frames = await browser.webNavigation.getAllFrames({ tabId });
+      if (!Array.isArray(frames)) return true;
+      if (typeof documentId === 'string' && documentId.trim()) {
+        return frames.some(f => f?.frameId === frameId && f?.documentId === documentId);
+      }
+      return frames.some(f => f?.frameId === frameId);
+    }),
+    isStructurallyNonInjectableFrame: vi.fn(() => false),
+    queryFrameStateWithKind: vi.fn(async () => {
+      return { kind: 'UNKNOWN', state: null };
+    }),
+    getParticipantsWithDocuments: vi.fn(tabId => {
+      const auth = authorities.get(tabId);
+      if (!auth) return new Map();
+      return new Map([...auth.participants.entries()].map(([fid, gen]) => [fid, { generation: gen, documentId: null }]));
+    }),
+    isValidDocumentId: vi.fn(v => typeof v === 'string' && v.trim().length > 0),
+    getStateForTab: vi.fn(() => ({ active: false })),
+    invalidateRetainedSessionRecovery: vi.fn(),
+    FrameStateKind: { ACTIVE: 'ACTIVE', INACTIVE: 'INACTIVE', NO_RECEIVER: 'NO_RECEIVER', UNKNOWN: 'UNKNOWN' },
   };
 });
 
@@ -57,15 +80,28 @@ vi.mock('webextension-polyfill', () => ({
 
 vi.mock('./selectElementStateManager.js', () => ({
   compensateInvalidatedActivationAttempts: registry.compensateInvalidatedActivationAttempts,
+  getActivationEpoch: registry.getActivationEpoch,
   getCompatibilityFrames: registry.getCompatibilityFrames,
   getProvisionalCleanupFrames: registry.getProvisionalCleanupFrames,
   setStateForTab: registry.setStateForTab,
   getParticipants: registry.getParticipants,
+  getParticipantsWithDocuments: registry.getParticipantsWithDocuments,
   getCurrentGeneration: registry.getCurrentGeneration,
   invalidateActivationAttempts: registry.invalidateActivationAttempts,
   removeCompatibilityFrame: registry.removeCompatibilityFrame,
   removeProvisionalCleanupFrame: registry.removeProvisionalCleanupFrame,
   removeParticipant: registry.removeParticipant,
+  isValidDocumentId: registry.isValidDocumentId,
+  getStateForTab: registry.getStateForTab,
+  isFrameDocumentLive: registry.isFrameDocumentLive,
+  isStructurallyNonInjectableFrame: registry.isStructurallyNonInjectableFrame,
+  queryFrameStateWithKind: registry.queryFrameStateWithKind,
+  FrameStateKind: registry.FrameStateKind,
+  invalidateJoinAuthority: registry.invalidateJoinAuthority,
+  invalidateRetainedSessionRecovery: registry.invalidateRetainedSessionRecovery,
+  markDeactivationPending: vi.fn(),
+  clearDeactivationPending: vi.fn(),
+  isDeactivationPending: vi.fn(() => false),
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -128,6 +164,7 @@ describe('handleDeactivateSelectElementMode', () => {
         data: expect.objectContaining({
           active: false,
           fromBackground: true,
+          activationEpoch: 'epoch-1',
           activationGeneration: 1,
           isExplicitDeactivation: true,
         }),
@@ -139,6 +176,20 @@ describe('handleDeactivateSelectElementMode', () => {
       expect.anything(),
       { frameId: 3 },
     );
+  });
+
+  it('invalidates retained recovery before asynchronous cleanup begins', async () => {
+    registry.authorities.set(124, {
+      generation: 1,
+      participants: new Map([[0, 1]]),
+    });
+
+    const response = await handleDeactivateSelectElementMode({ data: { tabId: 124 } }, {});
+
+    expect(response.success).toBe(true);
+    expect(registry.invalidateRetainedSessionRecovery).toHaveBeenCalledWith(124);
+    expect(registry.invalidateRetainedSessionRecovery.mock.invocationCallOrder[0])
+      .toBeLessThan(registry.invalidateActivationAttempts.mock.invocationCallOrder[0]);
   });
 
   it('should not publish inactive state when a participant remains unresolved', async () => {
@@ -328,7 +379,7 @@ describe('handleDeactivateSelectElementMode', () => {
     expect(response.success).toBe(true);
     expect(browser.tabs.sendMessage).toHaveBeenCalledWith(
       128,
-      expect.objectContaining({ data: expect.not.objectContaining({ activationGeneration: expect.anything() }) }),
+      expect.objectContaining({ data: expect.objectContaining({ activationGeneration: 1 }) }),
       { frameId: 0 },
     );
     expect(registry.removeCompatibilityFrame).toHaveBeenCalledWith(128, 0);

@@ -606,7 +606,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
               kind: 'hover',
               restore: () => {
                 if (value === undefined) hoverPreviewLookup.delete(node);
-                else hoverPreviewLookup.add(node, value);
+                else hoverPreviewLookup.add(node, value, node?.nodeValue);
               },
               createFailure: (rollbackError) => {
                 this.logger.error('[DomTranslatorAdapter] Direct hover rollback failed', { error: rollbackError });
@@ -1259,10 +1259,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       finalTranslation = finalTranslation.trim();
     }
 
-    // 1. Register original text before modification for Hover Tooltip
-    hoverPreviewLookup.add(textNode, originalText);
-
-    // 2. Mark the immediate parent element as having original text (Surgical marking)
+    // 1. Mark the immediate parent element as having original text (Surgical marking)
     const parentElement = textNode.parentElement;
     if (parentElement && parentElement.getAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL) !== 'true') {
       parentElement.setAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL, 'true');
@@ -1279,6 +1276,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
     }
 
     textNode.nodeValue = finalValue;
+
+    // Register only after the DOM write so cache validation reflects the value actually applied.
+    hoverPreviewLookup.add(textNode, originalText, textNode.nodeValue);
+
     this._applyTranslationFont(textNode, translationFontFamily, fontParents);
     DirectionManager.applyNodeDirection(textNode, targetLanguage, rootElement, {
       shadowAware: isSelectShadowNode(textNode),

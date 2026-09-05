@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleTranslateText } from './handleTranslateText.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { MessageHandler } from '@/shared/messaging/core/MessageHandler.js';
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
@@ -35,6 +37,20 @@ describe('handleTranslateText', () => {
     vi.clearAllMocks();
     vi.stubGlobal('backgroundService', { translationEngine: {} });
   });
+
+  function routeMessage(action = MessageActions.TRANSLATE_TEXT) {
+    const messageHandler = new MessageHandler();
+    const sendResponse = vi.fn();
+    messageHandler.registerHandler(action, handleTranslateText);
+
+    const routedResponse = messageHandler._handleMessage(
+      { ...message, action },
+      { id: 'sender' },
+      sendResponse,
+    );
+
+    return { routedResponse, sendResponse };
+  }
 
   it.each(['', ' ', '\n', '\t', ' \n\t '])('returns TEXT_EMPTY for scalar %j', async (text) => {
     const response = await handleTranslateText({
@@ -232,5 +248,130 @@ describe('handleTranslateText', () => {
       sourceLanguage: 'en',
       targetLanguage: 'fa'
     });
+  });
+
+  it('routes the final success response through MessageHandler without ACK', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      translatedText: 'سلام',
+      provider: 'Provider',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    });
+
+    const { routedResponse, sendResponse } = routeMessage();
+
+    await expect(routedResponse).resolves.toEqual({
+      success: true,
+      translation: 'سلام',
+      provider: 'Provider',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    });
+    expect(sendResponse).not.toHaveBeenCalled();
+  });
+
+  it('routes provider failures without ACK masking', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: { message: 'Provider failed', type: 'PROVIDER_ERROR' }
+    });
+
+    const { routedResponse, sendResponse } = routeMessage();
+
+    await expect(routedResponse).resolves.toMatchObject({
+      success: false,
+      error: 'Provider failed',
+      errorDetails: {
+        message: 'Provider failed',
+        type: 'PROVIDER_ERROR'
+      }
+    });
+    expect(sendResponse).not.toHaveBeenCalled();
+  });
+
+  it('routes timeout classification without ACK masking', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Translation timed out',
+        type: ErrorTypes.TRANSLATION_TIMEOUT
+      }
+    });
+
+    const { routedResponse, sendResponse } = routeMessage();
+
+    await expect(routedResponse).resolves.toMatchObject({
+      success: false,
+      error: 'Translation timed out',
+      errorDetails: {
+        message: 'Translation timed out',
+        type: ErrorTypes.TRANSLATION_TIMEOUT
+      }
+    });
+    expect(sendResponse).not.toHaveBeenCalled();
+  });
+
+  it('routes user cancellation classification without ACK masking', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: false,
+      error: {
+        message: 'Translation cancelled by user',
+        type: ErrorTypes.USER_CANCELLED
+      }
+    });
+
+    const { routedResponse, sendResponse } = routeMessage();
+
+    await expect(routedResponse).resolves.toMatchObject({
+      success: false,
+      error: 'Translation cancelled by user',
+      errorDetails: {
+        message: 'Translation cancelled by user',
+        type: ErrorTypes.USER_CANCELLED
+      }
+    });
+    expect(sendResponse).not.toHaveBeenCalled();
+  });
+
+  it('does not let a streaming-shaped final result restore callback ownership', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      streaming: true,
+      messageId: message.messageId,
+      translatedText: 'سلام طولانی',
+      provider: 'Provider',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    });
+
+    const { routedResponse, sendResponse } = routeMessage();
+
+    await expect(routedResponse).resolves.toEqual({
+      success: true,
+      translation: 'سلام طولانی',
+      provider: 'Provider',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    });
+    expect(sendResponse).not.toHaveBeenCalled();
+  });
+
+  it('keeps the legacy translateText alias on the final-response contract', async () => {
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      translatedText: 'سلام',
+      provider: 'Provider',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa'
+    });
+
+    const { routedResponse, sendResponse } = routeMessage('translateText');
+
+    await expect(routedResponse).resolves.toMatchObject({
+      success: true,
+      translation: 'سلام'
+    });
+    expect(sendResponse).not.toHaveBeenCalled();
   });
 });

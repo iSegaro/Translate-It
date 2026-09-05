@@ -28,9 +28,13 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getCustomApiKeysAsync: vi.fn().mockResolvedValue(['test-key']),
     getCustomApiUrlAsync: vi.fn().mockResolvedValue('https://custom-api.com/v1/chat/completions'),
     getCustomApiModelAsync: vi.fn().mockResolvedValue('custom-model'),
-    getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
+}));
 
 const CUSTOM_RAW_RESPONSE_FIXTURES = Object.freeze({
   contentOnly: Object.freeze({

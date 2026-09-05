@@ -4,6 +4,7 @@ import { TranslationMode } from '@/config.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { getPageTranslationErrorPresentation } from './PageTranslationErrorPresenter.js';
 
 /**
@@ -80,7 +81,7 @@ export class PageTranslationEventManager {
     this.logger.info('Setting up GLOBAL PageEventBus listeners for PageTranslationManager');
 
     // Aggregate completion is canonical presentation because child-only failures
-    // have no top-frame local completion event.
+    // have no top-frame local completion event. Use retained structured cause when available.
     bus.on(MessageActions.PAGE_TRANSLATE_COMPLETE, (data) => {
       if (
         data?.isAggregated
@@ -89,15 +90,19 @@ export class PageTranslationEventManager {
         && data.translatedCount === 0
         && data.failedCount > 0
       ) {
-        void getPageTranslationErrorPresentation({
-          error: Object.assign(new Error('Translation failed'), {
-            type: ErrorTypes.TRANSLATION_FAILED,
-          }),
-          errorType: ErrorTypes.TRANSLATION_FAILED,
-        }).then((displayError) => {
+        const presentationDetail = isStructuredTranslationError(data.errorDetails)
+          ? data
+          : {
+              error: Object.assign(new Error('Translation failed'), {
+                type: ErrorTypes.TRANSLATION_FAILED,
+              }),
+              errorType: ErrorTypes.TRANSLATION_FAILED,
+            };
+
+        void getPageTranslationErrorPresentation(presentationDetail).then((displayError) => {
           if (!displayError) return;
           return ErrorHandler.getInstance().handle(displayError, {
-            type: ErrorTypes.TRANSLATION_FAILED,
+            type: displayError.type || ErrorTypes.TRANSLATION_FAILED,
             context: 'page-translation-zero-result',
             showToast: true,
           });

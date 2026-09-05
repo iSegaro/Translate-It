@@ -106,29 +106,40 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
     handler.setPageTranslationManager(null);
   });
 
-  it('sanitizes direct iframe activation failures', async () => {
-    const technicalMessage = 'chrome.runtime.lastError: Receiving end does not exist INTERNAL_PORT_9f81';
-    handler.setSelectElementManager({
-      isInitialized: true,
-      activateSelectElementMode: vi.fn().mockRejectedValue(new Error(technicalMessage)),
-    });
-
-    const response = await handler.handleIFrameActivateSelectElement();
-
-    expect(response).toMatchObject({
-      success: false,
-      message: 'Could not activate Select Element mode.',
-      error: 'Could not activate Select Element mode.',
-      errorType: ErrorTypes.SELECT_ELEMENT,
-    });
-    expect(JSON.stringify(response)).not.toContain('INTERNAL_PORT_9f81');
-    expect(JSON.stringify(response)).not.toContain('Receiving end does not exist');
+  it('does not expose legacy iframe Select Element activation route', async () => {
+    expect(typeof handler.handleIFrameActivateSelectElement).toBe('undefined');
+    expect(handler.handlers.has(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT)).toBe(false);
   });
 
-  it('sanitizes coordinate activation failures through the same boundary', async () => {
+  it('does not announce iframe readiness during local initialization', () => {
+    handler.initialize();
+
+    expect(handler.handlers.has(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE)).toBe(true);
+    expect(handler.handlers.has(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE)).toBe(true);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('registers Select Element receivers before activation resolves', async () => {
+    const registrations = new Map();
+    window.translateItContentCore = {
+      messageHandler: {
+        isListenerActive: true,
+        registerHandler: vi.fn((action, callback) => registrations.set(action, callback)),
+      },
+    };
+
+    await expect(handler.activate()).resolves.toBe(true);
+
+    expect(registrations.has(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE)).toBe(true);
+    expect(registrations.has(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE)).toBe(true);
+    expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
+    delete window.translateItContentCore;
+  });
+
+  it('rejects coordinate Select Element operation via legacy iframe route', async () => {
     handler.setSelectElementManager({
       isInitialized: true,
-      activateSelectElementMode: vi.fn().mockRejectedValue(new Error('internal coordinate failure')),
+      activateSelectElementMode: vi.fn().mockResolvedValue({ isActive: true }),
     });
 
     const response = await handler.handleIFrameCoordinateOperation({
@@ -137,12 +148,11 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
 
     expect(response).toMatchObject({
       success: false,
-      error: 'Could not activate Select Element mode.',
-      errorType: ErrorTypes.SELECT_ELEMENT,
     });
+    expect(response.error).toMatch(/Unsupported/);
   });
 
-  it('preserves successful iframe activation response fields', async () => {
+  it('keeps iframe frame-info route available', async () => {
     handler.setSelectElementManager({
       isInitialized: true,
       activateSelectElementMode: vi.fn().mockResolvedValue({
@@ -151,11 +161,11 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       }),
     });
 
-    await expect(handler.handleIFrameActivateSelectElement()).resolves.toEqual({
-      success: true,
-      activated: true,
-      managerId: 'manager-1',
-    });
+    // Frame info handler should still exist and be registered
+    expect(typeof handler.handleIFrameGetFrameInfo).toBe('function');
+    expect(handler.handlers.has(MessageActions.IFRAME_GET_FRAME_INFO)).toBe(false);
+    // After initialize, it would be registered; but fresh handler without initialize has empty handlers map.
+    // Ensure class method exists.
   });
 
   it('stores accepted activation generation only after successful activation', async () => {
@@ -175,6 +185,129 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
       activationGeneration: 7,
     });
     expect(handler.acceptedSelectElementGeneration).toBe(7);
+  });
+
+  it('rejects lower generations within the same background epoch', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    handler.setSelectElementManager({ isInitialized: true, activateSelectElementMode });
+
+    await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-a', activationGeneration: 4 },
+    });
+    const staleResponse = await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-a', activationGeneration: 3 },
+    });
+
+    expect(staleResponse).toMatchObject({ success: false, staleGeneration: true });
+    expect(activateSelectElementMode).toHaveBeenCalledTimes(1);
+  });
+
+  it('simulates background restart across the content message boundary', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => true,
+    });
+    handler.registerHandler(
+      MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
+      handler.handleActivateSelectElementMode.bind(handler),
+    );
+    handler.registerHandler(
+      MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
+      handler.handleDeactivateSelectElementMode.bind(handler),
+    );
+    const sendBackgroundMessage = async (action, data) => {
+      let response;
+      await handler.handleMessage(
+        { action, data },
+        { tab: { id: 1 } },
+        value => { response = value.data; },
+      );
+      return response;
+    };
+
+    await sendBackgroundMessage(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, {
+      activationEpoch: 'epoch-a',
+      activationGeneration: 4,
+    });
+    await sendBackgroundMessage(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, {
+      activationEpoch: 'epoch-a',
+      activationGeneration: 4,
+      fromBackground: true,
+      isExplicitDeactivation: true,
+    });
+
+    const response = await sendBackgroundMessage(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, {
+      activationEpoch: 'epoch-b',
+      activationGeneration: 1,
+    });
+
+    expect(response).toMatchObject({
+      success: true,
+      activated: true,
+      activationEpoch: 'epoch-b',
+      activationGeneration: 1,
+    });
+    expect(handler.acceptedSelectElementEpoch).toBe('epoch-b');
+    expect(handler.acceptedSelectElementGeneration).toBe(1);
+    expect(handler.invalidatedSelectElementGeneration).toBeNull();
+  });
+
+  it('ignores old-epoch deactivation after newer epoch activation', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({
+      isInitialized: true,
+      activateSelectElementMode,
+      deactivate,
+      isSelectElementActive: () => true,
+    });
+
+    await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-b', activationGeneration: 1 },
+    });
+    deactivate.mockClear();
+
+    const response = await handler.handleDeactivateSelectElementMode({
+      data: {
+        activationEpoch: 'epoch-a',
+        activationGeneration: 4,
+        fromBackground: true,
+        isExplicitDeactivation: true,
+      },
+    });
+
+    expect(response).toMatchObject({ success: false, staleEpoch: true, activated: true });
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(handler.acceptedSelectElementEpoch).toBe('epoch-b');
+    expect(handler.acceptedSelectElementGeneration).toBe(1);
+    expect(handler.invalidatedSelectElementGeneration).toBeNull();
+  });
+
+  it('performs normal cleanup for current-epoch deactivation', async () => {
+    const activateSelectElementMode = vi.fn().mockResolvedValue({ isActive: true });
+    const deactivate = vi.fn().mockResolvedValue({ success: true, cleanupCompleted: true });
+    handler.setSelectElementManager({ isInitialized: true, activateSelectElementMode, deactivate });
+
+    await handler.handleActivateSelectElementMode({
+      data: { activationEpoch: 'epoch-b', activationGeneration: 1 },
+    });
+    const response = await handler.handleDeactivateSelectElementMode({
+      data: {
+        activationEpoch: 'epoch-b',
+        activationGeneration: 1,
+        fromBackground: true,
+        isExplicitDeactivation: true,
+      },
+    });
+
+    expect(response).toMatchObject({ success: true, cleanupCompleted: true, activated: false });
+    expect(deactivate).toHaveBeenCalledTimes(1);
+    expect(handler.acceptedSelectElementEpoch).toBe('epoch-b');
+    expect(handler.acceptedSelectElementGeneration).toBeNull();
   });
 
   it('does not replace accepted generation when newer activation fails', async () => {

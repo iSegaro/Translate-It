@@ -174,10 +174,25 @@
             <h3>{{ t('subtitle_error_title', 'Oops! Something went wrong') }}</h3>
             <p>{{ error }}</p>
             <button
+              v-if="errorAction === PublicTranslationErrorActions.RETRY"
               class="primary-btn"
               @click="status = 'idle'"
             >
               {{ t('subtitle_try_again_btn', 'Try Again') }}
+            </button>
+            <button
+              v-if="errorAction === PublicTranslationErrorActions.OPEN_SETTINGS"
+              class="secondary-btn"
+              @click="goToProviderSettings"
+            >
+              {{ t('configure_providers_tooltip', 'Configure Providers') }}
+            </button>
+            <button
+              v-if="errorAction !== PublicTranslationErrorActions.RETRY"
+              class="secondary-btn"
+              @click="backToSetup"
+            >
+              {{ t('subtitle_back_to_setup_btn', 'Back to Setup') }}
             </button>
           </div>
         </section>
@@ -211,6 +226,7 @@ import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
 import { openOptionsPage } from '@/core/helpers.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
 // --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.SUBTITLE, 'SubtitleApp');
@@ -226,6 +242,7 @@ const {
   status,
   progress,
   error,
+  errorAction,
   currentFile,
   cues,
   startTranslation,
@@ -246,6 +263,13 @@ const goToProviderSettings = async () => {
   } catch (err) {
     logger.error('Failed to open provider settings:', err);
   }
+};
+
+/**
+ * Returns to setup without clearing the loaded subtitle state.
+ */
+const backToSetup = () => {
+  status.value = 'idle';
 };
 
 /**

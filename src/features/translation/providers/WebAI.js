@@ -105,7 +105,7 @@ export class WebAIProvider extends BaseAIProvider {
       originalCharCount: isBatch ? AITextProcessor.estimateOriginalChars(userText) : userText.length,
       extractResponse: (data) => {
         this._recordWebAICompletion(data, executionContext);
-        return typeof data.response === "string" ? data.response : undefined;
+        return typeof data?.response === "string" ? data.response : undefined;
       },
       context: `${this.providerName.toLowerCase()}-translation`,
       abortController,

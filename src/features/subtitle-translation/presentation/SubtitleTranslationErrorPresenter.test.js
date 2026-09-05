@@ -4,6 +4,7 @@ import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTr
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
 vi.mock('@/shared/error-management/PublicTranslationErrorPolicy.js', () => ({
   mapCanonicalTranslationError: vi.fn((error) => ({ type: error.type, messageKey: `ERRORS_${error.type}` }))
@@ -49,6 +50,35 @@ describe('presentSubtitleTranslationError', () => {
     const canonicalError = mapCanonicalTranslationError.mock.calls[0][0];
     expect(canonicalError.type).toBe('MODEL_NOT_FOUND');
     expect(createLegacyDisplayError).toHaveBeenCalledWith(canonicalError, expect.any(Object));
+  });
+
+  it.each([
+    [400, undefined],
+    [404, undefined],
+    [413, undefined],
+    [422, undefined],
+    [409, PublicTranslationErrorActions.RETRY],
+    [500, PublicTranslationErrorActions.RETRY],
+  ])('preserves public action for HTTP %s', async (statusCode, action) => {
+    mapCanonicalTranslationError.mockReturnValueOnce({
+      type: 'REQUEST_FAILURE',
+      messageKey: 'ERRORS_HTTP_ERROR',
+      ...(action && { action }),
+    });
+
+    const result = await presentSubtitleTranslationError({
+      errorDetails: {
+        message: 'raw HTTP diagnostic',
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+      },
+    });
+
+    expect(result).toMatchObject({
+      kind: 'display',
+      message: 'Localized REQUEST_FAILURE',
+    });
+    expect(result.action).toBe(action);
   });
 
   it('uses safe generic display for missing or malformed details', async () => {

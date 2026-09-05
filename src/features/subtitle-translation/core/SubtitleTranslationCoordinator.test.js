@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { subtitleTranslationCoordinator } from './SubtitleTranslationCoordinator.js';
 import { SubtitleProgressTracker } from './SubtitleProgressTracker.js';
 import { unifiedTranslationService } from '@/core/services/translation/UnifiedTranslationService.js';
+import { TranslationMode } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { SubtitleParserFactory } from '../parsers/SubtitleParserFactory.js';
@@ -51,6 +52,78 @@ describe('SubtitleTranslationCoordinator Stability', () => {
   });
 
   const makeCue = (id, text, index) => ({ id, text, index, warnings: [] });
+
+  it.each(['deepl', 'edge'])('forwards selected %s as explicit canonical provider', async (providerId) => {
+    const cue = makeCue(`${providerId}-cue`, 'Hello', 1);
+    subtitleTranslationCoordinator.activeJobs.set(`job-${providerId}`, {
+      cues: [cue],
+      status: 'running',
+      progressTracker: new SubtitleProgressTracker(1),
+      activeBatchMessageId: null
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [{ id: cue.id, text: 'Translated' }]
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      `job-${providerId}`,
+      [cue],
+      'en',
+      'fa',
+      providerId,
+      {}
+    );
+
+    expect(result.success).toBe(true);
+    const message = unifiedTranslationService.handleTranslationRequest.mock.calls[0][0];
+    expect(message.data).toMatchObject({
+      provider: providerId,
+      isExplicitProvider: true,
+      mode: TranslationMode.Subtitle
+    });
+    expect(message.data).not.toHaveProperty('providerId');
+  });
+
+  it('preserves existing batch payload fields with explicit provider ownership', async () => {
+    const previousCue = makeCue('previous', 'Earlier', 1);
+    const currentCue = makeCue('current', 'Hello', 2);
+    subtitleTranslationCoordinator.activeJobs.set('job-payload', {
+      cues: [previousCue, currentCue],
+      status: 'running',
+      progressTracker: new SubtitleProgressTracker(1),
+      activeBatchMessageId: null
+    });
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [{ id: currentCue.id, text: 'Translated' }]
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch(
+      'job-payload',
+      [currentCue],
+      'en',
+      'fa',
+      'deepl',
+      { useContext: true }
+    );
+
+    expect(result.success).toBe(true);
+    const message = unifiedTranslationService.handleTranslationRequest.mock.calls[0][0];
+    expect(message.data).toMatchObject({
+      items: [{ id: currentCue.id, text: 'Hello', context: 'Previous cues: Earlier' }],
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'deepl',
+      isExplicitProvider: true,
+      mode: TranslationMode.Subtitle,
+      metadata: { batchInstruction: expect.anything() },
+      contextMetadata: { dialogueContext: 'Subtitle dialogue: Earlier' }
+    });
+    expect(message.data).toHaveProperty('promptTemplate');
+    expect(message.data).toHaveProperty('instruction');
+    expect(message.data).not.toHaveProperty('providerId');
+  });
 
   it('continues to next batch after an exhausted SERVER_ERROR', async () => {
     const firstCue = makeCue('server-error-cue', 'First source', 1);
@@ -677,6 +750,31 @@ describe('SubtitleTranslationCoordinator Source-Preservation Contract', () => {
     expect(progress.failed).toBe(1);
   });
 
+  it('continues after a formatting-token failure and counts translated and failed cues separately', async () => {
+    const batch = [
+      cue('format-valid-a', '<i>Hello</i>', 1),
+      cue('format-corrupt-b', '{\\an8}Styled', 2),
+      cue('format-valid-c', 'Line 1\nLine 2', 3)
+    ];
+    const tracker = makeJob(batch);
+    unifiedTranslationService.handleTranslationRequest.mockResolvedValue({
+      success: true,
+      results: [
+        { id: batch[0].id, text: '@@SUB_TAG_0@@Hola@@SUB_TAG_1@@' },
+        { id: batch[1].id, text: 'Estilo perdido' },
+        { id: batch[2].id, text: 'Linea 1@@SUB_NL_0@@Linea 2' }
+      ]
+    });
+
+    const result = await subtitleTranslationCoordinator._processBatch('job', batch, 'en', 'fa', 'google', {});
+
+    expect(result.success).toBe(true);
+    expect(batch[0]).toMatchObject({ status: 'translated', translatedText: '<i>Hola</i>' });
+    expect(batch[1]).toMatchObject({ status: 'failed', translatedText: '', text: '{\\an8}Styled' });
+    expect(batch[2]).toMatchObject({ status: 'translated', translatedText: 'Linea 1\nLinea 2' });
+    expect(tracker.getProgress()).toMatchObject({ translated: 2, failed: 1, processed: 3 });
+  });
+
   it('keeps all cues original and fails every cue when the entire batch is unresolved', async () => {
     const batch = [cue('e1', 'One'), cue('e2', 'Two')];
     const tracker = makeJob(batch);
@@ -987,7 +1085,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
     }
   });
 
-  it('keeps TRANSLATION_TIMEOUT primary and falls back to cancelRequest when cleanup fails', async () => {
+  it('keeps TRANSLATION_TIMEOUT primary when canonical cleanup fails', async () => {
     vi.useFakeTimers();
     try {
       const jobId = 'job-cleanup-fallback';
@@ -1009,11 +1107,7 @@ describe('SubtitleTranslationCoordinator Timeout Ownership', () => {
       expect(result.success).toBe(false);
       expect(result.isFatal).toBe(false);
       expect(result.errorDetails.message).toMatch(/timed out/);
-      expect(unifiedTranslationService.cancelRequest).toHaveBeenCalled();
-      expect(unifiedTranslationService.cancelRequest).toHaveBeenCalledWith(
-        expect.any(String),
-        'timeout'
-      );
+      expect(unifiedTranslationService.cancelRequest).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

@@ -98,7 +98,7 @@ const props = defineProps({
     type: Number,
     default: 3
   },
-  providerName: {
+  providerId: {
     type: String,
     required: true
   },
@@ -140,6 +140,6 @@ const togglePasswordVisibility = () => {
 }
 
 const handleTestKeys = () => {
-  emit('test', props.providerName)
+  emit('test', props.providerId)
 }
 </script>

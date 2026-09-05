@@ -46,13 +46,38 @@ export function BaseContentScriptCore() {
   const eventTarget = new EventTarget();
 
   eventTarget.initialized = false;
+  eventTarget.baseInitialized = false;
+  eventTarget._baseInitializationPromise = null;
   eventTarget.messageHandler = null;
   eventTarget.access = null;
 
   eventTarget.initializeBase = async function() {
-    if (this.initialized) return true;
+    if (this.baseInitialized || this.initialized) return true;
+    if (this._baseInitializationPromise) return this._baseInitializationPromise;
 
-    try {
+    if (window.translateItContentScriptLoaded) return false;
+
+    if (window.translateItContentScriptInitializing) {
+      const ownerPromise = window._translateItBootstrapPromise;
+      if (ownerPromise) {
+        const joined = ownerPromise.then(
+          () => false,
+          () => false,
+        );
+        const wrappedJoined = joined.finally(() => {
+          if (this._baseInitializationPromise === wrappedJoined) {
+            this._baseInitializationPromise = null;
+          }
+        });
+        this._baseInitializationPromise = wrappedJoined;
+        return wrappedJoined;
+      }
+      return false;
+    }
+
+    window.translateItContentScriptInitializing = true;
+
+    const initialization = (async () => {
       await loadBaseDependencies();
 
       this.access = checkContentScriptAccess();
@@ -67,20 +92,36 @@ export function BaseContentScriptCore() {
         errorModule.setupWindowErrorHandlers('content');
       }
 
-      // Prevent duplicate execution
+      // Another content core owns this document.
       if (window.translateItContentScriptLoaded) return false;
-      window.translateItContentScriptLoaded = true;
 
       await this.initializeMessaging();
+      window.translateItContentScriptLoaded = true;
+      this.baseInitialized = true;
       return true;
-    } catch (error) {
+    })().catch((error) => {
       if (logger) logger.error('Failed to initialize Base Core:', error);
       return false;
-    }
+    });
+
+    const wrapped = initialization.finally(() => {
+      if (window._translateItBootstrapPromise === wrapped) {
+        window._translateItBootstrapPromise = null;
+        window.translateItContentScriptInitializing = false;
+      }
+      if (this._baseInitializationPromise === wrapped) {
+        this._baseInitializationPromise = null;
+      }
+    });
+    window._translateItBootstrapPromise = wrapped;
+    this._baseInitializationPromise = wrapped;
+    return wrapped;
   };
 
   eventTarget.initializeMessaging = async function() {
-    if (!ExtensionContextManager?.isValidSync()) return;
+    if (!ExtensionContextManager?.isValidSync()) {
+      throw new Error('Extension context is unavailable for messaging initialization');
+    }
 
     try {
       const { initializeContentScriptIntegration } = await import('@/shared/messaging/core/ContentScriptIntegration.js');
@@ -91,7 +132,10 @@ export function BaseContentScriptCore() {
         this.messageHandler.listen();
       }
     } catch (error) {
+      this.messageHandler?.stopListening?.();
+      this.messageHandler = null;
       if (logger) logger.error('Failed to initialize messaging:', error);
+      throw error;
     }
   };
 

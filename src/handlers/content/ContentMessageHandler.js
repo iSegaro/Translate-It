@@ -21,6 +21,10 @@ function isSelectElementGeneration(value) {
   return Number.isInteger(value) && value > 0;
 }
 
+function isSelectElementEpoch(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
 function getSelectElementActiveState(manager) {
   if (typeof manager?.isSelectElementActive === 'function') {
     return manager.isSelectElementActive() === true;
@@ -40,11 +44,20 @@ export class ContentMessageHandler extends ResourceTracker {
 
     this.handlers = new Map();
     this.initialized = false;
+    this._handlersPrepared = false;
+    this._externallyRegistered = false;
+    this._externalMessageHandler = null;
+    this._registeredActions = new Set();
+    this.isActive = false;
     this.context = MessagingContexts.CONTENT;
     this.logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'MessageHandler');
     this.selectElementManager = null;
     // Generation is local to this content frame; tab-wide authority stays in Background.
+    // Epoch separates generation ordering across background module lifetimes.
+    this.acceptedSelectElementEpoch = null;
+    this.retiredSelectElementEpochs = new Set();
     this.acceptedSelectElementGeneration = null;
+    this.invalidatedSelectElementEpoch = null;
     this.invalidatedSelectElementGeneration = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
@@ -80,6 +93,32 @@ export class ContentMessageHandler extends ResourceTracker {
       activate: options => manager?.activateSelectElementMode(options),
       deactivate: options => manager?.deactivate(options),
     });
+  }
+
+  _admitSelectElementEpoch(requestedEpoch) {
+    if (!isSelectElementEpoch(requestedEpoch)) {
+      return { accepted: true, legacy: true };
+    }
+
+    if (this.acceptedSelectElementEpoch === null) {
+      this.acceptedSelectElementEpoch = requestedEpoch;
+      return { accepted: true, newEpoch: true };
+    }
+
+    if (requestedEpoch === this.acceptedSelectElementEpoch) {
+      return { accepted: true };
+    }
+
+    if (this.retiredSelectElementEpochs.has(requestedEpoch)) {
+      return { accepted: false, staleEpoch: true };
+    }
+
+    this.retiredSelectElementEpochs.add(this.acceptedSelectElementEpoch);
+    this.acceptedSelectElementEpoch = requestedEpoch;
+    this.acceptedSelectElementGeneration = null;
+    this.invalidatedSelectElementEpoch = null;
+    this.invalidatedSelectElementGeneration = null;
+    return { accepted: true, newEpoch: true };
   }
 
   setScreenCaptureManager(manager) {
@@ -118,20 +157,22 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   initialize() {
-    if (this.initialized) return;
+    if (this._handlersPrepared) return;
     this.registerHandlers();
+    this._handlersPrepared = true;
     this.initialized = true;
     this.logger.init('Content message handler initialized');
   }
 
   async activate() {
-    if (this.initialized) {
-      // logger.trace('ContentMessageHandler already active');
+    if (this.isActive && this._externallyRegistered) {
       return true;
     }
 
     try {
-      this.initialize();
+      if (!this._handlersPrepared) {
+        this.initialize();
+      }
 
       // Get the existing message handler from ContentScriptCore
       // ContentScriptCore should be available globally or through window
@@ -155,82 +196,127 @@ export class ContentMessageHandler extends ResourceTracker {
       // Use ContentScriptCore's message handler if available
       const messageHandler = contentScriptCore ? contentScriptCore.messageHandler : this.messageHandler;
 
-      // Register all handlers with the message handler
-      if (messageHandler && typeof messageHandler.registerHandler === 'function') {
-        for (const [action, handler] of this.handlers.entries()) {
-          messageHandler.registerHandler(action, (message, sender, sendResponse) => {
-            try {
-              // Call handler and return result directly (preserve Promise nature)
-              const result = handler.call(this, message, sender, sendResponse);
-              return result;
-            } catch (error) {
-              this.logger.error(`Error in content handler for ${action}:`, error);
-              throw error;
-            }
-          });
-        }
-
-        // Register DebugModeBridge handlers
-        try {
-          const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
-          const debugHandlers = debugModeBridge.getHandlerMappings();
-          for (const [action, handler] of Object.entries(debugHandlers)) {
-            messageHandler.registerHandler(action, handler);
+      const attemptActions = new Set();
+      let attemptOwnListenerStarted = false;
+      try {
+        // Register all handlers with the message handler
+        if (messageHandler && typeof messageHandler.registerHandler === 'function') {
+          for (const [action, handler] of this.handlers.entries()) {
+            messageHandler.registerHandler(action, (message, sender, sendResponse) => {
+              try {
+                // Call handler and return result directly (preserve Promise nature)
+                const result = handler.call(this, message, sender, sendResponse);
+                return result;
+              } catch (error) {
+                this.logger.error(`Error in content handler for ${action}:`, error);
+                throw error;
+              }
+            });
+            attemptActions.add(action);
           }
-          this.logger.info('Registered DebugModeBridge handlers');
-        } catch (error) {
-          this.logger.warn('Failed to register DebugModeBridge handlers:', error);
+
+          // Register DebugModeBridge handlers
+          try {
+            const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
+            const debugHandlers = debugModeBridge.getHandlerMappings();
+            for (const [action, handler] of Object.entries(debugHandlers)) {
+              messageHandler.registerHandler(action, handler);
+              attemptActions.add(action);
+            }
+            this.logger.info('Registered DebugModeBridge handlers');
+          } catch (error) {
+            this.logger.warn('Failed to register DebugModeBridge handlers:', error);
+          }
+
+          // Store reference to message handler
+          this.messageHandler = messageHandler;
+          this._externalMessageHandler = messageHandler;
+
+          this.logger.info(`ContentMessageHandler registered ${this.handlers.size} handlers`);
+        } else {
+          throw new Error('No valid message handler available');
         }
 
-        // Store reference to message handler
-        this.messageHandler = messageHandler;
+        // Activate the message listener if we created our own
+        if (!contentScriptCore && this.messageHandler && !this.messageHandler.isListenerActive) {
+          this.messageHandler.listen();
+          attemptOwnListenerStarted = true;
+          this.logger.info('ContentMessageHandler message listener activated');
+        }
 
-        this.logger.info(`ContentMessageHandler registered ${this.handlers.size} handlers`);
-      } else {
-        throw new Error('No valid message handler available');
+        // If using ContentScriptCore's message handler, it should already be listening
+        if (contentScriptCore) {
+          // logger.trace('Using ContentScriptCore message listener');
+        }
+
+        // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
+        this.trackResource('messageHandler', () => {
+          this.logger.debug('Message handler is protected from cleanup and remains active');
+        }, { isCritical: true });
+
+        for (const action of attemptActions) {
+          this._registeredActions.add(action);
+        }
+        this._externallyRegistered = true;
+        this.isActive = true;
+        this.initialized = true;
+        this.logger.info('ContentMessageHandler activated successfully with smart message handling');
+        return true;
+      } catch (error) {
+        for (const action of attemptActions) {
+          try {
+            if (messageHandler && typeof messageHandler.unregisterHandler === 'function') {
+              messageHandler.unregisterHandler(action);
+            }
+          } catch { /* ignore */ }
+        }
+        if (attemptOwnListenerStarted && this.messageHandler && typeof this.messageHandler.stopListening === 'function') {
+          try { this.messageHandler.stopListening(); } catch { /* ignore */ }
+        }
+        this.logger.error('Failed to activate ContentMessageHandler:', error);
+        this._externallyRegistered = false;
+        this.isActive = false;
+        // Keep handlersPrepared so retry can re-attempt external registration without rebuilding handlers
+        return false;
       }
-
-      // Activate the message listener if we created our own
-      if (!contentScriptCore && this.messageHandler && !this.messageHandler.isListenerActive) {
-        this.messageHandler.listen();
-        this.logger.info('ContentMessageHandler message listener activated');
-      }
-
-      // If using ContentScriptCore's message handler, it should already be listening
-      if (contentScriptCore) {
-        // logger.trace('Using ContentScriptCore message listener');
-      }
-
-      // Track message handler for cleanup - CRITICAL: Must survive memory cleanup
-      this.trackResource('messageHandler', () => {
-        // logger.trace('ContentMessageHandler messageHandler cleanup called - BUT SKIPPED DUE TO CRITICAL PROTECTION');
-        // This callback is called but the actual cleanup is skipped by MemoryManager
-        // because this resource is marked as critical. This is the expected behavior.
-        this.logger.debug('Message handler is protected from cleanup and remains active');
-      }, { isCritical: true });
-
-      this.isActive = true;
-      this.logger.info('ContentMessageHandler activated successfully with smart message handling');
-      return true;
     } catch (error) {
       this.logger.error('Failed to activate ContentMessageHandler:', error);
+      this._externallyRegistered = false;
+      this.isActive = false;
       return false;
     }
   }
 
   async deactivate() {
-    if (!this.initialized) {
-      // logger.trace('ContentMessageHandler not active');
+    if (!this._handlersPrepared && !this._externallyRegistered && !this.isActive) {
       return true;
     }
 
     try {
-      // Unregister all handlers to prevent duplicate registrations
-      this.unregisterAllHandlers();
+      if (this._externalMessageHandler && this._registeredActions.size > 0) {
+        for (const action of Array.from(this._registeredActions)) {
+          try {
+            if (typeof this._externalMessageHandler.unregisterHandler === 'function') {
+              this._externalMessageHandler.unregisterHandler(action);
+            }
+          } catch { /* ignore */ }
+        }
+        this._registeredActions.clear();
+      } else if (this.messageHandler && this._registeredActions.size > 0) {
+        for (const action of Array.from(this._registeredActions)) {
+          try {
+            if (typeof this.messageHandler.unregisterHandler === 'function') {
+              this.messageHandler.unregisterHandler(action);
+            }
+          } catch { /* ignore */ }
+        }
+        this._registeredActions.clear();
+      }
 
-      // Cleanup will handle message handler through ResourceTracker
-      this.cleanup();
+      this._externallyRegistered = false;
       this.isActive = false;
+      this.initialized = false;
+      // Keep handlersPrepared and handler map for retryable reactivation
       this.logger.info('ContentMessageHandler deactivated successfully');
       return true;
     } catch (error) {
@@ -242,6 +328,7 @@ export class ContentMessageHandler extends ResourceTracker {
   registerHandlers() {
     this.registerHandler(MessageActions.ACTIVATE_SELECT_ELEMENT_MODE, this.handleActivateSelectElementMode.bind(this));
     this.registerHandler(MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, this.handleDeactivateSelectElementMode.bind(this));
+    this.registerHandler(MessageActions.GET_SELECT_ELEMENT_FRAME_STATE, this.handleGetSelectElementFrameState.bind(this));
     
     // Screen capture handlers
     this.registerHandler(MessageActions.START_SCREEN_CAPTURE, this.handleStartScreenCapture.bind(this));
@@ -254,10 +341,8 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.TRANSLATION_STREAM_UPDATE, this.handleStreamUpdate.bind(this));
     this.registerHandler(MessageActions.TRANSLATION_STREAM_END, this.handleStreamEnd.bind(this));
 
-    // IFrame support handlers
-    this.registerHandler(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT, this.handleIFrameActivateSelectElement.bind(this));
+    // IFrame support handlers (Select Element authority is via Background frame-targeted messaging)
     this.registerHandler(MessageActions.IFRAME_GET_FRAME_INFO, this.handleIFrameGetFrameInfo.bind(this));
-    this.registerHandler(MessageActions.IFRAME_COORDINATE_OPERATION, this.handleIFrameCoordinateOperation.bind(this));
     this.registerHandler(MessageActions.IFRAME_DETECT_TEXT_FIELDS, this.handleIFrameDetectTextFields.bind(this));
     this.registerHandler(MessageActions.IFRAME_INSERT_TEXT, this.handleIFrameInsertText.bind(this));
     this.registerHandler(MessageActions.IFRAME_SYNC_REQUEST, this.handleIFrameSyncRequest.bind(this));
@@ -366,11 +451,41 @@ export class ContentMessageHandler extends ResourceTracker {
       }
 
       return await this._enqueueSelectElementLifecycle(async ({ activate }) => {
+        const requestedEpoch = message?.data?.activationEpoch;
+        // P9: epoch-less activation cannot supersede strict epoch-owned session
+        if (!isSelectElementEpoch(requestedEpoch) && this.acceptedSelectElementEpoch !== null) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleEpoch: true,
+          };
+        }
+        const epochAdmission = this._admitSelectElementEpoch(requestedEpoch);
+        if (!epochAdmission.accepted) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleEpoch: true,
+          };
+        }
+
         const requestedGeneration = message?.data?.activationGeneration;
         if (
           isSelectElementGeneration(requestedGeneration)
+          && this.invalidatedSelectElementEpoch === this.acceptedSelectElementEpoch
           && this.invalidatedSelectElementGeneration !== null
           && requestedGeneration <= this.invalidatedSelectElementGeneration
+        ) {
+          return {
+            success: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleGeneration: true,
+          };
+        }
+        if (
+          isSelectElementGeneration(requestedGeneration)
+          && this.acceptedSelectElementGeneration !== null
+          && requestedGeneration < this.acceptedSelectElementGeneration
         ) {
           return {
             success: false,
@@ -412,6 +527,9 @@ export class ContentMessageHandler extends ResourceTracker {
           && requestedGeneration === this.acceptedSelectElementGeneration
         ) {
           response.activationGeneration = requestedGeneration;
+          if (isSelectElementEpoch(requestedEpoch)) {
+            response.activationEpoch = this.acceptedSelectElementEpoch;
+          }
         }
         return response;
       });
@@ -444,9 +562,35 @@ export class ContentMessageHandler extends ResourceTracker {
 
   async _handleDeactivateSelectElementMode(message, lifecycle) {
     if (this.selectElementManager) {
+      const requestedEpoch = message?.data?.activationEpoch;
+      const currentGenerationBefore = this.acceptedSelectElementGeneration;
+      if (!isSelectElementEpoch(requestedEpoch) && this.acceptedSelectElementEpoch !== null && currentGenerationBefore !== null && getSelectElementActiveState(this.selectElementManager)) {
+        return {
+          success: false,
+          cleanupCompleted: false,
+          activated: getSelectElementActiveState(this.selectElementManager),
+          staleEpoch: true,
+        };
+      }
+      if (isSelectElementEpoch(requestedEpoch)) {
+        if (
+          this.acceptedSelectElementEpoch !== null
+          && requestedEpoch !== this.acceptedSelectElementEpoch
+        ) {
+          return {
+            success: false,
+            cleanupCompleted: false,
+            activated: getSelectElementActiveState(this.selectElementManager),
+            staleEpoch: true,
+          };
+        }
+        this.acceptedSelectElementEpoch = requestedEpoch;
+      }
+
       const requestedGeneration = message?.data?.activationGeneration;
       const currentGeneration = this.acceptedSelectElementGeneration;
       if (isSelectElementGeneration(requestedGeneration)) {
+        this.invalidatedSelectElementEpoch = this.acceptedSelectElementEpoch;
         this.invalidatedSelectElementGeneration = Math.max(
           this.invalidatedSelectElementGeneration || 0,
           requestedGeneration,
@@ -524,6 +668,17 @@ export class ContentMessageHandler extends ResourceTracker {
         error: 'Select Element manager unavailable',
       };
     }
+  }
+
+  async handleGetSelectElementFrameState() {
+    // P1: read-only, no epoch adoption, no manager mutation
+    const active = getSelectElementActiveState(this.selectElementManager);
+    return {
+      active,
+      activationEpoch: this.acceptedSelectElementEpoch,
+      activationGeneration: this.acceptedSelectElementGeneration,
+      hasManager: !!this.selectElementManager,
+    };
   }
 
   async handleStartScreenCapture(message) {
@@ -706,45 +861,6 @@ export class ContentMessageHandler extends ResourceTracker {
     }
   }
 
-  // IFrame support handlers
-  async handleIFrameActivateSelectElement(/* data */) {
-    return this._enqueueSelectElementLifecycle(
-      lifecycle => this._handleIFrameActivateSelectElement(lifecycle),
-    );
-  }
-
-  async _handleIFrameActivateSelectElement(lifecycle) {
-    this.logger.info('IFrame activate select element request');
-    try {
-      if (this.selectElementManager) {
-        // Initialize if not already initialized
-        if (!this.selectElementManager.isInitialized) {
-          await this.selectElementManager.initialize();
-        }
-
-        const result = await lifecycle.activate();
-        return { success: true, activated: result.isActive, managerId: result.instanceId };
-      }
-
-      const safeMessage = await getSelectElementActivationErrorMessage();
-      return {
-        success: false,
-        message: safeMessage,
-        error: safeMessage,
-        errorType: ErrorTypes.SELECT_ELEMENT,
-      };
-    } catch (error) {
-      this.logger.warn('IFrame Select Element activation failed:', error);
-      const safeMessage = await getSelectElementActivationErrorMessage();
-      return {
-        success: false,
-        message: safeMessage,
-        error: safeMessage,
-        errorType: ErrorTypes.SELECT_ELEMENT,
-      };
-    }
-  }
-
   async handleIFrameGetFrameInfo(/* data */) {
     this.logger.info('IFrame get frame info request');
     if (this.iFrameManager) {
@@ -756,12 +872,8 @@ export class ContentMessageHandler extends ResourceTracker {
     return { success: false, error: 'IFrameManager not available' };
   }
 
-  async handleIFrameCoordinateOperation(data) {
-    this.logger.info('IFrame coordinate operation request');
-    // Delegate to appropriate manager based on operation type
-    if (data.operation === TranslationMode.Select_Element && this.selectElementManager) {
-      return await this.handleIFrameActivateSelectElement(data);
-    }
+  async handleIFrameCoordinateOperation() {
+    this.logger.info('IFrame coordinate operation request (Select Element removed)');
     return { success: false, error: 'Unsupported operation or manager not available' };
   }
 
@@ -1010,11 +1122,26 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   async cleanup() {
+    if (this._externalMessageHandler && this._registeredActions.size > 0) {
+      for (const action of Array.from(this._registeredActions)) {
+        try {
+          if (typeof this._externalMessageHandler.unregisterHandler === 'function') {
+            this._externalMessageHandler.unregisterHandler(action);
+          }
+        } catch { /* ignore */ }
+      }
+      this._registeredActions.clear();
+    }
     this.handlers.clear();
     this.selectElementManager = null;
     this.iFrameManager = null;
     this.pageTranslationManager = null;
     this.childFrameRetirementListenerInstalled = false;
+    this._handlersPrepared = false;
+    this._externallyRegistered = false;
+    this._externalMessageHandler = null;
+    this.isActive = false;
+    this.initialized = false;
 
     // Use ResourceTracker cleanup for automatic resource management
     super.cleanup();

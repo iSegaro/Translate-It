@@ -281,16 +281,6 @@ const isZeroResult = computed(() => (
 ));
 
 const primaryAction = computed(() => {
-  const isError = pageTranslationData.value.status === 'error';
-
-  if (isError) {
-    if (pageTranslationData.value.canRetry !== true) {
-      return { label: t('mobile_close_button_alt', 'Close'), icon: closeIcon, bgColor: 'var(--ti-mobile-error)', textColor: 'white', border: 'none', iconFilter: 'brightness(0) invert(1)', handler: closeView, disabled: false }
-    }
-
-    return { label: t('mobile_page_retry_btn', 'Retry Translation'), icon: wholePageIcon, bgColor: 'var(--ti-mobile-error)', textColor: 'white', border: 'none', iconFilter: 'brightness(0) invert(1)', handler: startTranslation, disabled: !isBulkSupported.value }
-  }
-
   if (pageTranslationData.value.isTranslating || pageTranslationData.value.isAutoTranslating) {
     const isInitialPass = pageTranslationData.value.isTranslating;
     return {

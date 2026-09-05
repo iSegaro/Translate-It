@@ -61,7 +61,6 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getBilingualTranslationModesAsync: vi.fn(),
     getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(false),
     getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(3),
-    getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
 

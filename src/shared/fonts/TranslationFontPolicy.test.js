@@ -1,7 +1,35 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTranslationFontTarget } from './TranslationFontPolicy.js';
 
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+let computedStyleSpy;
+let pseudoContentOverrides;
+
+const setPseudoContent = (element, pseudo, content) => {
+  let overrides = pseudoContentOverrides.get(element);
+  if (!overrides) {
+    overrides = new Map();
+    pseudoContentOverrides.set(element, overrides);
+  }
+  overrides.set(pseudo, content);
+};
+
 describe('getTranslationFontTarget', () => {
+  beforeEach(() => {
+    pseudoContentOverrides = new WeakMap();
+    computedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      if (pseudo) {
+        return { content: pseudoContentOverrides.get(element)?.get(pseudo) ?? 'none' };
+      }
+      return nativeGetComputedStyle(element, pseudo);
+    });
+  });
+
+  afterEach(() => {
+    computedStyleSpy.mockRestore();
+    computedStyleSpy = null;
+  });
+
   it('allows a single meaningful direct TextNode', () => {
     const element = document.createElement('span');
     element.textContent = 'source';
@@ -66,15 +94,11 @@ describe('getTranslationFontTarget', () => {
     important.style.setProperty('font-family', 'serif', 'important');
     const pseudo = document.createElement('span');
     pseudo.textContent = 'source';
-    const getComputedStyle = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudoElement) => {
-      if (pseudoElement === '::before' && element === pseudo) return { content: '"label"' };
-      return { content: 'none' };
-    });
+    setPseudoContent(pseudo, '::before', '"label"');
 
     expect(getTranslationFontTarget(roleButton.firstChild)).toBeNull();
     expect(getTranslationFontTarget(editable.firstChild)).toBeNull();
     expect(getTranslationFontTarget(important.firstChild)).toBeNull();
     expect(getTranslationFontTarget(pseudo.firstChild)).toBeNull();
-    getComputedStyle.mockRestore();
   });
 });

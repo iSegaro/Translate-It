@@ -311,7 +311,7 @@ class SelectElementManager extends ResourceTracker {
    *   Routes the trusted DEACTIVATE_SELECT_ELEMENT_MODE request through the
    *   background, which authenticates the sender tab and broadcasts to all
    *   frames. Frame position never implies this intent.
-   * @returns {Promise<{success: boolean, cleanupCompleted: boolean, alreadyInactive?: boolean, error?: string}>}
+   * @returns {Promise<{success: boolean, cleanupCompleted: boolean, alreadyInactive?: boolean, error?: string, globalDeactivationRequested?: boolean, globalDeactivationSucceeded?: boolean}>}
   */
   async deactivate(options = {}) {
     const result = await this.enqueueSelectElementLifecycle(({ deactivate }) => deactivate(options));
@@ -324,8 +324,19 @@ class SelectElementManager extends ResourceTracker {
       && options.fromBackground !== true
     ) {
       try {
-        await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
-      } catch { /* ignore */ }
+        const response = await sendMessage({ action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE });
+        return {
+          ...result,
+          globalDeactivationRequested: true,
+          globalDeactivationSucceeded: response?.success === true,
+        };
+      } catch {
+        return {
+          ...result,
+          globalDeactivationRequested: true,
+          globalDeactivationSucceeded: false,
+        };
+      }
     }
 
     return result;

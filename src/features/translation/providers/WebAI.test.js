@@ -13,11 +13,15 @@ vi.mock('@/shared/config/config.js', () => ({
   getWebAIApiUrlAsync: vi.fn().mockResolvedValue('https://webai.example/api'),
   getWebAIApiModelAsync: vi.fn().mockResolvedValue('webai-model'),
   getAIConversationHistoryEnabledAsync: vi.fn().mockResolvedValue(true),
-  getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn().mockResolvedValue(3),
   TranslationMode: {
     Select_Element: 'select-element'
   }
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -65,6 +69,7 @@ import { WebAIProvider } from './WebAI.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { getAIConversationHistoryEnabledAsync } from '@/shared/config/config.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
+import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 
@@ -296,8 +301,42 @@ describe('WebAIProvider Completion Recording (ADR-016)', () => {
     });
 
     await expect(provider._callAI('system', 'text', { executionContext: { operation } }))
-      .rejects.toThrow();
+      .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
     expect(operation.snapshotCompletions()).toEqual([]);
+  });
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['empty object', {}],
+    ['null response', { response: null }],
+    ['numeric response', { response: 123 }],
+    ['object response', { response: {} }],
+  ])('rejects malformed HTTP-200 %s as API_RESPONSE_INVALID', async (_label, body) => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve(body),
+      clone() { return this; },
+    });
+
+    await expect(provider._callAI('system', 'text')).rejects.toMatchObject({
+      type: ErrorTypes.API_RESPONSE_INVALID,
+      statusCode: 200,
+    });
+  });
+
+  it('preserves a valid HTTP-200 response body', async () => {
+    proxyManager.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Map([['content-type', 'application/json']]),
+      json: () => Promise.resolve({ response: 'translated text' }),
+      clone() { return this; },
+    });
+
+    await expect(provider._callAI('system', 'text')).resolves.toBe('translated text');
   });
 
   it('does not copy requested model into the completion record', async () => {

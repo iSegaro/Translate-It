@@ -11,6 +11,7 @@ import { isDevelopmentMode } from '@/shared/utils/environment.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js'
+import { initializeBackgroundService } from './backgroundStartup.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -20,6 +21,7 @@ import "./listeners/onNotificationClicked.js";
 
 // Inject iframe-only content scripts after subframe DOM becomes available
 import "./listeners/onSubframeDOMContentLoaded.js";
+import "./listeners/onSpaNavigation.js";
 
 // Import Memory Garbage Collector
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
@@ -145,8 +147,7 @@ browser.runtime.onInstalled.addListener(async (details) => {
   }
 });
 
-// Initialize Background Service
-backgroundService.initialize().then(async () => {
+async function postInitializeBackgroundService() {
   logger.info("[Background] Background service initialization completed!");
 
   // Initialize DebugModeBridge for background script
@@ -203,6 +204,11 @@ backgroundService.initialize().then(async () => {
     })();
   }
 
+}
+
+// Initialize Background Service
+initializeBackgroundService(backgroundService, postInitializeBackgroundService, {
+  shouldRetry: error => !ExtensionContextManager.isContextError(error),
 }).catch((error) => {
   errorHandler.handle(error, {
     context: 'background-init',
@@ -211,4 +217,3 @@ backgroundService.initialize().then(async () => {
 });
 
 export { backgroundService };
-

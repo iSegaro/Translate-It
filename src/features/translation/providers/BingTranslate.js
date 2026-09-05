@@ -13,6 +13,7 @@ import { ProviderNames } from "@/features/translation/providers/ProviderConstant
 import { TraditionalTextProcessor, getTextInfo } from "./utils/TraditionalTextProcessor.js";
 import { getProviderConfiguration } from "@/features/translation/core/ProviderConfigurations.js";
 import { getProviderOptimizationLevelAsync } from "@/shared/config/config.js";
+import { proxyManager } from "@/shared/proxy/ProxyManager.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'BingTranslate');
 const BING_TOKEN_CONTEXT = 'bingtranslate-token-fetch';
@@ -157,9 +158,12 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             logger.debug(`[Bing] Received HTML response instead of JSON. Chunk size: ${chunkTexts.length}`);
             const htmlError = new Error('Bing returned HTML response instead of JSON');
             htmlError.name = 'BingHtmlResponseError';
+            htmlError.type = ErrorTypes.API_RESPONSE_INVALID;
+            htmlError.retryable = false;
             htmlError.context = context;
             htmlError.chunkSize = chunkTexts.length;
             htmlError.retryAttempt = retryAttempt;
+            htmlError.providerName = this.providerName;
             throw htmlError;
           }
 
@@ -175,15 +179,19 @@ export class BingTranslateProvider extends BaseTranslateProvider {
               logger.debug(`[Bing] Response appears to be HTML despite content-type`);
               const htmlError = new Error('Bing returned HTML response (detected after parsing)');
               htmlError.name = 'BingHtmlResponseError';
+              htmlError.type = ErrorTypes.API_RESPONSE_INVALID;
+              htmlError.retryable = false;
               htmlError.context = context;
               htmlError.chunkSize = chunkTexts.length;
               htmlError.retryAttempt = retryAttempt;
+              htmlError.providerName = this.providerName;
               throw htmlError;
             }
 
             // Regular JSON parsing error
             const jsonError = new Error(`JSON parsing failed: ${parseError.message}`);
             jsonError.name = 'BingJsonParseError';
+            jsonError.type = ErrorTypes.JSON_PARSING_ERROR;
             jsonError.context = context;
             jsonError.chunkSize = chunkTexts.length;
             jsonError.retryAttempt = retryAttempt;
@@ -240,9 +248,18 @@ export class BingTranslateProvider extends BaseTranslateProvider {
 
     } catch (error) {
       const errorType = error.type || matchErrorToType(error);
-      
-      // Handle HTML response and JSON parsing errors with existing adaptive recovery.
-      if (error.name === 'BingHtmlResponseError' || error.name === 'BingJsonParseError') {
+
+      // HTML responses are terminal: normalize to API_RESPONSE_INVALID and do not adaptively split.
+      if (error.name === 'BingHtmlResponseError') {
+        if (!error.type) error.type = ErrorTypes.API_RESPONSE_INVALID;
+        error.retryable = false;
+        if (!error.providerName) error.providerName = this.providerName;
+        if (!error.context) error.context = context;
+        throw error;
+      }
+
+      // Handle JSON parsing errors with existing adaptive recovery.
+      if (error.name === 'BingJsonParseError') {
         const maxRetries = providerConfig?.batching?.maxRetries ?? 3;
         const adaptiveChunking = providerConfig?.batching?.adaptiveChunking ?? true;
 
@@ -283,9 +300,11 @@ export class BingTranslateProvider extends BaseTranslateProvider {
             return results;
           } catch (retryError) {
             logger.error(`[Bing] Adaptive chunking failed for ${error.name}:`, retryError.message);
+            throw retryError;
           }
         }
 
+        error.retryable = false;
         throw error;
       }
 
@@ -322,9 +341,13 @@ export class BingTranslateProvider extends BaseTranslateProvider {
         
         let response;
         try {
-          response = await fetch(BingTranslateProvider.bingTokenUrl, {
-            signal: abortController?.signal
-          });
+          const proxyConfig = await this._initializeProxy();
+          response = await proxyManager.fetch(
+            BingTranslateProvider.bingTokenUrl,
+            { signal: abortController?.signal },
+            proxyConfig,
+            { allowHtmlResponse: true },
+          );
         } catch (fetchError) {
           throw normalizeBingTokenFetchError(fetchError, abortController);
         }
@@ -372,10 +395,11 @@ export class BingTranslateProvider extends BaseTranslateProvider {
           throw createInvalidBingTokenResponseError('Bing token response parameters are incomplete');
         }
 
-        const [_key, _token, interval] = params;
-        const tokenExpiryInterval = Number(interval);
-        if (!IG || !IID || typeof _key !== 'string' || !_key
+        const [_key, _token, tokenExpiryInterval] = params;
+        if (!IG || !IID
+          || typeof _key !== 'number' || !Number.isFinite(_key) || _key <= 0
           || typeof _token !== 'string' || !_token
+          || typeof tokenExpiryInterval !== 'number'
           || !Number.isFinite(tokenExpiryInterval) || tokenExpiryInterval <= 0) {
           throw createInvalidBingTokenResponseError('Bing token response contains unusable token data');
         }

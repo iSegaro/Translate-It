@@ -3,6 +3,7 @@ import { BingTranslateProvider } from './BingTranslate.js';
 import { ProviderNames } from '@/features/translation/providers/ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getProviderConfiguration } from '@/features/translation/core/ProviderConfigurations.js';
+import { queueManager } from '@/features/translation/core/QueueManager.js';
 
 // Mock dependencies
 vi.mock('webextension-polyfill', () => ({
@@ -34,8 +35,12 @@ vi.mock('@/shared/proxy/ProxyManager.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve(3)),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOriginal) => {
@@ -72,7 +77,7 @@ describe('BingTranslateProvider', () => {
     // Mock _getBingAccessToken to avoid real fetch
     vi.spyOn(provider, '_getBingAccessToken').mockResolvedValue({
       token: 'mock-token',
-      key: 'mock-key',
+      key: 1234567890,
       IG: 'mock-IG',
       IID: 'mock-IID'
     });
@@ -170,7 +175,7 @@ describe('BingTranslateProvider', () => {
       const controller = new AbortController();
       provider._getBingAccessToken.mockImplementation(async () => {
         controller.abort(reason);
-        return { token: 'token', key: 'key', IG: 'ig', IID: 'iid' };
+        return { token: 'token', key: 1234567890, IG: 'ig', IID: 'iid' };
       });
 
       let caughtError;
@@ -272,8 +277,62 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
-        .rejects.toMatchObject({ name: 'BingHtmlResponseError' });
-      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('preserves child user cancellation during adaptive recovery', async () => {
+      const childError = Object.assign(new Error('Translation cancelled by user'), {
+        name: 'AbortError',
+        type: ErrorTypes.USER_CANCELLED,
+      });
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
+        }))
+        .mockRejectedValueOnce(childError);
+
+      await expect(provider._translateChunk(['a', 'b'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(childError);
+    });
+
+    it('preserves child lifecycle abort during adaptive recovery', async () => {
+      const childError = Object.assign(new Error('Translation operation aborted'), {
+        name: 'AbortError',
+        operationAborted: true,
+        cancellationReason: 'document-replaced',
+      });
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
+        }))
+        .mockRejectedValueOnce(childError);
+
+      await expect(provider._translateChunk(['a', 'b'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(childError);
+      expect(childError).toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'document-replaced',
+      });
+    });
+
+    it('preserves child rate-limit errors during adaptive recovery', async () => {
+      const childError = Object.assign(new Error('Too many requests'), {
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        statusCode: 429,
+      });
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
+        }))
+        .mockRejectedValueOnce(childError);
+
+      await expect(provider._translateChunk(['a', 'b'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toBe(childError);
+      expect(childError.type).toBe(ErrorTypes.RATE_LIMIT_REACHED);
     });
 
     it('keeps default adaptive retry behavior when maxRetries is absent', async () => {
@@ -283,8 +342,89 @@ describe('BingTranslateProvider', () => {
       }));
 
       await expect(provider._translateChunk(['a', 'b', 'c', 'd'], 'en', 'fa', 'selection', null, 0, 4, 0, 1))
-        .rejects.toMatchObject({ name: 'BingJsonParseError' });
+        .rejects.toMatchObject({
+          name: 'BingJsonParseError',
+          type: ErrorTypes.JSON_PARSING_ERROR,
+          retryable: false,
+        });
       expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
+    });
+
+    it('succeeds when adaptive JSON recovery receives valid responses', async () => {
+      const createResponse = (text) => ({
+        headers: { get: () => 'application/json' },
+        text: async () => JSON.stringify([{ translations: [{ text }] }]),
+      });
+
+      provider._executeApiCall
+        .mockImplementationOnce(async (request) => request.extractResponse({
+          headers: { get: () => 'application/json' },
+          text: async () => 'not-json',
+        }))
+        .mockImplementation(async (request) => request.extractResponse(createResponse('translated')));
+
+      await expect(provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .resolves.toEqual(['translated', 'translated']);
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not retry the whole batch after adaptive JSON recovery exhausts', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => 'not-json',
+      }));
+
+      const queuedRequest = vi.fn(() => provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1));
+      const queuedBatch = queueManager.enqueue(
+        provider.providerName,
+        queuedRequest,
+        0,
+        'selection'
+      );
+
+      await expect(queuedBatch).rejects.toMatchObject({
+        type: ErrorTypes.JSON_PARSING_ERROR,
+        retryable: false,
+      });
+      expect(queuedRequest).toHaveBeenCalledTimes(1);
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not adaptively split on HTML content-type (T1)', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'text/html; charset=utf-8' },
+        text: async () => '<html><body>blocked</body></html>',
+      }));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID, retryable: false });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not adaptively split on HTML body with misleading content-type (T2)', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => '<html>challenge page</html>',
+      }));
+
+      await expect(provider._translateChunk(['first', 'second'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID, retryable: false });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
+    });
+
+    it('malformed JSON still adapts for multiple texts (T3)', async () => {
+      provider._executeApiCall.mockImplementation(async (request) => request.extractResponse({
+        headers: { get: () => 'application/json' },
+        text: async () => 'not-json-at-all',
+      }));
+
+      await expect(provider._translateChunk(['x', 'y'], 'en', 'fa', 'selection', null, 0, 2, 0, 1))
+        .rejects.toMatchObject({
+          name: 'BingJsonParseError',
+          type: ErrorTypes.JSON_PARSING_ERROR,
+          retryable: false,
+        });
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(2);
     });
 
     it('keeps transport HTTP 400 canonical identity', async () => {
@@ -311,7 +451,9 @@ describe('BingTranslateProvider', () => {
       text: vi.fn().mockResolvedValue(body),
     });
 
-    const validTokenPage = 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["internal-key","token-value",3600000];';
+    const validTokenKey = 1234567890;
+    const createTokenPage = (params) => `IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ${params};`;
+    const validTokenPage = createTokenPage(`[${validTokenKey},"token-value",3600000]`);
 
     beforeEach(() => {
       provider._getBingAccessToken.mockRestore();
@@ -326,7 +468,7 @@ describe('BingTranslateProvider', () => {
       [500, ErrorTypes.SERVER_ERROR],
       [503, ErrorTypes.SERVER_ERROR],
     ])('classifies token HTTP %s without API-key semantics', async (status, type) => {
-      fetch.mockResolvedValue(createResponse(status));
+      proxyFetch.mockResolvedValue(createResponse(status));
 
       await expect(provider._getBingAccessToken())
         .rejects.toMatchObject({
@@ -334,16 +476,17 @@ describe('BingTranslateProvider', () => {
           statusCode: status,
           context: 'bingtranslate-token-fetch',
         });
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
     });
 
     it('classifies ordinary token fetch rejection as NETWORK_ERROR', async () => {
-      fetch.mockRejectedValue(new TypeError('Failed to fetch'));
+      proxyFetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
       await expect(provider._getBingAccessToken()).rejects.toMatchObject({
         type: ErrorTypes.NETWORK_ERROR,
         context: 'bingtranslate-token-fetch',
       });
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
     });
 
     it.each([
@@ -354,12 +497,12 @@ describe('BingTranslateProvider', () => {
       controller.abort(reason);
 
       await expect(provider._getBingAccessToken(controller)).rejects.toMatchObject(expectedError);
-      expect(fetch).not.toHaveBeenCalled();
+      expect(proxyFetch).not.toHaveBeenCalled();
     });
 
     it('normalizes an in-flight user abort without API_ERROR', async () => {
       const controller = new AbortController();
-      fetch.mockImplementation(async () => {
+      proxyFetch.mockImplementation(async () => {
         controller.abort('user-cancelled');
         throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
       });
@@ -372,9 +515,41 @@ describe('BingTranslateProvider', () => {
     it.each([
       ['missing markers', 'not a token page'],
       ['malformed params JSON', 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["key",;'],
-      ['missing token value', 'IG:"ig-value" EventID:"iid-value" var params_AbusePreventionHelper = ["key","",3600000];'],
+      ['missing token value', createTokenPage(`[${validTokenKey},"",3600000]`)],
     ])('classifies %s successful response as API_RESPONSE_INVALID and does not cache it', async (_label, body) => {
-      fetch.mockResolvedValue(createResponse(200, body));
+      proxyFetch.mockResolvedValue(createResponse(200, body));
+
+      await expect(provider._getBingAccessToken()).rejects.toMatchObject({
+        type: ErrorTypes.API_RESPONSE_INVALID,
+        context: 'bingtranslate-token-fetch',
+      });
+      expect(BingTranslateProvider.bingAccessToken).toBeNull();
+    });
+
+    it.each([
+      ['missing key', '["token-value",3600000]'],
+      ['null key', '[null,"token-value",3600000]'],
+      ['non-finite key', '[1e309,"token-value",3600000]'],
+      ['zero key', '[0,"token-value",3600000]'],
+      ['negative key', '[-1,"token-value",3600000]'],
+    ])('rejects %s token key', async (_label, params) => {
+      proxyFetch.mockResolvedValue(createResponse(200, createTokenPage(params)));
+
+      await expect(provider._getBingAccessToken()).rejects.toMatchObject({
+        type: ErrorTypes.API_RESPONSE_INVALID,
+        context: 'bingtranslate-token-fetch',
+      });
+      expect(BingTranslateProvider.bingAccessToken).toBeNull();
+    });
+
+    it.each([
+      ['missing expiry', `[${validTokenKey},"token-value"]`],
+      ['non-finite expiry', `[${validTokenKey},"token-value",1e309]`],
+      ['zero expiry', `[${validTokenKey},"token-value",0]`],
+      ['negative expiry', `[${validTokenKey},"token-value",-1]`],
+      ['string expiry', `[${validTokenKey},"token-value","3600000"]`],
+    ])('rejects %s token expiry interval', async (_label, params) => {
+      proxyFetch.mockResolvedValue(createResponse(200, createTokenPage(params)));
 
       await expect(provider._getBingAccessToken()).rejects.toMatchObject({
         type: ErrorTypes.API_RESPONSE_INVALID,
@@ -384,18 +559,44 @@ describe('BingTranslateProvider', () => {
     });
 
     it('extracts and caches valid token-page data', async () => {
-      fetch.mockResolvedValue(createResponse(200, validTokenPage));
+      proxyFetch.mockResolvedValue(createResponse(200, validTokenPage));
 
       await expect(provider._getBingAccessToken()).resolves.toMatchObject({
         IG: 'ig-value',
         IID: 'iid-value',
-        key: 'internal-key',
+        key: validTokenKey,
         token: 'token-value',
         tokenExpiryInterval: 3600000,
       });
       await provider._getBingAccessToken();
 
-      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('uses proxy transport with request-local HTML policy', async () => {
+      const controller = new AbortController();
+      proxyFetch.mockResolvedValue(createResponse(200, validTokenPage));
+
+      await provider._getBingAccessToken(controller);
+
+      expect(proxyFetch).toHaveBeenCalledWith(
+        BingTranslateProvider.bingTokenUrl,
+        { signal: controller.signal },
+        {},
+        { allowHtmlResponse: true },
+      );
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('continues translation after proxied token acquisition', async () => {
+      proxyFetch.mockResolvedValue(createResponse(200, validTokenPage));
+
+      await expect(provider._translateChunk(['Hello'], 'en', 'fa'))
+        .resolves.toEqual(['translated-1\n[[---]]\ntranslated-2']);
+
+      expect(proxyFetch).toHaveBeenCalledTimes(1);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(provider._executeApiCall).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -3,7 +3,7 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
-import { getSettingsAsync } from "@/shared/config/config.js";
+import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
@@ -25,10 +25,13 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
     await ttsStateManager.ensureOffscreenDocument();
 
     // 3. Get OCR language mapping
-    // Priority: 1. Manually requested via UI, 2. OCR_DEFAULT_LANG from settings, 3. fallback to current source language
-    const settings = await getSettingsAsync();
+    // Priority: 1. Manually requested via UI, 2. runtime OCR_DEFAULT_LANG, 3. current source language
+    const [ocrDefaultLang, sourceLanguage] = await Promise.all([
+      settingsManager.getAsync('OCR_DEFAULT_LANG'),
+      settingsManager.getAsync('SOURCE_LANGUAGE')
+    ]);
 
-    const ocrLang = requestedOcrLang || settings.OCR_DEFAULT_LANG || settings.SOURCE_LANGUAGE || 'eng';
+    const ocrLang = requestedOcrLang || ocrDefaultLang || sourceLanguage || 'eng';
     const tesseractLang = toTesseractLanguageCode(ocrLang === 'auto' ? 'eng' : ocrLang);
 
     logger.debug(`Starting OCR with language: ${tesseractLang}`, { requestedOcrLang });

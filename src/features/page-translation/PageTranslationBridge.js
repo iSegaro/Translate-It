@@ -550,8 +550,12 @@ export class PageTranslationBridge extends ResourceTracker {
           if (processedNode) {
             const { TRANSLATED_MARKER, HAS_ORIGINAL } = PAGE_TRANSLATION_ATTRIBUTES;
 
-            if (bridge.showOriginalOnHover && node) {
-              hoverPreviewLookup.add(node, originalValue);
+            if (bridge.showOriginalOnHover) {
+              hoverPreviewLookup.add(
+                processedNode,
+                originalValue,
+                getCurrentNodeValue(processedNode)
+              );
             }
             
             // Determine if it was actually translated by checking for the BiDi mark

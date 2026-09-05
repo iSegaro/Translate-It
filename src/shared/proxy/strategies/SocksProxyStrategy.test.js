@@ -19,6 +19,13 @@ function response() {
   };
 }
 
+function htmlResponse() {
+  return {
+    status: 200,
+    headers: { get: () => 'text/html' },
+  };
+}
+
 function fetchThatFollowsSignal() {
   return vi.fn((_url, { signal }) => new Promise((resolve, reject) => {
     if (signal.aborted) {
@@ -157,5 +164,29 @@ describe('SocksProxyStrategy timeout provenance', () => {
     vi.spyOn(strategy, '_socksProxy').mockRejectedValue(typedError);
 
     await expect(strategy.execute('http://target.test/translate')).rejects.toBe(typedError);
+  });
+
+  it('rejects HTML responses by default', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response())
+      .mockResolvedValueOnce(htmlResponse());
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(strategy.execute('https://target.test/token'))
+      .rejects.toThrow('SOCKS proxy returned HTML error page instead of target response');
+  });
+
+  it('allows HTML responses with request-local policy', async () => {
+    const html = htmlResponse();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response())
+      .mockResolvedValueOnce(html);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(strategy.execute(
+      'https://target.test/token',
+      {},
+      { allowHtmlResponse: true },
+    )).resolves.toBe(html);
   });
 });

@@ -48,18 +48,99 @@ import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { getBrowserInfoSync } from '@/utils/browser/compatibility.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
+const createProxyConfig = (host = 'proxy.test') => ({
+  enabled: true,
+  type: 'http',
+  host,
+  port: 8080,
+  auth: { username: `${host}-user`, password: `${host}-password` },
+});
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+const createMalformedJsonResponse = (status = 200, withClone = true) => {
+  const createResponse = () => {
+    const response = {
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: status === 200 ? 'OK' : `HTTP ${status}`,
+      headers: new Map([['content-type', 'application/json']]),
+      json: vi.fn(async () => {
+        throw new SyntaxError('Unexpected token in JSON');
+      }),
+    };
+
+    if (withClone) response.clone = createResponse;
+    return response;
+  };
+
+  return createResponse();
+};
+
 describe('ProviderRequestEngine', () => {
   const mockProvider = {
     providerName: 'TestProvider',
     providerSettingKey: 'test_key_setting',
-    _initializeProxy: vi.fn().mockResolvedValue(true),
+    _initializeProxy: vi.fn().mockResolvedValue(createProxyConfig()),
   };
 
   const mockExtractResponse = vi.fn((data) => data.translated);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockProvider._initializeProxy.mockReset().mockResolvedValue(createProxyConfig());
     delete mockProvider.classifyProviderHttpError;
+    delete mockProvider.shouldFailoverApiKey;
+    delete mockProvider.isApiKeyCandidateEligible;
+  });
+
+  describe('successful JSON response classification', () => {
+    it.each([true, false])('classifies malformed successful JSON with clone=%s', async (withClone) => {
+      proxyManager.fetch.mockResolvedValue(createMalformedJsonResponse(200, withClone));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        context: 'json-parse-test',
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        message: 'Provider response contains invalid JSON',
+        type: ErrorTypes.JSON_PARSING_ERROR,
+        statusCode: 200,
+        context: 'json-parse-test',
+        providerName: 'TestProvider',
+      });
+      expect(mockExtractResponse).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [400, ErrorTypes.HTTP_ERROR],
+      [401, ErrorTypes.API_KEY_INVALID],
+      [429, ErrorTypes.RATE_LIMIT_REACHED],
+      [500, ErrorTypes.SERVER_ERROR],
+    ])('preserves HTTP %s classification with malformed JSON body', async (status, type) => {
+      proxyManager.fetch.mockResolvedValue(createMalformedJsonResponse(status));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        context: 'malformed-http-body-test',
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        type,
+        statusCode: status,
+        context: 'malformed-http-body-test',
+        providerName: 'TestProvider',
+      });
+    });
   });
 
   describe('HTTP error classification hook', () => {
@@ -200,6 +281,90 @@ describe('ProviderRequestEngine', () => {
       expect(classifyProviderHttpError.mock.calls[0][0]).not.toHaveProperty('arbitrary');
     });
 
+    it('preserves top-level provider message and code on the canonical error', async () => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        message: 'Request size limit exceeded',
+        code: 'some_code',
+      }));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        message: 'Request size limit exceeded',
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 400,
+        code: 'some_code',
+      });
+    });
+
+    it.each([400, 422])('does not use a top-level classification-looking message for generic HTTP %s classification', async (statusCode) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ message: 'Invalid API key' }, statusCode, 'Bad Request'));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode,
+        message: 'Invalid API key',
+      });
+    });
+
+    it.each([
+      ['object', { message: { secret: true } }],
+      ['overlong string', { message: 'x'.repeat(2049) }],
+    ])('does not expose unsafe top-level %s provider messages', async (_label, body) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.message).toBe('Bad Request');
+    });
+
+    it.each([
+      ['nested error message', {
+        error: { message: 'Nested provider failure', code: 'nested-code' },
+      }, 'Nested provider failure'],
+      ['detail precedence', {
+        detail: 'Detailed provider failure',
+        message: 'Top-level provider failure',
+        error: { message: 'Nested provider failure', code: 'nested-code' },
+      }, 'Detailed provider failure'],
+    ])('preserves existing %s handling', async (_label, body, message) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({ message, code: 'nested-code' });
+    });
+
+    it.each([
+      ['overlong string', { code: 'x'.repeat(129) }],
+      ['object', { code: { unsafe: true } }],
+      ['array', { code: ['unsafe'] }],
+      ['unsafe number', { code: Number.MAX_SAFE_INTEGER + 1 }],
+    ])('drops %s provider code from the canonical error', async (_label, body) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).not.toHaveProperty('code');
+    });
+
     it('excludes absent, non-scalar, and overlong provider fields', async () => {
       const classifyProviderHttpError = vi.fn(() => null);
       mockProvider.classifyProviderHttpError = classifyProviderHttpError;
@@ -291,7 +456,7 @@ describe('ProviderRequestEngine', () => {
       });
     });
 
-    it('does not attach extracted provider fields to thrown error', async () => {
+    it('attaches only canonical provider code to the thrown error', async () => {
       mockProvider.classifyProviderHttpError = vi.fn(() => ErrorTypes.HTTP_ERROR);
       proxyManager.fetch.mockResolvedValue(httpErrorResponse({
         code: 'provider-code',
@@ -309,16 +474,18 @@ describe('ProviderRequestEngine', () => {
         type: ErrorTypes.HTTP_ERROR,
         statusCode: 400,
         providerName: 'TestProvider',
+        code: 'nested-code',
       });
       expect(error).not.toHaveProperty('topLevelCode');
       expect(error).not.toHaveProperty('nestedErrorCode');
       expect(error).not.toHaveProperty('providerErrorInfo');
-      expect(error).not.toHaveProperty('code');
       expect(error).not.toHaveProperty('errorCode');
     });
 
     it('keeps providers without hook on existing ErrorMatcher path', async () => {
-      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: { message: 'Invalid API key' } }, 401, 'Unauthorized'));
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({
+        error: { message: 'Invalid API key', code: 'invalid_api_key' },
+      }, 401, 'Unauthorized'));
 
       await expect(ProviderRequestEngine.executeApiCall(mockProvider, {
         url: 'https://api.test.com',
@@ -330,6 +497,7 @@ describe('ProviderRequestEngine', () => {
         statusCode: 401,
         context: 'existing-path',
         providerName: 'TestProvider',
+        code: 'invalid_api_key',
       });
     });
 
@@ -392,6 +560,86 @@ describe('ProviderRequestEngine', () => {
   });
 
   describe('executeRequest - Failover Logic', () => {
+    it.each([
+      ['invalid key', 'API_ERROR: Invalid API key', ErrorTypes.API_KEY_INVALID],
+      ['insufficient balance', 'API_ERROR: Insufficient balance', ErrorTypes.INSUFFICIENT_BALANCE],
+      ['quota exceeded', 'API_ERROR: Quota exceeded', ErrorTypes.QUOTA_EXCEEDED],
+    ])('normalizes an untyped %s envelope before failover', async (_label, message, type) => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key-a', 'key-b']);
+      ApiKeyManager.shouldFailover.mockImplementation(error => error.type === type);
+      const firstError = new Error(message);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(firstError)
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(firstError.type).toBe(type);
+        expect(apiCallSpy).toHaveBeenCalledTimes(2);
+        expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(firstError);
+        expect(updateApiKey).toHaveBeenCalledWith('key-b', expect.any(Object));
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'key-b');
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('does not rotate keys for an untyped generic API error envelope', async () => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key-a', 'key-b']);
+      ApiKeyManager.shouldFailover.mockReturnValue(false);
+      const error = new Error('API_ERROR: Unknown provider failure');
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockRejectedValue(error);
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).rejects.toBe(error);
+
+        expect(error.type).toBe(ErrorTypes.TRANSLATION_ERROR);
+        expect(apiCallSpy).toHaveBeenCalledTimes(1);
+        expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(error);
+        expect(updateApiKey).not.toHaveBeenCalled();
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('passes normalized type to a provider failover hook', async () => {
+      ApiKeyManager.getKeys.mockResolvedValue(['key-a', 'key-b']);
+      const shouldFailoverApiKey = vi.fn(error => error.type === ErrorTypes.API_KEY_INVALID);
+      mockProvider.shouldFailoverApiKey = shouldFailoverApiKey;
+      const error = new Error('API_ERROR: Invalid API key');
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(error)
+        .mockResolvedValueOnce('translated');
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey: vi.fn(),
+        })).resolves.toBe('translated');
+
+        expect(shouldFailoverApiKey).toHaveBeenCalledWith(expect.objectContaining({
+          type: ErrorTypes.API_KEY_INVALID,
+        }));
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
     it.each([undefined, 'INVALID_PURPOSE'])('normalizes %p purpose to primary before physical accounting', async (callPurpose) => {
       const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockResolvedValue('translated');
       try {
@@ -447,6 +695,7 @@ describe('ProviderRequestEngine', () => {
       
       // Check if updateApiKey was called with the second key
       expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+      expect(ApiKeyManager.shouldFailover).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
       
       // Check if the working key was promoted
       expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
@@ -455,6 +704,221 @@ describe('ProviderRequestEngine', () => {
       expect(statsManager.recordError).toHaveBeenCalledTimes(1);
       expect(statsManager.recordRequest.mock.calls.every(([, , , , purpose]) => purpose === TranslationCallPurpose.STRUCTURED_RECOVERY)).toBe(true);
       expect(statsManager.recordError).toHaveBeenCalledWith('TestProvider', null, TranslationCallPurpose.STRUCTURED_RECOVERY);
+    });
+
+    it('uses provider failover eligibility when provider supplies a hook', async () => {
+      const firstError = Object.assign(new Error('Invalid key'), {
+        type: ErrorTypes.API_KEY_INVALID,
+        statusCode: 401,
+      });
+      const shouldFailoverApiKey = vi.fn(error => error.statusCode === 401);
+      mockProvider.shouldFailoverApiKey = shouldFailoverApiKey;
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(firstError)
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(shouldFailoverApiKey).toHaveBeenCalledWith(firstError);
+        expect(ApiKeyManager.shouldFailover).not.toHaveBeenCalled();
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('filters candidates before rotation and promotes filtered-list key actually used', async () => {
+      mockProvider.isApiKeyCandidateEligible = vi.fn((key, context) => context.apiTier === 'pro' && !key.endsWith(':fx'));
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'free-key:fx', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('Invalid key'), {
+          type: ErrorTypes.API_KEY_INVALID,
+          statusCode: 401,
+        }))
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+          apiKeyFailoverContext: { apiTier: 'pro' },
+        })).resolves.toBe('translated');
+
+        expect(mockProvider.isApiKeyCandidateEligible).toHaveBeenCalledWith('free-key:fx', { apiTier: 'pro' });
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('uses admission-time keys when settings change during failover', async () => {
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const firstAttempt = deferred();
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockImplementationOnce(() => firstAttempt.promise)
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn();
+
+      try {
+        const request = ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        });
+        await vi.waitFor(() => expect(apiCallSpy).toHaveBeenCalledTimes(1));
+        ApiKeyManager.getKeys.mockResolvedValue(['new-key']);
+        firstAttempt.reject(Object.assign(new Error('Invalid key'), { type: ErrorTypes.API_KEY_INVALID }));
+
+        await expect(request).resolves.toBe('translated');
+        expect(updateApiKey).toHaveBeenCalledWith('good-key', expect.any(Object));
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'good-key');
+        expect(ApiKeyManager.getKeys).toHaveBeenCalledTimes(1);
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('preserves three-key failover order after settings change', async () => {
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['key-A', 'key-B', 'key-C']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('A failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockRejectedValueOnce(Object.assign(new Error('B failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockResolvedValueOnce('translated');
+      const updateApiKey = vi.fn((key) => {
+        if (key === 'key-B') ApiKeyManager.getKeys.mockResolvedValue(['new-key']);
+      });
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).resolves.toBe('translated');
+
+        expect(updateApiKey.mock.calls.map(([key]) => key)).toEqual(['key-B', 'key-C']);
+        expect(ApiKeyManager.promoteKey).toHaveBeenCalledWith('test_key_setting', 'key-C');
+        expect(ApiKeyManager.getKeys).toHaveBeenCalledTimes(1);
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('next request captures new keys after settings change', async () => {
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['old-bad', 'old-good']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const firstSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('old-bad failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockResolvedValueOnce('first');
+      const firstUpdate = vi.fn();
+      await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: firstUpdate,
+      })).resolves.toBe('first');
+      expect(firstUpdate).toHaveBeenCalledWith('old-good', expect.any(Object));
+      firstSpy.mockRestore();
+      vi.clearAllMocks();
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      ApiKeyManager.getKeys.mockResolvedValueOnce(['new-bad', 'new-good']);
+      const secondSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall')
+        .mockRejectedValueOnce(Object.assign(new Error('new-bad failed'), { type: ErrorTypes.API_KEY_INVALID }))
+        .mockResolvedValueOnce('second');
+      const secondUpdate = vi.fn();
+      await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: secondUpdate,
+      })).resolves.toBe('second');
+      expect(secondUpdate).toHaveBeenCalledWith('new-good', expect.any(Object));
+      expect(ApiKeyManager.promoteKey).toHaveBeenLastCalledWith('test_key_setting', 'new-good');
+      secondSpy.mockRestore();
+    });
+
+    it.each([
+      [403, ErrorTypes.FORBIDDEN_ERROR],
+      [456, ErrorTypes.DEEPL_QUOTA_EXCEEDED],
+      [429, ErrorTypes.RATE_LIMIT_REACHED],
+      [529, ErrorTypes.RATE_LIMIT_REACHED],
+      [400, ErrorTypes.HTTP_ERROR],
+      [422, ErrorTypes.HTTP_ERROR],
+      [500, ErrorTypes.SERVER_ERROR],
+    ])('does not rotate when provider hook rejects HTTP %s', async (statusCode, type) => {
+      mockProvider.shouldFailoverApiKey = vi.fn(() => false);
+      ApiKeyManager.getKeys.mockResolvedValue(['first-key', 'second-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+      const error = Object.assign(new Error(`HTTP ${statusCode}`), { statusCode, type });
+      const apiCallSpy = vi.spyOn(ProviderRequestEngine, 'executeApiCall').mockRejectedValue(error);
+      const updateApiKey = vi.fn();
+
+      try {
+        await expect(ProviderRequestEngine.executeRequest(mockProvider, {
+          url: 'https://api.test.com',
+          fetchOptions: { headers: {} },
+          extractResponse: mockExtractResponse,
+          updateApiKey,
+        })).rejects.toBe(error);
+
+        expect(apiCallSpy).toHaveBeenCalledTimes(1);
+        expect(mockProvider.shouldFailoverApiKey).toHaveBeenCalledWith(error);
+        expect(ApiKeyManager.shouldFailover).not.toHaveBeenCalled();
+        expect(updateApiKey).not.toHaveBeenCalled();
+      } finally {
+        apiCallSpy.mockRestore();
+      }
+    });
+
+    it('should capture a fresh proxy snapshot for each physical failover attempt', async () => {
+      const firstSnapshot = createProxyConfig('proxy-first');
+      const secondSnapshot = createProxyConfig('proxy-second');
+      mockProvider._initializeProxy
+        .mockResolvedValueOnce(firstSnapshot)
+        .mockResolvedValueOnce(secondSnapshot);
+      ApiKeyManager.getKeys.mockResolvedValue(['bad-key', 'good-key']);
+      ApiKeyManager.shouldFailover.mockReturnValue(true);
+
+      const response = (ok, body) => ({
+        ok,
+        status: ok ? 200 : 401,
+        statusText: ok ? 'OK' : 'Unauthorized',
+        json: async () => body,
+        headers: new Map([['content-type', 'application/json']]),
+        clone() { return this; },
+      });
+      proxyManager.fetch
+        .mockResolvedValueOnce(response(false, { error: { message: 'Invalid key' } }))
+        .mockResolvedValueOnce(response(true, { translated: 'translated' }));
+
+      const result = await ProviderRequestEngine.executeRequest(mockProvider, {
+        url: 'https://api.test.com/translate?key=bad-key',
+        fetchOptions: { method: 'POST', headers: {} },
+        extractResponse: mockExtractResponse,
+        updateApiKey: vi.fn(),
+      });
+
+      expect(result).toBe('translated');
+      expect(mockProvider._initializeProxy).toHaveBeenCalledTimes(2);
+      expect(proxyManager.fetch.mock.calls[0][2]).toBe(firstSnapshot);
+      expect(proxyManager.fetch.mock.calls[1][2]).toBe(secondSnapshot);
     });
 
     it('does not delay key failover for Retry-After from the first key', async () => {
@@ -513,7 +977,7 @@ describe('ProviderRequestEngine', () => {
         fetchOptions: { headers: {} },
         extractResponse: mockExtractResponse,
         updateApiKey: vi.fn()
-      })).rejects.toThrow('Bad Request');
+      })).rejects.toThrow('Fatal Error');
 
       expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
     });

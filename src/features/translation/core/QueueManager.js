@@ -175,6 +175,9 @@ class QueueItem {
     // Local deterministic validation errors (e.g., TEXT_TOO_LONG) must never be retried
     if (isLocalDeterministicValidationError(this.lastError)) return false;
 
+    // Explicit per-error retry policy wins before generic classification.
+    if (this.lastError?.retryable === false) return false;
+
     // 1. If we have a fatal error (like invalid API key), do NOT retry
     if (this.lastError && isFatalError(this.lastError)) {
       // CIRCUIT_BREAKER_OPEN is considered fatal in ErrorMatcher.
@@ -498,7 +501,9 @@ export class QueueManager {
     if (index > -1 && (item.status === QueueStatus.COMPLETED || item.status === QueueStatus.FAILED)) {
       queue.splice(index, 1);
     }
-    this._detachAbortSignal(item);
+    if (item.status === QueueStatus.COMPLETED || item.status === QueueStatus.FAILED) {
+      this._detachAbortSignal(item);
+    }
   }
 
   _attachAbortSignal(item) {

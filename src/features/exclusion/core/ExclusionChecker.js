@@ -67,22 +67,23 @@ export class ExclusionChecker {
         showToast: false
       });
 
-      this.initialized = true;
-      logger.warn('ExclusionChecker initialized with fallback defaults due to error');
+      throw error;
     }
   }
 
   async refreshSettings() {
     try {
-      await settingsManager.initialize();
+      await settingsManager.refreshSettings();
     } catch (error) {
       logger.error('Error refreshing ExclusionChecker settings:', error);
+      throw error;
     }
   }
 
   updateUrl(newUrl) {
     if (this.currentUrl !== newUrl) {
       this.currentUrl = newUrl;
+      pageEventBus.emit('FEATURE_STATUS_CHANGED');
     }
   }
 

@@ -399,7 +399,7 @@ export function matchErrorToType(rawOrError = "") {
   if (msg.includes("password is required to import") || msg.includes("password is required for decryption") || msg.includes("password required to decrypt")) return ErrorTypes.IMPORT_PASSWORD_REQUIRED;
   if (msg.includes("incorrect password") || msg.includes("wrong password") || msg.includes("invalid password") || msg.includes("password or corrupted data")) return ErrorTypes.IMPORT_PASSWORD_INCORRECT;
 
-  if (msg.includes("wrong api key") || msg.includes("api key not valid") || msg.includes("no auth credentials") || msg.includes("incorrect api key provided") || msg.includes("api key expired") || msg.includes("renew the api key") || msg.includes("authentication fails") || msg.includes("auth failed") || msg.includes("token is invalid") || msg.includes("invalid token")) return ErrorTypes.API_KEY_INVALID;
+  if (msg.includes("wrong api key") || msg.includes("invalid api key") || msg.includes("api key not valid") || msg.includes("no auth credentials") || msg.includes("incorrect api key provided") || msg.includes("api key expired") || msg.includes("renew the api key") || msg.includes("authentication fails") || msg.includes("auth failed") || msg.includes("token is invalid") || msg.includes("invalid token")) return ErrorTypes.API_KEY_INVALID;
   if (msg.includes("api key is missing") || msg.includes("key missing") || msg.includes("key_missing") || msg.includes("api_key_missing") || msg.includes("token is missing") || msg.includes("received empty token") || msg.includes("empty token")) return ErrorTypes.API_KEY_MISSING;
 
   if (msg.includes("http 400") || msg.includes("400 error") || msg.includes("status 400") || msg.includes("bad request") || msg.includes("invalid request")) return ErrorTypes.INVALID_REQUEST;
@@ -427,10 +427,15 @@ export function matchErrorToType(rawOrError = "") {
 
   if (msg.includes("extension context invalidated") || 
       (msg.includes("extension context") && msg.includes("invalidated")) ||
-      msg.includes("extension context invalid before operation") ||
-      msg.includes("receiving end does not exist") ||
+      msg.includes("extension context invalid before operation")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+
+  if (msg.includes("receiving end does not exist") ||
+      msg.includes("could not establish connection") ||
+      msg.includes("no receiving end") ||
+      msg.includes("no receiver") ||
       msg.includes("message channel closed") ||
-      msg.includes("listener indicated an asynchronous response")) return ErrorTypes.EXTENSION_CONTEXT_INVALIDATED;
+      msg.includes("message port closed") ||
+      msg.includes("listener indicated an asynchronous response")) return ErrorTypes.CONNECTION_LOST;
   
   if (msg.includes("no sw") || msg.includes("no service worker") || (msg.includes("service worker") && msg.includes("not available"))) return ErrorTypes.CONTEXT;
 

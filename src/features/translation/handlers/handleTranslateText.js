@@ -19,14 +19,7 @@ const errorHandler = new ErrorHandler();
  * @param {Object} sender - The sender object.
  * @returns {Promise<Object>} - Returns Promise with translation result.
  */
-export async function handleTranslateText(message, sender, sendResponse) {
-  // send immediate ack for callers using sendMessage
-  try {
-    if (typeof sendResponse === 'function') {
-      try { sendResponse({ ack: true, messageId: message.messageId }) } catch { /* ignore */ }
-    }
-  } catch { /* ignore */ }
-
+export async function handleTranslateText(message, sender) {
   try {
     logger.debug('[Handler:TRANSLATE_TEXT] Processing Vue translation request:', message.data);
     

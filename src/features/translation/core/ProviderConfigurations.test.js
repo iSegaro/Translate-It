@@ -14,9 +14,36 @@ import {
   getProviderConfiguration,
   getProviderBatching,
   getProviderRateLimit,
+  resolveKnownProviderConfiguration,
 } from './ProviderConfigurations.js';
 
 describe('ProviderConfigurations optimization scaling', () => {
+  it('resolves registry aliases and canonical names without falling back to Custom', () => {
+    for (const [providerId, canonicalName] of [
+      ['deepl', 'DeepLTranslate'],
+      ['googlev2', 'GoogleTranslateV2'],
+      ['edge', 'MicrosoftEdge'],
+      ['bing', 'BingTranslate'],
+      ['gemini', 'Gemini'],
+      ['browser', 'BrowserAPI'],
+      ['custom', 'Custom'],
+      ['custom-openai', 'Custom'],
+    ]) {
+      expect(resolveKnownProviderConfiguration(providerId))
+        .toBe(PROVIDER_CONFIGURATIONS[canonicalName]);
+      expect(resolveKnownProviderConfiguration(canonicalName))
+        .toBe(PROVIDER_CONFIGURATIONS[canonicalName]);
+    }
+  });
+
+  it('returns null for unknown or invalid providers while keeping getProviderConfiguration fallback', () => {
+    for (const providerName of ['unknown-provider', '', null, undefined, 42, {}]) {
+      expect(resolveKnownProviderConfiguration(providerName)).toBeNull();
+    }
+
+    expect(getProviderConfiguration('unknown-provider')).toBe(PROVIDER_CONFIGURATIONS.Custom);
+  });
+
   it('configures explicit traditional network Queue budgets without affecting BrowserAPI', () => {
     for (const providerName of [
       'GoogleTranslate',
@@ -131,5 +158,23 @@ describe('ProviderConfigurations optimization scaling', () => {
     expect(getProviderBatching('GoogleTranslate', null, 5).characterLimit).toBe(3000);
     expect(getProviderBatching('BingTranslate', null, 5).characterLimit).toBe(2400);
     expect(getProviderRateLimit('GoogleTranslate', 5).delayBetweenRequests).toBe(0);
+  });
+
+  it('caps DeepL segment batches at its physical request limit', () => {
+    const levels = [1, 2, 3, 4, 5];
+    const batching = levels.map(level => getProviderBatching('DeepLTranslate', null, level));
+
+    expect(getProviderConfiguration('DeepLTranslate', 1).batching.maxChunksPerBatch).toBe(75);
+    expect(batching.map(config => config.maxChunksPerBatch)).toEqual([50, 50, 50, 40, 40]);
+    expect(batching.map(config => config.maxSegmentsPerRequest)).toEqual([50, 50, 50, 50, 50]);
+  });
+
+  it('keeps traditional segment scaling unchanged without a hard ceiling', () => {
+    const levels = [1, 2, 3, 4, 5];
+
+    expect(levels.map(level => getProviderBatching('GoogleTranslate', null, level).maxChunksPerBatch))
+      .toEqual([225, 180, 150, 120, 120]);
+    expect(levels.map(level => getProviderBatching('YandexTranslate', null, level).maxChunksPerBatch))
+      .toEqual([150, 120, 100, 80, 80]);
   });
 });

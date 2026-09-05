@@ -4,7 +4,7 @@
  * Decides how accepted terminal units map to future ledger settlement.
  * Stateless: owns no execution state; TranslationOperation remembers.
  * PR4B.5: COMPLETED settlement active.
- * PR4B.6B: CANCELLED cancelRemaining active. FAILED/TIMEOUT unwired.
+ * PR4B.6B: CANCELLED cancelRemaining active. FAILED/TIMEOUT use no-op policy.
  */
 
 const EMPTY_ACCEPTED_UNIT_IDS = Object.freeze([])
@@ -52,7 +52,7 @@ export const TerminalExecutionRouter = Object.freeze({
   /**
    * Routes a terminal transition. Settles drained accepted units for
    * COMPLETED only; NONE actions never drain operation state (critical
-   * invariant, keeps FAILED/TIMEOUT/CANCELLED ledgers untouched).
+   * invariant, keeps FAILED/TIMEOUT ledgers untouched).
    */
   routeTerminalExecution(operation, { status }) {
     const action = policyForStatus(status)

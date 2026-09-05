@@ -35,7 +35,6 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { settingsManager } from '@/shared/managers/SettingsManager.js'
 import { safeSendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
@@ -76,18 +75,27 @@ const statusMessage = ref('')
 const statusType = ref('')
 const isSaving = ref(false)
 
-// Save all settings
-// Shared post-save notification/refresh helper
+// Shared best-effort post-save notification/refresh helper.
+// Persistence remains authoritative for save status and events.
 const postSaveNotify = async () => {
-  // Refresh settings in all content scripts
-  await settingsManager.refreshSettings()
+  try {
+    // Notify background that persisted settings changed.
+    const response = await safeSendMessage({
+      action: MessageActions.SETTINGS_UPDATED,
+      timestamp: Date.now()
+    }, 'settings-notification')
 
-  // Notify all tabs about settings change using cross-browser compatible approach
-  await safeSendMessage({
-    action: MessageActions.SETTINGS_UPDATED,
-    timestamp: Date.now()
-  }, 'settings-notification')
-  logger.debug('All settings update notification sent to all tabs')
+    if (response?.success !== true) {
+      logger.warn('Settings update notification was not confirmed')
+      return false
+    }
+
+    logger.debug('Settings update notification acknowledged by background')
+    return true
+  } catch (error) {
+    logger.warn('Failed to send settings update notification:', error)
+    return false
+  }
 }
 
 // Partial save helper for prompt-only validation errors

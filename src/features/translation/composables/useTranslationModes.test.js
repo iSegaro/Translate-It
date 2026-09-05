@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createApp } from 'vue';
 import browser from 'webextension-polyfill';
-import { useSidepanelTranslation, useSelectElementTranslation, useSidepanelActions } from './useTranslationModes.js';
+import { useSelectElementTranslation, useSidepanelActions } from './useTranslationModes.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 // --- Mocks ---
@@ -34,27 +34,6 @@ vi.mock("@/shared/logging/logger.js", () => ({
   })),
 }));
 
-vi.mock("@/utils/messaging/messageId.js", () => ({
-  generateMessageId: vi.fn(() => "test-msg-id"),
-}));
-
-vi.mock("@/shared/config/config.js", () => ({
-  getSettingsAsync: vi.fn().mockResolvedValue({
-    ENABLE_DICTIONARY: true,
-    TRANSLATION_API: "google_v2",
-  }),
-  TranslationMode: {
-    Sidepanel_Translate: "sidepanel_translate",
-    Dictionary_Translation: "dictionary_translation",
-  },
-}));
-
-vi.mock("@/composables/shared/useLanguages.js", () => ({
-  useLanguages: vi.fn(() => ({
-    getLanguagePromptName: vi.fn((lang) => lang),
-  })),
-}));
-
 const sendMessageViaMessagingMock = vi.fn();
 vi.mock("@/shared/messaging/composables/useMessaging.js", () => ({
   useMessaging: vi.fn(() => ({
@@ -84,10 +63,6 @@ vi.mock("@/features/element-selection/utils/activationError.js", () => ({
   getSelectElementActivationErrorMessage: vi.fn(() => Promise.resolve('Could not activate Select Element mode.')),
 }));
 
-vi.mock("@/shared/utils/text/textAnalysis.js", () => ({
-  isSingleWordOrShortPhrase: vi.fn().mockReturnValue(false),
-}));
-
 // Helper to test composables
 function withSetup(composable) {
   let result;
@@ -105,59 +80,6 @@ describe("useTranslationModes", () => {
   
   afterEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe("useSidepanelTranslation", () => {
-    it("should initialize with default values", () => {
-      const [composable] = withSetup(() => useSidepanelTranslation());
-      expect(composable.isLoading.value).toBe(false);
-      expect(composable.result.value).toBeNull();
-      expect(composable.error.value).toBeNull();
-    });
-
-    it("should translate text successfully", async () => {
-      const [composable] = withSetup(() => useSidepanelTranslation());
-      const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
-      
-      const mockResponse = { success: true, translatedText: "سلام" };
-      sendMessage.mockResolvedValue(mockResponse);
-
-      const result = await composable.translateText("Hello", "en", "fa");
-
-      expect(composable.isLoading.value).toBe(false);
-      expect(composable.result.value).toEqual(mockResponse);
-      expect(result).toEqual(mockResponse);
-      expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
-        action: MessageActions.TRANSLATE,
-        data: expect.objectContaining({
-          text: "Hello",
-          targetLanguage: "fa"
-        })
-      }));
-    });
-
-    it("should handle translation error response", async () => {
-      const [composable] = withSetup(() => useSidepanelTranslation());
-      const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
-      
-      sendMessage.mockResolvedValue({ success: false, error: "API Error" });
-
-      await composable.translateText("Hello", "en", "fa");
-
-      expect(composable.error.value).toBe("API Error");
-      expect(composable.result.value).toBeNull();
-    });
-
-    it("should clear state", () => {
-      const [composable] = withSetup(() => useSidepanelTranslation());
-      composable.error.value = "Error";
-      composable.result.value = {};
-      
-      composable.clearState();
-      
-      expect(composable.error.value).toBeNull();
-      expect(composable.result.value).toBeNull();
-    });
   });
 
   describe("useSelectElementTranslation", () => {

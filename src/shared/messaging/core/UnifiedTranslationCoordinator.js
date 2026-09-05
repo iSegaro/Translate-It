@@ -150,9 +150,9 @@ export class UnifiedTranslationCoordinator {
           onComplete: (result) => {
             logger.debug(`Streaming completed: ${messageId}`, result);
           },
-          onTimeout: () => {
+          onTimeout: (timeoutError) => {
             logger.warn(`Streaming timeout: ${messageId}`);
-            this._handleStreamingTimeout(messageId);
+            this._handleStreamingTimeout(messageId, timeoutError);
           },
           onError: (error) => {
             // Log cancellation as debug instead of error using proper error management

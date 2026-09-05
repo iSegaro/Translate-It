@@ -41,7 +41,11 @@ vi.mock('@/shared/config/config.js', () => ({
   getDictionaryShowPosAsync: vi.fn(() => Promise.resolve(false)),
   getDictionaryShowDefinitionsAsync: vi.fn(() => Promise.resolve(false)),
   getDictionaryShowExamplesAsync: vi.fn(() => Promise.resolve(false)),
-  getSettingsAsync: vi.fn(() => Promise.resolve({}))
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/features/translation/core/ProviderConfigurations.js', async (importOriginal) => ({
@@ -68,8 +72,7 @@ vi.mock('@/features/translation/core/StreamingManager.js', () => ({
 vi.mock('./utils/TraditionalStreamManager.js', () => ({
   TraditionalStreamManager: {
     streamChunkResults: vi.fn(),
-    streamChunkError: vi.fn(),
-    sendStreamEnd: vi.fn()
+    streamChunkError: vi.fn()
   }
 }));
 

@@ -4,7 +4,6 @@
 import { computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { settingsManager } from '@/shared/managers/SettingsManager.js'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
@@ -15,13 +14,16 @@ import { UI_LOCALE_TO_CODE_MAP } from '@/shared/config/languageConstants.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUnifiedI18n')
 
+// Coalesce locale sync requests from multiple composable instances.
+const pendingLocaleSyncs = new Map()
+
 /**
  * Convert language name to locale code
  * @param {string} lang - Language name or code
  * @returns {string} Locale code
  */
 function normalizeLocale(lang) {
-  if (!lang) return 'en'
+  if (!lang || typeof lang !== 'string') return 'en'
   return UI_LOCALE_TO_CODE_MAP[lang] || lang.toLowerCase() || 'en'
 }
 
@@ -96,8 +98,8 @@ export function useUnifiedI18n() {
       // 2. Update vue-i18n locale and load messages if needed
       await setI18nLocale(normalizedLocale)
 
-      // 3. Update settings store with original value (for backward compatibility)
-      await settingsStore.updateSettingAndPersist('APPLICATION_LOCALIZE', langCode)
+      // 3. Persist the canonical locale through the Pinia settings store
+      await settingsStore.updateSettingAndPersist('APPLICATION_LOCALIZE', normalizedLocale)
 
       // 4. Send message to background to refresh context menus with new locale
       try {
@@ -120,22 +122,14 @@ export function useUnifiedI18n() {
   }
 
   /**
-   * Get current locale
+   * Get current locale from Pinia, with vue-i18n as the initialization fallback
    */
   const currentLocale = computed(() => {
-    // 1. Primary source: settingsManager (most reliable in content scripts)
-    const directStored = settingsManager.get('APPLICATION_LOCALIZE')
-    if (directStored) {
-      return normalizeLocale(directStored)
-    }
-
-    // 2. Fallback: store settings
     const storedLang = settingsStore.settings?.APPLICATION_LOCALIZE
     if (storedLang) {
       return normalizeLocale(storedLang)
     }
-    
-    // 3. Last resort: vue-i18n locale
+
     return locale.value || 'en'
   })
 
@@ -146,20 +140,38 @@ export function useUnifiedI18n() {
     return !!locale.value
   })
 
-  // Watch for settings changes to sync with vue-i18n
-  // Use settingsManager's reactive cache for immediate updates in all contexts
-  watch(
-    () => settingsManager.get('APPLICATION_LOCALIZE'),
-    async (newLang) => {
-      if (newLang) {
-        const normalizedLang = normalizeLocale(newLang)
-        if (normalizedLang !== locale.value) {
-          const { setI18nLocale } = await utilsFactory.getI18nUtils()
-          setI18nLocale(normalizedLang).catch(err =>
-            logger.warn('Failed to sync locale from settings change:', err)
-          )
+  // Watch Pinia settings changes to sync with vue-i18n after store initialization.
+  const syncLocaleFromSettings = async (newLang) => {
+    const normalizedLang = normalizeLocale(newLang)
+    if (normalizedLang === locale.value) return
+
+    let syncPromise = pendingLocaleSyncs.get(normalizedLang)
+    if (!syncPromise) {
+      syncPromise = (async () => {
+        const { setI18nLocale } = await utilsFactory.getI18nUtils()
+        await setI18nLocale(normalizedLang)
+      })()
+      pendingLocaleSyncs.set(normalizedLang, syncPromise)
+
+      const clearPendingSync = () => {
+        if (pendingLocaleSyncs.get(normalizedLang) === syncPromise) {
+          pendingLocaleSyncs.delete(normalizedLang)
         }
       }
+      syncPromise.then(clearPendingSync, clearPendingSync)
+    }
+
+    await syncPromise
+  }
+
+  watch(
+    () => [settingsStore.isInitialized, settingsStore.settings?.APPLICATION_LOCALIZE],
+    ([isInitialized, newLang]) => {
+      if (!isInitialized) return
+
+      syncLocaleFromSettings(newLang).catch(err => {
+        logger.warn('Failed to sync locale from settings change:', err)
+      })
     },
     { immediate: true }
   )

@@ -93,6 +93,19 @@ export async function loadFeature(featureName, force = false) {
       }
 
       if (instance) {
+        if (featureManager && typeof featureManager.isFeatureActive === 'function' && !featureManager.isFeatureActive(featureName)) {
+          if (featureName === 'contentMessageHandler') {
+            // Infrastructure feature may be active via handler registration even if not tracked as activeFeatures in some paths
+            // Allow caching if handler exists
+            if (!featureManager.getFeatureHandler(featureName)) {
+              logger.debug(`Feature ${featureName} not active after load, skipping cache`);
+              return null;
+            }
+          } else {
+            logger.debug(`Feature ${featureName} not active after load, skipping cache`);
+            return null;
+          }
+        }
         loadedFeatures.set(featureName, instance);
         logger.debug(`Feature instance cached: ${featureName}`);
       }
@@ -102,7 +115,9 @@ export async function loadFeature(featureName, force = false) {
       logger.error(`Failed to load feature ${featureName}:`, error);
       throw error;
     } finally {
-      loadingPromises.delete(featureName);
+      if (loadingPromises.get(featureName) === loadPromise) {
+        loadingPromises.delete(featureName);
+      }
     }
   })();
 

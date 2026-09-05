@@ -46,6 +46,7 @@ export function useSubtitleTranslation() {
   
   const translatedContent = ref('');
   const error = ref(null);
+  const errorAction = ref(null);
   const errorDetails = ref(null);
   const currentFile = ref(null);
   const cues = ref([]);
@@ -75,12 +76,22 @@ export function useSubtitleTranslation() {
         }
         break;
 
-      case MessageActions.SUBTITLE_TRANSLATE_COMPLETE:
+      case MessageActions.SUBTITLE_TRANSLATE_COMPLETE: {
         presentationVersion++;
+        Object.assign(progress, data.stats);
+        const translatedCount = Number(data.stats?.translated) || 0;
+        const failedCount = Number(data.stats?.failed) || 0;
+        const terminalErrorDetails = data.errorDetails || progress.terminalErrorDetails || null;
+
+        if (translatedCount === 0 && failedCount > 0) {
+          translatedContent.value = '';
+          void applyTranslationError({ errorDetails: terminalErrorDetails });
+          break;
+        }
+
         status.value = 'completed';
         translatedContent.value = data.content;
-        Object.assign(progress, data.stats);
-        errorDetails.value = data.errorDetails || progress.terminalErrorDetails || null;
+        errorDetails.value = terminalErrorDetails;
         
         // Final status update for any remaining cues if needed
         // (Coordinator handles serialization, but we want UI to reflect completion)
@@ -92,6 +103,7 @@ export function useSubtitleTranslation() {
           });
         }
         break;
+      }
 
       case MessageActions.SUBTITLE_TRANSLATE_ERROR:
         void applyTranslationError({ errorDetails: data.errorDetails });
@@ -107,17 +119,20 @@ export function useSubtitleTranslation() {
     if (presentation.kind === 'silent') {
       status.value = 'idle';
       error.value = null;
+      errorAction.value = null;
       return;
     }
 
     status.value = 'error';
     error.value = presentation.kind === 'display' ? presentation.message : null;
+    errorAction.value = presentation.kind === 'display' ? presentation.action ?? null : null;
   };
 
   const startTranslation = async (fileContent, filename, config) => {
     presentationVersion++;
     status.value = 'translating';
     error.value = null;
+    errorAction.value = null;
     errorDetails.value = null;
     translatedContent.value = '';
     
@@ -188,6 +203,7 @@ export function useSubtitleTranslation() {
     status,
     progress,
     error,
+    errorAction,
     errorDetails,
     currentFile,
     cues,

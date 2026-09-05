@@ -54,14 +54,13 @@ vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
 
-describe('PageTranslationView retry action', () => {
+describe('PageTranslationView page action', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sendRegularMessage.mockResolvedValue({ success: true })
     mobileStore = {
       pageTranslationData: ref({
         status: 'error',
-        canRetry: false,
         errorMessage: 'HTTP error',
         isTranslating: false,
         isAutoTranslating: false,
@@ -80,18 +79,18 @@ describe('PageTranslationView retry action', () => {
     })
   })
 
-  it('does not expose Retry Translation for non-retryable error', () => {
+  it('uses the normal Start Translation action for terminal errors without committed content', () => {
     const wrapper = mount(PageTranslationView)
 
-    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Close')
+    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Start Translation')
+    expect(wrapper.text()).toContain('HTTP error')
     expect(wrapper.text()).not.toContain('Retry Translation')
   })
 
-  it('does not expose Retry Translation for zero-result completion', () => {
+  it('uses the normal Start Translation action for zero-result completion', () => {
     mobileStore.pageTranslationData.value = {
       ...mobileStore.pageTranslationData.value,
       status: 'error',
-      canRetry: false,
       errorMessage: null,
       translatedCount: 0,
       failedCount: 3,
@@ -100,22 +99,29 @@ describe('PageTranslationView retry action', () => {
 
     const wrapper = mount(PageTranslationView)
 
-    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Close')
+    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Start Translation')
     expect(wrapper.text()).not.toContain('Retry Translation')
   })
 
-  it('keeps Retry Translation for retryable error', async () => {
-    mobileStore.pageTranslationData.value.canRetry = true
+  it('uses the normal Start Translation action when idle', () => {
+    mobileStore.pageTranslationData.value = {
+      ...mobileStore.pageTranslationData.value,
+      status: 'idle',
+      errorMessage: null,
+      failedCount: 0,
+      totalCount: 0,
+    }
     const wrapper = mount(PageTranslationView)
 
-    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Retry Translation')
+    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Start Translation')
   })
 
-  it('sends PAGE_TRANSLATE through runtime for zero-commit Retry', async () => {
-    mobileStore.pageTranslationData.value.canRetry = true
+  it('resets terminal error and starts a fresh PAGE_TRANSLATE session', async () => {
     const wrapper = mount(PageTranslationView)
 
     await wrapper.get('.ti-m-header-primary-btn').trigger('click')
+
+    expect(pageEventBus.emit).toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE_RESET_ERROR)
 
     expect(sendRegularMessage).toHaveBeenCalledWith({
       action: MessageActions.PAGE_TRANSLATE,
@@ -159,18 +165,17 @@ describe('PageTranslationView retry action', () => {
     expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_RESTORE)
   })
 
-  it('does not expose Retry for fatal partial output', () => {
+  it('keeps Restore for fatal partial output', () => {
     mobileStore.pageTranslationData.value = {
       ...mobileStore.pageTranslationData.value,
       isTranslated: true,
       translatedCount: 1,
       failedCount: 1,
       totalCount: 2,
-      canRetry: false,
     }
     const wrapper = mount(PageTranslationView)
 
-    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Close')
+    expect(wrapper.get('.ti-m-header-primary-btn').text()).toBe('Restore Original Page')
     expect(wrapper.text()).not.toContain('Retry Translation')
     expect(pageEventBus.emit).not.toHaveBeenCalledWith(MessageActions.PAGE_TRANSLATE, expect.anything())
   })

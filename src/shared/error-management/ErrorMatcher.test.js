@@ -62,6 +62,11 @@ describe('ErrorMatcher', () => {
       })).toBe(ErrorTypes.RATE_LIMIT_REACHED);
     });
 
+    it('classifies invalid API key wording from an HTTP-200 provider envelope', () => {
+      expect(matchErrorToType(new Error('API_ERROR: Invalid API key')))
+        .toBe(ErrorTypes.API_KEY_INVALID);
+    });
+
     it('should keep generic typed AbortError generic without stronger evidence', () => {
       expect(matchErrorToType({
         name: 'AbortError',
@@ -176,6 +181,15 @@ describe('ErrorMatcher', () => {
       expect(matchErrorToType('api key is missing')).toBe(ErrorTypes.API_KEY_MISSING);
       expect(matchErrorToType('failed to fetch')).toBe(ErrorTypes.NETWORK_ERROR);
       expect(matchErrorToType('extension context invalidated')).toBe(ErrorTypes.EXTENSION_CONTEXT_INVALIDATED);
+    });
+
+    it.each([
+      'Receiving end does not exist',
+      'Could not establish connection',
+      'Message port closed',
+      'Message channel closed',
+    ])('classifies %s as transport loss', (message) => {
+      expect(matchErrorToType(message)).toBe(ErrorTypes.CONNECTION_LOST);
     });
 
     it('should match complex provider-specific messages', () => {

@@ -52,6 +52,9 @@ export class MainFrameCoordinator {
       failedCount: 0,
       totalCount: 0,
       failed: 0,
+      errorDetails: null,
+      terminalErrorDetails: null,
+      terminalCauseSequence: 0,
       status: 'translating'
     });
   }
@@ -167,12 +170,18 @@ export class MainFrameCoordinator {
       this.aggregator.updateFrameData(frameId, aggregateData);
       this.aggregator.emitAggregateProgress(null, data);
     } else if (action === this.MessageActions.PAGE_TRANSLATE_COMPLETE) {
+      const terminalErrorDetails = aggregateData.isFatal !== true
+        && isStructuredTranslationError(aggregateData.errorDetails)
+        ? aggregateData.errorDetails
+        : null;
       this.aggregator.updateFrameData(frameId, {
         ...aggregateData,
+        errorDetails: terminalErrorDetails,
         isTranslating: false,
         status: 'idle',
         isTranslated: true,
       });
+      this.aggregator.recordTerminalCause(frameId, terminalErrorDetails);
       this.aggregator.emitAggregateProgress(action, data);
     } else if (action === this.MessageActions.PAGE_TRANSLATE_IDLE) {
       this.aggregator.updateFrameData(frameId, {

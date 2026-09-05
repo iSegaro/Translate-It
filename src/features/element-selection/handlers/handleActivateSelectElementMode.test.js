@@ -21,9 +21,16 @@ vi.mock('./selectElementStateManager.js', () => ({
   compensateInvalidatedActivationAttempts: vi.fn(() => Promise.resolve([])),
   setStateForTab: vi.fn(),
   createActivationGeneration: vi.fn(() => 1),
+  getActivationEpoch: vi.fn(() => 'epoch-1'),
   getActivationAttemptToken: vi.fn(() => ({})),
+  getActiveSessionRevision: vi.fn(() => 0),
+  getCurrentGeneration: vi.fn(() => undefined),
+  getStateForTab: vi.fn(() => ({ active: false })),
   invalidateOlderActivationAttempts: vi.fn(() => []),
+  invalidateRetainedSessionRecovery: vi.fn(),
   isActivationAttemptCurrent: vi.fn(() => true),
+  isDeactivationPending: vi.fn(() => false),
+  isRetainedSessionRecoveryCurrent: vi.fn(() => true),
   recordActivationAttemptFrames: vi.fn(),
   retainCompatibilityFrames: vi.fn(),
   registerParticipant: vi.fn(() => true),
@@ -81,9 +88,16 @@ import { tabPermissionChecker } from '@/core/tabPermissions.js';
 import {
   compensateInvalidatedActivationAttempts,
   createActivationGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
+  getActiveSessionRevision,
+  getCurrentGeneration,
+  getStateForTab,
   invalidateOlderActivationAttempts,
+  invalidateRetainedSessionRecovery,
   isActivationAttemptCurrent,
+  isDeactivationPending,
+  isRetainedSessionRecoveryCurrent,
   recordActivationAttemptFrames,
   retainCompatibilityFrames,
   registerParticipant,
@@ -96,9 +110,16 @@ describe('handleActivateSelectElementMode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createActivationGeneration.mockReturnValue(1);
+    getActivationEpoch.mockReturnValue('epoch-1');
     getActivationAttemptToken.mockReturnValue({});
+    getActiveSessionRevision.mockReturnValue(0);
+    getCurrentGeneration.mockReturnValue(undefined);
+    getStateForTab.mockReturnValue({ active: false });
     invalidateOlderActivationAttempts.mockReturnValue([]);
+    invalidateRetainedSessionRecovery.mockReturnValue(true);
     isActivationAttemptCurrent.mockReturnValue(true);
+    isDeactivationPending.mockReturnValue(false);
+    isRetainedSessionRecoveryCurrent.mockReturnValue(true);
     compensateInvalidatedActivationAttempts.mockResolvedValue([]);
     recordActivationAttemptFrames.mockReturnValue(undefined);
     retainCompatibilityFrames.mockReturnValue(undefined);
@@ -110,6 +131,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
     handleDeactivateSelectElementMode.mockResolvedValue({ success: true, tabId: 1, active: false });
   });
@@ -125,7 +147,101 @@ describe('handleActivateSelectElementMode', () => {
     }), { frameId: 0 });
     expect(browser.tabs.sendMessage.mock.calls[0][1].data).not.toHaveProperty('activate');
     expect(browser.tabs.sendMessage.mock.calls[0][1].data.activationGeneration).toBe(1);
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data.activationEpoch).toBe('epoch-1');
     expect(setStateForTab).toHaveBeenCalledWith(1, true);
+  });
+
+  it('registers strict authority when content echoes epoch and generation', async () => {
+    browser.tabs.sendMessage.mockImplementation(async (_tabId, contentMessage) => ({
+      success: true,
+      activated: true,
+      activationEpoch: contentMessage.data.activationEpoch,
+      activationGeneration: contentMessage.data.activationGeneration,
+    }));
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response).toMatchObject({ success: true, activated: true });
+    expect(registerParticipant).toHaveBeenCalledWith(1, 0, 1);
+    expect(setStateForTab).toHaveBeenCalledWith(1, true);
+  });
+
+  it('R5 uses current epoch and generation for retained-session re-authorization', async () => {
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response).toMatchObject({ success: true, activated: true });
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data).toMatchObject({
+      activationEpoch: 'epoch-1',
+      activationGeneration: 1,
+    });
+    expect(browser.tabs.sendMessage.mock.calls[0][1].data).not.toHaveProperty('recoveryDeadlineAt');
+  });
+
+  it('recovery aborts when token invalidated before generation creation', async () => {
+    let resolvePermission;
+    tabPermissionChecker.checkTabAccess.mockReturnValue(new Promise(r => { resolvePermission = r; }));
+    getActivationAttemptToken.mockReturnValue(undefined);
+    isRetainedSessionRecoveryCurrent.mockReturnValue(true);
+    const recoveryToken = 999;
+    const promise = handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+      { recoveryToken, expectedRevision: 0, expectedGeneration: undefined },
+    );
+    await vi.waitFor(() => expect(tabPermissionChecker.checkTabAccess).toHaveBeenCalled());
+    // Explicit deactivate invalidates recovery
+    isRetainedSessionRecoveryCurrent.mockReturnValue(false);
+    resolvePermission({ isAccessible: true, isRestricted: false, fullUrl: 'https://example.com' });
+    const response = await promise;
+    expect(response.success).toBe(false);
+    expect(response.activated).toBe(false);
+    expect(createActivationGeneration).not.toHaveBeenCalled();
+    expect(browser.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('explicit user activation invalidates retained recovery', async () => {
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+    expect(invalidateRetainedSessionRecovery).toHaveBeenCalledWith(1);
+    expect(response.success).toBe(true);
+  });
+
+  it('recovery activation does not invalidate itself', async () => {
+    getActivationAttemptToken.mockReturnValue(undefined);
+    isRetainedSessionRecoveryCurrent.mockReturnValue(true);
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+      { recoveryToken: 123, expectedRevision: 0, expectedGeneration: undefined },
+    );
+    expect(invalidateRetainedSessionRecovery).not.toHaveBeenCalled();
+    expect(response.success).toBe(true);
+  });
+
+  it('rejects an activation ACK from a different epoch', async () => {
+    browser.tabs.sendMessage.mockResolvedValue({
+      success: true,
+      activated: true,
+      activationEpoch: 'old-epoch',
+      activationGeneration: 1,
+    });
+
+    const response = await handleActivateSelectElementMode(
+      { data: { tabId: 1, active: true } },
+      {},
+    );
+
+    expect(response.success).toBe(false);
+    expect(registerParticipant).not.toHaveBeenCalled();
+    expect(setStateForTab).not.toHaveBeenCalledWith(1, true);
   });
 
   it('should find active tab if no tabId provided', async () => {
@@ -174,7 +290,7 @@ describe('handleActivateSelectElementMode', () => {
       if (frameId === 3) {
         return Promise.reject(new Error('Could not establish connection. Receiving end does not exist.'));
       }
-      return Promise.resolve({ success: true, activated: true, activationGeneration: 1 });
+      return Promise.resolve({ success: true, activated: true, activationGeneration: 1, activationEpoch: 'epoch-1' });
     });
 
     const response = await handleActivateSelectElementMode({ data: { tabId: 1, active: true } }, {});
@@ -241,6 +357,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
 
     const response = await handleActivateSelectElementMode(
@@ -260,7 +377,7 @@ describe('handleActivateSelectElementMode', () => {
     browser.webNavigation.getAllFrames.mockResolvedValue([{ frameId: 0 }, { frameId: 3 }]);
     browser.tabs.sendMessage.mockImplementation((_tabId, _message, { frameId }) => {
       if (frameId === 0) {
-        return Promise.resolve({ success: true, activated: true, activationGeneration: 1 });
+        return Promise.resolve({ success: true, activated: true, activationGeneration: 1, activationEpoch: 'epoch-1' });
       }
       return new Promise(resolve => {
         resolveFrameThree = resolve;
@@ -296,6 +413,7 @@ describe('handleActivateSelectElementMode', () => {
         success: true,
         activated: true,
         activationGeneration: 2,
+        activationEpoch: 'epoch-1',
       });
     });
     isActivationAttemptCurrent.mockImplementation((_tabId, generation) => (
@@ -319,6 +437,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
 
     const [firstResponse, secondResponse] = await Promise.all([firstActivation, secondActivation]);
@@ -432,6 +551,7 @@ describe('handleActivateSelectElementMode', () => {
       success: true,
       activated: true,
       activationGeneration: 1,
+      activationEpoch: 'epoch-1',
     });
 
     const response = await handleActivateSelectElementMode(
@@ -455,7 +575,7 @@ describe('handleActivateSelectElementMode', () => {
       { frameId: 4 },
     ]);
     browser.tabs.sendMessage
-      .mockResolvedValueOnce({ success: true, activated: true, activationGeneration: 1 })
+      .mockResolvedValueOnce({ success: true, activated: true, activationGeneration: 1, activationEpoch: 'epoch-1' })
       .mockResolvedValueOnce({ success: false, error: 'Frame unavailable' });
 
     const response = await handleActivateSelectElementMode(

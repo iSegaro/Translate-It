@@ -12,9 +12,16 @@ import {
   completeActivationAttempt,
   compensateInvalidatedActivationAttempts,
   createActivationGeneration,
+  getActivationEpoch,
   getActivationAttemptToken,
+  getActiveSessionRevision,
+  getCurrentGeneration,
+  getStateForTab,
   invalidateOlderActivationAttempts,
+  invalidateRetainedSessionRecovery,
   isActivationAttemptCurrent,
+  isDeactivationPending,
+  isRetainedSessionRecoveryCurrent,
   recordActivationAttemptFrames,
   retainCompatibilityFrames,
   registerParticipant,
@@ -42,9 +49,29 @@ function isProvenNoSelectElementReceiver(error) {
  * This activates element selection mode in each reachable frame of a specific tab.
  * @param {Object} message - The message object.
  * @param {Object} sender - The sender object.
+ * @param {Object} internalOptions - Optional in-memory recovery ownership checks; never sent to content.
  * @returns {Promise<Object>} - Promise that resolves with the response object.
  */
-export async function handleActivateSelectElementMode(message, sender) {
+export async function handleActivateSelectElementMode(message, sender, internalOptions = {}) {
+  const recoveryToken = Number.isInteger(internalOptions?.recoveryToken) ? internalOptions.recoveryToken : null;
+  const expectedRevision = internalOptions?.expectedRevision;
+  const expectedGeneration = internalOptions?.expectedGeneration;
+  const isRecoveryActivation = recoveryToken !== null;
+
+  const isRecoveryValidForTab = (tabId, ownActivationAttemptToken = null) => {
+    if (!isRecoveryActivation) return true;
+    if (!isRetainedSessionRecoveryCurrent(tabId, recoveryToken)) return false;
+    if (getStateForTab(tabId).active !== false) return false;
+    if (Number.isInteger(expectedRevision) && getActiveSessionRevision(tabId) !== expectedRevision) return false;
+    if (ownActivationAttemptToken === null
+      && expectedGeneration !== undefined
+      && getCurrentGeneration(tabId) !== expectedGeneration) return false;
+    const currentAttemptToken = getActivationAttemptToken(tabId);
+    if (currentAttemptToken != null && currentAttemptToken !== ownActivationAttemptToken) return false;
+    if (isDeactivationPending(tabId)) return false;
+    return true;
+  };
+
   logger.debug('Starting activation handler:', {
     messageData: message.data,
     senderTab: sender?.tab?.id,
@@ -107,9 +134,28 @@ export async function handleActivateSelectElementMode(message, sender) {
       };
     }
 
+    if (!isRecoveryActivation) {
+      invalidateRetainedSessionRecovery(targetTabId);
+    } else if (!isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
+
     // Check tab permissions before proceeding
     logger.debug('Checking tab access for:', targetTabId);
     const access = await tabPermissionChecker.checkTabAccess(targetTabId);
+    if (isRecoveryActivation && !isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
     logger.debug('Tab access result:', access);
     if (!access.isAccessible) {
       logger.debug(`Attempted to activate on restricted tab ${targetTabId}: ${access.errorMessage}`);
@@ -123,6 +169,28 @@ export async function handleActivateSelectElementMode(message, sender) {
       };
     }
     
+    if (isDeactivationPending(targetTabId)) {
+      logger.debug('Deactivation pending, attempting cleanup before fresh activation for tab', targetTabId);
+      const cleanupResult = await handleDeactivateSelectElementMode({ data: { tabId: targetTabId } }, sender);
+      if (!cleanupResult.success) {
+        return {
+          success: false,
+          message: 'Select Element previous session cleanup pending',
+          tabId: targetTabId,
+          activated: false,
+        };
+      }
+    }
+
+    if (isRecoveryActivation && !isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
+
     const action = MessageActions.ACTIVATE_SELECT_ELEMENT_MODE;
     
     logger.debug(`Sending ${action} to tab ${targetTabId} with mode: ${modeForContentScript}`);
@@ -131,13 +199,23 @@ export async function handleActivateSelectElementMode(message, sender) {
       ? { ...message.data }
       : {};
     delete contentData.activate;
+    if (isRecoveryActivation && !isRecoveryValidForTab(targetTabId)) {
+      return {
+        success: false,
+        message: 'Select Element recovery superseded',
+        tabId: targetTabId,
+        activated: false,
+      };
+    }
+    const activationEpoch = getActivationEpoch();
     const activationGeneration = createActivationGeneration(targetTabId);
     const activationAttemptToken = getActivationAttemptToken(targetTabId);
 
     try {
       const supersededAttempts = invalidateOlderActivationAttempts(targetTabId, activationGeneration);
       await compensateInvalidatedActivationAttempts(targetTabId, supersededAttempts);
-      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
+      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)
+        || (isRecoveryActivation && !isRecoveryValidForTab(targetTabId, activationAttemptToken))) {
         return {
           success: false,
           message: 'Select Element activation was superseded',
@@ -152,6 +230,7 @@ export async function handleActivateSelectElementMode(message, sender) {
           ...contentData,
           mode: modeForContentScript,
           active: isActivating,
+          activationEpoch,
           activationGeneration,
         },
         MessagingContexts.CONTENT // Context for content script
@@ -160,14 +239,19 @@ export async function handleActivateSelectElementMode(message, sender) {
       // Send activation explicitly so each reachable frame can establish its own ACK.
       const statusText = 'activated';
       let response;
-      const frames = browser.webNavigation?.getAllFrames
+      const rawFrames = browser.webNavigation?.getAllFrames
         ? await browser.webNavigation.getAllFrames({ tabId: targetTabId }).catch(() => [{ frameId: 0 }])
         : [{ frameId: 0 }];
-      const frameIds = [...new Set([
-        0,
-        ...(Array.isArray(frames) ? frames.map(frame => frame?.frameId) : [])
-      ])].filter(frameId => Number.isInteger(frameId) && frameId >= 0);
-      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
+      const frameDetails = new Map();
+      for (const f of Array.isArray(rawFrames) ? rawFrames : []) {
+        if (Number.isInteger(f?.frameId) && f.frameId >= 0) {
+          frameDetails.set(f.frameId, f.documentId && typeof f.documentId === 'string' && f.documentId.trim() ? f.documentId : null);
+        }
+      }
+      if (!frameDetails.has(0)) frameDetails.set(0, null);
+      const frameIds = [...frameDetails.keys()];
+      if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)
+        || (isRecoveryActivation && !isRecoveryValidForTab(targetTabId, activationAttemptToken))) {
         return {
           success: false,
           message: 'Select Element activation was superseded',
@@ -178,15 +262,21 @@ export async function handleActivateSelectElementMode(message, sender) {
 
       const frameResults = await Promise.all(frameIds.map(async frameId => {
         try {
+          const documentId = frameDetails.get(frameId) || null;
+          const target = documentId ? { frameId, documentId } : { frameId };
           // Only a dispatched request can leave cleanup ownership behind.
-          recordActivationAttemptFrames(targetTabId, activationGeneration, [frameId]);
+          if (documentId) {
+            recordActivationAttemptFrames(targetTabId, activationGeneration, [frameId], new Map([[frameId, documentId]]));
+          } else {
+            recordActivationAttemptFrames(targetTabId, activationGeneration, [frameId]);
+          }
           const frameResponse = await browser.tabs.sendMessage(
             targetTabId,
             contentMessage,
-            { frameId }
+            target
           );
           logger.debug(`Message sent to frame ${frameId} in tab ${targetTabId}, response:`, frameResponse);
-          return { frameId, response: frameResponse };
+          return { frameId, documentId, response: frameResponse };
         } catch (error) {
           if (isProvenNoSelectElementReceiver(error)) {
             settleActivationAttemptFrame(targetTabId, activationGeneration, frameId);
@@ -196,7 +286,7 @@ export async function handleActivateSelectElementMode(message, sender) {
           } else {
             logger.error(`Failed to send activation to frame ${frameId} in tab ${targetTabId}:`, error);
           }
-          return { frameId, error };
+          return { frameId, documentId: frameDetails.get(frameId) || null, error };
         }
       }));
 
@@ -205,20 +295,31 @@ export async function handleActivateSelectElementMode(message, sender) {
         && typeof frameResponse === 'object'
         && Object.prototype.hasOwnProperty.call(frameResponse, 'activationGeneration')
       );
+      const hasEpochEcho = frameResponse => (
+        frameResponse
+        && typeof frameResponse === 'object'
+        && Object.prototype.hasOwnProperty.call(frameResponse, 'activationEpoch')
+      );
       const strictResults = frameResults.filter(({ response: frameResponse }) => (
         frameResponse?.success === true
         && frameResponse?.activated === true
+        && hasGenerationEcho(frameResponse)
+        && hasEpochEcho(frameResponse)
         && frameResponse?.activationGeneration === activationGeneration
+        && frameResponse?.activationEpoch === activationEpoch
       ));
+      const isCompatibilityResponse = frameResponse => {
+        if (frameResponse === true) return true;
+        if (frameResponse?.success === true && frameResponse?.activated === true) {
+          const hasGen = hasGenerationEcho(frameResponse);
+          const hasEpoch = hasEpochEcho(frameResponse);
+          if (!hasGen) return true;
+          if (hasGen && !hasEpoch && frameResponse.activationGeneration === activationGeneration) return true;
+        }
+        return false;
+      };
       const compatibilityFrameIds = frameResults
-        .filter(({ response: frameResponse }) => (
-          frameResponse === true
-          || (
-            frameResponse?.success === true
-            && frameResponse?.activated === true
-            && !hasGenerationEcho(frameResponse)
-          )
-        ))
+        .filter(({ response: frameResponse }) => isCompatibilityResponse(frameResponse))
         .map(({ frameId }) => frameId);
       for (const { frameId, response: frameResponse } of frameResults) {
         if (
@@ -230,7 +331,8 @@ export async function handleActivateSelectElementMode(message, sender) {
       }
 
       if (strictResults.length > 0) {
-        if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)) {
+        if (!isActivationAttemptCurrent(targetTabId, activationGeneration, activationAttemptToken)
+          || (isRecoveryActivation && !isRecoveryValidForTab(targetTabId, activationAttemptToken))) {
           return {
             success: false,
             message: 'Select Element activation was superseded',
@@ -240,9 +342,10 @@ export async function handleActivateSelectElementMode(message, sender) {
           };
         }
 
-        const registeredResults = strictResults.filter(({ frameId }) => (
-          registerParticipant(targetTabId, frameId, activationGeneration)
-        ));
+        const registeredResults = strictResults.filter(({ frameId, documentId }) => {
+          const doc = documentId || frameDetails.get(frameId) || null;
+          return doc ? registerParticipant(targetTabId, frameId, activationGeneration, doc) : registerParticipant(targetTabId, frameId, activationGeneration);
+        });
         for (const { frameId } of registeredResults) {
           settleActivationAttemptFrame(targetTabId, activationGeneration, frameId);
         }
@@ -268,14 +371,7 @@ export async function handleActivateSelectElementMode(message, sender) {
         };
       }
 
-      const compatibilityResult = frameResults.find(({ response: frameResponse }) => (
-        frameResponse === true
-        || (
-          frameResponse?.success === true
-          && frameResponse?.activated === true
-          && !hasGenerationEcho(frameResponse)
-        )
-      ));
+      const compatibilityResult = frameResults.find(({ response: frameResponse }) => isCompatibilityResponse(frameResponse));
       if (compatibilityResult) {
         retainCompatibilityFrames(
           targetTabId,

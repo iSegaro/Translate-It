@@ -476,6 +476,34 @@ describe('TranslationEngine', () => {
       expect(result.success).toBe(true);
     });
 
+    it('should convert structured handler failures into typed engine errors', async () => {
+      const request = {
+        action: MessageActions.TRANSLATE,
+        messageId: 'structured-failure',
+        data: {
+          text: JSON.stringify([{ blockId: 'b1', text: 'Hello' }]),
+          provider: 'google',
+          sourceLanguage: 'en',
+          targetLanguage: 'fa',
+          mode: 'pdf-translation',
+          options: { rawJsonPayload: true, pdfTranslation: true }
+        }
+      };
+      const errorDetails = { type: ErrorTypes.VALIDATION, message: 'Structured result rejected' };
+      engine.jsonHandler.execute.mockResolvedValue({
+        success: false,
+        error: errorDetails,
+        errorDetails,
+      });
+
+      const result = await engine.handleMessage(request, {});
+
+      expect(result).toMatchObject({
+        success: false,
+        error: errorDetails,
+      });
+    });
+
     it('should handle errors and return formatted error response', async () => {
       const mockProvider = await engine.getProvider('google');
       mockProvider.translate.mockRejectedValue(new Error('API Down'));

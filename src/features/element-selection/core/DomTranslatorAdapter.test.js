@@ -1,5 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+let fontPolicyComputedStyleSpy;
+
+const enableFontPolicyStyles = () => {
+  if (fontPolicyComputedStyleSpy) return;
+  fontPolicyComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+    if (pseudo) return { content: 'none' };
+    return nativeGetComputedStyle(element, pseudo);
+  });
+};
 
 // Mock dependencies
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -157,6 +168,11 @@ describe('DomTranslatorAdapter', () => {
     document.body.appendChild(testElement);
   });
 
+  afterEach(() => {
+    fontPolicyComputedStyleSpy?.mockRestore();
+    fontPolicyComputedStyleSpy = null;
+  });
+
   it('should initialize and load original settings', async () => {
     await adapter.initialize();
     expect(adapter.originalSettings).toEqual({ source: 'en', target: 'fa' });
@@ -280,6 +296,7 @@ describe('DomTranslatorAdapter', () => {
     it('applies and publishes V2 font ownership, then restores it without overwriting drift', async () => {
       const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
       const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      enableFontPolicyStyles();
       testElement.style.setProperty('font-family', 'serif');
       getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
       getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
@@ -309,6 +326,7 @@ describe('DomTranslatorAdapter', () => {
     it('restores the original V2 font through normal Revert', async () => {
       const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
       const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      enableFontPolicyStyles();
       testElement.style.setProperty('font-family', 'serif');
       getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
       getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
@@ -766,6 +784,7 @@ describe('DomTranslatorAdapter', () => {
     it('publishes V3 font ownership through normal Revert', async () => {
       const { getFeatureSemanticBlockGroupingAsync, getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
       const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      enableFontPolicyStyles();
       getFeatureSemanticBlockGroupingAsync.mockResolvedValueOnce(true);
       getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
       getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
@@ -1064,6 +1083,7 @@ describe('DomTranslatorAdapter', () => {
 
     it('rolls back V2 font mutation when ownership publication fails', async () => {
       const { getSelectElementUseTranslationFontAsync, getTranslationFontFamilyAsync } = await import('@/config.js');
+      enableFontPolicyStyles();
       testElement.style.setProperty('font-family', 'serif');
       getSelectElementUseTranslationFontAsync.mockResolvedValueOnce(true);
       getTranslationFontFamilyAsync.mockResolvedValueOnce('auto');
@@ -4109,7 +4129,7 @@ describe('DomTranslatorAdapter', () => {
 
       // RTL mark (\u200f) should be present
       expect(textNode.nodeValue).toContain('\u200fسلام\u200f');
-      expect(hoverPreviewLookup.add).toHaveBeenCalledWith(textNode, originalText);
+      expect(hoverPreviewLookup.add).toHaveBeenCalledWith(textNode, originalText, textNode.nodeValue);
       expect(testElement.getAttribute('data-has-original')).toBe('true');
     });
 

@@ -95,6 +95,56 @@ describe('QueueManager', () => {
   });
 
   describe('Retry Logic', () => {
+    it('settles user cancellation immediately during retry wait', async () => {
+      const controller = new AbortController();
+      const retryAt = Date.now() + 60_000;
+      const request = vi.fn().mockRejectedValue({
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        message: 'rate limited',
+        retryAt,
+      });
+      const promise = queueManager.enqueue('retry-cancel-provider', request, 0, 'unknown', {
+        abortController: controller,
+      });
+
+      await vi.advanceTimersByTimeAsync(150);
+      const item = queueManager.queues.get('retry-cancel-provider')[0];
+      expect(item.status).toBe('retrying');
+      expect(queueManager.retryTimeouts.has(item.id)).toBe(true);
+
+      controller.abort('user-cancelled');
+
+      await expect(promise).rejects.toMatchObject({ type: ErrorTypes.USER_CANCELLED });
+      expect(queueManager.retryTimeouts.has(item.id)).toBe(false);
+      expect(queueManager.queues.get('retry-cancel-provider')).toHaveLength(0);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(request).toHaveBeenCalledOnce();
+    });
+
+    it('settles internal abort immediately during retry wait', async () => {
+      const controller = new AbortController();
+      const request = vi.fn().mockRejectedValue({
+        type: ErrorTypes.RATE_LIMIT_REACHED,
+        message: 'rate limited',
+        retryAt: Date.now() + 60_000,
+      });
+      const promise = queueManager.enqueue('retry-operation-abort-provider', request, 0, 'unknown', {
+        abortController: controller,
+      });
+
+      await vi.advanceTimersByTimeAsync(150);
+      const item = queueManager.queues.get('retry-operation-abort-provider')[0];
+      controller.abort('operation-abort');
+
+      await expect(promise).rejects.toMatchObject({
+        operationAborted: true,
+        cancellationReason: 'operation-abort',
+      });
+      expect(queueManager.retryTimeouts.has(item.id)).toBe(false);
+      expect(queueManager.queues.get('retry-operation-abort-provider')).toHaveLength(0);
+      expect(request).toHaveBeenCalledOnce();
+    });
+
     it('does not claim a strategy denominator for initial processing', async () => {
       const request = vi.fn().mockResolvedValue('Success');
       const promise = queueManager.enqueue('initial-attempt-provider', request);
@@ -173,9 +223,9 @@ describe('QueueManager', () => {
       expect(request).toHaveBeenCalledTimes(3);
     });
 
-    it('should retry a failed request with exponential backoff', async () => {
+    it.each([429, 529])('should retry a RATE_LIMIT_REACHED request with exponential backoff for HTTP %s', async (statusCode) => {
       // RATE_LIMIT_REACHED: baseDelay 2000. Jittered (0.75x) = 1500ms.
-      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode: 429, message: 'Rate limit' };
+      const mockError = { type: ErrorTypes.RATE_LIMIT_REACHED, statusCode, message: 'Rate limit' };
       
       const mockRequest = vi.fn()
         .mockRejectedValueOnce(mockError)
@@ -950,6 +1000,42 @@ describe('QueueManager', () => {
       expect(callCount).toBe(4);
       expect(queueManager.getQueueStatus('bound-test-provider').total).toBe(0);
       expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
+    it('does not retry when error explicitly sets retryable=false', async () => {
+      const terminalError = Object.assign(new Error('terminal invalid response'), {
+        type: ErrorTypes.API_RESPONSE_INVALID,
+        retryable: false,
+      });
+      const request = vi.fn().mockRejectedValue(terminalError);
+      const promise = queueManager.enqueue('explicit-non-retryable', request, 0, 'context', {
+        messageId: 'explicit-non-retryable',
+      });
+      const caught = promise.catch(e => e);
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(10000);
+      const error = await caught;
+      expect(error).toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID, retryable: false });
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(queueManager.getQueueStatus('explicit-non-retryable').total).toBe(0);
+      expect(queueManager.retryTimeouts.size).toBe(0);
+    });
+
+    it('preserves normal retry behavior when retryable policy is unspecified', async () => {
+      const genericError = Object.assign(new Error('generic invalid response'), {
+        type: ErrorTypes.API_RESPONSE_INVALID,
+      });
+      const request = vi.fn()
+        .mockRejectedValueOnce(genericError)
+        .mockResolvedValueOnce('recovered');
+      const promise = queueManager.enqueue('explicit-retryable-control', request, 0, 'context', {
+        messageId: 'explicit-retryable-control',
+      });
+      await vi.advanceTimersByTimeAsync(10);
+      await vi.advanceTimersByTimeAsync(2000);
+      await expect(promise).resolves.toBe('recovered');
+      expect(request).toHaveBeenCalledTimes(2);
+      expect(queueManager.getQueueStatus('explicit-retryable-control').total).toBe(0);
     });
   });
 });

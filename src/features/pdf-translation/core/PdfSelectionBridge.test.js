@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import { SelectionTranslationMode } from '@/shared/config/config.js'
 
-const emitMock = vi.fn()
-const settingsGetMock = vi.fn((key, defaultValue) => defaultValue)
 const getSelectionMock = vi.fn()
+const { emitMock, storageManagerMock } = vi.hoisted(() => ({
+  emitMock: vi.fn(),
+  storageManagerMock: {
+    get: vi.fn().mockResolvedValue({}),
+    set: vi.fn().mockResolvedValue(true)
+  }
+}))
 
 vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: {
@@ -11,12 +17,11 @@ vi.mock('@/core/PageEventBus.js', () => ({
   }
 }))
 
-vi.mock('@/shared/managers/SettingsManager.js', () => ({
-  default: {
-    get: settingsGetMock
-  }
+vi.mock('@/shared/storage/core/StorageCore.js', () => ({
+  storageManager: storageManagerMock
 }))
 
+const { settingsManager } = await import('@/shared/managers/SettingsManager.js')
 const { PdfSelectionBridge } = await import('./PdfSelectionBridge.js')
 
 function createSelection(text = 'PDF text', rect = { left: 20, top: 24, width: 90, height: 18, bottom: 42 }) {
@@ -48,10 +53,18 @@ describe('PdfSelectionBridge', () => {
   let windowAddSpy
   let windowRemoveSpy
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    if (settingsManager._initializationPromise) {
+      await settingsManager._initializationPromise
+    }
+
     emitMock.mockClear()
-    settingsGetMock.mockClear()
     getSelectionMock.mockClear()
+    settingsManager.destroy()
+    storageManagerMock.get.mockReset().mockResolvedValue({
+      selectionTranslationMode: SelectionTranslationMode.IMMEDIATE
+    })
+    await settingsManager.initialize()
 
     documentAddSpy = vi.spyOn(document, 'addEventListener').mockImplementation(() => {})
     documentRemoveSpy = vi.spyOn(document, 'removeEventListener').mockImplementation(() => {})
@@ -61,6 +74,7 @@ describe('PdfSelectionBridge', () => {
   })
 
   afterEach(() => {
+    settingsManager.destroy()
     documentAddSpy?.mockRestore()
     documentRemoveSpy?.mockRestore()
     windowAddSpy?.mockRestore()
@@ -86,6 +100,18 @@ describe('PdfSelectionBridge', () => {
         isPdf: true
       })
       }))
+  })
+
+  it('resolves selection mode through the runtime SettingsManager', () => {
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+
+    bridge.handleSelectionChange()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      mode: SelectionTranslationMode.IMMEDIATE
+    }))
   })
 
   it('defers selection emission while the pointer is down and flushes after pointer up', () => {
@@ -303,11 +329,46 @@ describe('PdfSelectionBridge', () => {
     }))
   })
 
-  it('registers and removes selection listeners on stop/destroy', () => {
+  it('waits for settings readiness before attaching selection listeners', async () => {
+    settingsManager.destroy()
+
+    let resolveSettings
+    storageManagerMock.get.mockReset().mockImplementation(() => new Promise((resolve) => {
+      resolveSettings = () => resolve({
+        selectionTranslationMode: SelectionTranslationMode.IMMEDIATE
+      })
+    }))
+
+    const { viewerRoot, selection } = createSelection()
+    getSelectionMock.mockReturnValue(selection)
+    const bridge = new PdfSelectionBridge(ref(viewerRoot))
+    const startPromise = bridge.start()
+
+    await vi.waitFor(() => expect(storageManagerMock.get).toHaveBeenCalled())
+    expect(bridge.isStarted).toBe(false)
+    expect(documentAddSpy).not.toHaveBeenCalled()
+    expect(emitMock).not.toHaveBeenCalled()
+
+    resolveSettings()
+
+    await expect(startPromise).resolves.toBe(true)
+    expect(bridge.isStarted).toBe(true)
+    expect(documentAddSpy).toHaveBeenCalledWith('selectionchange', bridge.handleSelectionChange, { capture: true })
+
+    bridge.handleSelectionChange()
+
+    expect(emitMock).toHaveBeenCalledWith('global-selection-change', expect.objectContaining({
+      mode: SelectionTranslationMode.IMMEDIATE
+    }))
+
+    bridge.destroy()
+  })
+
+  it('registers and removes selection listeners on stop/destroy', async () => {
     const { viewerRoot } = createSelection('Destroy me')
     const bridge = new PdfSelectionBridge(ref(viewerRoot))
 
-    bridge.start()
+    await bridge.start()
 
     expect(documentAddSpy).toHaveBeenCalledWith('selectionchange', bridge.handleSelectionChange, { capture: true })
     expect(documentAddSpy).toHaveBeenCalledWith('pointerdown', bridge.handlePointerDown, { capture: true })

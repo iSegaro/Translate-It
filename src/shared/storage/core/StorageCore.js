@@ -26,6 +26,7 @@ class StorageCore extends ResourceTracker {
       defaultTTL: MEMORY_TIMING.CRITICAL_CACHE_TTL, 
       isCritical: true 
     }); // Critical storage cache with centralized timing
+    this._cacheRevision = 0;
     this.listeners = new Map(); // event_name -> Set of callbacks
     this._isReady = false;
     this._useInMemoryStorage = false;
@@ -35,7 +36,9 @@ class StorageCore extends ResourceTracker {
     this.logger = getScopedLogger(LOG_COMPONENTS.STORAGE, 'Core');
     // StorageCore initialized - logged at TRACE level for detailed debugging
     // this.logger.init('StorageCore initialized');
-    this._initializeAsync();
+    this._initializeAsync().catch(() => {
+      // Keep rejected _readyPromise observable while handling fire-and-forget rejection.
+    });
   }
 
   /**
@@ -46,7 +49,13 @@ class StorageCore extends ResourceTracker {
       return this._readyPromise;
     }
 
-    this._readyPromise = this._initializeWithRetry();
+    const promise = this._initializeWithRetry().catch(error => {
+      if (this._readyPromise === promise) {
+        this._readyPromise = null;
+      }
+      throw error;
+    });
+    this._readyPromise = promise;
     return this._readyPromise;
   }
 
@@ -79,26 +88,23 @@ class StorageCore extends ResourceTracker {
   }
 
   async _initialize() {
-    try {
-      // Test browser storage availability
-      if (!browser?.storage?.local) {
-        throw new Error("Browser storage API not available");
-      }
-
-      // Test storage access
-      await browser.storage.local.get(["__storage_test__"]);
-
-      // Setup change listener for cache invalidation
-      this._setupChangeListener();
-
-      this._isReady = true;
-      this.logger.info('Storage core initialized successfully');
-    } catch (error) {
-      this.logger.debug('Standard browser storage not available, falling back to in-memory storage:', error.message);
+    // Keep memory fallback for environments without the storage API.
+    if (!browser?.storage?.local) {
+      this.logger.debug('Standard browser storage not available, falling back to in-memory storage: API unavailable');
       this._useInMemoryStorage = true;
       this._inMemoryData = {};
       this._isReady = true;
+      return;
     }
+
+    // Probe failures must reach the existing retry and context-error handling.
+    await browser.storage.local.get(["__storage_test__"]);
+
+    // Setup change listener for cache invalidation
+    this._setupChangeListener();
+
+    this._isReady = true;
+    this.logger.info('Storage core initialized successfully');
   }
 
   /**
@@ -113,6 +119,8 @@ class StorageCore extends ResourceTracker {
 
     this._changeListener = (changes, areaName) => {
       if (areaName !== "local") return;
+
+      this._advanceCacheRevision();
 
       // Update cache and emit events
       for (const [key, { newValue, oldValue }] of Object.entries(changes)) {
@@ -133,8 +141,21 @@ class StorageCore extends ResourceTracker {
       // Use tracked event listener
       this.addEventListener(browser.storage.onChanged, 'change', this._changeListener);
     } catch (error) {
-      this.logger.warn('Failed to setup change listener', error);
+      try {
+        browser.storage.onChanged.removeListener?.(this._changeListener);
+      } catch {
+        // Registration ownership was not established.
+      }
+      this._changeListener = null;
+      throw error;
     }
+  }
+
+  /**
+   * Mark cache/storage state as newer than pending browser reads.
+   */
+  _advanceCacheRevision() {
+    this._cacheRevision += 1;
   }
 
   /**
@@ -143,6 +164,9 @@ class StorageCore extends ResourceTracker {
    */
   _invalidateCache(keys) {
     if (!keys || !Array.isArray(keys)) return;
+    if (keys.length === 0) return;
+
+    this._advanceCacheRevision();
 
     // Cache invalidation - logged at TRACE level for detailed debugging
     // this.logger.debug(`Force invalidating cache for keys: ${keys.join(', ')}`);
@@ -156,7 +180,11 @@ class StorageCore extends ResourceTracker {
    */
   async _ensureReady() {
     if (this._isReady) return;
-    await this._readyPromise;
+    if (this._readyPromise) {
+      await this._readyPromise;
+      return;
+    }
+    await this._initializeAsync();
   }
 
   /**
@@ -186,12 +214,13 @@ class StorageCore extends ResourceTracker {
     const keyList = this._normalizeKeys(keys);
     this._invalidateCache(keyList);
 
-    // Get values (cache will be bypassed since we just invalidated)
+    // Get values through the shared revision-guarded read path.
     return this.get(keys, false);
   }
 
   /**
    * Get values from storage
+   * Retries backend reads that overlap newer cache or storage state.
    * @param {string|string[]|Object} keys - Keys to retrieve
    * @param {boolean} useCache - Whether to use cache (default: true)
    * @returns {Promise<Object>} Retrieved values
@@ -230,50 +259,46 @@ class StorageCore extends ResourceTracker {
         return result;
       }
 
-      // Check cache first if requested
-      if (useCache && keyList) {
-        // Ensure cache availability
-        this._ensureCache();
-        
-        const cachedResult = {};
-        const uncachedKeys = [];
+      while (true) {
+        let cachedResult = {};
+        let readKeys = keyList;
 
-        for (const key of keyList) {
-          if (this.cache.has(key)) {
-            cachedResult[key] = this.cache.get(key);
-          } else {
-            uncachedKeys.push(key);
-          }
-        }
+        // Rebuild cache snapshot after every retry.
+        if (useCache && keyList) {
+          this._ensureCache();
+          const uncachedKeys = [];
 
-        // If all keys are cached, return cached result
-        if (uncachedKeys.length === 0) {
-          return { ...defaultValues, ...cachedResult };
-        }
-
-        // Fetch uncached keys from storage
-        if (uncachedKeys.length > 0) {
-          const storageResult = await browser.storage.local.get(uncachedKeys);
-          
-          // Update cache with new values
-          for (const [key, value] of Object.entries(storageResult)) {
-            this.cache.set(key, value);
+          for (const key of keyList) {
+            if (this.cache.has(key)) {
+              cachedResult[key] = this.cache.get(key);
+            } else {
+              uncachedKeys.push(key);
+            }
           }
 
-          return { ...defaultValues, ...cachedResult, ...storageResult };
+          // If all keys are cached, return cached result
+          if (uncachedKeys.length === 0) {
+            return { ...defaultValues, ...cachedResult };
+          }
+
+          readKeys = uncachedKeys;
         }
+
+        const readRevision = this._cacheRevision;
+        const result = await browser.storage.local.get(readKeys || undefined);
+
+        if (readRevision !== this._cacheRevision) {
+          continue;
+        }
+
+        // Update cache only after the read is confirmed current.
+        for (const [key, value] of Object.entries(result)) {
+          this.cache.set(key, value);
+        }
+
+        // Apply default values if provided
+        return { ...defaultValues, ...cachedResult, ...result };
       }
-
-      // Fetch from storage
-      const result = await browser.storage.local.get(keyList || undefined);
-
-      // Update cache
-      for (const [key, value] of Object.entries(result)) {
-        this.cache.set(key, value);
-      }
-
-      // Apply default values if provided
-      return { ...defaultValues, ...result };
 
     } catch (error) {
       // StorageCore should not handle its own errors via ErrorHandler
@@ -352,6 +377,7 @@ class StorageCore extends ResourceTracker {
       }
 
       await browser.storage.local.set(plainData);
+      this._advanceCacheRevision();
 
       // Update cache if requested (use plain data)
       if (updateCache) {
@@ -409,6 +435,7 @@ class StorageCore extends ResourceTracker {
       }
 
       await browser.storage.local.remove(keyList);
+      this._advanceCacheRevision();
 
       // Update cache if requested
       if (updateCache) {
@@ -454,6 +481,7 @@ class StorageCore extends ResourceTracker {
       }
 
       await browser.storage.local.clear();
+      this._advanceCacheRevision();
 
       if (updateCache) {
         this.cache.clear();
@@ -502,6 +530,7 @@ class StorageCore extends ResourceTracker {
    */
   _ensureCache() {
     if (this.cache.isDestroyed) {
+      this._advanceCacheRevision();
       // Cache recreation - logged at TRACE level for detailed debugging
       // this.logger.debug('Cache was destroyed, recreating with enhanced settings...');
       
@@ -526,6 +555,7 @@ class StorageCore extends ResourceTracker {
    */
   invalidateCache(keys) {
     const keyList = Array.isArray(keys) ? keys : [keys];
+    this._advanceCacheRevision();
     
     for (const key of keyList) {
       this.cache.delete(key);
@@ -539,6 +569,7 @@ class StorageCore extends ResourceTracker {
    * Clear entire cache
    */
   clearCache() {
+    this._advanceCacheRevision();
     this.cache.clear();
     // Cache cleared - logged at TRACE level for detailed debugging
     // this.logger.debug('Cache cleared');

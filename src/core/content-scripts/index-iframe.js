@@ -25,65 +25,38 @@ if (!window.translateItContentScriptCore) {
 
   try {
     // 4. LAZY LOAD POLYFILL & UTILS
-    // We only load these if the frame passed the size check
     const [
       { default: browser },
-      { setupTrustedTypesCompatibility },
-      { checkUrlExclusionAsync }
+      { setupTrustedTypesCompatibility }
     ] = await Promise.all([
       import('webextension-polyfill'),
-      import('@/shared/vue/vue-utils.js'),
-      import('@/features/exclusion/utils/exclusion-utils.js')
+      import('@/shared/vue/vue-utils.js')
     ]);
 
     window.browser = browser;
     setupTrustedTypesCompatibility();
 
-    // 5. EXTENSION FRAME CHECK
+    // 5. EXTENSION FRAME CHECK (hard guard)
     const isExtensionFrame = window.location.protocol.endsWith('-extension:') || 
-                             window.location.href.startsWith(browser.runtime.getURL(''));
+                             (browser.runtime?.getURL && window.location.href.startsWith(browser.runtime.getURL('')));
     if (isExtensionFrame) return;
 
-    // 6. FAST FAIL (Exclusion)
-    if (await checkUrlExclusionAsync()) return;
-
-    // 7. Initialize Core (Lite version)
+    // 6. MINIMAL CORE BOOTSTRAP — always alive, even when policy-excluded
     const { IFrameContentScriptCore } = await import('./IFrameContentScriptCore.js');
     const contentScriptCore = new IFrameContentScriptCore();
     window.translateItContentCore = contentScriptCore;
     window.translateItContentScriptCore = contentScriptCore;
     
-    const initialized = await contentScriptCore.initializeCritical();
+    const { initializeContentCore } = await import('./contentStartup.js');
+    const initialized = await initializeContentCore(contentScriptCore);
 
     if (initialized) {
-      // Inject Styles
-      await contentScriptCore.injectMainDOMStyles();
-
-      // Interaction Coordinator (Lazy)
-      try {
-        const { interactionCoordinator } = await import('./InteractionCoordinator.js');
-        await interactionCoordinator.initialize();
-      } catch { /* ignore */ }
-
-      // Text selection window relay: single-owner upward routing for translation
-      // windows (installed before any windows manager can be activated).
-      try {
-        const { getTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
-        getTextSelectionWindowRelay();
-      } catch { /* ignore */ }
-
-      // Load Lite Features
-      const LITE_FEATURES = ['messaging', 'extensionContext', 'contentMessageHandler', 'mouseHover'];
-      for (const feature of LITE_FEATURES) {
-        await contentScriptCore.loadFeature(feature);
-      }
-
-      // 8. INITIALIZE MESSAGE LISTENERS (Modular)
-      setupIFrameMessageListeners();
-
       if (process.env.NODE_ENV === 'development') {
-        console.log('[IFrame] Lite mode initialized', window.location.href);
+        console.log('[IFrame] Lite minimal core initialized', window.location.href);
       }
+      // Allowed-runtime (styles, LITE features, listeners, FRAME_READY) will be
+      // started via IFrameContentScriptCore.reconcileAllowedRuntime() triggered by
+      // FeatureManager policy hook — no heavy work here.
     }
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
@@ -92,27 +65,4 @@ if (!window.translateItContentScriptCore) {
   }
 })();
 
-/**
- * Encapsulated message listeners for subframes
- */
-function setupIFrameMessageListeners() {
-  // --- CROSS-FRAME CLICK SYNC (IFRAME) ---
-  window.addEventListener('message', (event) => {
-    if (event.data?.type === 'translateit-activate-click-listeners') {
-      const handleInternalClick = () => {
-        try {
-          window.top.postMessage({ 
-            type: 'TRANSLATE_IT_IFRAME_CLICK_DETECTED', 
-            source: 'translate-it-iframe' 
-          }, '*');
-        } catch { /* ignore */ }
-        window.removeEventListener('click', handleInternalClick, { capture: true });
-      };
-      
-      window.addEventListener('click', handleInternalClick, { 
-        capture: true, once: true, passive: true 
-      });
-    }
-  });
 
-}

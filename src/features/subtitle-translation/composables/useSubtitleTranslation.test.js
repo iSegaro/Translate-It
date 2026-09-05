@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSubtitleTranslation } from './useSubtitleTranslation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 
 const { subscribeMock, sendToBackgroundMock, presentSubtitleTranslationErrorMock } = vi.hoisted(() => ({
   subscribeMock: vi.fn(),
@@ -40,6 +41,17 @@ describe('useSubtitleTranslation error presentation', () => {
     });
   });
 
+  const emitComplete = async (state, payload) => {
+    onMessage({
+      action: MessageActions.SUBTITLE_TRANSLATE_COMPLETE,
+      data: {
+        jobId: state.jobId.value,
+        ...payload
+      }
+    });
+    await Promise.resolve();
+  };
+
   it('maps structured terminal errors and hides raw diagnostics', async () => {
     const state = useSubtitleTranslation();
 
@@ -76,6 +88,128 @@ describe('useSubtitleTranslation error presentation', () => {
     expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails });
     expect(presentSubtitleTranslationErrorMock.mock.calls.at(-1)[0]).not.toHaveProperty('error');
     expect(state.error.value).toBe('Safe subtitle error');
+  });
+
+  it.each([
+    PublicTranslationErrorActions.RETRY,
+    PublicTranslationErrorActions.OPEN_SETTINGS,
+    undefined,
+  ])('preserves terminal public action %s', async (action) => {
+    const state = useSubtitleTranslation();
+    presentSubtitleTranslationErrorMock.mockResolvedValueOnce({
+      kind: 'display',
+      message: 'Safe subtitle error',
+      action,
+    });
+
+    await onMessage({
+      action: MessageActions.SUBTITLE_TRANSLATE_ERROR,
+      data: {
+        jobId: state.jobId.value,
+        errorDetails: { message: 'raw diagnostic', type: 'HTTP_ERROR', statusCode: 409 },
+      },
+    });
+    await Promise.resolve();
+
+    expect(state.errorAction.value).toBe(action ?? null);
+  });
+
+  it('marks useful completion as completed and preserves translated content', async () => {
+    const state = useSubtitleTranslation();
+
+    await emitComplete(state, {
+      content: 'translated content',
+      stats: { percent: 100, translated: 2, failed: 0, total: 2 }
+    });
+
+    expect(state.status.value).toBe('completed');
+    expect(state.translatedContent.value).toBe('translated content');
+    expect(state.progress.translated).toBe(2);
+    expect(state.progress.failed).toBe(0);
+  });
+
+  it('presents zero-result terminal failure as an error with its public action', async () => {
+    const state = useSubtitleTranslation();
+    const selectedFile = { name: 'sample.srt' };
+    const parsedCues = [{ id: 'cue-1', text: 'Hello' }];
+    const errorDetails = { message: 'Provider failed', type: 'API_KEY_INVALID' };
+    state.currentFile.value = selectedFile;
+    state.cues.value = parsedCues;
+    presentSubtitleTranslationErrorMock.mockResolvedValueOnce({
+      kind: 'display',
+      message: 'Safe subtitle error',
+      action: PublicTranslationErrorActions.OPEN_SETTINGS
+    });
+
+    await emitComplete(state, {
+      content: 'must not be downloadable',
+      errorDetails,
+      stats: { percent: 100, translated: 0, failed: 2, total: 2 }
+    });
+
+    expect(presentSubtitleTranslationErrorMock).toHaveBeenCalledWith({ errorDetails });
+    expect(state.status.value).toBe('error');
+    expect(state.status.value).not.toBe('completed');
+    expect(state.error.value).toBe('Safe subtitle error');
+    expect(state.errorAction.value).toBe(PublicTranslationErrorActions.OPEN_SETTINGS);
+    expect(state.translatedContent.value).toBe('');
+    expect(state.currentFile.value).toEqual(selectedFile);
+    expect(state.cues.value).toEqual(parsedCues);
+  });
+
+  it('preserves RETRY_LATER action for zero-result terminal failure', async () => {
+    const state = useSubtitleTranslation();
+    const errorDetails = { message: 'Try again later', type: 'RATE_LIMITED' };
+    presentSubtitleTranslationErrorMock.mockResolvedValueOnce({
+      kind: 'display',
+      message: 'Safe subtitle error',
+      action: PublicTranslationErrorActions.RETRY_LATER
+    });
+
+    await emitComplete(state, {
+      content: 'must not be downloadable',
+      errorDetails,
+      stats: { percent: 100, translated: 0, failed: 1, total: 1 }
+    });
+
+    expect(state.status.value).toBe('error');
+    expect(state.errorAction.value).toBe(PublicTranslationErrorActions.RETRY_LATER);
+    expect(state.translatedContent.value).toBe('');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['malformed', { arbitrary: true }]
+  ])('uses safe generic presentation for zero-result %s error details', async (_label, errorDetails) => {
+    const state = useSubtitleTranslation();
+
+    await emitComplete(state, {
+      content: 'must not be downloadable',
+      errorDetails,
+      stats: { percent: 100, translated: 0, failed: 1, total: 1 }
+    });
+
+    expect(state.status.value).toBe('error');
+    expect(state.status.value).not.toBe('completed');
+    expect(state.error.value).toBe('Localized TRANSLATION_FAILED');
+    expect(state.translatedContent.value).toBe('');
+  });
+
+  it('keeps zero-result cancellation terminal errors silent', async () => {
+    const state = useSubtitleTranslation();
+    const errorDetails = { message: 'Translation cancelled', type: 'USER_CANCELLED' };
+    presentSubtitleTranslationErrorMock.mockResolvedValueOnce({ kind: 'silent' });
+
+    await emitComplete(state, {
+      content: 'must not be downloadable',
+      errorDetails,
+      stats: { percent: 100, translated: 0, failed: 1, total: 1 }
+    });
+
+    expect(state.status.value).toBe('idle');
+    expect(state.error.value).toBeNull();
+    expect(state.errorAction.value).toBeNull();
+    expect(state.translatedContent.value).toBe('');
   });
 
   it('uses safe generic presentation for string-only failures', async () => {

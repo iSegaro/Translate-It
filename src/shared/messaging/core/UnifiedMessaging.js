@@ -2,7 +2,11 @@
 import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { isValidSync, isContextError } from '@/core/contextCore.js';
+import {
+  isValidSync,
+  isContextError,
+  isPermanentContextInvalidation,
+} from '@/core/contextCore.js';
 import { handleContextError } from '@/core/contextErrorHandler.js';
 import { unifiedTranslationCoordinator } from './UnifiedTranslationCoordinator.js';
 import { streamingTimeoutManager } from './StreamingTimeoutManager.js';
@@ -29,7 +33,6 @@ const OPERATION_TIMEOUTS = {
   'SHOW_NOTIFICATION': 2000,
   'DISMISS_NOTIFICATION': 2000,
   'OPEN_SIDEPANEL': 3000,
-  'GET_PROVIDER_STATUS': 2000,
   'GET_SERVICE_STATUS': 2000,
   'GET_BACKGROUND_STATUS': 2000,
   'PING': 1000,
@@ -299,11 +302,12 @@ export async function sendRegularMessage(message, options = {}) {
     
     if (isContextError(error)) {
       handleContextError(error, `UnifiedMessaging.${message.action}`);
+      const permanentlyInvalidated = isPermanentContextInvalidation(error);
       
       return { 
         success: false, 
         error: `Context error: ${error.message || error}`,
-        isContextInvalidated: true 
+        isContextInvalidated: permanentlyInvalidated,
       };
     }
 

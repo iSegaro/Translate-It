@@ -26,9 +26,13 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-3.5-flash'),
     getGeminiThinkingModeAsync: vi.fn().mockResolvedValue('default'),
     getGeminiApiUrlAsync: vi.fn().mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models'),
-    getSettingsAsync: vi.fn().mockResolvedValue({}),
   };
 });
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
+}));
 
 describe('GeminiProvider Error Handling', () => {
   let provider;

@@ -195,7 +195,7 @@ src/
 │   │   ├── core/                   # TranslationEngine, ProviderFactory, StreamingManager
 │   │   │   └── translation-engine.js # Translation coordination
 │   │   ├── ir/                     # Translation Pipeline Foundation (request manifest, execution router, outcome contracts)
-│   │   ├── handlers/               # handleTranslate.js, handleTranslationResult.js
+│   │   ├── handlers/               # handleTranslate.js and translation lifecycle handlers
 │   │   ├── stores/                 # translation.js store
 │   │   ├── composables/            # useTranslation, useTranslationModes
 │   │   ├── providers/              # Provider system (see below)
@@ -232,7 +232,6 @@ src/
 │   │   └── handlers/               # ShortcutHandler
 │   ├── exclusion/
 │   │   ├── core/                   # ExclusionChecker
-│   │   └── composables/            # useExclusionChecker
 │   ├── text-actions/
 │   │   ├── composables/            # useCopyAction, usePasteAction
 │   │   └── components/             # ActionToolbar, CopyButton
@@ -495,7 +494,7 @@ The system is built on three specialized services that handle different stages o
 
 ### Key Integration Points
 - **`handleTranslate.js`**: The single background handler that initializes and delegates to the service.
-- **`handleTranslationResult.js`**: Processes incoming results from providers and hands them back to the dispatcher.
+- **`StreamingManager.js`**: Publishes streaming terminal events after service-owned lifecycle transitions.
 
 ### Documentation & Deep Dive
 For detailed information on implementation, message formats, and streaming logic, refer to the **[Translation System Guide](architecture/TRANSLATION_SYSTEM.md)**. For the selection strategy and waterfall logic, see the **[Translation Provider Logic](TRANSLATION_PROVIDER_LOGIC.md)**.
@@ -648,15 +647,19 @@ const activeProvider = providers.getActiveProvider()
 ```
 
 ### Store Integration with Storage Manager
-The settings store is a Pinia setup store. It delegates its default values to `getPersistedDefaultSettings()`, which is the single authority for the persisted settings schema. Components and features never import `settingsDefaults.js` directly; only the settings store, InstallHandler, and migrations consume the builder.
+UI applications use the settings Pinia setup store. Content scripts, iframe contexts, and background handlers use the runtime `SettingsManager` facade; it reads and writes only its tracked runtime keys through `StorageCore`. Both paths delegate default values to `getPersistedDefaultSettings()`, which is the single authority for the persisted settings schema. Components and features never import `settingsDefaults.js` directly; the settings store, InstallHandler, migrations, and SettingsManager consume the builder.
 
 `CONFIG` owns default values; `getPersistedDefaultSettings()` in `src/shared/config/settingsDefaults.js` owns persisted key membership and drives fresh install, reset, import defaults, and migration fill. The store handles load (merge persisted settings into reactive state), save (persist to `browser.storage`), and reset (restore canonical persisted defaults).
 
 ### Reactive Data Flow
 ```
 Vue Component → Pinia Store → Storage Manager → browser.storage
-     ↓              ↓              ↓
-  Reactive UI → Computed → Event System → Cross-Tab Sync
+      ↓              ↓              ↓
+   Reactive UI → Computed → Event System → Cross-Tab Sync
+
+Content/IFrame/Background → SettingsManager → StorageCore → browser.storage
+                                    ↓
+                              Runtime listeners
 ```
 
 </details>
@@ -761,7 +764,7 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 - `src/core/services/translation/UnifiedResultDispatcher.js` - Intelligent result routing
 - `src/core/services/translation/TranslationRequestTracker.js` - Request lifecycle management
 - `src/features/translation/handlers/handleTranslate.js` - Translation request handler
-- `src/features/translation/handlers/handleTranslationResult.js` - Translation result processor
+- `src/features/translation/core/StreamingManager.js` - Central streaming terminal delivery
 
 ### Execution Foundation (Translation Pipeline Foundation)
 - `src/features/translation/ir/RequestUnitManifest.js` - Request unit manifest
@@ -832,7 +835,7 @@ For detailed information on UI hosting and in-page integration, refer to the fol
 
 ### Background Handlers
 - `src/features/translation/handlers/handleTranslate.js` - Main translation handler (integrated with UnifiedTranslationService)
-- `src/core/background/handlers/translation/handleTranslationResult.js` - Translation result processing
+- `src/core/services/translation/UnifiedTranslationService.js` - Canonical translation terminal lifecycle
 - `src/core/background/handlers/vue-integration/` - Vue-specific handlers
 - `src/features/tts/handlers/` - Text-to-speech handlers
 - `src/features/element-selection/handlers/` - Element selection handlers

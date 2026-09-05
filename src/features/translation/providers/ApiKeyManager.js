@@ -13,8 +13,23 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js';
+import { CONFIG, getDeeplApiTierAsync } from '@/shared/config/config.js';
+import { ProviderRegistryIds } from './ProviderConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ApiKeyManager');
+const DEEPL_FREE_USAGE_URL = 'https://api-free.deepl.com/v2/usage';
+const DEEPL_PRO_USAGE_URL = 'https://api.deepl.com/v2/usage';
+
+function isValidDeepLUsagePayload(payload) {
+  return payload !== null
+    && typeof payload === 'object'
+    && !Array.isArray(payload)
+    && Number.isInteger(payload.character_count)
+    && payload.character_count >= 0
+    && Number.isInteger(payload.character_limit)
+    && payload.character_limit >= 0;
+}
 
 /**
  * Settings key mapping for each provider
@@ -172,15 +187,28 @@ class ApiKeyManager {
   }
 
   /**
+   * Execute one validation request with a fresh proxy configuration snapshot.
+   * @param {string} url - Request URL
+   * @param {Object} options - Fetch options
+   * @returns {Promise<Response>} - Validation response
+   * @private
+   */
+  static async _fetchWithCurrentProxy(url, options = {}) {
+    const proxyConfig = await resolveProxyConfig();
+    const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
+    return proxyManager.fetch(url, options, proxyConfig);
+  }
+
+  /**
    * Test all keys for validity and reorder them
    * @param {string} providerSettingKey - Settings key
-   * @param {string} providerName - Provider name for testing
+   * @param {string} providerId - Provider registry ID for testing
    * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
    */
-  static async testAndReorderKeys(providerSettingKey, providerName) {
+  static async testAndReorderKeys(providerSettingKey, providerId) {
     const keys = await this.getKeys(providerSettingKey);
 
-    if (providerName === 'Custom') {
+    if (providerId === ProviderRegistryIds.CUSTOM) {
       const result = await this._testCustomKeys(keys);
       if (result.reorderedString !== undefined) {
         await storageManager.set({ [providerSettingKey]: result.reorderedString });
@@ -197,24 +225,28 @@ class ApiKeyManager {
       };
     }
 
+    const deepLContext = providerId === ProviderRegistryIds.DEEPL
+      ? { apiTier: await getDeeplApiTierAsync() }
+      : {};
+
     // Import provider classes dynamically
     const providerTests = {
-      'OpenAI': async (key) => await this._testOpenAIKey(key),
-      'Gemini': async (key) => await this._testGeminiKey(key),
-      'DeepSeek': async (key) => await this._testDeepSeekKey(key),
-      'OpenRouter': async (key) => await this._testOpenRouterKey(key),
-      'DeepL': async (key) => await this._testDeepLKey(key),
-      'Custom': async (key) => await this._testCustomKey(key)
+      [ProviderRegistryIds.OPENAI]: async (key) => await this._testOpenAIKey(key),
+      [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key),
+      [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key),
+      [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key),
+      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key, deepLContext),
+      [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key)
     };
 
-    const testFunc = providerTests[providerName];
+    const testFunc = providerTests[providerId];
     if (!testFunc) {
       return {
         valid: [],
         invalid: keys,
         allInvalid: true,
         messageKey: 'api_test_unknown_provider',
-        params: { provider: providerName }
+        params: { provider: providerId }
       };
     }
 
@@ -224,7 +256,7 @@ class ApiKeyManager {
         const isValid = await testFunc(key);
         return { key, isValid };
       } catch (error) {
-        logger.debug(`[ApiKeyManager] Key test failed for ${providerName}:`, error.message);
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}:`, error.message);
         return { key, isValid: false };
       }
     });
@@ -258,15 +290,15 @@ class ApiKeyManager {
   /**
    * Test keys directly from provided value (without reading from storage)
    * @param {string} keysString - Keys string (one per line)
-   * @param {string} providerName - Provider name for testing
-   * @param {Object} [context={}] - Optional additional context (e.g., custom URL/Model)
+   * @param {string} providerId - Provider registry ID for testing
+   * @param {Object} [context={}] - Optional additional context (e.g., custom URL/Model or DeepL API tier)
    * @returns {Promise<Object>} - Test result with valid, invalid arrays and allInvalid flag
    */
-  static async testKeysDirect(keysString, providerName, context = {}) {
+  static async testKeysDirect(keysString, providerId, context = {}) {
     // Parse keys from string
     const keys = this.parseKeys(keysString);
 
-    if (providerName === 'Custom') {
+    if (providerId === ProviderRegistryIds.CUSTOM) {
       return this._testCustomKeys(keys, context);
     }
 
@@ -281,22 +313,22 @@ class ApiKeyManager {
 
     // Import provider classes dynamically
     const providerTests = {
-      'OpenAI': async (key) => await this._testOpenAIKey(key, context),
-      'Gemini': async (key) => await this._testGeminiKey(key, context),
-      'DeepSeek': async (key) => await this._testDeepSeekKey(key, context),
-      'OpenRouter': async (key) => await this._testOpenRouterKey(key, context),
-      'DeepL': async (key) => await this._testDeepLKey(key),
-      'Custom': async (key) => await this._testCustomKey(key, context)
+      [ProviderRegistryIds.OPENAI]: async (key) => await this._testOpenAIKey(key, context),
+      [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key, context),
+      [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key, context),
+      [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key, context),
+      [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key, context),
+      [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key, context)
     };
 
-    const testFunc = providerTests[providerName];
+    const testFunc = providerTests[providerId];
     if (!testFunc) {
       return {
         valid: [],
         invalid: keys,
         allInvalid: true,
         messageKey: 'api_test_unknown_provider',
-        params: { provider: providerName }
+        params: { provider: providerId }
       };
     }
 
@@ -306,7 +338,7 @@ class ApiKeyManager {
         const isValid = await testFunc(key);
         return { key, isValid };
       } catch (error) {
-        logger.debug(`[ApiKeyManager] Key test failed for ${providerName}:`, error.message);
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}:`, error.message);
         return { key, isValid: false };
       }
     });
@@ -409,8 +441,7 @@ class ApiKeyManager {
   static async _testOpenAIKey(key, context = {}) {
     try {
       const apiUrl = context.apiUrl || 'https://api.openai.com/v1/models';
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(apiUrl, {
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`
@@ -451,8 +482,7 @@ class ApiKeyManager {
       const urlObj = new URL(apiUrl);
       urlObj.searchParams.set('key', key);
       
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(urlObj.toString(), { method: 'GET' });
+      const response = await this._fetchWithCurrentProxy(urlObj.toString(), { method: 'GET' });
       return response.ok;
     } catch {
       return false;
@@ -469,8 +499,7 @@ class ApiKeyManager {
   static async _testDeepSeekKey(key, context = {}) {
     try {
       const apiUrl = context.apiUrl || 'https://api.deepseek.com/models';
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(apiUrl, {
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`
@@ -494,8 +523,7 @@ class ApiKeyManager {
       // Use auth/key endpoint instead of models to properly validate the key
       // models endpoint is public and may return 200 even for invalid keys
       const apiUrl = context.apiUrl || 'https://openrouter.ai/api/v1/auth/key';
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch(apiUrl, {
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${key}`,
@@ -512,29 +540,34 @@ class ApiKeyManager {
   /**
    * Test DeepL API key
    * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional validation context with API tier
    * @returns {Promise<boolean>} - True if key is valid
    * @private
    */
-  static async _testDeepLKey(key) {
+  static async _testDeepLKey(key, context = {}) {
     try {
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-      const response = await proxyManager.fetch('https://api-free.deepl.com/v2/usage', {
-        method: 'POST',
+      const requestedTier = context?.apiTier;
+      const configuredTier = requestedTier === undefined
+        ? await getDeeplApiTierAsync()
+        : requestedTier;
+      const apiTier = configuredTier === 'free' || configuredTier === 'pro'
+        ? configuredTier
+        : CONFIG.DEEPL_API_TIER;
+      const apiUrl = typeof key === 'string' && key.endsWith(':fx')
+        ? DEEPL_FREE_USAGE_URL
+        : apiTier === 'pro'
+          ? DEEPL_PRO_USAGE_URL
+          : DEEPL_FREE_USAGE_URL;
+
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
+        method: 'GET',
         headers: {
           'Authorization': `DeepL-Auth-Key ${key}`
         }
       });
-      // Also check pro endpoint
-      if (!response.ok) {
-        const proResponse = await proxyManager.fetch('https://api.deepl.com/v2/usage', {
-          method: 'POST',
-          headers: {
-            'Authorization': `DeepL-Auth-Key ${key}`
-          }
-        });
-        return proResponse.ok;
-      }
-      return response.ok;
+      if (!response.ok) return false;
+
+      return isValidDeepLUsagePayload(await response.json());
     } catch {
       return false;
     }
@@ -579,7 +612,6 @@ class ApiKeyManager {
         modelsUrl = apiUrl.replace('/v1/chat/completions', '/v1/models');
       }
 
-      const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
       const headers = {};
       if (key?.trim()) {
         headers.Authorization = `Bearer ${key}`;
@@ -587,7 +619,7 @@ class ApiKeyManager {
 
       try {
         // Try models endpoint first
-        const response = await proxyManager.fetch(modelsUrl, {
+        const response = await this._fetchWithCurrentProxy(modelsUrl, {
           method: 'GET',
           headers
         });
@@ -615,7 +647,7 @@ class ApiKeyManager {
         }
 
         // Missing or nonstandard model metadata cannot prove model membership.
-        const chatResponse = await proxyManager.fetch(apiUrl, {
+        const chatResponse = await this._fetchWithCurrentProxy(apiUrl, {
           method: 'POST',
           headers: {
             ...headers,

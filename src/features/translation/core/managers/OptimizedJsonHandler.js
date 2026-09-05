@@ -1259,9 +1259,9 @@ hasErrors = true;
 
       if (batches.length > 0) await new Promise(resolve => setTimeout(resolve, 50));
 
-      // Final check for cancellation before sending end-of-stream markers
+      // Final check for cancellation before returning the terminal result.
       if (abortController.signal.aborted || engine.isCancelled(messageId)) {
-        logger.debug(`[JsonHandler] Skipping stream end markers for cancelled request: ${messageId}`);
+        logger.debug(`[JsonHandler] Returning cancellation result for request: ${messageId}`);
         if (lastError && hasStrongTerminalType(lastError)) {
           const serializedError = MessageFormat.serializeTranslationError(lastError);
           return {
@@ -1303,27 +1303,6 @@ hasErrors = true;
           };
         }
         return { success: false, streaming: true, error: cancellation };
-      }
-
-      if (!skipStreaming) {
-        if (hasErrors) {
-          // Strong typed operation aborts return a terminal result below. Do not
-          // also publish a stream-end error; one terminal delivery is enough.
-          if (!hasStrongTerminalType(lastError)) {
-            await this._sendStreamError(tabId, messageId, lastError, targetLanguage, detectedSourceLanguage, mode, frameId);
-          }
-        } else {
-            await this._sendStreamEnd(
-              tabId,
-              messageId,
-              providerInstance.providerName,
-              targetLanguage,
-              detectedSourceLanguage,
-              mode,
-              frameId,
-              operationExecutionContext
-            );
-        }
       }
 
       statsManager.printSummary(sessionId, { status: 'Streaming', success: !hasErrors, clear: true });
@@ -1556,49 +1535,4 @@ hasErrors = true;
     }
   }
 
-  async _sendStreamEnd(tabId, messageId, providerName, targetLanguage, sourceLanguage, translationMode, frameId = null, executionContext = null) {
-    if (!tabId) return;
-    const endMessage = {
-      action: MessageActions.TRANSLATION_STREAM_END,
-      messageId,
-      data: {
-        success: true,
-        completed: true,
-        provider: providerName,
-        sourceLanguage,
-        targetLanguage,
-        translationMode,
-        timestamp: Date.now(),
-        ...(executionContext?.conversationAcceptanceRegistered === true && { conversationAcceptance: true })
-      }
-    };
-    try {
-      const sendArgs = [tabId, endMessage];
-      if (typeof frameId === 'number') sendArgs.push({ frameId });
-      await browser.tabs.sendMessage(...sendArgs);
-    } catch { /* ignore */ }
-  }
-
-  async _sendStreamError(tabId, messageId, lastError, targetLanguage, sourceLanguage, translationMode, frameId = null) {
-    if (!tabId) return;
-    const serializedError = lastError ? MessageFormat.serializeTranslationError(lastError) : null;
-    const endMessage = {
-      action: MessageActions.TRANSLATION_STREAM_END,
-      messageId,
-      data: {
-        success: false,
-        error: serializedError,
-        errorDetails: serializedError,
-        sourceLanguage,
-        targetLanguage,
-        translationMode,
-        timestamp: Date.now()
-      }
-    };
-    try {
-      const sendArgs = [tabId, endMessage];
-      if (typeof frameId === 'number') sendArgs.push({ frameId });
-      await browser.tabs.sendMessage(...sendArgs);
-    } catch { /* ignore */ }
-  }
 }

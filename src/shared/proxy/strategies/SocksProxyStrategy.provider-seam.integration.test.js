@@ -26,7 +26,13 @@ function provider() {
   return {
     providerName: 'TestProvider',
     providerSettingKey: null,
-    _initializeProxy: vi.fn().mockResolvedValue(true),
+    _initializeProxy: vi.fn().mockResolvedValue({
+      enabled: true,
+      type: 'socks',
+      host: '127.0.0.1',
+      port: 1080,
+      auth: { username: '', password: '' },
+    }),
   };
 }
 

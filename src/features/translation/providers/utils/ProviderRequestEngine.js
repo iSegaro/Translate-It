@@ -34,6 +34,7 @@ function isAuthoritativeErrorType(error) {
 }
 
 const PROVIDER_ERROR_FIELD_MAX_LENGTH = 128;
+const PROVIDER_ERROR_MESSAGE_MAX_LENGTH = 2048;
 
 function getBoundedProviderErrorField(value) {
   if (typeof value === 'number') return Number.isSafeInteger(value) ? value : undefined;
@@ -42,6 +43,14 @@ function getBoundedProviderErrorField(value) {
   const normalized = value.trim();
   return normalized.length > 0 && normalized.length <= PROVIDER_ERROR_FIELD_MAX_LENGTH
     ? normalized
+    : undefined;
+}
+
+function getBoundedProviderErrorMessage(value) {
+  if (typeof value !== 'string') return undefined;
+
+  return value.trim().length > 0 && value.length <= PROVIDER_ERROR_MESSAGE_MAX_LENGTH
+    ? value
     : undefined;
 }
 
@@ -78,6 +87,51 @@ function classifyProviderHttpError(provider, errorInfo) {
     logger.debug(`[${provider.providerName}] Provider HTTP error classification failed; using generic classification`, error);
     return null;
   }
+}
+
+function getApiKeyCandidates(provider, keys, apiKeyFailoverContext) {
+  if (typeof provider?.isApiKeyCandidateEligible !== 'function') return keys;
+
+  return keys.filter((key) => {
+    try {
+      return provider.isApiKeyCandidateEligible(key, apiKeyFailoverContext) === true;
+    } catch (error) {
+      logger.debug(`[${provider.providerName}] API key candidate check failed; excluding key`, error);
+      return false;
+    }
+  });
+}
+
+function shouldFailoverApiKey(provider, error) {
+  if (typeof provider?.shouldFailoverApiKey !== 'function') {
+    return ApiKeyManager.shouldFailover(error);
+  }
+
+  try {
+    return provider.shouldFailoverApiKey(error) === true;
+  } catch (hookError) {
+    logger.debug(`[${provider.providerName}] Provider API key failover check failed`, hookError);
+    return false;
+  }
+}
+
+function createOperationAbortError(signal) {
+  const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
+  const error = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
+  error.name = 'AbortError';
+
+  if (isUserAbort) {
+    error.type = ErrorTypes.USER_CANCELLED;
+  } else {
+    error.operationAborted = true;
+    error.cancellationReason = typeof signal?.reason === 'string'
+      && signal.reason
+      && signal.reason !== 'timeout'
+      ? signal.reason
+      : 'operation-abort';
+  }
+
+  return error;
 }
 
 function parseRetryAt(response, now = Date.now()) {
@@ -132,14 +186,17 @@ export const ProviderRequestEngine = {
   /**
    * UNIFIED API REQUEST HANDLER
    */
-  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose }) {
+  async executeRequest(provider, { url, fetchOptions, extractResponse, context, abortController, updateApiKey, charCount, originalCharCount, sessionId, executionContext, callPurpose, apiKeyFailoverContext }) {
     const normalizedCallPurpose = normalizeCallPurpose(callPurpose);
     // 1. Determine how many attempts we should make based on available keys
     let availableKeysCount = 1;
+    let apiKeyCandidates = null;
     if (provider.providerSettingKey && updateApiKey) {
       try {
         const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
-        availableKeysCount = Math.min(Math.max(1, keys.length), 10);
+        const candidates = getApiKeyCandidates(provider, keys, apiKeyFailoverContext);
+        apiKeyCandidates = candidates.slice(0, 10);
+        availableKeysCount = Math.max(1, apiKeyCandidates.length);
       } catch (e) {
         logger.warn(`[${provider.providerName}] Failed to count keys for failover:`, e);
       }
@@ -149,6 +206,19 @@ export const ProviderRequestEngine = {
     let currentUrl = url;
 
     for (let attempt = 0; attempt < availableKeysCount; attempt++) {
+      if (abortController?.signal?.aborted) {
+        const abortError = createOperationAbortError(abortController.signal);
+        appendTranslationDiagnostic(executionContext, {
+          type: 'PROVIDER_CANCELLED',
+          stage: 'provider-request',
+          provider: provider.providerName,
+          reason: abortError.message,
+          code: abortError.type || abortError.cancellationReason,
+          cancelled: true,
+        });
+        throw abortError;
+      }
+
       try {
         // 2. Perform actual API call
         const result = await this.executeApiCall(provider, { 
@@ -166,7 +236,7 @@ export const ProviderRequestEngine = {
         // 3. Success! Promote the working key
         if (attempt > 0 && provider.providerSettingKey) {
           // Get the key actually used in THIS successful attempt
-          const currentKey = (await ApiKeyManager.getKeys(provider.providerSettingKey))[attempt];
+          const currentKey = apiKeyCandidates?.[attempt];
           
           if (currentKey) {
             await ApiKeyManager.promoteKey(provider.providerSettingKey, currentKey);
@@ -198,10 +268,24 @@ export const ProviderRequestEngine = {
           throw error;
         }
 
+        if (abortController?.signal?.aborted) {
+          const abortError = createOperationAbortError(abortController.signal);
+          appendTranslationDiagnostic(executionContext, {
+            type: 'PROVIDER_CANCELLED',
+            stage: 'provider-request',
+            provider: provider.providerName,
+            reason: abortError.message,
+            code: abortError.type || abortError.cancellationReason,
+            cancelled: true,
+          });
+          throw abortError;
+        }
+
+        if (!error.type && errorType) error.type = errorType;
+
         // 5. Handle Failover
-        if (attempt < availableKeysCount - 1 && ApiKeyManager.shouldFailover(error)) {
-          const keys = await ApiKeyManager.getKeys(provider.providerSettingKey);
-          if (keys.length > attempt + 1) {
+        if (attempt < availableKeysCount - 1 && shouldFailoverApiKey(provider, error)) {
+          if (apiKeyCandidates?.length > attempt + 1) {
             logger.warn(`[${provider.providerName}] Key error, attempting failover (${attempt + 1}/${availableKeysCount})`);
             appendTranslationDiagnostic(executionContext, {
               type: 'PROVIDER_KEY_FAILOVER_ATTEMPT',
@@ -211,7 +295,7 @@ export const ProviderRequestEngine = {
               reason: error.message,
               code: errorType,
             });
-            const nextKey = keys[attempt + 1];
+            const nextKey = apiKeyCandidates[attempt + 1];
             await updateApiKey(nextKey, fetchOptions);
             
             if (fetchOptions.url && fetchOptions.url !== currentUrl) {
@@ -225,7 +309,6 @@ export const ProviderRequestEngine = {
           }
         }
 
-        if (!error.type) error.type = errorType;
         appendTranslationDiagnostic(executionContext, {
           type: 'PROVIDER_REQUEST_FAILURE',
           stage: 'provider-request',
@@ -290,10 +373,10 @@ export const ProviderRequestEngine = {
         finalFetchOptions.headers = this.prepareHeaders(finalFetchOptions.headers, provider.providerName);
       }
 
-      // Ensure proxy is initialized
-      await provider._initializeProxy();
+      // Capture proxy configuration for this physical attempt.
+      const proxyConfig = await provider._initializeProxy();
 
-      const response = await proxyManager.fetch(url, finalFetchOptions);
+      const response = await proxyManager.fetch(url, finalFetchOptions, proxyConfig);
       const duration = Date.now() - startTime;
       const retryAt = parseRetryAt(response);
       
@@ -354,7 +437,15 @@ export const ProviderRequestEngine = {
           } catch { /* ignore */ }
         }
         
-        const msg = body.detail || body.error?.message || response.statusText || `HTTP ${response.status}`;
+        const classificationMessage = getBoundedProviderErrorMessage(body?.detail)
+          ?? getBoundedProviderErrorMessage(body?.error?.message)
+          ?? getBoundedProviderErrorMessage(response.statusText)
+          ?? `HTTP ${response.status}`;
+        const message = getBoundedProviderErrorMessage(body?.detail)
+          ?? getBoundedProviderErrorMessage(body?.error?.message)
+          ?? getBoundedProviderErrorMessage(body?.message)
+          ?? getBoundedProviderErrorMessage(response.statusText)
+          ?? `HTTP ${response.status}`;
         const logLevel = 'warn'; // Providers only warn, upper layers handle errors
         
         let sanitizedUrl = url;
@@ -367,7 +458,7 @@ export const ProviderRequestEngine = {
 
         logger[logLevel](`[${provider.providerName}] executeApiCall HTTP error (${response.status})`, {
           status: response.status,
-          message: msg,
+          message,
           url: sanitizedUrl,
         });
 
@@ -378,15 +469,17 @@ export const ProviderRequestEngine = {
         const providerErrorType = classifyProviderHttpError(provider, providerErrorInfo);
         const errorType = providerErrorType || matchErrorToType({
           statusCode: response.status,
-          message: msg,
+          message: classificationMessage,
           providerType: provider.constructor.type,
         });
 
-        const err = new Error(msg);
+        const err = new Error(message);
         err.type = errorType;
         err.statusCode = response.status;
         err.context = context;
         err.providerName = provider.providerName;
+        const providerCode = providerErrorInfo.nestedErrorCode ?? providerErrorInfo.topLevelCode;
+        if (providerCode !== undefined) err.code = providerCode;
         if (errorType === ErrorTypes.RATE_LIMIT_REACHED && retryAt !== undefined) {
           err.retryAt = retryAt;
         }
@@ -430,8 +523,28 @@ export const ProviderRequestEngine = {
       // Fallback: If we didn't parse for logging or parsing failed, try reading now
       const contentTypeSuccess = response.headers.get('content-type');
       if (contentTypeSuccess && contentTypeSuccess.includes('application/json')) {
-        const data = await response.json();
-        return await extractResponse(data, response.status);
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          if (parseError?.name === 'AbortError') throw parseError;
+          const error = new Error('Provider response contains invalid JSON');
+          error.type = ErrorTypes.JSON_PARSING_ERROR;
+          error.statusCode = response.status;
+          error.context = context;
+          error.providerName = provider.providerName;
+          throw error;
+        }
+        const result = await extractResponse(data, response.status);
+        if (result === undefined) {
+          const error = new Error(ErrorTypes.API_RESPONSE_INVALID);
+          error.type = ErrorTypes.API_RESPONSE_INVALID;
+          error.statusCode = response.status;
+          error.context = context;
+          error.providerName = provider.providerName;
+          throw error;
+        }
+        return result;
       }
 
       const responseText = await response.text();

@@ -37,14 +37,16 @@ async function loadElementSelectionHandlers() {
     import('@/features/element-selection/handlers/handleDeactivateSelectElementMode.js'),
     import('@/features/element-selection/handlers/handleGetSelectElementState.js'),
     import('@/features/element-selection/handlers/handleSetSelectElementState.js'),
-    import('@/features/element-selection/handlers/handleIframeSelectElementFinished.js')
-  ]).then(([activate, deactivate, getState, setState, iframeFinished]) => {
+    import('@/features/element-selection/handlers/handleIframeSelectElementFinished.js'),
+    import('@/features/element-selection/handlers/handleSelectElementFrameReady.js')
+  ]).then(([activate, deactivate, getState, setState, iframeFinished, frameReady]) => {
     const handlers = {
       handleActivateSelectElementMode: activate.handleActivateSelectElementMode,
       handleDeactivateSelectElementMode: deactivate.handleDeactivateSelectElementMode,
       handleGetSelectElementState: getState.handleGetSelectElementState,
       handleSetSelectElementState: setState.handleSetSelectElementState,
-      handleIframeSelectElementFinished: iframeFinished.handleIframeSelectElementFinished
+      handleIframeSelectElementFinished: iframeFinished.handleIframeSelectElementFinished,
+      handleSelectElementFrameReady: frameReady.handleSelectElementFrameReady
     };
 
     handlerCache.set(cacheKey, handlers);
@@ -174,6 +176,18 @@ export const handleIframeSelectElementFinishedLazy = async (message, sender, sen
         type: 'ELEMENT_SELECTION_LOADING_ERROR'
       }
     };
+  }
+};
+
+export const handleSelectElementFrameReadyLazy = async (message, sender, sendResponse) => {
+  try {
+    logger.debug('selectElementFrameReady requested, loading handlers...');
+    const { handleSelectElementFrameReady } = await loadElementSelectionHandlers();
+    logger.debug('Delegating to handleSelectElementFrameReady');
+    return await handleSelectElementFrameReady(message, sender, sendResponse);
+  } catch (error) {
+    logger.error('Failed to handle selectElementFrameReady:', error);
+    return { success: false, error: { message: 'Failed to load Element Selection functionality', type: 'ELEMENT_SELECTION_LOADING_ERROR' } };
   }
 };
 

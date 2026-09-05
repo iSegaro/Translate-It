@@ -2831,6 +2831,9 @@
   "subtitle_try_again_btn": {
     "message": "再試行"
   },
+  "subtitle_back_to_setup_btn": {
+    "message": "セットアップに戻る"
+  },
   "subtitle_terminal_error": {
     "message": "エラーにより停止しました"
   },

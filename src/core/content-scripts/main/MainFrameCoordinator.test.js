@@ -61,6 +61,7 @@ describe('MainFrameCoordinator Hover error normalization', () => {
       clearAll: vi.fn(),
       removeFrame: vi.fn(),
       updateFrameData: vi.fn(),
+      recordTerminalCause: vi.fn(),
       emitAggregateProgress: vi.fn()
     };
     coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
@@ -344,6 +345,37 @@ describe('MainFrameCoordinator Hover error normalization', () => {
       isTranslated: true,
       status: 'idle',
     }));
+    expect(aggregator.emitAggregateProgress).toHaveBeenCalledWith(
+      MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data
+    );
+  });
+
+  it('preserves structured completion error details through aggregation', () => {
+    const errorDetails = {
+      message: 'Model overloaded',
+      type: 'MODEL_OVERLOADED',
+    };
+    const data = {
+      sessionId: 'frame-session',
+      translatedCount: 0,
+      failedCount: 2,
+      totalCount: 2,
+      errorDetails,
+    };
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_START,
+      data: { sessionId: 'frame-session' },
+    });
+    vi.clearAllMocks();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data,
+    });
+
     expect(aggregator.emitAggregateProgress).toHaveBeenCalledWith(
       MessageActions.PAGE_TRANSLATE_COMPLETE,
       data

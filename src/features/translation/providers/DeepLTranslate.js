@@ -24,6 +24,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
+const DEEPL_SOURCE_CHINESE_VARIANTS = new Set(['zh', 'zh-cn', 'zh-tw', 'zh-hans', 'zh-hant']);
 
 export class DeepLTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -45,6 +46,34 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     this.providerSettingKey = 'DEEPL_API_KEY';
   }
 
+  classifyProviderHttpError(errorInfo) {
+    return Number(errorInfo?.statusCode) === 529
+      ? ErrorTypes.RATE_LIMIT_REACHED
+      : null;
+  }
+
+  _isUnsupportedLanguageError(error) {
+    if (Number(error?.statusCode) !== 400 || typeof error?.message !== 'string') return false;
+
+    const normalizedMessage = error.message
+      .toLowerCase()
+      .replace(/[\s"'`.,!?;:()\x5b\x5d{}-]+/g, ' ')
+      .trim();
+
+    return /\b(?:source_lang|target_lang|source language|target language)\b(?:\s+is)?\s+(?:not supported|unsupported)\b/.test(normalizedMessage)
+      || /\b(?:not supported|unsupported)\b\s+(?:source_lang|target_lang|source language|target language)\b/.test(normalizedMessage);
+  }
+
+  shouldFailoverApiKey(error) {
+    return Number(error?.statusCode) === 401
+      && error?.type === ErrorTypes.API_KEY_INVALID;
+  }
+
+  isApiKeyCandidateEligible(key, context = {}) {
+    return context.apiTier !== 'pro'
+      || (typeof key === 'string' && !key.endsWith(':fx'));
+  }
+
   /**
    * Get configuration using project's existing config system
    * Uses StorageManager's built-in caching and config.js helpers
@@ -57,18 +86,20 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         getDeeplApiTierAsync(),
       ]);
 
-      // Get first available key
-      const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
+      const normalizedTier = apiTier === 'pro' ? 'pro' : 'free';
+
+      // Select the first key compatible with the configured global tier.
+      const apiKey = apiKeys.find(key => this.isApiKeyCandidateEligible(key, { apiTier: normalizedTier })) || '';
 
       // Get API endpoint based on tier
-      const apiUrl = apiTier === 'pro'
+      const apiUrl = normalizedTier === 'pro'
         ? await getDeeplProApiUrlAsync()
         : await getDeeplFreeApiUrlAsync();
 
       // Configuration loaded successfully
-      logger.info(`[DeepL] Using tier: ${apiTier}`);
+      logger.info(`[DeepL] Using tier: ${normalizedTier}`);
 
-      return { apiKey, apiTier, apiUrl };
+      return { apiKey, apiTier: normalizedTier, apiUrl };
     } catch (error) {
       logger.error(`[DeepL] Error loading configuration:`, error);
       throw error;
@@ -76,13 +107,28 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
-   * Convert language code to DeepL uppercase format
+   * Convert source language to DeepL code.
    * @param {string} lang - Language code or name
-   * @returns {string} DeepL language code (uppercase)
+   * @returns {string} DeepL source language code
    */
-  _getLangCode(lang) {
+  _getSourceLangCode(lang) {
     const normalized = LanguageSwappingService._normalizeLangValue(lang);
     if (normalized === AUTO_DETECT_VALUE) return ''; // DeepL auto-detect uses empty string
+    if (DEEPL_SOURCE_CHINESE_VARIANTS.has(normalized)) return 'ZH';
+
+    return getProviderLanguageCode(normalized, 'DEEPL');
+  }
+
+  /**
+   * Convert target language to DeepL code.
+   * @param {string} lang - Language code or name
+   * @returns {string} DeepL target language code
+   */
+  _getTargetLangCode(lang) {
+    const normalized = LanguageSwappingService._normalizeLangValue(lang);
+    if (normalized === AUTO_DETECT_VALUE) return '';
+    if (normalized === 'zh-cn' || normalized === 'zh-hans') return 'ZH-HANS';
+    if (normalized === 'zh-tw' || normalized === 'zh-hant') return 'ZH-HANT';
 
     return getProviderLanguageCode(normalized, 'DEEPL');
   }
@@ -186,12 +232,12 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     const sessionId = options.sessionId || abortController?.sessionId;
     const context = `${this.providerName.toLowerCase()}-translate-chunk`;
 
-    // Normalize language codes
-    const sl = this._getLangCode(sourceLang, true); // Enable beta for normalization
-    const tl = this._getLangCode(targetLang, true);
+    // Normalize language codes with explicit source/target semantics.
+    const sl = this._getSourceLangCode(sourceLang);
+    const tl = this._getTargetLangCode(targetLang);
 
     // Get configuration and validate API key
-    const { apiKey, apiUrl } = await this._getConfig();
+    const { apiKey, apiUrl, apiTier } = await this._getConfig();
 
     // Validate configuration
     this._validateConfig(
@@ -509,7 +555,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         charCount: validTexts.join('').length,
         sessionId: options.sessionId,
         originalCharCount: options.originalCharCount || originalCharCount,
-        callPurpose: options.callPurpose
+        callPurpose: options.callPurpose,
+        apiKeyFailoverContext: Object.freeze({ apiTier }),
+        updateApiKey: (newKey, options) => {
+          if (options?.headers) {
+            options.headers.Authorization = `DeepL-Auth-Key ${newKey}`;
+          }
+        }
       });
 
       const finalResult = result;
@@ -529,6 +581,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
       return finalResult;
     } catch (error) {
+      if (this._isUnsupportedLanguageError(error)) {
+        error.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
+        throw error;
+      }
+
       // CRITICAL: Check if this is an XML corruption error and trigger fallback
       if (error.isXMLCorruptionError) {
         error.type = ErrorTypes.API_RESPONSE_INVALID;

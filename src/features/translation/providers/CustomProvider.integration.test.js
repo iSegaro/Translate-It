@@ -15,8 +15,12 @@ vi.mock('@/shared/config/config.js', () => ({
   getCustomApiKeysAsync: vi.fn().mockResolvedValue(['custom-key-1', 'custom-key-2']),
   getCustomApiUrlAsync: vi.fn().mockResolvedValue('https://my-local-ai.com/v1/chat/completions'),
   getCustomApiModelAsync: vi.fn().mockResolvedValue('local-llama-3'),
-  getSettingsAsync: vi.fn().mockResolvedValue({}),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -77,7 +81,8 @@ describe('CustomProvider Internal Integration (Endpoint & Failover)', () => {
         headers: expect.objectContaining({
           'Authorization': 'Bearer custom-key-1'
         })
-      })
+      }),
+      expect.any(Object)
     );
   });
 

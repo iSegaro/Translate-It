@@ -40,7 +40,7 @@ export const useTranslationStore = defineStore('translation', () => {
   // Actions
   const translateText = async () => {
     // This store is currently not directly handling translation requests.
-    // Translation logic is handled by composables (e.g., useSidepanelTranslation, usePopupTranslation)
+    // Translation logic is handled by composables.
     // which use UnifiedMessenger directly.
     logger.warn("TranslationStore: translateText is a placeholder. Use composables for translation.");
     return Promise.resolve(null);

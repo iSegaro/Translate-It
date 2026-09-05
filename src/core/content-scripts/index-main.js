@@ -53,49 +53,25 @@ async function initializeLogger(subComponent = 'Main') {
 
   try {
     // 2. LAZY LOAD CORE UTILS & POLYFILL
-    // We load these first to perform essential checks
     const [
       { default: browser },
-      { setupTrustedTypesCompatibility },
-      { checkUrlExclusionAsync }
+      { setupTrustedTypesCompatibility }
     ] = await Promise.all([
       import('webextension-polyfill'),
-      import('@/shared/vue/vue-utils.js'),
-      import('@/features/exclusion/utils/exclusion-utils.js')
+      import('@/shared/vue/vue-utils.js')
     ]);
 
     window.browser = browser;
     setupTrustedTypesCompatibility();
 
-    // 3. FAST FAIL: Check exclusion before heavy architecture loading
-    if (await checkUrlExclusionAsync()) {
-      return;
-    }
-
-    // 4. SELF-DETECTION: Never run content script inside our own UI frames
+    // 3. SELF-DETECTION: Never run content script inside our own UI frames (hard guard)
     const isExtensionFrame = window.location.protocol.endsWith('-extension:') || 
-                             window.location.href.startsWith(browser.runtime.getURL('')) ||
+                             (browser.runtime?.getURL && window.location.href.startsWith(browser.runtime.getURL(''))) ||
                              document.documentElement.classList.contains('translate-it-ui-frame');
     
     if (isExtensionFrame) {
       return;
     }
-
-    // 5. LOAD MODULAR ARCHITECTURE COMPONENTS
-    // These are only loaded if the script is cleared for execution
-    const [
-      { ContentScriptCore },
-      { MainFrameAggregator },
-      { MainFrameCoordinator },
-      { MainFeatureLoader },
-      { MessageActions }
-    ] = await Promise.all([
-      import('./ContentScriptCore.js'),
-      import('./main/MainFrameAggregator.js'),
-      import('./main/MainFrameCoordinator.js'),
-      import('./main/MainFeatureLoader.js'),
-      import('@/shared/messaging/core/MessageActions.js')
-    ]);
 
     const scriptLogger = await initializeLogger('Main');
 
@@ -104,101 +80,23 @@ async function initializeLogger(subComponent = 'Main') {
     }
     scriptLogger.info('Main frame initialized');
 
-    // 6. INITIALIZE CORE
+    // 4. MINIMAL CORE BOOTSTRAP — always alive, even when policy-excluded
     try {
+      const { ContentScriptCore } = await import('./ContentScriptCore.js');
       contentScriptCore = new ContentScriptCore();
       
       // Update global references with the real instance
       window.translateItContentCore = contentScriptCore;
       window.translateItContentScriptCore = contentScriptCore;
       
-      const initialized = await contentScriptCore.initializeCritical();
+      const { initializeContentCore } = await import('./contentStartup.js');
+      const initialized = await initializeContentCore(contentScriptCore);
       
       if (initialized) {
-        // --- MODULAR ARCHITECTURE SETUP ---
-
-        // 1. Aggregator: Handles stats and unified progress
-        const aggregator = new MainFrameAggregator(MessageActions);
-        window.getGlobalPageTranslationStatus = aggregator.getGlobalPageTranslationStatus;
-
-        // 2. Feature Loader: Handles prioritised loading sequence
-        const featureLoader = new MainFeatureLoader(contentScriptCore, initializeLogger);
-
-        // 3. Coordinator: Handles cross-frame and bus synchronization
-        new MainFrameCoordinator(aggregator, MessageActions, contentScriptCore);
-
-        // --- IDENTITY & CORE BOOT ---
-        await featureLoader.loadFeature('extensionContext', 'CRITICAL');
-
-        try {
-          const { interactionCoordinator } = await import('./InteractionCoordinator.js');
-          await interactionCoordinator.initialize();
-        } catch (coordError) {
-          scriptLogger.error('Failed to initialize InteractionCoordinator:', coordError);
-        }
-
-        // Text selection window relay: single-owner upward routing for translation
-        // windows, installed before any windows manager can be activated. Uses the
-        // reactivation-capable contentScriptCore.loadFeature path so a pre-activation
-        // (or post-deactivation) request triggers the lazy windows feature load.
-        try {
-          const { installTextSelectionWindowRelay } = await import('@/features/windows/managers/crossframe/TextSelectionWindowRelay.js');
-          installTextSelectionWindowRelay(contentScriptCore);
-        } catch { /* ignore */ }
-
-        // Start the multi-stage loading sequence (Interaction-driven lazy loading)
-        featureLoader.startIntelligentLoading();
-
-        // 4. Auto-translation Check
-        (async () => {
-          try {
-            const { default: settingsManager } = await import('@/shared/managers/SettingsManager.js');
-            await settingsManager.initialize();
-
-            if (settingsManager.isExtensionEnabled() && settingsManager.get('WHOLE_PAGE_TRANSLATION_ENABLED', true)) {
-              const autoRules = settingsManager.get('WHOLE_PAGE_AUTO_TRANSLATE_RULES', []);
-              if (autoRules.length > 0) {
-                const { matchesAutoTranslateRule } = await import('@/utils/ui/exclusion.js');
-                const currentUrl = window.location.href;
-                const isMatch = autoRules.some(rule => matchesAutoTranslateRule(currentUrl, rule));
-
-                if (isMatch) {
-                  const { ExclusionChecker } = await import('@/features/exclusion/core/ExclusionChecker.js');
-                  const exclusionChecker = ExclusionChecker.getInstance();
-                  await exclusionChecker.initialize();
-
-                  const isAllowed = await exclusionChecker.isFeatureAllowed('pageTranslation');
-                  if (isAllowed) {
-                    scriptLogger.info('Current URL matches auto-translate rules. Starting auto page translation...');
-                    await featureLoader.loadFeature('pageTranslation', 'INTERACTIVE');
-                    const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
-                    const manager = FeatureManager.getInstance().getFeatureHandler('pageTranslation');
-                    if (manager) {
-                      if (!manager.isActive) {
-                        await manager.activate();
-                      }
-                      if (!manager.userRestoredOverride && !manager.autoStartCancelledUrls?.has(currentUrl)) {
-                        const { sendRegularMessage } = await import('@/shared/messaging/core/UnifiedMessaging.js');
-                        const response = await sendRegularMessage({
-                          action: MessageActions.PAGE_TRANSLATE,
-                          data: { isAuto: true },
-                        }, { returnFailureResponse: true });
-                        if (response?.success === false) {
-                          scriptLogger.debug('Initial auto page translation command rejected', response);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            scriptLogger.error('Failed to run auto page translation check:', error);
-          }
-        })();
-
+        // Minimal core ready — allowed-runtime will be reconciled via FeatureManager policy hook
+        // (ContentScriptCore.initializeCritical registers onPolicyChanged → reconcileAllowedRuntime)
         if (process.env.NODE_ENV === 'development') {
-          scriptLogger.info('Main frame content script initialized (Modular mode)');
+          scriptLogger.info('Main frame minimal core initialized (Modular mode)');
         }
       }
     } catch (error) {

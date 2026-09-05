@@ -180,7 +180,14 @@ export class TranslationEngine {
     const isPdfJson = mode === TranslationMode.PDF && data.options?.rawJsonPayload;
     if (isSelectJson || isPdfJson) {
       logger.debug('[TranslationEngine] Using optimized structured batch strategy for provider:', provider);
-      return await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext, executionContext);
+      const structuredResult = await this.jsonHandler.execute(this, data, providerInstance, originalSourceLang, originalTargetLang, data.messageId, sender, uiContext, executionContext);
+      if (structuredResult?.success === false) {
+        const errorSource = isStructuredTranslationError(structuredResult.errorDetails)
+          ? structuredResult.errorDetails
+          : structuredResult.error || structuredResult;
+        throw reconstructTranslationError(errorSource);
+      }
+      return structuredResult;
     }
 
     // 5. Standard execution via ProviderCoordinator

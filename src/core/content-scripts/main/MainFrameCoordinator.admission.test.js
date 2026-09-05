@@ -525,6 +525,174 @@ describe('MainFrameCoordinator per-frame admission', () => {
     expect(coordinator.frameSessionOwners.get(7)).toBe('A7');
   });
 
+  it('uses an earlier current-frame terminal cause when another frame completes last', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 8, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A8' } });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'A7',
+        translatedCount: 0,
+        failedCount: 1,
+        totalCount: 1,
+        errorDetails: { message: 'Rate limited', type: 'RATE_LIMIT_REACHED' },
+      },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 8,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: { sessionId: 'A8', translatedCount: 0, failedCount: 1, totalCount: 1 },
+    });
+
+    const completion = emitSpy.mock.calls
+      .filter(([action]) => action === MessageActions.PAGE_TRANSLATE_COMPLETE).at(-1)?.[1];
+    expect(completion).toMatchObject({ translatedCount: 0, failedCount: 2 });
+    expect(completion.errorDetails).toMatchObject({ type: 'RATE_LIMIT_REACHED' });
+    emitSpy.mockRestore();
+  });
+
+  it('uses the latest structured terminal cause across current frames', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 8, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A8' } });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'A7',
+        translatedCount: 0,
+        failedCount: 1,
+        totalCount: 1,
+        errorDetails: { message: 'Rate limited', type: 'RATE_LIMIT_REACHED' },
+      },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 8,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'A8',
+        translatedCount: 0,
+        failedCount: 1,
+        totalCount: 1,
+        errorDetails: { message: 'Model overloaded', type: 'MODEL_OVERLOADED' },
+      },
+    });
+
+    const completion = emitSpy.mock.calls
+      .filter(([action]) => action === MessageActions.PAGE_TRANSLATE_COMPLETE).at(-1)?.[1];
+    expect(completion.errorDetails).toMatchObject({ type: 'MODEL_OVERLOADED' });
+    emitSpy.mockRestore();
+  });
+
+  it('omits terminal causes from partial-success aggregate completion', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 8, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A8' } });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'A7',
+        translatedCount: 0,
+        failedCount: 1,
+        totalCount: 1,
+        errorDetails: { message: 'Rate limited', type: 'RATE_LIMIT_REACHED' },
+      },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 8,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: { sessionId: 'A8', translatedCount: 1, failedCount: 0, totalCount: 1 },
+    });
+
+    const completion = emitSpy.mock.calls
+      .filter(([action]) => action === MessageActions.PAGE_TRANSLATE_COMPLETE).at(-1)?.[1];
+    expect(completion).toMatchObject({ translatedCount: 1, failedCount: 1 });
+    expect(completion).not.toHaveProperty('errorDetails');
+    emitSpy.mockRestore();
+  });
+
+  it('clears a replaced frame session terminal cause before its next completion', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'A7',
+        translatedCount: 0,
+        failedCount: 1,
+        totalCount: 1,
+        errorDetails: { message: 'Rate limited', type: 'RATE_LIMIT_REACHED' },
+      },
+    });
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'B7' } });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: { sessionId: 'B7', translatedCount: 0, failedCount: 1, totalCount: 1 },
+    });
+
+    const completion = emitSpy.mock.calls
+      .filter(([action]) => action === MessageActions.PAGE_TRANSLATE_COMPLETE).at(-1)?.[1];
+    expect(completion).not.toHaveProperty('errorDetails');
+    expect(aggregator.frameProgressMap.get(7)).toMatchObject({
+      terminalErrorDetails: null,
+      terminalCauseSequence: 0,
+    });
+    emitSpy.mockRestore();
+  });
+
+  it('removes a retired frame terminal cause from final aggregation', () => {
+    const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });
+    coordinator.handleTrustedPageLifecycle({ frameId: 8, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A8' } });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: {
+        sessionId: 'A7',
+        translatedCount: 0,
+        failedCount: 1,
+        totalCount: 1,
+        errorDetails: { message: 'Rate limited', type: 'RATE_LIMIT_REACHED' },
+      },
+    });
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 7,
+      action: MessageActions.PAGE_TRANSLATION_FRAME_RETIRED,
+      data: { sessionId: 'A7' },
+    });
+    emitSpy.mockClear();
+
+    coordinator.handleTrustedPageLifecycle({
+      frameId: 8,
+      action: MessageActions.PAGE_TRANSLATE_COMPLETE,
+      data: { sessionId: 'A8', translatedCount: 0, failedCount: 1, totalCount: 1 },
+    });
+
+    const completion = emitSpy.mock.calls
+      .filter(([action]) => action === MessageActions.PAGE_TRANSLATE_COMPLETE).at(-1)?.[1];
+    expect(completion).toMatchObject({ translatedCount: 0, failedCount: 1 });
+    expect(completion).not.toHaveProperty('errorDetails');
+    emitSpy.mockRestore();
+  });
+
   it('keeps existing aggregate state when a new attempt errors before START', () => {
     const coordinator = new MainFrameCoordinator(aggregator, MessageActions, null);
     coordinator.handleTrustedPageLifecycle({ frameId: 7, action: MessageActions.PAGE_TRANSLATE_START, data: { sessionId: 'A7' } });

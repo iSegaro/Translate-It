@@ -5,7 +5,7 @@ export function usePdfSelectionBridge(viewerRootRef) {
   const bridge = new PdfSelectionBridge(viewerRootRef)
 
   onMounted(() => {
-    bridge.start()
+    void bridge.start()
   })
 
   onBeforeUnmount(() => {

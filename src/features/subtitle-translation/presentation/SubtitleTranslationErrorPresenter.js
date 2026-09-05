@@ -16,7 +16,7 @@ function isSilentError(error) {
  * Missing or malformed details use a safe generic translation failure message.
  *
  * @param {Object} detail - Subtitle translation failure data
- * @returns {Promise<{kind: 'display', message: string, error: Error}|{kind: 'silent'}>}
+ * @returns {Promise<{kind: 'display', message: string, action?: string, error: Error}|{kind: 'silent'}>}
  */
 export async function presentSubtitleTranslationError(detail = {}) {
   if (!isStructuredTranslationError(detail.errorDetails)) {
@@ -29,6 +29,7 @@ export async function presentSubtitleTranslationError(detail = {}) {
     return {
       kind: 'display',
       message: displayError.message,
+      action: publicError.action,
       error: displayError
     };
   }
@@ -45,6 +46,7 @@ export async function presentSubtitleTranslationError(detail = {}) {
   return {
     kind: 'display',
     message: displayError.message,
+    action: publicError.action,
     error: displayError
   };
 }

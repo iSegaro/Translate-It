@@ -102,7 +102,14 @@ describe('TranslationRequestTracker', () => {
       expect(tracker.cleanup()).toBe(0);
       expect(tracker.getRequest('field-request-a')).toBe(first);
 
-      vi.advanceTimersByTime(30 * 60 * 1000 + 1);
+      vi.setSystemTime(Date.now() + 30 * 60 * 1000 + 1);
+      expect(tracker.cleanup()).toBe(0);
+      expect(tracker.getRequest('field-request-a')).toBe(first);
+      expect(tracker.getRequest('field-request-b')).toBe(second);
+
+      tracker.completeRequest('field-request-a', { success: true });
+      tracker.completeRequest('field-request-b', { success: true });
+      vi.setSystemTime(Date.now() + 6 * 60 * 1000);
       expect(tracker.cleanup()).toBe(2);
       expect(tracker.getRequest('field-request-a')).toBeUndefined();
       expect(tracker.getRequest('field-request-b')).toBeUndefined();
@@ -322,6 +329,24 @@ describe('TranslationRequestTracker', () => {
     });
   });
 
+  describe('active expiry', () => {
+    it('delegates stale active requests before cleanup removes them', () => {
+      const messageId = 'stale-active';
+      const expiryHandler = vi.fn(() => tracker.markTimeout(messageId));
+      tracker.setActiveExpiryHandler(expiryHandler);
+      tracker.createRequest({ messageId, data: {} });
+      tracker.getRequest(messageId).updatedAt = Date.now() - (31 * 60 * 1000);
+
+      expect(tracker.cleanup()).toBe(0);
+      expect(expiryHandler).toHaveBeenCalledWith(messageId, expect.objectContaining({ messageId }));
+      expect(tracker.getRequest(messageId)).toMatchObject({ status: RequestStatus.TIMEOUT });
+
+      vi.setSystemTime(Date.now() + 6 * 60 * 1000);
+      expect(tracker.cleanup()).toBe(1);
+      expect(tracker.getRequest(messageId)).toBeUndefined();
+    });
+  });
+
   describe('processingTime', () => {
     it('should calculate processing time correctly', () => {
       vi.setSystemTime(1000);
@@ -430,7 +455,7 @@ describe('TranslationRequestTracker', () => {
       expect(tracker.getRequest(messageId)).toBeUndefined();
     });
 
-    it('should remove stuck active requests after 30 minutes', () => {
+    it('should retain stuck active requests until canonical terminalization', () => {
       const startTime = 1000000000;
       vi.setSystemTime(startTime);
       const messageId = 'msg-stuck';
@@ -441,8 +466,8 @@ describe('TranslationRequestTracker', () => {
       vi.setSystemTime(startTime + 31 * 60 * 1000);
 
       const cleaned = tracker.cleanup();
-      expect(cleaned).toBe(1);
-      expect(tracker.getRequest(messageId)).toBeUndefined();
+      expect(cleaned).toBe(0);
+      expect(tracker.getRequest(messageId)).toMatchObject({ status: RequestStatus.PROCESSING });
     });
   });
 

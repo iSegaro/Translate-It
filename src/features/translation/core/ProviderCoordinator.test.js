@@ -12,6 +12,7 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock("@/shared/error-management/ErrorMatcher.js");
 
 import { providerCoordinator } from './ProviderCoordinator.js';
+import { streamingManager } from './StreamingManager.js';
 import { queueManager } from './QueueManager.js';
 import { PROVIDER_CONFIGURATIONS } from './ProviderConfigurations.js';
 import { ResponseFormat } from "@/shared/config/translationConstants.js";
@@ -282,6 +283,38 @@ describe('ProviderCoordinator', () => {
       } finally {
         PROVIDER_CONFIGURATIONS.GoogleTranslate.queueRetryPolicy.maxExecutions.RATE_LIMIT_REACHED = original;
       }
+    });
+  });
+
+  describe('Streaming initialization', () => {
+    it('registers sender and initializes streaming for long AI requests', async () => {
+      const messageId = 'streaming-message';
+      const sender = { tab: { id: 123 }, frameId: 2 };
+      const engine = { registerStreamingSender: vi.fn() };
+      const initializeStream = vi.spyOn(streamingManager, 'initializeStream').mockImplementation(() => undefined);
+      const longText = 'a'.repeat(501);
+
+      await providerCoordinator.execute(
+        {
+          ...mockProvider,
+          constructor: { isAI: true, supportsStreaming: true },
+        },
+        longText,
+        'en',
+        'fa',
+        { messageId, engine, sender, languagePairResolved: true },
+      );
+
+      expect(engine.registerStreamingSender).toHaveBeenCalledWith(messageId, sender);
+      expect(initializeStream).toHaveBeenCalledWith(
+        messageId,
+        sender,
+        expect.objectContaining({ providerName: 'TestAI' }),
+        [longText],
+        undefined,
+      );
+
+      initializeStream.mockRestore();
     });
   });
 

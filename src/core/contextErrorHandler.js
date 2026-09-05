@@ -5,7 +5,12 @@ import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";
 import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 import NotificationManager from "@/core/managers/core/NotificationManager.js";
-import { contextState, isContextError, getActiveEnvironment, ENVIRONMENTS } from "./contextCore.js";
+import {
+  contextState,
+  isPermanentContextInvalidation,
+  getActiveEnvironment,
+  ENVIRONMENTS,
+} from "./contextCore.js";
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, "ContextErrorHandler");
 const notificationManager = new NotificationManager();
@@ -19,7 +24,7 @@ const notificationManager = new NotificationManager();
  * @private
  */
 function getContextErrorReason(error) {
-  const msg = error?.message || error;
+  const msg = String(error?.message || error || '').toLowerCase();
   if (msg.includes("extension context invalidated")) return "Extension reloaded";
   if (msg.includes("message channel closed")) return "Message channel closed";
   if (msg.includes("receiving end does not exist")) return "Background script unavailable";
@@ -61,8 +66,10 @@ export function handleContextError(error, context = "unknown", options = {}) {
     fallbackAction = null,
   } = options;
 
-  // Mark globally as invalidated if it's a context error
-  if (isContextError(error)) {
+  const isPermanentInvalidation = isPermanentContextInvalidation(error);
+
+  // Transport failures are context-adjacent, but do not poison live contexts.
+  if (isPermanentInvalidation) {
     contextState.isInvalidated = true;
   }
 
@@ -78,7 +85,7 @@ export function handleContextError(error, context = "unknown", options = {}) {
   });
 
   // Handle UI notifications for Content Scripts
-  if (env === ENVIRONMENTS.CONTENT && isContextError(error)) {
+  if (env === ENVIRONMENTS.CONTENT && isPermanentInvalidation) {
     if (contextState.notificationShown) return { handled: true, silent };
     contextState.notificationShown = true;
     // Reset notification throttle after 5 seconds
@@ -93,7 +100,7 @@ export function handleContextError(error, context = "unknown", options = {}) {
   }
 
   // Handle System notifications for Background Script
-  if (env === ENVIRONMENTS.BACKGROUND && isContextError(error)) {
+  if (env === ENVIRONMENTS.BACKGROUND && isPermanentInvalidation) {
     if (contextState.notificationShown) return { handled: true, silent };
     contextState.notificationShown = true;
     setTimeout(() => { contextState.notificationShown = false; }, 5000);

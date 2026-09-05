@@ -5,7 +5,6 @@ import browser from "webextension-polyfill";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
 import { 
   getDebugModeAsync, 
   getTargetLanguageAsync,
@@ -40,6 +39,27 @@ const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
 const API_PROVIDER_PARENT_ID = "api-provider-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
+
+// Settings required to build context menus and filter available providers.
+const CONTEXT_MENU_SETTING_KEYS = [
+  'EXTENSION_ENABLED',
+  'TRANSLATE_WITH_SELECT_ELEMENT',
+  'ENABLE_SCREEN_CAPTURE',
+  'CONTEXT_MENU_VISIBILITY',
+  'TRANSLATION_API',
+  'DEBUG_MODE',
+  'HIDDEN_PROVIDERS',
+  'DEEPL_API_KEY',
+  'LINGVA_API_URL',
+  'GEMINI_API_KEY',
+  'OPENAI_API_KEY',
+  'OPENROUTER_API_KEY',
+  'DEEPSEEK_API_KEY',
+  'CUSTOM_API_URL',
+  'CUSTOM_API_MODEL',
+  'WEBAI_API_URL',
+  'WEBAI_API_MODEL'
+];
 
 // --- Get API Providers from Registry ---
 async function getApiProviders(settings = {}) {
@@ -175,32 +195,33 @@ async function getApiProviders(settings = {}) {
 }
 
 /**
- * Sends a message to all tabs to deactivate the "Select Element" mode.
- * This is useful for ensuring a consistent state when the user interacts with the browser action menu.
+ * Canonical bulk deactivation: routes each accessible tab through authoritative Background handler.
  */
 async function deactivateSelectElementModeInAllTabs() {
   try {
     const tabs = await browser.tabs.query({});
     let processedTabs = 0;
 
+    const { handleDeactivateSelectElementModeLazy } = await import('@/core/background/handlers/lazy/handleElementSelectionLazy.js');
+
     for (const tab of tabs) {
       if (tab.id) {
         try {
-          // Check if tab is accessible before sending message
           const tabAccess = await tabPermissionChecker.checkTabAccess(tab.id);
 
           if (tabAccess.isAccessible) {
-            // We send the message but don't wait for a response.
-            // A try-catch block handles cases where content scripts aren't injected.
-            browser.tabs
-              .sendMessage(tab.id, MessageFormat.create(
-                MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE,
-                { forceDeactivate: true },
-                'context-menu'
-              ))
-              .catch(() => {
-                // It's normal for this to fail on tabs without the content script; ignore the error.
-              });
+            try {
+              await handleDeactivateSelectElementModeLazy(
+                { action: MessageActions.DEACTIVATE_SELECT_ELEMENT_MODE, data: { tabId: tab.id, active: false } },
+                { tab: { id: tab.id } }
+              );
+            } catch (handlerError) {
+              if (ExtensionContextManager.isContextError(handlerError)) {
+                ExtensionContextManager.handleContextError(handlerError, `context-menu:deactivate:tab-${tab.id}`);
+              } else {
+                logger.debug(`Canonical deactivation failed for tab ${tab.id}:`, handlerError);
+              }
+            }
             processedTabs++;
           } else {
             logger.debug(`Skipping deactivation for restricted tab ${tab.id}: ${tabAccess.errorMessage}`);
@@ -212,7 +233,7 @@ async function deactivateSelectElementModeInAllTabs() {
     }
 
     logger.info(
-      "Sent deactivation signal for Select Element mode to accessible tabs",
+      "Sent canonical deactivation for Select Element mode to accessible tabs",
       {
         totalTabs: tabs.length,
         processedTabs,
@@ -305,14 +326,15 @@ export class ContextMenuManager extends ResourceTracker {
       // Set up default context menus (this clears existing ones)
       await this.setupDefaultMenus(locale);
 
-      // Register storage listener only if not already registered
-      if (!this.initialized) {
+      // Register storage listener only if it has not already been registered
+      if (!this.storageListener) {
         this.registerStorageListener();
       }
 
       this.initialized = true;
       logger.info("Context menu manager initialized");
     } catch (error) {
+      this.initialized = false;
       logger.error("Failed to initialize context menu manager:", error);
       throw error;
     }
@@ -357,8 +379,14 @@ export class ContextMenuManager extends ResourceTracker {
         await this._pendingSetupPromise;
         logger.debug("[ContextMenuManager] Setup iteration completed", { needsRerun: this._needsRerun });
       } while (this._needsRerun);
+
+      if (this.storageListener) {
+        this.initialized = true;
+      }
     } catch (error) {
+      this.initialized = false;
       logger.error("Failed to setup default menus:", error);
+      throw error;
     } finally {
       this._menuSetupLock = false;
       this._pendingSetupPromise = null;
@@ -374,6 +402,19 @@ export class ContextMenuManager extends ResourceTracker {
     try {
       // Get i18n utility from factory
       const { getTranslationString } = await utilsFactory.getI18nUtils();
+
+      // Prepare all required data before removing working menus.
+      const settings = await storageManager.get(CONTEXT_MENU_SETTING_KEYS, false);
+      const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
+      const selectElementApi = await getEffectiveProviderAsync(TranslationMode.Select_Element);
+      const provider = findProviderById(selectElementApi);
+      const isBulkSupported = provider?.features?.includes('bulk') ?? false;
+      const isSelectElementEnabled = isExtensionEnabled &&
+                                   (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
+                                   isBulkSupported;
+      const isScreenCaptureEnabled = isExtensionEnabled && (settings.ENABLE_SCREEN_CAPTURE !== false);
+      const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
+      const commands = await browser.commands.getAll();
 
       // Clear existing menus first and wait for completion
       // Increase delay to ensure removeAll() fully completes before creating new menus
@@ -397,27 +438,6 @@ export class ContextMenuManager extends ResourceTracker {
 
       this.createdMenus.clear();
       logger.debug("[ContextMenuManager] Cleared existing menus and verified");
-
-      // Get settings for feature enablement - Force fresh fetch to ensure cache consistency
-      const settings = await storageManager.get(null, false); 
-      
-      const isExtensionEnabled = settings.EXTENSION_ENABLED !== false;
-      
-      // Get effective provider for Select Element to check for bulk support
-      const selectElementApi = await getEffectiveProviderAsync(TranslationMode.Select_Element);
-
-      // Check if the effective provider supports bulk features (Select Element is a bulk feature)
-      const provider = findProviderById(selectElementApi);
-      const isBulkSupported = provider?.features?.includes('bulk') ?? false;
-
-      const isSelectElementEnabled = isExtensionEnabled &&
-                                   (settings.TRANSLATE_WITH_SELECT_ELEMENT !== false) &&
-                                   isBulkSupported;
-      const isScreenCaptureEnabled = isExtensionEnabled && (settings.ENABLE_SCREEN_CAPTURE !== false);
-      const visibility = settings.CONTEXT_MENU_VISIBILITY || CONFIG.CONTEXT_MENU_VISIBILITY;
-
-      // Get commands for keyboard shortcuts
-      const commands = await browser.commands.getAll();
 
       // --- 1. Create Page Context Menu (Select Element) ---
       if (isSelectElementEnabled && visibility.PAGE_CONTEXT_SELECT_ELEMENT) {
@@ -807,8 +827,6 @@ export class ContextMenuManager extends ResourceTracker {
         try {
           await storageManager.set({ TRANSLATION_API: newApiId });
           logger.info(`API Provider changed to: ${newApiId}`);
-          // Refresh context menus to update radio button states
-          await this.setupDefaultMenus();
         } catch (e) {
           logger.error(`Error setting new API provider:`, e);
         }
@@ -969,54 +987,61 @@ export class ContextMenuManager extends ResourceTracker {
    * Register storage change listener to sync context menus
    */
   registerStorageListener() {
+    if (this.storageListener || !browser?.storage?.onChanged) return;
+
     if (browser?.storage?.onChanged) {
-      this.storageListener = async (changes, areaName) => {
-        if (areaName === "local") {
-          // 1. DATA INTEGRITY CHECK: 
-          // If Debug Mode is disabled while Mock provider is selected, revert to default.
-          if (changes.DEBUG_MODE && changes.DEBUG_MODE.newValue === false) {
-            const settings = await storageManager.get(['TRANSLATION_API']);
-            if (settings.TRANSLATION_API === 'mock') {
-              const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
-              
-              await storageManager.set({ TRANSLATION_API: defaultApi });
-              logger.info(`Background Integrity: Debug mode disabled while Mock was active. Reverted to ${defaultApi}`);
-              
-              // Note: This set() will trigger this listener again, 
-              // but the 'if' above won't match, preventing infinite loops.
-              return; 
+      const storageListener = async (changes, areaName) => {
+        try {
+          if (areaName === "local") {
+            // 1. DATA INTEGRITY CHECK: 
+            // If Debug Mode is disabled while Mock provider is selected, revert to default.
+            if (changes.DEBUG_MODE && changes.DEBUG_MODE.newValue === false) {
+              const settings = await storageManager.get(['TRANSLATION_API']);
+              if (settings.TRANSLATION_API === 'mock') {
+                const defaultApi = CONFIG.TRANSLATION_API || 'googlev2';
+                
+                await storageManager.set({ TRANSLATION_API: defaultApi });
+                logger.info(`Background Integrity: Debug mode disabled while Mock was active. Reverted to ${defaultApi}`);
+                
+                // Note: This set() will trigger this listener again, 
+                // but the 'if' above won't match, preventing infinite loops.
+                return; 
+              }
+            }
+
+            // 2. UI SYNC:
+            // Rebuild menus if relevant settings changed
+            const relevantKeys = [
+              'TRANSLATION_API', 
+              'TRANSLATE_WITH_SELECT_ELEMENT', 
+              'ENABLE_SCREEN_CAPTURE',
+              'MODE_PROVIDERS', 
+              'EXTENSION_ENABLED', 
+              'DEBUG_MODE', 
+              'CONTEXT_MENU_VISIBILITY',
+              'HIDDEN_PROVIDERS'
+            ];
+            
+            const isRelevantChange = Object.keys(changes).some(key => 
+              relevantKeys.includes(key) || 
+              key.endsWith('_API_KEY') ||
+              key.endsWith('_API_URL') ||
+              key.endsWith('_API_MODEL')
+            );
+
+            if (isRelevantChange) {
+              logger.info(
+                "Relevant settings changed in storage. Rebuilding context menus for synchronization."
+              );
+              await this.setupDefaultMenus();
             }
           }
-
-          // 2. UI SYNC:
-          // Rebuild menus if relevant settings changed
-          const relevantKeys = [
-            'TRANSLATION_API', 
-            'TRANSLATE_WITH_SELECT_ELEMENT', 
-            'ENABLE_SCREEN_CAPTURE',
-            'MODE_PROVIDERS', 
-            'EXTENSION_ENABLED', 
-            'DEBUG_MODE', 
-            'CONTEXT_MENU_VISIBILITY',
-            'HIDDEN_PROVIDERS'
-          ];
-          
-          const isRelevantChange = Object.keys(changes).some(key => 
-            relevantKeys.includes(key) || 
-            key.endsWith('_API_KEY') || 
-            key.endsWith('_API_URL') ||
-            key.endsWith('_API_MODEL')
-          );
-
-          if (isRelevantChange) {
-            logger.info(
-              "Relevant settings changed in storage. Rebuilding context menus for synchronization."
-            );
-            this.setupDefaultMenus();
-          }
+        } catch (error) {
+          logger.error("Failed to rebuild context menus after storage change:", error);
         }
       };
-      browser.storage.onChanged.addListener(this.storageListener);
+      browser.storage.onChanged.addListener(storageListener);
+      this.storageListener = storageListener;
       logger.info("Storage change listener registered");
     }
   }

@@ -24,7 +24,7 @@
       v-model="deeplApiKey"
       :label="t('deepl_api_key_label') || 'API Keys'"
       :placeholder="t('deepl_api_key_placeholder') || 'Enter your API keys (one per line)'"
-      provider-name="DeepL"
+      :provider-id="ProviderRegistryIds.DEEPL"
       :testing="testingKeys"
       :test-result="testResult"
       @test="testKeys"
@@ -81,6 +81,7 @@ import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
 
 const { t } = useI18n()
@@ -112,13 +113,17 @@ const deeplBetaLanguagesEnabled = computed({
 const testingKeys = ref(false)
 const testResult = ref(null)
 
-const testKeys = async (providerName) => {
+const testKeys = async (providerId) => {
   testingKeys.value = true
   testResult.value = null
 
   try {
-    // Test keys directly from textbox value (not from storage)
-    const result = await ApiKeyManager.testKeysDirect(deeplApiKey.value, providerName)
+    // Test keys directly from textbox value and current unsaved tier (not storage)
+    const result = await ApiKeyManager.testKeysDirect(
+      deeplApiKey.value,
+      providerId,
+      { apiTier: deeplApiTier.value }
+    )
 
     // Store messageKey and params for reactive translation in ApiKeyInput
     testResult.value = {

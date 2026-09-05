@@ -33,6 +33,8 @@ vi.mock('webextension-polyfill', () => ({
 vi.mock('@/core/contextCore.js', () => ({
   isValidSync: vi.fn().mockReturnValue(true),
   isContextError: vi.fn().mockReturnValue(false),
+  isPermanentContextInvalidation: vi.fn().mockReturnValue(false),
+  isTransientMessagingError: vi.fn().mockReturnValue(false),
   contextState: { isInvalidated: false, notificationShown: false },
   getActiveEnvironment: vi.fn().mockReturnValue('popup'),
   ENVIRONMENTS: {
@@ -88,6 +90,8 @@ describe('UnifiedMessaging', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     contextCore.isValidSync.mockReturnValue(true);
+    contextCore.isContextError.mockReturnValue(false);
+    contextCore.isPermanentContextInvalidation.mockReturnValue(false);
     ExtensionContextManager.isValidSync.mockReturnValue(true);
   });
 
@@ -194,6 +198,22 @@ describe('UnifiedMessaging', () => {
       await expect(sendRegularMessage({ action: 'page-translate' }, {
         returnFailureResponse: true,
       })).rejects.toBe(runtimeError);
+    });
+
+    it('keeps transient receiver failures recoverable for later requests', async () => {
+      const runtimeError = new Error('Receiving end does not exist');
+      contextCore.isContextError.mockReturnValue(true);
+      contextCore.isPermanentContextInvalidation.mockReturnValue(false);
+      browser.runtime.sendMessage
+        .mockRejectedValueOnce(runtimeError)
+        .mockResolvedValueOnce({ success: true, recovered: true });
+
+      const failed = await sendRegularMessage({ action: 'PING', messageId: 'receiver-missing' });
+      const recovered = await sendRegularMessage({ action: 'PING', messageId: 'receiver-recovered' });
+
+      expect(failed).toMatchObject({ success: false, isContextInvalidated: false });
+      expect(recovered).toEqual({ success: true, recovered: true });
+      expect(contextCore.isValidSync).toHaveBeenCalled();
     });
 
     it('does not swallow timeout when resolved failures are enabled', async () => {

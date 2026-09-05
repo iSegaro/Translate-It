@@ -213,7 +213,6 @@ vi.mock('@/shared/constants/translation.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getSelectElementShowOriginalOnHoverAsync: vi.fn(() => Promise.resolve(true)),
   getSourceLanguageAsync: vi.fn(() => Promise.resolve('en')),
   getTargetLanguageAsync: vi.fn(() => Promise.resolve('fa')),
@@ -2245,6 +2244,19 @@ describe('explicit tab-wide deactivation ownership', () => {
 
     expect(sendMessage).toHaveBeenCalledWith(GLOBAL_DEACTIVATE);
     expect(sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports unconfirmed Background authority when the global request fails', async () => {
+    await activateManager(false);
+    manager.isActive = true;
+    sendMessage.mockRejectedValueOnce(new Error('Background unavailable'));
+
+    await expect(manager.deactivate({ reason: 'manual', requestGlobalDeactivation: true })).resolves.toMatchObject({
+      success: true,
+      cleanupCompleted: true,
+      globalDeactivationRequested: true,
+      globalDeactivationSucceeded: false,
+    });
   });
 
   it('releases local lifecycle cleanup before waiting for global deactivation', async () => {

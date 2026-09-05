@@ -41,6 +41,46 @@ export function isValidSync() {
   }
 }
 
+function getContextErrorMessage(error) {
+  return String(error?.message || error || '').toLowerCase();
+}
+
+/**
+ * Determines whether an error proves that this extension context is gone.
+ * @param {Error|string} error
+ * @returns {boolean}
+ */
+export function isPermanentContextInvalidation(error) {
+  const message = getContextErrorMessage(error);
+  const type = String(error?.type || '').toLowerCase();
+
+  return type === 'extension_context_invalidated'
+    || message.includes('extension context invalidated')
+    || message.includes('runtime api unavailable')
+    || message.includes('runtime api missing')
+    || message.includes('runtime.id missing')
+    || message.includes('runtime.geturl invalid')
+    || message.includes('runtime.geturl failed')
+    || message.includes('runtime.geturl throws');
+}
+
+/**
+ * Determines whether an error only describes a failed message transport.
+ * @param {Error|string} error
+ * @returns {boolean}
+ */
+export function isTransientMessagingError(error) {
+  const message = getContextErrorMessage(error);
+
+  return message.includes('receiving end does not exist')
+    || message.includes('could not establish connection')
+    || message.includes('no receiving end')
+    || message.includes('no receiver')
+    || message.includes('message channel closed')
+    || message.includes('message port closed')
+    || message.includes('listener indicated an asynchronous response');
+}
+
 /**
  * Check if an error is context-related.
  * Manual implementation to avoid circular dependency with ErrorMatcher.
@@ -48,15 +88,7 @@ export function isValidSync() {
  * @returns {boolean}
  */
 export function isContextError(error) {
-  const message = (error?.message || error || "").toLowerCase();
-  
-  return (
-    message.includes("extension context invalidated") ||
-    message.includes("message channel closed") ||
-    message.includes("receiving end does not exist") ||
-    message.includes("could not establish connection") ||
-    message.includes("message port closed")
-  );
+  return isPermanentContextInvalidation(error) || isTransientMessagingError(error);
 }
 
 /**

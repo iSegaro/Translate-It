@@ -23,7 +23,6 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock('@/shared/config/config.js', () => ({
-  getSettingsAsync: vi.fn(() => Promise.resolve({})),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
   getEffectiveProviderAsync: vi.fn(() => Promise.resolve('google')),
   getApplication_LocalizeAsync: vi.fn(() => Promise.resolve('fa')),
@@ -32,6 +31,11 @@ vi.mock('@/shared/config/config.js', () => ({
     Page: 'page',
     Select_Element: 'select_element'
   }
+}));
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  getProxySettingsAsync: vi.fn().mockResolvedValue({}),
+  resolveProxyConfig: vi.fn().mockResolvedValue({})
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({

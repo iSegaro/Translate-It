@@ -3,12 +3,11 @@ import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
 import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import { isStructuredTranslationError } from '@/shared/messaging/core/MessagingCore.js';
 import { WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import {
-  getPageTranslationErrorDecision,
-} from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
+import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useContentAppPageTranslation');
 
@@ -58,6 +57,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
     // Page Translation Life-cycle Events
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_START, (detail) => {
       logger.debug('PAGE_TRANSLATE_START received:', detail);
+      errorPresentationRevision++;
       mobileStore.setPageTranslation({
         isTranslating: true,
         isTranslated: false,
@@ -67,7 +67,6 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         failedCount: 0,
         totalCount: 0,
         errorMessage: null,
-        canRetry: false,
       });
 
       if (deviceDetector.isMobile()) {
@@ -86,6 +85,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       if (isMainFrame && !detail.isAggregated && mobileStore.pageTranslationData.status !== TRANSLATION_STATUS.IDLE) {
         return;
       }
+
+      errorPresentationRevision++;
 
       const translatedCount = detail.translatedCount ?? detail.translated ?? mobileStore.pageTranslationData.translatedCount;
       const failedCount = detail.failedCount ?? detail.failed ?? 0;
@@ -117,6 +118,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         return;
       }
 
+      errorPresentationRevision++;
+
       const translatedCount = detail.translatedCount ?? detail.translated ?? mobileStore.pageTranslationData.translatedCount;
       const failedCount = detail.failedCount ?? detail.failed ?? 0;
       const totalCount = detail.totalCount ?? mobileStore.pageTranslationData.totalCount;
@@ -133,7 +136,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       });
     });
 
-    tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, (detail) => {
+    tracker.addEventListener(pageEventBus, MessageActions.PAGE_TRANSLATE_COMPLETE, async (detail) => {
       // Skip empty/invalid completion messages - they might come from iframes or initialization
       // BUT: process if it is aggregated as it represents the whole page state
       if (!detail.isAggregated && (!detail || (detail.translatedCount === 0 && detail.failedCount === 0 && !detail.isTranslated && !mobileStore.pageTranslationData.isTranslating))) {
@@ -141,10 +144,18 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         return;
       }
 
+      const revision = ++errorPresentationRevision;
       const translatedCount = detail.translatedCount ?? mobileStore.pageTranslationData.translatedCount;
       const failedCount = detail.failedCount ?? detail.failed ?? 0;
       const totalCount = detail.totalCount ?? mobileStore.pageTranslationData.totalCount ?? (translatedCount + failedCount);
       const isZeroResult = translatedCount === 0 && failedCount > 0;
+      let errorMessage = null;
+
+      if (isZeroResult && isStructuredTranslationError(detail.errorDetails)) {
+        const displayError = await getPageTranslationErrorPresentation(detail);
+        if (revision !== errorPresentationRevision) return;
+        errorMessage = displayError?.message || null;
+      }
 
       mobileStore.setPageTranslation({
         isTranslating: false,
@@ -154,8 +165,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         translatedCount,
         failedCount,
         totalCount,
-        errorMessage: null,
-        canRetry: false,
+        errorMessage,
       });
     });
 
@@ -165,8 +175,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
       const isMainFrame = window.self === window.top;
       if (isMainFrame && detail.isAggregated !== true) return;
 
-      const revision = errorPresentationRevision;
-      const presentation = await getPageTranslationErrorDecision(detail);
+      const revision = ++errorPresentationRevision;
+      const presentation = await getPageTranslationErrorPresentation(detail);
       if (revision !== errorPresentationRevision) return;
       if (!presentation) return;
 
@@ -193,8 +203,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         isTranslated: hasCommittedContent,
         ...(translatedCount !== null && { translatedCount }),
         status: TRANSLATION_STATUS.ERROR,
-        errorMessage: presentation.displayError.message,
-        canRetry: presentation.canRetry && !hasCommittedContent,
+        errorMessage: presentation.message,
       });
     });
 
@@ -213,7 +222,6 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
           isTranslated: true,
           status: TRANSLATION_STATUS.COMPLETED,
           errorMessage: null,
-          canRetry: false,
         });
         return;
       }
@@ -223,6 +231,7 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
 
     tracker.addEventListener(pageEventBus, MessageActions.PAGE_RESTORE_COMPLETE, () => {
       logger.debug('PAGE_RESTORE_COMPLETE received, resetting page translation state');
+      errorPresentationRevision++;
       mobileStore.resetPageTranslation();
     });
 
@@ -254,6 +263,8 @@ export function useContentAppPageTranslation(mobileStore, tracker) {
         logger.debug('Skipping empty auto-restore message from iframe, keeping current state:', currentState);
         return;
       }
+
+      errorPresentationRevision++;
 
       const isTranslating = detail.isTranslating !== undefined
         ? detail.isTranslating

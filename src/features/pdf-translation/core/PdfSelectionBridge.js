@@ -22,6 +22,8 @@ export class PdfSelectionBridge extends ResourceTracker {
     this.isPointerDown = false
     this.hasPendingSelectionChange = false
     this.isResolvingPointerSelection = false
+    this.startGeneration = 0
+    this.isDestroyed = false
     this._documentListenerOptions = { capture: true }
     this._windowListenerOptions = { capture: true }
     this.handleSelectionChange = this.handleSelectionChange.bind(this)
@@ -35,8 +37,30 @@ export class PdfSelectionBridge extends ResourceTracker {
     return unref(this.viewerRootRef) || null
   }
 
-  start() {
-    if (this.isStarted || typeof document === 'undefined') return
+  /**
+   * Start selection listeners after runtime settings are ready.
+   * @returns {Promise<boolean>} Whether listeners were attached.
+   */
+  async start() {
+    if (this.isStarted || this.isDestroyed || typeof document === 'undefined') return false
+
+    const startGeneration = this.startGeneration
+
+    try {
+      await settingsManager.initialize()
+    } catch (error) {
+      logger.error('Failed to initialize settings before starting PDF selection bridge', error)
+      return false
+    }
+
+    if (
+      this.isStarted
+      || this.isDestroyed
+      || startGeneration !== this.startGeneration
+      || typeof document === 'undefined'
+    ) {
+      return false
+    }
 
     this.isStarted = true
     this.addEventListener(document, 'selectionchange', this.handleSelectionChange, this._documentListenerOptions)
@@ -45,9 +69,12 @@ export class PdfSelectionBridge extends ResourceTracker {
     this.addEventListener(document, 'pointercancel', this.handlePointerCancel, this._documentListenerOptions)
     this.addEventListener(window, 'blur', this.handleWindowBlur, this._windowListenerOptions)
     logger.debug('PDF selection bridge started')
+    return true
   }
 
   stop() {
+    this.startGeneration += 1
+
     if (!this.isStarted) return
 
     this.removeEventListener(document, 'selectionchange', this.handleSelectionChange, this._documentListenerOptions)
@@ -205,6 +232,7 @@ export class PdfSelectionBridge extends ResourceTracker {
   }
 
   destroy() {
+    this.isDestroyed = true
     this.stop()
     super.destroy()
   }

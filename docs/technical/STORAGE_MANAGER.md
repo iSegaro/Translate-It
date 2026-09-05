@@ -99,8 +99,21 @@ const { value: theme } = useStorageItem('theme', 'auto');
 - **Race Condition Prevention**: Centralized write operations ensure data consistency.
 - **Context Awareness**: Integrated with `ExtensionContextManager` to handle extension updates and reloads safely.
 
+### Settings Default Ownership
+
+Settings and storage layers have separate responsibilities:
+
+| Layer | Ownership |
+| --- | --- |
+| `CONFIG` | Setting default values. |
+| `getPersistedDefaultSettings()` | Persisted settings schema and canonical persisted defaults materialized from `CONFIG`. |
+| `SettingsManager` | Runtime facade limited to `FALLBACK_SETTING_KEYS`; values derive from `getPersistedDefaultSettings()` without duplicating defaults. |
+| `StorageCore` | Storage read/write, cache, and change-event mechanics. |
+
+Adding a persisted setting does not automatically require adding it to `FALLBACK_SETTING_KEYS`. Add it only when runtime contexts must read or react to that setting. Runtime consumers should request only required keys; keeping this allowlist narrow avoids unnecessary access to unrelated or sensitive persisted settings.
+
 ### Maintainability
-- **Single Source of Truth**: All storage logic is encapsulated within `StorageCore`.
+- **Storage Mechanics Authority**: All storage logic is encapsulated within `StorageCore`.
 - **Decoupled UI**: Vue components use composables that abstract away the complexity of storage listeners.
 
 ## Best Practices

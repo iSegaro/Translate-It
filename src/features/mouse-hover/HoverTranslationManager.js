@@ -64,6 +64,8 @@ export class HoverTranslationManager extends ResourceTracker {
     this.handleWheel = this.handleWheel.bind(this);
     this.handleWindowBlur = this.handleWindowBlur.bind(this);
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+    this.handleTooltipHidden = this.handleTooltipHidden.bind(this);
+    this.handleTranslationHide = this.handleTranslationHide.bind(this);
   }
 
   /**
@@ -94,12 +96,8 @@ export class HoverTranslationManager extends ResourceTracker {
       logger.info('Hover translation manager activated and listening');
       
       // Listen for when tooltip is hidden (could be via timer or other means)
-      this.addEventListener(pageEventBus, 'MOUSE_HOVER_TOOLTIP_HIDDEN', () => {
-        this.currentText = null;
-        this.currentRect = null;
-        this.currentElement = null;
-        this._removeBorder();
-      });
+      this.addEventListener(pageEventBus, 'MOUSE_HOVER_TOOLTIP_HIDDEN', this.handleTooltipHidden);
+      this.addEventListener(pageEventBus, 'hide-translation', this.handleTranslationHide);
 
       return true;
     } catch (error) {
@@ -112,17 +110,12 @@ export class HoverTranslationManager extends ResourceTracker {
    * Deactivate the hover translation feature
    */
   async deactivate() {
-    if (!this.isActive) {
-      this.modifierTriggerController.reset();
-      return true;
-    }
-
+    const wasActive = this.isActive;
     this.cleanup(); // Clean up all listeners and timers
     this.isActive = false;
-    this.lastMouseEvent = null;
-    
-    // Notify UI to hide tooltip
-    this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+
+    // Notify UI to hide tooltip only when this lifecycle was active.
+    if (wasActive) this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
     
     logger.debug('Hover translation manager deactivated');
     return true;
@@ -275,6 +268,35 @@ export class HoverTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Reset hover state after the UI confirms that its tooltip is hidden.
+   * @private
+   */
+  handleTooltipHidden() {
+    this._resetHoverState();
+  }
+
+  /**
+   * Hide hover UI when an existing translation lifecycle changes its target.
+   * @param {Object} detail - Existing hide-translation event detail
+   * @private
+   */
+  handleTranslationHide(detail) {
+    if (!this._hasHoverState()) return;
+
+    const element = detail?.element;
+    if (
+      element
+      && this.currentElement
+      && element !== this.currentElement
+      && !element.contains?.(this.currentElement)
+      && !this.currentElement.contains?.(element)
+    ) return;
+
+    this._resetHoverState();
+    this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+  }
+
+  /**
    * Handle mouse leave to hide tooltip or cancel pending hover
    */
   handleMouseLeave() {
@@ -282,15 +304,43 @@ export class HoverTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Reset transient hover state and cancel any active request.
+   * @private
+   */
+  _resetHoverState({ cancelRequest = true } = {}) {
+    if (cancelRequest) {
+      this._cancelPendingHover();
+    } else {
+      if (this.hoverTimer) {
+        this.clearTimer(this.hoverTimer);
+        this.hoverTimer = null;
+      }
+      this.currentMessageId = null;
+    }
+
+    this.currentText = null;
+    this.currentRect = null;
+    this.currentElement = null;
+    this._removeBorder();
+  }
+
+  _hasHoverState() {
+    return Boolean(
+      this.currentText
+      || this.currentElement
+      || this.currentRect
+      || this.borderedElement
+      || this.currentMessageId
+      || this.hoverTimer
+    );
+  }
+
+  /**
    * Internal helper to handle mouse leaving text area
    * @private
    */
   _handleMouseOut() {
-    this.currentText = null; // Reset text cache
-    this.currentRect = null; // Reset rectangle cache
-    this.currentElement = null;
-    this._removeBorder();
-    this._cancelPendingHover();
+    this._resetHoverState();
 
     const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
     if (autoClose === 'mouseleave') {
@@ -304,11 +354,7 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   _cleanupActiveHoverRequest(messageId) {
     if (this.currentMessageId === messageId) {
-      this.currentMessageId = null;
-      this.currentText = null;
-      this.currentRect = null;
-      this.currentElement = null;
-      this._removeBorder();
+      this._resetHoverState({ cancelRequest: false });
 
       const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
       if (autoClose === 'mouseleave') {
@@ -422,6 +468,8 @@ export class HoverTranslationManager extends ResourceTracker {
       // Register for streaming updates
       registerTranslation(messageId, {
         onStreamUpdate: (data) => {
+          if (this.currentMessageId !== messageId) return;
+
           if (data.data) {
             const batchText = Array.isArray(data.data) ? data.data.join('') : String(data.data);
             const index = typeof data.batchIndex === 'number' ? data.batchIndex : accumulatedResults.size;
@@ -576,8 +624,10 @@ export class HoverTranslationManager extends ResourceTracker {
    * Clean up resources
    */
   cleanup() {
+    this._resetHoverState();
     this.modifierTriggerController.reset();
-    this._cancelPendingHover();
+    this.lastPosition = { x: 0, y: 0 };
+    this.lastMouseEvent = null;
     super.cleanup();
   }
 }

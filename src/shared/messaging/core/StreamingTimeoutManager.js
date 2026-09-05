@@ -11,6 +11,7 @@ import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { isUserCancellationReason, normalizeOperationAbortReason } from '@/shared/error-management/CancellationPolicy.js';
+import { ActionReasons } from './MessagingConstants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'StreamingTimeoutManager');
 
@@ -44,6 +45,12 @@ export class StreamingTimeoutManager {
       maxProgressTimeout,
       gracePeriod
     });
+
+    if (this.activeStreams.has(messageId)) {
+      const duplicateError = new Error(`Streaming operation already active: ${messageId}`);
+      duplicateError.type = ActionReasons.ALREADY_EXECUTING;
+      throw duplicateError;
+    }
 
     // Create abort controller for this operation
     const abortController = new AbortController();

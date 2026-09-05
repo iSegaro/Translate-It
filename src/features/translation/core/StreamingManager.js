@@ -263,7 +263,7 @@ export class StreamingManager extends ResourceTracker {
    * Complete streaming session
    * @param {string} messageId - Message ID
    * @param {boolean} success - Whether translation was successful
-   * @param {object} additionalData - Additional completion data
+   * @param {object} additionalData - Additional completion data; terminalStatus is internal lifecycle metadata
    */
   async completeStream(messageId, success = true, additionalData = {}, finalizeCancelled = false) {
     const streamInfo = this.activeStreams.get(messageId);
@@ -276,9 +276,11 @@ export class StreamingManager extends ResourceTracker {
 
     const wasActive = streamInfo.status === 'active' || isCancelled;
     
+    const { terminalStatus, ...completionData } = additionalData;
+
     // Cancellation owns its terminal state; completion only publishes its final event and cleanup.
     if (!isCancelled) {
-      streamInfo.status = success ? 'completed' : 'error';
+      streamInfo.status = terminalStatus || (success ? 'completed' : 'error');
     }
     streamInfo.endTime = Date.now();
     streamInfo.duration = streamInfo.endTime - streamInfo.startTime;
@@ -295,7 +297,6 @@ export class StreamingManager extends ResourceTracker {
 
     try {
       // Send stream end message
-      const completionData = { ...additionalData };
       delete completionData.conversationAcceptance;
       const streamEndMessage = MessageFormat.create(
         MessageActions.TRANSLATION_STREAM_END,
