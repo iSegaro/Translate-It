@@ -5,6 +5,17 @@ import { useUnifiedTranslation } from './useUnifiedTranslation.js';
 
 // --- Mocks ---
 
+const sessionMocks = vi.hoisted(() => ({
+  load: vi.fn(),
+  save: vi.fn(),
+  clear: vi.fn(),
+}));
+
+const contentIntegrationMocks = vi.hoisted(() => ({
+  registerTranslation: vi.fn(),
+  handleMessage: vi.fn(() => false),
+}));
+
 vi.mock("webextension-polyfill", () => ({
   default: {
     runtime: {
@@ -15,6 +26,12 @@ vi.mock("webextension-polyfill", () => ({
     },
   },
 }));
+
+vi.mock('@/features/translation/storage/TranslationUiSessionState.js', () => ({
+  translationUiSessionState: sessionMocks,
+}));
+
+vi.mock('@/shared/messaging/core/ContentScriptIntegration.js', () => contentIntegrationMocks);
 
 vi.mock("@/shared/logging/logger.js", () => ({
   getScopedLogger: vi.fn(() => ({
@@ -138,6 +155,10 @@ describe("useUnifiedTranslation", () => {
     translationStore = useTranslationStore();
     vi.useFakeTimers();
     vi.clearAllMocks();
+    sessionMocks.load.mockResolvedValue(null);
+    sessionMocks.save.mockResolvedValue(true);
+    sessionMocks.clear.mockResolvedValue(true);
+    contentIntegrationMocks.handleMessage.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -350,11 +371,261 @@ describe("useUnifiedTranslation", () => {
 
   it("should clear translation", async () => {
     const [composable] = withSetup(() => useUnifiedTranslation("popup"));
+    await composable.initializeSessionState();
     composable.sourceText.value = "Some text";
     composable.translatedText.value = "Some translation";
     await composable.clearTranslation();
     expect(composable.sourceText.value).toBe("");
     expect(composable.translatedText.value).toBe("");
+    expect(sessionMocks.clear).toHaveBeenCalledWith('popup', expect.any(Number));
+  });
+
+  it('restores a context-local draft and provider', async () => {
+    const provider = ref('default');
+    sessionMocks.load.mockResolvedValue({
+      draftSource: 'Popup draft',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+      provider: 'deepl',
+      revision: 4,
+      completedTranslation: null,
+    });
+    const [composable] = withSetup(() => useUnifiedTranslation('popup', { provider }));
+
+    await composable.initializeSessionState();
+
+    expect(composable.sourceText.value).toBe('Popup draft');
+    expect(composable.translatedText.value).toBe('');
+    expect(composable.sourceLanguage.value).toBe('en');
+    expect(composable.targetLanguage.value).toBe('fa');
+    expect(provider.value).toBe('deepl');
+  });
+
+  it('restores a completed translation only when it matches saved draft source', async () => {
+    sessionMocks.load.mockResolvedValue({
+      draftSource: 'Hello',
+      revision: 2,
+      completedTranslation: {
+        source: 'Hello',
+        displayTranslatedText: 'سلام',
+        translationTarget: 'سلام',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        provider: 'google_v2',
+        actualSourceLanguage: 'en',
+        actualTargetLanguage: 'fa',
+        timestamp: 1,
+      },
+    });
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+
+    await composable.initializeSessionState();
+
+    expect(composable.sourceText.value).toBe('Hello');
+    expect(composable.translatedText.value).toBe('سلام');
+    expect(composable.lastTranslation.value).toMatchObject({ source: 'Hello', target: 'سلام' });
+  });
+
+  it('persists draft-only after source edit following a restored result', async () => {
+    sessionMocks.load.mockResolvedValue({
+      draftSource: 'Hello',
+      revision: 2,
+      completedTranslation: {
+        source: 'Hello',
+        displayTranslatedText: 'سلام',
+        translationTarget: 'سلام',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        timestamp: 1,
+      },
+    });
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+    await composable.initializeSessionState();
+
+    composable.sourceText.value = 'Hello again';
+    await nextTick();
+
+    expect(sessionMocks.save).toHaveBeenLastCalledWith('popup', expect.objectContaining({
+      draftSource: 'Hello again',
+      completedTranslation: null,
+    }));
+  });
+
+  it('clears only its session snapshot when source becomes empty', async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation('sidepanel'));
+    await composable.initializeSessionState();
+    composable.sourceText.value = 'draft';
+    await nextTick();
+    composable.sourceText.value = '';
+    await nextTick();
+
+    expect(sessionMocks.clear).toHaveBeenCalledWith('sidepanel', expect.any(Number));
+    expect(sessionMocks.clear).not.toHaveBeenCalledWith('popup', expect.any(Number));
+  });
+
+  it('persists and restores same-language display text without rewriting canonical target', async () => {
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+    await composable.initializeSessionState();
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+    sendMessage.mockResolvedValue({
+      success: true,
+      translatedText: null,
+      originalText: 'Hello',
+      sourceLanguage: 'en',
+      targetLanguage: 'en',
+    });
+    composable.sourceText.value = 'Hello';
+
+    await composable.triggerTranslation();
+
+    expect(composable.translatedText.value).toBe('Hello');
+    const snapshot = sessionMocks.save.mock.lastCall[1];
+    expect(snapshot.completedTranslation).toMatchObject({
+      source: 'Hello',
+      displayTranslatedText: 'Hello',
+      translationTarget: null,
+    });
+    expect(snapshot.completedTranslation).not.toHaveProperty('sameLanguage');
+
+    setActivePinia(createPinia());
+    sessionMocks.load.mockResolvedValue(snapshot);
+    const [restored] = withSetup(() => useUnifiedTranslation('popup'));
+    await restored.initializeSessionState();
+
+    expect(restored.translatedText.value).toBe('Hello');
+    expect(restored.lastTranslation.value.target).toBeNull();
+  });
+
+  it('persists and restores a reversed Popup translation pair', async () => {
+    sessionMocks.load.mockResolvedValue({
+      draftSource: 'Hello',
+      revision: 2,
+      completedTranslation: {
+        source: 'Hello',
+        displayTranslatedText: 'سلام',
+        translationTarget: 'سلام',
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+        provider: 'google_v2',
+        actualSourceLanguage: 'en',
+        actualTargetLanguage: 'fa',
+        timestamp: 1,
+      },
+    });
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+    await composable.initializeSessionState();
+
+    composable.revertTranslation();
+    await nextTick();
+
+    const snapshot = sessionMocks.save.mock.lastCall[1];
+    expect(snapshot.completedTranslation).toMatchObject({
+      source: 'سلام',
+      displayTranslatedText: 'Hello',
+      translationTarget: 'Hello',
+    });
+
+    setActivePinia(createPinia());
+    sessionMocks.load.mockResolvedValue(snapshot);
+    const [restored] = withSetup(() => useUnifiedTranslation('popup'));
+    await restored.initializeSessionState();
+
+    expect(restored.sourceText.value).toBe('سلام');
+    expect(restored.translatedText.value).toBe('Hello');
+  });
+
+  it('invalidates a same-source revert on the next real source edit', async () => {
+    sessionMocks.load.mockResolvedValue({
+      draftSource: 'OpenAI',
+      revision: 2,
+      completedTranslation: {
+        source: 'OpenAI',
+        displayTranslatedText: 'OpenAI',
+        translationTarget: 'OpenAI',
+        sourceLanguage: 'en',
+        targetLanguage: 'en',
+        provider: 'google_v2',
+        actualSourceLanguage: 'en',
+        actualTargetLanguage: 'en',
+        timestamp: 1,
+      },
+    });
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+    await composable.initializeSessionState();
+
+    composable.revertTranslation();
+    expect(composable.sourceText.value).toBe('OpenAI');
+
+    composable.sourceText.value = 'OpenAI test';
+    await nextTick();
+
+    expect(composable.lastTranslation.value).toBeNull();
+    expect(sessionMocks.save).toHaveBeenLastCalledWith('popup', expect.objectContaining({
+      draftSource: 'OpenAI test',
+      completedTranslation: null,
+    }));
+  });
+
+  it('persists draft-only while streaming and after cancellation or failure', async () => {
+    let resolveRequest;
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+    await composable.initializeSessionState();
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+    sendMessage
+      .mockImplementationOnce(() => new Promise(resolve => { resolveRequest = resolve; }))
+      .mockResolvedValueOnce(undefined);
+    composable.sourceText.value = 'draft';
+
+    const request = composable.triggerTranslation();
+    await nextTick();
+    contentIntegrationMocks.registerTranslation.mock.calls[0][1].onStreamUpdate({ data: 'partial' });
+
+    expect(sessionMocks.save).toHaveBeenLastCalledWith('popup', expect.objectContaining({
+      draftSource: 'draft',
+      completedTranslation: null,
+    }));
+
+    await composable.cancelTranslation();
+    await nextTick();
+    expect(sessionMocks.save).toHaveBeenLastCalledWith('popup', expect.objectContaining({
+      draftSource: 'draft',
+      completedTranslation: null,
+    }));
+
+    resolveRequest({ success: false, error: 'failed' });
+    await request;
+
+    expect(sessionMocks.save).toHaveBeenLastCalledWith('popup', expect.objectContaining({
+      draftSource: 'draft',
+      completedTranslation: null,
+    }));
+  });
+
+  it('does not let an older completion overwrite a newer draft snapshot', async () => {
+    let resolveRequest;
+    const [composable] = withSetup(() => useUnifiedTranslation('popup'));
+    await composable.initializeSessionState();
+    const { sendMessage } = await import("@/shared/messaging/core/UnifiedMessaging.js");
+    sendMessage.mockImplementation(() => new Promise(resolve => { resolveRequest = resolve; }));
+    composable.sourceText.value = 'old draft';
+
+    const request = composable.triggerTranslation();
+    composable.sourceText.value = 'new draft';
+    await nextTick();
+    resolveRequest({
+      success: true,
+      translatedText: 'old result',
+      originalText: 'old draft',
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+    });
+    await request;
+
+    expect(composable.sourceText.value).toBe('new draft');
+    expect(sessionMocks.save).toHaveBeenLastCalledWith('popup', expect.objectContaining({
+      draftSource: 'new draft',
+      completedTranslation: null,
+    }));
   });
 
   it("should update when translationStore.currentTranslation changes", async () => {

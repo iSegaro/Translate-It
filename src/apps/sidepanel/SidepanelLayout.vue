@@ -81,6 +81,8 @@ onMounted(async () => {
     manualProvider.value = defaultProvider
     logger.debug('[SidepanelLayout] Initialized manual translation provider:', manualProvider.value)
   }
+
+  await mainContentRef.value?.initializeSessionState?.()
 })
 
 // Watch for settings changes to keep global provider in sync

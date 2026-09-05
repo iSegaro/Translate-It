@@ -22,6 +22,7 @@ import { AUTO_DETECT_VALUE, DEFAULT_TARGET_LANGUAGE } from "@/shared/constants/c
 import { utilsFactory } from "@/utils/UtilsFactory.js";
 import { registerTranslation, handleMessage as routeMessage } from "@/shared/messaging/core/ContentScriptIntegration.js";
 import { sendMessage as sendUnifiedMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
+import { translationUiSessionState } from '@/features/translation/storage/TranslationUiSessionState.js';
 
 // Lazy logger to avoid TDZ ReferenceErrors when bundled
 const logger = new Proxy({}, {
@@ -45,7 +46,7 @@ function resolveFailureError(payload) {
 /**
  * useUnifiedTranslation - Unified composable for translation features
  */
-export function useUnifiedTranslation(context = 'popup') {
+export function useUnifiedTranslation(context = 'popup', { provider = null } = {}) {
   // Validate context
   const validContexts = ['popup', 'sidepanel'];
   if (!validContexts.includes(context)) {
@@ -98,7 +99,12 @@ export function useUnifiedTranslation(context = 'popup') {
   const pendingRequests = ref(new Set());
   const loadingStartTime = ref(null);
   const currentMessageId = ref(null);
+  const activeRequestSource = ref(null);
   const lastSyncedTimestamp = ref(0);
+  let sessionRevision = 0;
+  let sessionReady = false;
+  let sessionResultEligible = false;
+  let expectedProgrammaticSource = null;
   const MINIMUM_LOADING_DURATION = 100;
 
   /**
@@ -119,7 +125,10 @@ export function useUnifiedTranslation(context = 'popup') {
       isTranslating.value = false;
       isStreaming.value = false;
       currentMessageId.value = null;
+      activeRequestSource.value = null;
       loadingStartTime.value = null;
+      sessionResultEligible = false;
+      void persistSessionState();
     } catch (error) {
       logger.error(`[${context}] Failed to cancel translation:`, error);
     }
@@ -136,6 +145,89 @@ export function useUnifiedTranslation(context = 'popup') {
   const canTranslate = computed(
     () => Boolean(sourceText.value?.trim()) && !isTranslating.value
   );
+
+  const getSessionProvider = () => provider?.value || null;
+
+  const createSessionSnapshot = () => {
+    const draftSource = sourceText.value || '';
+    const translation = lastTranslation.value;
+    const canRestoreCompletedTranslation = sessionResultEligible
+      && !isTranslating.value
+      && !isStreaming.value
+      && translation?.source === draftSource;
+
+    return {
+      draftSource,
+      sourceLanguage: sourceLanguage.value,
+      targetLanguage: targetLanguage.value,
+      provider: getSessionProvider(),
+      revision: ++sessionRevision,
+      completedTranslation: canRestoreCompletedTranslation ? {
+        source: translation.source,
+        displayTranslatedText: translatedText.value,
+        translationTarget: translation.target,
+        sourceLanguage: translation.sourceLanguage,
+        targetLanguage: translation.targetLanguage,
+        provider: translation.provider,
+        actualSourceLanguage: actualSourceLanguage.value,
+        actualTargetLanguage: actualTargetLanguage.value,
+        mode: translation.mode,
+        timestamp: translation.timestamp,
+      } : null,
+    };
+  };
+
+  const persistSessionState = () => {
+    if (!sessionReady) return Promise.resolve(false);
+    if (!sourceText.value) return clearSessionState();
+    return translationUiSessionState.save(context, createSessionSnapshot());
+  };
+
+  const clearSessionState = () => {
+    sessionResultEligible = false;
+    sessionRevision += 1;
+    return translationUiSessionState.clear(context, sessionRevision);
+  };
+
+  const initializeSessionState = async () => {
+    await resetLanguagesToDefaults();
+
+    const snapshot = await translationUiSessionState.load(context);
+    if (!snapshot || typeof snapshot.draftSource !== 'string') {
+      sessionReady = true;
+      return false;
+    }
+
+    sessionRevision = Math.max(sessionRevision, Number(snapshot.revision) || 0);
+    sourceText.value = snapshot.draftSource;
+    sourceLanguage.value = snapshot.sourceLanguage || sourceLanguage.value;
+    targetLanguage.value = snapshot.targetLanguage || targetLanguage.value;
+    if (provider && snapshot.provider) provider.value = snapshot.provider;
+
+    const completed = snapshot.completedTranslation;
+    if (completed?.source === snapshot.draftSource) {
+      translatedText.value = completed.displayTranslatedText || '';
+      actualSourceLanguage.value = completed.actualSourceLanguage || completed.sourceLanguage || sourceLanguage.value;
+      actualTargetLanguage.value = completed.actualTargetLanguage || completed.targetLanguage || targetLanguage.value;
+      lastSyncedTimestamp.value = completed.timestamp || 0;
+      lastTranslation.value = {
+        source: completed.source,
+        target: completed.translationTarget,
+        sourceLanguage: completed.sourceLanguage,
+        targetLanguage: completed.targetLanguage,
+        provider: completed.provider,
+        mode: completed.mode,
+        timestamp: completed.timestamp,
+      };
+      sessionResultEligible = true;
+    } else {
+      translatedText.value = '';
+      lastTranslation.value = null;
+    }
+
+    sessionReady = true;
+    return true;
+  };
 
   /**
    * Returns the actual language detected by the provider/service during the last translation.
@@ -176,6 +268,7 @@ export function useUnifiedTranslation(context = 'popup') {
       // Also update actual language to reflect user's choice when manual selection changes
       actualTargetLanguage.value = newVal;
     }
+    void persistSessionState();
   });
 
   // Watch for local sourceLanguage changes
@@ -183,20 +276,39 @@ export function useUnifiedTranslation(context = 'popup') {
     if (newVal) {
       actualSourceLanguage.value = newVal;
     }
+    void persistSessionState();
   });
 
   // Reset lastTranslation when source text changes to ensure fresh detection for TTS
   // We keep translatedText as-is to prevent immediate UI clearing (better UX)
   watch(sourceText, (newVal, oldVal) => {
     if (newVal !== oldVal) {
+      const isExpectedProgrammaticChange = newVal === expectedProgrammaticSource;
+      expectedProgrammaticSource = null;
+      if (isExpectedProgrammaticChange) {
+        void persistSessionState();
+        return;
+      }
       // Don't clear if this change came from a store sync (source matches store)
       const ct = translationStore.currentTranslation;
       if (ct && ct.sourceText === newVal && ct.timestamp === lastSyncedTimestamp.value) {
         return;
       }
       lastTranslation.value = null;
+      sessionResultEligible = false;
     }
+    if (!newVal) {
+      void clearSessionState();
+      return;
+    }
+    void persistSessionState();
   });
+
+  if (provider) {
+    watch(provider, () => {
+      void persistSessionState();
+    });
+  }
 
   // Watch for store changes to update local targetLanguage (for cross-component sync)
   watch(() => translationStore.uiTargetLanguage, (newVal) => {
@@ -238,7 +350,12 @@ export function useUnifiedTranslation(context = 'popup') {
     };
   };
 
-  const handleTranslationSuccess = (resultData) => {
+  const handleTranslationSuccess = (resultData, requestSource) => {
+    if (requestSource !== sourceText.value) {
+      logger.debug(`[${context}] Ignoring stale translation result for changed source text`);
+      return false;
+    }
+
     translatedText.value = resultData.translatedText;
     errorManager.clearError();
     
@@ -269,6 +386,8 @@ export function useUnifiedTranslation(context = 'popup') {
     }
 
     logger.debug(`[${context}] Translation updated successfully - final translatedText: "${translatedText.value}"`);
+    sessionResultEligible = true;
+    return true;
   };
 
   const handleTranslationError = (error, messageId = null) => {
@@ -276,12 +395,14 @@ export function useUnifiedTranslation(context = 'popup') {
     translatedText.value = "";
     lastTranslation.value = null;
     lastSyncedTimestamp.value = 0;
+    sessionResultEligible = false;
     
     if (messageId && context === 'sidepanel') {
       pendingRequests.value.delete(messageId);
     }
     
     logger.debug(`[${context}] Translation error:`, error?.message || error);
+    void persistSessionState();
   };
 
   const ensureMinimumLoadingDuration = async () => {
@@ -312,6 +433,7 @@ export function useUnifiedTranslation(context = 'popup') {
 
     isTranslating.value = true;
     isStreaming.value = false;
+    sessionResultEligible = false;
     if (context === 'sidepanel') {
       loadingStartTime.value = Date.now();
     }
@@ -323,6 +445,8 @@ export function useUnifiedTranslation(context = 'popup') {
     try {
       const messageId = generateMessageId(context);
       currentMessageId.value = messageId;
+      activeRequestSource.value = sourceText.value;
+      void persistSessionState();
 
       // Track accumulated streaming results
       const accumulatedResults = new Map();
@@ -330,6 +454,7 @@ export function useUnifiedTranslation(context = 'popup') {
       // Register for streaming updates
       registerTranslation(messageId, {
         onStreamUpdate: (data) => {
+          if (activeRequestSource.value !== sourceText.value) return;
           if (data.data) {
             const batchText = Array.isArray(data.data) ? data.data.join('') : String(data.data);
             
@@ -386,7 +511,7 @@ export function useUnifiedTranslation(context = 'popup') {
         if (resultData.success === false && (resultData.error || resultData.errorDetails)) {
           handleTranslationError(resolveFailureError(resultData), messageId);
         } else if (resultData.success === true && resultData.translatedText !== undefined) {
-          handleTranslationSuccess(resultData);
+          handleTranslationSuccess(resultData, activeRequestSource.value);
           if (context === 'sidepanel') {
             pendingRequests.value.delete(messageId);
             await ensureMinimumLoadingDuration();
@@ -395,6 +520,8 @@ export function useUnifiedTranslation(context = 'popup') {
         isTranslating.value = false;
         isStreaming.value = false;
         currentMessageId.value = null;
+        activeRequestSource.value = null;
+        void persistSessionState();
         logger.debug(`[${context}] Direct response processed successfully`);
         return true;
       } else if (response && response.success === false && (response.error || response.errorDetails)) {
@@ -402,12 +529,16 @@ export function useUnifiedTranslation(context = 'popup') {
         isTranslating.value = false;
         isStreaming.value = false;
         currentMessageId.value = null;
+        activeRequestSource.value = null;
+        void persistSessionState();
         return false;
       } else {
         logger.warn(`[${context}] No valid response received`, response);
         isTranslating.value = false;
         isStreaming.value = false;
         currentMessageId.value = null;
+        activeRequestSource.value = null;
+        void persistSessionState();
         return false;
       }
 
@@ -427,13 +558,16 @@ export function useUnifiedTranslation(context = 'popup') {
       isTranslating.value = false;
       isStreaming.value = false;
       currentMessageId.value = null;
+      activeRequestSource.value = null;
       await ensureMinimumLoadingDuration();
+      void persistSessionState();
       return false;
     }
   };
 
   // --- Public Methods ---
   const clearTranslation = async () => {
+    await clearSessionState();
     sourceText.value = "";
     translatedText.value = "";
     errorManager.clearError();
@@ -442,12 +576,37 @@ export function useUnifiedTranslation(context = 'popup') {
     await resetLanguagesToDefaults();
   };
 
-  const loadLastTranslation = () => {
-    if (lastTranslation.value) {
-      sourceText.value = lastTranslation.value.source;
-      translatedText.value = lastTranslation.value.target;
-      lastSyncedTimestamp.value = lastTranslation.value.timestamp;
-    }
+  const revertTranslation = () => {
+    const translation = lastTranslation.value;
+    if (!translation) return null;
+
+    const revertedSource = translation.target || '';
+    expectedProgrammaticSource = revertedSource;
+    sourceText.value = revertedSource;
+    translatedText.value = translation.source || '';
+    sourceLanguage.value = translation.targetLanguage || sourceLanguage.value;
+    targetLanguage.value = translation.sourceLanguage || targetLanguage.value;
+    actualSourceLanguage.value = translation.targetLanguage || actualSourceLanguage.value;
+    actualTargetLanguage.value = translation.sourceLanguage || actualTargetLanguage.value;
+
+    const timestamp = Date.now();
+    lastSyncedTimestamp.value = timestamp;
+    lastTranslation.value = {
+      source: sourceText.value,
+      target: translatedText.value,
+      sourceLanguage: sourceLanguage.value,
+      targetLanguage: targetLanguage.value,
+      provider: translation.provider,
+      mode: translation.mode,
+      timestamp,
+    };
+    sessionResultEligible = true;
+    void persistSessionState();
+
+    return {
+      sourceLanguage: sourceLanguage.value,
+      targetLanguage: targetLanguage.value,
+    };
   };
 
   // --- Lifecycle & Watchers ---
@@ -460,14 +619,14 @@ export function useUnifiedTranslation(context = 'popup') {
       sourceLanguage.value = await findLanguageCode(newTranslation.sourceLanguage) || AUTO_DETECT_VALUE;
       targetLanguage.value = await findLanguageCode(newTranslation.targetLanguage) || DEFAULT_TARGET_LANGUAGE;
       errorManager.clearError();
+      sessionResultEligible = sourceText.value === newTranslation.sourceText;
+      void persistSessionState();
     }
   }, { deep: true });
 
   let messageListener = null;
 
   onMounted(async () => {
-    await resetLanguagesToDefaults();
-
     messageListener = (message, sender) => {
       // Route through ContentScriptIntegration for streaming and unified handling
       const handledByIntegration = routeMessage(message, sender);
@@ -491,18 +650,22 @@ export function useUnifiedTranslation(context = 'popup') {
       // 2. Handle Translation Results (Fallback/Direct)
       if (context === 'popup') {
         logger.debug(`[${context}] Message listener triggered - isTranslating: ${isTranslating.value}`);
+        if (message.messageId && message.messageId !== currentMessageId.value) return;
         let resultData = message.result || message.data || (message.translatedText ? message : null);
 
         if (resultData && (resultData.translatedText !== undefined || resultData.success === false || resultData.success === true)) {
           if (resultData.success === false && (resultData.error || resultData.errorDetails)) {
             handleTranslationError(resolveFailureError(resultData));
           } else if (resultData.success === true && resultData.translatedText !== undefined) {
-            handleTranslationSuccess(resultData);
+            handleTranslationSuccess(resultData, activeRequestSource.value);
           } else {
             handleTranslationError("Unexpected response format");
           }
           isTranslating.value = false;
           isStreaming.value = false;
+          currentMessageId.value = null;
+          activeRequestSource.value = null;
+          void persistSessionState();
         }
       } else if (context === 'sidepanel') {
         if (message.action !== MessageActions.TRANSLATION_RESULT_UPDATE || (message.context && message.context !== MessagingContexts.SIDEPANEL)) {
@@ -519,10 +682,13 @@ export function useUnifiedTranslation(context = 'popup') {
           if (message.data.success === false && (message.data.error || message.data.errorDetails)) {
             handleTranslationError(resolveFailureError(message.data));
           } else if (message.data.success === true && message.data.translatedText !== undefined) {
-            handleTranslationSuccess(message.data);
+            handleTranslationSuccess(message.data, activeRequestSource.value);
           } else {
             handleTranslationError("Unexpected response format in sidepanel");
           }
+          currentMessageId.value = null;
+          activeRequestSource.value = null;
+          void persistSessionState();
         });
       }
     };
@@ -569,7 +735,8 @@ export function useUnifiedTranslation(context = 'popup') {
     triggerTranslation,
     cancelTranslation,
     clearTranslation,
-    loadLastTranslation,
+    revertTranslation,
+    initializeSessionState,
     getRetryCallback: errorManager.getRetryCallback,
     getSettingsCallback: errorManager.getSettingsCallback,
     // Context
