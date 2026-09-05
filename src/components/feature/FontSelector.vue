@@ -110,6 +110,8 @@
       </div>
     </div>
 
+    <slot name="after-font-family" />
+
     <!-- Font Size Selector -->
     <div class="font-group">
       <label for="font-size-select">{{ t('font_size_label') || 'Font Size' }}</label>

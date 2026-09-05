@@ -19,15 +19,24 @@
             :target-language="targetLanguage"
             @update:font-family="fontFamily = $event"
             @update:font-size="fontSize = $event"
-          />
-        </div>
-        <div class="ti-translation-font-toggle">
-          <span>{{ t('select_element_use_translation_font_label') || 'Use translation font in Select Element' }}</span>
-          <BaseToggle v-model="selectElementUseTranslationFont" />
-        </div>
-        <div class="ti-translation-font-toggle">
-          <span>{{ t('whole_page_use_translation_font_label') || 'Use translation font in Page Translation' }}</span>
-          <BaseToggle v-model="wholePageUseTranslationFont" />
+          >
+            <template #after-font-family>
+              <div
+                id="SELECT_ELEMENT_USE_TRANSLATION_FONT"
+                class="ti-translation-font-toggle"
+              >
+                <span>{{ t('select_element_use_translation_font_label') || 'Use translation font in Select Element' }}</span>
+                <BaseToggle v-model="selectElementUseTranslationFont" />
+              </div>
+              <div
+                id="WHOLE_PAGE_USE_TRANSLATION_FONT"
+                class="ti-translation-font-toggle"
+              >
+                <span>{{ t('whole_page_use_translation_font_label') || 'Use translation font in Page Translation' }}</span>
+                <BaseToggle v-model="wholePageUseTranslationFont" />
+              </div>
+            </template>
+          </FontSelector>
         </div>
       </BaseFieldset>
       

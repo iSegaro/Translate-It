@@ -30,6 +30,10 @@
     margin-top: $spacing-lg;
   }
 
+  .font-selector > .font-group + .ti-translation-font-toggle {
+    margin-top: 0;
+  }
+
   .validation-error {
     margin-top: $spacing-md;
     padding: $spacing-sm;
