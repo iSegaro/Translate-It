@@ -38,6 +38,8 @@ const ACTION_CONTEXT_MENU_SUBTITLE_ID = "open-subtitle-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
 const API_PROVIDER_PARENT_ID = "api-provider-parent";
+const TRANSLATORS_PARENT_ID = "translators-parent";
+const SETTINGS_PARENT_ID = "settings-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 
 // Settings required to build context menus and filter available providers.
@@ -567,60 +569,83 @@ export class ContextMenuManager extends ResourceTracker {
           }
         }
 
-        // --- 2.3.4 PDF Menu (Before Subtitle) ---
-        if (visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false) {
-          await this.createMenu({
-            id: ACTION_CONTEXT_MENU_PDF_ID,
-            title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
-            contexts: ["action"],
-          });
-        }
+        // --- 2.4. Translators Menu ---
+        const isTranslatorsMenuVisible =
+          visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false ||
+          visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false;
 
-        // --- 2.3.5 Subtitle Menu (Before Options) ---
-        if (visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false) {
+        if (isTranslatorsMenuVisible) {
           await this.createMenu({
-            id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
-            title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
-            contexts: ["action"],
-          });
-        }
-
-        // --- 2.4. Options Menu (Fourth option in Action menu) ---
-        if (visibility.ACTION_CONTEXT_OPTIONS) {
-          await this.createMenu({
-            id: ACTION_CONTEXT_MENU_OPTIONS_ID,
-            title: (await getTranslationString("context_menu_options", locale)) || "Options",
-            contexts: ["action"],
-          });
-        }
-
-        // --- Separator ---
-        if (visibility.ACTION_CONTEXT_SHORTCUTS || visibility.ACTION_CONTEXT_HELP) {
-          await this.createMenu({
-            id: "action-separator-1",
-            type: "separator",
-            contexts: ["action"],
-          });
-        }
-
-        // --- Other Action Menus ---
-        if (visibility.ACTION_CONTEXT_SHORTCUTS) {
-          await this.createMenu({
-            id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+            id: TRANSLATORS_PARENT_ID,
             title:
-              (await getTranslationString("context_menu_shortcuts", locale)) ||
-              "Manage Shortcuts",
+              (await getTranslationString("context_menu_translators", locale)) ||
+              "Translators",
             contexts: ["action"],
           });
+
+          if (visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_PDF_ID,
+              parentId: TRANSLATORS_PARENT_ID,
+              title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+              contexts: ["action"],
+            });
+          }
+
+          if (visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
+              parentId: TRANSLATORS_PARENT_ID,
+              title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
+              contexts: ["action"],
+            });
+          }
         }
 
-        if (visibility.ACTION_CONTEXT_HELP) {
+        // --- 2.5. Settings Menu ---
+        const isSettingsMenuVisible =
+          visibility.ACTION_CONTEXT_OPTIONS ||
+          visibility.ACTION_CONTEXT_SHORTCUTS ||
+          visibility.ACTION_CONTEXT_HELP;
+
+        if (isSettingsMenuVisible) {
           await this.createMenu({
-            id: HELP_MENU_ID,
+            id: SETTINGS_PARENT_ID,
             title:
-              (await getTranslationString("context_menu_help", locale)) || "Help & Support",
+              (await getTranslationString("context_menu_settings", locale)) ||
+              "Settings",
             contexts: ["action"],
           });
+
+          if (visibility.ACTION_CONTEXT_OPTIONS) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_OPTIONS_ID,
+              parentId: SETTINGS_PARENT_ID,
+              title: (await getTranslationString("context_menu_options", locale)) || "Options",
+              contexts: ["action"],
+            });
+          }
+
+          if (visibility.ACTION_CONTEXT_SHORTCUTS) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+              parentId: SETTINGS_PARENT_ID,
+              title:
+                (await getTranslationString("context_menu_shortcuts", locale)) ||
+                "Manage Shortcuts",
+              contexts: ["action"],
+            });
+          }
+
+          if (visibility.ACTION_CONTEXT_HELP) {
+            await this.createMenu({
+              id: HELP_MENU_ID,
+              parentId: SETTINGS_PARENT_ID,
+              title:
+                (await getTranslationString("context_menu_help", locale)) || "Help & Support",
+              contexts: ["action"],
+            });
+          }
         }
         logger.debug("Action context menus created successfully.");
       } catch (e) {

@@ -47,6 +47,12 @@
   "context_menu_api_provider": {
     "message": "سرور API"
   },
+  "context_menu_translators": {
+    "message": "مترجم‌ها"
+  },
+  "context_menu_settings": {
+    "message": "تنظیمات"
+  },
   "api_provider_google": {
     "message": "مترجم گوگل (کلاسیک)"
   },

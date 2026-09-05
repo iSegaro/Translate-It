@@ -47,6 +47,12 @@
   "context_menu_api_provider": {
     "message": "API Provider"
   },
+  "context_menu_translators": {
+    "message": "Translators"
+  },
+  "context_menu_settings": {
+    "message": "Settings"
+  },
   "api_provider_google": {
     "message": "Google Translate (Classic)"
   },

@@ -158,6 +158,10 @@ const CONTEXT_MENU_VISIBILITY = {
   ACTION_CONTEXT_HELP: true
 };
 
+const API_PROVIDER_PARENT_ID = 'api-provider-parent';
+const TRANSLATORS_PARENT_ID = 'translators-parent';
+const SETTINGS_PARENT_ID = 'settings-parent';
+
 const createSettings = (overrides = {}) => ({
   EXTENSION_ENABLED: true,
   TRANSLATE_WITH_SELECT_ELEMENT: true,
@@ -172,6 +176,14 @@ const createSettings = (overrides = {}) => ({
 
 const getCreatedMenuIds = () => mocks.browser.contextMenus.create.mock.calls
   .map(([menu]) => menu.id);
+
+const getCreatedMenus = () => mocks.browser.contextMenus.create.mock.calls
+  .map(([menu]) => menu);
+
+const getCreatedMenu = (id) => getCreatedMenus().find(menu => menu.id === id);
+
+const getActionMenus = () => getCreatedMenus()
+  .filter(menu => menu.contexts?.includes('action'));
 
 describe('ContextMenuManager keyed storage reads', () => {
   let manager;
@@ -247,6 +259,119 @@ describe('ContextMenuManager keyed storage reads', () => {
     expect(menuIds).not.toContain('action-translate-element');
     expect(menuIds).not.toContain('screen-capture-page');
     expect(menuIds).not.toContain('screen-capture-action');
+  });
+
+  it('creates the expected Action menu structure with nested children', async () => {
+    await manager._setupMenusInternal();
+
+    const topLevelActionIds = getActionMenus()
+      .filter(menu => !menu.parentId)
+      .map(menu => menu.id);
+
+    expect(topLevelActionIds).toEqual([
+      API_PROVIDER_PARENT_ID,
+      'action-translate-element',
+      'screen-capture-action',
+      TRANSLATORS_PARENT_ID,
+      SETTINGS_PARENT_ID
+    ]);
+    expect(getCreatedMenu('open-pdf-page').parentId).toBe(TRANSLATORS_PARENT_ID);
+    expect(getCreatedMenu('open-subtitle-page').parentId).toBe(TRANSLATORS_PARENT_ID);
+    expect(getCreatedMenu('open-options-page').parentId).toBe(SETTINGS_PARENT_ID);
+    expect(getCreatedMenu('open-shortcuts-page').parentId).toBe(SETTINGS_PARENT_ID);
+    expect(getCreatedMenu('open-help-page').parentId).toBe(SETTINGS_PARENT_ID);
+    expect(getActionMenus().some(menu => menu.type === 'separator' && !menu.parentId)).toBe(false);
+  });
+
+  it('preserves provider submenu creation and selected provider state', async () => {
+    await manager._setupMenusInternal();
+
+    expect(getCreatedMenu('api-provider-googlev2')).toMatchObject({
+      parentId: API_PROVIDER_PARENT_ID,
+      type: 'checkbox',
+      checked: true
+    });
+    expect(getCreatedMenu('api-provider-openai')).toMatchObject({
+      parentId: API_PROVIDER_PARENT_ID,
+      type: 'checkbox',
+      checked: false
+    });
+    expect(getCreatedMenus()).toContainEqual(expect.objectContaining({
+      parentId: API_PROVIDER_PARENT_ID,
+      type: 'separator'
+    }));
+  });
+
+  it.each([
+    ['both children enabled', { ACTION_CONTEXT_PDF_TRANSLATOR: true, ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true }, ['open-pdf-page', 'open-subtitle-page']],
+    ['only PDF enabled', { ACTION_CONTEXT_PDF_TRANSLATOR: true, ACTION_CONTEXT_SUBTITLE_TRANSLATOR: false }, ['open-pdf-page']],
+    ['only Subtitle enabled', { ACTION_CONTEXT_PDF_TRANSLATOR: false, ACTION_CONTEXT_SUBTITLE_TRANSLATOR: true }, ['open-subtitle-page']]
+  ])('creates Translators parent for %s', async (_name, translatorVisibility, childIds) => {
+    mocks.storageManager.get.mockResolvedValue(createSettings({
+      CONTEXT_MENU_VISIBILITY: {
+        ...CONTEXT_MENU_VISIBILITY,
+        ...translatorVisibility
+      }
+    }));
+
+    await manager._setupMenusInternal();
+
+    expect(getCreatedMenu(TRANSLATORS_PARENT_ID)).toBeDefined();
+    expect(getCreatedMenus()
+      .filter(menu => menu.parentId === TRANSLATORS_PARENT_ID)
+      .map(menu => menu.id)).toEqual(childIds);
+  });
+
+  it('does not create Translators when both children are disabled', async () => {
+    mocks.storageManager.get.mockResolvedValue(createSettings({
+      CONTEXT_MENU_VISIBILITY: {
+        ...CONTEXT_MENU_VISIBILITY,
+        ACTION_CONTEXT_PDF_TRANSLATOR: false,
+        ACTION_CONTEXT_SUBTITLE_TRANSLATOR: false
+      }
+    }));
+
+    await manager._setupMenusInternal();
+
+    expect(getCreatedMenu(TRANSLATORS_PARENT_ID)).toBeUndefined();
+    expect(getCreatedMenu('open-pdf-page')).toBeUndefined();
+    expect(getCreatedMenu('open-subtitle-page')).toBeUndefined();
+  });
+
+  it('creates Settings parent with only enabled children', async () => {
+    mocks.storageManager.get.mockResolvedValue(createSettings({
+      CONTEXT_MENU_VISIBILITY: {
+        ...CONTEXT_MENU_VISIBILITY,
+        ACTION_CONTEXT_OPTIONS: false,
+        ACTION_CONTEXT_SHORTCUTS: true,
+        ACTION_CONTEXT_HELP: false
+      }
+    }));
+
+    await manager._setupMenusInternal();
+
+    expect(getCreatedMenu(SETTINGS_PARENT_ID)).toBeDefined();
+    expect(getCreatedMenus()
+      .filter(menu => menu.parentId === SETTINGS_PARENT_ID)
+      .map(menu => menu.id)).toEqual(['open-shortcuts-page']);
+  });
+
+  it('does not create Settings when all children are disabled', async () => {
+    mocks.storageManager.get.mockResolvedValue(createSettings({
+      CONTEXT_MENU_VISIBILITY: {
+        ...CONTEXT_MENU_VISIBILITY,
+        ACTION_CONTEXT_OPTIONS: false,
+        ACTION_CONTEXT_SHORTCUTS: false,
+        ACTION_CONTEXT_HELP: false
+      }
+    }));
+
+    await manager._setupMenusInternal();
+
+    expect(getCreatedMenu(SETTINGS_PARENT_ID)).toBeUndefined();
+    expect(getCreatedMenu('open-options-page')).toBeUndefined();
+    expect(getCreatedMenu('open-shortcuts-page')).toBeUndefined();
+    expect(getCreatedMenu('open-help-page')).toBeUndefined();
   });
 
   it('preserves defaults when requested settings are absent', async () => {
