@@ -47,6 +47,12 @@
   "context_menu_api_provider": {
     "message": "APIプロバイダー"
   },
+  "context_menu_translators": {
+    "message": "翻訳ツール"
+  },
+  "context_menu_settings": {
+    "message": "設定"
+  },
   "api_provider_google": {
     "message": "Google Translate (Classic)"
   },
@@ -510,19 +516,19 @@
     "message": "キーボードショートカットの変更方法"
   },
   "help_shortcut_content_p1": {
-    "message": "Firefoxでは、ショートカットはアドオンページで管理します："
+    "message": "キーボードショートカットをカスタマイズするには："
   },
   "help_shortcut_content_li1": {
-    "message": "アドレスバーに **about:addons** と入力します。"
+    "message": "ブラウザーのツールバーにある **Translate It** アイコンを右クリックします。"
   },
   "help_shortcut_content_li2": {
-    "message": "右上の **歯車アイコン（⚙️）** をクリックします。"
+    "message": "**設定** を開きます。"
   },
   "help_shortcut_content_li3": {
-    "message": "メニューから **拡張機能のショートカットを管理** を選択します。"
+    "message": "**キーボードショートカット**を選択します。"
   },
   "help_shortcut_content_li4": {
-    "message": "**Translate It** を見つけて、お好みのショートカットを設定します。"
+    "message": "ブラウザーのショートカット設定ページが開きます。"
   },
   "help_api_keys_title": {
     "message": "APIキーはどこで取得できますか？"
@@ -564,16 +570,7 @@
     "message": "API キーはブラウザ内にローカルに保存され、第三者と共有されることはありません。さらにセキュリティを高めるため、インポート/エクスポート機能を使用して設定をエクスポートする際に暗号化することが可能です。"
   },
   "help_shortcut_content_p2": {
-    "message": "**Chrome** では操作が異なります："
-  },
-  "help_shortcut_content_chrome_li1": {
-    "message": "拡張機能アイコンを右クリックします。"
-  },
-  "help_shortcut_content_chrome_li2": {
-    "message": "メニューから **キーボードショートカット** を選択します。"
-  },
-  "help_shortcut_content_chrome_li3": {
-    "message": "**Translate It** の横にある鉛筆アイコン（✏️）をクリックして、新しいショートカットを入力します。"
+    "message": "**Translate It** を見つけて、必要なショートカットを設定します。"
   },
   "translation_activation_section_title": {
     "message": "翻訳の有効化方法"

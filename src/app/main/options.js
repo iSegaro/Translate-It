@@ -67,28 +67,22 @@ async function initializeApp() {
     await setI18nLocale(userLocale);
     logger.debug('� vue-i18n plugin locale set:', userLocale)
 
-    // Check for tab query parameter for Firefox shortcuts navigation and hash URLs
+    // Check for Help navigation query and hash URLs
     let initialRoute = '/languages'; // Default to languages tab
-    let shouldNavigateToHelp = false;
 
     try {
-      // First check query parameters (for Firefox shortcuts)
+      // First check query parameters
       const urlParams = new URLSearchParams(window.location.search);
       const tabParam = urlParams.get('tab');
 
-      if (tabParam === 'shortcuts') {
-        // For Firefox shortcuts navigation, redirect to help tab
+      if (tabParam === 'help') {
+        // Redirect Help query navigation to the Help tab
         initialRoute = '/help';
-        shouldNavigateToHelp = true;
-        logger.debug('Detected tab=shortcuts parameter, redirecting to help tab for Firefox');
-      } else if (tabParam === 'help') {
-        // For Firefox help navigation, redirect to help tab
-        initialRoute = '/help';
-        logger.debug('Detected tab=help parameter, redirecting to help tab for Firefox');
+        logger.debug('Detected tab=help parameter, redirecting to help tab');
       } else {
         // If no query parameter, check hash URL
         const hash = window.location.hash.replace('#', '').replace('/', '');
-        if (hash === 'help' || hash === 'shortcuts') {
+        if (hash === 'help') {
           initialRoute = '/help';
           logger.debug(`Detected hash #${hash}, redirecting to help tab`);
         } else if (hash && hash !== '') {
@@ -141,33 +135,6 @@ async function initializeApp() {
       ]
     })
     logger.debug('� Router created successfully')
-
-    // Handle Firefox shortcuts navigation after router is ready
-    router.isReady().then(() => {
-      if (shouldNavigateToHelp) {
-        logger.debug('� Navigating to help tab for Firefox shortcuts');
-        // Use replace to avoid adding to history
-        router.replace('/help');
-
-        // Additional fallback: manually set hash after a delay
-        setTimeout(() => {
-          if (window.location.hash !== '#/help') {
-            logger.debug('� Setting hash manually as fallback');
-            window.location.hash = '#/help';
-          }
-        }, 100);
-      }
-    }).catch(error => {
-      logger.error('Router ready failed:', error);
-
-      // Fallback navigation if router fails
-      if (shouldNavigateToHelp) {
-        logger.debug('� Using fallback navigation to help tab');
-        setTimeout(() => {
-          window.location.hash = '#/help';
-        }, 500);
-      }
-    });
 
     // Create Vue app
     logger.debug('� Creating Vue app...')

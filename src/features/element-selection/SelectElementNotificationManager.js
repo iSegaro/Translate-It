@@ -15,7 +15,9 @@ class SelectElementNotificationManager extends ResourceTracker {
     
     this.notificationManager = notificationManager;
     this.toastId = null;
-    this.showPending = false;
+    this.toastGeneration = null;
+    this.notificationGeneration = 0;
+    this.isStatusToast = false;
     this.isInitialized = false;
     
     this.logger = getScopedLogger(LOG_COMPONENTS.ELEMENT_SELECTION, 'SelectElementNotificationManager');
@@ -49,6 +51,34 @@ class SelectElementNotificationManager extends ResourceTracker {
     this.addEventListener(pageEventBus, 'cancel-select-element-mode', () => this.dismissNotification());
     this.addEventListener(pageEventBus, 'show-select-element-info', (data) => this.showInfoNotification(data));
   }
+
+  _startNotificationLifecycle() {
+    this.notificationGeneration += 1;
+
+    if (this.toastId) {
+      this.notificationManager.dismiss(this.toastId);
+    }
+
+    this.toastId = null;
+    this.toastGeneration = null;
+    this.isStatusToast = false;
+
+    return {
+      generation: this.notificationGeneration,
+      toastId: `select-element-toast-${this.notificationGeneration}`
+    };
+  }
+
+  _isCurrentGeneration(generation) {
+    return generation === this.notificationGeneration;
+  }
+
+  _ownsStatusToast(generation, toastId) {
+    return this.isStatusToast
+      && this.toastGeneration === generation
+      && this.toastId === toastId
+      && this._isCurrentGeneration(generation);
+  }
   
   async showNotification(data = {}) {
     // Safety check for null data from events
@@ -58,20 +88,18 @@ class SelectElementNotificationManager extends ResourceTracker {
     const isTopFrame = window === window.top;
     if (!isTopFrame) return;
 
-    this.showPending = true;
+    const { generation, toastId } = this._startNotificationLifecycle();
     try {
       const { getTranslationString } = await utilsFactory.getI18nUtils();
-      
-      // Check if we should still show this after async call
-      if (!this.showPending) return;
+      if (!this._isCurrentGeneration(generation)) return;
 
       const cancelLabel = await getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
+      if (!this._isCurrentGeneration(generation)) return;
+
       const isMobile = deviceDetector.isMobile();
       const messageKey = isMobile ? 'SELECT_ELEMENT_MODE_ACTIVATED_MOBILE' : 'SELECT_ELEMENT_MODE_ACTIVATED';
       const message = await getTranslationString(messageKey) || (isMobile ? 'Drag over text to translate.' : 'Click text to translate.');
-
-      // Final check before showing
-      if (!this.showPending) return;
+      if (!this._isCurrentGeneration(generation)) return;
 
       const actions = [
         {
@@ -80,16 +108,21 @@ class SelectElementNotificationManager extends ResourceTracker {
         }
       ];
 
-      // Use central showStatus for a consistent experience
-      this.toastId = this.notificationManager.showStatus(message, {
-        id: 'select-element-toast',
+      // Status IDs must remain feature-owned across rapid activation cycles.
+      this.notificationManager.show(message, 'status', 0, {
+        id: toastId,
+        persistent: true,
         actions
       });
+      if (!this._isCurrentGeneration(generation)) return;
 
+      this.toastId = toastId;
+      this.toastGeneration = generation;
+      this.isStatusToast = true;
     } catch (error) {
-      this.logger.error('Error showing Select Element notification:', error);
-    } finally {
-      this.showPending = false;
+      if (this._isCurrentGeneration(generation)) {
+        this.logger.error('Error showing Select Element notification:', error);
+      }
     }
   }
   
@@ -98,7 +131,9 @@ class SelectElementNotificationManager extends ResourceTracker {
     if (!data) data = {};
 
     const isTopFrame = window === window.top;
-    if (!this.toastId || !isTopFrame) {
+    const generation = this.notificationGeneration;
+    const toastId = this.toastId;
+    if (!this._ownsStatusToast(generation, toastId) || !isTopFrame) {
       this.logger.debug(`[SelectElementNotificationManager] Skip update - toastId: ${this.toastId}, isTopFrame: ${isTopFrame}`);
       return;
     }
@@ -106,7 +141,10 @@ class SelectElementNotificationManager extends ResourceTracker {
     try {
       if (data.status === TRANSLATION_STATUS.TRANSLATING) {
         const i18n = await utilsFactory.getI18nUtils();
+        if (!this._ownsStatusToast(generation, toastId)) return;
+
         let translatingMessage = await i18n.getTranslationString('SELECT_ELEMENT_TRANSLATING') || 'Translating...';
+        if (!this._ownsStatusToast(generation, toastId)) return;
 
         // Show progress based on API requests
         if (data.progress && data.progress.completed !== undefined && data.progress.total !== undefined) {
@@ -117,17 +155,11 @@ class SelectElementNotificationManager extends ResourceTracker {
           this.logger.debug(`[SelectElementNotificationManager] Updating toast with: ${translatingMessage}`);
         }
 
-        // CRITICAL: Re-check toastId after async await
-        if (!this.toastId) return;
-
         const cancelLabel = await i18n.getTranslationString('SELECT_ELEMENT_CANCEL') || 'Cancel';
+        if (!this._ownsStatusToast(generation, toastId)) return;
 
-        // Final safety check
-        if (!this.toastId) return;
-
-        // Update existing notification - ALWAYS use 'select-element-toast' as ID for safety
-        this.notificationManager.update(this.toastId, translatingMessage, {
-          id: 'select-element-toast',
+        this.notificationManager.update(toastId, translatingMessage, {
+          id: toastId,
           type: 'status',
           persistent: true,
           actions: [{
@@ -142,10 +174,15 @@ class SelectElementNotificationManager extends ResourceTracker {
   }
   
   dismissNotification() {
-    this.showPending = false;
-    if (this.toastId) {
-      this.notificationManager.dismiss(this.toastId);
-      this.toastId = null;
+    this.notificationGeneration += 1;
+    const toastId = this.toastId;
+
+    this.toastId = null;
+    this.toastGeneration = null;
+    this.isStatusToast = false;
+
+    if (toastId) {
+      this.notificationManager.dismiss(toastId);
     }
   }
 
@@ -162,10 +199,10 @@ class SelectElementNotificationManager extends ResourceTracker {
     const isTopFrame = window === window.top;
     if (!isTopFrame) return;
 
-    this.dismissNotification();
+    const { toastId } = this._startNotificationLifecycle();
 
     const message = data.message || 'No translatable text was found in this element.';
-    this.notificationManager.show(message, 'info', 4000, { id: 'select-element-toast' });
+    this.notificationManager.show(message, 'info', 4000, { id: toastId });
   }
   
   async cleanup() {

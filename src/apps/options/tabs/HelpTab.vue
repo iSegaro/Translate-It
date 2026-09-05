@@ -85,20 +85,13 @@ const toggleAccordion = (section) => {
 }
 
 const shortcutHelpContent = computed(() => {
-  const content = `${t('help_shortcut_content_p1') || 'To use this extension, you have several options:'}
+  const content = `${t('help_shortcut_content_p1') || 'To customize keyboard shortcuts:'}
 
-1. ${t('help_shortcut_content_li1') || 'Select text on any webpage and press **Ctrl+/** (**Cmd+/** on Mac) to translate it instantly.'}
-2. ${t('help_shortcut_content_li2') || 'Right-click on selected text and choose **"Translate Selected Text"** from the context menu.'}
-3. ${t('help_shortcut_content_li3') || 'Click on the extension icon in the toolbar to open the translation popup.'}
-4. ${t('help_shortcut_content_li4') || 'Use the side panel for continuous translation work (**Chrome only**).'}
-
----
-
-${t('help_shortcut_content_p2') || 'To customize keyboard shortcuts in Chrome:'}
-
-1. ${t('help_shortcut_content_chrome_li1') || 'Go to **chrome://extensions/**'}
-2. ${t('help_shortcut_content_chrome_li2') || 'Click on the menu **(☰)** in the top-left corner'}
-3. ${t('help_shortcut_content_chrome_li3') || 'Select **"Keyboard shortcuts"** and customize as needed'}`
+1. ${t('help_shortcut_content_li1') || 'Right-click the **Translate It** icon in the browser toolbar.'}
+2. ${t('help_shortcut_content_li2') || 'Open **Settings**.'}
+3. ${t('help_shortcut_content_li3') || 'Select **Manage Shortcuts**.'}
+4. ${t('help_shortcut_content_li4') || "Your browser's shortcut settings page will open."}
+5. ${t('help_shortcut_content_p2') || 'Find **Translate It** and configure the shortcuts you want.'}`
 
   try {
     const markdownElement = SimpleMarkdown.render(content)
@@ -157,31 +150,6 @@ watch([sanitizedShortcutHelp, sanitizedApiKeysHelp], () => {
 // Process links when component mounts and when accordions are clicked
 onMounted(() => {
   setTimeout(addTargetBlankToLinks, 200)
-
-  // Check if user came from shortcuts menu and auto-open shortcuts section
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tabParam = urlParams.get('tab');
-
-    if (tabParam === 'shortcuts') {
-      logger.debug('Auto-opening shortcuts accordion for Firefox user');
-      // Auto-open the shortcuts section
-      openAccordion.value = 'shortcut';
-
-      // Scroll to shortcuts section after a brief delay
-      setTimeout(() => {
-        const shortcutsElement = document.querySelector('.accordion-item');
-        if (shortcutsElement) {
-          shortcutsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 300);
-    } else if (tabParam === 'help') {
-      logger.debug('Firefox user accessing help tab via context menu');
-      // No auto-open needed for general help access, just log the navigation
-    }
-  } catch (e) {
-    logger.debug('Failed to check URL parameters for auto-opening accordion:', e);
-  }
 
   // Also process when accordion is clicked
   document.addEventListener('click', (e) => {
