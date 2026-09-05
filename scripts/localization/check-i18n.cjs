@@ -38,7 +38,8 @@ const safeSpecificKeys = [
   'app_welcome', 'context_menu_options', 'context_menu_shortcuts', 
   'context_menu_help', 'context_menu_translate_screen', 
   'context_menu_reload_extension', 'context_menu_translate_with_selection', 
-  'context_menu_api_provider', 'export_settings_description', 
+  'context_menu_api_provider', 'context_menu_translators', 'context_menu_settings',
+  'export_settings_description', 
   'import_settings_description', 'import_success', 
   'notification_update_title', 'notification_update_message', 
   'save_settings_button', 'excluded_sites_label', 'translateSelectedText'

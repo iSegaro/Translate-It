@@ -38,6 +38,8 @@ const ACTION_CONTEXT_MENU_SUBTITLE_ID = "open-subtitle-page";
 const ACTION_CONTEXT_MENU_SHORTCUTS_ID = "open-shortcuts-page";
 const HELP_MENU_ID = "open-help-page";
 const API_PROVIDER_PARENT_ID = "api-provider-parent";
+const TRANSLATORS_PARENT_ID = "translators-parent";
+const SETTINGS_PARENT_ID = "settings-parent";
 const API_PROVIDER_ITEM_ID_PREFIX = "api-provider-";
 
 // Settings required to build context menus and filter available providers.
@@ -567,60 +569,83 @@ export class ContextMenuManager extends ResourceTracker {
           }
         }
 
-        // --- 2.3.4 PDF Menu (Before Subtitle) ---
-        if (visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false) {
-          await this.createMenu({
-            id: ACTION_CONTEXT_MENU_PDF_ID,
-            title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
-            contexts: ["action"],
-          });
-        }
+        // --- 2.4. Translators Menu ---
+        const isTranslatorsMenuVisible =
+          visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false ||
+          visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false;
 
-        // --- 2.3.5 Subtitle Menu (Before Options) ---
-        if (visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false) {
+        if (isTranslatorsMenuVisible) {
           await this.createMenu({
-            id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
-            title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
-            contexts: ["action"],
-          });
-        }
-
-        // --- 2.4. Options Menu (Fourth option in Action menu) ---
-        if (visibility.ACTION_CONTEXT_OPTIONS) {
-          await this.createMenu({
-            id: ACTION_CONTEXT_MENU_OPTIONS_ID,
-            title: (await getTranslationString("context_menu_options", locale)) || "Options",
-            contexts: ["action"],
-          });
-        }
-
-        // --- Separator ---
-        if (visibility.ACTION_CONTEXT_SHORTCUTS || visibility.ACTION_CONTEXT_HELP) {
-          await this.createMenu({
-            id: "action-separator-1",
-            type: "separator",
-            contexts: ["action"],
-          });
-        }
-
-        // --- Other Action Menus ---
-        if (visibility.ACTION_CONTEXT_SHORTCUTS) {
-          await this.createMenu({
-            id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+            id: TRANSLATORS_PARENT_ID,
             title:
-              (await getTranslationString("context_menu_shortcuts", locale)) ||
-              "Manage Shortcuts",
+              (await getTranslationString("context_menu_translators", locale)) ||
+              "Translators",
             contexts: ["action"],
           });
+
+          if (visibility.ACTION_CONTEXT_PDF_TRANSLATOR !== false) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_PDF_ID,
+              parentId: TRANSLATORS_PARENT_ID,
+              title: (await getTranslationString("pdf_app_title", locale)) || "PDF Translator",
+              contexts: ["action"],
+            });
+          }
+
+          if (visibility.ACTION_CONTEXT_SUBTITLE_TRANSLATOR !== false) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_SUBTITLE_ID,
+              parentId: TRANSLATORS_PARENT_ID,
+              title: (await getTranslationString("subtitle_app_title", locale)) || "Subtitle Translator",
+              contexts: ["action"],
+            });
+          }
         }
 
-        if (visibility.ACTION_CONTEXT_HELP) {
+        // --- 2.5. Settings Menu ---
+        const isSettingsMenuVisible =
+          visibility.ACTION_CONTEXT_OPTIONS ||
+          visibility.ACTION_CONTEXT_SHORTCUTS ||
+          visibility.ACTION_CONTEXT_HELP;
+
+        if (isSettingsMenuVisible) {
           await this.createMenu({
-            id: HELP_MENU_ID,
+            id: SETTINGS_PARENT_ID,
             title:
-              (await getTranslationString("context_menu_help", locale)) || "Help & Support",
+              (await getTranslationString("context_menu_settings", locale)) ||
+              "Settings",
             contexts: ["action"],
           });
+
+          if (visibility.ACTION_CONTEXT_OPTIONS) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_OPTIONS_ID,
+              parentId: SETTINGS_PARENT_ID,
+              title: (await getTranslationString("context_menu_options", locale)) || "Options",
+              contexts: ["action"],
+            });
+          }
+
+          if (visibility.ACTION_CONTEXT_SHORTCUTS) {
+            await this.createMenu({
+              id: ACTION_CONTEXT_MENU_SHORTCUTS_ID,
+              parentId: SETTINGS_PARENT_ID,
+              title:
+                (await getTranslationString("context_menu_shortcuts", locale)) ||
+                "Manage Shortcuts",
+              contexts: ["action"],
+            });
+          }
+
+          if (visibility.ACTION_CONTEXT_HELP) {
+            await this.createMenu({
+              id: HELP_MENU_ID,
+              parentId: SETTINGS_PARENT_ID,
+              title:
+                (await getTranslationString("context_menu_help", locale)) || "Help & Support",
+              contexts: ["action"],
+            });
+          }
         }
         logger.debug("Action context menus created successfully.");
       } catch (e) {
@@ -897,81 +922,54 @@ export class ContextMenuManager extends ResourceTracker {
 
         case ACTION_CONTEXT_MENU_SHORTCUTS_ID:
           try {
-            let url;
-
-            // Check if current tab is accessible and determine appropriate shortcuts URL
-            const [activeTab] = await browser.tabs.query({ active: true, currentWindow: true });
-
-            if (activeTab) {
-              // Check if current tab is accessible before determining shortcuts URL
-              const tabAccess = await tabPermissionChecker.checkTabAccess(activeTab.id);
-
-              if (!tabAccess.isAccessible) {
-                logger.debug(`Current tab is restricted (${tabAccess.errorMessage}), using fallback shortcuts URL`);
+            let browserName = null;
+            if (typeof browser.runtime?.getBrowserInfo === 'function') {
+              try {
+                browserName = (await browser.runtime.getBrowserInfo())?.name;
+              } catch (browserInfoError) {
+                logger.debug("Browser info not available, using default Chrome shortcuts URL", browserInfoError);
               }
-
-              if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
-                try {
-                  const browserInfo = await browser.runtime.getBrowserInfo();
-                  if (browserInfo.name === "Firefox") {
-                    // Use extension's options page for Firefox with query param
-                    url = browser.runtime.getURL("src/html/options.html?tab=shortcuts");
-                  } else {
-                    // Use Chrome shortcuts page
-                    url = "chrome://extensions/shortcuts";
-                  }
-                } catch (browserInfoError) {
-                  logger.debug("Browser info not available, using default Chrome shortcuts URL", browserInfoError);
-                  url = "chrome://extensions/shortcuts";
-                }
-              } else {
-                // Fallback to Chrome shortcuts
-                url = "chrome://extensions/shortcuts";
-              }
-            } else {
-              // No active tab, use default behavior
-              url = "chrome://extensions/shortcuts";
             }
 
-            await browser.tabs.create({ url });
+            if (browserName === "Firefox") {
+              if (typeof browser.commands?.openShortcutSettings === 'function') {
+                try {
+                  await browser.commands.openShortcutSettings();
+                } catch (error) {
+                  logger.error("Could not open Firefox shortcut settings:", error);
+                }
+              } else {
+                logger.error("Firefox shortcut settings API unavailable");
+              }
+            } else {
+              await browser.tabs.create({ url: "chrome://extensions/shortcuts" });
+            }
           } catch (e) {
             if (ExtensionContextManager.isContextError(e)) {
               ExtensionContextManager.handleContextError(e, 'context-menu:open-shortcuts');
             } else {
               logger.error("Could not open shortcuts page:", e);
             }
-            // Final fallback - try to open options page instead
-            try {
-              await browser.tabs.create({ url: browser.runtime.getURL("src/html/options.html?tab=shortcuts") });
-            } catch (fallbackError) {
-              if (!ExtensionContextManager.isContextError(fallbackError)) {
-                logger.error("Failed to open fallback shortcuts page:", fallbackError);
-              }
-            }
           }
           break;
 
-        case HELP_MENU_ID:
-          // Check browser type for proper help navigation
-          if (browser.runtime && typeof browser.runtime.getBrowserInfo === 'function') {
-            try {
-              const browserInfo = await browser.runtime.getBrowserInfo();
-              if (browserInfo.name === "Firefox") {
-                // Use query parameter for Firefox to ensure proper tab selection
-                await focusOrCreateTab(browser.runtime.getURL("src/html/options.html?tab=help"));
-              } else {
-                // Use hash for Chrome and other browsers
-                await focusOrCreateTab(browser.runtime.getURL("src/html/options.html#help"));
-              }
-            } catch (browserInfoError) {
-              logger.debug("Browser info not available, using default hash URL", browserInfoError);
-              await focusOrCreateTab(browser.runtime.getURL("src/html/options.html#help"));
-            }
+        case HELP_MENU_ID: {
+          const message = {
+            action: MessageActions.OPEN_OPTIONS_PAGE,
+            data: { anchor: 'help' }
+          };
+          const backgroundService = globalThis.backgroundService;
+          const handler = backgroundService?.messageHandler?.getHandlerForMessage?.(
+            MessageActions.OPEN_OPTIONS_PAGE
+          );
+
+          if (handler) {
+            await handler(message, { tab: null }, () => {});
           } else {
-            // Fallback to hash URL
-            await focusOrCreateTab(browser.runtime.getURL("src/html/options.html#help"));
+            await browser.runtime.sendMessage(message);
           }
           break;
+        }
 
 
         default:

@@ -47,6 +47,12 @@
   "context_menu_api_provider": {
     "message": "API Provider"
   },
+  "context_menu_translators": {
+    "message": "Translators"
+  },
+  "context_menu_settings": {
+    "message": "Settings"
+  },
   "api_provider_google": {
     "message": "Google Translate (Classic)"
   },
@@ -588,19 +594,19 @@
     "message": "How to change keyboard shortcuts ?"
   },
   "help_shortcut_content_p1": {
-    "message": "In Firefox, shortcuts are managed through the Add-ons page:"
+    "message": "To customize keyboard shortcuts:"
   },
   "help_shortcut_content_li1": {
-    "message": "Navigate to **about:addons** in your address bar."
+    "message": "Right-click the **Translate It** icon in the browser toolbar."
   },
   "help_shortcut_content_li2": {
-    "message": "Click the **gear icon (⚙️)** in the top-right corner."
+    "message": "Open **Settings**."
   },
   "help_shortcut_content_li3": {
-    "message": "Select **Manage Extension Shortcuts** from the menu."
+    "message": "Select **Keyboard Shortcut**."
   },
   "help_shortcut_content_li4": {
-    "message": "Find **Translate It** and set your desired shortcut."
+    "message": "Your browser's shortcut settings page will open."
   },
   "help_api_keys_title": {
     "message": "Where do I get API keys?"
@@ -642,16 +648,7 @@
     "message": "Your API keys are stored locally in your browser and are never shared with third parties. For additional security, you can encrypt your settings when exporting them using the Import/Export feature."
   },
   "help_shortcut_content_p2": {
-    "message": "In **Chrome**, the process is different:"
-  },
-  "help_shortcut_content_chrome_li1": {
-    "message": "Right-click on the extension icon."
-  },
-  "help_shortcut_content_chrome_li2": {
-    "message": "Select **Keyboard shortcuts** from the menu."
-  },
-  "help_shortcut_content_chrome_li3": {
-    "message": "Click the pencil icon (✏️) next to **Translate It** and type your new shortcut."
+    "message": "Find **Translate It** and configure the shortcuts you want."
   },
   "translation_activation_section_title": {
     "message": "Translation Activation Methods"

@@ -47,6 +47,12 @@
   "context_menu_api_provider": {
     "message": "سرور API"
   },
+  "context_menu_translators": {
+    "message": "مترجم‌ها"
+  },
+  "context_menu_settings": {
+    "message": "تنظیمات"
+  },
   "api_provider_google": {
     "message": "مترجم گوگل (کلاسیک)"
   },
@@ -588,19 +594,19 @@
     "message": "چگونه میانبرهای کیبورد را تغییر دهیم؟"
   },
   "help_shortcut_content_p1": {
-    "message": "در **Firefox**، میانبرها از طریق صفحه افزونه‌ها مدیریت می‌شوند:"
+    "message": "برای سفارشی‌سازی میانبرهای کیبورد:"
   },
   "help_shortcut_content_li1": {
-    "message": "آدرس <strong>about:addons</strong> را در نوار آدرس خود وارد کنید."
+    "message": "روی آیکون **Translate It** در نوار ابزار مرورگر کلیک راست کنید."
   },
   "help_shortcut_content_li2": {
-    "message": "روی آیکون **چرخ‌دنده (⚙️)** در گوشه بالا-راست کلیک کنید."
+    "message": "**تنظیمات** را باز کنید."
   },
   "help_shortcut_content_li3": {
-    "message": "گزینه **Manage Extension Shortcuts** را از منو انتخاب کنید."
+    "message": "**میانبر کیبورد** را انتخاب کنید."
   },
   "help_shortcut_content_li4": {
-    "message": "افزونه **Translate It** را پیدا کرده و میانبر دلخواه خود را تنظیم کنید."
+    "message": "صفحه تنظیمات میانبرهای مرورگر شما باز می‌شود."
   },
   "help_api_keys_title": {
     "message": "کلیدهای API را از کجا دریافت کنم؟"
@@ -642,16 +648,7 @@
     "message": "کلیدهای API شما به‌صورت محلی در مرورگر شما ذخیره می‌شوند و هرگز با اشخاص ثالث به اشتراک گذاشته نمی‌شوند. برای امنیت بیشتر، می‌توانید هنگام خروجی گرفتن از تنظیمات با استفاده از ویژگی پشتیبان گیری، آن‌ها را رمزگذاری کنید."
   },
   "help_shortcut_content_p2": {
-    "message": "در **Chrome**، روند متفاوت است:"
-  },
-  "help_shortcut_content_chrome_li1": {
-    "message": "روی ایکون افزونه کلیک راست کنید."
-  },
-  "help_shortcut_content_chrome_li2": {
-    "message": "گزینه **تنظیمات میانبرها** را انتخاب کنید."
-  },
-  "help_shortcut_content_chrome_li3": {
-    "message": "روی آیکون مداد (✏️) کنار **Translate It** کلیک کنید و میانبر جدید خود را تایپ کنید."
+    "message": "افزونه **Translate It** را پیدا کنید و میانبرهای دلخواهتان را تنظیم کنید."
   },
   "translation_activation_section_title": {
     "message": "روش‌های فعال‌سازی ترجمه"
