@@ -106,13 +106,18 @@ export function useTTSSmart() {
       lastText.value = text;
       lastLanguage.value = lang;
 
+      // Snapshot reactive settings before crossing the WebExtension messaging boundary.
+      const preferredVoices = options.preferredVoices === undefined
+        ? undefined
+        : JSON.parse(JSON.stringify(options.preferredVoices));
+
       const message = {
         action: MessageActions.GOOGLE_TTS_SPEAK,
         data: {
           text: cleanText.trim(),
           language: language,
           ttsId: currentTTSId.value,
-          preferredVoices: options.preferredVoices,
+          preferredVoices,
           engine: options.engine
         },
         context: 'tts-smart',
