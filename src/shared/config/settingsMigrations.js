@@ -49,6 +49,11 @@ const MODEL_VALUE_MIGRATIONS = {
   }
 };
 
+const OBSOLETE_MICROSOFT_EDGE_SETTING_KEYS = [
+  'MICROSOFT_EDGE_AUTH_URL',
+  'MICROSOFT_EDGE_TRANSLATE_URL'
+];
+
 /**
  * Migrate the former ambiguous Ctrl trigger to the platform-aware primary modifier.
  */
@@ -57,6 +62,19 @@ function migrateMouseHoverTrigger(currentSettings, updates, migrationLog) {
 
   updates.MOUSE_HOVER_TRIGGER = 'primary';
   migrationLog.push('Migrated MOUSE_HOVER_TRIGGER from ctrl to primary');
+}
+
+/**
+ * Remove internal Microsoft Edge endpoint overrides from older installations.
+ * The provider now owns one canonical endpoint and exposes no custom endpoint setting.
+ */
+function removeObsoleteMicrosoftEdgeSettings(currentSettings, removals, migrationLog) {
+  OBSOLETE_MICROSOFT_EDGE_SETTING_KEYS.forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(currentSettings, key)) return;
+
+    removals.push(key);
+    migrationLog.push(`Removed obsolete setting: ${key}`);
+  });
 }
 
 /**
@@ -307,6 +325,8 @@ function runMainMigration(currentSettings) {
       migrationLog.push(`Removing obsolete stored prompt wrapper: ${key}`);
     });
   }
+
+  removeObsoleteMicrosoftEdgeSettings(currentSettings, removals, migrationLog);
   if (Object.prototype.hasOwnProperty.call(currentSettings, 'GEMINI_THINKING_ENABLED')) {
     removals.push('GEMINI_THINKING_ENABLED');
     migrationLog.push('Removing obsolete stored setting: GEMINI_THINKING_ENABLED');

@@ -232,6 +232,25 @@ describe('Settings Store', () => {
       expect(storageManager.set).toHaveBeenCalled();
     });
 
+    it('importSettings should remove obsolete endpoint overrides returned by migrations', async () => {
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        MICROSOFT_EDGE_AUTH_URL: 'https://edge.microsoft.com/translate/auth',
+        MICROSOFT_EDGE_TRANSLATE_URL: 'https://api-edge.cognitive.microsofttranslator.com/translate'
+      });
+      runSettingsMigrations.mockResolvedValueOnce({
+        updates: {},
+        removals: ['MICROSOFT_EDGE_AUTH_URL', 'MICROSOFT_EDGE_TRANSLATE_URL'],
+        logs: []
+      });
+
+      const store = useSettingsStore();
+      await store.importSettings({ THEME: 'dark', _exported: true });
+
+      expect(store.settings).not.toHaveProperty('MICROSOFT_EDGE_AUTH_URL');
+      expect(store.settings).not.toHaveProperty('MICROSOFT_EDGE_TRANSLATE_URL');
+    });
+
     it('importSettings should pass legacy Mouse Hover triggers through centralized migration', async () => {
       secureStorage.processImportedSettings.mockResolvedValueOnce({
         THEME: 'dark',

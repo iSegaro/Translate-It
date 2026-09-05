@@ -32,6 +32,20 @@ describe('Settings Migrations', () => {
     expect(updates.CHANGELOG_URL).toBeUndefined();
   });
 
+  it('should remove obsolete Microsoft Edge endpoint overrides', async () => {
+    const { removals, logs } = await runSettingsMigrations({
+      MICROSOFT_EDGE_AUTH_URL: 'https://edge.microsoft.com/translate/auth',
+      MICROSOFT_EDGE_TRANSLATE_URL: 'https://api-edge.cognitive.microsofttranslator.com/translate'
+    });
+
+    expect(removals).toEqual(expect.arrayContaining([
+      'MICROSOFT_EDGE_AUTH_URL',
+      'MICROSOFT_EDGE_TRANSLATE_URL'
+    ]));
+    expect(logs).toContain('Removed obsolete setting: MICROSOFT_EDGE_AUTH_URL');
+    expect(logs).toContain('Removed obsolete setting: MICROSOFT_EDGE_TRANSLATE_URL');
+  });
+
   it('should migrate the legacy Mouse Hover ctrl trigger to primary', async () => {
     const { updates, logs } = await runSettingsMigrations({
       MOUSE_HOVER_TRIGGER: 'ctrl'

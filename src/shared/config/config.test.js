@@ -70,6 +70,13 @@ describe('Config Module', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
 
+    it('should expose the current Microsoft Edge translation endpoint without auth config', () => {
+      expect(CONFIG.MICROSOFT_EDGE_TRANSLATE_URL).toBe(
+        'https://edge.microsoft.com/translate/translatetext'
+      );
+      expect(CONFIG).not.toHaveProperty('MICROSOFT_EDGE_AUTH_URL');
+    });
+
     it('should expose approved WebAI models in order', () => {
       expect(CONFIG.WEBAI_API_MODEL).toBe('gemini-3-flash');
       expect(CONFIG.WEBAI_API_URL).toBe('');

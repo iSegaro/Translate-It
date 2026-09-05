@@ -24,8 +24,14 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 vi.mock("@/shared/config/config.js", () => ({
-  getMicrosoftEdgeAuthUrlAsync: vi.fn().mockResolvedValue('https://auth.edge.com'),
-  getMicrosoftEdgeTranslateUrlAsync: vi.fn().mockResolvedValue('https://api.edge.com/translate'),
+  CONFIG: {
+    MICROSOFT_EDGE_TRANSLATE_URL: 'https://edge.microsoft.com/translate/translatetext'
+  },
+  TranslationMode: {
+    Page: 'page-translation-batch',
+    Select_Element: 'select-element',
+    PDF: 'pdf-translation'
+  },
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
 }));
 
@@ -63,9 +69,11 @@ describe('MicrosoftEdgeProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     provider = new MicrosoftEdgeProvider();
-    MicrosoftEdgeProvider.accessToken = null;
-    MicrosoftEdgeProvider.tokenExpiry = 0;
   });
+
+  const mockResponse = (providerInstance, response, statusCode = 200) => vi
+    .spyOn(providerInstance, '_executeRequest')
+    .mockImplementation(async (options) => options.extractResponse(response, statusCode));
 
   describe('_getLangCode', () => {
     it('should return null for auto-detect', () => {
@@ -77,57 +85,98 @@ describe('MicrosoftEdgeProvider', () => {
     });
   });
 
-  describe('_getAuthToken', () => {
-    it('should fetch and process a new token', async () => {
-      const mockToken = 'header.eyJleHAiOjE3Nzc1MDUzNzZ9.signature'; // Payload with exp
-      
-      // We need to simulate _executeRequest calling the extractResponse callback
-      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
-        const mockResponse = { text: () => Promise.resolve(mockToken) };
-        return await opts.extractResponse(mockResponse);
-      });
-
-      const token = await provider._getAuthToken();
-
-      expect(token).toBe(mockToken);
-      expect(MicrosoftEdgeProvider.accessToken).toBe(mockToken);
-      expect(MicrosoftEdgeProvider.tokenExpiry).toBeGreaterThan(0);
-    });
-  });
-
   describe('_translateChunk', () => {
-    it('should translate text and detect language', async () => {
-      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
-      
-      const mockApiResponse = [
-        { translations: [{ text: 'سلام' }], detectedLanguage: { language: 'en' } }
-      ];
-      
-      // Simulate _executeRequest returning the extracted data
-      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
-        return opts.extractResponse(mockApiResponse);
-      });
-
+    it('should send the current Edge request contract for explicit source language', async () => {
+      const executeMock = mockResponse(provider, '[{"translations":[{"text":"سلام"}]}]');
       const options = { providerMetadataRef: { metadata: {} } };
-      const result = await provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
 
-      expect(result).toEqual(['سلام']);
+      await expect(provider._translateChunk(
+        ['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options
+      )).resolves.toEqual(['سلام']);
+
+      const request = executeMock.mock.calls[0][0];
+      const requestUrl = new URL(request.url);
+      expect(`${requestUrl.origin}${requestUrl.pathname}`).toBe(
+        'https://edge.microsoft.com/translate/translatetext'
+      );
+      expect(requestUrl.searchParams.get('isEnterpriseClient')).toBe('false');
+      expect(requestUrl.searchParams.get('to')).toBe('fa');
+      expect(requestUrl.searchParams.get('from')).toBe('en');
+      expect(requestUrl.searchParams.has('api-version')).toBe(false);
+      expect(requestUrl.searchParams.has('includeSentenceLength')).toBe(false);
+      expect(request.fetchOptions.method).toBe('POST');
+      expect(request.fetchOptions.credentials).toBe('omit');
+      expect(request.fetchOptions.headers).toEqual({ 'Content-Type': 'application/json' });
+      expect(request.fetchOptions.headers).not.toHaveProperty('Authorization');
+      expect(JSON.parse(request.fetchOptions.body)).toEqual(['Hello']);
+    });
+
+    it('should omit from for auto-detect and send multiple text strings', async () => {
+      const executeMock = mockResponse(provider, [
+        { translations: [{ text: 'سلام' }] },
+        { translations: [{ text: 'دنیا' }] }
+      ]);
+
+      await expect(provider._translateChunk(
+        ['Hello', 'World'], 'auto', 'fa', 'selection', null
+      )).resolves.toEqual(['سلام', 'دنیا']);
+
+      const request = executeMock.mock.calls[0][0];
+      const requestUrl = new URL(request.url);
+      expect(requestUrl.searchParams.get('isEnterpriseClient')).toBe('false');
+      expect(requestUrl.searchParams.get('to')).toBe('fa');
+      expect(requestUrl.searchParams.has('from')).toBe(false);
+      expect(JSON.parse(request.fetchOptions.body)).toEqual(['Hello', 'World']);
+    });
+
+    it('should publish detected language metadata when provided', async () => {
+      mockResponse(
+        provider,
+        '[{"translations":[{"text":"سلام"}],"detectedLanguage":{"language":"EN"}}]'
+      );
+      const options = { providerMetadataRef: { metadata: {} } };
+
+      await provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
+
       expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('en');
-      expect(provider).not.toHaveProperty('lastDetectedLanguage');
+    });
+
+    it('should throw JSON_PARSING_ERROR for invalid raw JSON', async () => {
+      mockResponse(provider, 'not-json');
+
+      await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null))
+        .rejects.toMatchObject({
+          type: 'JSON_PARSING_ERROR',
+          statusCode: 200,
+          context: 'edge-translate-chunk'
+        });
+    });
+
+    it('should not invent detected language metadata when it is absent', async () => {
+      mockResponse(provider, [{ translations: [{ text: 'سلام' }] }]);
+      const options = { providerMetadataRef: { metadata: {} } };
+
+      await provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
+
+      expect(options.providerMetadataRef.metadata).toEqual({});
+    });
+
+    it('should preserve existing metadata when detected language is absent', async () => {
+      mockResponse(provider, [{ translations: [{ text: 'سلام' }] }]);
+      const options = { providerMetadataRef: { metadata: { detectedLanguage: 'fr' } } };
+
+      await provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options);
+
+      expect(options.providerMetadataRef.metadata.detectedLanguage).toBe('fr');
     });
 
     it('should throw API_RESPONSE_INVALID for malformed API response', async () => {
-      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
-
-      const malformedResponse = { unexpected: 'shape' };
-
-      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
-        return opts.extractResponse(malformedResponse);
-      });
-
+      mockResponse(provider, { unexpected: 'shape' });
       const options = { providerMetadataRef: { metadata: {} } };
-      await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options))
-        .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
+
+      await expect(provider._translateChunk(
+        ['Hello'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, options
+      )).rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
       expect(options.providerMetadataRef.metadata).toEqual({});
     });
 
@@ -136,64 +185,43 @@ describe('MicrosoftEdgeProvider', () => {
       ['empty translated text', [{ translations: [{ text: '' }] }]],
       ['whitespace-only translated text', [{ translations: [{ text: '   ' }] }]],
     ])('throws API_RESPONSE_INVALID for %s instead of returning empty output', async (_label, response) => {
-      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
-
-      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
-        return opts.extractResponse(response);
-      });
+      mockResponse(provider, response);
 
       await expect(provider._translateChunk(['Hello'], 'en', 'fa', 'selection', null))
         .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
     });
 
     it('accepts identity translation where translated text equals source', async () => {
-      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
+      mockResponse(provider, [{ translations: [{ text: 'URL' }] }]);
 
-      const identityResponse = [{ translations: [{ text: 'URL' }] }];
-
-      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
-        return opts.extractResponse(identityResponse);
-      });
-
-      await expect(provider._translateChunk(['URL'], 'en', 'fa', 'selection', null)).resolves.toEqual(['URL']);
+      await expect(provider._translateChunk(['URL'], 'en', 'fa', 'selection', null))
+        .resolves.toEqual(['URL']);
     });
 
     it('should throw API_RESPONSE_INVALID when a translation item lacks translations', async () => {
-      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
-
-      const malformedResponse = [
+      mockResponse(provider, [
         { translations: [{ text: 'سلام' }] },
         { missing: 'translations field' }
-      ];
-
-      vi.spyOn(provider, '_executeRequest').mockImplementation(async (opts) => {
-        return opts.extractResponse(malformedResponse);
-      });
+      ]);
 
       await expect(provider._translateChunk(['Hello', 'World'], 'en', 'fa', 'selection', null))
         .rejects.toMatchObject({ type: 'API_RESPONSE_INVALID' });
     });
 
-    it('should retry without "from" param if source language is rejected', async () => {
-      vi.spyOn(provider, '_getAuthToken').mockResolvedValue('valid-token');
-      
+    it('should retry without from when source language is rejected', async () => {
       const executeMock = vi.spyOn(provider, '_executeRequest');
-      const langError = new Error('The source language is not valid');
-      
       executeMock
-        .mockRejectedValueOnce(langError)
-        .mockImplementationOnce(async (opts) => {
-          return opts.extractResponse([{ translations: [{ text: 'سلام' }] }]);
-        });
+        .mockRejectedValueOnce(new Error('The source language is not valid'))
+        .mockImplementationOnce(async (options) => options.extractResponse([
+          { translations: [{ text: 'سلام' }] }
+        ]));
 
       const result = await provider._translateChunk(['Hello'], 'invalid-lang', 'fa', 'selection', null);
 
       expect(result).toEqual(['سلام']);
       expect(executeMock).toHaveBeenCalledTimes(2);
-      
-      // Verify retry URL doesn't have 'from'
-      const secondCallUrl = new URL(executeMock.mock.calls[1][0].url);
-      expect(secondCallUrl.searchParams.has('from')).toBe(false);
+      expect(new URL(executeMock.mock.calls[0][0].url).searchParams.get('from')).toBe('invalid-lang');
+      expect(new URL(executeMock.mock.calls[1][0].url).searchParams.has('from')).toBe(false);
     });
   });
 });

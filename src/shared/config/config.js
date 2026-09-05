@@ -175,8 +175,7 @@ export const CONFIG = {
   DEEPL_PRO_API_URL: "https://api.deepl.com/v2/translate",
   YANDEX_TRANSLATE_URL: "https://translate.yandex.net/api/v1/tr.json/translate",
   YANDEX_DETECT_URL: "https://translate.yandex.net/api/v1/tr.json/detect",
-  MICROSOFT_EDGE_AUTH_URL: "https://edge.microsoft.com/translate/auth",
-  MICROSOFT_EDGE_TRANSLATE_URL: "https://api-edge.cognitive.microsofttranslator.com/translate",
+  MICROSOFT_EDGE_TRANSLATE_URL: "https://edge.microsoft.com/translate/translatetext",
   LINGVA_API_URL: "",
   WEBAI_API_URL: "",
   WEBAI_API_MODEL: "gemini-3-flash",
@@ -833,15 +832,6 @@ export const getYandexTranslateUrlAsync = async () => {
 
 export const getYandexDetectUrlAsync = async () => {
   return getSettingValueAsync("YANDEX_DETECT_URL", CONFIG.YANDEX_DETECT_URL);
-};
-
-// Microsoft Edge Specific
-export const getMicrosoftEdgeAuthUrlAsync = async () => {
-  return getSettingValueAsync("MICROSOFT_EDGE_AUTH_URL", CONFIG.MICROSOFT_EDGE_AUTH_URL);
-};
-
-export const getMicrosoftEdgeTranslateUrlAsync = async () => {
-  return getSettingValueAsync("MICROSOFT_EDGE_TRANSLATE_URL", CONFIG.MICROSOFT_EDGE_TRANSLATE_URL);
 };
 
 // Lingva Translate Specific
