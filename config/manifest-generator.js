@@ -113,6 +113,9 @@ function generateChromeManifest(baseManifest) {
   const manifest = {
     ...baseManifest,
     manifest_version: 3,
+    // WORKERS is available from Chrome 114; shared offscreen reasons including
+    // USER_MEDIA require Chrome/Chromium 116.
+    minimum_chrome_version: '116',
     
     // Chrome MV3 background service worker
     background: {
@@ -245,7 +248,8 @@ function generateFirefoxManifest(baseManifest) {
     
     // Firefox-specific web accessible resources format (stripping use_dynamic_url which is unsupported)
     web_accessible_resources: baseManifest.web_accessible_resources.map(resource => {
-      const { use_dynamic_url, ...rest } = resource;
+      const rest = { ...resource };
+      delete rest.use_dynamic_url;
       return rest;
     })
   };

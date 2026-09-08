@@ -2,7 +2,7 @@
 import { ErrorTypes } from "@/shared/error-management/ErrorTypes.js";
 import { ErrorHandler } from "@/shared/error-management/ErrorHandler.js";
 import browser from "webextension-polyfill";
-import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
+import { offscreenRuntimeLeaseManager } from '@/shared/runtime/OffscreenRuntimeLeaseManager.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
 import { toTesseractLanguageCode } from '@/features/screen-capture/utils/ocrLanguageMap.js';
@@ -11,9 +11,40 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
 const errorHandler = new ErrorHandler();
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'handleCaptureScreenArea');
+let fallbackLeaseCounter = 0;
+
+function createScreenCaptureLeaseId(captureId) {
+  if ((typeof captureId === 'string' || typeof captureId === 'number') && String(captureId).trim()) {
+    return String(captureId);
+  }
+
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return `screen-capture-${globalThis.crypto.randomUUID()}`;
+  }
+
+  fallbackLeaseCounter += 1;
+  return `screen-capture-${Date.now()}-${fallbackLeaseCounter}-${Math.random().toString(36).slice(2)}`;
+}
+
+function normalizeErrorMessage(error, fallback = 'Screen capture failed') {
+  if (typeof error === 'string' && error) return error;
+  if (typeof error?.message === 'string' && error.message) return error.message;
+  if (typeof error?.error === 'string' && error.error) return error.error;
+  if (typeof error?.error?.message === 'string' && error.error.message) return error.error.message;
+  return fallback;
+}
+
+function getErrorType(error) {
+  if (typeof error?.type === 'string' && error.type) return error.type;
+  if (typeof error?.errorType === 'string' && error.errorType) return error.errorType;
+  return null;
+}
 
 export async function handleCaptureScreenArea(message, sender, sendResponse) {
   const { coordinates, ocrLang: requestedOcrLang, captureId } = message.data;
+  let screenCaptureLease;
+  let useOffscreenOcr = false;
+  const isFirefoxBuild = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox';
 
   try {
     // 1. Capture visible tab
@@ -21,8 +52,24 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       format: "png",
     });
 
-    // 2. Ensure offscreen document is ready
-    await ttsStateManager.ensureOffscreenDocument();
+    // 2. Acquire the lease before choosing the OCR execution context
+    const requestedLease = {
+      owner: 'screen-capture',
+      leaseId: createScreenCaptureLeaseId(captureId),
+      requiredReasons: ['WORKERS'],
+    };
+    if (typeof offscreenRuntimeLeaseManager?.acquire === 'function') {
+      useOffscreenOcr = await offscreenRuntimeLeaseManager.acquire(requestedLease);
+      if (useOffscreenOcr) {
+        screenCaptureLease = requestedLease;
+      }
+    }
+
+    if (!isFirefoxBuild && !useOffscreenOcr) {
+      const unsupportedError = new Error('Screen capture is not supported in this browser or context.');
+      unsupportedError.type = ErrorTypes.SCREEN_CAPTURE_NOT_SUPPORTED;
+      throw unsupportedError;
+    }
 
     // 3. Get OCR language mapping
     // Priority: 1. Manually requested via UI, 2. runtime OCR_DEFAULT_LANG, 3. current source language
@@ -39,7 +86,7 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
     // 4. Perform OCR
     let extractedText = '';
 
-    if (browser.offscreen) {
+    if (useOffscreenOcr) {
       // Chrome: Send to offscreen for OCR
       const ocrResponse = await browser.runtime.sendMessage({
         target: 'offscreen',
@@ -52,9 +99,12 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       });
 
       if (!ocrResponse || !ocrResponse.success) {
-        const errorMsg = ocrResponse?.error || "OCR processing failed";
+        const errorMsg = normalizeErrorMessage(ocrResponse?.error, "OCR processing failed");
         logger.error("OCR failed in offscreen:", { error: errorMsg, stack: ocrResponse?.stack });
-        throw new Error(errorMsg);
+        const ocrError = new Error(errorMsg);
+        const errorType = getErrorType(ocrResponse?.error) || getErrorType(ocrResponse);
+        if (errorType) ocrError.type = errorType;
+        throw ocrError;
       }
       
       // Robustly handle different response formats from offscreen context
@@ -117,10 +167,23 @@ export async function handleCaptureScreenArea(message, sender, sendResponse) {
       context: "handleCaptureScreenArea",
       messageData: message.data,
     });
-    const errorResponse = { success: false, error: error.message };
+    const errorResponse = {
+      success: false,
+      error: normalizeErrorMessage(error),
+    };
+    const errorType = getErrorType(error);
+    if (errorType) errorResponse.errorType = errorType;
     if (sendResponse && typeof sendResponse === 'function') {
       sendResponse(errorResponse);
     }
     return errorResponse;
+  } finally {
+    if (screenCaptureLease) {
+      try {
+        await offscreenRuntimeLeaseManager.release(screenCaptureLease);
+      } catch (releaseError) {
+        logger.debug('Screen-capture offscreen lease release failed:', releaseError);
+      }
+    }
   }
 }

@@ -50,8 +50,19 @@ export function useScreenCapture() {
     };
   });
 
+  const normalizeCaptureError = (captureError) => {
+    if (captureError instanceof Error) return captureError;
+    if (typeof captureError === 'string') return new Error(captureError);
+
+    const normalizedError = new Error(
+      typeof captureError?.message === 'string' ? captureError.message : 'ocr-failed'
+    );
+    if (typeof captureError?.name === 'string') normalizedError.name = captureError.name;
+    if (typeof captureError?.type === 'string') normalizedError.type = captureError.type;
+    return normalizedError;
+  };
+
   const normalizeScreenOcrError = (captureError) => {
-    if (captureError?.message === 'no-text') return 'no-text';
     return mapOcrError(captureError);
   };
 
@@ -169,9 +180,9 @@ export function useScreenCapture() {
           text: response.data.text,
         };
       } else {
-        throw new Error(response.error || 'ocr-failed');
+        throw normalizeCaptureError(response.error);
       }
-      } catch (err) {
+    } catch (err) {
       logger.error("Capture area error:", err);
       handleScreenOcrError(err);
 
@@ -287,7 +298,7 @@ export function useScreenCapture() {
           text: response.data.text,
         };
       } else {
-        throw new Error(response.error || 'ocr-failed');
+        throw normalizeCaptureError(response.error);
       }
     } catch (err) {
       logger.error("Full screen capture error:", err);

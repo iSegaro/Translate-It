@@ -9,7 +9,6 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 import { TTS_ENGINES } from '@/shared/constants/tts.js';
 import { PROVIDER_CONFIGS } from '@/features/tts/constants/ttsProviders.js';
-import { ttsQueueManager } from '@/features/tts/services/TTSQueueManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'GoogleTTSHandler');
 
@@ -27,38 +26,34 @@ const buildGoogleTTSUrl = (text, language) => {
 };
 
 /**
- * Handle Google TTS requests
+ * Resolve one Google TTS request. Pending-request identity is registered by
+ * handleGoogleTTSSpeak before this async work can yield.
  */
-export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = null) => {
+const resolveGoogleTTSSpeak = async ({
+  sender,
+  text,
+  language,
+  ttsId,
+  previousRequest,
+}) => {
   const config = PROVIDER_CONFIGS[TTS_ENGINES.GOOGLE];
-  
+  let playbackToken = null;
+
   try {
-    const { text, language: originalLanguage } = message.data || {};
-    const language = overrideLanguage || originalLanguage;
-    
-    // 1. Deduplication
-    if (ttsStateManager.currentTTSRequest && 
-        text === ttsStateManager.lastTTSText && 
-        language === ttsStateManager.lastTTSLanguage) {
-      return await ttsStateManager.currentTTSRequest;
-    }
-    
-    // 2. Interrupt previous
-    if (ttsStateManager.currentTTSRequest) {
+    // Interrupt previous request without changing active playback metadata.
+    if (previousRequest) {
       await ttsStateManager.notifyTTSEnded('interrupted');
-      try { await ttsStateManager.currentTTSRequest; } catch { /* ignore */ }
+      try { await previousRequest; } catch { /* ignore */ }
     }
-    
+
     if (!text || !text.trim()) {
       throw new Error('No valid text provided for Google TTS');
     }
-    
-    // 3. Validate language support via central config
+
+    // Validate language support via central config.
     const targetLanguage = language || config.defaultLanguage;
     const isSupported = config.supportedLanguages.has(targetLanguage.split('-')[0].toLowerCase()) || 
                         config.supportedLanguages.has(targetLanguage.toLowerCase());
-
-    const ttsId = message.data?.ttsId || overrideLanguage?.ttsId || null;
 
     if (!isSupported) {
       logger.warn(`[GoogleTTS] Unsupported language: ${targetLanguage}`);
@@ -70,7 +65,7 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
       };
     }
     
-    // 4. Text cleaning using central regex
+    // Text cleaning using central regex.
     let finalText = text.trim()
       .replace(/\*\*(.*?)\*\*/g, '$1') // remove markdown bold
       .replace(/\s+/g, ' ')
@@ -83,45 +78,48 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
     
     const ttsUrl = buildGoogleTTSUrl(finalText, targetLanguage);
     
-    // 5. Set Shared State
-    ttsStateManager.lastTTSText = text;
-    ttsStateManager.lastTTSLanguage = targetLanguage;
-    ttsStateManager.currentTTSId = ttsId;
-    ttsStateManager.currentTTSSender = sender;
-    
-    ttsStateManager.currentTTSRequest = (async () => {
-      try {
-        const isChromiumBrowser = isChromium();
-        const browserAPI = await initializebrowserAPI();
+    const isChromiumBrowser = isChromium();
+    const browserAPI = await initializebrowserAPI();
 
-        if (isChromiumBrowser) {
-          await ttsStateManager.ensureOffscreenDocument();
-          
-          const response = await browserAPI.runtime.sendMessage({
-            action: MessageActions.PLAY_OFFSCREEN_AUDIO,
-            url: ttsUrl,
-            target: 'offscreen'
-          });
+    if (isChromiumBrowser) {
+      const playbackMetadata = {
+        sender,
+        ttsId,
+        language: targetLanguage,
+        text
+      };
+      playbackToken = await ttsStateManager.acquirePlaybackLease(playbackMetadata);
 
-          if (response && response.success === false) {
-            throw new Error(response.error || 'Offscreen playback failed');
-          }
-        } else {
-          // Play directly in Firefox using the unified state manager
-          await ttsStateManager.playFirefoxAudio(ttsUrl);
-        }
-        
-        return { success: true, processedVia: 'google-tts' };
-      } finally {
-        ttsStateManager.resetSpeakState();
+      const response = await browserAPI.runtime.sendMessage({
+        action: MessageActions.PLAY_OFFSCREEN_AUDIO,
+        url: ttsUrl,
+        playbackToken,
+        text: finalText,
+        language: targetLanguage,
+        target: 'offscreen'
+      });
+
+      if (response && response.success === false) {
+        throw new Error(response.error || 'Offscreen playback failed');
       }
-    })();
-    
-    return await ttsStateManager.currentTTSRequest;
-    
+
+      if (!await ttsStateManager.commitPlaybackLease(playbackToken, playbackMetadata)) {
+        throw new Error('Offscreen playback handoff was superseded');
+      }
+    } else {
+      // Play directly in Firefox using the unified state manager.
+      await ttsStateManager.playFirefoxAudio(ttsUrl, {
+        sender,
+        ttsId,
+        language: targetLanguage,
+        text
+      });
+    }
+
+    return { success: true, processedVia: 'google-tts' };
   } catch (error) {
     logger.warn('[GoogleTTS] Request failed:', error);
-    ttsStateManager.fullReset();
+    await ttsStateManager.failPlaybackHandoff(playbackToken, { error: error.message });
     
     const isUnsupported = error.message?.includes('400') || error.message?.includes('supported source');
     
@@ -134,36 +132,84 @@ export const handleGoogleTTSSpeak = async (message, sender, overrideLanguage = n
 };
 
 /**
+ * Handle Google TTS requests.
+ * The pending key is independent from active playback metadata so resolving
+ * successors cannot overwrite the currently committed request.
+ */
+export const handleGoogleTTSSpeak = (message, sender, overrideLanguage = null) => {
+  const { text, language: originalLanguage } = message?.data || {};
+  const language = overrideLanguage || originalLanguage;
+  const ttsId = message?.data?.ttsId || null;
+  const requestKey = ttsStateManager.createPendingRequestKey({
+    engine: TTS_ENGINES.GOOGLE,
+    text,
+    language,
+    ttsId
+  });
+  const pendingRequest = ttsStateManager.getPendingRequest(requestKey);
+  if (pendingRequest) return pendingRequest;
+
+  const previousRequest = ttsStateManager.currentTTSRequest;
+  let request;
+  request = resolveGoogleTTSSpeak({
+    sender,
+    text,
+    language,
+    ttsId,
+    previousRequest
+  }).finally(() => {
+    ttsStateManager.clearPendingRequest(requestKey, request);
+  });
+  ttsStateManager.setPendingRequest(requestKey, request);
+  return request;
+};
+
+/**
  * Handle TTS Stop request
  */
 export const handleGoogleTTSStopAll = async (message, sender) => {
   try {
     const { ttsId, stopOnlyIfOwner } = message.data || {};
     const isSpecificStop = ttsId && ttsId !== 'all';
-    
-    // 1. Specific ID check
-    if (isSpecificStop && ttsStateManager.currentTTSId !== ttsId) {
-      return { success: true, skipped: true };
-    }
+    const hasPendingPlayback = Boolean(ttsStateManager.pendingPlaybackToken);
+    const pendingPlaybackMetadata = hasPendingPlayback
+      ? ttsStateManager.pendingPlaybackMetadata
+      : null;
 
-    // 2. Ownership check (for automatic cleanups)
-    if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(sender)) {
+    // Pending handoffs supersede predecessor identity for specific stops.
+    if (isSpecificStop) {
+      if (hasPendingPlayback) {
+        if (pendingPlaybackMetadata?.ttsId !== ttsId) {
+          return { success: true, skipped: true };
+        }
+
+        if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(
+          sender,
+          pendingPlaybackMetadata?.sender ?? null,
+        )) {
+          logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
+          return { success: true, skipped: true, reason: 'not_owner' };
+        }
+      } else {
+        if (ttsStateManager.currentTTSId !== ttsId) {
+          return { success: true, skipped: true };
+        }
+
+        if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(sender)) {
+          logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
+          return { success: true, skipped: true, reason: 'not_owner' };
+        }
+      }
+    } else if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(
+      sender,
+      hasPendingPlayback ? pendingPlaybackMetadata?.sender ?? null : undefined,
+    )) {
+      // Stop-all requests validate pending owner during handoff.
       logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
       return { success: true, skipped: true, reason: 'not_owner' };
     }
     
-    // Stop any active queue
-    ttsQueueManager.stop();
-    
-    await ttsStateManager.notifyTTSEnded('stopped');
-    ttsStateManager.fullReset();
-    
-    if (isChromium()) {
-      await ttsStateManager.stopAudioOnly();
-    } else {
-      // Direct call to state manager for Firefox cleanup
-      ttsStateManager.stopFirefoxAudio();
-    }
+    await ttsStateManager.stopPlayback();
     
     return { success: true, action: 'stopped' };
   } catch (error) {
@@ -175,9 +221,11 @@ export const handleGoogleTTSStopAll = async (message, sender) => {
 /**
  * Handle TTS End notification from Offscreen
  */
-export const handleGoogleTTSEnded = async () => {
+export const handleGoogleTTSEnded = async (message) => {
   try {
-    await ttsStateManager.notifyTTSEnded('completed');
+    const reason = message?.reason || 'completed';
+    const errorData = reason === 'error' && message?.error ? { error: message.error } : null;
+    await ttsStateManager.notifyTTSEnded(reason, errorData, message?.playbackToken);
     return { success: true, action: 'cleared' };
   } catch (error) {
     logger.warn('[GoogleTTS] End handling failed:', error);

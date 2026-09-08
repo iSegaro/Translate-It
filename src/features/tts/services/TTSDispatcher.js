@@ -14,13 +14,25 @@ import { ttsStateManager } from '@/features/tts/services/TTSStateManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TTS, 'TTSDispatcher');
 
+async function notifyRequestError(request) {
+  try {
+    await ttsStateManager.notifyTTSRequestError(request);
+  } catch (notificationError) {
+    logger.debug('[TTSDispatcher] Request error notification failed:', notificationError?.message);
+  }
+}
+
 export class TTSDispatcher {
   static async dispatchTTSRequest(message, sender) {
+    let text;
+    let language;
+    let ttsId;
+    let targetLanguage;
+    let resolution;
+
     try {
-      const { text, language, ttsId } = message.data || {};
-      
-      // Update state manager with the current ID so it knows what to notify
-      ttsStateManager.currentTTSId = ttsId;
+      ({ text, language, ttsId } = message?.data || {});
+      targetLanguage = language;
 
       // 1. Get user settings using StorageCore
       const settings = await storageCore.get({
@@ -40,8 +52,6 @@ export class TTSDispatcher {
                              incomingLang === 'auto' || 
                              incomingLang === 'unknown' || 
                              !incomingLang;
-
-      let targetLanguage = language;
 
       // 2. Proactive Language Detection (Context-aware)
       // Only perform proactive detection if:
@@ -92,7 +102,7 @@ export class TTSDispatcher {
       }
 
       // 3. Resolve BEST ENGINE with Circuit Breaker awareness
-      let resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled, preferredVoices);
+      resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled, preferredVoices);
       
       // Check if the resolved engine is actually allowed (not blocked)
       const isEngineAllowed = await ttsCircuitBreaker.isAllowed(resolution.engine);
@@ -106,38 +116,54 @@ export class TTSDispatcher {
         } else {
           // Both engines blocked!
           const errorInfo = { error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
-          await ttsStateManager.notifyTTSEnded('error', errorInfo);
+          await notifyRequestError({
+            sender,
+            ttsId,
+            language: resolution.language || targetLanguage,
+            text,
+            error: errorInfo
+          });
           return { success: false, ...errorInfo };
         }
       } else if (!isEngineAllowed) {
         // Primary engine blocked and fallback is disabled
         const errorInfo = { error: 'Circuit Breaker Open', errorType: 'ERRORS_CIRCUIT_BREAKER_OPEN' };
-        await ttsStateManager.notifyTTSEnded('error', errorInfo);
+        await notifyRequestError({
+          sender,
+          ttsId,
+          language: resolution.language || targetLanguage,
+          text,
+          error: errorInfo
+        });
         return { success: false, ...errorInfo };
       }
 
       // Notify UI immediately about the detected language for tooltip updates
       // Only broadcast if we actually performed a detection (was auto)
       if (isExplicitAuto && targetLanguage !== 'auto') {
-        ttsStateManager.lastTTSLanguage = targetLanguage;
         ttsStateManager.broadcastStatus('playing', { 
           action: 'TTS_LANG_DETECTED', 
           detectedSourceLanguage: targetLanguage 
+        }, {
+          sender,
+          ttsId,
+          detectedSourceLanguage: targetLanguage,
+          text
         });
       }
-
-      // 3. Resolve BEST ENGINE with Circuit Breaker awareness
-      resolution = TTSLanguageService.resolveTTSSettings(targetLanguage, preferredEngine, fallbackEnabled, preferredVoices);
-      
-      // Update state manager with the resolved language for accurate broadcasting
-      ttsStateManager.lastTTSLanguage = resolution.language;
 
       // CRITICAL: Start playback via QueueManager to support chunking for large texts
       return await ttsQueueManager.start(text, resolution.language, resolution.engine, message, sender);
     } catch (error) {
       logger.error('[TTSDispatcher] Dispatch critical failure:', error);
-      await ttsStateManager.notifyTTSEnded('error', { error: error.message });
-      return { success: false, error: error.message };
+      await notifyRequestError({
+        sender,
+        ttsId,
+        language: resolution?.language || targetLanguage || language,
+        text,
+        error
+      });
+      return { success: false, error: error?.message || String(error) };
     }
   }
 }

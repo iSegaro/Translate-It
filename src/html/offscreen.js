@@ -51,6 +51,16 @@ class OffscreenResourceTracker {
     element.addEventListener(event, handler, options);
   }
 
+  removeEventListeners(element) {
+    const listeners = this.eventListeners.get(element);
+    if (!listeners) return;
+
+    for (const { event, handler, options } of listeners) {
+      element.removeEventListener(event, handler, options);
+    }
+    this.eventListeners.delete(element);
+  }
+
   cleanup() {
     // Clear all tracked timeouts
     for (const timeoutId of this.timeouts) {
@@ -65,12 +75,9 @@ class OffscreenResourceTracker {
     this.intervals.clear();
 
     // Clear all tracked event listeners
-    for (const [element, listeners] of this.eventListeners) {
-      for (const { event, handler, options } of listeners) {
-        element.removeEventListener(event, handler, options);
-      }
+    for (const element of this.eventListeners.keys()) {
+      this.removeEventListeners(element);
     }
-    this.eventListeners.clear();
   }
 }
 
@@ -80,9 +87,169 @@ const resourceTracker = new OffscreenResourceTracker();
 let currentAudio = null;
 let currentUtterance = null;
 let currentFetchController = null;
-let isPlaying = false;
+let currentPlayback = null;
+const canceledPlaybackTokens = new Set();
+const canceledPlaybackTokenTimeouts = new Map();
+// Retain canceled tokens only long enough to reject delayed cross-context playback commands.
+const CANCELED_PLAYBACK_TOKEN_TTL = 30_000;
 
-logger.info("TTS script loaded - Version 1.5 - Fixed race condition and null audio cleanup");
+function rememberCanceledPlaybackToken(playbackToken) {
+  if (playbackToken === undefined || playbackToken === null) return;
+
+  canceledPlaybackTokens.add(playbackToken);
+  const existingTimeout = canceledPlaybackTokenTimeouts.get(playbackToken);
+  if (existingTimeout !== undefined) resourceTracker.clearTimeout(existingTimeout);
+
+  const timeoutId = resourceTracker.trackTimeout(() => {
+    canceledPlaybackTokens.delete(playbackToken);
+    canceledPlaybackTokenTimeouts.delete(playbackToken);
+  }, CANCELED_PLAYBACK_TOKEN_TTL);
+  canceledPlaybackTokenTimeouts.set(playbackToken, timeoutId);
+}
+
+function isCurrentPlayback(playback) {
+  return currentPlayback === playback && !playback.stopped;
+}
+
+function sendPlaybackTerminal(playback, reason) {
+  if (!isCurrentPlayback(playback) || playback.terminalSent) return false;
+
+  playback.terminalSent = true;
+  Promise.resolve(chrome.runtime.sendMessage({
+    action: 'INTERNAL_TTS_CHUNK_FINISHED',
+    playbackToken: playback.playbackToken,
+    reason
+  })).catch((error) => {
+    logger.debug('Failed to send internal chunk ended notification:', error);
+  });
+  return true;
+}
+
+function clearPlayback(playback) {
+  if (currentPlayback !== playback) return;
+
+  if (playback.audio) resourceTracker.removeEventListeners(playback.audio);
+  currentPlayback = null;
+  if (currentAudio === playback.audio) currentAudio = null;
+  if (currentUtterance === playback.utterance) currentUtterance = null;
+  if (currentFetchController === playback.fetchController) currentFetchController = null;
+  if (playback.speechTimeout !== null) resourceTracker.clearTimeout(playback.speechTimeout);
+  if (playback.retryTimeout !== null) resourceTracker.clearTimeout(playback.retryTimeout);
+}
+
+function finishPlayback(playback, reason, response = null) {
+  if (!isCurrentPlayback(playback)) return false;
+
+  sendPlaybackTerminal(playback, reason);
+  clearPlayback(playback);
+  sendResponseOnce(playback, response || createTerminalResponse(playback, reason));
+  return true;
+}
+
+function createTerminalResponse(playback, reason, error = null) {
+  if (reason === 'completed') {
+    return { success: true, playbackToken: playback.playbackToken, reason };
+  }
+
+  return {
+    success: false,
+    playbackToken: playback.playbackToken,
+    reason,
+    ...(error ? { error } : {})
+  };
+}
+
+function stopPlayback(playback, reason = 'stopped') {
+  if (!isCurrentPlayback(playback)) return false;
+
+  playback.stopped = true;
+  playback.terminalIntent = reason;
+  rememberCanceledPlaybackToken(playback.playbackToken);
+
+  // Settle request before cancellation; browser speech cancellation can fire onend synchronously.
+  sendResponseOnce(playback, createTerminalResponse(playback, reason));
+  const fetchController = playback.fetchController;
+  if (playback.fetchController) {
+    playback.fetchController.abort();
+    playback.fetchController = null;
+  }
+  if (currentFetchController === fetchController) currentFetchController = null;
+
+  if (playback.utterance && typeof speechSynthesis !== 'undefined') {
+    speechSynthesis.cancel();
+  }
+
+  if (playback.audio) {
+    playback.audio.pause();
+    try {
+      playback.audio.src = '';
+    } catch { /* ignore */ }
+  }
+
+  if (playback.audioUrl) {
+    URL.revokeObjectURL(playback.audioUrl);
+    playback.audioUrl = null;
+  }
+
+  clearPlayback(playback);
+  return true;
+}
+
+function createPlayback(playbackToken, sendResponse) {
+  const playback = {
+    playbackToken: playbackToken ?? null,
+    audio: null,
+    audioUrl: null,
+    utterance: null,
+    fetchController: null,
+    terminalSent: false,
+    stopped: false,
+    fallbackStarted: false,
+    retryScheduled: false,
+    speechStarted: false,
+    speechTimeout: null,
+    retryTimeout: null,
+    responseSent: false,
+    responseSettlement: {
+      sendResponse,
+      settled: false
+    },
+    terminalIntent: null
+  };
+
+  if (playbackToken !== undefined && playbackToken !== null && canceledPlaybackTokens.has(playbackToken)) {
+    playback.stopped = true;
+    sendResponseOnce(playback, createTerminalResponse(playback, 'stopped', 'Playback was stopped'));
+    return null;
+  }
+
+  if (currentPlayback) stopPlayback(currentPlayback, 'interrupted');
+  currentPlayback = playback;
+  return playback;
+}
+
+function sendResponseOnce(playback, sendResponse, response) {
+  if (response === undefined) {
+    response = sendResponse;
+    sendResponse = playback.responseSettlement?.sendResponse;
+  }
+  if (!playback.responseSettlement) {
+    playback.responseSettlement = {
+      sendResponse,
+      settled: false
+    };
+  }
+  if (playback.responseSettlement.settled || playback.responseSent) return;
+  playback.responseSettlement.settled = true;
+  playback.responseSent = true;
+  try {
+    sendResponse(response);
+  } catch (error) {
+    logger.debug('Playback response settlement failed:', error);
+  }
+}
+
+logger.info("TTS script loaded - Version 1.6 - Tokenized playback lifecycle");
 
 // Signal readiness immediately to parent
 if (chrome.runtime) {
@@ -118,7 +285,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // keep async channel open
   }
   else if (action === "TTS_STOP" || action === "handleTTSStop") {
-    handleTTSStop(sendResponse);
+    handleTTSStop(sendResponse, cleanMessage.playbackToken);
     return true;
   }
   else if (action === "TTS_PAUSE" || action === "handleTTSPause") {
@@ -138,12 +305,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false; // synchronous response
   }
   else if (action === "playOffscreenAudio" && cleanMessage.url) {
-    // Use the enhanced function with proper state management and fallback
     const ttsData = {
-      text: "TTS Audio", // Placeholder since we already have the URL
-      language: "en" // Default language
+      text: cleanMessage.text || "TTS Audio",
+      language: cleanMessage.language || "en"
     };
-    handleAudioPlaybackWithFallback(cleanMessage.url, ttsData, sendResponse);
+    handleAudioPlaybackWithFallback(cleanMessage.url, ttsData, sendResponse, cleanMessage.playbackToken);
     return true;
   }
   else if (action === "stopOffscreenAudio") {
@@ -155,7 +321,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   else if (action === "playCachedAudio" && cleanMessage.audioData) {
-    handleCachedAudioPlayback(cleanMessage.audioData, sendResponse);
+    handleCachedAudioPlayback(cleanMessage.audioData, sendResponse, cleanMessage.playbackToken);
     return true;
   }
   else if (action === "OCR_PROCESS" && cleanMessage.data) {
@@ -297,11 +463,6 @@ function handleTTSSpeak(data, sendResponse) {
   try {
     console.log("[Offscreen] Starting TTS speak:", data);
 
-    // Stop any current speech
-    if (currentUtterance || currentAudio) {
-      handleTTSStop(() => {});
-    }
-
     // Convert language code to simple format for Google TTS
     let langCode = data.language || data.lang || "en"; // Support both 'language' and 'lang' parameters
     if (langCode.includes("-")) {
@@ -320,7 +481,7 @@ function handleTTSSpeak(data, sendResponse) {
     const googleTTSUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${encodeURIComponent(langCode)}&q=${encodeURIComponent(data.text)}&client=gtx&ttsspeed=1&total=1&idx=0&tk=1`;
     
     // Attempt Google TTS with fallback
-    handleAudioPlaybackWithFallback(googleTTSUrl, data, sendResponse);
+    handleAudioPlaybackWithFallback(googleTTSUrl, data, sendResponse, data.playbackToken);
   } catch (error) {
     console.error("[Offscreen] TTS speak failed:", error);
     sendResponse({ success: false, error: error.message });
@@ -403,7 +564,7 @@ function handleTTSGetVoices(sendResponse) {
 /**
  * Handle TTS stop
  */
-function handleTTSStop(sendResponse) {
+function handleTTSStop(sendResponse, playbackToken) {
   // Create safe response wrapper to prevent duplicate calls
   let responseSent = false;
   const safeResponse = (response) => {
@@ -420,43 +581,22 @@ function handleTTSStop(sendResponse) {
   };
 
   try {
-    let stopped = false;
-
-    // Cancel ongoing fetch if any
-    if (currentFetchController) {
-      logger.debug("[Offscreen] Aborting ongoing fetch request");
-      currentFetchController.abort();
-      currentFetchController = null;
-      stopped = true;
+    const hasPlaybackToken = playbackToken !== undefined && playbackToken !== null;
+    if (hasPlaybackToken) {
+      rememberCanceledPlaybackToken(playbackToken);
+    } else if (currentPlayback?.playbackToken !== undefined && currentPlayback?.playbackToken !== null) {
+      rememberCanceledPlaybackToken(currentPlayback.playbackToken);
     }
 
-    // Reset playing state
-    isPlaying = false;
-
-    // Stop speech synthesis
-    if (currentUtterance) {
-      speechSynthesis.cancel();
-      currentUtterance = null;
-      stopped = true;
-      console.log("[Offscreen] TTS speech cancelled");
+    if (
+      hasPlaybackToken &&
+      (!currentPlayback || currentPlayback.playbackToken !== playbackToken)
+    ) {
+      safeResponse({ success: true, skipped: true });
+      return;
     }
 
-    // Stop audio playback
-    if (currentAudio) {
-      // Pause first to prevent further events
-      currentAudio.pause();
-      // Clear source safely
-      try {
-        currentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-        currentAudio.load(); // Reset to empty state
-      } catch {
-        // Ignore errors during cleanup
-      }
-      currentAudio = null;
-      stopped = true;
-      console.log("[Offscreen] TTS audio stopped");
-    }
-
+    const stopped = currentPlayback ? stopPlayback(currentPlayback) : false;
     safeResponse({ success: true, stopped });
   } catch (error) {
     console.error("[Offscreen] TTS stop failed:", error);
@@ -555,49 +695,35 @@ function handleTTSGetStatus(sendResponse) {
 
 /**
  * Handle audio playback with fallback to Web Speech API
+ * @param {string} url - Audio URL
+ * @param {Object} ttsData - TTS fallback data
+ * @param {Function} sendResponse - Response callback
+ * @param {string} playbackToken - Playback generation token
  */
-function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
+function handleAudioPlaybackWithFallback(url, ttsData, sendResponse, playbackToken) {
   try {
-    
-    // Prevent multiple simultaneous requests
-    if (isPlaying) {
-      handleTTSStop(() => {}); // Stop current playback
-    }
-    
-    // Always create a new Audio object to avoid race conditions with global currentAudio
+    const playback = createPlayback(playbackToken, sendResponse);
+    if (!playback) return;
     const newAudio = new Audio();
-    if (currentAudio) { // Stop and clear previous audio if it exists
-      handleAudioStop(() => {}); // Use the dedicated stop function
-    }
-    if (currentUtterance) {
-      speechSynthesis.cancel();
-      currentUtterance = null;
-    }
+    playback.audio = newAudio;
+    currentAudio = newAudio;
+    newAudio.crossOrigin = "anonymous";
+    playback.fetchController = new AbortController();
+    currentFetchController = playback.fetchController;
 
-    currentAudio = newAudio; // Assign the new audio object to global currentAudio
-    currentAudio.crossOrigin = "anonymous"; // Set crossOrigin after creating new Audio
-    isPlaying = true; // Mark as playing
-    
-    let responseSent = false;
-    
-    // Create AbortController for fetch cancellation
-    currentFetchController = new AbortController();
-    
-    // Timeout for Google TTS fetch
     const fetchTimeout = resourceTracker.trackTimeout(() => {
-      if (!responseSent && currentFetchController) {
-        currentFetchController.abort();
-        currentFetchController = null;
-        isPlaying = false;
-        responseSent = true;
-        handleWebSpeechFallback(ttsData, sendResponse);
-      }
-    }, 3000); // 3 second timeout for fetch
-    
-    // Try Google TTS with fetch
+      if (!isCurrentPlayback(playback) || playback.fallbackStarted) return;
+
+      playback.fallbackStarted = true;
+      playback.fetchController?.abort();
+      playback.fetchController = null;
+      currentFetchController = null;
+      handleWebSpeechFallback(ttsData, sendResponse, playback);
+    }, 3000);
+
     fetch(url, {
       method: 'GET',
-      signal: currentFetchController.signal, // Add AbortController signal
+      signal: playback.fetchController.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Referer': 'https://translate.google.com/',
@@ -605,235 +731,191 @@ function handleAudioPlaybackWithFallback(url, ttsData, sendResponse) {
         'Accept-Language': 'en-US,en;q=0.9'
       }
     })
-    .then(response => {
-      resourceTracker.clearTimeout(fetchTimeout); // Clear the timeout on successful response
-      currentFetchController = null; // Clear the AbortController reference
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      return response.blob();
-    })
-    .then(audioBlob => {
-      // Check if audio was stopped during fetch (race condition protection)
-      if (!currentAudio || !isPlaying) {
-        console.warn("[Offscreen] currentAudio was null or stopped during fetch, cleaning up blob");
-        URL.revokeObjectURL(URL.createObjectURL(audioBlob)); // Clean up blob
-        isPlaying = false;
-        if (!responseSent) {
-          responseSent = true;
-          sendResponse({ success: false, error: "Audio was stopped during fetch" });
-        }
-        return Promise.reject(new Error('Audio was stopped during fetch'));
-      }
-      
-      const audioUrl = URL.createObjectURL(audioBlob);
-      currentAudio.src = audioUrl;
-      
-      resourceTracker.addEventListener(currentAudio, "ended", () => {
+      .then(response => {
+        resourceTracker.clearTimeout(fetchTimeout);
+        if (!isCurrentPlayback(playback)) return null;
+        playback.fetchController = null;
+        currentFetchController = null;
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return response.blob();
+      })
+      .then(audioBlob => {
+        if (!audioBlob || !isCurrentPlayback(playback)) return null;
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+        playback.audioUrl = audioUrl;
+        playback.audio.src = audioUrl;
+
+        resourceTracker.addEventListener(playback.audio, "ended", () => {
           URL.revokeObjectURL(audioUrl);
-        currentAudio = null;
-        isPlaying = false; // Reset playing state
-        
-        // Notify background that this chunk ended (internal only)
-        chrome.runtime.sendMessage({ action: 'INTERNAL_TTS_CHUNK_FINISHED' }).catch(err => {
-          console.log("[Offscreen] Failed to send internal chunk ended notification:", err);
+          playback.audioUrl = null;
+          finishPlayback(playback, 'completed');
         });
-      });
 
-      resourceTracker.addEventListener(currentAudio, "error", () => {
-        URL.revokeObjectURL(audioUrl);
+        resourceTracker.addEventListener(playback.audio, "error", () => {
+          URL.revokeObjectURL(audioUrl);
+          playback.audioUrl = null;
+          if (!isCurrentPlayback(playback) || playback.fallbackStarted) return;
+          resourceTracker.removeEventListeners(playback.audio);
+          playback.audio = null;
+          currentAudio = null;
+          playback.fallbackStarted = true;
+          handleWebSpeechFallback(ttsData, sendResponse, playback);
+        });
+
+        return playback.audio.play();
+      })
+      .then(() => {
+        if (isCurrentPlayback(playback)) {
+          sendResponseOnce(playback, sendResponse, { success: true, message: "Audio playback started" });
+        }
+      })
+      .catch((error) => {
+        resourceTracker.clearTimeout(fetchTimeout);
+        if (!isCurrentPlayback(playback) || playback.fallbackStarted) return;
+
+        if (error.name === 'AbortError') return;
+        playback.fetchController = null;
+        currentFetchController = null;
+        resourceTracker.removeEventListeners(playback.audio);
+        playback.audio = null;
         currentAudio = null;
-        isPlaying = false; // Reset playing state
-        if (!responseSent) {
-          responseSent = true; // Set this first to prevent race conditions
-          handleWebSpeechFallback(ttsData, sendResponse);
-        }
+        playback.fallbackStarted = true;
+        logger.debug('Google TTS failed, using Web Speech fallback:', error);
+        handleWebSpeechFallback(ttsData, sendResponse, playback);
       });
-
-      return currentAudio.play();
-    })
-    .then(() => {
-      // Send success response after play() succeeds
-      if (!responseSent) {
-        responseSent = true;
-        sendResponse({ success: true, message: "Audio playback started" });
-      }
-    })
-    .catch(async (err) => { // Make this catch block async
-      resourceTracker.clearTimeout(fetchTimeout); // Clear the timeout on error too
-      currentFetchController = null; // Clear the AbortController reference
-      currentAudio = null;
-      isPlaying = false; // Reset playing state
-      
-      // Handle AbortError specifically (when fetch is cancelled)
-      if (err.name === 'AbortError') {
-        console.log("[Offscreen] Google TTS fetch was aborted");
-        return; // Don't send response or fallback for aborted requests
-      }
-      
-      // Log Google TTS errors with less severity for expected failures
-      if (err.message && err.message.includes('HTTP 400')) {
-        console.debug("[Offscreen] Google TTS HTTP 400 (expected for some languages/text):", err.message);
-      } else {
-        console.error("[Offscreen] Google TTS failed:", err);
-      }
-      
-      if (!responseSent) {
-        responseSent = true; // Set responseSent to true here to prevent duplicate responses
-        console.debug("[Offscreen] Falling back to Web Speech API");
-        // Await the fallback to ensure its response is sent
-        try {
-          await handleWebSpeechFallback(ttsData, sendResponse); // Pass sendResponse directly
-        } catch (fallbackError) {
-          console.error("[Offscreen] Web Speech API fallback also failed:", fallbackError);
-          // If fallback also fails, send a final failure response
-          sendResponse({ success: false, error: fallbackError.message || 'Web Speech API fallback failed' });
-        }
-      }
-    });
-    
   } catch (error) {
     console.error("[Offscreen] TTS setup failed:", error);
-    currentFetchController = null; // Clear the AbortController reference
-    isPlaying = false; // Reset playing state
-    console.log("[Offscreen] Falling back to Web Speech API");
-    handleWebSpeechFallback(ttsData, sendResponse);
+    if (currentPlayback && isCurrentPlayback(currentPlayback)) {
+      currentPlayback.fallbackStarted = true;
+      handleWebSpeechFallback(ttsData, sendResponse, currentPlayback);
+    }
   }
 }
 
 /**
  * Fallback to Web Speech API with improved reliability
  */
-function handleWebSpeechFallback(data, sendResponse) {
+function handleWebSpeechFallback(data, sendResponse, playback) {
+  const activePlayback = playback || currentPlayback;
+  if (!activePlayback || !isCurrentPlayback(activePlayback)) return;
+
+  const respond = (response) => sendResponseOnce(activePlayback, sendResponse, response);
+
+  const fail = (message, { cancelSpeech = false } = {}) => {
+    if (!isCurrentPlayback(activePlayback)) return;
+    activePlayback.terminalIntent = 'error';
+    activePlayback.utterance = null;
+    if (currentUtterance) currentUtterance = null;
+    if (cancelSpeech) {
+      // Detach record before cancel; some engines invoke onend synchronously.
+      speechSynthesis.cancel();
+    }
+    finishPlayback(activePlayback, 'error', {
+      success: false,
+      playbackToken: activePlayback.playbackToken,
+      reason: 'error',
+      error: message
+    });
+  };
+
+  const clearSpeechTimeout = () => {
+    if (activePlayback.speechTimeout !== null) {
+      resourceTracker.clearTimeout(activePlayback.speechTimeout);
+      activePlayback.speechTimeout = null;
+    }
+  };
+
+  const startWebSpeech = (retry = false) => {
+    if (!isCurrentPlayback(activePlayback)) return;
+
+    const utterance = new SpeechSynthesisUtterance(data.text);
+    activePlayback.utterance = utterance;
+    activePlayback.speechStarted = false;
+    currentUtterance = utterance;
+
+    const voiceLang = data.language || data.lang;
+    if (voiceLang) utterance.lang = voiceLang;
+    utterance.rate = retry ? 1 : (data.rate ? Math.max(0.1, Math.min(10, data.rate)) : 1);
+    utterance.pitch = retry ? 1 : (data.pitch ? Math.max(0, Math.min(2, data.pitch)) : 1);
+    utterance.volume = retry ? 1 : (data.volume ? Math.max(0, Math.min(1, data.volume)) : 1);
+
+    const isActiveUtterance = () => isCurrentPlayback(activePlayback) && activePlayback.utterance === utterance;
+
+    utterance.onend = () => {
+      clearSpeechTimeout();
+      if (!isActiveUtterance()) return;
+      finishPlayback(activePlayback, 'completed');
+      respond({ success: true });
+    };
+
+    utterance.onerror = (error) => {
+      clearSpeechTimeout();
+      if (!isActiveUtterance()) return;
+
+      activePlayback.utterance = null;
+      currentUtterance = null;
+      const errorType = error.error || 'unknown';
+      if (!retry && (errorType === 'synthesis-failed' || errorType === 'synthesis-unavailable')) {
+        activePlayback.retryScheduled = true;
+        activePlayback.retryTimeout = resourceTracker.trackTimeout(() => {
+          activePlayback.retryTimeout = null;
+          if (!isCurrentPlayback(activePlayback)) return;
+          speechSynthesis.cancel();
+          startSafely(true);
+        }, 500);
+        return;
+      }
+
+      fail(retry ? `Web Speech retry failed: ${errorType}` : `Web Speech API failed: ${errorType}`);
+    };
+
+    utterance.onstart = () => {
+      activePlayback.speechStarted = true;
+      clearSpeechTimeout();
+      console.log("Web Speech TTS started");
+    };
+
+    // Keep startup failure bounded, but never terminate speech solely because utterance is long.
+    activePlayback.speechTimeout = resourceTracker.trackTimeout(() => {
+      activePlayback.speechTimeout = null;
+      if (!isActiveUtterance()) return;
+      if (activePlayback.speechStarted || speechSynthesis.speaking) return;
+      console.warn("[Offscreen] Web Speech TTS startup timeout, cancelling");
+      fail("Web Speech API timeout", { cancelSpeech: true });
+    }, 5000);
+
+    speechSynthesis.speak(utterance);
+    sendResponseOnce(activePlayback, sendResponse, { success: true, message: "Web Speech playback started" });
+  };
+
+  const startSafely = (retry = false) => {
+    try {
+      startWebSpeech(retry);
+    } catch (error) {
+      fail(`All TTS methods failed: ${error.message}`);
+    }
+  };
+
   try {
     console.log("[Offscreen] Using Web Speech API fallback");
-    
-    if ("speechSynthesis" in window) {
-      // Reset speechSynthesis if it's in bad state
-      if (speechSynthesis.pending || speechSynthesis.speaking) {
-        console.log("[Offscreen] Cancelling existing speech synthesis");
-        speechSynthesis.cancel();
-        // Small delay to ensure cancellation completes
-        resourceTracker.trackTimeout(() => startWebSpeech(), 100);
-      } else {
-        startWebSpeech();
-      }
-      
-      function startWebSpeech() {
-        currentUtterance = new SpeechSynthesisUtterance(data.text);
-
-        // Set voice options - support both 'language' and 'lang' parameters
-        const voiceLang = data.language || data.lang;
-        if (voiceLang) currentUtterance.lang = voiceLang;
-        if (data.rate) currentUtterance.rate = Math.max(0.1, Math.min(10, data.rate)); // Clamp rate
-        if (data.pitch) currentUtterance.pitch = Math.max(0, Math.min(2, data.pitch)); // Clamp pitch
-        if (data.volume) currentUtterance.volume = Math.max(0, Math.min(1, data.volume)); // Clamp volume
-
-        let responseAlreadySent = false;
-
-        currentUtterance.onend = () => {
-          console.log("Web Speech TTS ended");
-          currentUtterance = null;
-          isPlaying = false; // Reset playing state
-          if (!responseAlreadySent) {
-            responseAlreadySent = true;
-            sendResponse({ success: true });
-          }
-        };
-
-        currentUtterance.onerror = (error) => {
-          // Use debug level for expected synthesis failures
-          if (error.error === 'synthesis-failed' || error.error === 'synthesis-unavailable') {
-            console.debug("Web Speech TTS error (expected):", error.error);
-          } else {
-            console.error("Web Speech TTS error:", error);
-          }
-          
-          currentUtterance = null;
-          isPlaying = false; // Reset playing state
-          
-          if (!responseAlreadySent) {
-            // Try to recover from common errors
-            if (error.error === 'synthesis-failed' || error.error === 'synthesis-unavailable') {
-              console.debug("[Offscreen] Attempting Web Speech recovery...");
-              
-              // Wait a bit and try once more
-              resourceTracker.trackTimeout(() => {
-                if (!responseAlreadySent) {
-                  speechSynthesis.cancel();
-                  const retryUtterance = new SpeechSynthesisUtterance(data.text);
-                  retryUtterance.lang = data.language || data.lang || 'en-US';
-                  retryUtterance.rate = 1; // Use default rate for retry
-                  retryUtterance.pitch = 1; // Use default pitch for retry
-                  retryUtterance.volume = 1; // Use default volume for retry
-                  
-                  retryUtterance.onend = () => {
-                    console.log("Web Speech TTS retry succeeded");
-                    isPlaying = false; // Reset playing state
-                    if (!responseAlreadySent) {
-                      responseAlreadySent = true;
-                      sendResponse({ success: true });
-                    }
-                  };
-                  
-                  retryUtterance.onerror = (retryError) => {
-                    console.error("Web Speech TTS retry also failed:", retryError);
-                    isPlaying = false; // Reset playing state
-                    if (!responseAlreadySent) {
-                      responseAlreadySent = true;
-                      sendResponse({ success: false, error: `Web Speech retry failed: ${retryError.error}` });
-                    }
-                  };
-                  
-                  speechSynthesis.speak(retryUtterance);
-                }
-              }, 500);
-            } else {
-              responseAlreadySent = true;
-              isPlaying = false; // Reset playing state
-              sendResponse({ success: false, error: `Web Speech API failed: ${error.error}` });
-            }
-          }
-        };
-
-        currentUtterance.onstart = () => {
-          console.log("Web Speech TTS started");
-        };
-
-        // Add timeout as additional safety measure
-        const timeout = resourceTracker.trackTimeout(() => {
-          if (!responseAlreadySent && currentUtterance) {
-            console.warn("[Offscreen] Web Speech TTS timeout, cancelling");
-            speechSynthesis.cancel();
-            currentUtterance = null;
-            isPlaying = false; // Reset playing state
-            responseAlreadySent = true;
-            sendResponse({ success: false, error: "Web Speech API timeout" });
-          }
-        }, 5000); // 5 second timeout
-
-        // Clear timeout when speech ends
-        const originalOnEnd = currentUtterance.onend;
-        currentUtterance.onend = (event) => {
-          resourceTracker.clearTimeout(timeout);
-          if (originalOnEnd) originalOnEnd(event);
-        };
-
-        const originalOnError = currentUtterance.onerror;
-        currentUtterance.onerror = (event) => {
-          resourceTracker.clearTimeout(timeout);
-          if (originalOnError) originalOnError(event);
-        };
-
-        speechSynthesis.speak(currentUtterance);
-      }
-    } else {
+    if (!("speechSynthesis" in window)) {
       throw new Error("Web Speech API not available");
+    }
+
+    activePlayback.fallbackStarted = true;
+    if (speechSynthesis.pending || speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+      activePlayback.retryTimeout = resourceTracker.trackTimeout(() => {
+        activePlayback.retryTimeout = null;
+        startSafely();
+      }, 100);
+    } else {
+      startSafely();
     }
   } catch (error) {
     console.error("[Offscreen] Web Speech API fallback failed:", error);
-    isPlaying = false; // Reset playing state
-    sendResponse({ success: false, error: `All TTS methods failed: ${error.message}` });
+    fail(`All TTS methods failed: ${error.message}`);
   }
 }
 
@@ -841,30 +923,22 @@ function handleWebSpeechFallback(data, sendResponse) {
  * Handle audio stop (legacy support)
  */
 function handleAudioStop(sendResponse) {
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.src = "";
-    currentAudio = null;
-    sendResponse({ success: true });
-  } else {
-    sendResponse({ success: false, error: "No offscreen audio playing" });
-  }
+  sendResponse({ success: true, stopped: currentPlayback ? stopPlayback(currentPlayback) : false });
 }
 
 /**
  * Handle cached audio blob playback
  * @param {Array} audioData - Audio data as byte array
  * @param {Function} sendResponse - Response callback
+ * @param {string} playbackToken - Playback generation token
  */
-function handleCachedAudioPlayback(audioData, sendResponse) {
+function handleCachedAudioPlayback(audioData, sendResponse, playbackToken) {
+  let playback = null;
   try {
     console.log("[Offscreen] Playing cached audio blob:", audioData.length, "bytes");
-    
-    // Stop any current audio
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.src = "";
-    }
+
+    playback = createPlayback(playbackToken, sendResponse);
+    if (!playback) return;
 
     // Convert byte array back to Blob
     const uint8Array = new Uint8Array(audioData);
@@ -874,52 +948,72 @@ function handleCachedAudioPlayback(audioData, sendResponse) {
     console.log("[Offscreen] Created blob URL for cached audio:", audioUrl);
 
     // Create and setup audio element
-    currentAudio = new Audio(audioUrl);
+    playback.audioUrl = audioUrl;
+    playback.audio = new Audio(audioUrl);
+    currentAudio = playback.audio;
     
     // NO crossOrigin needed for local Blobs, can cause issues in some environments
     // currentAudio.crossOrigin = "anonymous";
 
-    resourceTracker.addEventListener(currentAudio, "ended", () => {
+    resourceTracker.addEventListener(playback.audio, "ended", () => {
       console.log("[Offscreen] Cached audio playback ended");
       URL.revokeObjectURL(audioUrl); // Clean up memory
-      currentAudio = null;
-      isPlaying = false; // Reset playing state
-      chrome.runtime.sendMessage({ action: 'INTERNAL_TTS_CHUNK_FINISHED' }).catch(() => {});
+      playback.audioUrl = null;
+      finishPlayback(playback, 'completed');
     });
 
-    resourceTracker.addEventListener(currentAudio, "error", (e) => {
+    resourceTracker.addEventListener(playback.audio, "error", (e) => {
       console.error("[Offscreen] Cached audio playback error:", e);
       URL.revokeObjectURL(audioUrl); // Clean up memory
-      currentAudio = null;
-      isPlaying = false; // Reset playing state
-      // Send error response if not already sent
-      sendResponse({ success: false, error: "Audio playback failed" });
+      playback.audioUrl = null;
+      if (!isCurrentPlayback(playback)) return;
+      finishPlayback(playback, 'error', {
+        success: false,
+        playbackToken: playback.playbackToken,
+        reason: 'error',
+        error: "Audio playback failed"
+      });
     });
 
-    resourceTracker.addEventListener(currentAudio, "loadstart", () => {
+    resourceTracker.addEventListener(playback.audio, "loadstart", () => {
       console.log("[Offscreen] Cached audio loading started");
     });
 
     // Start playback
-    currentAudio
+    playback.audio
       .play()
       .then(() => {
         console.log("[Offscreen] Cached audio playback started successfully");
-        isPlaying = true;
-        // CRITICAL: Send success response immediately so background doesn't wait
-        sendResponse({ success: true, message: "Cached audio playback started" });
+        if (isCurrentPlayback(playback)) {
+          sendResponseOnce(playback, sendResponse, { success: true, message: "Cached audio playback started" });
+        }
       })
       .catch((err) => {
         console.error("[Offscreen] Cached audio play failed:", err);
         URL.revokeObjectURL(audioUrl);
-        currentAudio = null;
-        isPlaying = false;
-        sendResponse({ success: false, error: err.message });
+        playback.audioUrl = null;
+        if (isCurrentPlayback(playback)) {
+          finishPlayback(playback, 'error', {
+            success: false,
+            playbackToken: playback.playbackToken,
+            reason: 'error',
+            error: err.message
+          });
+        }
       });
       
   } catch (error) {
     console.error("[Offscreen] Cached audio setup failed:", error);
-    sendResponse({ success: false, error: error.message });
+    if (currentPlayback) {
+      finishPlayback(currentPlayback, 'error', {
+        success: false,
+        playbackToken: currentPlayback.playbackToken,
+        reason: 'error',
+        error: error.message
+      });
+    } else {
+      sendResponse({ success: false, error: error.message });
+    }
   }
 }
 
@@ -967,25 +1061,7 @@ resourceTracker.addEventListener(window, 'beforeunload', () => {
   logger.debug('Offscreen document unloading, cleaning up resources...');
   resourceTracker.cleanup();
   
-  // Cancel any ongoing fetch
-  if (currentFetchController) {
-    currentFetchController.abort();
-    currentFetchController = null;
-  }
-  
-  // Stop any current audio
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio = null;
-  }
-  
-  // Cancel any ongoing speech synthesis
-  if (speechSynthesis.speaking || speechSynthesis.pending) {
-    speechSynthesis.cancel();
-  }
-  
-  currentUtterance = null;
-  isPlaying = false;
+  if (currentPlayback) stopPlayback(currentPlayback);
   
   logger.debug('Offscreen cleanup completed');
 });

@@ -119,8 +119,24 @@ describe('useScreenCapture', () => {
 
   it.each([
     ['model-not-installed', { success: false, error: 'model-not-installed' }, 'model-not-installed'],
+    ['Error instance', { success: false, error: new Error('model-not-installed') }, 'model-not-installed'],
+    ['legacy error object', {
+      success: false,
+      error: { message: 'model-not-installed', type: 'OCR_FAILED' }
+    }, 'model-not-installed'],
     ['generic OCR failure', { success: false, error: 'Tesseract worker crashed' }, 'ocr-failed'],
+    ['legacy unsupported capture error', {
+      success: false,
+      error: {
+        message: 'Screen capture is not supported in this browser or context.',
+        type: 'SCREEN_CAPTURE_NOT_SUPPORTED'
+      }
+    }, 'ocr-failed'],
     ['cancelled OCR', { success: false, error: 'cancelled' }, 'cancelled'],
+    ['legacy cancelled OCR', {
+      success: false,
+      error: { message: 'cancelled', type: 'OCR_CANCELLED' }
+    }, 'cancelled'],
     ['no text', { success: true, data: { imageData: 'data:image/png;base64,test', text: '' } }, 'no-text']
   ])('stores %s as a stable error code', async (_label, response, expectedCode) => {
     composable.selectionRect.value = { x: 10, y: 10, width: 100, height: 100 };
@@ -130,6 +146,17 @@ describe('useScreenCapture', () => {
 
     expect(composable.error.value).toBe(expectedCode);
     expect(composable.error.value).not.toContain('Tesseract');
+  });
+
+  it('does not coerce object capture failures to [object Object]', async () => {
+    composable.selectionRect.value = { x: 10, y: 10, width: 100, height: 100 };
+    captureScreenAreaMock.mockResolvedValue({
+      success: false,
+      error: { message: { unexpected: true }, type: 'OCR_FAILED' }
+    });
+
+    await expect(composable.confirmSelection()).rejects.toThrow('ocr-failed');
+    expect(composable.error.value).toBe('ocr-failed');
   });
 
   it('should cleanup on unmount', () => {
