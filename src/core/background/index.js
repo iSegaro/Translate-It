@@ -12,6 +12,9 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { initializeBackgroundService } from './backgroundStartup.js';
+import { liveDubbingCoordinator } from '@/features/live-dubbing/background/LiveDubbingCoordinator.js';
+import { registerLiveDubbingTabLifecycle } from '@/features/live-dubbing/background/tabLifecycle.js';
+import * as browserCapabilities from '@/core/browserHandlers.js';
 
 // Import context menu click listener
 import "./listeners/onContextMenuClicked.js";
@@ -22,6 +25,17 @@ import "./listeners/onNotificationClicked.js";
 // Inject iframe-only content scripts after subframe DOM becomes available
 import "./listeners/onSubframeDOMContentLoaded.js";
 import "./listeners/onSpaNavigation.js";
+
+function isChromeRuntime() {
+  if (typeof __BROWSER__ !== 'undefined') return __BROWSER__ === 'chrome';
+  const detector = Object.prototype.hasOwnProperty.call(browserCapabilities, 'isChrome')
+    ? browserCapabilities.isChrome
+    : null;
+  return typeof detector === 'function' ? detector() : true;
+}
+
+// Live dubbing owns tab teardown, independent of popup/sidepanel lifetime.
+if (isChromeRuntime()) registerLiveDubbingTabLifecycle();
 
 // Import Memory Garbage Collector
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
@@ -149,6 +163,13 @@ browser.runtime.onInstalled.addListener(async (details) => {
 
 async function postInitializeBackgroundService() {
   logger.info("[Background] Background service initialization completed!");
+
+  if (isChromeRuntime()) {
+    // Service workers can restart while a capture session remains in session storage.
+    await liveDubbingCoordinator.reconcile().catch(error => {
+      logger.debug('[Background] Live dubbing reconciliation skipped:', error);
+    });
+  }
 
   // Initialize DebugModeBridge for background script
   try {

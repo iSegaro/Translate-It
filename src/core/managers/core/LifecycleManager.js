@@ -7,11 +7,20 @@ import { createMessageHandler } from "@/shared/messaging/core/MessageHandler.js"
 import * as Handlers from "@/core/background/handlers/index.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { addBrowserSpecificHandlers } from '@/core/browserHandlers.js';
+import * as browserCapabilities from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
+import { LIVE_DUBBING_ACTIONS } from '@/features/live-dubbing/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
+
+function isChromeRuntime() {
+  if (typeof __BROWSER__ !== 'undefined') return __BROWSER__ === 'chrome';
+  const detector = Object.prototype.hasOwnProperty.call(browserCapabilities, 'isChrome')
+    ? browserCapabilities.isChrome
+    : null;
+  return typeof detector === 'function' ? detector() : true;
+}
 
 class LifecycleManager {
   constructor() {
@@ -260,9 +269,21 @@ class LifecycleManager {
       [MessageActions.SUBTITLE_TRANSLATE]: Handlers.handleSubtitleTranslation,
       [MessageActions.SUBTITLE_TRANSLATE_CANCEL]: Handlers.handleSubtitleTranslation
     };
+
+    if (isChromeRuntime()) {
+      Object.assign(handlerMappings, {
+        [MessageActions.START_LIVE_DUBBING]: Handlers.handleLiveDubbingStartLazy,
+        [MessageActions.STOP_LIVE_DUBBING]: Handlers.handleLiveDubbingStopLazy,
+        [MessageActions.GET_LIVE_DUBBING_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
+        [MessageActions.LIVE_DUBBING_START]: Handlers.handleLiveDubbingStartLazy,
+        [MessageActions.LIVE_DUBBING_STOP]: Handlers.handleLiveDubbingStopLazy,
+        [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
+        [LIVE_DUBBING_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
+      });
+    }
     
     // Add browser-specific handlers
-    addBrowserSpecificHandlers();
+    browserCapabilities.addBrowserSpecificHandlers();
     
     // Validate handler mappings
     this.validateHandlerMappings(handlerMappings);

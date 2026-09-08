@@ -5,6 +5,9 @@ const state = vi.hoisted(() => ({
   listener: null,
   audios: [],
   utterances: [],
+  mediaDevices: null,
+  previousMediaDevices: undefined,
+  hadMediaDevices: false,
 }));
 
 class FakeAudio {
@@ -47,8 +50,17 @@ class FakeUtterance {
   }
 }
 
-async function loadOffscreen() {
+async function loadOffscreen({ mediaDevices = null } = {}) {
   vi.resetModules();
+  if (mediaDevices) {
+    state.hadMediaDevices = 'mediaDevices' in navigator;
+    state.previousMediaDevices = navigator.mediaDevices;
+    state.mediaDevices = mediaDevices;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: mediaDevices,
+    });
+  }
   globalThis.chrome = {
     runtime: {
       sendMessage: vi.fn((message) => {
@@ -97,6 +109,7 @@ beforeEach(() => {
   state.audios = [];
   state.utterances = [];
   state.lastUtterance = null;
+  state.mediaDevices = null;
 });
 
 afterEach(() => {
@@ -106,6 +119,16 @@ afterEach(() => {
   delete globalThis.Audio;
   delete globalThis.SpeechSynthesisUtterance;
   delete globalThis.speechSynthesis;
+  if (state.mediaDevices) {
+    if (state.hadMediaDevices) {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: state.previousMediaDevices,
+      });
+    } else {
+      delete navigator.mediaDevices;
+    }
+  }
   vi.restoreAllMocks();
 });
 
@@ -419,5 +442,77 @@ describe('offscreen TTS terminal playback lifecycle', () => {
       playbackToken: 'timeout-token',
       reason: 'error'
     })]);
+  });
+});
+
+describe('offscreen live-dubbing route', () => {
+  it('coexists with TTS and does not log or expose stream IDs', async () => {
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      listeners: new Map(),
+      stop: vi.fn(() => {
+        track.readyState = 'ended';
+      }),
+      addEventListener: vi.fn((type, handler) => track.listeners.set(type, handler)),
+      removeEventListener: vi.fn((type, handler) => {
+        if (track.listeners.get(type) === handler) track.listeners.delete(type);
+      }),
+    };
+    const stream = {
+      getAudioTracks: () => [track],
+      getTracks: () => [track],
+    };
+    const mediaDevices = {
+      getUserMedia: vi.fn(() => Promise.resolve(stream)),
+    };
+    const logSpy = vi.spyOn(console, 'log');
+    await loadOffscreen({ mediaDevices });
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_PREPARE',
+      data: { sessionId: 'session-1' },
+    })).resolves.toMatchObject({
+      success: true,
+      ack: 'READY',
+    });
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_CONSUME',
+      data: { sessionId: 'session-1', streamId: 'stream-secret' },
+    })).resolves.toMatchObject({
+      success: true,
+      ack: 'MEDIA_ACQUIRED',
+    });
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'TTS_TEST',
+    })).resolves.toEqual({ success: true, message: 'Offscreen TTS ready' });
+
+    const status = await sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_STATUS',
+      data: { sessionId: 'session-1' },
+    });
+    expect(status).toMatchObject({
+      success: true,
+      sessionId: 'session-1',
+      status: 'CAPTURING',
+    });
+    expect(status).not.toHaveProperty('streamId');
+    expect(logSpy.mock.calls.some(args => JSON.stringify(args).includes('stream-secret'))).toBe(false);
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_DISPOSE',
+      data: { sessionId: 'session-1', reason: 'STOP' },
+    })).resolves.toMatchObject({
+      success: true,
+      ack: 'DISPOSED',
+    });
+    expect(track.stop).toHaveBeenCalledOnce();
   });
 });

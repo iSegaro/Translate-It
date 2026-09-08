@@ -127,6 +127,8 @@ function generateChromeManifest(baseManifest) {
     permissions: [
       ...baseManifest.permissions,
       'offscreen',
+      'tabCapture',
+      'activeTab',
       'contextMenus',
       'sidePanel'
     ],

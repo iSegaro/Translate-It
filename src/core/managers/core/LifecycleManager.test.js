@@ -58,6 +58,18 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.get(MessageActions.REFRESH_CONTEXT_MENUS)).toEqual(expect.any(Function))
     expect(registeredHandlers.has('undefined')).toBe(false)
   })
+
+  it('does not register live-dubbing routes in Firefox builds', () => {
+    vi.stubGlobal('__BROWSER__', 'firefox')
+    const manager = new LifecycleManager()
+
+    manager.registerMessageHandlers()
+
+    expect(registeredHandlers.has(MessageActions.START_LIVE_DUBBING)).toBe(false)
+    expect(registeredHandlers.has(MessageActions.STOP_LIVE_DUBBING)).toBe(false)
+    expect(registeredHandlers.has(MessageActions.GET_LIVE_DUBBING_STATUS)).toBe(false)
+    vi.unstubAllGlobals()
+  })
 })
 
 describe('LifecycleManager legacy Select Element handler removal', () => {

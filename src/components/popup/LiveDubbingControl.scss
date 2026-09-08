@@ -1,0 +1,48 @@
+.ti-live-dubbing-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--header-border-color);
+  background: var(--bg-color);
+}
+
+.ti-live-dubbing-control-copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ti-live-dubbing-control-label {
+  font-weight: 600;
+}
+
+.ti-live-dubbing-control-status {
+  overflow: hidden;
+  color: var(--text-color);
+  font-size: 12px;
+  opacity: 0.7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ti-live-dubbing-control-spinner {
+  flex-shrink: 0;
+}
+
+.ti-live-dubbing-control-error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--error-color, #b42318);
+  font-size: 12px;
+}
+
+@media (width <= 340px) {
+  .ti-live-dubbing-control {
+    gap: 4px;
+    padding: 4px 6px;
+  }
+}

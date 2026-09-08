@@ -59,6 +59,7 @@
               v-model:source-language="sourceLanguage"
               v-model:target-language="targetLanguage"
               :provider="currentProvider"
+              :disabled="isLiveDubbingBusy"
               :last-keyword="lastTranslation?.source"
               :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
               show-default-actions
@@ -90,6 +91,12 @@
             </button>
           </div>
         </div>
+
+        <LiveDubbingControl
+          v-if="isLiveDubbingSupported"
+          :target-language="targetLanguage"
+          @busy-change="isLiveDubbingBusy = $event"
+        />
         
         <!-- Scrollable Translation Area: Contains the main translation form -->
         <div class="translation-container">
@@ -118,6 +125,7 @@ import PopupHeader from '@/components/popup/PopupHeader.vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
+import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
 import browser from 'webextension-polyfill'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -188,6 +196,8 @@ const hasError = ref(false)
 const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
+const isLiveDubbingBusy = ref(false)
+const isLiveDubbingSupported = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'chrome'
 
 // Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {
