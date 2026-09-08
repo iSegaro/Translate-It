@@ -28,11 +28,43 @@ const STRUCTURED_RESPONSE_FORMATS = new Set([
 ]);
 
 const UNSUPPORTED_RESPONSE_FORMAT_PATTERNS = [
-  /\b(?:unknown|unsupported|unrecognized)\s+(?:parameter|field|property|key)?\s*[:=]?\s*[`'" ]*response_format\b/i,
-  /[`'"]?response_format[`'"]?\s+(?:is\s+)?(?:not\s+supported|unsupported|unrecognized|unknown)\b/i,
+  /\b(?:unknown|unsupported|unrecognized|invalid)\s+(?:parameter|field|property|key|value|type)?\s*[:=]?\s*[`'" ]*response_format\b/i,
+  /[`'"]?response_format[`'"]?\s+(?:is\s+)?(?:not\s+supported|unsupported|unrecognized|unknown|invalid|rejected)\b/i,
+  /[`'"]?response_format(?:\.\w+)?[`'"]?\s+must\s+be\b/i,
 ];
 
 const CUSTOM_MODEL_NOT_FOUND_CODES = new Set(['model_not_found']);
+
+// Runtime-only tri-state for json_object support, keyed by endpoint + model.
+// Absent = unknown (probe with response_format), 'supported' | 'unsupported' otherwise.
+// Single authoritative owner for Custom response_format capability; lives only in
+// memory for the current extension context lifetime. No persistence, no listeners.
+const CUSTOM_RESPONSE_FORMAT_SUPPORT = Object.freeze({
+  SUPPORTED: 'supported',
+  UNSUPPORTED: 'unsupported',
+});
+const customResponseFormatSupportCache = new Map();
+
+/**
+ * Builds the deterministic cache key for response_format capability.
+ * Conservative normalization: trim + trailing-slash trim only, case preserved.
+ * @param {string} apiUrl - Custom endpoint URL.
+ * @param {string} model - Custom model name.
+ * @returns {string|null} Cache key, or null when keying facts are missing.
+ */
+export function normalizeCustomResponseFormatCacheKey(apiUrl, model) {
+  const normalizedUrl = String(apiUrl ?? '').trim().replace(/\/+$/, '');
+  const normalizedModel = String(model ?? '').trim();
+  if (!normalizedUrl || !normalizedModel) return null;
+  return `${normalizedUrl}||${normalizedModel}`;
+}
+
+/**
+ * Clears the runtime response_format capability cache. Intended for tests.
+ */
+export function clearCustomResponseFormatSupportCache() {
+  customResponseFormatSupportCache.clear();
+}
 
 function isUnsupportedResponseFormatError(error) {
   const statusCode = Number(error?.statusCode);
@@ -40,6 +72,16 @@ function isUnsupportedResponseFormatError(error) {
 
   const message = typeof error?.message === 'string' ? error.message : '';
   return UNSUPPORTED_RESPONSE_FORMAT_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function didSendResponseFormat(fetchOptions) {
+  if (typeof fetchOptions?.body !== 'string') return false;
+
+  try {
+    return JSON.parse(fetchOptions.body)?.response_format != null;
+  } catch {
+    return false;
+  }
 }
 
 function removeResponseFormat(fetchOptions) {
@@ -152,6 +194,20 @@ export class CustomProvider extends BaseAIProvider {
       headers.Authorization = `Bearer ${apiKey}`;
     }
 
+    // Keyed runtime cache is the sole authority for send/omit. The per-batch
+    // ref is a compat/observer mirror only and never suppresses a probe:
+    // a stale ref reused across URL/model change must not leak into a new key.
+    // _validateConfig above guarantees truthy apiUrl/model in normal execution;
+    // a null key (e.g. whitespace-only) probes conservatively instead of omitting.
+    const cacheKey = normalizeCustomResponseFormatCacheKey(apiUrl, model);
+    const cachedSupport = cacheKey ? customResponseFormatSupportCache.get(cacheKey) : undefined;
+    const responseFormatUnsupported = cachedSupport === CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED;
+    if (customResponseFormatCapabilityRef) {
+      customResponseFormatCapabilityRef.responseFormatUnsupported = responseFormatUnsupported;
+    }
+    const shouldSendResponseFormat = STRUCTURED_RESPONSE_FORMATS.has(expectedFormat)
+      && !responseFormatUnsupported;
+
     const fetchOptions = {
       method: "POST",
       headers,
@@ -160,9 +216,7 @@ export class CustomProvider extends BaseAIProvider {
         messages: messages,
         max_tokens: 4096,
         // Apply JSON mode if requested by the contract
-        ...((STRUCTURED_RESPONSE_FORMATS.has(expectedFormat)
-          && customResponseFormatCapabilityRef?.responseFormatUnsupported !== true)
-          && { response_format: { type: "json_object" } })
+        ...(shouldSendResponseFormat && { response_format: { type: "json_object" } })
       }),
     };
 
@@ -193,11 +247,23 @@ export class CustomProvider extends BaseAIProvider {
     let result;
     try {
       result = await this._executeRequest(request);
+      // Structured success while sending response_format proves support.
+      if (shouldSendResponseFormat && cacheKey) {
+        customResponseFormatSupportCache.set(cacheKey, CUSTOM_RESPONSE_FORMAT_SUPPORT.SUPPORTED);
+        if (customResponseFormatCapabilityRef) {
+          customResponseFormatCapabilityRef.responseFormatUnsupported = false;
+        }
+      }
     } catch (error) {
-      if (!STRUCTURED_RESPONSE_FORMATS.has(expectedFormat) || !isUnsupportedResponseFormatError(error)) {
+      // Fallback only when ALL hold: 400/422 + request actually contained
+      // response_format + error specifically rejects the response_format field.
+      if (!didSendResponseFormat(fetchOptions) || !isUnsupportedResponseFormatError(error)) {
         throw error;
       }
 
+      if (cacheKey) {
+        customResponseFormatSupportCache.set(cacheKey, CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED);
+      }
       if (customResponseFormatCapabilityRef) {
         customResponseFormatCapabilityRef.responseFormatUnsupported = true;
       }

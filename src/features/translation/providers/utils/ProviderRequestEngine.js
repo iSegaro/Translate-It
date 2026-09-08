@@ -437,12 +437,16 @@ export const ProviderRequestEngine = {
           } catch { /* ignore */ }
         }
         
+        // A top-level string `body.error` must participate via the existing
+        // bounded helper; non-strings safely yield undefined.
         const classificationMessage = getBoundedProviderErrorMessage(body?.detail)
           ?? getBoundedProviderErrorMessage(body?.error?.message)
+          ?? getBoundedProviderErrorMessage(body?.error)
           ?? getBoundedProviderErrorMessage(response.statusText)
           ?? `HTTP ${response.status}`;
         const message = getBoundedProviderErrorMessage(body?.detail)
           ?? getBoundedProviderErrorMessage(body?.error?.message)
+          ?? getBoundedProviderErrorMessage(body?.error)
           ?? getBoundedProviderErrorMessage(body?.message)
           ?? getBoundedProviderErrorMessage(response.statusText)
           ?? `HTTP ${response.status}`;
