@@ -1245,52 +1245,52 @@
     "message": "モデル名を入力"
   },
   "custom_api_test_connection": {
-    "message": "接続をテスト"
+    "message": "互換性を確認"
   },
   "custom_api_testing_connection": {
-    "message": "テスト中…"
+    "message": "確認中…"
   },
   "custom_api_not_tested": {
-    "message": "未テスト"
+    "message": "未確認"
   },
   "custom_api_connection_success": {
-    "message": "接続OK。構造化出力（response_format）に対応しています。"
+    "message": "使用可能です。"
   },
   "custom_api_connection_fallback": {
-    "message": "接続OK。このサーバーはresponse_formatに対応していません。プレーンテキストのフォールバックを使用します。"
+    "message": "使用可能です。互換モードを使用します。"
   },
   "custom_api_connection_inconclusive": {
-    "message": "接続OK。ただしresponse_formatへの対応は不明です。自動的に確認します。"
+    "message": "接続は有効ですが、互換性を完全には確認できませんでした。"
   },
   "custom_api_connection_structured_invalid": {
-    "message": "接続OK。ただしモデルが有効な構造化出力を返しませんでした。翻訳が不安定な可能性があります。"
+    "message": "モデルは応答しましたが、その出力は正しく動作しない可能性があります。"
   },
   "custom_api_connection_model_mismatch": {
-    "message": "接続OK。サーバーは{requestedModel}ではなく{effectiveModel}として応答しましたが、構造化出力（response_format）に対応しており使用可能です。"
+    "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。"
   },
   "custom_api_connection_model_mismatch_fallback": {
-    "message": "接続OK。サーバーは{requestedModel}ではなく{effectiveModel}として応答しました。response_formatには対応していないため、プレーンテキストのフォールバックを使用します。"
+    "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。互換モードを使用します。"
   },
   "custom_api_connection_model_mismatch_inconclusive": {
-    "message": "接続OK。サーバーは{requestedModel}ではなく{effectiveModel}として応答しました。response_formatへの対応は不明ですが、プレーンテキストのフォールバックを使用できます。"
+    "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。互換性は完全には確認できませんでした。"
   },
   "custom_api_connection_model_mismatch_unusable": {
-    "message": "接続OK。ただしサーバーは{requestedModel}ではなく{effectiveModel}として応答し、有効な構造化出力（response_format）を返しませんでした。翻訳が不安定な可能性があります。"
+    "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しましたが、その出力は正しく動作しない可能性があります。"
   },
   "custom_api_connection_unreachable": {
-    "message": "サーバーに接続できません。APIのURLとネットワークを確認してください。"
+    "message": "サーバーに接続できません。サーバーアドレスとネットワークを確認してください。"
   },
   "custom_api_connection_auth_failed": {
     "message": "認証に失敗しました。APIキーを確認してください。"
   },
   "custom_api_connection_completion_failed": {
-    "message": "サーバーから応答はありましたが、使用可能な補完が返されませんでした。"
+    "message": "サーバーから応答はありましたが、使用可能な出力は返されませんでした。"
   },
   "custom_api_connection_request_failed": {
-    "message": "リクエストが失敗しました（ステータス {status}）。"
+    "message": "リクエストが失敗しました。サーバー設定を確認してください。"
   },
   "custom_api_connection_failed_unexpected": {
-    "message": "接続テストが予期せず失敗しました。"
+    "message": "互換性チェックが予期せず失敗しました。"
   },
   "import_export_section_title": {
     "message": "設定のインポート/エクスポート"

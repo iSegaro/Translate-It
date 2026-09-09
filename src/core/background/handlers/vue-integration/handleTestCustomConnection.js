@@ -8,6 +8,10 @@
 // settings mutation.
 import { probeCustomConnection } from '@/features/translation/providers/CustomConnectionProbe.js';
 import { MessageFormat } from '@/shared/messaging/core/MessagingCore.js';
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+
+const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'TestCustomConnection');
 
 function toProbeString(value) {
   return typeof value === 'string' ? value : '';
@@ -22,6 +26,18 @@ export async function handleTestCustomConnection(message) {
       apiUrl: toProbeString(values.apiUrl),
       apiModel: toProbeString(values.apiModel),
       apiKey: toProbeString(values.apiKey),
+    });
+    // Single bounded semantic summary for the Test Compatibility boundary.
+    // Approved fields only: never keys, bodies, raw params, or unbounded
+    // content (model names arrive already bounded by the probe).
+    logger.debug('[Custom] Test compatibility result:', {
+      state: report?.state,
+      usable: report?.usable,
+      responseFormat: report?.responseFormat,
+      fallbackStructured: report?.fallbackStructured,
+      modelStatus: report?.modelStatus,
+      requestedModel: report?.requestedModel,
+      effectiveModel: report?.effectiveModel,
     });
     return { success: true, data: { report } };
   } catch (error) {

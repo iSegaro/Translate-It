@@ -8,32 +8,12 @@ import CustomApiSettings from './CustomApiSettings.vue';
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
+import enMessages from '@/_locales/en/messages.json';
 
-// Fake translation catalog: resolves keys the way vue-i18n would, so tests
-// verify which semantic message the UI selects (and its params), not key names.
-const CATALOG = {
-  custom_api_test_connection: 'Test Connection',
-  custom_api_testing_connection: 'Testing…',
-  custom_api_not_tested: 'Not tested',
-  custom_api_connection_success: 'TRANSLATED SUCCESS',
-  custom_api_connection_fallback: 'TRANSLATED FALLBACK',
-  custom_api_connection_inconclusive: 'TRANSLATED INCONCLUSIVE',
-  custom_api_connection_unreachable: 'TRANSLATED UNREACHABLE',
-  custom_api_connection_auth_failed: 'TRANSLATED AUTH',
-  custom_api_connection_completion_failed: 'TRANSLATED COMPLETION',
-  custom_api_connection_request_failed: 'TRANSLATED REQUEST {status}',
-  custom_api_connection_structured_invalid: 'TRANSLATED STRUCTURED INVALID',
-  custom_api_connection_model_mismatch: 'TRANSLATED MISMATCH {requestedModel}->{effectiveModel}',
-  custom_api_connection_model_mismatch_fallback: 'TRANSLATED MISMATCH FALLBACK {requestedModel}->{effectiveModel}',
-  custom_api_connection_model_mismatch_inconclusive: 'TRANSLATED MISMATCH UNKNOWN {requestedModel}->{effectiveModel}',
-  custom_api_connection_model_mismatch_unusable: 'TRANSLATED MISMATCH UNUSABLE {requestedModel}->{effectiveModel}',
-  custom_api_connection_failed_unexpected: 'TRANSLATED UNEXPECTED',
-  api_test_custom_config_missing: 'TRANSLATED MISSING CONFIG',
-  api_test_custom_model_not_found: 'TRANSLATED MODEL {model}',
-};
-
+// Resolve keys through the real EN reference (with {param} interpolation),
+// so tests lock the approved wording instead of key names.
 const translate = (key, params) => {
-  let text = CATALOG[key] ?? key;
+  let text = enMessages[key]?.message ?? key;
   if (params) {
     for (const [name, value] of Object.entries(params)) {
       text = text.replaceAll(`{${name}}`, String(value));
@@ -105,6 +85,9 @@ const successReport = (messageKey = 'custom_api_connection_success', params = nu
   state: 'success',
   messageKey,
   params,
+  modelStatus: responseFormat === 'supported' ? 'matched' : 'unknown',
+  requestedModel: 'm',
+  effectiveModel: responseFormat === 'supported' ? 'm' : null,
 });
 
 const failedReport = (messageKey, params = null) => ({
@@ -114,6 +97,9 @@ const failedReport = (messageKey, params = null) => ({
   state: 'completion_failed',
   messageKey,
   params,
+  modelStatus: 'unknown',
+  requestedModel: 'm',
+  effectiveModel: null,
 });
 
 const envelope = (report) => ({ success: true, data: { report } });
@@ -134,6 +120,7 @@ function mountWith(settings) {
 }
 
 const statusOf = (wrapper) => wrapper.get('[data-testid="custom-connection-status"]');
+const buttonOf = (wrapper) => wrapper.get('[data-testid="custom-test-connection"]');
 
 describe('CustomApiSettings Test Connection', () => {
   beforeEach(() => {
@@ -156,18 +143,33 @@ describe('CustomApiSettings Test Connection', () => {
     expect(source).not.toContain('CustomResponseFormatCapability');
   });
 
-  it('does not probe on mount and shows the translated Not tested status', () => {
+  it('does not probe on mount and shows idle labels', () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
     expect(mocks.testCustomConnection).not.toHaveBeenCalled();
-    expect(statusOf(wrapper).text()).toBe('Not tested');
+    expect(buttonOf(wrapper).text()).toBe('Check Compatibility');
+    expect(statusOf(wrapper).text()).toBe('Not checked');
+    wrapper.unmount();
+  });
+
+  it('shows the busy label while the background check runs', async () => {
+    let resolveProbe;
+    mocks.testCustomConnection.mockImplementationOnce(() => new Promise((resolve) => { resolveProbe = resolve; }));
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(buttonOf(wrapper).text()).toBe('Checking…'));
+
+    resolveProbe(envelope(successReport()));
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use.'));
+    await vi.waitFor(() => expect(buttonOf(wrapper).text()).toBe('Check Compatibility'));
     wrapper.unmount();
   });
 
   it('sends unsaved form values with the first key via messaging', async () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k1\nk2', CUSTOM_API_MODEL: 'm1' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
+    await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
 
     expect(mocks.testCustomConnection).toHaveBeenCalledWith({
@@ -175,7 +177,7 @@ describe('CustomApiSettings Test Connection', () => {
       apiModel: 'm1',
       apiKey: 'k1',
     });
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED SUCCESS'));
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use.'));
     expect(statusOf(wrapper).classes()).toContain('success');
     expect(statusOf(wrapper).classes()).not.toContain('warning');
     expect(statusOf(wrapper).classes()).not.toContain('error');
@@ -188,8 +190,9 @@ describe('CustomApiSettings Test Connection', () => {
     ));
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED FALLBACK'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.'));
+    expect(statusOf(wrapper).text()).toContain('Compatibility mode');
     expect(statusOf(wrapper).classes()).toContain('warning');
     wrapper.unmount();
   });
@@ -198,8 +201,8 @@ describe('CustomApiSettings Test Connection', () => {
     mocks.testCustomConnection.mockResolvedValueOnce(envelope(failedReport('custom_api_connection_completion_failed')));
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED COMPLETION'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('The server responded, but returned nothing usable.'));
     expect(statusOf(wrapper).classes()).toContain('error');
     expect(statusOf(wrapper).classes()).not.toContain('warning');
     expect(statusOf(wrapper).classes()).not.toContain('success');
@@ -214,11 +217,14 @@ describe('CustomApiSettings Test Connection', () => {
       state: 'success',
       messageKey: 'custom_api_connection_structured_invalid',
       params: null,
+      modelStatus: 'matched',
+      requestedModel: 'm',
+      effectiveModel: 'm',
     } } });
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED STRUCTURED INVALID'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('The model responded, but its output may not work reliably.'));
     expect(statusOf(wrapper).classes()).toContain('error');
     expect(statusOf(wrapper).classes()).not.toContain('success');
     expect(statusOf(wrapper).classes()).not.toContain('warning');
@@ -239,8 +245,10 @@ describe('CustomApiSettings Test Connection', () => {
     } } });
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm1' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED MISMATCH m1->other'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('The server used other instead of m1.'));
+    expect(statusOf(wrapper).text()).toContain('m1');
+    expect(statusOf(wrapper).text()).toContain('other');
     expect(statusOf(wrapper).classes()).toContain('warning');
     expect(statusOf(wrapper).classes()).not.toContain('success');
     expect(statusOf(wrapper).classes()).not.toContain('error');
@@ -261,8 +269,10 @@ describe('CustomApiSettings Test Connection', () => {
     } } });
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm1' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED MISMATCH FALLBACK m1->other'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe(
+      'The server used other instead of m1. Compatibility mode will be used.',
+    ));
     expect(statusOf(wrapper).classes()).toContain('warning');
     wrapper.unmount();
   });
@@ -281,8 +291,10 @@ describe('CustomApiSettings Test Connection', () => {
     } } });
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm1' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED MISMATCH UNUSABLE m1->other'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe(
+      'The server used other instead of m1, and its output may not work reliably.',
+    ));
     expect(statusOf(wrapper).classes()).toContain('error');
     expect(statusOf(wrapper).classes()).not.toContain('warning');
     expect(statusOf(wrapper).classes()).not.toContain('success');
@@ -296,10 +308,66 @@ describe('CustomApiSettings Test Connection', () => {
     mocks.testCustomConnection.mockResolvedValueOnce(envelope(successReport(messageKey, null, responseFormat)));
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
+    await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(statusOf(wrapper).classes()).toContain('warning'));
     expect(statusOf(wrapper).classes()).not.toContain('success');
     expect(statusOf(wrapper).classes()).not.toContain('error');
+    wrapper.unmount();
+  });
+
+  it.each([
+    ['inconclusive', 'custom_api_connection_inconclusive', null, 'Connection works, but compatibility could not be fully verified.'],
+    ['unreachable', 'custom_api_connection_unreachable', null, 'Cannot reach the server. Check the server address and network.'],
+    ['auth_failed', 'custom_api_connection_auth_failed', null, 'Authentication failed. Check the API key.'],
+    ['mismatch_inconclusive', 'custom_api_connection_model_mismatch_inconclusive',
+      { requestedModel: 'm1', effectiveModel: 'other' },
+      'The server used other instead of m1. Compatibility could not be fully verified.'],
+    ['unexpected', 'custom_api_connection_failed_unexpected', null, 'Compatibility check failed unexpectedly.'],
+  ])('renders approved %s wording', async (_label, messageKey, params, text) => {
+    mocks.testCustomConnection.mockResolvedValueOnce(envelope({
+      ...failedReport(messageKey, params),
+      state: 'success',
+      usable: messageKey === 'custom_api_connection_model_mismatch_inconclusive',
+    }));
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe(text));
+    wrapper.unmount();
+  });
+
+  it.each([
+    ['custom_api_connection_success', successReport()],
+    ['custom_api_connection_fallback', successReport('custom_api_connection_fallback', null, 'unsupported')],
+    ['custom_api_connection_inconclusive', successReport('custom_api_connection_inconclusive', null, 'unknown')],
+    ['custom_api_connection_model_mismatch', { ...successReport('custom_api_connection_model_mismatch', { requestedModel: 'm1', effectiveModel: 'other' }), modelStatus: 'mismatch', requestedModel: 'm1', effectiveModel: 'other' }],
+    ['custom_api_connection_model_mismatch_fallback', { ...successReport('custom_api_connection_model_mismatch_fallback', { requestedModel: 'm1', effectiveModel: 'other' }, 'unsupported'), modelStatus: 'mismatch', requestedModel: 'm1', effectiveModel: 'other' }],
+    ['custom_api_connection_model_mismatch_inconclusive', { ...successReport('custom_api_connection_model_mismatch_inconclusive', { requestedModel: 'm1', effectiveModel: 'other' }, 'unknown'), modelStatus: 'mismatch', requestedModel: 'm1', effectiveModel: 'other' }],
+    ['custom_api_connection_model_mismatch_unusable', { fallbackStructured: 'unsupported', responseFormat: 'unsupported', usable: false, state: 'success', messageKey: 'custom_api_connection_model_mismatch_unusable', params: { requestedModel: 'm1', effectiveModel: 'other' }, modelStatus: 'mismatch', requestedModel: 'm1', effectiveModel: 'other' }],
+    ['custom_api_connection_structured_invalid', { fallbackStructured: 'supported', responseFormat: 'supported', usable: false, state: 'success', messageKey: 'custom_api_connection_structured_invalid', params: null, modelStatus: 'matched', requestedModel: 'm', effectiveModel: 'm' }],
+  ])('hides protocol details in %s', async (_label, report) => {
+    expect(report.messageKey.startsWith('custom_api_')).toBe(true);
+    mocks.testCustomConnection.mockResolvedValueOnce(envelope(report));
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).not.toBe('Not checked'));
+    expect(statusOf(wrapper).text()).not.toContain('response_format');
+    wrapper.unmount();
+  });
+
+  it('renders request failures without any HTTP status', async () => {
+    mocks.testCustomConnection.mockResolvedValueOnce(envelope({
+      ...failedReport('custom_api_connection_request_failed', { status: 500 }),
+      state: 'request_failed',
+    }));
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('The request failed. Check the server settings.'));
+    expect(statusOf(wrapper).text()).not.toContain('500');
+    expect(statusOf(wrapper).classes()).toContain('error');
     wrapper.unmount();
   });
 
@@ -310,8 +378,8 @@ describe('CustomApiSettings Test Connection', () => {
     }));
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm1' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED MODEL m1'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Configured model was not found: m1'));
     wrapper.unmount();
   });
 
@@ -322,8 +390,8 @@ describe('CustomApiSettings Test Connection', () => {
     mocks.testCustomConnection.mockResolvedValueOnce(response);
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED UNEXPECTED'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Compatibility check failed unexpectedly.'));
     expect(statusOf(wrapper).classes()).toContain('error');
     wrapper.unmount();
   });
@@ -332,15 +400,15 @@ describe('CustomApiSettings Test Connection', () => {
     mocks.testCustomConnection.mockRejectedValueOnce(new Error('background unreachable'));
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED UNEXPECTED'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Compatibility check failed unexpectedly.'));
     wrapper.unmount();
   });
 
   it('probes keyless with an empty key', async () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: '', CUSTOM_API_MODEL: 'm1' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
+    await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
 
     expect(mocks.testCustomConnection).toHaveBeenCalledWith({
@@ -354,7 +422,7 @@ describe('CustomApiSettings Test Connection', () => {
   it('never gates Save or persists: no storage writes from Test Connection', async () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
+    await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
 
     expect(vi.mocked(storageManager.set)).not.toHaveBeenCalled();
@@ -365,14 +433,14 @@ describe('CustomApiSettings Test Connection', () => {
     ['URL', { CUSTOM_API_URL: URL_B }],
     ['model', { CUSTOM_API_MODEL: 'm2' }],
     ['key', { CUSTOM_API_KEY: 'other-key' }],
-  ])('invalidates the report back to Not tested on %s edit', async (_label, edit) => {
+  ])('invalidates the report back to Not checked on %s edit', async (_label, edit) => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED SUCCESS'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use.'));
 
     Object.assign(mocks.settingsStore.settings, edit);
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Not tested'));
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Not checked'));
     wrapper.unmount();
   });
 
@@ -383,17 +451,17 @@ describe('CustomApiSettings Test Connection', () => {
       .mockImplementationOnce(() => new Promise((resolve) => { resolveA = resolve; }))
       .mockImplementationOnce(async () => envelope(successReport('custom_api_connection_fallback', null, 'unsupported')));
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
+    await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
 
     Object.assign(mocks.settingsStore.settings, { CUSTOM_API_URL: URL_B });
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED FALLBACK'));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.'));
 
     resolveA(envelope(successReport()));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(statusOf(wrapper).text()).toBe('TRANSLATED FALLBACK');
+    expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.');
     wrapper.unmount();
   });
 
@@ -404,14 +472,14 @@ describe('CustomApiSettings Test Connection', () => {
       .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
       .mockImplementationOnce(async () => envelope(successReport('custom_api_connection_fallback', null, 'unsupported')));
 
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await wrapper.get('[data-testid="custom-test-connection"]').trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('TRANSLATED FALLBACK'));
+    await buttonOf(wrapper).trigger('click');
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.'));
 
     resolveFirst(envelope(failedReport('custom_api_connection_completion_failed')));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(statusOf(wrapper).text()).toBe('TRANSLATED FALLBACK');
+    expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.');
     wrapper.unmount();
   });
 
@@ -426,7 +494,7 @@ describe('CustomApiSettings Test Connection', () => {
       { apiUrl: URL_A, apiModel: 'm' },
     );
     expect(mocks.testCustomConnection).not.toHaveBeenCalled();
-    expect(statusOf(wrapper).text()).toBe('Not tested');
+    expect(statusOf(wrapper).text()).toBe('Not checked');
     wrapper.unmount();
   });
 });

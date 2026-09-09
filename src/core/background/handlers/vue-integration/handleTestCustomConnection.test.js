@@ -16,6 +16,18 @@ vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
   },
 }));
 
+const loggerSpies = vi.hoisted(() => ({
+  debug: vi.fn(),
+  debugLazy: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock('@/shared/logging/logger.js', () => ({
+  getScopedLogger: () => loggerSpies,
+}));
+
 const semanticReport = (overrides = {}) => ({
   fallbackStructured: 'supported',
   responseFormat: 'supported',
@@ -102,6 +114,48 @@ describe('handleTestCustomConnection', () => {
     expect(response.success).toBe(false);
     expect(response.errorDetails).toMatchObject({ message: 'probe exploded' });
     expect(response.data).toMatchObject({ success: false });
+  });
+
+  it('logs a single bounded semantic summary with approved fields only', async () => {
+    const apiKey = 'super-secret-key material';
+    vi.mocked(probeCustomConnection).mockResolvedValue(semanticReport({
+      state: 'success',
+      usable: true,
+      responseFormat: 'supported',
+      fallbackStructured: 'supported',
+      modelStatus: 'matched',
+      requestedModel: 'm',
+      effectiveModel: 'm',
+    }));
+
+    await handleTestCustomConnection({
+      data: { config: { apiUrl: 'https://a.example/x', apiModel: 'm', apiKey } },
+    });
+
+    expect(loggerSpies.debug).toHaveBeenCalledTimes(1);
+    expect(loggerSpies.warn).not.toHaveBeenCalled();
+    expect(loggerSpies.info).not.toHaveBeenCalled();
+    expect(loggerSpies.error).not.toHaveBeenCalled();
+    const [message, summary] = loggerSpies.debug.mock.calls[0];
+    expect(typeof message).toBe('string');
+    expect(Object.keys(summary).sort()).toEqual(
+      ['effectiveModel', 'fallbackStructured', 'modelStatus', 'requestedModel', 'responseFormat', 'state', 'usable'].sort(),
+    );
+    expect(summary).toMatchObject({
+      state: 'success',
+      usable: true,
+      responseFormat: 'supported',
+      fallbackStructured: 'supported',
+      modelStatus: 'matched',
+      requestedModel: 'm',
+      effectiveModel: 'm',
+    });
+    const serialized = JSON.stringify(summary);
+    expect(serialized).not.toContain('super-secret-key');
+    expect(serialized).not.toContain('choices');
+    for (const value of Object.values(summary)) {
+      if (typeof value === 'string') expect(value.length).toBeLessThanOrEqual(80);
+    }
   });
 
   it('never touches Test Key semantics or settings', async () => {

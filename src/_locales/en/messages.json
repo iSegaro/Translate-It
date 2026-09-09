@@ -1245,52 +1245,52 @@
     "message": "Enter the model name"
   },
   "custom_api_test_connection": {
-    "message": "Test Connection"
+    "message": "Check Compatibility"
   },
   "custom_api_testing_connection": {
-    "message": "Testing…"
+    "message": "Checking…"
   },
   "custom_api_not_tested": {
-    "message": "Not tested"
+    "message": "Not checked"
   },
   "custom_api_connection_success": {
-    "message": "Connection OK. Structured output (response_format) is supported."
+    "message": "Ready to use."
   },
   "custom_api_connection_fallback": {
-    "message": "Connection OK. This server does not support response_format; plain-text fallback will be used."
+    "message": "Ready to use. Compatibility mode will be used."
   },
   "custom_api_connection_inconclusive": {
-    "message": "Connection OK, but response_format support is inconclusive. It will be probed automatically."
+    "message": "Connection works, but compatibility could not be fully verified."
   },
   "custom_api_connection_structured_invalid": {
-    "message": "Connection OK, but the model did not return valid structured output. Translation may be unreliable."
+    "message": "The model responded, but its output may not work reliably."
   },
   "custom_api_connection_model_mismatch": {
-    "message": "Connection OK. The server responded as {effectiveModel} instead of {requestedModel}, but structured output (response_format) is supported and usable."
+    "message": "The server used {effectiveModel} instead of {requestedModel}."
   },
   "custom_api_connection_model_mismatch_fallback": {
-    "message": "Connection OK. The server responded as {effectiveModel} instead of {requestedModel}; response_format is not supported and plain-text fallback will be used."
+    "message": "The server used {effectiveModel} instead of {requestedModel}. Compatibility mode will be used."
   },
   "custom_api_connection_model_mismatch_inconclusive": {
-    "message": "Connection OK. The server responded as {effectiveModel} instead of {requestedModel}; response_format support is inconclusive, but plain-text fallback is available."
+    "message": "The server used {effectiveModel} instead of {requestedModel}. Compatibility could not be fully verified."
   },
   "custom_api_connection_model_mismatch_unusable": {
-    "message": "Connection OK, but the server responded as {effectiveModel} instead of {requestedModel} and did not return valid structured output. Translation may be unreliable."
+    "message": "The server used {effectiveModel} instead of {requestedModel}, and its output may not work reliably."
   },
   "custom_api_connection_unreachable": {
-    "message": "Cannot reach the server. Check the API URL and network."
+    "message": "Cannot reach the server. Check the server address and network."
   },
   "custom_api_connection_auth_failed": {
     "message": "Authentication failed. Check the API key."
   },
   "custom_api_connection_completion_failed": {
-    "message": "The server responded but returned no usable completion."
+    "message": "The server responded, but returned nothing usable."
   },
   "custom_api_connection_request_failed": {
-    "message": "Request failed with status {status}."
+    "message": "The request failed. Check the server settings."
   },
   "custom_api_connection_failed_unexpected": {
-    "message": "Connection test failed unexpectedly."
+    "message": "Compatibility check failed unexpectedly."
   },
   "import_export_section_title": {
     "message": "Import/Export Settings"
