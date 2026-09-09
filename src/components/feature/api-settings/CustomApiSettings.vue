@@ -45,22 +45,31 @@
           <div
             data-testid="custom-connection-status"
             role="status"
-            :class="connectionReport ? ['test-result', connectionResultClass] : 'setting-help-text'"
+            class="custom-connection-status"
           >
-            <template v-if="connectionReport">
+            <div v-if="connectionReport" :class="['test-result', connectionResultClass]">
               <p v-if="connectionVerdict" class="connection-verdict">{{ connectionVerdict }}</p>
               <p v-if="connectionDetailSegments.length > 0" class="connection-detail"><template v-for="(segment, index) in connectionDetailSegments" :key="index"><strong v-if="segment.strong">{{ segment.text }}</strong><span v-else>{{ segment.text }}</span></template></p>
-            </template>
-            <template v-else>{{ connectionStatusText }}</template>
+            </div>
+            <div v-else class="setting-help-text">{{ connectionStatusText }}</div>
           </div>
           <button
             type="button"
-            class="test-keys-button"
+            class="test-keys-button compat-check-button"
             :class="{ 'testing-keys': testingConnection }"
             data-testid="custom-test-connection"
             @click="testConnection"
           >
-            {{ testingConnection ? t('custom_api_testing_connection') : t('custom_api_test_connection') }}
+            <span
+              class="compat-check-label"
+              :class="{ 'is-hidden': testingConnection }"
+              :aria-hidden="testingConnection ? 'true' : 'false'"
+            >{{ t('custom_api_test_connection') }}</span>
+            <span
+              class="compat-check-label compat-check-label-busy"
+              :class="{ 'is-hidden': !testingConnection }"
+              :aria-hidden="!testingConnection ? 'true' : 'false'"
+            >{{ t('custom_api_testing_connection') }}</span>
           </button>
         </div>
       </div>

@@ -121,7 +121,10 @@ function mountWith(settings) {
 }
 
 const statusOf = (wrapper) => wrapper.get('[data-testid="custom-connection-status"]');
+const innerOf = (wrapper) => wrapper.get('[data-testid="custom-connection-status"] > div');
 const buttonOf = (wrapper) => wrapper.get('[data-testid="custom-test-connection"]');
+const buttonLabelsOf = (wrapper) => wrapper.findAll('[data-testid="custom-test-connection"] .compat-check-label');
+const visibleButtonLabelOf = (wrapper) => buttonLabelsOf(wrapper).find((label) => !label.classes('is-hidden'));
 const verdictOf = (wrapper) => wrapper.get('[data-testid="custom-connection-status"] .connection-verdict');
 const detailOf = (wrapper) => wrapper.get('[data-testid="custom-connection-status"] .connection-detail');
 const detailExists = (wrapper) => wrapper.find('[data-testid="custom-connection-status"] .connection-detail').exists();
@@ -152,7 +155,7 @@ describe('CustomApiSettings Test Connection', () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
     expect(mocks.testCustomConnection).not.toHaveBeenCalled();
-    expect(buttonOf(wrapper).text()).toBe('Check Compatibility');
+    expect(visibleButtonLabelOf(wrapper).text()).toBe('Check Compatibility');
     expect(statusOf(wrapper).text()).toBe('Not checked');
     wrapper.unmount();
   });
@@ -163,12 +166,11 @@ describe('CustomApiSettings Test Connection', () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
     await buttonOf(wrapper).trigger('click');
-    await vi.waitFor(() => expect(buttonOf(wrapper).text()).toBe('Checking…'));
+    await vi.waitFor(() => expect(visibleButtonLabelOf(wrapper).text()).toBe('Checking…'));
 
     resolveProbe(envelope(successReport()));
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatible.'));
-    expect(detailExists(wrapper)).toBe(false);
-    await vi.waitFor(() => expect(buttonOf(wrapper).text()).toBe('Check Compatibility'));
+    await vi.waitFor(() => expect(visibleButtonLabelOf(wrapper).text()).toBe('Check Compatibility'));
     wrapper.unmount();
   });
 
@@ -189,9 +191,9 @@ describe('CustomApiSettings Test Connection', () => {
     expect(sentId.length).toBeGreaterThan(0);
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatible.'));
     expect(detailExists(wrapper)).toBe(false);
-    expect(statusOf(wrapper).classes()).toContain('success');
-    expect(statusOf(wrapper).classes()).not.toContain('warning');
-    expect(statusOf(wrapper).classes()).not.toContain('error');
+    expect(innerOf(wrapper).classes()).toContain('success');
+    expect(innerOf(wrapper).classes()).not.toContain('warning');
+    expect(innerOf(wrapper).classes()).not.toContain('error');
     wrapper.unmount();
   });
 
@@ -239,7 +241,7 @@ describe('CustomApiSettings Test Connection', () => {
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatible.'));
     expect(detailOf(wrapper).text()).toBe('Compatibility mode will be used.');
     expect(detailOf(wrapper).text()).toContain('Compatibility mode');
-    expect(statusOf(wrapper).classes()).toContain('warning');
+    expect(innerOf(wrapper).classes()).toContain('warning');
     wrapper.unmount();
   });
 
@@ -250,9 +252,9 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatibility check failed.'));
     expect(detailOf(wrapper).text()).toBe('The server responded, but returned nothing usable.');
-    expect(statusOf(wrapper).classes()).toContain('error');
-    expect(statusOf(wrapper).classes()).not.toContain('warning');
-    expect(statusOf(wrapper).classes()).not.toContain('success');
+    expect(innerOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).not.toContain('warning');
+    expect(innerOf(wrapper).classes()).not.toContain('success');
     wrapper.unmount();
   });
 
@@ -273,9 +275,9 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Not compatible.'));
     expect(detailOf(wrapper).text()).toBe('The model returned an unusable response.');
-    expect(statusOf(wrapper).classes()).toContain('error');
-    expect(statusOf(wrapper).classes()).not.toContain('success');
-    expect(statusOf(wrapper).classes()).not.toContain('warning');
+    expect(innerOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).not.toContain('success');
+    expect(innerOf(wrapper).classes()).not.toContain('warning');
     wrapper.unmount();
   });
 
@@ -298,9 +300,9 @@ describe('CustomApiSettings Test Connection', () => {
     expect(detailOf(wrapper).text()).toBe('The server used other instead of m1.');
     expect(detailOf(wrapper).text()).toContain('m1');
     expect(detailOf(wrapper).text()).toContain('other');
-    expect(statusOf(wrapper).classes()).toContain('warning');
-    expect(statusOf(wrapper).classes()).not.toContain('success');
-    expect(statusOf(wrapper).classes()).not.toContain('error');
+    expect(innerOf(wrapper).classes()).toContain('warning');
+    expect(innerOf(wrapper).classes()).not.toContain('success');
+    expect(innerOf(wrapper).classes()).not.toContain('error');
     wrapper.unmount();
   });
 
@@ -323,7 +325,7 @@ describe('CustomApiSettings Test Connection', () => {
     expect(detailOf(wrapper).text()).toBe(
       'The server used other instead of m1. Compatibility mode will be used.',
     );
-    expect(statusOf(wrapper).classes()).toContain('warning');
+    expect(innerOf(wrapper).classes()).toContain('warning');
     wrapper.unmount();
   });
 
@@ -346,9 +348,9 @@ describe('CustomApiSettings Test Connection', () => {
     expect(detailOf(wrapper).text()).toBe(
       'The server used other instead of m1, and its output may not work reliably.',
     );
-    expect(statusOf(wrapper).classes()).toContain('error');
-    expect(statusOf(wrapper).classes()).not.toContain('warning');
-    expect(statusOf(wrapper).classes()).not.toContain('success');
+    expect(innerOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).not.toContain('warning');
+    expect(innerOf(wrapper).classes()).not.toContain('success');
     wrapper.unmount();
   });
 
@@ -360,9 +362,9 @@ describe('CustomApiSettings Test Connection', () => {
     const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
 
     await buttonOf(wrapper).trigger('click');
-    await vi.waitFor(() => expect(statusOf(wrapper).classes()).toContain('warning'));
-    expect(statusOf(wrapper).classes()).not.toContain('success');
-    expect(statusOf(wrapper).classes()).not.toContain('error');
+    await vi.waitFor(() => expect(innerOf(wrapper).classes()).toContain('warning'));
+    expect(innerOf(wrapper).classes()).not.toContain('success');
+    expect(innerOf(wrapper).classes()).not.toContain('error');
     wrapper.unmount();
   });
 
@@ -428,7 +430,7 @@ describe('CustomApiSettings Test Connection', () => {
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatibility check failed.'));
     expect(detailOf(wrapper).text()).toBe('Check the server settings.');
     expect(statusOf(wrapper).text()).not.toContain('500');
-    expect(statusOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).toContain('error');
     wrapper.unmount();
   });
 
@@ -455,7 +457,7 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatibility check failed.'));
     expect(detailExists(wrapper)).toBe(false);
-    expect(statusOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).toContain('error');
     wrapper.unmount();
   });
 
@@ -584,9 +586,9 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatibility check timed out.'));
     expect(detailOf(wrapper).text()).toBe('Try again.');
-    expect(statusOf(wrapper).classes()).toContain('error');
-    expect(statusOf(wrapper).classes()).not.toContain('success');
-    expect(statusOf(wrapper).classes()).not.toContain('warning');
+    expect(innerOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).not.toContain('success');
+    expect(innerOf(wrapper).classes()).not.toContain('warning');
     wrapper.unmount();
   });
 
@@ -760,7 +762,7 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('custom_api_connection_nonexistent'));
     expect(wrapper.find('[data-testid="custom-connection-status"] .connection-verdict').exists()).toBe(false);
-    expect(statusOf(wrapper).classes()).toContain('error');
+    expect(innerOf(wrapper).classes()).toContain('error');
     wrapper.unmount();
   });
 
@@ -772,6 +774,81 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatible.'));
     expect(statusOf(wrapper).attributes('role')).toBe('status');
+    wrapper.unmount();
+  });
+
+  it('keeps both button labels in the DOM with grid-stack stability semantics', async () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    const labels = buttonLabelsOf(wrapper);
+    expect(labels).toHaveLength(2);
+    expect(labels[0].text()).toBe('Check Compatibility');
+    expect(labels[1].text()).toBe('Checking…');
+    // Idle: first label active, busy label layout-reserving but hidden from AT.
+    expect(labels[0].classes()).not.toContain('is-hidden');
+    expect(labels[0].attributes('aria-hidden')).toBe('false');
+    expect(labels[1].classes()).toContain('is-hidden');
+    expect(labels[1].attributes('aria-hidden')).toBe('true');
+
+    let resolveProbe;
+    mocks.testCustomConnection.mockImplementationOnce(() => new Promise((resolve) => { resolveProbe = resolve; }));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(visibleButtonLabelOf(wrapper).text()).toBe('Checking…'));
+
+    const busyLabels = buttonLabelsOf(wrapper);
+    expect(busyLabels).toHaveLength(2);
+    expect(busyLabels[0].classes()).toContain('is-hidden');
+    expect(busyLabels[0].attributes('aria-hidden')).toBe('true');
+    expect(busyLabels[1].classes()).not.toContain('is-hidden');
+    expect(busyLabels[1].attributes('aria-hidden')).toBe('false');
+
+    resolveProbe(envelope(successReport()));
+    await vi.waitFor(() => expect(visibleButtonLabelOf(wrapper).text()).toBe('Check Compatibility'));
+    wrapper.unmount();
+  });
+
+  it('declares the grid-stack and reservation rules in the component stylesheet', () => {
+    const scss = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), './CustomApiSettings.scss'),
+      'utf8',
+    );
+    // Button: both labels share one grid cell; inactive keeps space.
+    expect(scss).toContain('display: grid');
+    expect(scss).toContain('grid-area: 1 / 1');
+    expect(scss).toContain('visibility: hidden');
+    // Status: scalable reservation, never a rigid height; reservation
+    // metrics pinned on the outer wrapper, not inherited from inner
+    // presentation classes.
+    expect(scss).toContain('.custom-connection-status');
+    expect(scss).toMatch(/min-height:\s*calc\(2lh \+ 4px \+ 16px\)/);
+    expect(scss).not.toMatch(/\.custom-connection-status\s*{[^}]*?(?<!min-)(?<!line-)height:/);
+    expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*font-size:/);
+    expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*line-height:/);
+    // Model emphasis stays direction-isolated.
+    expect(scss).toContain('unicode-bidi: isolate');
+  });
+
+  it('keeps layout ownership on the outer wrapper and presentation on the inner element', async () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    // Idle: outer owns layout, inner carries the idle presentation.
+    expect(statusOf(wrapper).classes()).toContain('custom-connection-status');
+    expect(statusOf(wrapper).classes()).not.toContain('test-result');
+    expect(statusOf(wrapper).classes()).not.toContain('setting-help-text');
+    expect(statusOf(wrapper).attributes('role')).toBe('status');
+    expect(innerOf(wrapper).classes()).toContain('setting-help-text');
+    expect(innerOf(wrapper).classes()).not.toContain('custom-connection-status');
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatible.'));
+
+    // Result: outer unchanged, inner carries the result presentation.
+    expect(statusOf(wrapper).classes()).toContain('custom-connection-status');
+    expect(statusOf(wrapper).classes()).not.toContain('test-result');
+    expect(statusOf(wrapper).classes()).not.toContain('setting-help-text');
+    expect(statusOf(wrapper).attributes('role')).toBe('status');
+    expect(innerOf(wrapper).classes()).toContain('test-result');
+    expect(innerOf(wrapper).classes()).toContain('success');
     wrapper.unmount();
   });
 

@@ -14,4 +14,44 @@
   .connection-detail {
     margin-top: 4px;
   }
+
+  // Layout stability: the outer wrapper owns a two-line reservation so
+  // idle → verdict-only → verdict+detail transitions do not move the
+  // controls below. The reservation metrics are pinned here (not inherited
+  // from the inner presentation classes), so switching between
+  // setting-help-text and test-result cannot change the reserved height.
+  // The reservation covers the full two-line result box: two line-heights
+  // plus the verdict/detail gap (4px, see .connection-detail above) plus
+  // the .test-result vertical padding (16px = 8px top + 8px bottom, kept in
+  // sync with ApiKeyInput.scss, whose padding is a literal, not a token).
+  // Scalable units only; longer content grows naturally and never clips
+  // (min-height, never height). The wrapper keeps the row flex sizing the
+  // status box previously had as a direct flex item.
+  .custom-connection-status {
+    flex: 1 1 200px;
+    font-size: $font-size-sm;
+    line-height: 1.4;
+    min-height: calc(2lh + 4px + 16px);
+  }
+
+  .connection-detail strong {
+    unicode-bidi: isolate;
+  }
+
+  // Grid-stacked button labels: both labels share one cell, so the button
+  // width equals the widest current-locale label with no JS measurement.
+  // The inactive label keeps layout space via visibility (never
+  // display:none) and is hidden from assistive technology.
+  .compat-check-button {
+    display: grid;
+    text-align: center;
+
+    .compat-check-label {
+      grid-area: 1 / 1;
+
+      &.is-hidden {
+        visibility: hidden;
+      }
+    }
+  }
 }
