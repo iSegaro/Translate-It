@@ -122,6 +122,25 @@ function toBoundedModelName(value) {
 }
 
 /**
+ * Display form of a model name for mismatch params: absolute filesystem
+ * paths collapse to their basename so messages stay readable
+ * ("/models/foo.gguf" → "foo.gguf"). Only absolute-path forms qualify —
+ * POSIX (/…), Windows drive (C:\… or C:/…), UNC (\\…) — everything else
+ * (org/model, relative paths, plain names) passes through unchanged. An
+ * empty basename falls back to the full value. Pure string ops, no Node
+ * path dependency. Bounding stays with the caller (toBoundedModelName).
+ */
+function toDisplayModelName(value) {
+  const text = String(value ?? '').trim();
+  const isAbsolutePath = text.startsWith('/')
+    || /^[A-Za-z]:[\\/]/.test(text)
+    || text.startsWith('\\\\');
+  if (!isAbsolutePath) return text;
+  const base = text.split(/[/\\]/).pop();
+  return base && base.length > 0 ? base : text;
+}
+
+/**
  * Same proxy boundary as ApiKeyManager key testing: fresh proxy snapshot per
  * physical attempt, proxyManager.fetch transport. Never native fetch. An
  * optional AbortSignal is forwarded in the fetch options so cancellation
@@ -197,6 +216,19 @@ function extractEffectiveModel(body) {
 }
 
 /**
+ * Chooses which raw served name evidences identity: Probe A normally; Probe
+ * B only when A is silent or A matches while B differs. Shared by identity
+ * resolution and params display so both stay consistent.
+ */
+function selectEffectiveRaw(requested, modelA, modelB) {
+  if (modelA != null && modelB != null && modelA !== modelB) {
+    if (modelA !== requested) return modelA;
+    if (modelB !== requested) return modelB;
+  }
+  return modelA ?? modelB;
+}
+
+/**
  * Resolves served-model identity against the requested model. Probe A is
  * primary; Probe B only fills the gap when A is silent. Both naming
  * different models is itself a mismatch (see header); the effective side is
@@ -209,22 +241,25 @@ function extractEffectiveModel(body) {
  */
 function resolveModelIdentity(requestedModel, modelA, modelB) {
   const requested = String(requestedModel ?? '').trim();
-  const build = (effective) => ({
+  const effective = selectEffectiveRaw(requested, modelA, modelB);
+  const build = (shown) => ({
     requestedModel: requested ? toBoundedModelName(requested) : null,
-    effectiveModel: effective != null ? toBoundedModelName(effective) : null,
+    effectiveModel: shown != null ? toBoundedModelName(shown) : null,
   });
-  if (modelA == null && modelB == null) return { modelStatus: 'unknown', ...build(null) };
+  if (effective == null) return { modelStatus: 'unknown', ...build(null) };
   if (modelA != null && modelB != null && modelA !== modelB) {
-    let effective = modelA;
-    if (effective === requested && modelB !== requested) effective = modelB;
     return { modelStatus: 'mismatch', ...build(effective) };
   }
-  const effective = modelA ?? modelB;
   return { modelStatus: effective === requested ? 'matched' : 'mismatch', ...build(effective) };
 }
 
-function mismatchParams(identity) {
-  return { requestedModel: identity.requestedModel, effectiveModel: identity.effectiveModel };
+function mismatchParams(identity, rawEffective) {
+  return {
+    requestedModel: identity.requestedModel,
+    effectiveModel: rawEffective != null
+      ? toBoundedModelName(toDisplayModelName(rawEffective))
+      : identity.effectiveModel,
+  };
 }
 
 /**
@@ -360,7 +395,7 @@ function degradedStructuredResult(
  * Probe A fallback keeps the endpoint usable, with the inconclusive reason.
  * A proven mismatch is still surfaced in the reason and the identity fields.
  */
-function inconclusiveResult(fallbackStructured, modelIdentity) {
+function inconclusiveResult(fallbackStructured, modelIdentity, rawEffective) {
   if (fallbackStructured === 'supported') {
     if (modelIdentity.modelStatus === 'mismatch') {
       return usableResult(
@@ -368,7 +403,7 @@ function inconclusiveResult(fallbackStructured, modelIdentity) {
         'unknown',
         'custom_api_connection_model_mismatch_inconclusive',
         modelIdentity,
-        mismatchParams(modelIdentity),
+        mismatchParams(modelIdentity, rawEffective),
       );
     }
     return usableResult(
@@ -384,7 +419,7 @@ function inconclusiveResult(fallbackStructured, modelIdentity) {
       'unknown',
       modelIdentity,
       'custom_api_connection_model_mismatch_unusable',
-      mismatchParams(modelIdentity),
+      mismatchParams(modelIdentity, rawEffective),
     );
   }
   return degradedStructuredResult(fallbackStructured, 'unknown', modelIdentity);
@@ -524,17 +559,19 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey, signal }
     }, signal);
   } catch {
     if (isProbeAbort(signal)) return timedOutResult(model);
-    return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null));
+    return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null), modelA);
   }
 
   if (probeBResponse.ok) {
     const probeBBody = await readJsonBody(probeBResponse);
     if (!hasCompletionEnvelope(probeBBody)) {
       // No protocol evidence: usability follows Probe A alone, no write.
-      return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null));
+      return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null), modelA);
     }
     // Gap-fill evidence only: B names the model solely when A was silent.
-    const identity = resolveModelIdentity(model, modelA, extractEffectiveModel(probeBBody));
+    const modelB = extractEffectiveModel(probeBBody);
+    const identity = resolveModelIdentity(model, modelA, modelB);
+    const rawEffective = selectEffectiveRaw(model, modelA, modelB);
     // Publication race: an abort landing after the body read must not
     // publish a verdict for a cancelled check.
     if (isProbeAbort(signal)) return timedOutResult(model);
@@ -550,7 +587,7 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey, signal }
           'supported',
           identity,
           'custom_api_connection_model_mismatch_unusable',
-          mismatchParams(identity),
+          mismatchParams(identity, rawEffective),
         );
       }
       return degradedStructuredResult(fallbackStructured, 'supported', identity);
@@ -561,7 +598,7 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey, signal }
         'supported',
         'custom_api_connection_model_mismatch',
         identity,
-        mismatchParams(identity),
+        mismatchParams(identity, rawEffective),
       );
     }
     return usableResult(fallbackStructured, 'supported', 'custom_api_connection_success', identity);
@@ -582,7 +619,7 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey, signal }
           'unsupported',
           identity,
           'custom_api_connection_model_mismatch_unusable',
-          mismatchParams(identity),
+          mismatchParams(identity, modelA),
         );
       }
       return degradedStructuredResult(fallbackStructured, 'unsupported', identity);
@@ -593,11 +630,11 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey, signal }
         'unsupported',
         'custom_api_connection_model_mismatch_fallback',
         identity,
-        mismatchParams(identity),
+        mismatchParams(identity, modelA),
       );
     }
     return usableResult(fallbackStructured, 'unsupported', 'custom_api_connection_fallback', identity);
   }
 
-  return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null));
+  return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null), modelA);
 }

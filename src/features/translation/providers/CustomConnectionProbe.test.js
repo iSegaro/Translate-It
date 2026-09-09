@@ -663,6 +663,89 @@ describe('CustomConnectionProbe', () => {
     expect(getCustomResponseFormatSupport(URL, requested)).toBe('supported');
   });
 
+  describe('effective-model basename presentation', () => {
+    it.each([
+      ['POSIX path', '/models/foo.gguf', 'foo.gguf'],
+      ['Windows backslash path', 'C:\\models\\foo.gguf', 'foo.gguf'],
+      ['Windows forward-slash path', 'C:/models/foo.gguf', 'foo.gguf'],
+      ['UNC path', '\\\\server\\share\\foo.gguf', 'foo.gguf'],
+    ])('collapses %s to its basename in mismatch params', async (_label, served, base) => {
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody(served), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody(served), 'OK'));
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: 'foo', apiKey: 'k' });
+
+      // Full-value mismatch is preserved: basename display never leaks into
+      // matching, and the report keeps the bounded raw evidence.
+      expect(report).toMatchObject({
+        modelStatus: 'mismatch',
+        requestedModel: 'foo',
+        usable: true,
+      });
+      expect(report.effectiveModel).toBe(served);
+      expect(report.params).toMatchObject({ requestedModel: 'foo', effectiveModel: base });
+    });
+
+    it.each([
+      ['org/model names', 'org/foo'],
+      ['relative paths', './models/foo'],
+      ['plain names', 'other-model'],
+    ])('leaves %s unchanged in mismatch params', async (_label, served) => {
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody(served), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody(served), 'OK'));
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: 'foo', apiKey: 'k' });
+
+      expect(report).toMatchObject({ modelStatus: 'mismatch' });
+      expect(report.effectiveModel).toBe(served);
+      expect(report.params).toMatchObject({ requestedModel: 'foo', effectiveModel: served });
+    });
+
+    it('keeps requestedModel display raw even when it is a path', async () => {
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody('foo'), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody('foo'), 'OK'));
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: '/models/foo.gguf', apiKey: 'k' });
+
+      // Matching still uses full values (path vs bare name mismatch), and
+      // only the effective side gets basename presentation.
+      expect(report).toMatchObject({
+        modelStatus: 'mismatch',
+        requestedModel: '/models/foo.gguf',
+        effectiveModel: 'foo',
+      });
+      expect(report.params).toMatchObject({ requestedModel: '/models/foo.gguf', effectiveModel: 'foo' });
+    });
+
+    it('bounds long basenames to 80 chars', async () => {
+      const served = `/models/${'y'.repeat(100)}.gguf`;
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody(served), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody(served), 'OK'));
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: 'foo', apiKey: 'k' });
+
+      expect(report).toMatchObject({ modelStatus: 'mismatch', requestedModel: 'foo' });
+      expect(report.params.effectiveModel.length).toBeLessThanOrEqual(80);
+      expect(report.params.effectiveModel.endsWith('.gguf')).toBe(true);
+    });
+
+    it('falls back to the full value for trailing-separator paths', async () => {
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody('/models/'), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, modelBody('/models/'), 'OK'));
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: 'foo', apiKey: 'k' });
+
+      expect(report).toMatchObject({ modelStatus: 'mismatch' });
+      expect(report.effectiveModel).toBe('/models/');
+      expect(report.params).toMatchObject({ requestedModel: 'foo', effectiveModel: '/models/' });
+    });
+  });
+
   it('carries the requested model on pre-probe failures without effective evidence', async () => {
     proxyManager.fetch.mockRejectedValueOnce(new TypeError('NetworkError: Failed to fetch'));
 
