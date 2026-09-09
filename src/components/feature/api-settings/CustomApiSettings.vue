@@ -119,12 +119,33 @@ const connectionResultClass = computed(() => {
   return 'warning'
 })
 let connectionGeneration = 0
+let connectionOperationCounter = 0
+
+const createConnectionOperationId = () => {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    // Fall through to the local fallback below.
+  }
+  connectionOperationCounter += 1
+  return `compat-${Date.now().toString(36)}-${connectionOperationCounter}`
+}
+
+// Stable identity for this component instance, generated once at setup —
+// never per check. Background keys supersede/cancel scoping on it, so two
+// options.html instances never collide even though they share a sender URL.
+// Operation ids stay unique per check; only the caller id is stable.
+const connectionCallerId = createConnectionOperationId()
 
 const testConnection = async () => {
   // Snapshot unsaved form values so a later edit (config B) can never be
   // mislabeled by this run's resolution. The probe itself executes in
   // background (same runtime as CustomProvider's capability cache); this
-  // context only sends the snapshot and renders the returned report.
+  // context only sends the snapshot and renders the returned report. The
+  // per-check operation id lets background correlate (supersede/timeout)
+  // without touching translation message lifecycles.
   const snapshot = {
     url: customApiUrl.value,
     model: customApiModel.value,
@@ -138,7 +159,9 @@ const testConnection = async () => {
     const response = await testCustomConnection({
       apiUrl: snapshot.url,
       apiModel: snapshot.model,
-      apiKey: snapshot.key
+      apiKey: snapshot.key,
+      operationId: createConnectionOperationId(),
+      callerId: connectionCallerId
     })
     const report = response?.data?.report
     if (!report || typeof report.messageKey !== 'string') {
@@ -175,10 +198,17 @@ const testConnection = async () => {
 // Any edit invalidates the report back to Not tested and stales in-flight
 // runs; prior capability cache entries are retained (never deleted here).
 // Sync flush so an edit can never be reordered behind a subsequent click.
+// An edit also cancels the active background check for this caller so a
+// stale config never burns a full probe deadline; harmless when no check is
+// in flight. Save gating and Test Key behavior are untouched.
 watch([customApiUrl, customApiModel, customApiKey], () => {
+  const hadActiveCheck = testingConnection.value
   connectionGeneration++
   testingConnection.value = false
   connectionReport.value = null
+  if (hadActiveCheck) {
+    testCustomConnection({ cancel: true, callerId: connectionCallerId }).catch(() => undefined)
+  }
 }, { flush: 'sync' })
 
 // Test keys functionality

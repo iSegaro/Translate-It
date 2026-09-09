@@ -1292,6 +1292,9 @@
   "custom_api_connection_failed_unexpected": {
     "message": "Compatibility check failed unexpectedly."
   },
+  "custom_api_connection_timed_out": {
+    "message": "Compatibility check timed out. Try again."
+  },
   "import_export_section_title": {
     "message": "Import/Export Settings"
   },

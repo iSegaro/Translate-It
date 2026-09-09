@@ -1292,6 +1292,9 @@
   "custom_api_connection_failed_unexpected": {
     "message": "互換性チェックが予期せず失敗しました。"
   },
+  "custom_api_connection_timed_out": {
+    "message": "互換性チェックがタイムアウトしました。もう一度お試しください。"
+  },
   "import_export_section_title": {
     "message": "設定のインポート/エクスポート"
   },

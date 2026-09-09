@@ -1292,6 +1292,9 @@
   "custom_api_connection_failed_unexpected": {
     "message": "بررسی سازگاری به‌طور غیرمنتظره ناموفق بود."
   },
+  "custom_api_connection_timed_out": {
+    "message": "زمان بررسی سازگاری به پایان رسید. دوباره تلاش کنید."
+  },
   "import_export_section_title": {
     "message": "پشتیبان‌گیری و بازیابی تنظیمات"
   },

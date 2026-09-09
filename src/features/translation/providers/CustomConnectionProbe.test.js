@@ -943,4 +943,213 @@ describe('CustomConnectionProbe', () => {
     expect(source).not.toMatch(/stripJsonFence/);
     expect(source).not.toMatch(/JSON\.parse\(strip/);
   });
+
+  describe('probe cancellation (AbortSignal)', () => {
+    const timedOutShape = {
+      fallbackStructured: 'unknown',
+      responseFormat: 'unknown',
+      usable: false,
+      state: 'timed_out',
+      messageKey: 'custom_api_connection_timed_out',
+      params: null,
+      modelStatus: 'unknown',
+      requestedModel: MODEL,
+      effectiveModel: null,
+    };
+
+    it('threads the same signal into Probe A and Probe B fetch options', async () => {
+      const controller = new AbortController();
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'));
+
+      await probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+
+      expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
+      expect(proxyManager.fetch.mock.calls[0][1].signal).toBe(controller.signal);
+      expect(proxyManager.fetch.mock.calls[1][1].signal).toBe(controller.signal);
+    });
+
+    it('threads the signal into the /models lookup', async () => {
+      const controller = new AbortController();
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(false, 404, { error: { message: 'Not found' } }, 'Not Found'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, { data: [{ id: 'other-model' }] }, 'OK'));
+
+      await probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+
+      expect(proxyManager.fetch).toHaveBeenCalledTimes(2);
+      expect(proxyManager.fetch.mock.calls[1][0]).toBe(MODELS_URL);
+      expect(proxyManager.fetch.mock.calls[1][1].signal).toBe(controller.signal);
+    });
+
+    it('returns the dedicated timed_out outcome with its exact shape', async () => {
+      const controller = new AbortController();
+      proxyManager.fetch.mockImplementationOnce(async () => {
+        controller.abort();
+        return jsonResponse(true, 200, completionBody(), 'OK');
+      });
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+
+      // Aborted before Probe B could start: one fetch, no cache write.
+      expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
+      expect(report).toEqual(timedOutShape);
+      expect(getCustomResponseFormatSupport(URL, MODEL)).toBeUndefined();
+    });
+
+    it('classifies an aborted Probe A rejection as timed_out, not unreachable', async () => {
+      const controller = new AbortController();
+      const abortError = new Error('The operation was aborted');
+      abortError.name = 'AbortError';
+      proxyManager.fetch.mockRejectedValueOnce(abortError);
+      controller.abort();
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+
+      expect(report).toMatchObject({ state: 'timed_out', messageKey: 'custom_api_connection_timed_out', usable: false });
+      expect(report).not.toMatchObject({ state: 'unreachable' });
+    });
+
+    it('classifies an aborted Probe B rejection as timed_out, not inconclusive', async () => {
+      const controller = new AbortController();
+      let rejectProbeB;
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'))
+        .mockImplementationOnce(() => new Promise((_, reject) => { rejectProbeB = reject; }));
+
+      const pending = probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+      await vi.waitFor(() => expect(proxyManager.fetch).toHaveBeenCalledTimes(2));
+      controller.abort();
+      rejectProbeB(new Error('socket hang up'));
+
+      const report = await pending;
+      expect(report).toMatchObject({ state: 'timed_out', usable: false });
+      expect(getCustomResponseFormatSupport(URL, MODEL)).toBeUndefined();
+    });
+
+    it('skips Probe B entirely when already aborted after Probe A', async () => {
+      const controller = new AbortController();
+      setCustomResponseFormatSupport(URL, MODEL, 'supported');
+      proxyManager.fetch.mockImplementationOnce(async () => {
+        controller.abort();
+        return jsonResponse(true, 200, completionBody(), 'OK');
+      });
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+
+      expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
+      expect(report).toMatchObject({ state: 'timed_out' });
+      // No SUPPORTED/UNSUPPORTED writes after abort: the preseeded entry is
+      // retained untouched.
+      expect(getCustomResponseFormatSupport(URL, MODEL)).toBe('supported');
+    });
+
+    it('resolves an abort during the /models lookup as timed_out, not request_failed', async () => {
+      const controller = new AbortController();
+      let resolveModels;
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(false, 404, { error: { message: 'Not found' } }, 'Not Found'))
+        .mockImplementationOnce(() => new Promise((resolve) => { resolveModels = resolve; }));
+
+      const pending = probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+      await vi.waitFor(() => expect(proxyManager.fetch).toHaveBeenCalledTimes(2));
+      controller.abort();
+      resolveModels(jsonResponse(true, 200, { data: [{ id: 'other-model' }] }, 'OK'));
+
+      const report = await pending;
+      expect(report).toMatchObject({ state: 'timed_out', usable: false });
+      expect(report).not.toMatchObject({ state: 'request_failed' });
+    });
+
+    it('keeps an already-aborted signal from starting Probe B', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'))
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'));
+
+      const report = await probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+
+      expect(proxyManager.fetch).toHaveBeenCalledTimes(1);
+      expect(report).toMatchObject({ state: 'timed_out' });
+    });
+
+    it('publishes no SUPPORTED verdict when abort lands while the Probe B body is pending', async () => {
+      const controller = new AbortController();
+      let resolveBody;
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'))
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: new Map([['content-type', 'application/json']]),
+          json: () => new Promise((resolve) => { resolveBody = resolve; }),
+          clone() { return this; },
+        });
+
+      const pending = probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+      await vi.waitFor(() => expect(proxyManager.fetch).toHaveBeenCalledTimes(2));
+      controller.abort();
+      resolveBody(completionBody());
+
+      const report = await pending;
+      expect(report).toMatchObject({ state: 'timed_out', usable: false });
+      expect(report).not.toMatchObject({ responseFormat: 'supported' });
+      expect(getCustomResponseFormatSupport(URL, MODEL)).toBeUndefined();
+    });
+
+    it('publishes no UNSUPPORTED verdict when abort lands after classification', async () => {
+      const controller = new AbortController();
+      let resolveBody;
+      setCustomResponseFormatSupport(URL, MODEL, 'unsupported');
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'))
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          statusText: 'Bad Request',
+          headers: new Map([['content-type', 'application/json']]),
+          json: () => new Promise((resolve) => { resolveBody = resolve; }),
+          clone() { return this; },
+        });
+
+      const pending = probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+      await vi.waitFor(() => expect(proxyManager.fetch).toHaveBeenCalledTimes(2));
+      controller.abort();
+      resolveBody({ error: "'response_format.type' must be 'json_schema' or 'text'" });
+
+      const report = await pending;
+      expect(report).toMatchObject({ state: 'timed_out', usable: false });
+      expect(report).not.toMatchObject({ responseFormat: 'unsupported' });
+      // Preseeded entry retained untouched: no write happened after abort.
+      expect(getCustomResponseFormatSupport(URL, MODEL)).toBe('unsupported');
+    });
+
+    it('leaves a preseeded SUPPORTED entry untouched when abort lands at publication', async () => {
+      const controller = new AbortController();
+      let resolveBody;
+      setCustomResponseFormatSupport(URL, MODEL, 'supported');
+      proxyManager.fetch
+        .mockResolvedValueOnce(jsonResponse(true, 200, completionBody(), 'OK'))
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: new Map([['content-type', 'application/json']]),
+          json: () => new Promise((resolve) => { resolveBody = resolve; }),
+          clone() { return this; },
+        });
+
+      const pending = probeCustomConnection({ apiUrl: URL, apiModel: MODEL, apiKey: 'k', signal: controller.signal });
+      await vi.waitFor(() => expect(proxyManager.fetch).toHaveBeenCalledTimes(2));
+      controller.abort();
+      resolveBody(completionBody());
+
+      const report = await pending;
+      expect(report).toMatchObject({ state: 'timed_out' });
+      expect(getCustomResponseFormatSupport(URL, MODEL)).toBe('supported');
+    });
+  });
 });

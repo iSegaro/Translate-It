@@ -176,12 +176,50 @@ describe('CustomApiSettings Test Connection', () => {
       apiUrl: URL_A,
       apiModel: 'm1',
       apiKey: 'k1',
+      operationId: expect.any(String),
+      callerId: expect.any(String),
     });
+    const sentId = mocks.testCustomConnection.mock.calls[0][0].operationId;
+    expect(sentId.length).toBeGreaterThan(0);
     await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use.'));
     expect(statusOf(wrapper).classes()).toContain('success');
     expect(statusOf(wrapper).classes()).not.toContain('warning');
     expect(statusOf(wrapper).classes()).not.toContain('error');
     wrapper.unmount();
+  });
+
+  it('generates a unique operation id per check with a stable caller id', async () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(2));
+
+    const [firstCall, secondCall] = mocks.testCustomConnection.mock.calls.map(([payload]) => payload);
+    expect(typeof firstCall.operationId).toBe('string');
+    expect(firstCall.operationId.length).toBeGreaterThan(0);
+    expect(secondCall.operationId).not.toBe(firstCall.operationId);
+    // One stable id per component instance across both checks.
+    expect(typeof firstCall.callerId).toBe('string');
+    expect(firstCall.callerId.length).toBeGreaterThan(0);
+    expect(secondCall.callerId).toBe(firstCall.callerId);
+    wrapper.unmount();
+  });
+
+  it('uses a fresh caller id per component instance', async () => {
+    const first = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+    await buttonOf(first).trigger('click');
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    const second = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+    await buttonOf(second).trigger('click');
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(2));
+    second.unmount();
+
+    const [firstCall, secondCall] = mocks.testCustomConnection.mock.calls.map(([payload]) => payload);
+    expect(secondCall.callerId).not.toBe(firstCall.callerId);
   });
 
   it('renders the background report unchanged', async () => {
@@ -415,6 +453,8 @@ describe('CustomApiSettings Test Connection', () => {
       apiUrl: URL_A,
       apiModel: 'm1',
       apiKey: '',
+      operationId: expect.any(String),
+      callerId: expect.any(String),
     });
     wrapper.unmount();
   });
@@ -449,12 +489,15 @@ describe('CustomApiSettings Test Connection', () => {
     let resolveA;
     mocks.testCustomConnection
       .mockImplementationOnce(() => new Promise((resolve) => { resolveA = resolve; }))
+      .mockResolvedValueOnce({ success: true, data: { cancelled: true } })
       .mockImplementationOnce(async () => envelope(successReport('custom_api_connection_fallback', null, 'unsupported')));
 
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
+    const checkCallerId = mocks.testCustomConnection.mock.calls[0][0].callerId;
 
     Object.assign(mocks.settingsStore.settings, { CUSTOM_API_URL: URL_B });
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledWith({ cancel: true, callerId: checkCallerId }));
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.'));
 
@@ -462,6 +505,59 @@ describe('CustomApiSettings Test Connection', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(statusOf(wrapper).text()).toBe('Ready to use. Compatibility mode will be used.');
+    wrapper.unmount();
+  });
+
+  it('cancels the active background check on config edit and renders nothing stale', async () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+    let resolveCheck;
+    mocks.testCustomConnection.mockImplementationOnce(() => new Promise((resolve) => { resolveCheck = resolve; }));
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledTimes(1));
+    const checkCallerId = mocks.testCustomConnection.mock.calls[0][0].callerId;
+
+    Object.assign(mocks.settingsStore.settings, { CUSTOM_API_URL: URL_B });
+    await vi.waitFor(() => expect(mocks.testCustomConnection).toHaveBeenCalledWith({ cancel: true, callerId: checkCallerId }));
+
+    resolveCheck(envelope(successReport()));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(statusOf(wrapper).text()).toBe('Not checked');
+    expect(vi.mocked(storageManager.set)).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('sends no cancel message when no check is in flight', async () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    Object.assign(mocks.settingsStore.settings, { CUSTOM_API_URL: URL_B });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(mocks.testCustomConnection).not.toHaveBeenCalled();
+    expect(statusOf(wrapper).text()).toBe('Not checked');
+    wrapper.unmount();
+  });
+
+  it('renders background timeout reports with the timed-out wording and error styling', async () => {
+    mocks.testCustomConnection.mockResolvedValueOnce(envelope({
+      fallbackStructured: 'unknown',
+      responseFormat: 'unknown',
+      usable: false,
+      state: 'timed_out',
+      messageKey: 'custom_api_connection_timed_out',
+      params: null,
+      modelStatus: 'unknown',
+      requestedModel: 'm',
+      effectiveModel: null,
+    }));
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    await buttonOf(wrapper).trigger('click');
+    await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('Compatibility check timed out. Try again.'));
+    expect(statusOf(wrapper).classes()).toContain('error');
+    expect(statusOf(wrapper).classes()).not.toContain('success');
+    expect(statusOf(wrapper).classes()).not.toContain('warning');
     wrapper.unmount();
   });
 

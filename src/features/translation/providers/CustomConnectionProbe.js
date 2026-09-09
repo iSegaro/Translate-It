@@ -59,6 +59,13 @@
  * English here; the UI renders localized text from messageKey/params. There
  * is no connection flag: state ('success' vs failure states) is the single
  * primary signal and every consumer branches on state/usable instead.
+ *
+ * Cancellation: probeCustomConnection accepts an optional AbortSignal that
+ * is threaded into Probe A, the optional /models lookup, and Probe B.
+ * Aborted checks resolve to a dedicated 'timed_out' outcome — never
+ * unreachable/auth/request_failed/unsupported/invalid, never a cache write,
+ * never a raw AbortError. Guards before /models and Probe B ensure neither
+ * starts after cancel.
  */
 
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
@@ -116,11 +123,22 @@ function toBoundedModelName(value) {
 
 /**
  * Same proxy boundary as ApiKeyManager key testing: fresh proxy snapshot per
- * physical attempt, proxyManager.fetch transport. Never native fetch.
+ * physical attempt, proxyManager.fetch transport. Never native fetch. An
+ * optional AbortSignal is forwarded in the fetch options so cancellation
+ * propagates through the proxy strategies to the underlying request.
  */
-async function fetchWithCurrentProxy(url, options = {}) {
+async function fetchWithCurrentProxy(url, options = {}, signal = null) {
   const proxyConfig = await resolveProxyConfig();
-  return proxyManager.fetch(url, options, proxyConfig);
+  return proxyManager.fetch(url, signal ? { ...options, signal } : options, proxyConfig);
+}
+
+/**
+ * True only when the caller-supplied probe signal was aborted. Transport
+ * rejections are classified as cancellation solely on this basis, so
+ * unrelated AbortErrors can never masquerade as a cancelled check.
+ */
+function isProbeAbort(signal) {
+  return signal?.aborted === true;
 }
 
 function buildHeaders(apiKey) {
@@ -270,9 +288,9 @@ function deriveModelsUrl(apiUrl) {
  * Optional disambiguation only: refines an unclear model failure, never fails
  * the overall result alone (any problem here returns 'inconclusive').
  */
-async function checkModelMembership(modelsUrl, headers, apiModel) {
+async function checkModelMembership(modelsUrl, headers, apiModel, signal = null) {
   try {
-    const response = await fetchWithCurrentProxy(modelsUrl, { method: 'GET', headers });
+    const response = await fetchWithCurrentProxy(modelsUrl, { method: 'GET', headers }, signal);
     if (response.status === 401 || response.status === 403) return 'authentication';
     if (!response.ok) return 'inconclusive';
     const payload = await readJsonBody(response);
@@ -383,17 +401,29 @@ function modelUnavailableResult(model) {
 }
 
 /**
+ * Dedicated cancellation outcome (deadline expiry or supersession). Distinct
+ * from every transport/protocol failure, writes nothing, and carries no
+ * AbortError state — only the already-bounded requested model name.
+ */
+function timedOutResult(requested) {
+  return failedResult('timed_out', 'custom_api_connection_timed_out', null, 'unknown', requested);
+}
+
+/**
  * Runs the two-probe Test Connection sequence for a snapshotted config.
  * Writes the capability cache only on definitive Probe B outcomes
  * (supported/unsupported with a recognizable envelope or classified
  * rejection); inconclusive results never write, overwrite, or delete.
  * @param {Object} config - Snapshotted { apiUrl, apiModel, apiKey }.
+ * @param {AbortSignal} [config.signal] - Optional cancellation signal,
+ *   threaded into Probe A, the optional /models lookup, and Probe B.
+ *   An aborted check resolves to the dedicated 'timed_out' outcome.
  * @returns {Promise<Object>} Semantic { state, messageKey, params } plus
  *   tri-state fallbackStructured, responseFormat, usable flag, and model
  *   identity (modelStatus matched|mismatch|unknown, requestedModel,
  *   effectiveModel).
  */
-export async function probeCustomConnection({ apiUrl, apiModel, apiKey } = {}) {
+export async function probeCustomConnection({ apiUrl, apiModel, apiKey, signal } = {}) {
   const url = String(apiUrl ?? '').trim();
   const model = String(apiModel ?? '').trim();
   const key = firstCustomProbeKey(apiKey);
@@ -411,8 +441,9 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey } = {}) {
       method: 'POST',
       headers,
       body: buildChatBody(model, false),
-    });
+    }, signal);
   } catch (error) {
+    if (isProbeAbort(signal)) return timedOutResult(model);
     logger.warn('[Custom] Connection probe unreachable:', error?.message);
     return failedResult('unreachable', 'custom_api_connection_unreachable', null, 'unknown', model);
   }
@@ -430,10 +461,15 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey } = {}) {
       return modelUnavailableResult(model);
     }
     if (Number(probeAResponse.status) === 404) {
+      // Never start the disambiguation lookup after cancel.
+      if (isProbeAbort(signal)) return timedOutResult(model);
       const modelsUrl = deriveModelsUrl(url);
       const membership = modelsUrl
-        ? await checkModelMembership(modelsUrl, headers, model)
+        ? await checkModelMembership(modelsUrl, headers, model, signal)
         : 'inconclusive';
+      // An abort that lands during the lookup is cancellation, not an
+      // endpoint failure.
+      if (isProbeAbort(signal)) return timedOutResult(model);
       if (membership === 'authentication') {
         return failedResult('auth_failed', 'custom_api_connection_auth_failed', null, 'unknown', model);
       }
@@ -477,14 +513,17 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey } = {}) {
   // classification (responseFormat + cache, always keyed by configured URL +
   // requested model) is independent of structured content validity and of
   // served-model identity; usability requires a proven structured path.
+  // Never start Probe B after cancel.
+  if (isProbeAbort(signal)) return timedOutResult(model);
   let probeBResponse;
   try {
     probeBResponse = await fetchWithCurrentProxy(url, {
       method: 'POST',
       headers,
       body: buildChatBody(model, true),
-    });
+    }, signal);
   } catch {
+    if (isProbeAbort(signal)) return timedOutResult(model);
     return inconclusiveResult(fallbackStructured, resolveModelIdentity(model, modelA, null));
   }
 
@@ -496,6 +535,9 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey } = {}) {
     }
     // Gap-fill evidence only: B names the model solely when A was silent.
     const identity = resolveModelIdentity(model, modelA, extractEffectiveModel(probeBBody));
+    // Publication race: an abort landing after the body read must not
+    // publish a verdict for a cancelled check.
+    if (isProbeAbort(signal)) return timedOutResult(model);
     // Protocol acceptance: the cache write is protocol-only, even when the
     // content itself fails the structured contract (validated below without
     // changing responseFormat).
@@ -528,6 +570,9 @@ export async function probeCustomConnection({ apiUrl, apiModel, apiKey } = {}) {
   const probeBBody = await readJsonBody(probeBResponse);
   const probeBMessage = extractProbeErrorMessage(probeBBody);
   if (isUnsupportedResponseFormatError({ statusCode: probeBResponse.status, message: probeBMessage })) {
+    // Publication race: same guard as the SUPPORTED path — a cancelled check
+    // must not publish, even after classification ran.
+    if (isProbeAbort(signal)) return timedOutResult(model);
     setCustomResponseFormatSupport(url, model, CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED);
     const identity = resolveModelIdentity(model, modelA, null);
     if (fallbackStructured !== 'supported') {
