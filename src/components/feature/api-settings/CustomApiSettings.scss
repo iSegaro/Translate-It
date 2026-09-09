@@ -28,10 +28,18 @@
   // (min-height, never height). The wrapper keeps the row flex sizing the
   // status box previously had as a direct flex item.
   .custom-connection-status {
+    display: flex;
+    align-items: center;
     flex: 1 1 200px;
     font-size: $font-size-sm;
     line-height: 1.4;
     min-height: calc(2lh + 4px + 16px);
+  }
+
+  // The inner presentation element fills the wrapper width so result
+  // boxes span the reserved area while content stays vertically centered.
+  .custom-connection-status > div {
+    width: 100%;
   }
 
   .connection-detail strong {

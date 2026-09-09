@@ -824,6 +824,11 @@ describe('CustomApiSettings Test Connection', () => {
     expect(scss).not.toMatch(/\.custom-connection-status\s*{[^}]*?(?<!min-)(?<!line-)height:/);
     expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*font-size:/);
     expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*line-height:/);
+    // Outer wrapper vertically centers shorter content; inner presentation
+    // element fills the available width.
+    expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*display:\s*flex/);
+    expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*align-items:\s*center/);
+    expect(scss).toMatch(/\.custom-connection-status\s*>\s*div\s*{[^}]*width:\s*100%/);
     // Model emphasis stays direction-isolated.
     expect(scss).toContain('unicode-bidi: isolate');
   });
