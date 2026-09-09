@@ -245,6 +245,7 @@ class LifecycleManager {
       
       // Vue integration handlers - Lazy loaded for better performance
       'testProviderConnection': Handlers.handleTestProviderConnectionLazy,
+      [MessageActions.TEST_CUSTOM_CONNECTION]: Handlers.handleTestCustomConnectionLazy,
       'saveProviderConfig': Handlers.handleSaveProviderConfigLazy,
       'getProviderConfig': Handlers.handleGetProviderConfigLazy,
       'updateContextMenu': Handlers.handleUpdateContextMenuLazy,

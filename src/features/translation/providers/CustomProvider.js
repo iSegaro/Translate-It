@@ -27,52 +27,26 @@ const STRUCTURED_RESPONSE_FORMATS = new Set([
   ResponseFormat.JSON_ARRAY,
 ]);
 
-const UNSUPPORTED_RESPONSE_FORMAT_PATTERNS = [
-  /\b(?:unknown|unsupported|unrecognized|invalid)\s+(?:parameter|field|property|key|value|type)?\s*[:=]?\s*[`'" ]*response_format\b/i,
-  /[`'"]?response_format[`'"]?\s+(?:is\s+)?(?:not\s+supported|unsupported|unrecognized|unknown|invalid|rejected)\b/i,
-  /[`'"]?response_format(?:\.\w+)?[`'"]?\s+must\s+be\b/i,
-];
+// Capability state lives in CustomResponseFormatCapability (single owner).
+// Re-exported here for backward compatibility with existing import sites.
+import {
+  CUSTOM_RESPONSE_FORMAT_SUPPORT,
+  normalizeCustomResponseFormatCacheKey,
+  getCustomResponseFormatSupport,
+  setCustomResponseFormatSupport,
+  clearCustomResponseFormatSupportCache,
+  isUnsupportedResponseFormatError,
+} from './CustomResponseFormatCapability.js';
+export {
+  CUSTOM_RESPONSE_FORMAT_SUPPORT,
+  normalizeCustomResponseFormatCacheKey,
+  getCustomResponseFormatSupport,
+  setCustomResponseFormatSupport,
+  clearCustomResponseFormatSupportCache,
+  isUnsupportedResponseFormatError,
+};
 
 const CUSTOM_MODEL_NOT_FOUND_CODES = new Set(['model_not_found']);
-
-// Runtime-only tri-state for json_object support, keyed by endpoint + model.
-// Absent = unknown (probe with response_format), 'supported' | 'unsupported' otherwise.
-// Single authoritative owner for Custom response_format capability; lives only in
-// memory for the current extension context lifetime. No persistence, no listeners.
-const CUSTOM_RESPONSE_FORMAT_SUPPORT = Object.freeze({
-  SUPPORTED: 'supported',
-  UNSUPPORTED: 'unsupported',
-});
-const customResponseFormatSupportCache = new Map();
-
-/**
- * Builds the deterministic cache key for response_format capability.
- * Conservative normalization: trim + trailing-slash trim only, case preserved.
- * @param {string} apiUrl - Custom endpoint URL.
- * @param {string} model - Custom model name.
- * @returns {string|null} Cache key, or null when keying facts are missing.
- */
-export function normalizeCustomResponseFormatCacheKey(apiUrl, model) {
-  const normalizedUrl = String(apiUrl ?? '').trim().replace(/\/+$/, '');
-  const normalizedModel = String(model ?? '').trim();
-  if (!normalizedUrl || !normalizedModel) return null;
-  return `${normalizedUrl}||${normalizedModel}`;
-}
-
-/**
- * Clears the runtime response_format capability cache. Intended for tests.
- */
-export function clearCustomResponseFormatSupportCache() {
-  customResponseFormatSupportCache.clear();
-}
-
-function isUnsupportedResponseFormatError(error) {
-  const statusCode = Number(error?.statusCode);
-  if (statusCode !== 400 && statusCode !== 422) return false;
-
-  const message = typeof error?.message === 'string' ? error.message : '';
-  return UNSUPPORTED_RESPONSE_FORMAT_PATTERNS.some((pattern) => pattern.test(message));
-}
 
 function didSendResponseFormat(fetchOptions) {
   if (typeof fetchOptions?.body !== 'string') return false;
@@ -194,13 +168,13 @@ export class CustomProvider extends BaseAIProvider {
       headers.Authorization = `Bearer ${apiKey}`;
     }
 
-    // Keyed runtime cache is the sole authority for send/omit. The per-batch
-    // ref is a compat/observer mirror only and never suppresses a probe:
-    // a stale ref reused across URL/model change must not leak into a new key.
-    // _validateConfig above guarantees truthy apiUrl/model in normal execution;
-    // a null key (e.g. whitespace-only) probes conservatively instead of omitting.
-    const cacheKey = normalizeCustomResponseFormatCacheKey(apiUrl, model);
-    const cachedSupport = cacheKey ? customResponseFormatSupportCache.get(cacheKey) : undefined;
+    // Keyed runtime cache (CustomResponseFormatCapability, sole authority)
+    // decides send/omit. The per-batch ref is a compat/observer mirror only
+    // and never suppresses a probe: a stale ref reused across URL/model
+    // change must not leak into a new key. _validateConfig above guarantees
+    // truthy apiUrl/model in normal execution; a null key (e.g.
+    // whitespace-only) probes conservatively instead of omitting.
+    const cachedSupport = getCustomResponseFormatSupport(apiUrl, model);
     const responseFormatUnsupported = cachedSupport === CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED;
     if (customResponseFormatCapabilityRef) {
       customResponseFormatCapabilityRef.responseFormatUnsupported = responseFormatUnsupported;
@@ -248,8 +222,8 @@ export class CustomProvider extends BaseAIProvider {
     try {
       result = await this._executeRequest(request);
       // Structured success while sending response_format proves support.
-      if (shouldSendResponseFormat && cacheKey) {
-        customResponseFormatSupportCache.set(cacheKey, CUSTOM_RESPONSE_FORMAT_SUPPORT.SUPPORTED);
+      if (shouldSendResponseFormat) {
+        setCustomResponseFormatSupport(apiUrl, model, CUSTOM_RESPONSE_FORMAT_SUPPORT.SUPPORTED);
         if (customResponseFormatCapabilityRef) {
           customResponseFormatCapabilityRef.responseFormatUnsupported = false;
         }
@@ -261,9 +235,7 @@ export class CustomProvider extends BaseAIProvider {
         throw error;
       }
 
-      if (cacheKey) {
-        customResponseFormatSupportCache.set(cacheKey, CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED);
-      }
+      setCustomResponseFormatSupport(apiUrl, model, CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED);
       if (customResponseFormatCapabilityRef) {
         customResponseFormatCapabilityRef.responseFormatUnsupported = true;
       }

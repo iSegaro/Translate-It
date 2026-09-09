@@ -53,6 +53,9 @@ const OPERATION_TIMEOUTS = {
   'PROCESS_SELECTED_ELEMENT': 8000,
   'TEST_PROVIDER': 8000,
   'TEST_PROVIDER_CONNECTION': 8000,
+  // Custom Test Connection: up to three sequential probe round-trips
+  // (baseline completion, response_format capability, optional /models).
+  'TEST_CUSTOM_CONNECTION': 30000,
   'VALIDATE_API_KEY': 6000,
   'GOOGLE_TTS_SPEAK': 20000,
   'TTS_SPEAK': 20000,

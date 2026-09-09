@@ -1244,6 +1244,54 @@
   "custom_api_model_placeholder": {
     "message": "نام مدل را وارد کنید"
   },
+  "custom_api_test_connection": {
+    "message": "تست اتصال"
+  },
+  "custom_api_testing_connection": {
+    "message": "در حال تست..."
+  },
+  "custom_api_not_tested": {
+    "message": "تست نشده"
+  },
+  "custom_api_connection_success": {
+    "message": "اتصال برقرار است. خروجی ساختاریافته (response_format) پشتیبانی می‌شود."
+  },
+  "custom_api_connection_fallback": {
+    "message": "اتصال برقرار است. این سرور از response_format پشتیبانی نمی‌کند؛ از جایگزین متن ساده استفاده می‌شود."
+  },
+  "custom_api_connection_inconclusive": {
+    "message": "اتصال برقرار است، اما وضعیت پشتیبانی از response_format مشخص نیست. به‌طور خودکار بررسی می‌شود."
+  },
+  "custom_api_connection_structured_invalid": {
+    "message": "اتصال برقرار است، اما مدل خروجی ساختاریافته معتبری برنگرداند. ممکن است ترجمه قابل اعتماد نباشد."
+  },
+  "custom_api_connection_model_mismatch": {
+    "message": "اتصال برقرار است. سرور به‌جای {requestedModel} با {effectiveModel} پاسخ داد، اما خروجی ساختاریافته (response_format) پشتیبانی و قابل استفاده است."
+  },
+  "custom_api_connection_model_mismatch_fallback": {
+    "message": "اتصال برقرار است. سرور به‌جای {requestedModel} با {effectiveModel} پاسخ داد؛ response_format پشتیبانی نمی‌شود و از جایگزین متن ساده استفاده می‌شود."
+  },
+  "custom_api_connection_model_mismatch_inconclusive": {
+    "message": "اتصال برقرار است. سرور به‌جای {requestedModel} با {effectiveModel} پاسخ داد؛ وضعیت پشتیبانی از response_format مشخص نیست، اما جایگزین متن ساده در دسترس است."
+  },
+  "custom_api_connection_model_mismatch_unusable": {
+    "message": "اتصال برقرار است، اما سرور به‌جای {requestedModel} با {effectiveModel} پاسخ داد و خروجی ساختاریافته (response_format) معتبری برنگرداند. ممکن است ترجمه قابل اعتماد نباشد."
+  },
+  "custom_api_connection_unreachable": {
+    "message": "دسترسی به سرور ممکن نیست. نشانی API و اتصال شبکه را بررسی کنید."
+  },
+  "custom_api_connection_auth_failed": {
+    "message": "احراز هویت ناموفق بود. کلید API را بررسی کنید."
+  },
+  "custom_api_connection_completion_failed": {
+    "message": "سرور پاسخ داد اما خروجی قابل استفاده‌ای برنگرداند."
+  },
+  "custom_api_connection_request_failed": {
+    "message": "درخواست با وضعیت {status} ناموفق بود."
+  },
+  "custom_api_connection_failed_unexpected": {
+    "message": "تست اتصال به‌طور غیرمنتظره ناموفق بود."
+  },
   "import_export_section_title": {
     "message": "پشتیبان‌گیری و بازیابی تنظیمات"
   },
