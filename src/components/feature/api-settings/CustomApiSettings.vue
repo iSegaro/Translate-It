@@ -44,9 +44,14 @@
         <div class="button-result-row">
           <div
             data-testid="custom-connection-status"
+            role="status"
             :class="connectionReport ? ['test-result', connectionResultClass] : 'setting-help-text'"
           >
-            {{ connectionStatusText }}
+            <template v-if="connectionReport">
+              <p v-if="connectionVerdict" class="connection-verdict">{{ connectionVerdict }}</p>
+              <p v-if="connectionDetailSegments.length > 0" class="connection-detail"><template v-for="(segment, index) in connectionDetailSegments" :key="index"><strong v-if="segment.strong">{{ segment.text }}</strong><span v-else>{{ segment.text }}</span></template></p>
+            </template>
+            <template v-else>{{ connectionStatusText }}</template>
           </div>
           <button
             type="button"
@@ -108,10 +113,91 @@ const connectionStatusText = computed(() => {
   const { messageKey, params } = connectionReport.value
   return params ? t(messageKey, params) : t(messageKey)
 })
+// Verdict-first presentation: messageKey selects a short verdict line, while
+// the existing detail string becomes the optional second line. Report
+// semantics are untouched — this mapping is presentation-only. Unknown keys
+// render detail only, never crash.
 // Presentation: success only when usable, structured-supported, and the
 // served model matches; any proven mismatch warns even when usable;
 // unsupported/inconclusive protocol on usable reports warns; any unusable
 // report or failure is an error.
+const CONNECTION_VERDICT_BY_MESSAGE_KEY = {
+  custom_api_connection_success: 'custom_api_verdict_compatible',
+  custom_api_connection_fallback: 'custom_api_verdict_compatible',
+  custom_api_connection_model_mismatch: 'custom_api_verdict_compatible',
+  custom_api_connection_model_mismatch_fallback: 'custom_api_verdict_compatible',
+  custom_api_connection_inconclusive: 'custom_api_verdict_inconclusive',
+  custom_api_connection_model_mismatch_inconclusive: 'custom_api_verdict_inconclusive',
+  custom_api_connection_structured_invalid: 'custom_api_verdict_incompatible',
+  custom_api_connection_model_mismatch_unusable: 'custom_api_verdict_incompatible',
+  api_test_custom_model_not_found: 'custom_api_verdict_incompatible',
+  custom_api_connection_unreachable: 'custom_api_verdict_unreachable',
+  custom_api_connection_auth_failed: 'custom_api_verdict_auth_failed',
+  custom_api_connection_completion_failed: 'custom_api_verdict_check_failed',
+  custom_api_connection_request_failed: 'custom_api_verdict_check_failed',
+  custom_api_connection_failed_unexpected: 'custom_api_verdict_check_failed',
+  custom_api_connection_timed_out: 'custom_api_verdict_timed_out',
+}
+
+// Internal markers stand in for model names during t() interpolation so the
+// translated detail can be tokenized independent of locale placeholder
+// order. extremely unlikely to occur in locale text, and the
+// markers never come from server/user data; real model values are
+// substituted afterwards and escaped normally by Vue (no v-html).
+const REQUESTED_MODEL_MARKER = 'compat-requested'
+const EFFECTIVE_MODEL_MARKER = 'compat-effective'
+
+const MISMATCH_DETAIL_MESSAGE_KEYS = new Set([
+  'custom_api_connection_model_mismatch',
+  'custom_api_connection_model_mismatch_fallback',
+  'custom_api_connection_model_mismatch_inconclusive',
+  'custom_api_connection_model_mismatch_unusable',
+])
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const tokenizeDetail = (translated, requestedModel, effectiveModel) => {
+  const pattern = new RegExp(`(${escapeRegExp(REQUESTED_MODEL_MARKER)}|${escapeRegExp(EFFECTIVE_MODEL_MARKER)})`)
+  return translated
+    .split(pattern)
+    .filter((part) => part.length > 0)
+    .map((part) => {
+      if (part === REQUESTED_MODEL_MARKER) {
+        return requestedModel ? { strong: true, text: requestedModel } : { strong: false, text: '' }
+      }
+      if (part === EFFECTIVE_MODEL_MARKER) {
+        return effectiveModel ? { strong: true, text: effectiveModel } : { strong: false, text: '' }
+      }
+      return { strong: false, text: part }
+    })
+    .filter((segment) => segment.text.length > 0)
+}
+
+const connectionVerdict = computed(() => {
+  const report = connectionReport.value
+  if (!report) return ''
+  const verdictKey = CONNECTION_VERDICT_BY_MESSAGE_KEY[report.messageKey]
+  return verdictKey ? t(verdictKey) : ''
+})
+
+const connectionDetailSegments = computed(() => {
+  const report = connectionReport.value
+  if (!report) return []
+  const { messageKey, params } = report
+  if (MISMATCH_DETAIL_MESSAGE_KEYS.has(messageKey)) {
+    // params carry the presentation-safe values (basename-shortened
+    // effective model); never recomputed here. Marker tokenization keeps
+    // this correct regardless of locale placeholder order, and overlapping
+    // model values (foo vs foo.gguf) cannot confuse it.
+    const translated = t(messageKey, {
+      requestedModel: REQUESTED_MODEL_MARKER,
+      effectiveModel: EFFECTIVE_MODEL_MARKER,
+    })
+    return tokenizeDetail(translated, params?.requestedModel, params?.effectiveModel)
+  }
+  const text = params ? t(messageKey, params) : t(messageKey)
+  return text ? [{ strong: false, text }] : []
+})
 const connectionResultClass = computed(() => {
   const report = connectionReport.value
   if (!report || !report.usable) return 'error'

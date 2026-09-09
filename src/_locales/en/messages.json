@@ -1253,17 +1253,38 @@
   "custom_api_not_tested": {
     "message": "Not checked"
   },
+  "custom_api_verdict_compatible": {
+    "message": "Compatible."
+  },
+  "custom_api_verdict_inconclusive": {
+    "message": "Compatibility could not be fully verified."
+  },
+  "custom_api_verdict_incompatible": {
+    "message": "Not compatible."
+  },
+  "custom_api_verdict_unreachable": {
+    "message": "Cannot connect."
+  },
+  "custom_api_verdict_auth_failed": {
+    "message": "Authentication failed."
+  },
+  "custom_api_verdict_check_failed": {
+    "message": "Compatibility check failed."
+  },
+  "custom_api_verdict_timed_out": {
+    "message": "Compatibility check timed out."
+  },
   "custom_api_connection_success": {
-    "message": "Ready to use."
+    "message": ""
   },
   "custom_api_connection_fallback": {
-    "message": "Ready to use. Compatibility mode will be used."
+    "message": "Compatibility mode will be used."
   },
   "custom_api_connection_inconclusive": {
-    "message": "Connection works, but compatibility could not be fully verified."
+    "message": ""
   },
   "custom_api_connection_structured_invalid": {
-    "message": "The model responded, but its output may not work reliably."
+    "message": "The model returned an unusable response."
   },
   "custom_api_connection_model_mismatch": {
     "message": "The server used {effectiveModel} instead of {requestedModel}."
@@ -1272,28 +1293,28 @@
     "message": "The server used {effectiveModel} instead of {requestedModel}. Compatibility mode will be used."
   },
   "custom_api_connection_model_mismatch_inconclusive": {
-    "message": "The server used {effectiveModel} instead of {requestedModel}. Compatibility could not be fully verified."
+    "message": "The server used {effectiveModel} instead of {requestedModel}."
   },
   "custom_api_connection_model_mismatch_unusable": {
     "message": "The server used {effectiveModel} instead of {requestedModel}, and its output may not work reliably."
   },
   "custom_api_connection_unreachable": {
-    "message": "Cannot reach the server. Check the server address and network."
+    "message": "Check the server address and network."
   },
   "custom_api_connection_auth_failed": {
-    "message": "Authentication failed. Check the API key."
+    "message": "Check the API key."
   },
   "custom_api_connection_completion_failed": {
     "message": "The server responded, but returned nothing usable."
   },
   "custom_api_connection_request_failed": {
-    "message": "The request failed. Check the server settings."
+    "message": "Check the server settings."
   },
   "custom_api_connection_failed_unexpected": {
-    "message": "Compatibility check failed unexpectedly."
+    "message": ""
   },
   "custom_api_connection_timed_out": {
-    "message": "Compatibility check timed out. Try again."
+    "message": "Try again."
   },
   "import_export_section_title": {
     "message": "Import/Export Settings"

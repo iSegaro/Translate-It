@@ -1253,17 +1253,38 @@
   "custom_api_not_tested": {
     "message": "未確認"
   },
+  "custom_api_verdict_compatible": {
+    "message": "互換性があります。"
+  },
+  "custom_api_verdict_inconclusive": {
+    "message": "互換性を完全には確認できませんでした。"
+  },
+  "custom_api_verdict_incompatible": {
+    "message": "互換性がありません。"
+  },
+  "custom_api_verdict_unreachable": {
+    "message": "接続できません。"
+  },
+  "custom_api_verdict_auth_failed": {
+    "message": "認証に失敗しました。"
+  },
+  "custom_api_verdict_check_failed": {
+    "message": "互換性チェックに失敗しました。"
+  },
+  "custom_api_verdict_timed_out": {
+    "message": "互換性チェックがタイムアウトしました。"
+  },
   "custom_api_connection_success": {
-    "message": "使用可能です。"
+    "message": ""
   },
   "custom_api_connection_fallback": {
-    "message": "使用可能です。互換モードを使用します。"
+    "message": "互換モードを使用します。"
   },
   "custom_api_connection_inconclusive": {
-    "message": "接続は有効ですが、互換性を完全には確認できませんでした。"
+    "message": ""
   },
   "custom_api_connection_structured_invalid": {
-    "message": "モデルは応答しましたが、その出力は正しく動作しない可能性があります。"
+    "message": "モデルは使用可能な応答を返しませんでした。"
   },
   "custom_api_connection_model_mismatch": {
     "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。"
@@ -1272,28 +1293,28 @@
     "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。互換モードを使用します。"
   },
   "custom_api_connection_model_mismatch_inconclusive": {
-    "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。互換性は完全には確認できませんでした。"
+    "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しました。"
   },
   "custom_api_connection_model_mismatch_unusable": {
     "message": "サーバーは{requestedModel}ではなく{effectiveModel}を使用しましたが、その出力は正しく動作しない可能性があります。"
   },
   "custom_api_connection_unreachable": {
-    "message": "サーバーに接続できません。サーバーアドレスとネットワークを確認してください。"
+    "message": "サーバーアドレスとネットワークを確認してください。"
   },
   "custom_api_connection_auth_failed": {
-    "message": "認証に失敗しました。APIキーを確認してください。"
+    "message": "APIキーを確認してください。"
   },
   "custom_api_connection_completion_failed": {
     "message": "サーバーから応答はありましたが、使用可能な出力は返されませんでした。"
   },
   "custom_api_connection_request_failed": {
-    "message": "リクエストが失敗しました。サーバー設定を確認してください。"
+    "message": "サーバー設定を確認してください。"
   },
   "custom_api_connection_failed_unexpected": {
-    "message": "互換性チェックが予期せず失敗しました。"
+    "message": ""
   },
   "custom_api_connection_timed_out": {
-    "message": "互換性チェックがタイムアウトしました。もう一度お試しください。"
+    "message": "もう一度お試しください。"
   },
   "import_export_section_title": {
     "message": "設定のインポート/エクスポート"

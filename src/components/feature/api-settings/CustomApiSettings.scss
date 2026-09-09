@@ -1,2 +1,17 @@
 @use "@/assets/styles/base/variables" as *;
 @use "@/assets/styles/components/api-settings-common" as *;
+
+.custom-settings {
+  .connection-verdict,
+  .connection-detail {
+    margin: 0;
+  }
+
+  .connection-verdict {
+    font-weight: 600;
+  }
+
+  .connection-detail {
+    margin-top: 4px;
+  }
+}
