@@ -9,6 +9,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { resourceTracker } from './state.js';
 import { getPendingTranslationData } from './dataStore.js';
 import { isEditableElement } from './elementHelper.js';
+import { getFieldSourceScope } from '@/features/text-field-interaction/utils/framework/framework-compat/fieldSourceSnapshot.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationExecutor');
 
@@ -64,6 +65,16 @@ export async function applyTranslation(translatedText, selectionRange, platform,
     if (!isCurrent()) return { applied: false, mode: 'stale' };
     const pendingData = getPendingTranslationData(document.activeElement, toastId);
     const target = targetElement || pendingData?.target || document.activeElement;
+
+    // Canonical request-time Field scope (Issue #201): the service attaches the
+    // normalized descriptor as applicationContext.fieldSource; legacy direct
+    // callers carry only pending-state/positional range. The shared pipeline
+    // (smartTextReplacement) enforces a present scope for native INPUT/TEXTAREA
+    // across every strategy, so no strategy needs its own range/stale logic and
+    // the live DOM selection can never redirect the output.
+    const fieldSource = applicationContext?.fieldSource
+      ?? getFieldSourceScope(selectionRange ?? pendingData?.selectionRange ?? null, pendingData?.sourceSnapshot ?? null);
+    const scopedContext = fieldSource ? { ...applicationContext, fieldSource } : applicationContext;
     
     if (!target || !isEditableElement(target) || !target.isConnected) {
       logger.warn('No valid target element connected to DOM');
@@ -95,7 +106,7 @@ export async function applyTranslation(translatedText, selectionRange, platform,
     if (!isCurrent()) return { applied: false, mode: 'stale' };
     const strategy = new strategyModule.default();
     
-    const success = await strategy.updateElement(target, translatedText, applicationContext);
+    const success = await strategy.updateElement(target, translatedText, scopedContext);
     logger.debug('Translation strategy completed', { success });
     
     if (!isCurrent()) return { applied: false, mode: 'stale' };

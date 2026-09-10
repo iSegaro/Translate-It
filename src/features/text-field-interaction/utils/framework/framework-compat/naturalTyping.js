@@ -1,6 +1,7 @@
 // src/utils/framework-compat/naturalTyping.js
 
 import { checkTextSelection } from "./selectionUtils.js";
+import { ensureCEAim, hasScopedCESelection } from "./contentEditableScope.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'naturalTyping');
@@ -21,6 +22,17 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     return false;
   }
 
+  // Scoped contentEditable requests never enter character-by-character typing:
+  // the await → live-selection → mutate loop cannot hold a captured range, so
+  // post-first-character selection movement would redirect the remaining chars
+  // while isCurrent() stays true. Optimized/universal atomic strategies already
+  // ran first; simpleReplacement remains the final scoped fallback. Legacy
+  // descriptor-absent calls keep char-by-char typing exactly.
+  if (applicationContext?.fieldSource?.targetKind === 'contenteditable') {
+    logger.debug('Scoped CE request yields before natural typing (no mutation)');
+    return false;
+  }
+
   try {
   logger.debug('Starting for element:', {
       tagName: element.tagName,
@@ -31,9 +43,15 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
 
     // ابتدا المان را فوکوس کن
     element.focus();
+
+    // JIT aim for legacy descriptor-absent runs: revalidate + restore before
+    // typing starts. (Explicit CE descriptors yield above and never reach the
+    // char loop, whose awaits could not hold a captured range.)
+    if (!ensureCEAim(element, applicationContext)) return false;
     
-    // بررسی انتخاب متن
-    const hasSelection = checkTextSelection(element);
+    // بررسی انتخاب متن (whitespace-scoped aims count as selections here)
+    const hasSelection = checkTextSelection(element)
+      || hasScopedCESelection(element, applicationContext);
   logger.debug('Selection status:', {
       hasSelection,
       replaceSelection,
@@ -43,7 +61,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
     
     // برای Reddit و contentEditable، از روش ساده‌تر استفاده کن
     if (element.isContentEditable && typeof window !== 'undefined' && window.location.hostname.includes('reddit.com')) {
-      const simpleSuccess = await handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection, isCurrent);
+      const simpleSuccess = await handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection, isCurrent, applicationContext);
       if (!isCurrent()) return false;
       if (simpleSuccess) {
         return true;
@@ -238,7 +256,7 @@ export async function simulateNaturalTyping(element, text, delay = 10, replaceSe
  * @param {boolean} replaceSelection - آیا باید فقط انتخاب جایگزین شود
  * @returns {Promise<boolean>}
  */
-async function handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection, isCurrent) {
+async function handleContentEditableReplacementSimple(element, text, hasSelection, replaceSelection, isCurrent, applicationContext = null) {
   try {
   logger.debug('Starting Reddit-specific replacement:', {
       hasSelection,
@@ -254,6 +272,8 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
     
     if (!isCurrent()) return false;
     if (hasSelection && selection.rangeCount > 0) {
+      // JIT aim just before mutating (or fail closed on stale scope).
+      if (!ensureCEAim(element, applicationContext)) return false;
       // جایگزینی انتخاب
       const range = selection.getRangeAt(0);
       const originalText = range.toString();
@@ -292,6 +312,8 @@ async function handleContentEditableReplacementSimple(element, text, hasSelectio
     } else {
       // جایگزینی کل محتوا
       if (!isCurrent()) return false;
+      // JIT aim just before mutating (or fail closed on stale scope).
+      if (!ensureCEAim(element, applicationContext)) return false;
       const originalText = element.textContent || element.innerText;
       logger.debug('Replacing all content');
       element.textContent = text;

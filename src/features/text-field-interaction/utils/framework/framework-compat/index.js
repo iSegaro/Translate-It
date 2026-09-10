@@ -3,6 +3,8 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { checkTextSelection } from "./selectionUtils.js";
+import { resolveScopedInputRange } from "./fieldSourceSnapshot.js";
+import { resolveScopedContentEditable, hasScopedCESelection } from "./contentEditableScope.js";
 import { simulateNaturalTyping } from "./naturalTyping.js";
 import {
   universalTextInsertion,
@@ -31,6 +33,31 @@ export async function smartTextReplacement(
   if (!element) return false;
   const isCurrent = applicationContext?.isCurrent || (() => true);
   if (!isCurrent()) return false;
+
+  // Canonical request-time Field scope (Issue #201): when applicationContext
+  // carries fieldSource for a native INPUT/TEXTAREA, the captured scope is
+  // authoritative over both the passed range and the live DOM selection, so a
+  // later caret/selection movement can never redirect the output. Absent
+  // descriptors (legacy direct callers) flow through untouched here. A refused
+  // (stale) scope must never mutate.
+  const scoped = resolveScopedInputRange(element, start, end, applicationContext);
+  if (scoped.refused) {
+    logger.debug('Refusing scoped field replacement: stale source snapshot');
+    return false;
+  }
+  start = scoped.start;
+  end = scoped.end;
+
+  // Same authority for contentEditable: validate the captured scope, then aim
+  // the live window selection (bookmark restore for selection scope, select-all
+  // for full scope) so downstream insertion layers replace exactly the aim.
+  // Absent descriptors and non-CE targets pass through untouched. Layers
+  // re-aim just in time via ensureCEAim before each CE mutation.
+  const ceScoped = resolveScopedContentEditable(element, applicationContext);
+  if (ceScoped.refused) {
+    logger.debug('Refusing scoped contentEditable replacement: stale source');
+    return false;
+  }
 
   try {
     logger.debug('Starting text replacement with strategies', {
@@ -86,8 +113,12 @@ export async function smartTextReplacement(
     if (shouldUseNaturalTyping) {
       logger.debug('Trying natural typing', { hostname: typeof window !== 'undefined' ? window.location.hostname : '' });
 
-      // بررسی انتخاب فعلی
-      const hasCurrentSelection = checkTextSelection(element);
+      // بررسی انتخاب فعلی (whitespace-scoped aims count as selections here).
+      // Note: simulateNaturalTyping itself yields without mutating for
+      // explicit CE descriptors (char-by-char typing cannot hold a range);
+      // simpleReplacement below remains the final scoped fallback.
+      const hasCurrentSelection = checkTextSelection(element)
+        || hasScopedCESelection(element, applicationContext);
 
       // اگر محدوده مشخص شده یا انتخاب فعلی داریم
       if ((start !== null && end !== null) || hasCurrentSelection) {
@@ -128,6 +159,24 @@ export async function smartTextReplacement(
 // Re-export all the necessary functions for backward compatibility
 export { isComplexEditor } from "./editorDetection.js";
 export { checkTextSelection } from "./selectionUtils.js";
+export { captureFieldTranslationSource, validateFieldSourceSnapshot, getFieldSourceScope, resolveScopedInputRange, INVALID_FIELD_SCOPE } from "./fieldSourceSnapshot.js";
+export {
+  serializeContentEditableText,
+  getContentEditableSelection,
+  bookmarkContentEditableRange,
+  restoreContentEditableBookmark,
+  readContentEditableBookmarkText,
+  validateContentEditableSelection,
+  validateContentEditableFull,
+  hasScopedCESelection,
+  ensureCEAim,
+  resolveScopedContentEditable,
+  nodePathFromRoot,
+  resolveNodePath,
+  lineageFromRoot,
+  isValidContentEditableBookmark,
+  buildMultilineFragment,
+} from "./contentEditableScope.js";
 export { simulateNaturalTyping } from "./naturalTyping.js";
 export {
   universalTextInsertion,

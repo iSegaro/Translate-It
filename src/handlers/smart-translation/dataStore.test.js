@@ -191,6 +191,8 @@ describe('Field request ownership data store', () => {
       platform: 'default',
       tabId: 7,
       selectionRange: null,
+      sourceSnapshot: null,
+      submittedText: null,
       timestamp: 123,
       toastId: 'active-toast',
       messageId: 'active-request',
@@ -281,5 +283,53 @@ describe('Field request ownership data store', () => {
     const previous = { target: document.createElement('textarea'), data: null, toastId: null };
     expect(() => cleanupSupersededFieldTranslationState(previous)).not.toThrow();
     expect(() => cleanupSupersededFieldTranslationState(previous)).not.toThrow();
+  });
+
+  it('stores the actual submitted selection text instead of the full live value', () => {
+    const target = document.createElement('textarea');
+    target.value = 'Hello سلام world';
+    const ownership = beginFieldTranslationRequest(target).ownership;
+
+    const data = storePendingTranslationData(
+      target,
+      'field',
+      'default',
+      null,
+      { start: 6, end: 10 },
+      Date.now(),
+      'toast-selection',
+      'message-selection',
+      ownership,
+      'سلام',
+      { scope: 'selection', expectedSourceText: 'سلام' }
+    );
+
+    expect(data.selectionRange).toEqual({ start: 6, end: 10 });
+    expect(data.sourceSnapshot).toEqual({ scope: 'selection', expectedSourceText: 'سلام' });
+    expect(data.submittedText).toBe('سلام');
+    expect(mocks.tracker.createRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          text: 'سلام',
+          selectionRange: { start: 6, end: 10 },
+          sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
+        }),
+      })
+    );
+    expect(getPendingTranslationData(target, 'toast-selection', ownership)).toBe(data);
+  });
+
+  it('falls back to the live full value for legacy callers without submitted text', () => {
+    const target = document.createElement('textarea');
+    target.value = 'full value';
+    const ownership = beginFieldTranslationRequest(target).ownership;
+
+    const data = storePendingTranslationData(
+      target, 'field', 'default', null, null, Date.now(), 'toast-full', 'message-full', ownership
+    );
+
+    expect(data.selectionRange).toBeNull();
+    expect(data.sourceSnapshot).toBeNull();
+    expect(data.submittedText).toBe('full value');
   });
 });

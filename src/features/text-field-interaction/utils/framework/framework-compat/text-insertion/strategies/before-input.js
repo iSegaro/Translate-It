@@ -1,6 +1,7 @@
 // src/utils/framework-compat/text-insertion/strategies/before-input.js
 
 import { smartDelay } from "../helpers.js";
+import { serializeContentEditableText, ensureCEAim, hasScopedCESelection } from "../../contentEditableScope.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'before-input');
@@ -12,6 +13,9 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'before-input');
  * @param {string} text - متن برای درج
  * @param {boolean} hasSelection - آیا انتخاب دارد
  * @returns {Promise<boolean>}
+ * Success is claimed (and the input event emitted) only when the beforeinput
+ * path actually produced the expected mutation; otherwise returns false with
+ * no events so the next fallback owns mutation+events (no duplicate/spurious input).
  */
 export async function tryBeforeInputInsertion(element, text, hasSelection, applicationContext = null) {
   const isCurrent = applicationContext?.isCurrent || (() => true);
@@ -29,8 +33,9 @@ export async function tryBeforeInputInsertion(element, text, hasSelection, appli
     await smartDelay(10);
     if (!isCurrent()) return false;
 
-    // اگر انتخاب ندارد، کل محتوا را انتخاب کن
-    if (!hasSelection) {
+    // اگر انتخاب ندارد، کل محتوا را انتخاب کن — مگر اینکه محدوده انتخاب
+    // دارای scope معتبر باشد که از قبل هدف‌گیری شده است.
+    if (!hasSelection && !hasScopedCESelection(element, applicationContext)) {
       if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         const range = document.createRange();
@@ -44,6 +49,15 @@ export async function tryBeforeInputInsertion(element, text, hasSelection, appli
 
     // ایجاد beforeinput event
     if (!isCurrent()) return false;
+    // Snapshot content to prove the beforeinput path actually mutated (partial
+    // replacements validate via inclusion, not whole-value equality; CE reads
+    // the canonical form so multiline mutations stay provable).
+    const contentBeforeInput = element.isContentEditable
+      ? serializeContentEditableText(element)
+      : element.value;
+    // JIT aim just before dispatching: revalidate + restore the captured CE
+    // scope (or fail closed) so a moved live selection cannot redirect output.
+    if (!ensureCEAim(element, applicationContext)) return false;
     const beforeInputEvent = new InputEvent("beforeinput", {
       bubbles: true,
       cancelable: true,
@@ -64,6 +78,16 @@ export async function tryBeforeInputInsertion(element, text, hasSelection, appli
 
     // ارسال input event
     if (!isCurrent()) return false;
+    // Mutation proof: emit input and claim success only when the beforeinput
+    // handler actually produced the expected text. Accepted-but-unchanged
+    // returns false with no events so the next fallback owns mutation+events.
+    const contentAfterInput = element.isContentEditable
+      ? serializeContentEditableText(element)
+      : element.value;
+    if (!contentAfterInput || contentAfterInput === contentBeforeInput || !contentAfterInput.includes(text)) {
+      logger.debug('beforeinput produced no mutation, yielding to next fallback');
+      return false;
+    }
     const inputEvent = new InputEvent("input", {
       bubbles: true,
       cancelable: false,
@@ -74,6 +98,7 @@ export async function tryBeforeInputInsertion(element, text, hasSelection, appli
     element.dispatchEvent(inputEvent);
 
     await smartDelay(50);
+    if (!isCurrent()) return false;
     return true;
   } catch (error) {
     logger.warn('Error:', error);
