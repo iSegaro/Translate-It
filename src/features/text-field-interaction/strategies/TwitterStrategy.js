@@ -84,11 +84,25 @@ export default class TwitterStrategy extends PlatformStrategy {
 
       let field = null;
 
-      if (this.isDMElement(element)) {
-        field = element.closest('[data-testid="dmComposerTextInput"]') || 
-               (element.getAttribute('role') === 'textbox' ? element : null);
-      } else if (this.isTwitterElement(element)) {
-        field = element.closest('[data-testid="tweetTextarea_0"]');
+      // Scoped CE application must run on the capture root itself: bookmarks and
+      // canonical identity are rooted at the request-time element, and resolving
+      // outward to the composer container would misalign them (central validation
+      // would refuse). Legacy descriptor-absent calls keep the historical resolve.
+      // The passed element is the stored request target.
+      const ceFieldSource = applicationContext?.fieldSource?.targetKind === 'contenteditable'
+        ? applicationContext.fieldSource
+        : null;
+      if (ceFieldSource && element.isContentEditable) {
+        field = element;
+      }
+
+      if (!field) {
+        if (this.isDMElement(element)) {
+          field = element.closest('[data-testid="dmComposerTextInput"]') || 
+                 (element.getAttribute('role') === 'textbox' ? element : null);
+        } else if (this.isTwitterElement(element)) {
+          field = element.closest('[data-testid="tweetTextarea_0"]');
+        }
       }
 
       // Fallback: If no specific field found but the element itself looks like a Twitter editor or a standard input
@@ -105,8 +119,14 @@ export default class TwitterStrategy extends PlatformStrategy {
         if (!isCurrent()) return false;
         
         const isDraftJS = this.isTwitterElement(element) || this.isDMElement(element);
-        
-        if (isDraftJS) {
+        // Request-time CE selection scope replaces only the captured bookmark
+        // range (centrally restored into the live selection below): a select-all
+        // here would wipe it and full-replace a partial request. Full and
+        // legacy scopes keep the historical select-all for Draft.js state.
+        const isScopedCESelection = applicationContext?.fieldSource?.scope === 'selection'
+          && (applicationContext?.fieldSource?.targetKind ?? 'native') === 'contenteditable';
+
+        if (isDraftJS && !isScopedCESelection) {
           // هک برای Draft.js توییتر (توییت و DM): انتخاب کل
           // به جای حذف جداگانه، اجازه می‌دهیم insertText خودش جایگزین کند تا State ادیتور به هم نریزد
           document.execCommand('selectAll', false, null);
@@ -114,16 +134,30 @@ export default class TwitterStrategy extends PlatformStrategy {
           if (!isCurrent()) return false;
         }
 
+        // Observe input notifications during the shared replace: paste-style
+        // layers rely on editor-handled events and emit none themselves, while
+        // direct-mutation layers emit input/change. Dispatch the manual input
+        // nudge below only when nothing was observed (exactly-once, no dups).
+        let observedInput = false;
+        const markObservedInput = () => { observedInput = true; };
+        field.addEventListener('input', markObservedInput);
         // استفاده از جایگزینی هوشمند متن (جایگزین clearTweetField و pasteText)
-        const success = await smartTextReplacement(field, translatedText, null, null, undefined, applicationContext);
+        // The observer is always detached (success, false, throw, stale).
+        let success = false;
+        try {
+          success = await smartTextReplacement(field, translatedText, null, null, undefined, applicationContext);
+        } finally {
+          field.removeEventListener('input', markObservedInput);
+        }
 
         if (success) {
           if (!isCurrent()) return false;
           // برای توییتر/Draft.js، فقط اگر لازم بود مکان‌نما را تنظیم می‌کنیم
           if (!isDraftJS) {
             this.setCursorToEnd(field);
-          } else {
-            // برای توییتر، اجبار به بروزرسانی State با ارسال رویداد input
+          } else if (!observedInput) {
+            // برای توییتر، اجبار به بروزرسانی State با ارسال رویداد input —
+            // فقط وقتی پایپ‌لاین خودش هیچ input منتشر نکرده باشد.
             field.dispatchEvent(new Event('input', { bubbles: true }));
           }
           

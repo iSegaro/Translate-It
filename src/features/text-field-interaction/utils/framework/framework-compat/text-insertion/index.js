@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { checkTextSelection } from "../selectionUtils.js";
+import { hasScopedCESelection, serializeContentEditableText } from "../contentEditableScope.js";
 import { detectOptimalStrategy } from "./detector.js";
 import {
   findTextNodeAtPosition,
@@ -139,10 +140,11 @@ export async function universalTextInsertion(
       if (!isCurrent()) return false;
     }
 
-    // ذخیره محتوای اولیه برای تأیید تغییرات
+    // ذخیره محتوای اولیه برای تأیید تغییرات (فرم canonical برای CE تا مقایسه
+    // با متن canonical لایه‌های بعدی مثبت/منفی کاذب ندهد)
     const initialContent =
       element.isContentEditable ?
-        element.textContent || element.innerText
+        serializeContentEditableText(element)
       : element.value;
 
     // تنظیم انتخاب در صورت نیاز یا انتخاب کل محتوا برای جایگزینی
@@ -167,7 +169,11 @@ export async function universalTextInsertion(
         // برای input/textarea
         element.setSelectionRange(start, end);
       }
-    } else {
+    } else if (!hasScopedCESelection(element, applicationContext)) {
+      // A centrally-restored CE selection scope already aimed the live
+      // selection at the captured bookmark; a legacy select-all here would
+      // wipe it and full-replace a partial request. Scoped full CE was also
+      // aimed (select-all) by central restore, so skipping is safe there too.
       // انتخاب کل محتوا برای جایگزینی کامل
       if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();

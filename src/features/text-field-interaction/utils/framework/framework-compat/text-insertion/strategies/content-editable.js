@@ -1,6 +1,7 @@
 // src/utils/framework-compat/text-insertion/strategies/content-editable.js
 
 import { smartDelay } from "../helpers.js";
+import { buildMultilineFragment, ensureCEAim, hasScopedCESelection } from "../../contentEditableScope.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'content-editable');
@@ -26,8 +27,9 @@ export async function tryContentEditableInsertion(element, text, hasSelection, a
 
     const selection = window.getSelection();
 
-    // اگر انتخاب ندارد، کل محتوا را انتخاب کن
-    if (!hasSelection) {
+    // اگر انتخاب ندارد، کل محتوا را انتخاب کن — مگر اینکه محدوده انتخاب
+    // دارای scope معتبر باشد که از قبل هدف‌گیری شده است.
+    if (!hasSelection && !hasScopedCESelection(element, applicationContext)) {
       const range = document.createRange();
       range.selectNodeContents(element);
       selection.removeAllRanges();
@@ -38,6 +40,9 @@ export async function tryContentEditableInsertion(element, text, hasSelection, a
     }
 
     // تلاش برای استفاده از execCommand برای حفظ undo
+    // JIT aim just before mutating: revalidate + restore the captured CE scope
+    // (or fail closed) so a moved live selection cannot redirect output.
+    if (!ensureCEAim(element, applicationContext)) return false;
     if (
       typeof document.execCommand === "function" &&
       selection.rangeCount > 0
@@ -85,32 +90,28 @@ export async function tryContentEditableInsertion(element, text, hasSelection, a
 
     // fallback: جایگزینی مستقیم (بدون undo)
     if (!isCurrent()) return false;
+    // JIT re-aim (a select-all or a moved caret above must not redirect a
+    // scoped request); whitespace-scoped aims count as selections here.
+    if (!ensureCEAim(element, applicationContext)) return false;
+    const fallbackHasSelection = hasSelection || hasScopedCESelection(element, applicationContext);
   logger.debug('Falling back to direct DOM manipulation (no undo)');
 
-    if (hasSelection && selection.rangeCount > 0) {
+    if (fallbackHasSelection && selection.rangeCount > 0) {
       if (!isCurrent()) return false;
       // جایگزینی انتخاب
       const range = selection.getRangeAt(0);
       range.deleteContents();
 
-      // تبدیل متن به HTML ساده با حفظ خطوط جدید
-      const lines = text.split("\n");
-      const fragment = document.createDocumentFragment();
-
-      lines.forEach((line, index) => {
-        if (index > 0) {
-          fragment.appendChild(document.createElement("br"));
-        }
-        if (line) {
-          fragment.appendChild(document.createTextNode(line));
-        }
-      });
-
+      // تبدیل متن به HTML ساده با حفظ خطوط جدید (سازنده مشترک)
+      const fragment = buildMultilineFragment(text);
+      const anchor = fragment.lastChild;
       range.insertNode(fragment);
 
       // تنظیم cursor بعد از متن
-      range.setStartAfter(fragment.lastChild || fragment);
-      range.setEndAfter(fragment.lastChild || fragment);
+      if (anchor) {
+        range.setStartAfter(anchor);
+        range.setEndAfter(anchor);
+      }
       selection.removeAllRanges();
       selection.addRange(range);
     } else {

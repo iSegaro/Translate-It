@@ -1344,4 +1344,81 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
     document.body.removeChild(field);
   });
+
+  it('copies only the contentEditable selection in Copy mode without touching the editor', async () => {
+    const field = document.createElement('div');
+    field.setAttribute('contenteditable', 'true');
+    Object.defineProperty(field, 'isContentEditable', { value: true, configurable: true });
+    field.innerHTML = '<p>Hello <b>سلام</b> world</p>';
+    document.body.appendChild(field);
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.determineReplaceMode.mockResolvedValue(false);
+    mocks.safeSendMessage.mockResolvedValue({
+      success: true,
+      translatedText: 'hello',
+      originalText: 'سلام',
+    });
+
+    await expect(translateFieldViaSmartHandler({
+      text: 'سلام',
+      target: field,
+      selectionRange: null,
+      sourceSnapshot: {
+        scope: 'selection',
+        targetKind: 'contenteditable',
+        bookmark: { startPath: [0, 1, 0], startOffset: 0, endPath: [0, 1, 0], endOffset: 4 },
+        expectedSourceText: 'سلام',
+      },
+    })).resolves.toBeUndefined();
+
+    // Only the selection translation is copied; the editor is never mutated
+    // (no range restore is needed on the copy path).
+    expect(writeText).toHaveBeenCalledWith('hello');
+    expect(field.textContent).toBe('Hello سلام world');
+    expect(mocks.applyTranslation).not.toHaveBeenCalled();
+
+    document.body.removeChild(field);
+  });
+
+  it('copies the full canonical text in Copy mode when a CE field has no selection', async () => {
+    const field = document.createElement('div');
+    field.setAttribute('contenteditable', 'true');
+    Object.defineProperty(field, 'isContentEditable', { value: true, configurable: true });
+    field.innerHTML = '<p>line1</p><p>line2</p>';
+    document.body.appendChild(field);
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.determineReplaceMode.mockResolvedValue(false);
+    mocks.safeSendMessage.mockResolvedValue({
+      success: true,
+      translatedText: 'a\nb',
+      originalText: 'line1\nline2',
+    });
+
+    await expect(translateFieldViaSmartHandler({
+      text: 'line1\nline2',
+      target: field,
+      selectionRange: null,
+      sourceSnapshot: {
+        scope: 'full',
+        targetKind: 'contenteditable',
+        expectedSourceText: 'line1\nline2',
+      },
+    })).resolves.toBeUndefined();
+
+    expect(writeText).toHaveBeenCalledWith('a\nb');
+    expect(field.textContent).toBe('line1line2');
+    expect(mocks.applyTranslation).not.toHaveBeenCalled();
+
+    document.body.removeChild(field);
+  });
 });

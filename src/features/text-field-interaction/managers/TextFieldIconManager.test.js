@@ -309,7 +309,7 @@ describe('TextFieldIconManager', () => {
         text: 'hello',
         target: el,
         selectionRange: null,
-        sourceSnapshot: { scope: 'full', expectedSourceText: 'hello' },
+        sourceSnapshot: { scope: 'full', targetKind: 'native', expectedSourceText: 'hello' },
       });
       expect(spy).toHaveBeenCalledWith(el);
     });
@@ -327,7 +327,7 @@ describe('TextFieldIconManager', () => {
         text: 'سلام',
         target: el,
         selectionRange: { start: 6, end: 10 },
-        sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
+        sourceSnapshot: { scope: 'selection', targetKind: 'native', expectedSourceText: 'سلام' },
       });
     });
 
@@ -344,8 +344,55 @@ describe('TextFieldIconManager', () => {
         text: 'Hello سلام world',
         target: el,
         selectionRange: null,
-        sourceSnapshot: { scope: 'full', expectedSourceText: 'Hello سلام world' },
+        sourceSnapshot: { scope: 'full', targetKind: 'native', expectedSourceText: 'Hello سلام world' },
       });
+    });
+
+    it('sends only the contained contentEditable selection with a bookmarked CE scope', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+
+      // This file stubs window with a spread that drops getSelection;
+      // bridge the real document selection for this CE test only.
+      const hadOwnGetSelection = Object.prototype.hasOwnProperty.call(window, 'getSelection');
+      window.getSelection = () => document.getSelection();
+
+      const el = document.createElement('div');
+      el.setAttribute('contenteditable', 'true');
+      // jsdom does not reflect contenteditable IDL attributes; stub the flag
+      // the way real browsers expose it.
+      Object.defineProperty(el, 'isContentEditable', { value: true, configurable: true });
+      el.innerHTML = '<p>Hello <b>سلام</b> world</p>';
+      document.body.appendChild(el);
+
+      const boldText = el.querySelector('b').firstChild;
+      const range = document.createRange();
+      range.setStart(boldText, 0);
+      range.setEnd(boldText, 4);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+
+      await manager.executeTranslation({ targetElement: el });
+
+      expect(translateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'سلام',
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: expect.objectContaining({
+          scope: 'selection',
+          targetKind: 'contenteditable',
+          expectedSourceText: 'سلام',
+        }),
+      });
+      const sentSnapshot = translateFieldViaSmartHandler.mock.calls.at(-1)[0].sourceSnapshot;
+      expect(sentSnapshot.bookmark).toMatchObject({
+        startPath: expect.any(Array),
+        endPath: expect.any(Array),
+      });
+      expect(JSON.parse(JSON.stringify(sentSnapshot))).toEqual(sentSnapshot);
+
+      window.getSelection().removeAllRanges();
+      if (!hadOwnGetSelection) delete window.getSelection;
+      document.body.removeChild(el);
     });
 
     it('presents only marked request failures with adapted Error and canonical type metadata', async () => {

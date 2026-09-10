@@ -17,7 +17,7 @@ describe('captureFieldTranslationSource', () => {
     expect(captureFieldTranslationSource(el)).toEqual({
       text: 'سلام',
       selectionRange: { start: 6, end: 10 },
-      sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
+      sourceSnapshot: { scope: 'selection', targetKind: 'native', expectedSourceText: 'سلام' },
     });
   });
 
@@ -29,11 +29,11 @@ describe('captureFieldTranslationSource', () => {
     expect(captureFieldTranslationSource(el)).toEqual({
       text: 'Hello سلام world',
       selectionRange: null,
-      sourceSnapshot: { scope: 'full', expectedSourceText: 'Hello سلام world' },
+      sourceSnapshot: { scope: 'full', targetKind: 'native', expectedSourceText: 'Hello سلام world' },
     });
   });
 
-  it('preserves contentEditable behavior (full text, null range, no scope)', () => {
+  it('captures full canonical text with a CE full scope (no native range/refs)', () => {
     const el = document.createElement('div');
     el.contentEditable = 'true';
     el.textContent = 'hello world';
@@ -41,7 +41,11 @@ describe('captureFieldTranslationSource', () => {
     expect(captureFieldTranslationSource(el)).toEqual({
       text: 'hello world',
       selectionRange: null,
-      sourceSnapshot: null,
+      sourceSnapshot: {
+        scope: 'full',
+        targetKind: 'contenteditable',
+        expectedSourceText: 'hello world',
+      },
     });
   });
 });
@@ -51,25 +55,29 @@ describe('getFieldSourceScope', () => {
     expect(
       getFieldSourceScope(
         { start: 6, end: 10 },
-        { scope: 'selection', expectedSourceText: 'سلام' }
+        { scope: 'selection', targetKind: 'native', expectedSourceText: 'سلام' }
       )
     ).toEqual({
       scope: 'selection',
+      targetKind: 'native',
       range: { start: 6, end: 10 },
+      bookmark: null,
       expectedSourceText: 'سلام',
     });
   });
 
   it('normalizes a full descriptor carrying source identity into a canonical full scope', () => {
     expect(
-      getFieldSourceScope(null, { scope: 'full', expectedSourceText: 'Hello سلام world' })
-    ).toEqual({ scope: 'full', range: null, expectedSourceText: 'Hello سلام world' });
+      getFieldSourceScope(null, { scope: 'full', targetKind: 'native', expectedSourceText: 'Hello سلام world' })
+    ).toEqual({ scope: 'full', targetKind: 'native', range: null, bookmark: null, expectedSourceText: 'Hello سلام world' });
   });
 
   it('marks a full descriptor without source identity invalid (fail closed)', () => {
-    expect(getFieldSourceScope(null, { scope: 'full', expectedSourceText: null })).toEqual({
+    expect(getFieldSourceScope(null, { scope: 'full', targetKind: 'native', expectedSourceText: null })).toEqual({
       scope: INVALID_FIELD_SCOPE,
+      targetKind: 'native',
       range: null,
+      bookmark: null,
       expectedSourceText: null,
     });
   });
@@ -80,14 +88,18 @@ describe('getFieldSourceScope', () => {
   });
 
   it('marks an incomplete selection descriptor invalid (fail closed, no legacy fallback)', () => {
-    expect(getFieldSourceScope(null, { scope: 'selection', expectedSourceText: 'سلام' })).toEqual({
+    expect(getFieldSourceScope(null, { scope: 'selection', targetKind: 'native', expectedSourceText: 'سلام' })).toEqual({
       scope: INVALID_FIELD_SCOPE,
+      targetKind: 'native',
       range: null,
+      bookmark: null,
       expectedSourceText: null,
     });
     expect(getFieldSourceScope({ start: 6, end: 10 }, { scope: 'selection' })).toEqual({
       scope: INVALID_FIELD_SCOPE,
+      targetKind: 'native',
       range: null,
+      bookmark: null,
       expectedSourceText: null,
     });
   });
@@ -95,14 +107,76 @@ describe('getFieldSourceScope', () => {
   it('marks an unknown scope invalid (fail closed, no legacy fallback)', () => {
     expect(getFieldSourceScope(null, { scope: 'weird', expectedSourceText: null })).toEqual({
       scope: INVALID_FIELD_SCOPE,
+      targetKind: 'native',
       range: null,
+      bookmark: null,
       expectedSourceText: null,
     });
     expect(getFieldSourceScope(null, {})).toEqual({
       scope: INVALID_FIELD_SCOPE,
+      targetKind: 'native',
       range: null,
+      bookmark: null,
       expectedSourceText: null,
     });
+  });
+
+  it('rejects contradictory range representations instead of canonicalizing', () => {
+    const bookmark = { startPath: [0, 0], startOffset: 0, endPath: [0, 0], endOffset: 4 };
+    // Native selection must not carry a CE bookmark.
+    expect(
+      getFieldSourceScope({ start: 0, end: 4 }, {
+        scope: 'selection',
+        targetKind: 'native',
+        bookmark,
+        expectedSourceText: 'test',
+      }).scope
+    ).toBe(INVALID_FIELD_SCOPE);
+    // CE selection must not carry native offsets.
+    expect(
+      getFieldSourceScope({ start: 0, end: 4 }, {
+        scope: 'selection',
+        targetKind: 'contenteditable',
+        bookmark,
+        expectedSourceText: 'test',
+      }).scope
+    ).toBe(INVALID_FIELD_SCOPE);
+    // Full must not carry a range representation from either technology.
+    expect(
+      getFieldSourceScope({ start: 0, end: 4 }, {
+        scope: 'full',
+        targetKind: 'native',
+        expectedSourceText: 'full text',
+      }).scope
+    ).toBe(INVALID_FIELD_SCOPE);
+    expect(
+      getFieldSourceScope(null, {
+        scope: 'full',
+        targetKind: 'contenteditable',
+        bookmark,
+        expectedSourceText: 'full text',
+      }).scope
+    ).toBe(INVALID_FIELD_SCOPE);
+  });
+
+  it('rejects non-integer or negative bookmark offsets', () => {
+    const base = { scope: 'selection', targetKind: 'contenteditable', expectedSourceText: 'test' };
+    for (const bookmark of [
+      { startPath: [0], startOffset: 1.5, endPath: [0], endOffset: 4 },
+      { startPath: [0], startOffset: -1, endPath: [0], endOffset: 4 },
+      { startPath: [0], startOffset: 0, endPath: [0], endOffset: NaN },
+      { startPath: ['a'], startOffset: 0, endPath: [0], endOffset: 4 },
+    ]) {
+      expect(getFieldSourceScope(null, { ...base, bookmark }).scope).toBe(INVALID_FIELD_SCOPE);
+    }
+  });
+
+  it('keeps missing-targetKind native and absent legacy compat', () => {
+    // Wire descriptors predating explicit kinds are always native captures.
+    expect(
+      getFieldSourceScope({ start: 6, end: 10 }, { scope: 'selection', expectedSourceText: 'سلام' })
+    ).toMatchObject({ scope: 'selection', targetKind: 'native' });
+    expect(getFieldSourceScope(null, undefined)).toBeNull();
   });
 });
 
@@ -146,7 +220,7 @@ describe('validateFieldSourceSnapshot', () => {
     el.setSelectionRange(2, 2);
 
     expect(
-      validateFieldSourceSnapshot(el, { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' })
+      validateFieldSourceSnapshot(el, { scope: 'full', targetKind: 'native', range: null, expectedSourceText: 'Hello سلام world' })
     ).toBe(true);
   });
 
@@ -159,7 +233,7 @@ describe('validateFieldSourceSnapshot', () => {
     el.value = editedValue;
 
     expect(
-      validateFieldSourceSnapshot(el, { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' })
+      validateFieldSourceSnapshot(el, { scope: 'full', targetKind: 'native', range: null, expectedSourceText: 'Hello سلام world' })
     ).toBe(false);
   });
 
@@ -195,7 +269,7 @@ describe('resolveScopedInputRange', () => {
     expect(
       resolveScopedInputRange(el, 6, 10, {
         isCurrent: () => true,
-        fieldSource: { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' },
+        fieldSource: { scope: 'full', targetKind: 'native', range: null, expectedSourceText: 'Hello سلام world' },
       })
     ).toEqual({ start: 0, end: 16, refused: false });
   });
@@ -207,7 +281,7 @@ describe('resolveScopedInputRange', () => {
     expect(
       resolveScopedInputRange(el, null, null, {
         isCurrent: () => true,
-        fieldSource: { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' },
+        fieldSource: { scope: 'full', targetKind: 'native', range: null, expectedSourceText: 'Hello سلام world' },
       })
     ).toEqual(expect.objectContaining({ refused: true }));
     expect(el.value).toBe('Hello سلام world!');
