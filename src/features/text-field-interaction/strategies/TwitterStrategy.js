@@ -70,6 +70,12 @@ export default class TwitterStrategy extends PlatformStrategy {
       if (isSearchInput) {
         await this.applyVisualFeedback(element);
         if (!isCurrent()) return false;
+        // Scoped Field application: when a request-time scope is present, the
+        // single canonical pipeline enforces it (captured range or full) with
+        // stale validation instead of this direct full-value assignment.
+        if (applicationContext?.fieldSource) {
+          return await smartTextReplacement(element, translatedText, null, null, undefined, applicationContext);
+        }
         element.value = translatedText;
         element.dispatchEvent(new Event("input", { bubbles: true }));
         element.dispatchEvent(new Event("change", { bubbles: true }));

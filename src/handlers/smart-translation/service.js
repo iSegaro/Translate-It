@@ -32,6 +32,7 @@ import { determineReplaceMode, applyTranslation } from './executor.js';
 import { TRANSLATION_TIMEOUT, STALE_DATA_THRESHOLD } from './constants.js';
 import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
 import { markFieldTranslationRequestError } from './translationErrorOwnership.js';
+import { getFieldSourceScope } from '@/features/text-field-interaction/utils/framework/framework-compat/fieldSourceSnapshot.js';
 import { translationRequestTracker } from '@/core/services/translation/TranslationRequestTracker.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'SmartTranslationService');
@@ -68,8 +69,13 @@ function isSuccessfulFieldApplication(result) {
 
 /**
  * Main entry point for field translation
+ * @param {Object} params - Translation params
+ * @param {string} params.text - Actual submitted text (selected substring when a selection exists, else full value)
+ * @param {HTMLElement} params.target - Target field element
+ * @param {{start:number,end:number}|null} [params.selectionRange] - Request-time selection range for INPUT/TEXTAREA
+ * @param {{scope:'selection'|'full',expectedSelectedText:string|null}|null} [params.sourceSnapshot] - Request-time scope descriptor
  */
-export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, tabId, toastId }) {
+export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, sourceSnapshot = null, tabId, toastId }) {
   const localNotificationManager = new NotificationManager();
   logger.info('Translation field request', { targetTag: target?.tagName });
 
@@ -141,7 +147,7 @@ export async function translateFieldViaSmartHandler({ text, target, selectionRan
     ownership.toastId = currentToastId;
     
     if (!isCurrent()) return;
-    myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId, ownership);
+    myData = storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, currentToastId, messageId, ownership, text, sourceSnapshot);
     if (!myData || !isCurrent()) return;
     inheritedPendingAdopted = true;
     if (inheritedState && inheritedState !== ownership) {
@@ -442,6 +448,11 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
     const mode = pendingData?.mode || translationMode;
     const platform = detectSite();
     const selectionRange = pendingData?.selectionRange || null;
+    // Request-time scope descriptor; Copy mode translates/copies only the
+    // selection and never mutates the field.
+    const sourceSnapshot = pendingData?.sourceSnapshot || null;
+    // Canonical scope consumed by the shared pipeline across every strategy.
+    const fieldSource = getFieldSourceScope(selectionRange, sourceSnapshot);
     const tabId = pendingData?.tabId || null;
 
     if (toastId) notifier.dismiss(toastId);
@@ -478,7 +489,8 @@ async function processTranslationToTextFieldInternal(translatedText, originalTex
          target,
          toastId,
          ownership ? {
-           isCurrent: () => isCurrentFieldTranslationRequest(ownership.target, ownership)
+           isCurrent: () => isCurrentFieldTranslationRequest(ownership.target, ownership),
+           fieldSource
          } : null
        );
        if (applicationResult?.mode === 'stale') return applicationResult;

@@ -48,6 +48,8 @@ export function cleanupSupersededFieldTranslationState(previousOwnership) {
     window.pendingTranslationPlatform = null;
     window.pendingTranslationTabId = null;
     window.pendingSelectionRange = null;
+    window.pendingSourceSnapshot = null;
+    window.pendingSubmittedText = null;
     window.pendingTranslationTimestamp = null;
     window.pendingTranslationToastId = null;
   }
@@ -178,8 +180,19 @@ export function clearPendingNotificationData(context = 'cleanup', ownership = nu
 
 /**
  * Store pending translation data
+ * @param {HTMLElement} target - Target element
+ * @param {string} mode - Translation mode
+ * @param {string} platform - Platform
+ * @param {number} tabId - Tab ID
+ * @param {{start:number,end:number}|null} selectionRange - Request-time selection range
+ * @param {number} timestamp - Request timestamp
+ * @param {string} toastId - Toast ID
+ * @param {string|null} messageId - Message ID
+ * @param {Object|null} ownership - Latest-request ownership
+ * @param {string|null} submittedText - Actual submitted text (selection or full value); falls back to live DOM read for legacy callers
+ * @param {{scope:'selection'|'full',expectedSelectedText:string|null}|null} sourceSnapshot - Request-time scope descriptor for partial replace
  */
-export function storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId = null, ownership = null) {
+export function storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId = null, ownership = null, submittedText = null, sourceSnapshot = null) {
   if (ownership && !isCurrentFieldTranslationRequest(target, ownership)) return null;
 
   let targetId = target?.id || null;
@@ -201,8 +214,11 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
     }
   }
 
+  // requestData.text must represent the actual submitted text (selection or full
+  // value), not a live re-read of target.value which would lose selection scope.
+  const submittedSourceText = submittedText ?? (target ? target.value || target.textContent : '');
   const requestData = {
-    text: target ? target.value || target.textContent : '',
+    text: submittedSourceText,
     targetLanguage: 'fa',
     sourceLanguage: 'auto',
     mode: TranslationMode.Field,
@@ -213,6 +229,7 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
     elementClassName: target?.className,
     toastId,
     selectionRange,
+    sourceSnapshot: sourceSnapshot ?? null,
     context: 'field-translation'
   };
 
@@ -231,7 +248,9 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
   }
 
   const data = {
-    target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, targetId, targetSelector, ownership
+    target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, targetId, targetSelector, ownership,
+    submittedText: submittedSourceText,
+    sourceSnapshot: sourceSnapshot ?? null,
   };
 
   if (ownership) {
@@ -258,6 +277,8 @@ export function storePendingTranslationData(target, mode, platform, tabId, selec
   window.pendingTranslationPlatform = platform;
   window.pendingTranslationTabId = tabId;
   window.pendingSelectionRange = selectionRange;
+  window.pendingSourceSnapshot = sourceSnapshot ?? null;
+  window.pendingSubmittedText = submittedSourceText;
   window.pendingTranslationTimestamp = timestamp;
   window.pendingTranslationToastId = toastId;
   window.pendingTranslationOwner = ownership;
@@ -284,7 +305,9 @@ export function getPendingTranslationData(fallbackTarget, toastId, ownership = n
         mode: request.mode,
         platform: request.metadata.platform,
         tabId: request.metadata.tabId,
-        selectionRange: request.metadata.selectionRange,
+        selectionRange: request.metadata.selectionRange ?? request.data?.selectionRange ?? null,
+        sourceSnapshot: request.data?.sourceSnapshot ?? null,
+        submittedText: request.data?.text ?? request.metadata?.originalText ?? null,
         timestamp: request.timestamp,
         toastId: request.metadata.toastId,
         messageId: request.messageId,
@@ -305,7 +328,9 @@ export function getPendingTranslationData(fallbackTarget, toastId, ownership = n
           mode: request.mode,
           platform: request.metadata.platform,
           tabId: request.metadata.tabId,
-          selectionRange: request.metadata.selectionRange,
+          selectionRange: request.metadata.selectionRange ?? request.data?.selectionRange ?? null,
+          sourceSnapshot: request.data?.sourceSnapshot ?? null,
+          submittedText: request.data?.text ?? request.metadata?.originalText ?? null,
           timestamp: request.timestamp,
           toastId: request.metadata.toastId,
           messageId: request.messageId,
@@ -334,6 +359,8 @@ export function getPendingTranslationData(fallbackTarget, toastId, ownership = n
       platform: window.pendingTranslationPlatform,
       tabId: window.pendingTranslationTabId,
       selectionRange: window.pendingSelectionRange,
+      sourceSnapshot: window.pendingSourceSnapshot ?? null,
+      submittedText: window.pendingSubmittedText ?? null,
       timestamp: window.pendingTranslationTimestamp,
       toastId: window.pendingTranslationToastId
     };
@@ -362,6 +389,8 @@ export function clearPendingTranslationData(specificToastId, ownership = null) {
   window.pendingTranslationPlatform = null;
   window.pendingTranslationTabId = null;
   window.pendingSelectionRange = null;
+  window.pendingSourceSnapshot = null;
+  window.pendingSubmittedText = null;
   window.pendingTranslationTimestamp = null;
   window.pendingTranslationToastId = null;
 

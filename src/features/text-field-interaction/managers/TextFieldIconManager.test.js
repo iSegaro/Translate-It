@@ -307,9 +307,45 @@ describe('TextFieldIconManager', () => {
       
       expect(translateFieldViaSmartHandler).toHaveBeenCalledWith({
         text: 'hello',
-        target: el
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
       });
       expect(spy).toHaveBeenCalledWith(el);
+    });
+
+    it('sends only the selected substring with its request-time range (selection scope)', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+
+      const el = document.createElement('textarea');
+      el.value = 'Hello سلام world';
+      el.setSelectionRange(6, 10);
+
+      await manager.executeTranslation({ targetElement: el });
+
+      expect(translateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'سلام',
+        target: el,
+        selectionRange: { start: 6, end: 10 },
+        sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+      });
+    });
+
+    it('sends the full value with an explicit full scope when nothing is selected (full-field)', async () => {
+      const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
+
+      const el = document.createElement('textarea');
+      el.value = 'Hello سلام world';
+      el.setSelectionRange(0, 0);
+
+      await manager.executeTranslation({ targetElement: el });
+
+      expect(translateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'Hello سلام world',
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+      });
     });
 
     it('presents only marked request failures with adapted Error and canonical type metadata', async () => {

@@ -39,26 +39,37 @@ export async function optimizedTextInsertion(
   if (!isCurrent()) return false;
 
   const strategy = detectOptimalStrategy(element);
-  const hasSelection = checkTextSelection(element);
 
   logger.debug('Using optimized insertion strategy', { strategy, hostname: typeof window !== 'undefined' ? window.location.hostname : '' });
 
-  // تنظیم انتخاب در صورت نیاز
+  // تنظیم انتخاب در صورت نیاز (authoritative: explicit range first, so the
+  // effective selection below describes it rather than the old live state)
   if (start !== null && end !== null) {
-    if (element.isContentEditable && typeof window !== 'undefined') {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      const textNode = findTextNodeAtPosition(element, start);
-      if (textNode) {
-        range.setStart(textNode, Math.min(start, textNode.textContent.length));
-        range.setEnd(textNode, Math.min(end, textNode.textContent.length));
-        selection.removeAllRanges();
-        selection.addRange(range);
+    try {
+      if (element.isContentEditable && typeof window !== 'undefined') {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        const textNode = findTextNodeAtPosition(element, start);
+        if (textNode) {
+          range.setStart(textNode, Math.min(start, textNode.textContent.length));
+          range.setEnd(textNode, Math.min(end, textNode.textContent.length));
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } else {
+        element.setSelectionRange(start, end);
       }
-    } else {
-      element.setSelectionRange(start, end);
+    } catch (installError) {
+      // Capability-safe (e.g. INPUT types without selection support): keep the
+      // live selection; downstream layers fail safe on their own guards.
+      logger.debug('Explicit range install failed, keeping live selection', installError);
     }
   }
+
+  // Describe the EFFECTIVE selection for downstream layers. Reading live state
+  // before installing the explicit range would hand exec/paste layers a stale
+  // hasSelection=false, making them select-all and full-replace a scoped request.
+  const hasSelection = checkTextSelection(element);
 
   switch (strategy) {
     case "google-docs": {

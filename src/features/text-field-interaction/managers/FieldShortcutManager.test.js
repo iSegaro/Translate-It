@@ -305,10 +305,52 @@ describe('FieldShortcutManager', () => {
       expect(result.type).toBe('ctrl-slash');
       expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
         text: 'hello',
-        target: el
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
       });
       expect(errorHandler.handle).not.toHaveBeenCalled();
       
+      document.body.removeChild(el);
+    });
+
+    it('sends only the selected substring with its request-time range (selection scope)', async () => {
+      const el = document.createElement('textarea');
+      el.value = 'Hello سلام world';
+      document.body.appendChild(el);
+      el.focus();
+      // Select "سلام" (indices 6-10)
+      el.setSelectionRange(6, 10);
+
+      const result = await manager.execute();
+
+      expect(result.success).toBe(true);
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'سلام',
+        target: el,
+        selectionRange: { start: 6, end: 10 },
+        sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+      });
+
+      document.body.removeChild(el);
+    });
+
+    it('sends the full value with an explicit full scope when nothing is selected (full-field)', async () => {
+      const el = document.createElement('textarea');
+      el.value = 'Hello سلام world';
+      document.body.appendChild(el);
+      el.focus();
+      el.setSelectionRange(0, 0);
+
+      await manager.execute();
+
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'Hello سلام world',
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+      });
+
       document.body.removeChild(el);
     });
 

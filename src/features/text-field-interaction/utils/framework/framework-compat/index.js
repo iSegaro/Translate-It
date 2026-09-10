@@ -3,6 +3,7 @@
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { checkTextSelection } from "./selectionUtils.js";
+import { resolveScopedInputRange } from "./fieldSourceSnapshot.js";
 import { simulateNaturalTyping } from "./naturalTyping.js";
 import {
   universalTextInsertion,
@@ -31,6 +32,20 @@ export async function smartTextReplacement(
   if (!element) return false;
   const isCurrent = applicationContext?.isCurrent || (() => true);
   if (!isCurrent()) return false;
+
+  // Canonical request-time Field scope (Issue #201): when applicationContext
+  // carries fieldSource for a native INPUT/TEXTAREA, the captured scope is
+  // authoritative over both the passed range and the live DOM selection, so a
+  // later caret/selection movement can never redirect the output. Absent
+  // descriptors (legacy direct callers) and contentEditable flow through
+  // untouched. A refused (stale) scope must never mutate.
+  const scoped = resolveScopedInputRange(element, start, end, applicationContext);
+  if (scoped.refused) {
+    logger.debug('Refusing scoped field replacement: stale source snapshot');
+    return false;
+  }
+  start = scoped.start;
+  end = scoped.end;
 
   try {
     logger.debug('Starting text replacement with strategies', {
@@ -128,6 +143,7 @@ export async function smartTextReplacement(
 // Re-export all the necessary functions for backward compatibility
 export { isComplexEditor } from "./editorDetection.js";
 export { checkTextSelection } from "./selectionUtils.js";
+export { captureFieldTranslationSource, validateFieldSourceSnapshot, getFieldSourceScope, resolveScopedInputRange, INVALID_FIELD_SCOPE } from "./fieldSourceSnapshot.js";
 export { simulateNaturalTyping } from "./naturalTyping.js";
 export {
   universalTextInsertion,

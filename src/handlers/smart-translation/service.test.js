@@ -206,7 +206,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       mocks.activeAbortControllers.delete(requestTarget);
       return true;
     });
-    mocks.storePendingTranslationData.mockImplementation((target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, ownership) => {
+    mocks.storePendingTranslationData.mockImplementation((target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId, ownership, submittedText = null, sourceSnapshot = null) => {
       const data = {
         target,
         mode,
@@ -217,6 +217,8 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
         toastId,
         messageId,
         ownership,
+        submittedText,
+        sourceSnapshot,
       };
       if (ownership) {
         ownership.data = data;
@@ -1261,6 +1263,85 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
 
     expect(field.value).toBe('translated B');
     expect(mocks.applyTranslation).toHaveBeenCalledTimes(1);
+    document.body.removeChild(field);
+  });
+
+  it('forwards the request-time selection range and snapshot into pending storage', async () => {
+    const field = document.createElement('textarea');
+    field.value = 'Hello سلام world';
+    document.body.appendChild(field);
+    field.focus();
+
+    await expect(translateFieldViaSmartHandler({
+      text: 'سلام',
+      target: field,
+      selectionRange: { start: 6, end: 10 },
+      sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+    })).resolves.toBeUndefined();
+
+    expect(mocks.storePendingTranslationData).toHaveBeenCalledWith(
+      field,
+      expect.anything(),
+      expect.anything(),
+      undefined,
+      { start: 6, end: 10 },
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      'سلام',
+      { scope: 'selection', expectedSelectedText: 'سلام' }
+    );
+    // Provider receives only the selected substring, never the full field.
+    const sentMessage = mocks.safeSendMessage.mock.calls.find(
+      ([message]) => message?.action === 'TRANSLATE'
+    )?.[0];
+    expect(sentMessage?.data?.text).toBe('سلام');
+    // The apply path receives the canonical scope via applicationContext.
+    expect(mocks.applyTranslation).toHaveBeenCalledWith(
+      expect.anything(),
+      { start: 6, end: 10 },
+      expect.anything(),
+      null,
+      field,
+      expect.anything(),
+      expect.objectContaining({
+        fieldSource: expect.objectContaining({ scope: 'selection' }),
+      })
+    );
+
+    document.body.removeChild(field);
+  });
+
+  it('copies only the selection translation in Copy mode without mutating the field', async () => {
+    const field = document.createElement('textarea');
+    field.value = 'Hello سلام world';
+    document.body.appendChild(field);
+    field.focus();
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    mocks.determineReplaceMode.mockResolvedValue(false);
+    mocks.safeSendMessage.mockResolvedValue({
+      success: true,
+      translatedText: 'hello',
+      originalText: 'سلام',
+    });
+
+    await expect(translateFieldViaSmartHandler({
+      text: 'سلام',
+      target: field,
+      selectionRange: { start: 6, end: 10 },
+      sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+    })).resolves.toBeUndefined();
+
+    expect(writeText).toHaveBeenCalledWith('hello');
+    expect(field.value).toBe('Hello سلام world');
+    expect(mocks.applyTranslation).not.toHaveBeenCalled();
+
     document.body.removeChild(field);
   });
 });
