@@ -152,7 +152,7 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
 
     // Save should run!
     expect(mockSaveSettings).toHaveBeenCalled();
-    expect(mockSaveSettings).toHaveBeenCalledWith(true);
+    expect(mockSaveSettings).toHaveBeenCalledWith();
     expect(safeSendMessageMock).toHaveBeenCalledWith(
       {
         action: 'SETTINGS_UPDATED',
@@ -273,7 +273,7 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
     await wrapper.find('#saveSettings').trigger('click');
     await flushPromises();
 
-    expect(mockSaveSettings).toHaveBeenCalledWith(true);
+    expect(mockSaveSettings).toHaveBeenCalledWith();
     expect(mockSettingsStore.settings.PROMPT_TEMPLATE).toBe('invalid draft template');
     expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_WITH_PROMPT_ERRORS');
     expect(wrapper.find('#status').classes()).toContain('status-warning');
@@ -311,7 +311,7 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
     await wrapper.find('#saveSettings').trigger('click');
     await flushPromises();
 
-    expect(mockSaveSettings).toHaveBeenCalledWith(true);
+    expect(mockSaveSettings).toHaveBeenCalledWith();
     expect(mockSettingsStore.settings.PROMPT_TEMPLATE).toBe('invalid draft template');
     expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_WITH_PROMPT_ERRORS');
     expect(wrapper.find('#status').classes()).toContain('status-warning');

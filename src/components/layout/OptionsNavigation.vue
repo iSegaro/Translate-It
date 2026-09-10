@@ -127,7 +127,7 @@ const performPartialSave = async (errors) => {
     }
 
     // 3. Save the rest of settings (which are valid)
-    await settingsStore.saveAllSettings(true)
+    await settingsStore.saveAllSettings()
     logger.debug('Valid settings saved successfully; invalid prompts were ignored.')
 
     // 4. Trigger cross-context updates

@@ -648,6 +648,9 @@ $_{TEXT}
 $_{TEXT}`,
   /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
 
+  /*--- Prompt editor UI state (Options page only, not a prompt template) ---*/
+  PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_TEMPLATE',
+
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- Translate the input text from $_{SOURCE} (or any other language) into $_{TARGET}.
 - Produce fluent, natural, and idiomatic translations as if written by a native speaker.

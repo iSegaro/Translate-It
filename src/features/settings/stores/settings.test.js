@@ -5,6 +5,7 @@ import useSettingsStore from './settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
 import { SelectionTranslationMode, CONFIG, TranslationMode } from '@/shared/config/config.js';
+import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js';
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 
@@ -140,7 +141,7 @@ describe('Settings Store', () => {
     store.settings.SHOW_MOBILE_FAB = false;
     store.settings.selectionTranslationMode = SelectionTranslationMode.ON_FAB_CLICK;
 
-    await store.saveAllSettings(true);
+    await store.saveAllSettings();
     await nextTick();
 
     expect(store.settings.selectionTranslationMode).toBe(SelectionTranslationMode.ON_CLICK);
@@ -205,7 +206,7 @@ describe('Settings Store', () => {
     store.updateSettingLocally('PROMPT_BASE_FIELD', customPrompt);
     
     // 2. Save
-    await store.saveAllSettings(true);
+    await store.saveAllSettings();
     expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
       PROMPT_BASE_FIELD: customPrompt
     }));
@@ -219,6 +220,103 @@ describe('Settings Store', () => {
     await nextTick();
     
     expect(store.settings.PROMPT_BASE_FIELD).toBe(customPrompt);
+  });
+
+  describe('saveAllSettings immediate persistence', () => {
+    it('invokes persistence immediately without timer', async () => {
+      const store = useSettingsStore();
+
+      const savePromise = store.saveAllSettings();
+
+      // No timer advance: the storage write must already be underway.
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+
+      await savePromise;
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+    });
+
+    it('Promise resolves only after storage resolves', async () => {
+      const store = useSettingsStore();
+      let resolveStorage;
+      storageManager.set.mockImplementationOnce(
+        () => new Promise((resolve) => { resolveStorage = resolve; })
+      );
+
+      let settled = false;
+      const savePromise = store.saveAllSettings().then((result) => {
+        settled = true;
+        return result;
+      });
+
+      await Promise.resolve();
+      await nextTick();
+
+      // Storage still pending: save must not have settled.
+      expect(settled).toBe(false);
+
+      resolveStorage(true);
+      const result = await savePromise;
+
+      expect(result).toBe(true);
+      expect(settled).toBe(true);
+    });
+
+    it('multiple concurrent saves settle correctly', async () => {
+      const store = useSettingsStore();
+      storageManager.set.mockResolvedValue(true);
+
+      const results = await Promise.all([store.saveAllSettings(), store.saveAllSettings()]);
+
+      expect(results).toEqual([true, true]);
+      expect(storageManager.set).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('PROMPT_EDITOR_SELECTED_KEY persistence lifecycle', () => {
+    it("persists the selected prompt editor key via saveAllSettings", async () => {
+      // PROMPT_BASE_FIELD must stay editable in PROMPT_REGISTRY for this
+      // lifecycle coverage; pick another editable key if the registry changes.
+      expect(PROMPT_REGISTRY['PROMPT_BASE_FIELD']?.editable).toBe(true);
+
+      const store = useSettingsStore();
+      store.settings.PROMPT_EDITOR_SELECTED_KEY = 'PROMPT_BASE_FIELD';
+
+      await store.saveAllSettings();
+
+      expect(storageManager.set).toHaveBeenCalledWith(
+        expect.objectContaining({ PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_BASE_FIELD' })
+      );
+    });
+
+    it('restores the selected key on a fresh store via loadSettings', async () => {
+      storageManager.get.mockResolvedValue({ PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_BASE_FIELD' });
+
+      const store = useSettingsStore();
+      store.isInitialized = false;
+      await store.loadSettings();
+      await nextTick();
+
+      expect(store.settings.PROMPT_EDITOR_SELECTED_KEY).toBe('PROMPT_BASE_FIELD');
+    });
+
+    it('stale stored value keeps raw value but normalizes effectively to PROMPT_TEMPLATE', async () => {
+      storageManager.get.mockResolvedValue({ PROMPT_EDITOR_SELECTED_KEY: 'STALE_REMOVED_KEY' });
+
+      const store = useSettingsStore();
+      store.isInitialized = false;
+      await store.loadSettings();
+      await nextTick();
+
+      // Store boundary: loadSettings does not rewrite stale values in place.
+      expect(store.settings.PROMPT_EDITOR_SELECTED_KEY).toBe('STALE_REMOVED_KEY');
+
+      // Effective selection mirrors PromptTab's guarded getter: only editable
+      // registry entries are effective, everything else falls back.
+      const stored = store.settings.PROMPT_EDITOR_SELECTED_KEY;
+      const effective =
+        PROMPT_REGISTRY[stored]?.editable === true ? stored : 'PROMPT_TEMPLATE';
+      expect(effective).toBe('PROMPT_TEMPLATE');
+    });
   });
 
   describe('Import & Migration Flow', () => {

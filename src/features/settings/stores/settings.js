@@ -154,18 +154,8 @@ export const useSettingsStore = defineStore('settings', () => {
     return __loadInFlight;
   }
   
-  // Debounced save (simple trailing debounce)
-  let __saveTimer = null;
-  const saveAllSettings = async (immediate = false) => {
-    if (immediate) {
-      clearTimeout(__saveTimer);
-      return performSave();
-    }
-    return new Promise((resolve, reject) => {
-      clearTimeout(__saveTimer);
-      __saveTimer = setTimeout(() => performSave().then(resolve).catch(reject), 120);
-    });
-  }
+  // Immediate save: resolves only after the storage operation finishes.
+  const saveAllSettings = async () => performSave()
 
   /**
    * Sanitizes settings before saving to prevent logical inconsistencies.
