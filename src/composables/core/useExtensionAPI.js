@@ -185,6 +185,13 @@ export function useExtensionAPI() {
     return await sendMessage(MessageActions.TEST_PROVIDER_CONNECTION, { provider, config });
   };
 
+  // Custom Test Connection runs probeCustomConnection in background so its
+  // capability writes land where CustomProvider reads them. Config carries
+  // exact unsaved { apiUrl, apiModel, apiKey } values; nothing is persisted.
+  const testCustomConnection = async (config) => {
+    return await sendMessage(MessageActions.TEST_CUSTOM_CONNECTION, { config });
+  };
+
   const saveProviderConfig = async (provider, config) => {
     return await sendMessage(MessageActions.UPDATE_PROVIDER_CONFIG, { provider, ...config });
   };
@@ -266,6 +273,7 @@ export function useExtensionAPI() {
 
     // Provider methods
     testProviderConnection,
+    testCustomConnection,
     saveProviderConfig,
     getProviderConfig,
 
