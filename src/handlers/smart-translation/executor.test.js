@@ -53,7 +53,7 @@ describe('applyTranslation canonical Field scope', () => {
     const fieldSource = {
       scope: 'selection',
       range: { start: 6, end: 10 },
-      expectedSelectedText: 'سلام',
+      expectedSourceText: 'سلام',
     };
 
     await applyTranslation('hello', { start: 6, end: 10 }, 'default', null, field, null, {

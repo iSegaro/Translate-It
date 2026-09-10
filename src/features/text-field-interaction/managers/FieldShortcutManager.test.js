@@ -307,7 +307,7 @@ describe('FieldShortcutManager', () => {
         text: 'hello',
         target: el,
         selectionRange: null,
-        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+        sourceSnapshot: { scope: 'full', expectedSourceText: 'hello' },
       });
       expect(errorHandler.handle).not.toHaveBeenCalled();
       
@@ -329,7 +329,7 @@ describe('FieldShortcutManager', () => {
         text: 'سلام',
         target: el,
         selectionRange: { start: 6, end: 10 },
-        sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+        sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
       });
 
       document.body.removeChild(el);
@@ -348,7 +348,7 @@ describe('FieldShortcutManager', () => {
         text: 'Hello سلام world',
         target: el,
         selectionRange: null,
-        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+        sourceSnapshot: { scope: 'full', expectedSourceText: 'Hello سلام world' },
       });
 
       document.body.removeChild(el);

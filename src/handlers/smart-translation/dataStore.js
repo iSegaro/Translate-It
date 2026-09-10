@@ -190,7 +190,7 @@ export function clearPendingNotificationData(context = 'cleanup', ownership = nu
  * @param {string|null} messageId - Message ID
  * @param {Object|null} ownership - Latest-request ownership
  * @param {string|null} submittedText - Actual submitted text (selection or full value); falls back to live DOM read for legacy callers
- * @param {{scope:'selection'|'full',expectedSelectedText:string|null}|null} sourceSnapshot - Request-time scope descriptor for partial replace
+ * @param {{scope:'selection'|'full',expectedSourceText:string|null}|null} sourceSnapshot - Request-time scope descriptor for partial replace
  */
 export function storePendingTranslationData(target, mode, platform, tabId, selectionRange, timestamp, toastId, messageId = null, ownership = null, submittedText = null, sourceSnapshot = null) {
   if (ownership && !isCurrentFieldTranslationRequest(target, ownership)) return null;

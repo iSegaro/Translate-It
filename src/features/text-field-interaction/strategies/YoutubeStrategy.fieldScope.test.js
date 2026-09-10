@@ -19,7 +19,7 @@ import YoutubeStrategy from './YoutubeStrategy.js';
 const selectionScope = {
   scope: 'selection',
   range: { start: 6, end: 10 },
-  expectedSelectedText: 'سلام',
+  expectedSourceText: 'سلام',
 };
 
 describe('YoutubeStrategy canonical Field scope', () => {

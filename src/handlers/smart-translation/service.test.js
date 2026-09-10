@@ -1276,7 +1276,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       text: 'سلام',
       target: field,
       selectionRange: { start: 6, end: 10 },
-      sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+      sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
     })).resolves.toBeUndefined();
 
     expect(mocks.storePendingTranslationData).toHaveBeenCalledWith(
@@ -1290,7 +1290,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       expect.anything(),
       expect.anything(),
       'سلام',
-      { scope: 'selection', expectedSelectedText: 'سلام' }
+      { scope: 'selection', expectedSourceText: 'سلام' }
     );
     // Provider receives only the selected substring, never the full field.
     const sentMessage = mocks.safeSendMessage.mock.calls.find(
@@ -1335,7 +1335,7 @@ describe('translateFieldViaSmartHandler translation ownership', () => {
       text: 'سلام',
       target: field,
       selectionRange: { start: 6, end: 10 },
-      sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+      sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
     })).resolves.toBeUndefined();
 
     expect(writeText).toHaveBeenCalledWith('hello');

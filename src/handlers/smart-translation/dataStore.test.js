@@ -301,18 +301,18 @@ describe('Field request ownership data store', () => {
       'message-selection',
       ownership,
       'سلام',
-      { scope: 'selection', expectedSelectedText: 'سلام' }
+      { scope: 'selection', expectedSourceText: 'سلام' }
     );
 
     expect(data.selectionRange).toEqual({ start: 6, end: 10 });
-    expect(data.sourceSnapshot).toEqual({ scope: 'selection', expectedSelectedText: 'سلام' });
+    expect(data.sourceSnapshot).toEqual({ scope: 'selection', expectedSourceText: 'سلام' });
     expect(data.submittedText).toBe('سلام');
     expect(mocks.tracker.createRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           text: 'سلام',
           selectionRange: { start: 6, end: 10 },
-          sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+          sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
         }),
       })
     );

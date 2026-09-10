@@ -19,7 +19,7 @@ import TwitterStrategy from './TwitterStrategy.js';
 const selectionScope = {
   scope: 'selection',
   range: { start: 6, end: 10 },
-  expectedSelectedText: 'سلام',
+  expectedSourceText: 'سلام',
 };
 
 describe('TwitterStrategy search INPUT canonical Field scope', () => {
@@ -44,7 +44,7 @@ describe('TwitterStrategy search INPUT canonical Field scope', () => {
     document.body.removeChild(field);
   });
 
-  it('emits bubbling input/change events for accepted scoped updates (Field contract)', async () => {
+  it('emits exactly one bubbling input and one bubbling change event (Field contract)', async () => {
     const strategy = new TwitterStrategy(null, { handle: vi.fn() });
 
     const field = document.createElement('input');
@@ -64,16 +64,11 @@ describe('TwitterStrategy search INPUT canonical Field scope', () => {
     });
 
     expect(result).toBe(true);
-    // Field contract: the accepted update surfaces as bubbling input/change,
-    // like the legacy direct assignment did — no loss of notifications.
-    // Note: environments without document.execCommand (jsdom) may observe one
-    // extra synthetic input from the shared pipeline's beforeinput simulation
-    // layer; that pre-existing trait affects every strategy path equally and
-    // is not introduced by scoped application.
-    const inputs = seen.filter((event) => event.type === 'input');
-    const changes = seen.filter((event) => event.type === 'change');
-    expect(inputs.length).toBeGreaterThanOrEqual(1);
-    expect(changes.length).toBeGreaterThanOrEqual(1);
+    // Same contract as the legacy direct assignment (one input + one change,
+    // both bubbling): the beforeinput layer yields without events when it does
+    // not mutate, so the single succeeding fallback owns mutation+events.
+    expect(seen.filter((event) => event.type === 'input')).toHaveLength(1);
+    expect(seen.filter((event) => event.type === 'change')).toHaveLength(1);
     expect(seen.every((event) => event.bubbles)).toBe(true);
 
     document.body.removeChild(field);

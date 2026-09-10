@@ -19,9 +19,9 @@ import { smartTextReplacement } from './index.js';
 const selectionScope = {
   scope: 'selection',
   range: { start: 6, end: 10 },
-  expectedSelectedText: 'سلام',
+  expectedSourceText: 'سلام',
 };
-const fullScope = { scope: 'full', range: null, expectedSelectedText: null };
+const fullScope = { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' };
 
 describe('smartTextReplacement canonical Field scope', () => {
   it('replaces only the captured range and preserves prefix/suffix', async () => {
@@ -89,6 +89,44 @@ describe('smartTextReplacement canonical Field scope', () => {
 
     expect(result).toBe(false);
     expect(field.value).toBe('Hello CHANGED world');
+
+    document.body.removeChild(field);
+  });
+
+  it('applies a full-field replace when the value is unedited, caret movement included', async () => {
+    const field = document.createElement('textarea');
+    field.value = 'Hello سلام world';
+    document.body.appendChild(field);
+    // Caret/selection-only movement never changes element value: still valid.
+    field.setSelectionRange(2, 2);
+
+    const result = await smartTextReplacement(field, 'all new', null, null, true, {
+      isCurrent: () => true,
+      fieldSource: fullScope,
+    });
+
+    expect(result).toBe(true);
+    expect(field.value).toBe('all new');
+
+    document.body.removeChild(field);
+  });
+
+  it.each([
+    ['appended suffix', 'Hello سلام world!'],
+    ['deleted text', 'Hello سلام'],
+    ['changed text', 'Hello CHANGED world'],
+  ])('refuses a full-field replace when the value was edited (%s), no overwrite', async (_label, editedValue) => {
+    const field = document.createElement('textarea');
+    field.value = editedValue;
+    document.body.appendChild(field);
+
+    const result = await smartTextReplacement(field, 'all new', null, null, true, {
+      isCurrent: () => true,
+      fieldSource: fullScope,
+    });
+
+    expect(result).toBe(false);
+    expect(field.value).toBe(editedValue);
 
     document.body.removeChild(field);
   });

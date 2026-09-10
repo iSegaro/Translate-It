@@ -11,17 +11,20 @@ const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'fieldSourceSnapshot');
  * @typedef {Object} FieldTranslationSource
  * @property {string} text - Exact text submitted for translation (selected substring or full value).
  * @property {{start:number,end:number}|null} selectionRange - Request-time range for INPUT/TEXTAREA, else null.
- * @property {{scope:'selection'|'full',expectedSelectedText:string|null}|null} sourceSnapshot - Request-time scope descriptor for partial replace, else null.
+ * @property {{scope:'selection'|'full',expectedSourceText:string|null}|null} sourceSnapshot - Request-time scope descriptor carrying the one canonical source-identity field, else null.
  */
 
 /**
  * Canonical request-time Field source scope for normal INPUT/TEXTAREA.
  * This is the single structured shape consumed on the apply path. It is
- * authoritative: later caret/selection movement must NEVER change it.
+ * authoritative: later caret/selection movement must NEVER change it; only a
+ * source-text edit invalidates it. Validation reads exactly one descriptor
+ * field (`expectedSourceText`): the selected substring for selection scope,
+ * the full value for full scope.
  * @typedef {Object} FieldSourceScope
  * @property {'selection'|'full'|'invalid'} scope - 'selection' replaces only the captured range; 'full' replaces the whole field; 'invalid' is a present-but-malformed descriptor that must fail closed (no mutation).
  * @property {{start:number,end:number}|null} range - Captured offsets when scope is 'selection', else null.
- * @property {string|null} expectedSelectedText - Exact selected substring when scope is 'selection', else null.
+ * @property {string|null} expectedSourceText - Exact source text submitted at request time.
  */
 
 /**
@@ -35,8 +38,9 @@ export const INVALID_FIELD_SCOPE = 'invalid';
  *
  * For normal INPUT/TEXTAREA: when selectionStart/End are valid numbers and
  * non-collapsed, the exact selected substring is captured with its {start,end}
- * range plus an explicit scope descriptor. Otherwise the full value is returned
- * with an explicit full scope (existing full-field behavior preserved).
+ * range plus an explicit scope descriptor. Otherwise the full value is captured
+ * with an explicit full scope carrying the full value as source identity, so a
+ * later text edit (not mere caret/selection movement) invalidates the apply.
  *
  * For contentEditable: preserves existing behavior (full textContent, null range).
  * contentEditable ranges are intentionally NOT refactored here.
@@ -69,7 +73,7 @@ export function captureFieldTranslationSource(element) {
           tagName,
           type: element.type,
         });
-        return { text: fullValue, selectionRange: null, sourceSnapshot: { scope: 'full', expectedSelectedText: null } };
+        return { text: fullValue, selectionRange: null, sourceSnapshot: { scope: 'full', expectedSourceText: fullValue } };
       }
 
       const isValidRange =
@@ -95,7 +99,7 @@ export function captureFieldTranslationSource(element) {
           selectionRange: { start, end },
           sourceSnapshot: {
             scope: 'selection',
-            expectedSelectedText: selectedText,
+            expectedSourceText: selectedText,
           },
         };
       }
@@ -104,7 +108,7 @@ export function captureFieldTranslationSource(element) {
         tagName,
         textLength: fullValue.length,
       });
-      return { text: fullValue, selectionRange: null, sourceSnapshot: { scope: 'full', expectedSelectedText: null } };
+      return { text: fullValue, selectionRange: null, sourceSnapshot: { scope: 'full', expectedSourceText: fullValue } };
     }
 
     // contentEditable: preserve existing behavior (full text, no range refactor).
@@ -142,7 +146,7 @@ export function captureFieldTranslationSource(element) {
  *   scope with null range or missing expected text): fail closed, no mutation.
  *
  * @param {{start:number,end:number}|null} selectionRange - Stored request-time range
- * @param {{scope:string,expectedSelectedText:string|null}|null} sourceSnapshot - Stored request-time scope descriptor
+ * @param {{scope:string,expectedSourceText:string|null}|null} sourceSnapshot - Stored request-time scope descriptor
  * @returns {FieldSourceScope|null} Canonical scope, invalid marker, or null when absent
  */
 export function getFieldSourceScope(selectionRange, sourceSnapshot) {
@@ -152,14 +156,21 @@ export function getFieldSourceScope(selectionRange, sourceSnapshot) {
   const scope = sourceSnapshot?.scope ?? null;
 
   if (scope === 'full') {
-    return { scope: 'full', range: null, expectedSelectedText: null };
+    // Full scope carries the whole request-time value as source identity; a
+    // missing identity cannot be validated fail-closed, so it is invalid.
+    const expectedSourceText = sourceSnapshot?.expectedSourceText ?? null;
+    if (typeof expectedSourceText !== 'string') {
+      logger.debug('getFieldSourceScope: full descriptor without expected text, marking invalid');
+      return { scope: INVALID_FIELD_SCOPE, range: null, expectedSourceText: null };
+    }
+    return { scope: 'full', range: null, expectedSourceText };
   }
 
   if (scope === 'selection') {
     // A usable range plus the exact expected text are both required. Without
     // the expected text we cannot validate staleness fail-closed.
     const { start, end } = selectionRange ?? {};
-    const expectedSelectedText = sourceSnapshot?.expectedSelectedText ?? null;
+    const expectedSourceText = sourceSnapshot?.expectedSourceText ?? null;
     if (
       typeof start !== 'number' ||
       typeof end !== 'number' ||
@@ -168,19 +179,19 @@ export function getFieldSourceScope(selectionRange, sourceSnapshot) {
       start < 0 ||
       end < start ||
       start === end ||
-      typeof expectedSelectedText !== 'string'
+      typeof expectedSourceText !== 'string'
     ) {
       logger.debug('getFieldSourceScope: incomplete selection descriptor, marking invalid');
-      return { scope: INVALID_FIELD_SCOPE, range: null, expectedSelectedText: null };
+      return { scope: INVALID_FIELD_SCOPE, range: null, expectedSourceText: null };
     }
 
-    return { scope: 'selection', range: { start, end }, expectedSelectedText };
+    return { scope: 'selection', range: { start, end }, expectedSourceText };
   }
 
   // Present but unrecognized (unknown scope string, non-object shape, ...):
   // fail closed rather than falling back to a live selection that was never captured.
   logger.debug('getFieldSourceScope: unrecognized descriptor, marking invalid');
-  return { scope: INVALID_FIELD_SCOPE, range: null, expectedSelectedText: null };
+  return { scope: INVALID_FIELD_SCOPE, range: null, expectedSourceText: null };
 }
 
 /**
@@ -190,9 +201,12 @@ export function getFieldSourceScope(selectionRange, sourceSnapshot) {
  * DOM selection after the async request. Returns true when the apply may
  * proceed; false means the source was edited (fail safely = no overwrite).
  *
- * Full scope is always valid here; staleness for full-field replaces is owned
- * by the existing latest-request/stale architecture (ownership +
- * STALE_DATA_THRESHOLD), not by this check.
+ * Both scopes validate source identity against the single descriptor field:
+ * selection checks bounds plus the live substring at [start,end]; full checks
+ * the live full value. Caret/selection-only movement never changes element
+ * value, so it never invalidates either scope. Absent descriptors (legacy
+ * callers) stay valid; latest-request ownership and cancellation still apply
+ * around this check, unchanged.
  *
  * @param {HTMLElement} element - Live target element
  * @param {FieldSourceScope|null} fieldSource - Canonical request-time scope (null = absent)
@@ -203,13 +217,25 @@ export function validateFieldSourceSnapshot(element, fieldSource) {
   if (!fieldSource) return true;
   // Present-but-malformed descriptor: fail closed, never mutate.
   if (fieldSource.scope === INVALID_FIELD_SCOPE) return false;
-  // Full scope: staleness is owned by the latest-request architecture.
-  if (fieldSource.scope !== 'selection') return true;
   if (!element) return false;
 
   try {
-    // Only INPUT/TEXTAREA carry request-time ranges; anything else cannot be validated.
+    // Only INPUT/TEXTAREA carry request-time source identity; anything else
+    // cannot be validated here.
     if (element.tagName !== 'INPUT' && element.tagName !== 'TEXTAREA') return true;
+
+    if (fieldSource.scope === 'full') {
+      // Full-identity guard: any text edit (append, delete, change) before
+      // settle refuses the replace; caret/selection movement is harmless.
+      const liveValue = element.value ?? '';
+      if (liveValue !== fieldSource.expectedSourceText) {
+        logger.debug('validateFieldSourceSnapshot: full value changed, refusing replace');
+        return false;
+      }
+      return true;
+    }
+
+    if (fieldSource.scope !== 'selection') return false;
 
     const { start, end } = fieldSource.range ?? {};
     if (
@@ -238,7 +264,7 @@ export function validateFieldSourceSnapshot(element, fieldSource) {
     // Stale-source guard: the exact selected text must still sit at [start,end].
     // A mismatch means the user edited the source before settle -> no overwrite.
     const liveSlice = currentValue.substring(start, end);
-    if (liveSlice !== fieldSource.expectedSelectedText) {
+    if (liveSlice !== fieldSource.expectedSourceText) {
       logger.debug('validateFieldSourceSnapshot: source text changed, refusing partial replace');
       return false;
     }
@@ -292,6 +318,11 @@ export function resolveScopedInputRange(element, start, end, applicationContext 
   if (fieldSource.scope === 'full') {
     // Authoritative full-field: force whole-value replacement even when the user
     // selected (or moved the caret into) a sub-range while the request was in flight.
+    // The identity check above already rejected any text edit, so the live
+    // length equals the captured length here.
+    if (!validateFieldSourceSnapshot(element, fieldSource)) {
+      return { start, end, refused: true };
+    }
     try {
       const fullLength = (element.value ?? '').length;
       return { start: 0, end: fullLength, refused: false };

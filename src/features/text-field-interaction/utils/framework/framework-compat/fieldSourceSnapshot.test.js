@@ -17,11 +17,11 @@ describe('captureFieldTranslationSource', () => {
     expect(captureFieldTranslationSource(el)).toEqual({
       text: 'سلام',
       selectionRange: { start: 6, end: 10 },
-      sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+      sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
     });
   });
 
-  it('returns the full value with an explicit full scope when nothing is selected', () => {
+  it('returns the full value with an explicit full scope carrying source identity', () => {
     const el = document.createElement('textarea');
     el.value = 'Hello سلام world';
     el.setSelectionRange(0, 0);
@@ -29,7 +29,7 @@ describe('captureFieldTranslationSource', () => {
     expect(captureFieldTranslationSource(el)).toEqual({
       text: 'Hello سلام world',
       selectionRange: null,
-      sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+      sourceSnapshot: { scope: 'full', expectedSourceText: 'Hello سلام world' },
     });
   });
 
@@ -51,19 +51,27 @@ describe('getFieldSourceScope', () => {
     expect(
       getFieldSourceScope(
         { start: 6, end: 10 },
-        { scope: 'selection', expectedSelectedText: 'سلام' }
+        { scope: 'selection', expectedSourceText: 'سلام' }
       )
     ).toEqual({
       scope: 'selection',
       range: { start: 6, end: 10 },
-      expectedSelectedText: 'سلام',
+      expectedSourceText: 'سلام',
     });
   });
 
-  it('normalizes a full descriptor into a canonical full scope', () => {
+  it('normalizes a full descriptor carrying source identity into a canonical full scope', () => {
     expect(
-      getFieldSourceScope(null, { scope: 'full', expectedSelectedText: null })
-    ).toEqual({ scope: 'full', range: null, expectedSelectedText: null });
+      getFieldSourceScope(null, { scope: 'full', expectedSourceText: 'Hello سلام world' })
+    ).toEqual({ scope: 'full', range: null, expectedSourceText: 'Hello سلام world' });
+  });
+
+  it('marks a full descriptor without source identity invalid (fail closed)', () => {
+    expect(getFieldSourceScope(null, { scope: 'full', expectedSourceText: null })).toEqual({
+      scope: INVALID_FIELD_SCOPE,
+      range: null,
+      expectedSourceText: null,
+    });
   });
 
   it('returns null when no descriptor is present (legacy callers keep live fallback)', () => {
@@ -72,28 +80,28 @@ describe('getFieldSourceScope', () => {
   });
 
   it('marks an incomplete selection descriptor invalid (fail closed, no legacy fallback)', () => {
-    expect(getFieldSourceScope(null, { scope: 'selection', expectedSelectedText: 'سلام' })).toEqual({
+    expect(getFieldSourceScope(null, { scope: 'selection', expectedSourceText: 'سلام' })).toEqual({
       scope: INVALID_FIELD_SCOPE,
       range: null,
-      expectedSelectedText: null,
+      expectedSourceText: null,
     });
     expect(getFieldSourceScope({ start: 6, end: 10 }, { scope: 'selection' })).toEqual({
       scope: INVALID_FIELD_SCOPE,
       range: null,
-      expectedSelectedText: null,
+      expectedSourceText: null,
     });
   });
 
   it('marks an unknown scope invalid (fail closed, no legacy fallback)', () => {
-    expect(getFieldSourceScope(null, { scope: 'weird', expectedSelectedText: null })).toEqual({
+    expect(getFieldSourceScope(null, { scope: 'weird', expectedSourceText: null })).toEqual({
       scope: INVALID_FIELD_SCOPE,
       range: null,
-      expectedSelectedText: null,
+      expectedSourceText: null,
     });
     expect(getFieldSourceScope(null, {})).toEqual({
       scope: INVALID_FIELD_SCOPE,
       range: null,
-      expectedSelectedText: null,
+      expectedSourceText: null,
     });
   });
 });
@@ -107,7 +115,7 @@ describe('validateFieldSourceSnapshot', () => {
       validateFieldSourceSnapshot(el, {
         scope: 'selection',
         range: { start: 6, end: 10 },
-        expectedSelectedText: 'سلام',
+        expectedSourceText: 'سلام',
       })
     ).toBe(true);
   });
@@ -120,17 +128,39 @@ describe('validateFieldSourceSnapshot', () => {
       validateFieldSourceSnapshot(el, {
         scope: 'selection',
         range: { start: 6, end: 10 },
-        expectedSelectedText: 'سلام',
+        expectedSourceText: 'سلام',
       })
     ).toBe(false);
   });
 
-  it('treats full scope and absent descriptors as valid (ownership owns staleness)', () => {
+  it('treats absent descriptors as valid (ownership owns staleness)', () => {
     const el = document.createElement('textarea');
     el.value = 'anything';
 
-    expect(validateFieldSourceSnapshot(el, { scope: 'full', range: null, expectedSelectedText: null })).toBe(true);
     expect(validateFieldSourceSnapshot(el, null)).toBe(true);
+  });
+
+  it('accepts an unedited full value, caret/selection movement included', () => {
+    const el = document.createElement('textarea');
+    el.value = 'Hello سلام world';
+    el.setSelectionRange(2, 2);
+
+    expect(
+      validateFieldSourceSnapshot(el, { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' })
+    ).toBe(true);
+  });
+
+  it.each([
+    ['appended suffix', 'Hello سلام world!'],
+    ['deleted text', 'Hello سلام'],
+    ['changed text', 'Hello CHANGED world'],
+  ])('rejects an edited full value (%s), no overwrite', (_label, editedValue) => {
+    const el = document.createElement('textarea');
+    el.value = editedValue;
+
+    expect(
+      validateFieldSourceSnapshot(el, { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' })
+    ).toBe(false);
   });
 
   it('rejects present-but-malformed descriptors (fail closed, no mutation)', () => {
@@ -138,7 +168,7 @@ describe('validateFieldSourceSnapshot', () => {
     el.value = 'Hello سلام world';
 
     expect(
-      validateFieldSourceSnapshot(el, { scope: INVALID_FIELD_SCOPE, range: null, expectedSelectedText: null })
+      validateFieldSourceSnapshot(el, { scope: INVALID_FIELD_SCOPE, range: null, expectedSourceText: null })
     ).toBe(false);
   });
 });
@@ -152,12 +182,12 @@ describe('resolveScopedInputRange', () => {
     expect(
       resolveScopedInputRange(el, null, null, {
         isCurrent: () => true,
-        fieldSource: { scope: 'selection', range: { start: 6, end: 10 }, expectedSelectedText: 'سلام' },
+        fieldSource: { scope: 'selection', range: { start: 6, end: 10 }, expectedSourceText: 'سلام' },
       })
     ).toEqual({ start: 6, end: 10, refused: false });
   });
 
-  it('forces full-field range even when a live selection was created later', () => {
+  it('forces full-field range for an unedited value even when a live selection was created later', () => {
     const el = document.createElement('textarea');
     el.value = 'Hello سلام world';
     el.setSelectionRange(6, 10);
@@ -165,9 +195,22 @@ describe('resolveScopedInputRange', () => {
     expect(
       resolveScopedInputRange(el, 6, 10, {
         isCurrent: () => true,
-        fieldSource: { scope: 'full', range: null, expectedSelectedText: null },
+        fieldSource: { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' },
       })
     ).toEqual({ start: 0, end: 16, refused: false });
+  });
+
+  it('refuses a full-field replace when the value was edited (no overwrite)', () => {
+    const el = document.createElement('textarea');
+    el.value = 'Hello سلام world!';
+
+    expect(
+      resolveScopedInputRange(el, null, null, {
+        isCurrent: () => true,
+        fieldSource: { scope: 'full', range: null, expectedSourceText: 'Hello سلام world' },
+      })
+    ).toEqual(expect.objectContaining({ refused: true }));
+    expect(el.value).toBe('Hello سلام world!');
   });
 
   it('refuses when the scoped source was edited (no overwrite)', () => {
@@ -177,7 +220,7 @@ describe('resolveScopedInputRange', () => {
     expect(
       resolveScopedInputRange(el, null, null, {
         isCurrent: () => true,
-        fieldSource: { scope: 'selection', range: { start: 6, end: 10 }, expectedSelectedText: 'سلام' },
+        fieldSource: { scope: 'selection', range: { start: 6, end: 10 }, expectedSourceText: 'سلام' },
       })
     ).toEqual(expect.objectContaining({ refused: true }));
   });
@@ -188,8 +231,8 @@ describe('resolveScopedInputRange', () => {
     el.setSelectionRange(6, 10);
 
     for (const fieldSource of [
-      { scope: INVALID_FIELD_SCOPE, range: null, expectedSelectedText: null },
-      { scope: 'weird', range: null, expectedSelectedText: null },
+      { scope: INVALID_FIELD_SCOPE, range: null, expectedSourceText: null },
+      { scope: 'weird', range: null, expectedSourceText: null },
     ]) {
       expect(
         resolveScopedInputRange(el, 6, 10, { isCurrent: () => true, fieldSource })
@@ -219,7 +262,7 @@ describe('resolveScopedInputRange', () => {
     expect(
       resolveScopedInputRange(el, null, null, {
         isCurrent: () => true,
-        fieldSource: { scope: 'selection', range: { start: 0, end: 5 }, expectedSelectedText: 'hello' },
+        fieldSource: { scope: 'selection', range: { start: 0, end: 5 }, expectedSourceText: 'hello' },
       })
     ).toEqual({ start: null, end: null, refused: false });
   });

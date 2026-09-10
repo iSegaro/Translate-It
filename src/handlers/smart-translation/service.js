@@ -73,7 +73,7 @@ function isSuccessfulFieldApplication(result) {
  * @param {string} params.text - Actual submitted text (selected substring when a selection exists, else full value)
  * @param {HTMLElement} params.target - Target field element
  * @param {{start:number,end:number}|null} [params.selectionRange] - Request-time selection range for INPUT/TEXTAREA
- * @param {{scope:'selection'|'full',expectedSelectedText:string|null}|null} [params.sourceSnapshot] - Request-time scope descriptor
+ * @param {{scope:'selection'|'full',expectedSourceText:string|null}|null} [params.sourceSnapshot] - Request-time scope descriptor
  */
 export async function translateFieldViaSmartHandler({ text, target, selectionRange = null, sourceSnapshot = null, tabId, toastId }) {
   const localNotificationManager = new NotificationManager();

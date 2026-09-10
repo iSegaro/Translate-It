@@ -309,7 +309,7 @@ describe('TextFieldIconManager', () => {
         text: 'hello',
         target: el,
         selectionRange: null,
-        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+        sourceSnapshot: { scope: 'full', expectedSourceText: 'hello' },
       });
       expect(spy).toHaveBeenCalledWith(el);
     });
@@ -327,7 +327,7 @@ describe('TextFieldIconManager', () => {
         text: 'سلام',
         target: el,
         selectionRange: { start: 6, end: 10 },
-        sourceSnapshot: { scope: 'selection', expectedSelectedText: 'سلام' },
+        sourceSnapshot: { scope: 'selection', expectedSourceText: 'سلام' },
       });
     });
 
@@ -344,7 +344,7 @@ describe('TextFieldIconManager', () => {
         text: 'Hello سلام world',
         target: el,
         selectionRange: null,
-        sourceSnapshot: { scope: 'full', expectedSelectedText: null },
+        sourceSnapshot: { scope: 'full', expectedSourceText: 'Hello سلام world' },
       });
     });
 
