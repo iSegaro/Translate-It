@@ -67,7 +67,7 @@ export function captureFieldTranslationSource(element) {
       try {
         start = element.selectionStart;
         end = element.selectionEnd;
-      } catch (selectionError) {
+      } catch {
         // Some input types (e.g. number/date) throw or report null for selection.
         logger.debug('captureFieldTranslationSource: selection unreadable, using full value', {
           tagName,

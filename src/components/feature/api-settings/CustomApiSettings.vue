@@ -47,11 +47,34 @@
             role="status"
             class="custom-connection-status"
           >
-            <div v-if="connectionReport" :class="['test-result', connectionResultClass]">
-              <p v-if="connectionVerdict" :class="['connection-verdict', connectionVerdictCategoryClass]">{{ connectionVerdict }}</p>
-              <p v-if="connectionDetailSegments.length > 0" class="connection-detail"><template v-for="(segment, index) in connectionDetailSegments" :key="index"><strong v-if="segment.strong">{{ segment.text }}</strong><span v-else>{{ segment.text }}</span></template></p>
+            <div
+              v-if="connectionReport"
+              :class="['test-result', connectionResultClass]"
+            >
+              <p
+                v-if="connectionVerdict"
+                :class="['connection-verdict', connectionVerdictCategoryClass]"
+              >
+                {{ connectionVerdict }}
+              </p>
+              <p
+                v-if="connectionDetailSegments.length > 0"
+                class="connection-detail"
+              >
+                <template
+                  v-for="(segment, index) in connectionDetailSegments"
+                  :key="index"
+                >
+                  <strong v-if="segment.strong">{{ segment.text }}</strong><span v-else>{{ segment.text }}</span>
+                </template>
+              </p>
             </div>
-            <div v-else class="setting-help-text">{{ connectionStatusText }}</div>
+            <div
+              v-else
+              class="setting-help-text"
+            >
+              {{ connectionStatusText }}
+            </div>
           </div>
           <button
             type="button"
