@@ -48,7 +48,7 @@
             class="custom-connection-status"
           >
             <div v-if="connectionReport" :class="['test-result', connectionResultClass]">
-              <p v-if="connectionVerdict" class="connection-verdict">{{ connectionVerdict }}</p>
+              <p v-if="connectionVerdict" :class="['connection-verdict', connectionVerdictCategoryClass]">{{ connectionVerdict }}</p>
               <p v-if="connectionDetailSegments.length > 0" class="connection-detail"><template v-for="(segment, index) in connectionDetailSegments" :key="index"><strong v-if="segment.strong">{{ segment.text }}</strong><span v-else>{{ segment.text }}</span></template></p>
             </div>
             <div v-else class="setting-help-text">{{ connectionStatusText }}</div>
@@ -187,6 +187,35 @@ const connectionVerdict = computed(() => {
   if (!report) return ''
   const verdictKey = CONNECTION_VERDICT_BY_MESSAGE_KEY[report.messageKey]
   return verdictKey ? t(verdictKey) : ''
+})
+
+// Presentation-only color category for the verdict line, derived from the
+// same messageKey mapping — deliberately independent from
+// connectionResultClass (e.g. mismatch+supported is class warning but
+// verdict-compatible green). Unknown keys get no category.
+const CONNECTION_VERDICT_CATEGORY_BY_MESSAGE_KEY = {
+  custom_api_connection_success: 'compatible',
+  custom_api_connection_fallback: 'compatible',
+  custom_api_connection_model_mismatch: 'compatible',
+  custom_api_connection_model_mismatch_fallback: 'compatible',
+  custom_api_connection_inconclusive: 'inconclusive',
+  custom_api_connection_model_mismatch_inconclusive: 'inconclusive',
+  custom_api_connection_structured_invalid: 'error',
+  custom_api_connection_model_mismatch_unusable: 'error',
+  api_test_custom_model_not_found: 'error',
+  custom_api_connection_unreachable: 'error',
+  custom_api_connection_auth_failed: 'error',
+  custom_api_connection_completion_failed: 'error',
+  custom_api_connection_request_failed: 'error',
+  custom_api_connection_failed_unexpected: 'error',
+  custom_api_connection_timed_out: 'error',
+}
+
+const connectionVerdictCategoryClass = computed(() => {
+  const report = connectionReport.value
+  if (!report) return ''
+  const category = CONNECTION_VERDICT_CATEGORY_BY_MESSAGE_KEY[report.messageKey]
+  return category ? `verdict-${category}` : ''
 })
 
 const connectionDetailSegments = computed(() => {

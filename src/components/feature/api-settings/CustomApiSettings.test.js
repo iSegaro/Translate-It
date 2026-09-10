@@ -297,6 +297,9 @@ describe('CustomApiSettings Test Connection', () => {
 
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe('Compatible.'));
+    // Motivating case: verdict color is compatible-green even though the
+    // legacy result class stays warning.
+    expect(verdictOf(wrapper).classes()).toContain('verdict-compatible');
     expect(detailOf(wrapper).text()).toBe('The server used other instead of m1.');
     expect(detailOf(wrapper).text()).toContain('m1');
     expect(detailOf(wrapper).text()).toContain('other');
@@ -613,22 +616,22 @@ describe('CustomApiSettings Test Connection', () => {
   });
 
   it.each([
-    ['success', 'custom_api_connection_success', null, 'Compatible.'],
-    ['fallback', 'custom_api_connection_fallback', null, 'Compatible.'],
-    ['mismatch', 'custom_api_connection_model_mismatch', { requestedModel: 'm1', effectiveModel: 'other' }, 'Compatible.'],
-    ['mismatch_fallback', 'custom_api_connection_model_mismatch_fallback', { requestedModel: 'm1', effectiveModel: 'other' }, 'Compatible.'],
-    ['inconclusive', 'custom_api_connection_inconclusive', null, 'Compatibility could not be fully verified.'],
-    ['mismatch_inconclusive', 'custom_api_connection_model_mismatch_inconclusive', { requestedModel: 'm1', effectiveModel: 'other' }, 'Compatibility could not be fully verified.'],
-    ['structured_invalid', 'custom_api_connection_structured_invalid', null, 'Not compatible.'],
-    ['mismatch_unusable', 'custom_api_connection_model_mismatch_unusable', { requestedModel: 'm1', effectiveModel: 'other' }, 'Not compatible.'],
-    ['model_not_found', 'api_test_custom_model_not_found', { model: 'm1' }, 'Not compatible.'],
-    ['unreachable', 'custom_api_connection_unreachable', null, 'Cannot connect.'],
-    ['auth_failed', 'custom_api_connection_auth_failed', null, 'Authentication failed.'],
-    ['completion_failed', 'custom_api_connection_completion_failed', null, 'Compatibility check failed.'],
-    ['request_failed', 'custom_api_connection_request_failed', null, 'Compatibility check failed.'],
-    ['unexpected', 'custom_api_connection_failed_unexpected', null, 'Compatibility check failed.'],
-    ['timed_out', 'custom_api_connection_timed_out', null, 'Compatibility check timed out.'],
-  ])('renders the %s verdict first', async (_label, messageKey, params, verdict) => {
+    ['success', 'custom_api_connection_success', null, 'Compatible.', 'compatible'],
+    ['fallback', 'custom_api_connection_fallback', null, 'Compatible.', 'compatible'],
+    ['mismatch', 'custom_api_connection_model_mismatch', { requestedModel: 'm1', effectiveModel: 'other' }, 'Compatible.', 'compatible'],
+    ['mismatch_fallback', 'custom_api_connection_model_mismatch_fallback', { requestedModel: 'm1', effectiveModel: 'other' }, 'Compatible.', 'compatible'],
+    ['inconclusive', 'custom_api_connection_inconclusive', null, 'Compatibility could not be fully verified.', 'inconclusive'],
+    ['mismatch_inconclusive', 'custom_api_connection_model_mismatch_inconclusive', { requestedModel: 'm1', effectiveModel: 'other' }, 'Compatibility could not be fully verified.', 'inconclusive'],
+    ['structured_invalid', 'custom_api_connection_structured_invalid', null, 'Not compatible.', 'error'],
+    ['mismatch_unusable', 'custom_api_connection_model_mismatch_unusable', { requestedModel: 'm1', effectiveModel: 'other' }, 'Not compatible.', 'error'],
+    ['model_not_found', 'api_test_custom_model_not_found', { model: 'm1' }, 'Not compatible.', 'error'],
+    ['unreachable', 'custom_api_connection_unreachable', null, 'Cannot connect.', 'error'],
+    ['auth_failed', 'custom_api_connection_auth_failed', null, 'Authentication failed.', 'error'],
+    ['completion_failed', 'custom_api_connection_completion_failed', null, 'Compatibility check failed.', 'error'],
+    ['request_failed', 'custom_api_connection_request_failed', null, 'Compatibility check failed.', 'error'],
+    ['unexpected', 'custom_api_connection_failed_unexpected', null, 'Compatibility check failed.', 'error'],
+    ['timed_out', 'custom_api_connection_timed_out', null, 'Compatibility check timed out.', 'error'],
+  ])('renders the %s verdict first', async (_label, messageKey, params, verdict, category) => {
     mocks.testCustomConnection.mockResolvedValueOnce(envelope({
       ...failedReport(messageKey, params),
       usable: true,
@@ -637,6 +640,7 @@ describe('CustomApiSettings Test Connection', () => {
 
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(verdictOf(wrapper).text()).toBe(verdict));
+    expect(verdictOf(wrapper).classes()).toContain(`verdict-${category}`);
     wrapper.unmount();
   });
 
@@ -762,6 +766,7 @@ describe('CustomApiSettings Test Connection', () => {
     await buttonOf(wrapper).trigger('click');
     await vi.waitFor(() => expect(statusOf(wrapper).text()).toBe('custom_api_connection_nonexistent'));
     expect(wrapper.find('[data-testid="custom-connection-status"] .connection-verdict').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="custom-connection-status"] [class*="verdict-"]').exists()).toBe(false);
     expect(innerOf(wrapper).classes()).toContain('error');
     wrapper.unmount();
   });
@@ -840,6 +845,13 @@ describe('CustomApiSettings Test Connection', () => {
     expect(scss).toMatch(/\.custom-connection-status\s*>\s*div\s*{[^}]*width:\s*100%/);
     // Model emphasis stays direction-isolated.
     expect(scss).toContain('unicode-bidi: isolate');
+    // Verdict-owned semantic colors use existing theme tokens only, and
+    // detail text resets to the normal settings foreground token.
+    expect(scss).toContain('var(--color-success)');
+    expect(scss).toContain('var(--color-warning)');
+    expect(scss).toContain('var(--color-error-text)');
+    expect(scss).toMatch(/\.connection-detail\s*{[^}]*color:\s*var\(--color-text\)/);
+    expect(scss).not.toMatch(/#[0-9a-fA-F]{3}/);
   });
 
   it('keeps layout ownership on the outer wrapper and presentation on the inner element', async () => {

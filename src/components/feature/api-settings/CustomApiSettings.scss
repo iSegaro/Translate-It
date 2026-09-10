@@ -11,8 +11,25 @@
     font-weight: 600;
   }
 
+  // Verdict-owned semantic colors: the category comes from the verdict
+  // mapping, deliberately independent from the legacy result class (e.g.
+  // mismatch+supported warns at the box level but verdicts Compatible in
+  // green). Existing theme tokens only; no hard-coded colors.
+  .connection-verdict.verdict-compatible {
+    color: var(--color-success);
+  }
+
+  .connection-verdict.verdict-inconclusive {
+    color: var(--color-warning);
+  }
+
+  .connection-verdict.verdict-error {
+    color: var(--color-error-text);
+  }
+
   .connection-detail {
     margin-top: 4px;
+    color: var(--color-text);
   }
 
   // Layout stability: the outer wrapper owns a two-line reservation so
