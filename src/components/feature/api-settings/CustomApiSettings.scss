@@ -20,10 +20,9 @@
   // controls below. The reservation metrics are pinned here (not inherited
   // from the inner presentation classes), so switching between
   // setting-help-text and test-result cannot change the reserved height.
-  // The reservation covers the full two-line result box: two line-heights
-  // plus the verdict/detail gap (4px, see .connection-detail above) plus
-  // the .test-result vertical padding (16px = 8px top + 8px bottom, kept in
-  // sync with ApiKeyInput.scss, whose padding is a literal, not a token).
+  // The reservation covers two normal result line-heights plus the
+  // verdict/detail gap (4px, see .connection-detail above). Inner box
+  // padding is stripped below, so no padding is reserved here.
   // Scalable units only; longer content grows naturally and never clips
   // (min-height, never height). The wrapper keeps the row flex sizing the
   // status box previously had as a direct flex item.
@@ -33,13 +32,26 @@
     flex: 1 1 200px;
     font-size: $font-size-sm;
     line-height: 1.4;
-    min-height: calc(2lh + 4px + 16px);
+    min-height: calc(2lh + 4px);
   }
 
   // The inner presentation element fills the wrapper width so result
   // boxes span the reserved area while content stays vertically centered.
   .custom-connection-status > div {
     width: 100%;
+  }
+
+  // Plain-text status: strip the shared result-box decoration inside this
+  // feature only. Scoped with the child combinator so the shared
+  // .test-result (Test Key, other providers, AdvanceTab) and the shared
+  // .setting-help-text are never modified globally. Semantic text colors,
+  // line-height, and word-break are inherited untouched.
+  .custom-connection-status > div.test-result,
+  .custom-connection-status > div.setting-help-text {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
   }
 
   .connection-detail strong {

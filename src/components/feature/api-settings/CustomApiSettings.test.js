@@ -820,8 +820,17 @@ describe('CustomApiSettings Test Connection', () => {
     // metrics pinned on the outer wrapper, not inherited from inner
     // presentation classes.
     expect(scss).toContain('.custom-connection-status');
-    expect(scss).toMatch(/min-height:\s*calc\(2lh \+ 4px \+ 16px\)/);
+    expect(scss).toMatch(/min-height:\s*calc\(2lh \+ 4px\)/);
     expect(scss).not.toMatch(/\.custom-connection-status\s*{[^}]*?(?<!min-)(?<!line-)height:/);
+    // Plain-text status: scoped box-decoration removal for result and idle
+    // inners, never a global shared-class override.
+    expect(scss).toMatch(/\.custom-connection-status\s*>\s*div\.test-result/);
+    expect(scss).toMatch(/\.custom-connection-status\s*>\s*div\.setting-help-text/);
+    expect(scss).toMatch(/background:\s*transparent/);
+    expect(scss).toMatch(/border:\s*none/);
+    expect(scss).toMatch(/border-radius:\s*0/);
+    expect(scss).toMatch(/padding:\s*0/);
+    expect(scss).not.toMatch(/^\s*\.test-result\s*{/m);
     expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*font-size:/);
     expect(scss).toMatch(/\.custom-connection-status\s*{[^}]*line-height:/);
     // Outer wrapper vertically centers shorter content; inner presentation
