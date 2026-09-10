@@ -53,6 +53,11 @@ const OPERATION_TIMEOUTS = {
   'PROCESS_SELECTED_ELEMENT': 8000,
   'TEST_PROVIDER': 8000,
   'TEST_PROVIDER_CONNECTION': 8000,
+  // Custom Test Connection backstop only: the background handler enforces
+  // its own shorter probe deadline (CUSTOM_CONNECTION_PROBE_DEADLINE_MS),
+  // so this timeout must stay safely above it and only fires if the handler
+  // itself stalls. Do not lower it near or below the probe deadline.
+  'TEST_CUSTOM_CONNECTION': 120000,
   'VALIDATE_API_KEY': 6000,
   'GOOGLE_TTS_SPEAK': 20000,
   'TTS_SPEAK': 20000,

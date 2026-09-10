@@ -151,5 +151,11 @@
       color: var(--color-error-text, #c62828);
       border: 1px solid var(--color-error-border, rgba(244, 67, 54, 0.2));
     }
+
+    &.warning {
+      background-color: var(--color-warning-bg, rgba(255, 152, 0, 0.1));
+      color: var(--color-warning-text, #e65100);
+      border: 1px solid var(--color-warning-border, rgba(255, 152, 0, 0.2));
+    }
   }
 }

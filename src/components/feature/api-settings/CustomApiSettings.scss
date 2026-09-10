@@ -1,2 +1,94 @@
 @use "@/assets/styles/base/variables" as *;
 @use "@/assets/styles/components/api-settings-common" as *;
+
+.custom-settings {
+  .connection-verdict,
+  .connection-detail {
+    margin: 0;
+  }
+
+  .connection-verdict {
+    font-weight: 600;
+  }
+
+  // Verdict-owned semantic colors: the category comes from the verdict
+  // mapping, deliberately independent from the legacy result class (e.g.
+  // mismatch+supported warns at the box level but verdicts Compatible in
+  // green). Existing theme tokens only; no hard-coded colors.
+  .connection-verdict.verdict-compatible {
+    color: var(--color-success);
+  }
+
+  .connection-verdict.verdict-inconclusive {
+    color: var(--color-warning);
+  }
+
+  .connection-verdict.verdict-error {
+    color: var(--color-error-text);
+  }
+
+  .connection-detail {
+    margin-top: 4px;
+    color: var(--color-text);
+  }
+
+  // Layout stability: the outer wrapper owns a two-line reservation so
+  // idle → verdict-only → verdict+detail transitions do not move the
+  // controls below. The reservation metrics are pinned here (not inherited
+  // from the inner presentation classes), so switching between
+  // setting-help-text and test-result cannot change the reserved height.
+  // The reservation covers two normal result line-heights plus the
+  // verdict/detail gap (4px, see .connection-detail above). Inner box
+  // padding is stripped below, so no padding is reserved here.
+  // Scalable units only; longer content grows naturally and never clips
+  // (min-height, never height). The wrapper keeps the row flex sizing the
+  // status box previously had as a direct flex item.
+  .custom-connection-status {
+    display: flex;
+    align-items: center;
+    flex: 1 1 200px;
+    font-size: $font-size-sm;
+    line-height: 1.4;
+    min-height: calc(2lh + 4px);
+  }
+
+  // The inner presentation element fills the wrapper width so result
+  // boxes span the reserved area while content stays vertically centered.
+  .custom-connection-status > div {
+    width: 100%;
+  }
+
+  // Plain-text status: strip the shared result-box decoration inside this
+  // feature only. Scoped with the child combinator so the shared
+  // .test-result (Test Key, other providers, AdvanceTab) and the shared
+  // .setting-help-text are never modified globally. Semantic text colors,
+  // line-height, and word-break are inherited untouched.
+  .custom-connection-status > div.test-result,
+  .custom-connection-status > div.setting-help-text {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .connection-detail strong {
+    unicode-bidi: isolate;
+  }
+
+  // Grid-stacked button labels: both labels share one cell, so the button
+  // width equals the widest current-locale label with no JS measurement.
+  // The inactive label keeps layout space via visibility (never
+  // display:none) and is hidden from assistive technology.
+  .compat-check-button {
+    display: grid;
+    text-align: center;
+
+    .compat-check-label {
+      grid-area: 1 / 1;
+
+      &.is-hidden {
+        visibility: hidden;
+      }
+    }
+  }
+}

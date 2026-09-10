@@ -79,6 +79,17 @@ describe('useExtensionAPI.translateText', () => {
     });
   });
 
+  it('sends Custom Test Connection snapshots to background unchanged', async () => {
+    const response = { success: true, data: { report: { state: 'success' } } };
+    sendMessage.mockResolvedValue(response);
+    const config = { apiUrl: 'https://a.example/x', apiModel: 'm', apiKey: 'k' };
+
+    await expect(withSetup(useExtensionAPI).testCustomConnection(config)).resolves.toBe(response);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ action: MessageActions.TEST_CUSTOM_CONNECTION, data: { config } })
+    );
+  });
+
   it('does not expose the removed uppercase context-menu action', () => {
     expect(withSetup(useExtensionAPI)).not.toHaveProperty('updateContextMenu');
   });

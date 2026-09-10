@@ -1244,6 +1244,78 @@
   "custom_api_model_placeholder": {
     "message": "نام مدل را وارد کنید"
   },
+  "custom_api_test_connection": {
+    "message": "بررسی سازگاری"
+  },
+  "custom_api_testing_connection": {
+    "message": "در حال بررسی..."
+  },
+  "custom_api_not_tested": {
+    "message": "بررسی نشده"
+  },
+  "custom_api_verdict_compatible": {
+    "message": "سازگار است."
+  },
+  "custom_api_verdict_inconclusive": {
+    "message": "سازگاری به‌طور کامل تأیید نشد."
+  },
+  "custom_api_verdict_incompatible": {
+    "message": "سازگار نیست."
+  },
+  "custom_api_verdict_unreachable": {
+    "message": "اتصال ممکن نیست."
+  },
+  "custom_api_verdict_auth_failed": {
+    "message": "احراز هویت ناموفق بود."
+  },
+  "custom_api_verdict_check_failed": {
+    "message": "بررسی سازگاری ناموفق بود."
+  },
+  "custom_api_verdict_timed_out": {
+    "message": "زمان بررسی سازگاری به پایان رسید."
+  },
+  "custom_api_connection_success": {
+    "message": ""
+  },
+  "custom_api_connection_fallback": {
+    "message": "از حالت سازگاری استفاده می‌شود."
+  },
+  "custom_api_connection_inconclusive": {
+    "message": ""
+  },
+  "custom_api_connection_structured_invalid": {
+    "message": "مدل پاسخی غیرقابل استفاده برگرداند."
+  },
+  "custom_api_connection_model_mismatch": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد."
+  },
+  "custom_api_connection_model_mismatch_fallback": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد. از حالت سازگاری استفاده می‌شود."
+  },
+  "custom_api_connection_model_mismatch_inconclusive": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد."
+  },
+  "custom_api_connection_model_mismatch_unusable": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد و ممکن است خروجی آن به‌درستی کار نکند."
+  },
+  "custom_api_connection_unreachable": {
+    "message": "نشانی سرور و شبکه را بررسی کنید."
+  },
+  "custom_api_connection_auth_failed": {
+    "message": "کلید API را بررسی کنید."
+  },
+  "custom_api_connection_completion_failed": {
+    "message": "سرور پاسخ داد، اما خروجی قابل استفاده‌ای برنگرداند."
+  },
+  "custom_api_connection_request_failed": {
+    "message": "تنظیمات سرور را بررسی کنید."
+  },
+  "custom_api_connection_failed_unexpected": {
+    "message": ""
+  },
+  "custom_api_connection_timed_out": {
+    "message": "دوباره تلاش کنید."
+  },
   "import_export_section_title": {
     "message": "پشتیبان‌گیری و بازیابی تنظیمات"
   },
