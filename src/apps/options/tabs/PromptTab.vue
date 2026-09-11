@@ -209,8 +209,21 @@ const editablePrompts = Object.values(PROMPT_REGISTRY).filter(p => p.editable)
 const basicPrompts = editablePrompts.filter(p => p.category === PromptCategory.USER)
 const advancedPrompts = editablePrompts.filter(p => p.category === PromptCategory.SYSTEM)
 
-// State
-const currentPromptKey = ref('PROMPT_TEMPLATE')
+// Prompt editor selection (Options-page UI state, persisted via settings store).
+// Normalized in the getter without side-effects: only editable registry entries
+// are effective; stale/invalid persisted values fall back to PROMPT_TEMPLATE.
+const selectedPromptKeySetting = createSetting('PROMPT_EDITOR_SELECTED_KEY', CONFIG.PROMPT_EDITOR_SELECTED_KEY || 'PROMPT_TEMPLATE')
+const currentPromptKey = computed({
+  get: () => {
+    const stored = selectedPromptKeySetting.value
+    return PROMPT_REGISTRY[stored]?.editable === true ? stored : 'PROMPT_TEMPLATE'
+  },
+  set: (val) => {
+    if (PROMPT_REGISTRY[val]?.editable === true) {
+      selectedPromptKeySetting.value = val
+    }
+  }
+})
 
 // Pre-create settings for all editable prompts to ensure reactivity
 const promptSettings = {}
@@ -284,7 +297,7 @@ const handleValidationFeedback = (e) => {
   
   if (field === 'prompt' || promptKey) {
     // Switch to specific prompt if provided, otherwise stick to current
-    if (promptKey && PROMPT_REGISTRY[promptKey]) {
+    if (promptKey && PROMPT_REGISTRY[promptKey]?.editable === true) {
       currentPromptKey.value = promptKey;
     }
 

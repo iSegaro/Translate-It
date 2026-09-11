@@ -998,6 +998,9 @@
   "translation_api_label": {
     "message": "سرویس دهنده"
   },
+  "providers_configure_label": {
+    "message": "سرویس‌دهنده برای تنظیم"
+  },
   "provider_label": {
     "message": "سرویس‌دهنده"
   },

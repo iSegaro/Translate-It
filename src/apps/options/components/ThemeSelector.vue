@@ -73,9 +73,51 @@ const broadcastThemeChange = (theme) => {
   });
 }
 
+// Latest-wins theme persistence: every click applies locally at once and records
+// the latest pending theme; a single worker persists pending themes one at a time.
+// updateSettingLocally() only touches Pinia state (no storage); the worker is the
+// sole THEME persistence path. A capture always equals the live state at capture
+// time (clicks set both together, synchronously), and the persist call runs before
+// any other task can interleave — so updateSettingAndPersist's synchronous
+// re-application is always a no-op and can never overwrite newer local state.
+let pendingTheme = null
+let themeWorkerRunning = false
+
+const runThemeWorker = async () => {
+  try {
+    while (pendingTheme !== null) {
+      const captured = pendingTheme
+      pendingTheme = null
+      try {
+        await settingsStore.updateSettingAndPersist('THEME', captured)
+      } catch (error) {
+        logger.warn('Failed to persist theme change:', error)
+      }
+      // Broadcast only the still-latest selection after its own persistence
+      // settles; a newer click during flight suppresses this stale broadcast
+      // and the loop persists/broadcasts the newer theme instead.
+      if (pendingTheme === null && settingsStore.settings.THEME === captured) {
+        broadcastThemeChange(captured)
+      }
+    }
+  } finally {
+    themeWorkerRunning = false
+  }
+}
+
+const persistPendingTheme = () => {
+  if (themeWorkerRunning) return
+  themeWorkerRunning = true
+  runThemeWorker()
+}
+
 const setTheme = (theme) => {
-  settingsStore.updateSettingAndPersist('THEME', theme)
-  broadcastThemeChange(theme)
+  // Immediate local state so every click computes from the latest selection,
+  // even while an earlier persistence is still in flight. No rollback on
+  // persistence failure: local state always reflects the user's last click.
+  settingsStore.updateSettingLocally('THEME', theme)
+  pendingTheme = theme
+  persistPendingTheme()
 }
 
 const cycleTheme = () => {

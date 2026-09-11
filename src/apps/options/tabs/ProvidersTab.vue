@@ -5,7 +5,7 @@
 
       <!-- Service Selection -->
       <div class="setting-group primary-service-selection">
-        <label>{{ t('translation_api_label') || 'Primary Service' }}</label>
+        <label>{{ t('providers_configure_label') || 'Provider to configure' }}</label>
         <div class="selector-wrapper">
           <ProviderSelector 
             v-model="selectedProvider" 

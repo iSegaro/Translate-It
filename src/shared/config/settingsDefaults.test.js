@@ -43,6 +43,7 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.MOUSE_HOVER_TRIGGER).toBe(CONFIG.MOUSE_HOVER_TRIGGER);
     expect(defaults.translationHistory).toBeUndefined();
     expect(defaults.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);
+    expect(defaults.PROMPT_EDITOR_SELECTED_KEY).toBe('PROMPT_TEMPLATE');
     expect(defaults.APP_NAME).toBeUndefined();
     expect(defaults.CHANGELOG_URL).toBeUndefined();
     expect(defaults.GOOGLE_TRANSLATE_URL).toBeUndefined();

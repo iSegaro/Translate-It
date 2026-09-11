@@ -2403,6 +2403,52 @@ describe('PdfApp', () => {
 
       expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledWith('OCR_DEFAULT_LANG', 'fas')
     })
+
+    it('handles preferred-action persistence rejection without unhandled rejection', async () => {
+      const failures = []
+      const onUnhandled = (reason) => failures.push(reason)
+      process.on('unhandledRejection', onUnhandled)
+      try {
+        settingsStoreMock.updateSettingAndPersist.mockClear()
+        settingsStoreMock.updateSettingAndPersist.mockRejectedValueOnce(new Error('storage failed'))
+        const wrapper = mount(PdfApp)
+        await flushPromises()
+
+        wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('select-action', 'page')
+        await flushPromises()
+        await flushPromises()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledWith('OCR_PREFERRED_ACTION', 'page')
+        expect(pdfAppLoggerMock.warn).toHaveBeenCalled()
+        expect(failures).toHaveLength(0)
+      } finally {
+        process.off('unhandledRejection', onUnhandled)
+      }
+    })
+
+    it('handles language persistence rejection without unhandled rejection', async () => {
+      const failures = []
+      const onUnhandled = (reason) => failures.push(reason)
+      process.on('unhandledRejection', onUnhandled)
+      try {
+        settingsStoreMock.updateSettingAndPersist.mockClear()
+        settingsStoreMock.updateSettingAndPersist.mockRejectedValueOnce(new Error('storage failed'))
+        const wrapper = mount(PdfApp)
+        await flushPromises()
+
+        wrapper.findComponent({ name: 'PdfToolbar' }).vm.$emit('select-language', 'fas')
+        await flushPromises()
+        await flushPromises()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(settingsStoreMock.updateSettingAndPersist).toHaveBeenCalledWith('OCR_DEFAULT_LANG', 'fas')
+        expect(pdfAppLoggerMock.warn).toHaveBeenCalled()
+        expect(failures).toHaveLength(0)
+      } finally {
+        process.off('unhandledRejection', onUnhandled)
+      }
+    })
   })
 
   describe('OCR highlight reactivity', () => {

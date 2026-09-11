@@ -5,6 +5,7 @@ import useSettingsStore from './settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
 import { SelectionTranslationMode, CONFIG, TranslationMode } from '@/shared/config/config.js';
+import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js';
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 
@@ -140,7 +141,7 @@ describe('Settings Store', () => {
     store.settings.SHOW_MOBILE_FAB = false;
     store.settings.selectionTranslationMode = SelectionTranslationMode.ON_FAB_CLICK;
 
-    await store.saveAllSettings(true);
+    await store.saveAllSettings();
     await nextTick();
 
     expect(store.settings.selectionTranslationMode).toBe(SelectionTranslationMode.ON_CLICK);
@@ -156,6 +157,74 @@ describe('Settings Store', () => {
 
     expect(store.settings.THEME).toBe('light');
     expect(storageManager.set).toHaveBeenCalledWith({ THEME: 'light' });
+  });
+
+  describe('updateSettingAndPersist canonical boundary', () => {
+    it('persists a canonical key/value exactly', async () => {
+      const store = useSettingsStore();
+
+      const result = await store.updateSettingAndPersist('THEME', 'dark');
+
+      expect(result).toBe(true);
+      expect(store.settings.THEME).toBe('dark');
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({ THEME: 'dark' });
+    });
+
+    it('keeps a non-canonical key local-only without throwing', async () => {
+      const store = useSettingsStore();
+
+      const result = await store.updateSettingAndPersist('__SYNTHETIC_UNKNOWN_KEY__', 'x');
+
+      expect(result).toBe(true);
+      expect(store.settings.__SYNTHETIC_UNKNOWN_KEY__).toBe('x');
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('skips the storage write for store-owned translationHistory', async () => {
+      const store = useSettingsStore();
+      const history = [{ text: 'hi', translated: 'سلام' }];
+
+      const result = await store.updateSettingAndPersist('translationHistory', history);
+
+      expect(result).toBe(true);
+      expect(store.settings.translationHistory).toEqual(history);
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('passes nested canonical values through', async () => {
+      const store = useSettingsStore();
+      const modeProviders = { ...store.settings.MODE_PROVIDERS, field: 'googlev2' };
+
+      await store.updateSettingAndPersist('MODE_PROVIDERS', modeProviders);
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({ MODE_PROVIDERS: modeProviders });
+    });
+
+    it('still persists DEBUG_MODE cleanup additions', async () => {
+      const store = useSettingsStore();
+      store.settings.TRANSLATION_API = 'mock';
+      store.settings.MODE_PROVIDERS = { ...store.settings.MODE_PROVIDERS, field: 'mock' };
+
+      await store.updateSettingAndPersist('DEBUG_MODE', false);
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual(expect.objectContaining({
+        DEBUG_MODE: false,
+        TRANSLATION_API: CONFIG.TRANSLATION_API || 'googlev2'
+      }));
+      expect(storageManager.set.mock.calls[0][0]).toHaveProperty('MODE_PROVIDERS');
+    });
+
+    it('preserves rejection behavior for canonical writes', async () => {
+      const store = useSettingsStore();
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.updateSettingAndPersist('THEME', 'dark')).rejects.toThrow('storage failed');
+      // Synchronous local update still applied before the failure.
+      expect(store.settings.THEME).toBe('dark');
+    });
   });
 
   it('should handle complex merge for EXCLUDED_SITES with various data types', async () => {
@@ -205,7 +274,7 @@ describe('Settings Store', () => {
     store.updateSettingLocally('PROMPT_BASE_FIELD', customPrompt);
     
     // 2. Save
-    await store.saveAllSettings(true);
+    await store.saveAllSettings();
     expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
       PROMPT_BASE_FIELD: customPrompt
     }));
@@ -219,6 +288,211 @@ describe('Settings Store', () => {
     await nextTick();
     
     expect(store.settings.PROMPT_BASE_FIELD).toBe(customPrompt);
+  });
+
+  describe('saveAllSettings immediate persistence', () => {
+    it('invokes persistence immediately without timer', async () => {
+      const store = useSettingsStore();
+
+      const savePromise = store.saveAllSettings();
+
+      // No timer advance: the storage write must already be underway.
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+
+      await savePromise;
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+    });
+
+    it('Promise resolves only after storage resolves', async () => {
+      const store = useSettingsStore();
+      let resolveStorage;
+      storageManager.set.mockImplementationOnce(
+        () => new Promise((resolve) => { resolveStorage = resolve; })
+      );
+
+      let settled = false;
+      const savePromise = store.saveAllSettings().then((result) => {
+        settled = true;
+        return result;
+      });
+
+      await Promise.resolve();
+      await nextTick();
+
+      // Storage still pending: save must not have settled.
+      expect(settled).toBe(false);
+
+      resolveStorage(true);
+      const result = await savePromise;
+
+      expect(result).toBe(true);
+      expect(settled).toBe(true);
+    });
+
+    it('multiple concurrent saves settle correctly', async () => {
+      const store = useSettingsStore();
+      storageManager.set.mockResolvedValue(true);
+
+      const results = await Promise.all([store.saveAllSettings(), store.saveAllSettings()]);
+
+      expect(results).toEqual([true, true]);
+      expect(storageManager.set).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('PROMPT_EDITOR_SELECTED_KEY persistence lifecycle', () => {
+    it("persists the selected prompt editor key via saveAllSettings", async () => {
+      // PROMPT_BASE_FIELD must stay editable in PROMPT_REGISTRY for this
+      // lifecycle coverage; pick another editable key if the registry changes.
+      expect(PROMPT_REGISTRY['PROMPT_BASE_FIELD']?.editable).toBe(true);
+
+      const store = useSettingsStore();
+      store.settings.PROMPT_EDITOR_SELECTED_KEY = 'PROMPT_BASE_FIELD';
+
+      await store.saveAllSettings();
+
+      expect(storageManager.set).toHaveBeenCalledWith(
+        expect.objectContaining({ PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_BASE_FIELD' })
+      );
+    });
+
+    it('restores the selected key on a fresh store via loadSettings', async () => {
+      storageManager.get.mockResolvedValue({ PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_BASE_FIELD' });
+
+      const store = useSettingsStore();
+      store.isInitialized = false;
+      await store.loadSettings();
+      await nextTick();
+
+      expect(store.settings.PROMPT_EDITOR_SELECTED_KEY).toBe('PROMPT_BASE_FIELD');
+    });
+
+    it('stale stored value keeps raw value but normalizes effectively to PROMPT_TEMPLATE', async () => {
+      storageManager.get.mockResolvedValue({ PROMPT_EDITOR_SELECTED_KEY: 'STALE_REMOVED_KEY' });
+
+      const store = useSettingsStore();
+      store.isInitialized = false;
+      await store.loadSettings();
+      await nextTick();
+
+      // Store boundary: loadSettings does not rewrite stale values in place.
+      expect(store.settings.PROMPT_EDITOR_SELECTED_KEY).toBe('STALE_REMOVED_KEY');
+
+      // Effective selection mirrors PromptTab's guarded getter: only editable
+      // registry entries are effective, everything else falls back.
+      const stored = store.settings.PROMPT_EDITOR_SELECTED_KEY;
+      const effective =
+        PROMPT_REGISTRY[stored]?.editable === true ? stored : 'PROMPT_TEMPLATE';
+      expect(effective).toBe('PROMPT_TEMPLATE');
+    });
+  });
+
+  describe('write-boundary hardening', () => {
+    it('saveAllSettings persists canonical keys with live values', async () => {
+      const store = useSettingsStore();
+      store.settings.THEME = 'dark';
+      store.settings.PROMPT_EDITOR_SELECTED_KEY = 'PROMPT_BASE_FIELD';
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload.THEME).toBe('dark');
+      expect(payload.PROMPT_EDITOR_SELECTED_KEY).toBe('PROMPT_BASE_FIELD');
+      // Membership is canonical-only: every written key belongs to the schema.
+      const canonicalKeys = new Set(Object.keys(getPersistedDefaultSettings()));
+      Object.keys(payload).forEach(key => expect(canonicalKeys.has(key)).toBe(true));
+    });
+
+    it('saveAllSettings excludes translationHistory from the global write', async () => {
+      const store = useSettingsStore();
+      store.settings.translationHistory = [{ text: 'hi', translated: 'سلام' }];
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('translationHistory');
+      // History remains store-owned runtime state; the write boundary only skips it.
+      expect(store.settings.translationHistory).toHaveLength(1);
+    });
+
+    it('saveAllSettings does not persist synthetic unknown keys', async () => {
+      const store = useSettingsStore();
+      store.settings.__SYNTHETIC_UNKNOWN_KEY__ = 'should-not-persist';
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('__SYNTHETIC_UNKNOWN_KEY__');
+      expect(payload).not.toHaveProperty('translationHistory');
+    });
+
+    it('saveAllSettings keeps nested canonical values intact', async () => {
+      const store = useSettingsStore();
+      store.settings.CONTEXT_MENU_VISIBILITY = {
+        ...store.settings.CONTEXT_MENU_VISIBILITY,
+        ACTION_CONTEXT_OPTIONS: false
+      };
+      store.settings.PROVIDER_OPTIMIZATION_LEVELS = { gemini: 5 };
+      store.settings.LANGUAGE_DETECTION_PREFERENCES = { 'latin-script': 'en' };
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload.CONTEXT_MENU_VISIBILITY).toEqual(store.settings.CONTEXT_MENU_VISIBILITY);
+      expect(payload.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_OPTIONS).toBe(false);
+      expect(payload.PROVIDER_OPTIMIZATION_LEVELS).toEqual({ gemini: 5 });
+      expect(payload.LANGUAGE_DETECTION_PREFERENCES).toEqual({ 'latin-script': 'en' });
+      expect(payload.MODE_PROVIDERS).toEqual(store.settings.MODE_PROVIDERS);
+    });
+
+    it('updateMultipleSettings persists only the canonical updated keys', async () => {
+      const store = useSettingsStore();
+      // Unrelated canonical state must NOT be rewritten by a narrowed write.
+      store.settings.TARGET_LANGUAGE = 'fr';
+      store.settings.translationHistory = [{ text: 'hi', translated: 'سلام' }];
+
+      await store.updateMultipleSettings({ THEME: 'dark' });
+
+      expect(store.settings.THEME).toBe('dark');
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({ THEME: 'dark' });
+    });
+
+    it('updateMultipleSettings keeps unknown keys local-only', async () => {
+      const store = useSettingsStore();
+
+      const result = await store.updateMultipleSettings({
+        __SYNTHETIC_UNKNOWN_KEY__: 'should-not-persist'
+      });
+
+      // Local state still accepts runtime keys; storage sees nothing.
+      expect(result).toBe(true);
+      expect(store.settings.__SYNTHETIC_UNKNOWN_KEY__).toBe('should-not-persist');
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('updateMultipleSettings persists multiple canonical keys and nothing else', async () => {
+      const store = useSettingsStore();
+      store.settings.TARGET_LANGUAGE = 'fr';
+
+      await store.updateMultipleSettings({ THEME: 'dark', SOURCE_LANGUAGE: 'en' });
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({
+        THEME: 'dark',
+        SOURCE_LANGUAGE: 'en'
+      });
+    });
+
+    it('updateMultipleSettings with no canonical keys skips the storage write', async () => {
+      const store = useSettingsStore();
+
+      expect(await store.updateMultipleSettings({})).toBe(true);
+      expect(await store.updateMultipleSettings({ translationHistory: [] })).toBe(true);
+
+      // set({}) writes nothing and emits no events, so the round-trip is skipped.
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
   });
 
   describe('Import & Migration Flow', () => {

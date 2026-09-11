@@ -2,7 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import PromptTab from './PromptTab.vue';
 import { createPinia, setActivePinia } from 'pinia';
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
+
+// Shared in-memory selected key across mounts within a test (component binding
+// fixture only). This does NOT exercise browser-storage persistence: no
+// saveAllSettings()/storageManager.set()/loadSettings() is involved here.
+// True storage persistence is covered at the settings-store boundary in
+// src/features/settings/stores/settings.test.js.
+const mockSelectedState = vi.hoisted(() => ({ selectedRef: null }));
 
 // Mock dependencies
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
@@ -11,11 +18,25 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   })
 }));
 
-vi.mock('../composables/useTabSettings.js', () => ({
-  useTabSettings: () => ({
-    createSetting: vi.fn((key, defaultValue) => ref(defaultValue))
-  })
-}));
+vi.mock('../composables/useTabSettings.js', async () => {
+  const { ref: vueRef, computed: vueComputed } = await import('vue');
+  return {
+    useTabSettings: () => ({
+      createSetting: vi.fn((key, defaultValue) => {
+        if (key === 'PROMPT_EDITOR_SELECTED_KEY') {
+          if (!mockSelectedState.selectedRef) {
+            mockSelectedState.selectedRef = vueRef(defaultValue);
+          }
+          return vueComputed({
+            get: () => mockSelectedState.selectedRef.value,
+            set: (v) => { mockSelectedState.selectedRef.value = v; }
+          });
+        }
+        return vueRef(defaultValue);
+      })
+    })
+  };
+});
 
 const mockValidatePromptTemplate = vi.fn().mockResolvedValue(true);
 const mockGetFirstError = vi.fn();
@@ -39,6 +60,7 @@ vi.mock('../composables/useHighlightManager.js', () => ({
 
 vi.mock('@/shared/config/config.js', () => ({
   CONFIG: {
+    PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_TEMPLATE',
     PROMPT_TEMPLATE: 'GENERAL',
     PROMPT_TEMPLATE_AUTO: 'AUTO',
     PROMPT_BASE_FIELD: 'BASE_FIELD',
@@ -113,6 +135,9 @@ describe('PromptTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+
+    // Reset persisted editor selection so each test starts with no stored pref
+    mockSelectedState.selectedRef = null;
     
     // Reset mock state
     mockPromptExamples.value = [];
@@ -207,18 +232,76 @@ describe('PromptTab', () => {
     expect(wrapper.vm.promptExamples.length).toBe(0);
   });
 
-  it('handles invalid currentPromptKey gracefully without crashing', async () => {
+  it('defaults to PROMPT_TEMPLATE with no stored preference', async () => {
     const wrapper = mount(PromptTab);
-    
-    // Manually set to invalid key
-    wrapper.vm.currentPromptKey = 'INVALID_KEY';
-    
-    // These should not crash and return safe fallbacks
+
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE');
+    expect(wrapper.vm.activeTemplateValue).toBe('GENERAL');
+  });
+
+  // Component binding / normalization across remount with shared mock state.
+  // NOTE: not browser-storage persistence — mockSelectedState.selectedRef stays
+  // alive across mounts, so no saveAllSettings()/storageManager.set()/
+  // loadSettings() path is exercised here.
+  it('retains editor selection across remount via shared component binding (not browser storage)', async () => {
+    const wrapper = mount(PromptTab);
+    const select = wrapper.find('select');
+
+    // Select another editable prompt (writes to the shared in-memory binding)
+    await select.setValue('PROMPT_BASE_FIELD');
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_BASE_FIELD');
+
+    wrapper.unmount();
+
+    // Remount reuses the shared mock binding instead of resetting
+    const remounted = mount(PromptTab);
+    expect(remounted.vm.currentPromptKey).toBe('PROMPT_BASE_FIELD');
+    expect(remounted.vm.activeTemplateValue).toBe('BASE_FIELD');
+  });
+
+  it('falls back to PROMPT_TEMPLATE for stale/invalid persisted values', async () => {
+    const wrapper = mount(PromptTab);
+
+    // Simulate a stale persisted value bypassing the guarded setter
+    mockSelectedState.selectedRef.value = 'STALE_REMOVED_KEY';
+    await nextTick();
+
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE');
     expect(wrapper.vm.currentPromptMetadata).toBeDefined();
-    expect(wrapper.vm.activeTemplateValue).toBe('');
-    
+    expect(wrapper.vm.activeTemplateValue).toBe('GENERAL');
+    expect(wrapper.vm.hasRiskWarning).toBe(false);
+  });
+
+  it('ignores direct assignment of invalid keys and keeps the last valid selection', async () => {
+    const wrapper = mount(PromptTab);
+
+    // Manually assign an invalid key (guarded setter ignores it)
+    wrapper.vm.currentPromptKey = 'INVALID_KEY';
+    await nextTick();
+
+    // Effective selection stays on the last valid prompt with safe fallbacks
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE');
+    expect(wrapper.vm.currentPromptMetadata).toBeDefined();
+    expect(wrapper.vm.activeTemplateValue).toBe('GENERAL');
+
     // Risk check should be safe
     expect(wrapper.vm.hasRiskWarning).toBe(false);
+  });
+
+  it('never exposes non-editable registry entries as effective selection', async () => {
+    const wrapper = mount(PromptTab);
+
+    // Direct assignment of a locked prompt is ignored
+    wrapper.vm.currentPromptKey = 'PROMPT_BASE_SELECT';
+    await nextTick();
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE');
+    expect(wrapper.vm.activeTemplateValue).toBe('GENERAL');
+
+    // A stale persisted locked key also normalizes to the fallback
+    mockSelectedState.selectedRef.value = 'PROMPT_BASE_AI_BATCH';
+    await nextTick();
+    expect(wrapper.vm.currentPromptKey).toBe('PROMPT_TEMPLATE');
+    expect(wrapper.vm.activeTemplateValue).toBe('GENERAL');
   });
 
   it('resets selected advanced prompt', async () => {

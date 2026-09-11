@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { reactive, isReactive } from 'vue';
 import { StorageCore } from './StorageCore.js';
 import { isContextError } from '@/core/contextCore.js';
 
@@ -100,6 +101,39 @@ describe('StorageCore CRUD Operations', () => {
     
     expect(browser.storage.local.remove).toHaveBeenCalledWith(['key']);
     expect(storage.cache.has('key')).toBe(false);
+  });
+});
+
+describe('StorageCore set plain-data conversion', () => {
+  let storage;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    browser.storage.local.get.mockResolvedValue({});
+    storage = new StorageCore();
+    await storage._readyPromise;
+  });
+
+  it('converts nested objects and arrays to detached plain values', async () => {
+    const input = { nested: { count: 1, list: [1, { label: 'x' }] } };
+
+    await storage.set(input);
+
+    const written = browser.storage.local.set.mock.calls[0][0];
+    expect(written).toEqual({ nested: { count: 1, list: [1, { label: 'x' }] } });
+    expect(written.nested).not.toBe(input.nested);
+    expect(written.nested.list).not.toBe(input.nested.list);
+  });
+
+  it('strips Vue reactive proxies before reaching browser storage', async () => {
+    const proxy = reactive({ theme: 'dark', nested: { list: [1, 2] } });
+
+    await storage.set(proxy);
+
+    const written = browser.storage.local.set.mock.calls[0][0];
+    expect(written).toEqual({ theme: 'dark', nested: { list: [1, 2] } });
+    expect(isReactive(written)).toBe(false);
+    expect(isReactive(written.nested)).toBe(false);
   });
 });
 
