@@ -15,7 +15,7 @@
         class="api-url-input"
         dir="ltr"
       />
-      <p class="setting-help-text">
+      <p class="setting-help-text ti-custom-api-url-example">
         {{ t('custom_api_url_example') || 'Example:' }} https://openai.com/v1/chat/completions
       </p>
     </div>
