@@ -41,7 +41,10 @@
     </div>
     <div class="setting-group vertical">
       <div class="api-key-input-wrapper">
-        <div class="button-result-row">
+        <div
+          id="CUSTOM_API_COMPATIBILITY_CHECK"
+          class="button-result-row"
+        >
           <div
             data-testid="custom-connection-status"
             role="status"

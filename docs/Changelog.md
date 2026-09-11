@@ -1,3 +1,17 @@
+#### v1.19.1 – Released on September 11, 2026
+
+##### Added
+
+- Added a [Compatibility Check](#/providers?highlight=CUSTOM_API_COMPATIBILITY_CHECK) for OpenAI-compatible providers in Settings.
+
+##### Fixed
+
+- Fixed `Field` translation to translate and replace only the selected text instead of the entire field ([#201](https://github.com/iSegaro/Translate-It/issues/201)).
+- Fixed `Select Element` translation failures with OpenAI-compatible local LLM providers such as LM Studio ([#164](https://github.com/iSegaro/Translate-It/issues/164)).
+- Fixed Settings persistence issues, including Prompt Template selections not being saved correctly ([#202](https://github.com/iSegaro/Translate-It/issues/202)).
+
+---
+
 #### v1.19.0 – Released on September 06, 2026
 
 ##### Added

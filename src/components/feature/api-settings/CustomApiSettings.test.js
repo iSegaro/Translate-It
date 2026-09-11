@@ -904,4 +904,15 @@ describe('CustomApiSettings Test Connection', () => {
     expect(statusOf(wrapper).text()).toBe('Not checked');
     wrapper.unmount();
   });
+
+  it('exposes the compat-check spotlight target on the shared status+button row', () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    const row = wrapper.get('#CUSTOM_API_COMPATIBILITY_CHECK');
+    expect(row.classes()).toContain('button-result-row');
+    expect(row.find('[data-testid="custom-connection-status"]').exists()).toBe(true);
+    expect(row.find('[data-testid="custom-test-connection"]').exists()).toBe(true);
+    expect(buttonOf(wrapper).attributes('id')).toBeUndefined();
+    wrapper.unmount();
+  });
 });
