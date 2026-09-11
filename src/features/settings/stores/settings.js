@@ -31,6 +31,27 @@ function getDefaultSettings() {
   };
 }
 
+/**
+ * Builds a canonical persisted-settings snapshot from live state.
+ *
+ * Membership comes from getPersistedDefaultSettings() (single schema authority,
+ * keys only); values are always taken from the live state and never backfilled
+ * from defaults. Nested objects are deep-cloned so reactive proxies never leak
+ * into storage. translationHistory and any non-schema runtime keys are excluded
+ * by construction — history owns its own storage key via the history feature.
+ */
+function buildPersistedSnapshot(source) {
+  const snapshot = {};
+  Object.keys(getPersistedDefaultSettings()).forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(source, key) || source[key] === undefined) return;
+    const value = source[key];
+    snapshot[key] = (value !== null && typeof value === 'object')
+      ? JSON.parse(JSON.stringify(value))
+      : value;
+  });
+  return snapshot;
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
   const settings = ref(getDefaultSettings())
@@ -180,8 +201,9 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       // Run sanitization before saving
       sanitizeSettings();
-      
-      await storageManager.set(settings.value);
+
+      // Write-boundary: persist canonical schema keys only, with live values.
+      await storageManager.set(buildPersistedSnapshot(settings.value));
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -253,9 +275,9 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       // Update local state
       Object.assign(settings.value, updates)
-      
-      // Get browser API and save to storage
-  await storageManager.set(settings.value)
+
+      // Global-settings persistence: same canonical write boundary as performSave().
+      await storageManager.set(buildPersistedSnapshot(settings.value))
       
       return true
     } catch (error) {

@@ -319,6 +319,86 @@ describe('Settings Store', () => {
     });
   });
 
+  describe('write-boundary hardening', () => {
+    it('saveAllSettings persists canonical keys with live values', async () => {
+      const store = useSettingsStore();
+      store.settings.THEME = 'dark';
+      store.settings.PROMPT_EDITOR_SELECTED_KEY = 'PROMPT_BASE_FIELD';
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload.THEME).toBe('dark');
+      expect(payload.PROMPT_EDITOR_SELECTED_KEY).toBe('PROMPT_BASE_FIELD');
+      // Membership is canonical-only: every written key belongs to the schema.
+      const canonicalKeys = new Set(Object.keys(getPersistedDefaultSettings()));
+      Object.keys(payload).forEach(key => expect(canonicalKeys.has(key)).toBe(true));
+    });
+
+    it('saveAllSettings excludes translationHistory from the global write', async () => {
+      const store = useSettingsStore();
+      store.settings.translationHistory = [{ text: 'hi', translated: 'سلام' }];
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('translationHistory');
+      // History remains store-owned runtime state; the write boundary only skips it.
+      expect(store.settings.translationHistory).toHaveLength(1);
+    });
+
+    it('saveAllSettings does not persist synthetic unknown keys', async () => {
+      const store = useSettingsStore();
+      store.settings.__SYNTHETIC_UNKNOWN_KEY__ = 'should-not-persist';
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('__SYNTHETIC_UNKNOWN_KEY__');
+      expect(payload).not.toHaveProperty('translationHistory');
+    });
+
+    it('saveAllSettings keeps nested canonical values intact and detached', async () => {
+      const store = useSettingsStore();
+      store.settings.CONTEXT_MENU_VISIBILITY = {
+        ...store.settings.CONTEXT_MENU_VISIBILITY,
+        ACTION_CONTEXT_OPTIONS: false
+      };
+      store.settings.PROVIDER_OPTIMIZATION_LEVELS = { gemini: 5 };
+      store.settings.LANGUAGE_DETECTION_PREFERENCES = { 'latin-script': 'en' };
+
+      await store.saveAllSettings();
+
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload.CONTEXT_MENU_VISIBILITY).toEqual(store.settings.CONTEXT_MENU_VISIBILITY);
+      expect(payload.CONTEXT_MENU_VISIBILITY.ACTION_CONTEXT_OPTIONS).toBe(false);
+      expect(payload.PROVIDER_OPTIMIZATION_LEVELS).toEqual({ gemini: 5 });
+      expect(payload.LANGUAGE_DETECTION_PREFERENCES).toEqual({ 'latin-script': 'en' });
+      // Cloned before storage: no shared references with live reactive state.
+      expect(payload.CONTEXT_MENU_VISIBILITY).not.toBe(store.settings.CONTEXT_MENU_VISIBILITY);
+      expect(payload.MODE_PROVIDERS).toEqual(store.settings.MODE_PROVIDERS);
+      expect(payload.MODE_PROVIDERS).not.toBe(store.settings.MODE_PROVIDERS);
+    });
+
+    it('updateMultipleSettings enforces the same canonical boundary', async () => {
+      const store = useSettingsStore();
+      store.settings.translationHistory = [{ text: 'hi', translated: 'سلام' }];
+
+      await store.updateMultipleSettings({
+        THEME: 'dark',
+        __SYNTHETIC_UNKNOWN_KEY__: 'should-not-persist'
+      });
+
+      expect(store.settings.THEME).toBe('dark');
+      const payload = storageManager.set.mock.calls[0][0];
+      expect(payload.THEME).toBe('dark');
+      expect(payload).not.toHaveProperty('translationHistory');
+      expect(payload).not.toHaveProperty('__SYNTHETIC_UNKNOWN_KEY__');
+      const canonicalKeys = new Set(Object.keys(getPersistedDefaultSettings()));
+      Object.keys(payload).forEach(key => expect(canonicalKeys.has(key)).toBe(true));
+    });
+  });
+
   describe('Import & Migration Flow', () => {
     it('importSettings should merge defaults and run migrations', async () => {
       const mockImportData = { THEME: 'dark', TRANSLATION_API: 'google' };
