@@ -32,14 +32,18 @@ function getDefaultSettings() {
 }
 
 /**
- * Builds a canonical persisted-settings snapshot from a source object.
+ * Filters a source object to canonical persisted-settings keys.
  *
- * Membership comes from getPersistedDefaultSettings() (single schema authority,
- * keys only); values are always taken from the source and never backfilled
- * from defaults. Keys absent from the source — or explicitly undefined — are
- * skipped. Nested objects are deep-cloned so reactive proxies never leak
- * into storage. translationHistory and any non-schema runtime keys are excluded
- * by construction — history owns its own storage key via the history feature.
+ * Ownership invariant: SettingsStore owns key membership (from
+ * getPersistedDefaultSettings(), keys only); StorageCore owns plain-data
+ * conversion (StorageCore.set() runs _convertToPlainObject() on every write,
+ * so reactive proxies never reach browser storage as proxies). Values here
+ * keep their original references — no store-level cloning.
+ *
+ * Values are always taken from the source and never backfilled from defaults.
+ * Keys absent from the source — or explicitly undefined — are skipped.
+ * translationHistory and any non-schema runtime keys are excluded by
+ * construction — history owns its own storage key via the history feature.
  *
  * Used for full-state writes (performSave reads settings.value) and for
  * narrowed writes (updateMultipleSettings reads the updates object only).
@@ -48,10 +52,7 @@ function buildPersistedSnapshot(source) {
   const snapshot = {};
   Object.keys(getPersistedDefaultSettings()).forEach(key => {
     if (!Object.prototype.hasOwnProperty.call(source, key) || source[key] === undefined) return;
-    const value = source[key];
-    snapshot[key] = (value !== null && typeof value === 'object')
-      ? JSON.parse(JSON.stringify(value))
-      : value;
+    snapshot[key] = source[key];
   });
   return snapshot;
 }
