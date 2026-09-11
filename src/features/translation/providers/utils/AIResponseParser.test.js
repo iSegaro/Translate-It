@@ -6,6 +6,12 @@ import { createManifestView, createRequestUnitManifest, MappingStrategy } from '
 import { createTranslationOperation } from '@/features/translation/ir/TranslationOperation.js';
 import { createCompletionRecord, CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
 
+const { loggerMock } = vi.hoisted(() => ({
+  loggerMock: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@/shared/logging/logger.js', () => ({ getScopedLogger: () => loggerMock }));
+
 describe('AIResponseParser', () => {
   it('emits bounded mapping diagnostics with accurate totals and no response text', () => {
     const operation = createTranslationOperation('parser-diagnostics');
@@ -925,6 +931,100 @@ describe('AIResponseParser', () => {
       );
 
       expect(truncated).toEqual(normal);
+    });
+  });
+
+  describe('strict parse failure logging', () => {
+    it('logs Error reason in a single string with no structured arg', () => {
+      loggerMock.error.mockClear();
+      const cleanSpy = vi.spyOn(AIResponseParser, 'cleanAIResponse').mockImplementation(() => {
+        throw new TypeError('boom detail');
+      });
+
+      try {
+        const operation = createTranslationOperation('parser-log-error');
+        const result = AIResponseParser.parseBatchResult(
+          '{"translations":',
+          1,
+          ['source'],
+          'MockProvider',
+          ResponseFormat.JSON_OBJECT,
+          { operation },
+        );
+
+        expect(result.parseFailed).toBe(true);
+        expect(loggerMock.error).toHaveBeenCalledTimes(1);
+        expect(loggerMock.error).toHaveBeenCalledWith(
+          '[MockProvider] Strict parse failed [PARSE_FAILED]: TypeError: boom detail',
+        );
+        expect(operation.finalize().entries).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'PARSER_MALFORMED_RESPONSE', reason: 'PARSE_FAILED', code: 'PARSE_FAILED' }),
+        ]));
+      } finally {
+        cleanSpy.mockRestore();
+      }
+    });
+
+    it('logs string thrown values directly with no structured arg', () => {
+      loggerMock.error.mockClear();
+      const cleanSpy = vi.spyOn(AIResponseParser, 'cleanAIResponse').mockImplementation(() => {
+        throw 'custom string failure';
+      });
+
+      try {
+        const operation = createTranslationOperation('parser-log-string');
+        const result = AIResponseParser.parseBatchResult(
+          '{"translations":',
+          1,
+          ['source'],
+          'MockProvider',
+          ResponseFormat.JSON_OBJECT,
+          { operation },
+        );
+
+        expect(result.parseFailed).toBe(true);
+        expect(loggerMock.error).toHaveBeenCalledTimes(1);
+        expect(loggerMock.error).toHaveBeenCalledWith(
+          '[MockProvider] Strict parse failed [PARSE_FAILED]: custom string failure',
+        );
+        expect(operation.finalize().entries).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'PARSER_MALFORMED_RESPONSE', reason: 'PARSE_FAILED' }),
+        ]));
+      } finally {
+        cleanSpy.mockRestore();
+      }
+    });
+
+    it('uses a stable generic fallback for unknown thrown values without exposing the value', () => {
+      loggerMock.error.mockClear();
+      const thrownValue = { secretValue: 'super-secret-12345' };
+      const cleanSpy = vi.spyOn(AIResponseParser, 'cleanAIResponse').mockImplementation(() => {
+        throw thrownValue;
+      });
+
+      try {
+        const operation = createTranslationOperation('parser-log-unknown');
+        const result = AIResponseParser.parseBatchResult(
+          '{"translations":',
+          1,
+          ['source'],
+          'MockProvider',
+          ResponseFormat.JSON_OBJECT,
+          { operation },
+        );
+
+        expect(result.parseFailed).toBe(true);
+        expect(loggerMock.error).toHaveBeenCalledTimes(1);
+        expect(loggerMock.error).toHaveBeenCalledWith(
+          '[MockProvider] Strict parse failed [PARSE_FAILED]: Unknown error',
+        );
+        expect(JSON.stringify(loggerMock.error.mock.calls)).not.toContain('super-secret-12345');
+        expect(operation.finalize().entries).toEqual(expect.arrayContaining([
+          expect.objectContaining({ type: 'PARSER_MALFORMED_RESPONSE', reason: 'PARSE_FAILED', code: 'PARSE_FAILED' }),
+        ]));
+      } finally {
+        cleanSpy.mockRestore();
+      }
     });
   });
 });

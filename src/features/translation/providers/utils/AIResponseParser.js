@@ -620,8 +620,11 @@ export const AIResponseParser = {
         ...(parserFacts || {}),
         ...(repairContext ? { repairContext } : {}),
       };
-    } catch {
-      logger.error(`[${providerName}] Strict parse failed`, { code: 'PARSE_FAILED' });
+    } catch (error) {
+      const reason = error instanceof Error
+        ? `${error.name}: ${error.message}`
+        : (typeof error === 'string' ? error : 'Unknown error');
+      logger.error(`[${providerName}] Strict parse failed [PARSE_FAILED]: ${reason}`);
       appendTranslationDiagnostic(executionContext, {
         type: 'PARSER_MALFORMED_RESPONSE',
         stage: 'parser',
