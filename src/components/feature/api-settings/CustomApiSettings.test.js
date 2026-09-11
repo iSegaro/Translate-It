@@ -852,6 +852,18 @@ describe('CustomApiSettings Test Connection', () => {
     expect(scss).toContain('var(--color-error-text)');
     expect(scss).toMatch(/\.connection-detail\s*{[^}]*color:\s*var\(--color-text\)/);
     expect(scss).not.toMatch(/#[0-9a-fA-F]{3}/);
+    // URL example: border-box alignment scoped to the Custom example only;
+    // no width rules (ProvidersTab already forces width:100% on the group).
+    expect(scss).toMatch(/\.ti-custom-api-url-example\s*{[^}]*box-sizing:\s*border-box/);
+    expect(scss).not.toMatch(/\.ti-custom-api-url-example\s*{[^}]*width:/);
+  });
+
+  it('renders the Custom URL example with the dedicated alignment class', () => {
+    const wrapper = mountWith({ CUSTOM_API_URL: URL_A, CUSTOM_API_KEY: 'k', CUSTOM_API_MODEL: 'm' });
+
+    const example = wrapper.get('p.ti-custom-api-url-example.setting-help-text');
+    expect(example.text()).toContain('https://openai.com/v1/chat/completions');
+    wrapper.unmount();
   });
 
   it('keeps layout ownership on the outer wrapper and presentation on the inner element', async () => {

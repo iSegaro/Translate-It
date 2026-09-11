@@ -75,6 +75,15 @@
     unicode-bidi: isolate;
   }
 
+  // URL example alignment: ProvidersTab forces width:100% on direct
+  // children of .setting-group.vertical, but the shared help text carries
+  // padding/border without border-box sizing (100% + padding + border).
+  // Border-box here (Custom URL example only) aligns its outer edge with
+  // the border-box-sized URL textbox. No width rules needed.
+  .ti-custom-api-url-example {
+    box-sizing: border-box;
+  }
+
   // Grid-stacked button labels: both labels share one cell, so the button
   // width equals the widest current-locale label with no JS measurement.
   // The inactive label keeps layout space via visibility (never
