@@ -998,6 +998,9 @@
   "translation_api_label": {
     "message": "サービス"
   },
+  "providers_configure_label": {
+    "message": "設定するプロバイダー"
+  },
   "provider_label": {
     "message": "プロバイダー"
   },

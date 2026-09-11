@@ -998,6 +998,9 @@
   "translation_api_label": {
     "message": "Service"
   },
+  "providers_configure_label": {
+    "message": "Provider to configure"
+  },
   "provider_label": {
     "message": "Provider"
   },
