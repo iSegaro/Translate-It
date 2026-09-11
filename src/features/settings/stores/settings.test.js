@@ -159,6 +159,74 @@ describe('Settings Store', () => {
     expect(storageManager.set).toHaveBeenCalledWith({ THEME: 'light' });
   });
 
+  describe('updateSettingAndPersist canonical boundary', () => {
+    it('persists a canonical key/value exactly', async () => {
+      const store = useSettingsStore();
+
+      const result = await store.updateSettingAndPersist('THEME', 'dark');
+
+      expect(result).toBe(true);
+      expect(store.settings.THEME).toBe('dark');
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({ THEME: 'dark' });
+    });
+
+    it('keeps a non-canonical key local-only without throwing', async () => {
+      const store = useSettingsStore();
+
+      const result = await store.updateSettingAndPersist('__SYNTHETIC_UNKNOWN_KEY__', 'x');
+
+      expect(result).toBe(true);
+      expect(store.settings.__SYNTHETIC_UNKNOWN_KEY__).toBe('x');
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('skips the storage write for store-owned translationHistory', async () => {
+      const store = useSettingsStore();
+      const history = [{ text: 'hi', translated: 'سلام' }];
+
+      const result = await store.updateSettingAndPersist('translationHistory', history);
+
+      expect(result).toBe(true);
+      expect(store.settings.translationHistory).toEqual(history);
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('passes nested canonical values through', async () => {
+      const store = useSettingsStore();
+      const modeProviders = { ...store.settings.MODE_PROVIDERS, field: 'googlev2' };
+
+      await store.updateSettingAndPersist('MODE_PROVIDERS', modeProviders);
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({ MODE_PROVIDERS: modeProviders });
+    });
+
+    it('still persists DEBUG_MODE cleanup additions', async () => {
+      const store = useSettingsStore();
+      store.settings.TRANSLATION_API = 'mock';
+      store.settings.MODE_PROVIDERS = { ...store.settings.MODE_PROVIDERS, field: 'mock' };
+
+      await store.updateSettingAndPersist('DEBUG_MODE', false);
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual(expect.objectContaining({
+        DEBUG_MODE: false,
+        TRANSLATION_API: CONFIG.TRANSLATION_API || 'googlev2'
+      }));
+      expect(storageManager.set.mock.calls[0][0]).toHaveProperty('MODE_PROVIDERS');
+    });
+
+    it('preserves rejection behavior for canonical writes', async () => {
+      const store = useSettingsStore();
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.updateSettingAndPersist('THEME', 'dark')).rejects.toThrow('storage failed');
+      // Synchronous local update still applied before the failure.
+      expect(store.settings.THEME).toBe('dark');
+    });
+  });
+
   it('should handle complex merge for EXCLUDED_SITES with various data types', async () => {
     // Case 1: Object format (legacy/migration)
     storageManager.get.mockResolvedValueOnce({ 

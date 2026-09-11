@@ -264,7 +264,13 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       }
 
-      await storageManager.set(updates) // Persist all changes
+      // Canonical write boundary: persist only schema keys from the final
+      // updates object (including DEBUG_MODE cleanup additions, which are
+      // canonical). An empty result skips the storage round-trip; local state
+      // and the true return are unaffected.
+      const filtered = buildPersistedSnapshot(updates)
+      if (Object.keys(filtered).length === 0) return true
+      await storageManager.set(filtered)
       return true
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
