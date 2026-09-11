@@ -32,13 +32,17 @@ function getDefaultSettings() {
 }
 
 /**
- * Builds a canonical persisted-settings snapshot from live state.
+ * Builds a canonical persisted-settings snapshot from a source object.
  *
  * Membership comes from getPersistedDefaultSettings() (single schema authority,
- * keys only); values are always taken from the live state and never backfilled
- * from defaults. Nested objects are deep-cloned so reactive proxies never leak
+ * keys only); values are always taken from the source and never backfilled
+ * from defaults. Keys absent from the source — or explicitly undefined — are
+ * skipped. Nested objects are deep-cloned so reactive proxies never leak
  * into storage. translationHistory and any non-schema runtime keys are excluded
  * by construction — history owns its own storage key via the history feature.
+ *
+ * Used for full-state writes (performSave reads settings.value) and for
+ * narrowed writes (updateMultipleSettings reads the updates object only).
  */
 function buildPersistedSnapshot(source) {
   const snapshot = {};
@@ -273,11 +277,17 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const updateMultipleSettings = async (updates) => {
     try {
-      // Update local state
+      // Update local state (all keys, including non-schema runtime keys)
       Object.assign(settings.value, updates)
 
-      // Global-settings persistence: same canonical write boundary as performSave().
-      await storageManager.set(buildPersistedSnapshot(settings.value))
+      // Narrow write: persist only the canonical keys from this update.
+      // Unrelated canonical settings already in state are NOT rewritten, which
+      // removes the concurrent-overwrite window of a whole-snapshot write.
+      // An empty result skips the storage round-trip (set({}) writes nothing
+      // and emits no events); local state and the true return are unaffected.
+      const filtered = buildPersistedSnapshot(updates || {})
+      if (Object.keys(filtered).length === 0) return true
+      await storageManager.set(filtered)
       
       return true
     } catch (error) {

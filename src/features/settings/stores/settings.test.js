@@ -380,22 +380,53 @@ describe('Settings Store', () => {
       expect(payload.MODE_PROVIDERS).not.toBe(store.settings.MODE_PROVIDERS);
     });
 
-    it('updateMultipleSettings enforces the same canonical boundary', async () => {
+    it('updateMultipleSettings persists only the canonical updated keys', async () => {
       const store = useSettingsStore();
+      // Unrelated canonical state must NOT be rewritten by a narrowed write.
+      store.settings.TARGET_LANGUAGE = 'fr';
       store.settings.translationHistory = [{ text: 'hi', translated: 'سلام' }];
 
-      await store.updateMultipleSettings({
-        THEME: 'dark',
+      await store.updateMultipleSettings({ THEME: 'dark' });
+
+      expect(store.settings.THEME).toBe('dark');
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({ THEME: 'dark' });
+    });
+
+    it('updateMultipleSettings keeps unknown keys local-only', async () => {
+      const store = useSettingsStore();
+
+      const result = await store.updateMultipleSettings({
         __SYNTHETIC_UNKNOWN_KEY__: 'should-not-persist'
       });
 
-      expect(store.settings.THEME).toBe('dark');
-      const payload = storageManager.set.mock.calls[0][0];
-      expect(payload.THEME).toBe('dark');
-      expect(payload).not.toHaveProperty('translationHistory');
-      expect(payload).not.toHaveProperty('__SYNTHETIC_UNKNOWN_KEY__');
-      const canonicalKeys = new Set(Object.keys(getPersistedDefaultSettings()));
-      Object.keys(payload).forEach(key => expect(canonicalKeys.has(key)).toBe(true));
+      // Local state still accepts runtime keys; storage sees nothing.
+      expect(result).toBe(true);
+      expect(store.settings.__SYNTHETIC_UNKNOWN_KEY__).toBe('should-not-persist');
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('updateMultipleSettings persists multiple canonical keys and nothing else', async () => {
+      const store = useSettingsStore();
+      store.settings.TARGET_LANGUAGE = 'fr';
+
+      await store.updateMultipleSettings({ THEME: 'dark', SOURCE_LANGUAGE: 'en' });
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(storageManager.set.mock.calls[0][0]).toEqual({
+        THEME: 'dark',
+        SOURCE_LANGUAGE: 'en'
+      });
+    });
+
+    it('updateMultipleSettings with no canonical keys skips the storage write', async () => {
+      const store = useSettingsStore();
+
+      expect(await store.updateMultipleSettings({})).toBe(true);
+      expect(await store.updateMultipleSettings({ translationHistory: [] })).toBe(true);
+
+      // set({}) writes nothing and emits no events, so the round-trip is skipped.
+      expect(storageManager.set).not.toHaveBeenCalled();
     });
   });
 
