@@ -1,6 +1,18 @@
 import { nextTick, ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { usePdfNavigation } from './usePdfNavigation.js'
+import { NavigationTargetType } from '@/features/pdf-translation/core/NavigationModels.js'
+
+const navigationLoggerMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn()
+}))
+
+vi.mock('@/shared/logging/logger.js', () => ({
+  getScopedLogger: () => navigationLoggerMock
+}))
 
 function createDeferred() {
   let resolve
@@ -146,5 +158,51 @@ describe('usePdfNavigation', () => {
 
     expect(navigation.activeOutlineDest.value).toBe('chapter')
     expect(session.resolveDestination).toHaveBeenCalledTimes(2)
+  })
+
+  describe('external link navigation', () => {
+    let openSpy
+
+    beforeEach(() => {
+      navigationLoggerMock.warn.mockClear()
+      navigationLoggerMock.info.mockClear()
+      openSpy = vi.spyOn(window, 'open').mockReturnValue({})
+    })
+
+    afterEach(() => {
+      openSpy.mockRestore()
+    })
+
+    it('opens a valid external URL with secure args', () => {
+      const navigation = usePdfNavigation(ref(null), ref(null), ref('original'))
+      const url = 'https://example.com/article'
+
+      navigation.handleNavigationTarget({ type: NavigationTargetType.URI, url })
+
+      expect(openSpy).toHaveBeenCalledTimes(1)
+      expect(openSpy).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
+    })
+
+    it('emits no popup-blocked warning when window.open returns null', () => {
+      openSpy.mockReturnValue(null)
+      const navigation = usePdfNavigation(ref(null), ref(null), ref('original'))
+      const url = 'https://example.com/article'
+
+      navigation.handleNavigationTarget({ type: NavigationTargetType.URI, url })
+
+      expect(openSpy).toHaveBeenCalledTimes(1)
+      expect(openSpy).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer')
+      expect(navigationLoggerMock.warn).not.toHaveBeenCalled()
+    })
+
+    it('rejects an unsafe URL without calling window.open', () => {
+      const navigation = usePdfNavigation(ref(null), ref(null), ref('original'))
+      const url = 'javascript:alert(1)'
+
+      navigation.handleNavigationTarget({ type: NavigationTargetType.URI, url })
+
+      expect(openSpy).not.toHaveBeenCalled()
+      expect(navigationLoggerMock.warn).toHaveBeenCalledWith('Rejected unsafe URL:', url)
+    })
   })
 })

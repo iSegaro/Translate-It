@@ -317,15 +317,10 @@ export function usePdfNavigation(viewerRef, translatedPaneRef, contentView) {
           return
         }
 
-        const openedWindow = window.open(
-          target.url,
-          '_blank',
-          'noopener,noreferrer'
-        )
-
-        if (!openedWindow) {
-          logger.warn('Failed to open URL — popup may have been blocked:', target.url)
-        }
+        // NOTE: window.open return value is intentionally ignored — with
+        // noopener it may be null even when the tab opened successfully,
+        // so a null return must not be treated as popup-blocked.
+        window.open(target.url, '_blank', 'noopener,noreferrer')
         break
       }
 

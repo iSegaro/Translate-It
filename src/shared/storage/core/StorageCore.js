@@ -98,13 +98,32 @@ class StorageCore extends ResourceTracker {
     }
 
     // Probe failures must reach the existing retry and context-error handling.
-    await browser.storage.local.get(["__storage_test__"]);
+    await this._getBrowserStorageOrThrow().get(["__storage_test__"]);
 
     // Setup change listener for cache invalidation
     this._setupChangeListener();
 
     this._isReady = true;
     this.logger.info('Storage core initialized successfully');
+  }
+
+  /**
+   * Resolve the browser storage area, failing fast when the extension
+   * runtime has disappeared after startup (e.g. invalidated context in
+   * long-lived pages). Deliberately never falls back to in-memory here:
+   * a browser-backed instance must not silently fork into a second
+   * storage universe on runtime loss. The thrown error carries an explicit
+   * message recognized by the permanent-context contract.
+   * @returns {object} The browser.storage.local area.
+   * @throws {Error} Explicit context error when the runtime API is gone.
+   * @private
+   */
+  _getBrowserStorageOrThrow() {
+    const area = browser?.storage?.local;
+    if (!area) {
+      throw new Error('Runtime API unavailable: browser.storage.local is missing');
+    }
+    return area;
   }
 
   /**
@@ -285,7 +304,7 @@ class StorageCore extends ResourceTracker {
         }
 
         const readRevision = this._cacheRevision;
-        const result = await browser.storage.local.get(readKeys || undefined);
+        const result = await this._getBrowserStorageOrThrow().get(readKeys || undefined);
 
         if (readRevision !== this._cacheRevision) {
           continue;
@@ -376,7 +395,7 @@ class StorageCore extends ResourceTracker {
         return;
       }
 
-      await browser.storage.local.set(plainData);
+      await this._getBrowserStorageOrThrow().set(plainData);
       this._advanceCacheRevision();
 
       // Update cache if requested (use plain data)
@@ -434,7 +453,7 @@ class StorageCore extends ResourceTracker {
         return;
       }
 
-      await browser.storage.local.remove(keyList);
+      await this._getBrowserStorageOrThrow().remove(keyList);
       this._advanceCacheRevision();
 
       // Update cache if requested
@@ -480,7 +499,7 @@ class StorageCore extends ResourceTracker {
         return;
       }
 
-      await browser.storage.local.clear();
+      await this._getBrowserStorageOrThrow().clear();
       this._advanceCacheRevision();
 
       if (updateCache) {
