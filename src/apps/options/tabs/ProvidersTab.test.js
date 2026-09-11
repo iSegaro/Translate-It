@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
-import { reactive, ref } from 'vue';
+import { nextTick, reactive, ref } from 'vue';
 import ProvidersTab from './ProvidersTab.vue';
 
 // Mock vue-router (useRoute for the tab, useRouter for useHighlightManager)
@@ -48,6 +48,19 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
   }
 }));
 
+// Mock highlight manager with hoisted spies: reveal assertions observe
+// activeConfigProvider synchronously on mount (OptionsLayout owns
+// checkAndHighlight execution, so it must stay uncalled here), while
+// missing-highlight assertions use fake timers to flush the watcher's
+// 600ms window with no real-wait fragility.
+const highlightMocks = vi.hoisted(() => ({
+  checkAndHighlight: vi.fn(),
+  highlightElement: vi.fn()
+}));
+vi.mock('../composables/useHighlightManager.js', () => ({
+  useHighlightManager: () => highlightMocks
+}));
+
 // Mock logger to avoid console noise
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
@@ -59,6 +72,17 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }));
 
 describe('ProvidersTab.vue - Config-panel selector labeling', () => {
+  // Every mount registers a live selectedProvider watcher on the shared
+  // mock store. Track wrappers so afterEach can unmount them all: otherwise
+  // a later provider assignment would fire stale watchers and pollute
+  // highlightElement assertions across tests.
+  const mountedWrappers = [];
+  const mountTab = () => {
+    const wrapper = mount(ProvidersTab);
+    mountedWrappers.push(wrapper);
+    return wrapper;
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     currentRouteQuery.value = {};
@@ -67,8 +91,13 @@ describe('ProvidersTab.vue - Config-panel selector labeling', () => {
     mockSettingsStore.activeConfigProvider = 'test-provider';
   });
 
+  afterEach(() => {
+    while (mountedWrappers.length) mountedWrappers.pop().unmount();
+    vi.useRealTimers();
+  });
+
   it('renders the ProvidersTab-specific label key, not the shared global key', () => {
-    const wrapper = mount(ProvidersTab);
+    const wrapper = mountTab();
 
     const label = wrapper.find('.primary-service-selection label');
     expect(label.exists()).toBe(true);
@@ -77,7 +106,7 @@ describe('ProvidersTab.vue - Config-panel selector labeling', () => {
   });
 
   it('selector change updates activeConfigProvider and leaves TRANSLATION_API untouched', async () => {
-    const wrapper = mount(ProvidersTab);
+    const wrapper = mountTab();
 
     await wrapper.find('.provider-selector-stub').setValue('other-provider');
     await flushPromises();
@@ -87,7 +116,7 @@ describe('ProvidersTab.vue - Config-panel selector labeling', () => {
   });
 
   it('computed selector reflects the store-managed config provider', async () => {
-    const wrapper = mount(ProvidersTab);
+    const wrapper = mountTab();
 
     expect(wrapper.find('.provider-selector-stub').element.value).toBe('test-provider');
 
@@ -96,5 +125,114 @@ describe('ProvidersTab.vue - Config-panel selector labeling', () => {
 
     expect(wrapper.find('.provider-selector-stub').element.value).toBe('other-provider');
     expect(mockSettingsStore.settings.TRANSLATION_API).toBe('googlev2');
+  });
+
+  it('routes ?highlight=CUSTOM_API_COMPATIBILITY_CHECK to the custom provider', async () => {
+    vi.useFakeTimers();
+    currentRouteQuery.value = { highlight: 'CUSTOM_API_COMPATIBILITY_CHECK' };
+    mountTab();
+    await nextTick();
+
+    expect(mockSettingsStore.activeConfigProvider).toBe('custom');
+    vi.advanceTimersByTime(1000);
+  });
+
+  it('route-driven compat-check switch does NOT trigger the CUSTOM_API_URL missing-highlight', async () => {
+    vi.useFakeTimers();
+    currentRouteQuery.value = { highlight: 'CUSTOM_API_COMPATIBILITY_CHECK' };
+    mountTab();
+    await nextTick();
+
+    expect(mockSettingsStore.activeConfigProvider).toBe('custom');
+    // Flush the watcher's 600ms missing-highlight window: the suppressed
+    // watcher must stay silent (spotlight execution belongs to OptionsLayout).
+    vi.advanceTimersByTime(1000);
+    expect(highlightMocks.highlightElement).not.toHaveBeenCalledWith('CUSTOM_API_URL');
+    expect(highlightMocks.highlightElement).not.toHaveBeenCalled();
+  });
+
+  it('manual provider change still highlights the first missing setting', async () => {
+    vi.useFakeTimers();
+    mountTab();
+    await nextTick();
+    expect(highlightMocks.highlightElement).not.toHaveBeenCalled();
+
+    mockSettingsStore.activeConfigProvider = 'custom';
+    await nextTick();
+    vi.advanceTimersByTime(600);
+
+    expect(highlightMocks.highlightElement).toHaveBeenCalledWith('CUSTOM_API_URL');
+  });
+
+  it('pre-active custom route load leaks no suppression into the next manual change', async () => {
+    vi.useFakeTimers();
+    mockSettingsStore.activeConfigProvider = 'custom';
+    currentRouteQuery.value = { highlight: 'CUSTOM_API_COMPATIBILITY_CHECK' };
+    mountTab();
+    await nextTick();
+
+    expect(mockSettingsStore.activeConfigProvider).toBe('custom');
+    vi.advanceTimersByTime(1000);
+    expect(highlightMocks.highlightElement).not.toHaveBeenCalled();
+
+    // A later manual change must highlight normally (no leaked suppression).
+    mockSettingsStore.activeConfigProvider = 'deepl';
+    await nextTick();
+    vi.advanceTimersByTime(600);
+
+    expect(highlightMocks.highlightElement).toHaveBeenCalledWith('DEEPL_API_KEY');
+  });
+
+  it('while-mounted highlight navigation reveals its provider without executing the spotlight', async () => {
+    vi.useFakeTimers();
+    mountTab();
+    await nextTick();
+    expect(mockSettingsStore.activeConfigProvider).toBe('test-provider');
+
+    // In-place mutation: the vue-router mock snapshots `query` at useRoute()
+    // time, so a same-object update is how a while-mounted navigation is
+    // simulated (the watcher shape is identical for real-router updates).
+    currentRouteQuery.value.highlight = 'CUSTOM_API_COMPATIBILITY_CHECK';
+    await nextTick();
+
+    expect(mockSettingsStore.activeConfigProvider).toBe('custom');
+    vi.advanceTimersByTime(1000);
+    expect(highlightMocks.highlightElement).not.toHaveBeenCalled();
+    expect(highlightMocks.checkAndHighlight).not.toHaveBeenCalled();
+  });
+
+  it('never executes route-driven spotlight itself (OptionsLayout owns checkAndHighlight)', async () => {
+    vi.useFakeTimers();
+    currentRouteQuery.value = { highlight: 'CUSTOM_API_COMPATIBILITY_CHECK' };
+    mountTab();
+    await nextTick();
+    vi.advanceTimersByTime(2000);
+
+    currentRouteQuery.value.highlight = 'DEEPL_API_KEY';
+    await nextTick();
+    vi.advanceTimersByTime(2000);
+
+    expect(mockSettingsStore.activeConfigProvider).toBe('deepl');
+    expect(highlightMocks.checkAndHighlight).not.toHaveBeenCalled();
+  });
+
+  it('keeps existing required-setting highlight routing unchanged', async () => {
+    vi.useFakeTimers();
+    currentRouteQuery.value = { highlight: 'DEEPL_API_KEY' };
+    mountTab();
+    await nextTick();
+
+    expect(mockSettingsStore.activeConfigProvider).toBe('deepl');
+    // Required-setting routes keep the watcher's missing-highlight path.
+    vi.advanceTimersByTime(600);
+    expect(highlightMocks.highlightElement).toHaveBeenCalledWith('DEEPL_API_KEY');
+  });
+
+  it('leaves custom provider validation metadata unmodified', async () => {
+    const { getProviderManifest } = await import('@/features/translation/providers/ProviderManifest.js');
+    const custom = getProviderManifest().find((p) => p.id === 'custom');
+
+    expect(custom.requiredSettings).toEqual(['CUSTOM_API_URL', 'CUSTOM_API_MODEL']);
+    expect(custom.requiredSettings).not.toContain('CUSTOM_API_COMPATIBILITY_CHECK');
   });
 });

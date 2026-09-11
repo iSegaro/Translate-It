@@ -128,7 +128,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProvidersTab')
 const settingsStore = useSettingsStore()
 const route = useRoute()
 const { t } = useUnifiedI18n()
-const { checkAndHighlight, highlightElement } = useHighlightManager()
+const { highlightElement } = useHighlightManager()
 
 // Use the store-managed activeConfigProvider instead of a local ref.
 // This allows the configuration state to persist across tab switches in the Options page,
@@ -138,8 +138,18 @@ const selectedProvider = computed({
   set: (val) => { settingsStore.activeConfigProvider = val }
 })
 
+// Route-driven switches skip the watcher's missing-setting highlight once:
+// the URL highlight target owns the spotlight (fixes the compat-check
+// first-load race where the watcher would steal it with CUSTOM_API_URL).
+// Manual provider changes are unaffected; no timing dependence.
+let suppressNextProviderMissingHighlight = false
+
 // Auto-highlight missing settings when provider is changed manually
 watch(selectedProvider, (newProvider) => {
+  if (suppressNextProviderMissingHighlight) {
+    suppressNextProviderMissingHighlight = false
+    return
+  }
   logger.debug(`[ProvidersTab] Local provider changed to ${newProvider}`);
   const missingKey = getFirstMissingSetting(newProvider, settingsStore.settings);
   if (missingKey) {
@@ -150,21 +160,40 @@ watch(selectedProvider, (newProvider) => {
   }
 })
 
-// Global reveal listener for highlighting
-onMounted(async () => {
-  // Detect provider from highlight parameter if it exists
-  const highlightKey = route.query.highlight;
-  if (highlightKey) {
-    const provider = getProviderManifest().find(p => p.requiredSettings?.includes(highlightKey));
-    if (provider) {
-      settingsStore.activeConfigProvider = provider.id;
-    }
-  }
+// Spotlight routing for non-persisted highlight targets. Explicit cases run
+// first; required-setting keys fall back to the manifest lookup below.
+// No validation or persisted-state change.
+const resolveHighlightProvider = (highlightKey) => {
+  if (highlightKey === 'CUSTOM_API_COMPATIBILITY_CHECK') return 'custom'
+  return getProviderManifest().find(p => p.requiredSettings?.includes(highlightKey))?.id ?? null
+}
 
-  // Handle highlighting logic
-  setTimeout(async () => {
-    await checkAndHighlight();
-  }, 100);
+// Reveal the provider panel for a highlight target. No-op when falsy,
+// unmapped, or already active. Route-driven spotlight execution itself
+// stays with OptionsLayout (sole owner of checkAndHighlight).
+const revealProviderForHighlight = (highlightKey) => {
+  if (!highlightKey) return
+  const providerId = resolveHighlightProvider(highlightKey)
+  if (!providerId || providerId === settingsStore.activeConfigProvider) return
+  // The compat-check spotlight owns its highlight: suppress the watcher's
+  // missing-setting highlight for this route-driven switch only. Set only
+  // on an actual change, so a pre-active custom (no watcher fires) never
+  // leaks the flag into a later manual change.
+  if (highlightKey === 'CUSTOM_API_COMPATIBILITY_CHECK') {
+    suppressNextProviderMissingHighlight = true
+  }
+  settingsStore.activeConfigProvider = providerId
+}
+
+// Reveal the matching provider for the current route highlight (if any).
+onMounted(() => {
+  revealProviderForHighlight(route.query.highlight)
+})
+
+// While-mounted navigations (e.g. a new ?highlight= while the tab is open)
+// reveal their provider the same way.
+watch(() => route.query.highlight, (highlightKey) => {
+  revealProviderForHighlight(highlightKey)
 })
 
 // Provider Visibility logic
