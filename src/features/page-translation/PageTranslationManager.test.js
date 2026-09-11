@@ -153,11 +153,21 @@ vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: vi.fn(() => ({
     debug: vi.fn(),
     error: vi.fn(),
-    warn: vi.fn(),
+    warn: mockLoggerWarn,
     info: vi.fn(),
     init: vi.fn(),
     debugLazy: vi.fn()
   }))
+}));
+
+const mockStorageManagerSet = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
+
+vi.mock('@/shared/storage/core/StorageCore.js', () => ({
+  storageManager: {
+    set: mockStorageManagerSet,
+    get: vi.fn(),
+  }
 }));
 
 // Mock window.location
@@ -191,6 +201,7 @@ describe('PageTranslationManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStorageManagerSet.mockResolvedValue(true);
     // Ensure helper returns true by default for all tests
     PageTranslationHelper.isSuitableForTranslation.mockReturnValue(true);
     
@@ -1151,6 +1162,112 @@ describe('PageTranslationManager', () => {
       const input = "example.com\n  google.com,   github.com  \n,apple.com";
       const result = parseRules(input);
       expect(result).toEqual(['example.com', 'google.com', 'github.com', 'apple.com']);
+    });
+  });
+
+  describe('Token warning persistence', () => {
+    const collectUnhandledRejections = () => {
+      const failures = [];
+      const onUnhandled = (reason) => failures.push(reason);
+      process.on('unhandledRejection', onUnhandled);
+      return {
+        failures,
+        release: () => process.off('unhandledRejection', onUnhandled),
+      };
+    };
+
+    const showTokenWarning = async (alreadyShown = 0) => {
+      manager.settings = { tokenWarningHidden: false };
+      const pending = manager._confirmTokenUsage('gemini', 'Gemini');
+      await vi.waitFor(() => expect(
+        manager.notificationManager.show.mock.calls.length
+      ).toBeGreaterThan(alreadyShown));
+      const options = manager.notificationManager.show.mock.calls.at(-1)[3];
+      return { pending, actions: options.actions };
+    };
+
+    const settleRejections = async () => {
+      await vi.waitFor(() => expect(mockLoggerWarn).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    it('confirm+dontShowAgain resolves true and persists best-effort', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        const { pending, actions } = await showTokenWarning();
+        actions[0].onClick(true);
+
+        await expect(pending).resolves.toBe(true);
+        expect(mockStorageManagerSet).toHaveBeenCalledWith({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+        expect(failures).toHaveLength(0);
+      } finally {
+        release();
+      }
+    });
+
+    it('confirm+dontShowAgain handles persistence rejection without blocking the flow', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        mockStorageManagerSet.mockRejectedValueOnce(new Error('storage failed'));
+        const { pending, actions } = await showTokenWarning();
+        actions[0].onClick(true);
+
+        // Dismiss/resolve and continue behavior exactly as today.
+        await expect(pending).resolves.toBe(true);
+        expect(mockStorageManagerSet).toHaveBeenCalledWith({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+        await settleRejections();
+        expect(mockLoggerWarn).toHaveBeenCalled();
+        expect(failures).toHaveLength(0);
+      } finally {
+        release();
+      }
+    });
+
+    it('cancel+dontShowAgain handles persistence rejection without blocking the flow', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        mockStorageManagerSet.mockRejectedValueOnce(new Error('storage failed'));
+        const { pending, actions } = await showTokenWarning();
+        actions[1].onClick(true);
+
+        await expect(pending).resolves.toBe(false);
+        expect(mockStorageManagerSet).toHaveBeenCalledWith({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+        await settleRejections();
+        expect(mockLoggerWarn).toHaveBeenCalled();
+        expect(failures).toHaveLength(0);
+      } finally {
+        release();
+      }
+    });
+
+    it('confirm without dontShowAgain skips persistence', async () => {
+      const { pending, actions } = await showTokenWarning();
+      actions[0].onClick(false);
+
+      await expect(pending).resolves.toBe(true);
+      expect(mockStorageManagerSet).not.toHaveBeenCalled();
+    });
+
+    it('subsequent warning flow stays usable after a rejected write', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        mockStorageManagerSet.mockRejectedValueOnce(new Error('storage failed'));
+        const first = await showTokenWarning();
+        first.actions[0].onClick(true);
+        await expect(first.pending).resolves.toBe(true);
+        await settleRejections();
+
+        // Next warning still shows and its persist is attempted again.
+        const shownBefore = manager.notificationManager.show.mock.calls.length;
+        const second = await showTokenWarning(shownBefore);
+        second.actions[0].onClick(true);
+        await expect(second.pending).resolves.toBe(true);
+        expect(mockStorageManagerSet).toHaveBeenCalledTimes(2);
+        expect(mockStorageManagerSet).toHaveBeenNthCalledWith(2, { WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+        expect(failures).toHaveLength(0);
+      } finally {
+        release();
+      }
     });
   });
 });
