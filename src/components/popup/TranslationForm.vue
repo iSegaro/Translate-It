@@ -201,8 +201,13 @@ const clearStorage = () => {
 const revertTranslation = () => {
   const languages = revertCurrentTranslation()
   if (languages?.sourceLanguage && languages?.targetLanguage) {
-    settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', languages.sourceLanguage)
-    settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', languages.targetLanguage)
+    // Two independent best-effort writes: neither blocks nor awaits the other.
+    void settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', languages.sourceLanguage).catch(error => {
+      logger.warn('Failed to persist SOURCE_LANGUAGE:', error);
+    });
+    void settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', languages.targetLanguage).catch(error => {
+      logger.warn('Failed to persist TARGET_LANGUAGE:', error);
+    });
   }
 }
 

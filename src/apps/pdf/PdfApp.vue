@@ -712,11 +712,15 @@ function refreshOcrPageData(pageNumbers) {
 }
 
 function handleOcrSelectAction(action) {
-  settingsStore.updateSettingAndPersist('OCR_PREFERRED_ACTION', action)
+  void settingsStore.updateSettingAndPersist('OCR_PREFERRED_ACTION', action).catch(error => {
+    logger.warn('Failed to persist OCR_PREFERRED_ACTION:', error);
+  });
 }
 
 function handleOcrSelectLanguage(langCode) {
-  settingsStore.updateSettingAndPersist('OCR_DEFAULT_LANG', langCode)
+  void settingsStore.updateSettingAndPersist('OCR_DEFAULT_LANG', langCode).catch(error => {
+    logger.warn('Failed to persist OCR_DEFAULT_LANG:', error);
+  });
 }
 
 function handleOcrManageLanguages() {
