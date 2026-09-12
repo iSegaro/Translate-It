@@ -82,7 +82,7 @@ class ApiKeyManager {
       .filter(key => key.length > 0);
 
     if (keys.length > 1) {
-      logger.debug(`[ApiKeyManager] Parsed ${keys.length} keys from string of length ${keyString.length}`);
+      logger.debug('[ApiKeyManager] Parsed API keys', { count: keys.length });
     }
 
     return keys;
@@ -110,23 +110,14 @@ class ApiKeyManager {
       const result = await storageManager.get({ [providerSettingKey]: '' });
       const keyString = result[providerSettingKey] || '';
 
-      // Debug logging to see what's actually in storage (masked for security)
-      const maskedValue = keyString.length > 10 
-        ? `${keyString.substring(0, 4)}...${keyString.substring(keyString.length - 4)}`
-        : '***';
-
-      logger.info(`[ApiKeyManager] Raw storage value for ${providerSettingKey}:`, {
-        value: maskedValue,
-        length: keyString.length,
-        hasNewlines: keyString.includes('\n'),
-        lineCount: keyString.split('\n').length
-      });
-
       const keys = this.parseKeys(keyString);
-      logger.debug(`[ApiKeyManager] Parsed ${keys.length} keys for ${providerSettingKey}`);
+      logger.debug('[ApiKeyManager] Loaded API keys', {
+        provider: providerSettingKey,
+        count: keys.length
+      });
       return keys;
-    } catch (error) {
-      logger.error(`[ApiKeyManager] Failed to get keys for ${providerSettingKey}:`, error);
+    } catch {
+      logger.error(`[ApiKeyManager] Failed to get keys for ${providerSettingKey}`);
       return [];
     }
   }
@@ -169,8 +160,8 @@ class ApiKeyManager {
       await storageManager.set({ [providerSettingKey]: keyString });
 
       logger.debug(`[ApiKeyManager] Promoted key to front for ${providerSettingKey}`);
-    } catch (error) {
-      logger.error(`[ApiKeyManager] Failed to promote key for ${providerSettingKey}:`, error);
+    } catch {
+      logger.error(`[ApiKeyManager] Failed to promote key for ${providerSettingKey}`);
     }
   }
 
@@ -256,7 +247,9 @@ class ApiKeyManager {
         const isValid = await testFunc(key);
         return { key, isValid };
       } catch (error) {
-        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}:`, error.message);
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}`, {
+          errorType: error instanceof Error ? 'Error' : typeof error
+        });
         return { key, isValid: false };
       }
     });
@@ -338,7 +331,9 @@ class ApiKeyManager {
         const isValid = await testFunc(key);
         return { key, isValid };
       } catch (error) {
-        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}:`, error.message);
+        logger.debug(`[ApiKeyManager] Key test failed for ${providerId}`, {
+          errorType: error instanceof Error ? 'Error' : typeof error
+        });
         return { key, isValid: false };
       }
     });
@@ -666,11 +661,15 @@ class ApiKeyManager {
 
         return { valid: chatResponse.ok };
       } catch (err) {
-        logger.error('[ApiKeyManager] Custom API test error:', err);
+        logger.error('[ApiKeyManager] Custom API test error', {
+          errorType: err instanceof Error ? 'Error' : typeof err
+        });
         return { valid: false, reason: 'request_failed' };
       }
     } catch (error) {
-      logger.error('[ApiKeyManager] Custom API test failed:', error);
+      logger.error('[ApiKeyManager] Custom API test failed', {
+        errorType: error instanceof Error ? 'Error' : typeof error
+      });
       return { valid: false, reason: 'request_failed' };
     }
   }

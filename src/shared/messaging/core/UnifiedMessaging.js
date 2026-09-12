@@ -21,6 +21,9 @@ import {
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
+import {
+  LIVE_DUBBING_ACTION_TIMEOUTS,
+} from '@/features/live-dubbing/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -71,6 +74,7 @@ const OPERATION_TIMEOUTS = {
   'START_AREA_CAPTURE': 15000,
   'START_SCREEN_AREA_SELECTION': 10000,
   'CAPTURE_SCREEN_AREA': 30000,
+  ...LIVE_DUBBING_ACTION_TIMEOUTS,
   'DEFAULT': 8000
 };
 

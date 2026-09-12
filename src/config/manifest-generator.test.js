@@ -12,4 +12,12 @@ describe('live dubbing manifest capability', () => {
     expect(firefoxManifest.permissions).not.toContain('tabCapture');
     expect(firefoxManifest.permissions).not.toContain('activeTab');
   });
+
+  it('does not expose the Chrome offscreen document through web accessible resources', () => {
+    const chromeManifest = generateManifest('chrome');
+    const resources = chromeManifest.web_accessible_resources.flatMap(({ resources }) => resources);
+
+    expect(resources).not.toContain('src/html/offscreen.html');
+    expect(resources).not.toContain('src/html/offscreen.js');
+  });
 });

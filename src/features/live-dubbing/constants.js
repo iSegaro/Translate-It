@@ -1,7 +1,8 @@
 /**
- * Stage 1 live-dubbing control-plane constants.
+ * Live-dubbing control-plane and bounded transport constants.
  *
- * Audio transport and provider execution deliberately do not belong here.
+ * Provider execution remains feature-local; only its public action and timing
+ * fences are shared across extension contexts.
  */
 export const LIVE_DUBBING_OWNER = 'live-dubbing';
 export const LIVE_DUBBING_STORAGE_KEY = '__translateItLiveDubbingSession';
@@ -23,11 +24,29 @@ export const LIVE_DUBBING_STORAGE_STATE = Object.freeze({
   UNREADABLE: 'UNREADABLE',
 });
 
-export const LIVE_DUBBING_STATUS = Object.freeze({
+const publicLiveDubbingStatus = {
   PREPARING_CAPTURE: 'PREPARING_CAPTURE',
-  CAPTURING: 'CAPTURING',
+  CONNECTING_PROVIDER: 'CONNECTING_PROVIDER',
+  RUNNING: 'RUNNING',
   STOPPING: 'STOPPING',
   ERROR: 'ERROR',
+};
+
+// Legacy consumers can still read the old internal name, but it is not an
+// enumerable/public status and is never accepted in a descriptor.
+Object.defineProperty(publicLiveDubbingStatus, 'CAPTURING', {
+  value: 'CAPTURING',
+  enumerable: false,
+});
+
+export const LIVE_DUBBING_STATUS = Object.freeze(publicLiveDubbingStatus);
+
+/**
+ * CAPTURING is an offscreen implementation state, not a public descriptor
+ * state. Keep it separate so it cannot accidentally be exposed to UI callers.
+ */
+export const LIVE_DUBBING_INTERNAL_STATUS = Object.freeze({
+  CAPTURING: 'CAPTURING',
 });
 
 export const LIVE_DUBBING_ACTIONS = Object.freeze({
@@ -39,16 +58,69 @@ export const LIVE_DUBBING_ACTIONS = Object.freeze({
   GET_STATUS_ALIAS: 'LIVE_DUBBING_GET_STATUS',
   PREPARE: 'LIVE_DUBBING_PREPARE',
   CONSUME: 'LIVE_DUBBING_CONSUME',
+  CONNECT_PROVIDER: 'LIVE_DUBBING_CONNECT_PROVIDER',
   DISPOSE: 'LIVE_DUBBING_DISPOSE',
   STATUS: 'LIVE_DUBBING_STATUS',
   TERMINAL: 'LIVE_DUBBING_TERMINAL',
+  REQUEST_PROVIDER_CREDENTIAL: 'LIVE_DUBBING_REQUEST_PROVIDER_CREDENTIAL',
 });
+
+export const LIVE_DUBBING_OFFSCREEN_ACTIONS = Object.freeze([
+  LIVE_DUBBING_ACTIONS.PREPARE,
+  LIVE_DUBBING_ACTIONS.CONSUME,
+  LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER,
+  LIVE_DUBBING_ACTIONS.STATUS,
+  LIVE_DUBBING_ACTIONS.DISPOSE,
+]);
+
+export const LIVE_DUBBING_TIMEOUTS = Object.freeze({
+  START: 30_000,
+  STOP: 10_000,
+  STATUS: 5_000,
+  SETUP: 10_000,
+});
+
+export const LIVE_DUBBING_START_TIMEOUT = LIVE_DUBBING_TIMEOUTS.START;
+export const LIVE_DUBBING_STOP_TIMEOUT = LIVE_DUBBING_TIMEOUTS.STOP;
+export const LIVE_DUBBING_STATUS_TIMEOUT = LIVE_DUBBING_TIMEOUTS.STATUS;
+export const LIVE_DUBBING_SETUP_TIMEOUT = LIVE_DUBBING_TIMEOUTS.SETUP;
+
+export const LIVE_DUBBING_ACTION_TIMEOUTS = Object.freeze({
+  [LIVE_DUBBING_ACTIONS.START]: LIVE_DUBBING_TIMEOUTS.START,
+  [LIVE_DUBBING_ACTIONS.START_ALIAS]: LIVE_DUBBING_TIMEOUTS.START,
+  [LIVE_DUBBING_ACTIONS.STOP]: LIVE_DUBBING_TIMEOUTS.STOP,
+  [LIVE_DUBBING_ACTIONS.STOP_ALIAS]: LIVE_DUBBING_TIMEOUTS.STOP,
+  [LIVE_DUBBING_ACTIONS.GET_STATUS]: LIVE_DUBBING_TIMEOUTS.STATUS,
+  [LIVE_DUBBING_ACTIONS.GET_STATUS_ALIAS]: LIVE_DUBBING_TIMEOUTS.STATUS,
+  [LIVE_DUBBING_ACTIONS.PREPARE]: LIVE_DUBBING_TIMEOUTS.SETUP,
+  [LIVE_DUBBING_ACTIONS.CONSUME]: LIVE_DUBBING_TIMEOUTS.SETUP,
+  [LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER]: LIVE_DUBBING_TIMEOUTS.SETUP,
+  [LIVE_DUBBING_ACTIONS.DISPOSE]: LIVE_DUBBING_TIMEOUTS.SETUP,
+  [LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_CREDENTIAL]: LIVE_DUBBING_TIMEOUTS.SETUP,
+});
+
+export const LIVE_DUBBING_ACTION_TIMEOUT_MAP = LIVE_DUBBING_ACTION_TIMEOUTS;
 
 export const LIVE_DUBBING_OFFSCREEN_ACKS = Object.freeze({
   READY: 'READY',
   MEDIA_ACQUIRED: 'MEDIA_ACQUIRED',
+  PROVIDER_READY: 'PROVIDER_READY',
   DISPOSED: 'DISPOSED',
 });
+
+/**
+ * Audio transport limits are intentionally small and explicit. They bound
+ * startup pressure without making normal translated output lossy.
+ */
+export const LIVE_DUBBING_AUDIO_LIMITS = Object.freeze({
+  INPUT_PENDING_MAX_MS: 500,
+  INPUT_PENDING_RETAIN_MS: 200,
+  INPUT_MAX_BUFFERED_AMOUNT: 64 * 1024,
+});
+
+export const LIVE_DUBBING_INPUT_PENDING_MAX_MS = LIVE_DUBBING_AUDIO_LIMITS.INPUT_PENDING_MAX_MS;
+export const LIVE_DUBBING_INPUT_PENDING_RETAIN_MS = LIVE_DUBBING_AUDIO_LIMITS.INPUT_PENDING_RETAIN_MS;
+export const LIVE_DUBBING_INPUT_MAX_BUFFERED_AMOUNT = LIVE_DUBBING_AUDIO_LIMITS.INPUT_MAX_BUFFERED_AMOUNT;
 
 export const LIVE_DUBBING_DESCRIPTOR_FIELDS = Object.freeze([
   'sessionId',

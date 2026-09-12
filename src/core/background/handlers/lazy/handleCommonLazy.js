@@ -103,3 +103,13 @@ export async function handleLiveDubbingGetStatusLazy(message, sender) {
         return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
     }
 }
+
+export async function handleLiveDubbingCredentialRequestLazy(message, sender) {
+    try {
+        const { handleLiveDubbingCredentialRequest } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingCredentialRequest(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing credential handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}

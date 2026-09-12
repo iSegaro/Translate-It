@@ -1,12 +1,118 @@
+import { getScopedLogger } from '@/shared/logging/logger.js';
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import {
   LIVE_DUBBING_ACTIONS,
+  LIVE_DUBBING_AUDIO_LIMITS,
   LIVE_DUBBING_CAPTURE_STAGES,
+  LIVE_DUBBING_INTERNAL_STATUS,
   LIVE_DUBBING_OFFSCREEN_ACKS,
   LIVE_DUBBING_STATUS,
 } from '../constants.js';
-import { createLiveDubbingDiagnostic } from '../contracts.js';
+import {
+  createLiveDubbingDiagnostic,
+  createLiveDubbingCleanupDiagnostic,
+  createLiveDubbingProviderDiagnostic,
+  createProviderCredentialRequest,
+  normalizeTargetLanguage,
+  parseProviderCredentialResponse,
+  sanitizeLiveDubbingProviderDiagnostic,
+} from '../contracts.js';
+import { GeminiLiveTranslationClient } from './GeminiLiveTranslationClient.js';
+import { TabAudioPipeline } from './TabAudioPipeline.js';
+import { PcmOutputPlayer } from './PcmOutputPlayer.js';
 
 const IDLE_STATUS = 'IDLE';
+const INPUT_SAMPLE_RATE = 16_000;
+const OUTPUT_SAMPLE_RATE = 24_000;
+const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
+const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'LiveDubbingController');
+const TELEMETRY_MILESTONES = Object.freeze([
+  'captureReady',
+  'inputReady',
+  'outputReady',
+  'wsOpen',
+  'setupSent',
+  'setupComplete',
+  'firstInputSent',
+  'firstTranslatedAudioReceived',
+  'firstTranslatedAudioAcceptedByPlayback',
+  'cleanupStart',
+  'cleanupComplete',
+]);
+
+function createTelemetry() {
+  return {
+    milestones: Object.fromEntries(TELEMETRY_MILESTONES.map(name => [name, null])),
+    inputQueueCurrentDurationMs: 0,
+    inputQueuePeakDurationMs: 0,
+    inputDroppedDurationMs: 0,
+    preSetupDroppedDurationMs: 0,
+    preSetupDroppedFrames: 0,
+    wsBufferedAmountPeak: 0,
+    outputQueueCurrentDurationMs: 0,
+    outputQueuePeakDurationMs: 0,
+    underruns: 0,
+    interruptions: 0,
+    providerTerminalCategory: null,
+    providerBaseline: null,
+    outputBaseline: null,
+  };
+}
+
+function getPerformanceNow(options) {
+  if (typeof options?.performanceNow === 'function') return options.performanceNow;
+  if (typeof options?.performance?.now === 'function') return options.performance.now.bind(options.performance);
+  if (typeof globalThis.performance?.now === 'function') return globalThis.performance.now.bind(globalThis.performance);
+  return () => null;
+}
+
+function safeNonNegativeNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function safeInteger(value) {
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function safeTelemetrySnapshot(telemetry) {
+  const source = telemetry || createTelemetry();
+  return {
+    milestones: Object.fromEntries(TELEMETRY_MILESTONES.map(name => [
+      name,
+      Number.isFinite(source.milestones?.[name]) ? source.milestones[name] : null,
+    ])),
+    inputQueueCurrentDurationMs: safeNonNegativeNumber(source.inputQueueCurrentDurationMs),
+    inputQueuePeakDurationMs: safeNonNegativeNumber(source.inputQueuePeakDurationMs),
+    inputDroppedDurationMs: safeNonNegativeNumber(source.inputDroppedDurationMs),
+    preSetupDroppedDurationMs: safeNonNegativeNumber(source.preSetupDroppedDurationMs),
+    preSetupDroppedFrames: safeInteger(source.preSetupDroppedFrames),
+    wsBufferedAmountPeak: safeNonNegativeNumber(source.wsBufferedAmountPeak),
+    outputQueueCurrentDurationMs: safeNonNegativeNumber(source.outputQueueCurrentDurationMs),
+    outputQueuePeakDurationMs: safeNonNegativeNumber(source.outputQueuePeakDurationMs),
+    underruns: safeInteger(source.underruns),
+    interruptions: safeInteger(source.interruptions),
+    providerTerminalCategory: typeof source.providerTerminalCategory === 'string'
+      && SAFE_ERROR_CODE.test(source.providerTerminalCategory)
+      ? source.providerTerminalCategory
+      : null,
+  };
+}
+
+function getFrameByteLength(frame) {
+  if (isArrayBuffer(frame?.buffer)) return frame.buffer.byteLength;
+  return ArrayBuffer.isView(frame?.buffer) ? frame.buffer.byteLength : 0;
+}
+
+function getFrameDurationMs(frame, byteLength = getFrameByteLength(frame)) {
+  const sampleCount = Number.isInteger(frame?.sampleCount) && frame.sampleCount > 0
+    ? frame.sampleCount
+    : Math.floor(byteLength / 2);
+  const sampleRate = Number.isInteger(frame?.sampleRate) && frame.sampleRate > 0
+    ? frame.sampleRate
+    : INPUT_SAMPLE_RATE;
+  const durationMs = (sampleCount / sampleRate) * 1000;
+  return Number.isFinite(durationMs) && durationMs >= 0 ? durationMs : 0;
+}
 
 function isSessionId(value) {
   return typeof value === 'string' && Boolean(value.trim());
@@ -18,6 +124,15 @@ function isStreamId(value) {
 
 function getMessageValue(message, key) {
   return message?.data?.[key] ?? message?.[key];
+}
+
+function isEventSequence(value) {
+  return Number.isInteger(value) && value >= 0;
+}
+
+function getEventSequence(message) {
+  const value = getMessageValue(message, 'eventSequence');
+  return isEventSequence(value) ? value : undefined;
 }
 
 function createCaptureFailure(stage, code, error, fields = {}, sensitiveValues = []) {
@@ -59,24 +174,108 @@ function stopTracks(stream) {
   }
 }
 
+function isArrayBuffer(value) {
+  return value instanceof ArrayBuffer
+    || (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer);
+}
+
+function getFrameBuffer(frame) {
+  if (isArrayBuffer(frame?.buffer)) return frame.buffer;
+  if (ArrayBuffer.isView(frame?.buffer)) {
+    return frame.buffer.buffer.slice(
+      frame.buffer.byteOffset,
+      frame.buffer.byteOffset + frame.buffer.byteLength,
+    );
+  }
+  return null;
+}
+
+function decodeBase64(value) {
+  if (typeof value !== 'string' || !value) throw new TypeError('PCM data is required');
+
+  if (typeof globalThis.atob === 'function') {
+    const binary = globalThis.atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  }
+  if (typeof globalThis.Buffer !== 'undefined') return new Uint8Array(globalThis.Buffer.from(value, 'base64'));
+  throw new Error('PCM decoding is unavailable');
+}
+
+function errorCode(error, fallback) {
+  return typeof error?.code === 'string' && SAFE_ERROR_CODE.test(error.code)
+    ? error.code
+    : fallback;
+}
+
+function hasAudioContext(options) {
+  return Boolean(
+    options.audioContextFactory
+      || options.contextFactory
+      || options.AudioContext
+      || globalThis.AudioContext
+      || globalThis.webkitAudioContext,
+  );
+}
+
 /**
- * Owns the offscreen document's Stage 1 capture lifecycle.
+ * Owns one offscreen live-dubbing transaction: capture, both local audio
+ * graphs, one credential request, and one fenced Gemini provider generation.
  *
- * The controller deliberately keeps capture local. It never creates an audio
- * source, connects a destination, stores a stream ID, or accesses settings.
- * Capture failures return stage-scoped, sanitized diagnostics to background.
+ * The controller is deliberately the only owner of these resources. A
+ * terminal callback changes the session fence before cleanup so late worklet
+ * and socket events cannot affect a subsequent session.
  */
 export class LiveDubbingController {
   constructor(options = {}) {
     this.mediaDevices = options.mediaDevices || globalThis.navigator?.mediaDevices;
     this.notify = options.notify || ((message) => globalThis.chrome?.runtime?.sendMessage?.(message));
+    this.requestCredential = options.requestCredential
+      || ((message) => globalThis.chrome?.runtime?.sendMessage?.(message));
+    this.performanceNow = getPerformanceNow(options);
+    this.onPlaybackAccepted = typeof options.onPlaybackAccepted === 'function'
+      ? options.onPlaybackAccepted
+      : null;
+    this.log = options.logger || logger;
+
+    this.inputPipelineFactory = options.inputPipelineFactory
+      || options.tabAudioPipelineFactory
+      || options.createInputPipeline
+      || null;
+    this.outputPlayerFactory = options.outputPlayerFactory
+      || options.pcmOutputPlayerFactory
+      || options.createOutputPlayer
+      || null;
+    this.providerClientFactory = options.providerClientFactory
+      || options.geminiClientFactory
+      || options.createProviderClient
+      || null;
+    this.inputPipeline = options.inputPipeline || null;
+    this.outputPlayer = options.outputPlayer || null;
+    this.providerClient = options.providerClient || null;
+    this.inputPipelineOptions = options.inputPipelineOptions || options.tabAudioPipelineOptions || {};
+    this.outputPlayerOptions = options.outputPlayerOptions || options.pcmOutputPlayerOptions || {};
+    this.providerClientOptions = options.providerClientOptions || options.geminiClientOptions || {};
+    this.pipelineRequired = options.requirePipelines
+      ?? Boolean(
+        this.inputPipelineFactory
+          || this.outputPlayerFactory
+          || this.inputPipeline
+          || this.outputPlayer
+          || hasAudioContext(options),
+      );
+
     this.currentSession = null;
+    this.lastTelemetry = null;
     this.disposedSessionId = null;
+    this.providerGeneration = 0;
   }
 
   handles(action) {
     return action === LIVE_DUBBING_ACTIONS.PREPARE
       || action === LIVE_DUBBING_ACTIONS.CONSUME
+      || action === LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER
       || action === LIVE_DUBBING_ACTIONS.STATUS
       || action === LIVE_DUBBING_ACTIONS.DISPOSE;
   }
@@ -84,31 +283,68 @@ export class LiveDubbingController {
   handle(message = {}) {
     switch (message.action) {
       case LIVE_DUBBING_ACTIONS.PREPARE:
-        return this.prepare(getMessageValue(message, 'sessionId'));
+        return this.prepare(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'targetLanguage'),
+          getEventSequence(message),
+        );
       case LIVE_DUBBING_ACTIONS.CONSUME:
         return this.consume(
           getMessageValue(message, 'sessionId'),
           getMessageValue(message, 'streamId'),
+          getEventSequence(message),
+        );
+      case LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER:
+        return this.connectProvider(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'targetLanguage'),
+          getEventSequence(message),
         );
       case LIVE_DUBBING_ACTIONS.STATUS:
-        return this.status(getMessageValue(message, 'sessionId'));
+        return this.status(
+          getMessageValue(message, 'sessionId'),
+          getEventSequence(message),
+        );
       case LIVE_DUBBING_ACTIONS.DISPOSE:
         return this.dispose(
           getMessageValue(message, 'sessionId'),
           getMessageValue(message, 'reason'),
+          getEventSequence(message),
         );
       default:
         return { success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED' };
     }
   }
 
-  prepare(sessionId) {
+  prepare(sessionId, targetLanguage = null, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence);
+    if (sequenceError) return sequenceError;
+
+    const session = this.currentSession;
+    if ((!session && eventSequence !== 0)
+      || (session?.sessionId === sessionId && eventSequence !== session.eventSequence)) {
+      return this._sequenceMismatch(sessionId, session?.sessionId === sessionId ? session : null);
+    }
+
     if (!isSessionId(sessionId)) {
       return createCaptureFailure(
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
         'INVALID_SESSION_ID',
         { name: 'TypeError', message: 'sessionId is required', code: 'INVALID_SESSION_ID' },
       );
+    }
+
+    let mappedTargetLanguage = targetLanguage;
+    if (targetLanguage !== null && targetLanguage !== undefined) {
+      try {
+        mappedTargetLanguage = normalizeTargetLanguage(targetLanguage);
+      } catch (error) {
+        return createCaptureFailure(
+          LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
+          'INVALID_TARGET_LANGUAGE',
+          { name: error?.name || 'RangeError', message: 'Unsupported target language', code: 'INVALID_TARGET_LANGUAGE' },
+        );
+      }
     }
 
     if (this.disposedSessionId === sessionId) {
@@ -137,15 +373,79 @@ export class LiveDubbingController {
       );
     }
 
+    if (this.currentSession
+      && mappedTargetLanguage !== null
+      && mappedTargetLanguage !== undefined
+      && mappedTargetLanguage !== this.currentSession.targetLanguage) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH',
+        ignored: true,
+        sessionId,
+        status: this.currentSession.status,
+      };
+    }
+
+    if (this.currentSession && eventSequence !== this.currentSession.eventSequence) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+        ignored: true,
+        sessionId,
+        eventSequence: this.currentSession.eventSequence,
+        status: this.currentSession.status,
+      };
+    }
+
     if (!this.currentSession) {
       this.currentSession = {
         sessionId,
+        targetLanguage: mappedTargetLanguage,
+        eventSequence,
         status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
         lastError: null,
         stream: null,
+        streamStopped: false,
         capturePromise: null,
+        connectPromise: null,
         listeners: [],
         terminalSent: false,
+        terminalRequested: false,
+        disposing: false,
+        credentialRequested: false,
+        credentialRequestPromise: null,
+        providerClient: null,
+        providerGeneration: 0,
+        providerDiagnostic: null,
+        setupComplete: false,
+        setupAcknowledged: false,
+        inputPipeline: null,
+        outputPlayer: null,
+        pipelinesReady: false,
+        pendingInput: [],
+        pendingInputMs: 0,
+        outputEpoch: 0,
+        outputSequence: 0,
+        metrics: {
+          inputFrames: 0,
+          inputBytes: 0,
+          inputSentFrames: 0,
+          inputSentBytes: 0,
+          inputPendingFrames: 0,
+          inputPendingBytes: 0,
+          inputPendingDurationMs: 0,
+          inputQueuePeakDurationMs: 0,
+          inputDroppedFrames: 0,
+          inputDroppedBytes: 0,
+          inputBackpressureEvents: 0,
+          inputDroppedDurationMs: 0,
+          preSetupDroppedFrames: 0,
+          preSetupDroppedDurationMs: 0,
+          outputChunks: 0,
+          outputBytes: 0,
+          outputSafetyDrops: 0,
+        },
+        telemetry: createTelemetry(),
       };
     }
 
@@ -155,15 +455,18 @@ export class LiveDubbingController {
       ready: true,
       sessionId,
       status: this.currentSession.status,
+      eventSequence: this.currentSession.eventSequence,
     };
   }
 
   /**
-   * Start getUserMedia before creating any promise that could await I/O.
-   * Chrome tab-capture stream IDs stay inside this method and are never
-   * returned, stored, or logged.
+   * Start getUserMedia immediately. The Chrome tab stream ID remains inside
+   * this method and is never returned, stored, or logged.
    */
-  consume(sessionId, streamId) {
+  consume(sessionId, streamId, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence);
+    if (sequenceError) return sequenceError;
+
     const session = this.currentSession;
     if (!session || session.sessionId !== sessionId) {
       return {
@@ -175,20 +478,25 @@ export class LiveDubbingController {
       };
     }
 
-    if (session.status === LIVE_DUBBING_STATUS.CAPTURING && session.stream) {
+    const captureStarted = Boolean(session.capturePromise)
+      || [
+        LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+        LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        LIVE_DUBBING_STATUS.RUNNING,
+      ].includes(session.status);
+    if (captureStarted) {
+      if (!isEventSequence(eventSequence) || eventSequence !== session.eventSequence) {
+        return this._sequenceMismatch(sessionId, session);
+      }
+      if (session.capturePromise) return session.capturePromise;
       return this._mediaAcquiredResponse(session);
     }
 
-    if (session.capturePromise) return session.capturePromise;
-
-    if (session.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE) {
-      return createCaptureFailure(
-        LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA,
-        'LIVE_DUBBING_CAPTURE_UNAVAILABLE',
-        { name: 'CaptureUnavailableError', message: 'Capture is not ready', code: 'LIVE_DUBBING_CAPTURE_UNAVAILABLE' },
-        { sessionId, status: session.status },
-      );
+    if (session.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE
+      || eventSequence !== session.eventSequence + 1) {
+      return this._sequenceMismatch(sessionId, session);
     }
+    session.eventSequence = eventSequence;
 
     if (!isStreamId(streamId)) {
       return createCaptureFailure(
@@ -202,36 +510,18 @@ export class LiveDubbingController {
     const mediaDevices = this.mediaDevices || globalThis.navigator?.mediaDevices;
     const getUserMedia = mediaDevices?.getUserMedia;
     if (typeof getUserMedia !== 'function') {
-      return this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_UNAVAILABLE', {
-        streamId,
-      });
+      return this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_UNAVAILABLE', { streamId });
     }
 
     let capturePromise;
     try {
-      capturePromise = getUserMedia.call(
-        mediaDevices,
-        createCaptureConstraints(streamId),
-      );
+      capturePromise = getUserMedia.call(mediaDevices, createCaptureConstraints(streamId));
     } catch (error) {
-      return this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_FAILED', {
-        cause: error,
-        streamId,
-      });
+      return this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_FAILED', { cause: error, streamId });
     }
 
     session.capturePromise = Promise.resolve(capturePromise).then(
-      stream => {
-        try {
-          return this._captureResolved(session, stream, streamId);
-        } catch (error) {
-          return this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_FAILED', {
-            cause: error,
-            stream,
-            streamId,
-          });
-        }
-      },
+      stream => this._captureResolved(session, stream, streamId),
       error => this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_FAILED', {
         cause: error,
         streamId,
@@ -240,92 +530,13 @@ export class LiveDubbingController {
     return session.capturePromise;
   }
 
-  status(requestedSessionId = this.currentSession?.sessionId) {
-    if (requestedSessionId === undefined && !this.currentSession) {
-      return {
-        success: true,
-        active: false,
-        sessionId: null,
-        status: IDLE_STATUS,
-      };
-    }
-
-    if (!isSessionId(requestedSessionId)) {
-      return {
-        success: false,
-        error: 'INVALID_SESSION_ID',
-        sessionId: requestedSessionId ?? null,
-        status: IDLE_STATUS,
-      };
-    }
-
-    const session = this.currentSession;
-    if (!session) {
-      return {
-        success: true,
-        active: false,
-        sessionId: requestedSessionId,
-        status: IDLE_STATUS,
-      };
-    }
-
-    if (session.sessionId !== requestedSessionId) {
-      return {
-        success: false,
-        error: 'LIVE_DUBBING_SESSION_MISMATCH',
-        ignored: true,
-        sessionId: requestedSessionId,
-        requestedSessionId,
-        actualSessionId: session.sessionId,
-        status: session.status,
-      };
-    }
-
-    return {
-      success: true,
-      active: session.status === LIVE_DUBBING_STATUS.PREPARING_CAPTURE
-        || session.status === LIVE_DUBBING_STATUS.CAPTURING,
-      sessionId: session.sessionId,
-      status: session.status,
-      ...(session.lastError ? { lastError: session.lastError } : {}),
-    };
-  }
-
-  dispose(sessionId) {
-    const session = this.currentSession;
-    if (!session || session.sessionId !== sessionId) {
-      return {
-        success: true,
-        ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
-        disposed: true,
-        idempotent: !session,
-        ignored: Boolean(session),
-        sessionId: isSessionId(sessionId) ? sessionId : null,
-        active: Boolean(session),
-        status: session?.status || IDLE_STATUS,
-      };
-    }
-
-    this._removeTrackListeners(session);
-    stopTracks(session.stream);
-    session.capturePromise = null;
-    session.stream = null;
-    this.disposedSessionId = sessionId;
-    this.currentSession = null;
-
-    return {
-      success: true,
-      ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
-      disposed: true,
-      sessionId,
-      active: false,
-      status: IDLE_STATUS,
-    };
-  }
-
-  _captureResolved(session, stream, streamId) {
+  /** Initialize both graphs before the provider credential request is made. */
+  async _captureResolved(session, stream, streamId) {
     if (!this._isCurrentSession(session)) {
-      stopTracks(stream);
+      if (!session.streamStopped) {
+        stopTracks(stream);
+        session.streamStopped = true;
+      }
       return {
         success: false,
         error: 'LIVE_DUBBING_SESSION_DISPOSED',
@@ -342,23 +553,503 @@ export class LiveDubbingController {
     }
 
     session.stream = stream;
-    session.capturePromise = null;
-    session.status = LIVE_DUBBING_STATUS.CAPTURING;
+    session.streamStopped = false;
+    session.status = LIVE_DUBBING_INTERNAL_STATUS.CAPTURING;
+    this._markMilestone(session, 'captureReady');
     session.lastError = null;
     this._addTrackListeners(session, liveAudioTracks);
-    return this._mediaAcquiredResponse(session);
+
+    try {
+      await this._initializePipelines(session);
+      if (!this._isCurrentSession(session)) {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_SESSION_DISPOSED',
+          ignored: true,
+          sessionId: session.sessionId,
+          status: IDLE_STATUS,
+        };
+      }
+      session.capturePromise = null;
+      return this._mediaAcquiredResponse(session);
+    } catch (error) {
+      return this._pipelineFailed(session, error, streamId);
+    }
+  }
+
+  async _initializePipelines(session) {
+    if (!this.pipelineRequired) {
+      session.pipelinesReady = true;
+      return;
+    }
+
+    const inputPipeline = await this._createInputPipeline(session);
+    session.inputPipeline = inputPipeline;
+    const outputPlayer = await this._createOutputPlayer(session);
+    if (!inputPipeline || !outputPlayer) {
+      throw Object.assign(new Error('Live dubbing audio pipelines are unavailable'), {
+        code: 'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE',
+      });
+    }
+    if (!this._isCurrentSession(session)) {
+      await Promise.allSettled([
+        inputPipeline.stop?.(),
+        outputPlayer.stop?.(),
+      ]);
+      throw Object.assign(new Error('Live dubbing pipeline setup was cancelled'), {
+        code: 'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
+      });
+    }
+
+    session.outputPlayer = outputPlayer;
+    const inputStart = Promise.resolve(inputPipeline.start?.(session.stream)).then(() => {
+      this._markMilestone(session, 'inputReady');
+    });
+    const outputStart = Promise.resolve(outputPlayer.start?.()).then(() => {
+      this._markMilestone(session, 'outputReady');
+    });
+    await Promise.all([inputStart, outputStart]);
+    if (!this._isCurrentSession(session)) {
+      throw Object.assign(new Error('Live dubbing pipeline setup was cancelled'), {
+        code: 'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
+      });
+    }
+
+    session.pipelinesReady = true;
+    session.status = LIVE_DUBBING_STATUS.CONNECTING_PROVIDER;
+  }
+
+  async _createInputPipeline(session) {
+    const callbacks = {
+      onFrame: frame => this._handleInputFrame(session, frame),
+      onError: error => this._handlePipelineError(session, error, 'INPUT_PIPELINE_ERROR'),
+    };
+    let pipeline = this.inputPipeline;
+    if (!pipeline && typeof this.inputPipelineFactory === 'function') {
+      pipeline = await this.inputPipelineFactory({ sessionId: session.sessionId, ...callbacks });
+    }
+    if (!pipeline) {
+      pipeline = new TabAudioPipeline({
+        ...this.inputPipelineOptions,
+        stopStreamOnCleanup: false,
+        ...callbacks,
+      });
+    }
+    pipeline.onFrame = callbacks.onFrame;
+    pipeline.onError = callbacks.onError;
+    return pipeline;
+  }
+
+  async _createOutputPlayer(session) {
+    const callbacks = {
+      onError: error => this._handlePipelineError(session, error, 'OUTPUT_PIPELINE_ERROR'),
+      onMetrics: metrics => {
+        if (!this._isCurrentSession(session)) return;
+        session.outputMetrics = { ...metrics };
+        this._recordOutputMetrics(session, metrics);
+      },
+      onPlaybackAccepted: details => {
+        this._handlePlaybackAccepted(session, details);
+      },
+    };
+    let player = this.outputPlayer;
+    if (!player && typeof this.outputPlayerFactory === 'function') {
+      player = await this.outputPlayerFactory({ sessionId: session.sessionId, ...callbacks });
+    }
+    if (!player) player = new PcmOutputPlayer({ ...this.outputPlayerOptions, ...callbacks });
+    player.onError = callbacks.onError;
+    player.onMetrics = callbacks.onMetrics;
+    player.onPlaybackAccepted = callbacks.onPlaybackAccepted;
+    session.telemetry.outputBaseline = this._readChildMetrics(player);
+    return player;
+  }
+
+  connectProvider(sessionId, targetLanguage = null, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence);
+    if (sequenceError) return sequenceError;
+
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId) {
+      return this._sessionMismatch(sessionId, session);
+    }
+    const connectionStarted = Boolean(session.connectPromise)
+      || session.status === LIVE_DUBBING_STATUS.RUNNING;
+    if (connectionStarted) {
+      if (!isEventSequence(eventSequence) || eventSequence !== session.eventSequence) {
+        return this._sequenceMismatch(sessionId, session);
+      }
+      if (session.status === LIVE_DUBBING_STATUS.RUNNING) return this._providerReadyResponse(session);
+      return session.connectPromise;
+    }
+    if (session.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || !session.pipelinesReady
+      || eventSequence !== session.eventSequence + 1) {
+      return this._sequenceMismatch(sessionId, session);
+    }
+    if (targetLanguage !== null && targetLanguage !== undefined) {
+      try {
+        if (normalizeTargetLanguage(targetLanguage) !== normalizeTargetLanguage(session.targetLanguage)) {
+          return { success: false, error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH', sessionId, status: session.status };
+        }
+      } catch {
+        return { success: false, error: 'INVALID_TARGET_LANGUAGE', sessionId, status: session.status };
+      }
+    }
+    session.eventSequence = eventSequence;
+
+    const providerGeneration = ++this.providerGeneration;
+    session.providerGeneration = providerGeneration;
+    session.connectPromise = Promise.resolve().then(async () => {
+      const client = await this._createProviderClient(session, providerGeneration);
+      if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
+        return this._disposedProviderResponse(session);
+      }
+      if (!client || typeof client.connect !== 'function') {
+        throw Object.assign(new Error('Gemini Live client is unavailable'), {
+          code: 'LIVE_DUBBING_PROVIDER_UNAVAILABLE',
+        });
+      }
+      session.providerClient = client;
+      let credential = await this.requestProviderCredentialForSession(session);
+      if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
+        return this._disposedProviderResponse(session);
+      }
+      if (!credential) throw Object.assign(new Error('Provider credential is unavailable'), {
+        code: 'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE',
+      });
+
+      let setupPromise;
+      try {
+        setupPromise = client.connect(credential.apiKey, credential.targetLanguage);
+      } finally {
+        // The controller never stores the key; this local reference is cleared
+        // before the provider setup promise is awaited.
+        credential = null;
+      }
+      await setupPromise;
+      if (!this._isCurrentProvider(session, providerGeneration)) {
+        throw Object.assign(new Error('Gemini Live setup was not acknowledged'), {
+          code: 'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
+        });
+      }
+
+      // The client promise resolves only after setupComplete. The callback is
+      // retained as an early fence for input and for callback-driven clients.
+      session.setupAcknowledged = true;
+      session.setupComplete = true;
+      this._markMilestone(session, 'setupComplete');
+      session.status = LIVE_DUBBING_STATUS.RUNNING;
+      session.eventSequence += 1;
+      this._drainPendingInput(session);
+      return this._providerReadyResponse(session);
+    }).catch(error => {
+      if (this._isCurrentProviderGeneration(session, providerGeneration)) {
+        this._providerFailed(session, error, 'PROVIDER_ERROR', error?.providerDiagnostic);
+      }
+      if (session.providerDiagnostic) return this._providerFailureResponse(session, error);
+      return this._disposedProviderResponse(session);
+    });
+    return session.connectPromise;
+  }
+
+  async _createProviderClient(session, generation) {
+    const callbacks = {
+      onSetupComplete: () => {
+        if (!this._isCurrentProvider(session, generation)) return;
+        session.setupAcknowledged = true;
+        session.setupComplete = true;
+        this._markMilestone(session, 'setupComplete');
+        this._drainPendingInput(session);
+      },
+      onAudio: audio => this._handleProviderAudio(session, generation, audio),
+      onInterrupted: () => this._handleProviderInterrupted(session, generation),
+      onGenerationComplete: () => {},
+      onTurnComplete: () => {},
+      onGoAway: details => this._handleProviderTerminal(
+        session,
+        generation,
+        'PROVIDER_GO_AWAY',
+        details,
+        details?.providerDiagnostic,
+      ),
+      onError: error => this._handleProviderError(
+        session,
+        generation,
+        error,
+        error?.providerDiagnostic,
+      ),
+      onClose: (details, providerDiagnostic) => this._handleProviderClose(
+        session,
+        generation,
+        details,
+        providerDiagnostic,
+      ),
+    };
+    let client = this.providerClient;
+    if (!client && typeof this.providerClientFactory === 'function') {
+      client = await this.providerClientFactory({
+        sessionId: session.sessionId,
+        providerGeneration: generation,
+        ...this.providerClientOptions,
+        callbacks,
+        ...callbacks,
+      });
+    }
+    if (!client) {
+      client = new GeminiLiveTranslationClient({
+        ...this.providerClientOptions,
+        performanceNow: this.performanceNow,
+        callbacks,
+        ...callbacks,
+      });
+    }
+    for (const [name, callback] of Object.entries(callbacks)) client[name] = callback;
+    session.telemetry.providerBaseline = this._readChildTelemetry(client);
+    return client;
+  }
+
+  requestProviderCredentialForSession(session) {
+    if (session.credentialRequestPromise) return session.credentialRequestPromise;
+    if (session.credentialRequested) {
+      return Promise.resolve(null);
+    }
+    session.credentialRequested = true;
+    const request = createProviderCredentialRequest({
+      sessionId: session.sessionId,
+      targetLanguage: session.targetLanguage,
+      eventSequence: session.eventSequence,
+    });
+    const credentialRequestPromise = Promise.resolve()
+      .then(() => this.requestCredential(request))
+      .then(response => parseProviderCredentialResponse(response, session.targetLanguage))
+      .catch(() => null);
+    const trackedCredentialRequest = credentialRequestPromise.finally(() => {
+      if (session.credentialRequestPromise === trackedCredentialRequest) {
+        session.credentialRequestPromise = null;
+      }
+    });
+    session.credentialRequestPromise = trackedCredentialRequest;
+    return trackedCredentialRequest;
+  }
+
+  /** Backwards-compatible public helper; provider starts still use the same request. */
+  requestProviderCredential() {
+    const session = this.currentSession;
+    if (!session || !isSessionId(session.sessionId) || !isSessionId(session.targetLanguage)) {
+      return Promise.resolve({ success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' });
+    }
+    if (session.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || !session.pipelinesReady) {
+      return Promise.resolve({ success: false, error: 'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE' });
+    }
+    return this.requestProviderCredentialForSession(session);
+  }
+
+  status(requestedSessionId = this.currentSession?.sessionId, requestedEventSequence = undefined) {
+    if (requestedSessionId === undefined && !this.currentSession) {
+      return { success: true, active: false, sessionId: null, status: IDLE_STATUS };
+    }
+    if (!isSessionId(requestedSessionId)) {
+      return { success: false, error: 'INVALID_SESSION_ID', sessionId: requestedSessionId ?? null, status: IDLE_STATUS };
+    }
+
+    const session = this.currentSession;
+    if (!session) return { success: true, active: false, sessionId: requestedSessionId, status: IDLE_STATUS };
+    if (session.sessionId !== requestedSessionId) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_MISMATCH',
+        ignored: true,
+        sessionId: requestedSessionId,
+        requestedSessionId,
+        actualSessionId: session.sessionId,
+        status: session.status,
+      };
+    }
+    if (requestedEventSequence !== undefined && requestedEventSequence !== session.eventSequence) {
+      return this._sequenceMismatch(requestedSessionId, session);
+    }
+
+    const active = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ].includes(session.status);
+    return {
+      success: true,
+      active,
+      sessionId: session.sessionId,
+      status: session?.status || IDLE_STATUS,
+      eventSequence: session.eventSequence,
+      captureReady: Boolean(session.stream),
+      inputPipelineReady: Boolean(session.inputPipeline && session.pipelinesReady),
+      outputPipelineReady: Boolean(session.outputPlayer && session.pipelinesReady),
+      setupComplete: session.setupComplete,
+      metrics: { ...session.metrics },
+      ...(session.outputMetrics ? { outputMetrics: { ...session.outputMetrics } } : {}),
+      ...(session.lastError ? { lastError: session.lastError } : {}),
+    };
+  }
+
+  /** Return scalar-only, same-context diagnostics for local validation. */
+  getTelemetry() {
+    const session = this.currentSession;
+    if (session) this._syncProviderTelemetry(session);
+    return safeTelemetrySnapshot(session?.telemetry || this.lastTelemetry);
+  }
+
+  getTelemetrySnapshot() {
+    return this.getTelemetry();
+  }
+
+  getSnapshot() {
+    const session = this.currentSession;
+    return {
+      active: Boolean(session),
+      sessionId: session?.sessionId || null,
+      status: session?.status || IDLE_STATUS,
+      telemetry: this.getTelemetry(),
+    };
+  }
+
+  /**
+   * The one authoritative, idempotent disposal path. Fencing happens before
+   * any resource call. The offscreen router awaits this Promise before
+   * returning the exact DISPOSED acknowledgement for the requested session.
+   */
+  async dispose(sessionId, reason = null, eventSequence = undefined) {
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId) {
+      return {
+        success: true,
+        ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
+        disposed: true,
+        idempotent: !session,
+        ignored: Boolean(session),
+        sessionId: isSessionId(sessionId) ? sessionId : null,
+        active: Boolean(session),
+        status: session?.status || IDLE_STATUS,
+      };
+    }
+    // An exact session identity is the terminal fence; sequence drift is
+    // expected when a response is lost while setup is still settling.
+    void eventSequence;
+    void reason;
+
+    session.terminalRequested = true;
+    this._removeTrackListeners(session);
+    const cleanup = this._cleanupSessionResources(session);
+    this.disposedSessionId = sessionId;
+    this.currentSession = null;
+
+    const response = {
+      success: true,
+      ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
+      disposed: true,
+      sessionId,
+      active: false,
+      status: IDLE_STATUS,
+    };
+    await cleanup;
+    return response;
+  }
+
+  _cleanupSessionResources(session) {
+    if (session.cleanupPromise) return session.cleanupPromise;
+    const cleanupDiagnostic = this._createCleanupDiagnostic(session);
+    if (cleanupDiagnostic && !cleanupDiagnostic.playbackAccepted) {
+      try {
+        this.log?.warn?.('Live dubbing ended without translated playback', cleanupDiagnostic);
+      } catch {
+        // Diagnostic logging must not affect resource cleanup.
+      }
+    }
+    this._markMilestone(session, 'cleanupStart');
+    session.disposing = true;
+    session.providerGeneration = ++this.providerGeneration;
+    session.setupComplete = false;
+    session.pendingInput = [];
+    session.pendingInputMs = 0;
+    session.metrics.inputPendingFrames = 0;
+    session.metrics.inputPendingBytes = 0;
+    session.metrics.inputPendingDurationMs = 0;
+    session.telemetry.inputQueueCurrentDurationMs = 0;
+
+    const client = session.providerClient;
+    const inputPipeline = session.inputPipeline;
+    const outputPlayer = session.outputPlayer;
+    const stream = session.stream;
+    session.providerClient = null;
+    session.inputPipeline = null;
+    session.outputPlayer = null;
+    session.stream = null;
+    if (stream && !session.streamStopped) {
+      stopTracks(stream);
+      session.streamStopped = true;
+    }
+    session.credentialRequestPromise = null;
+    session.credentialRequested = false;
+
+    try {
+      client?.close?.();
+    } catch {
+      // Socket close is best effort; callbacks are already fenced.
+    }
+    try {
+      outputPlayer?.clear?.();
+    } catch {
+      // Queue clearing is best effort before graph teardown.
+    }
+
+    session.cleanupPromise = Promise.allSettled([
+      inputPipeline?.stop?.(),
+      outputPlayer?.stop?.(),
+    ]).then(() => {
+      session.telemetry.outputQueueCurrentDurationMs = 0;
+      this._markMilestone(session, 'cleanupComplete');
+      this.lastTelemetry = safeTelemetrySnapshot(session.telemetry);
+      return true;
+    });
+    return session.cleanupPromise;
+  }
+
+  _createCleanupDiagnostic(session) {
+    this._syncProviderTelemetry(session);
+    this._recordOutputMetrics(session, session.outputMetrics);
+    if (session.setupComplete !== true
+      && session.telemetry.milestones.setupComplete === null) return null;
+    let providerLastSendReason;
+    try {
+      providerLastSendReason = session.providerClient?.lastSendReason;
+    } catch {
+      providerLastSendReason = undefined;
+    }
+
+    return createLiveDubbingCleanupDiagnostic({
+      cleanupCause: session.lastError,
+      capturedFrames: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        safeInteger(session.metrics.preSetupDroppedFrames)
+          + safeInteger(session.metrics.inputFrames),
+      ),
+      inputSentFrames: session.metrics.inputSentFrames,
+      inputPendingFrames: session.metrics.inputPendingFrames,
+      providerLastSendReason,
+      providerAudioChunks: session.metrics.outputChunks,
+      playbackAccepted: session.telemetry.milestones.firstTranslatedAudioAcceptedByPlayback !== null,
+      outputSafetyDrops: session.metrics.outputSafetyDrops,
+      interruptions: session.telemetry.interruptions,
+      providerTerminalCategory: session.telemetry.providerTerminalCategory,
+    });
   }
 
   _captureFailed(session, error, options = {}) {
     const isCurrent = this._isCurrentSession(session);
-    if (options.stream) stopTracks(options.stream);
+    if (options.stream && session.stream !== options.stream) stopTracks(options.stream);
     const diagnostic = createLiveDubbingDiagnostic(
       LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA,
-      options.cause || {
-        name: 'CaptureError',
-        message: error,
-        code: error,
-      },
+      options.cause || { name: 'CaptureError', message: error, code: error },
       { sensitiveValues: options.streamId ? [options.streamId] : [] },
     );
     if (isCurrent) {
@@ -366,7 +1057,6 @@ export class LiveDubbingController {
       session.status = LIVE_DUBBING_STATUS.ERROR;
       session.lastError = error;
     }
-
     return {
       success: false,
       error,
@@ -376,6 +1066,15 @@ export class LiveDubbingController {
     };
   }
 
+  _pipelineFailed(session, error, streamId) {
+    const result = this._captureFailed(session, errorCode(error, 'LIVE_DUBBING_AUDIO_PIPELINES_FAILED'), {
+      cause: error,
+      streamId,
+    });
+    this._cleanupSessionResources(session);
+    return result;
+  }
+
   _mediaAcquiredResponse(session) {
     return {
       success: true,
@@ -383,17 +1082,339 @@ export class LiveDubbingController {
       mediaAcquired: true,
       sessionId: session.sessionId,
       active: true,
-      status: LIVE_DUBBING_STATUS.CAPTURING,
+      status: session.status,
+      eventSequence: session.eventSequence,
+      captureReady: Boolean(session.stream),
+      inputPipelineReady: Boolean(session.inputPipeline && session.pipelinesReady),
+      outputPipelineReady: Boolean(session.outputPlayer && session.pipelinesReady),
     };
+  }
+
+  _providerReadyResponse(session) {
+    return {
+      success: true,
+      ack: LIVE_DUBBING_OFFSCREEN_ACKS.PROVIDER_READY,
+      providerReady: true,
+      running: true,
+      sessionId: session.sessionId,
+      active: true,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      eventSequence: session.eventSequence,
+      captureReady: Boolean(session.stream),
+      inputPipelineReady: Boolean(session.inputPipeline && session.pipelinesReady),
+      outputPipelineReady: Boolean(session.outputPlayer && session.pipelinesReady),
+      setupComplete: session.setupComplete,
+    };
+  }
+
+  _disposedProviderResponse(session) {
+    return {
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_DISPOSED',
+      ignored: true,
+      sessionId: session.sessionId,
+      status: IDLE_STATUS,
+      ...(session.providerDiagnostic ? { providerDiagnostic: session.providerDiagnostic } : {}),
+    };
+  }
+
+  _providerFailureResponse(session, error) {
+    return {
+      success: false,
+      error: errorCode(error, session.lastError || 'LIVE_DUBBING_PROVIDER_FAILED'),
+      sessionId: session.sessionId,
+      status: session.status,
+      providerDiagnostic: session.providerDiagnostic,
+    };
+  }
+
+  _handleInputFrame(session, frame) {
+    if (!this._isCurrentSession(session) || session.terminalRequested || session.disposing) return;
+    if (!session.setupComplete) {
+      const byteLength = getFrameByteLength(frame);
+      const durationMs = getFrameDurationMs(frame, byteLength);
+      session.metrics.preSetupDroppedFrames += 1;
+      session.metrics.preSetupDroppedDurationMs += durationMs;
+      session.telemetry.preSetupDroppedFrames += 1;
+      session.telemetry.preSetupDroppedDurationMs += durationMs;
+      return;
+    }
+    const buffer = getFrameBuffer(frame);
+    if (!buffer || buffer.byteLength === 0) return;
+    const sampleCount = Number.isInteger(frame?.sampleCount) && frame.sampleCount > 0
+      ? frame.sampleCount
+      : Math.floor(buffer.byteLength / 2);
+    const sampleRate = Number.isInteger(frame?.sampleRate) && frame.sampleRate > 0
+      ? frame.sampleRate
+      : INPUT_SAMPLE_RATE;
+    const queued = {
+      buffer,
+      sampleCount,
+      sampleRate,
+      sourceSampleStart: frame?.sourceSampleStart,
+      sourceTimestamp: frame?.sourceTimestamp,
+    };
+    session.metrics.inputFrames += 1;
+    session.metrics.inputBytes += buffer.byteLength;
+    session.pendingInput.push(queued);
+    session.pendingInputMs += (sampleCount / sampleRate) * 1000;
+    this._trimPendingInput(session);
+    this._updatePendingInputMetrics(session);
+    this._drainPendingInput(session);
+  }
+
+  _trimPendingInput(session) {
+    if (session.pendingInputMs <= LIVE_DUBBING_AUDIO_LIMITS.INPUT_PENDING_MAX_MS) return;
+    while (session.pendingInput.length > 0
+      && session.pendingInputMs > LIVE_DUBBING_AUDIO_LIMITS.INPUT_PENDING_RETAIN_MS) {
+      const dropped = session.pendingInput.shift();
+      const durationMs = getFrameDurationMs(dropped);
+      session.pendingInputMs -= durationMs;
+      session.metrics.inputDroppedFrames += 1;
+      session.metrics.inputDroppedBytes += dropped.buffer.byteLength;
+      session.metrics.inputDroppedDurationMs += durationMs;
+      session.telemetry.inputDroppedDurationMs += durationMs;
+    }
+    this._updatePendingInputMetrics(session);
+  }
+
+  _drainPendingInput(session) {
+    if (!this._isCurrentSession(session) || !session.setupComplete || !session.providerClient) return;
+    while (session.pendingInput.length > 0) {
+      const frame = session.pendingInput[0];
+      let sent = false;
+      try {
+        sent = session.providerClient.sendAudio(frame.buffer) === true;
+      } catch (error) {
+        this._providerFailed(session, error, 'INPUT_SEND_ERROR');
+        return;
+      }
+      if (!sent) {
+        if (session.providerClient.lastSendReason === 'BACKPRESSURE') {
+          session.metrics.inputBackpressureEvents += 1;
+        }
+        break;
+      }
+      session.pendingInput.shift();
+      session.pendingInputMs -= getFrameDurationMs(frame);
+      session.metrics.inputSentFrames += 1;
+      session.metrics.inputSentBytes += frame.buffer.byteLength;
+      this._markMilestone(session, 'firstInputSent');
+    }
+    this._updatePendingInputMetrics(session);
+  }
+
+  _updatePendingInputMetrics(session) {
+    session.metrics.inputPendingFrames = session.pendingInput.length;
+    session.metrics.inputPendingBytes = session.pendingInput.reduce(
+      (sum, item) => sum + item.buffer.byteLength,
+      0,
+    );
+    session.metrics.inputPendingDurationMs = safeNonNegativeNumber(session.pendingInputMs);
+    session.metrics.inputQueuePeakDurationMs = Math.max(
+      session.metrics.inputQueuePeakDurationMs || 0,
+      session.metrics.inputPendingDurationMs,
+    );
+    session.telemetry.inputQueueCurrentDurationMs = session.metrics.inputPendingDurationMs;
+    session.telemetry.inputQueuePeakDurationMs = Math.max(
+      session.telemetry.inputQueuePeakDurationMs,
+      session.metrics.inputPendingDurationMs,
+    );
+  }
+
+  _markMilestone(session, name) {
+    if (session.telemetry.milestones[name] !== null) return;
+    let value = null;
+    try {
+      value = this.performanceNow();
+    } catch {
+      value = null;
+    }
+    if (Number.isFinite(value)) session.telemetry.milestones[name] = value;
+  }
+
+  _readChildMetrics(child) {
+    try {
+      const metrics = child?.getMetrics?.();
+      return metrics && typeof metrics === 'object'
+        ? {
+          queuedSamples: safeInteger(metrics.queuedSamples),
+          underruns: safeInteger(metrics.underruns),
+        }
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  _readChildTelemetry(child) {
+    try {
+      const telemetry = child?.getTelemetry?.();
+      if (!telemetry || typeof telemetry !== 'object') return null;
+      return {
+        milestones: Object.fromEntries(TELEMETRY_MILESTONES.map(name => [
+          name,
+          Number.isFinite(telemetry.milestones?.[name]) ? telemetry.milestones[name] : null,
+        ])),
+        wsBufferedAmountPeak: safeNonNegativeNumber(telemetry.wsBufferedAmountPeak),
+        interruptions: safeInteger(telemetry.interruptions),
+        providerTerminalCategory: typeof telemetry.providerTerminalCategory === 'string'
+          && SAFE_ERROR_CODE.test(telemetry.providerTerminalCategory)
+          ? telemetry.providerTerminalCategory
+          : null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _syncProviderTelemetry(session) {
+    const childTelemetry = this._readChildTelemetry(session.providerClient);
+    if (!childTelemetry) return;
+    const baseline = session.telemetry.providerBaseline;
+    for (const name of ['wsOpen', 'setupSent', 'setupComplete']) {
+      const value = childTelemetry.milestones[name];
+      const previous = baseline?.milestones?.[name] ?? null;
+      if (Number.isFinite(value) && value !== previous && session.telemetry.milestones[name] === null) {
+        session.telemetry.milestones[name] = value;
+      }
+    }
+    const childInterruptions = Math.max(
+      0,
+      childTelemetry.interruptions - safeInteger(baseline?.interruptions),
+    );
+    session.telemetry.interruptions = Math.max(session.telemetry.interruptions, childInterruptions);
+    session.telemetry.wsBufferedAmountPeak = Math.max(
+      session.telemetry.wsBufferedAmountPeak,
+      childTelemetry.wsBufferedAmountPeak,
+    );
+    const previousCategory = baseline?.providerTerminalCategory || null;
+    if (!session.telemetry.providerTerminalCategory
+      && childTelemetry.providerTerminalCategory
+      && childTelemetry.providerTerminalCategory !== previousCategory) {
+      session.telemetry.providerTerminalCategory = childTelemetry.providerTerminalCategory;
+    }
+  }
+
+  _recordOutputMetrics(session, metrics) {
+    if (!metrics || typeof metrics !== 'object') return;
+    const queuedSamples = safeInteger(metrics.queuedSamples);
+    const durationMs = (queuedSamples / OUTPUT_SAMPLE_RATE) * 1000;
+    session.telemetry.outputQueueCurrentDurationMs = durationMs;
+    session.telemetry.outputQueuePeakDurationMs = Math.max(
+      session.telemetry.outputQueuePeakDurationMs,
+      durationMs,
+    );
+    const baselineUnderruns = safeInteger(session.telemetry.outputBaseline?.underruns);
+    const underruns = Math.max(0, safeInteger(metrics.underruns) - baselineUnderruns);
+    session.telemetry.underruns = Math.max(session.telemetry.underruns, underruns);
+  }
+
+  _handlePlaybackAccepted(session, details = {}) {
+    if (!this._isCurrentSession(session) || details?.accepted === false) return;
+    this._markMilestone(session, 'firstTranslatedAudioAcceptedByPlayback');
+    try {
+      this.onPlaybackAccepted?.({
+        accepted: true,
+        sampleCount: safeInteger(details?.sampleCount),
+      });
+    } catch {
+      // Playback telemetry callbacks must never affect audio or cleanup.
+    }
+  }
+
+  _handleProviderAudio(session, generation, audio) {
+    if (!this._isCurrentProvider(session, generation) || !session.setupComplete) return;
+    if (typeof audio?.mimeType !== 'string' || !/audio\/pcm(?:;\s*rate=24000\b)/i.test(audio.mimeType)) {
+      this._providerFailed(session, Object.assign(new Error('Gemini Live returned unsupported PCM audio'), {
+        code: 'LIVE_DUBBING_INVALID_OUTPUT_AUDIO',
+      }), 'INVALID_OUTPUT_AUDIO');
+      return;
+    }
+    try {
+      const bytes = decodeBase64(audio.data);
+      this._markMilestone(session, 'firstTranslatedAudioReceived');
+      const result = session.outputPlayer?.enqueuePcm16(bytes, {
+        epoch: session.outputEpoch,
+        sequence: ++session.outputSequence,
+      });
+      session.metrics.outputChunks += 1;
+      session.metrics.outputBytes += bytes.byteLength;
+      if (result?.accepted === false) session.metrics.outputSafetyDrops += 1;
+    } catch (error) {
+      this._providerFailed(session, error, 'OUTPUT_AUDIO_ERROR');
+    }
+  }
+
+  _handleProviderInterrupted(session, generation) {
+    if (!this._isCurrentProvider(session, generation) || !session.setupComplete) return;
+    session.telemetry.interruptions += 1;
+    session.outputEpoch += 1;
+    session.outputPlayer?.resetEpoch?.(session.outputEpoch);
+  }
+
+  _handleProviderError(session, generation, error, providerDiagnostic = null) {
+    if (!this._isCurrentProvider(session, generation)) return;
+    this._providerFailed(session, error, 'PROVIDER_ERROR', providerDiagnostic);
+  }
+
+  _handleProviderClose(session, generation, details = {}, providerDiagnostic = null) {
+    if (!this._isCurrentProvider(session, generation) || session.disposing) return;
+    this._providerFailed(session, Object.assign(new Error('Gemini Live connection closed'), {
+      code: 'LIVE_DUBBING_PROVIDER_CLOSED',
+    }), 'PROVIDER_CLOSED', providerDiagnostic, details);
+  }
+
+  _handleProviderTerminal(session, generation, reason, details = {}, providerDiagnostic = null) {
+    if (!this._isCurrentProvider(session, generation)) return;
+    providerDiagnostic ||= details?.providerDiagnostic;
+    this._providerFailed(session, Object.assign(new Error('Gemini Live requested termination'), {
+      code: reason,
+    }), reason, providerDiagnostic);
+  }
+
+  _providerFailed(session, error, reason, providerDiagnostic = null, closeDetails = {}) {
+    if (!this._isCurrentSession(session) || session.disposing) return;
+    this._latchProviderDiagnostic(session, providerDiagnostic, {
+      code: errorCode(error, `LIVE_DUBBING_${reason}`),
+      closeCode: closeDetails?.code,
+      wasClean: closeDetails?.wasClean,
+      terminalCategory: reason,
+      wsOpen: session.telemetry.milestones.wsOpen !== null,
+      setupSent: session.telemetry.milestones.setupSent !== null,
+      setupComplete: session.setupComplete,
+    });
+    session.status = LIVE_DUBBING_STATUS.ERROR;
+    session.lastError = errorCode(error, `LIVE_DUBBING_${reason}`);
+    session.telemetry.providerTerminalCategory = errorCode({ code: reason }, 'PROVIDER_ERROR');
+    session.terminalRequested = true;
+    const cleanupDiagnostic = this._createCleanupDiagnostic(session);
+    this._notifyTerminal(session, reason, cleanupDiagnostic);
+    this._cleanupSessionResources(session, cleanupDiagnostic);
+  }
+
+  _latchProviderDiagnostic(session, diagnostic, fallback = {}) {
+    if (session.providerDiagnostic) return session.providerDiagnostic;
+    session.providerDiagnostic = sanitizeLiveDubbingProviderDiagnostic(diagnostic)
+      || createLiveDubbingProviderDiagnostic(fallback);
+    return session.providerDiagnostic;
+  }
+
+  _handlePipelineError(session, error, reason) {
+    if (!this._isCurrentSession(session) || session.disposing) return;
+    if (reason === 'OUTPUT_PIPELINE_ERROR'
+      && error?.code === 'OUTPUT_AUDIO_QUEUE_SAFETY_LIMIT') {
+      session.metrics.outputSafetyDrops += 1;
+      return;
+    }
+    this._providerFailed(session, error, reason);
   }
 
   _getLiveAudioTracks(stream) {
     if (typeof stream?.getAudioTracks === 'function') {
       return stream.getAudioTracks().filter(track => track?.readyState === 'live');
     }
-
-    return getTracks(stream).filter(track => track?.kind === 'audio'
-      && track.readyState === 'live');
+    return getTracks(stream).filter(track => track?.kind === 'audio' && track.readyState === 'live');
   }
 
   _addTrackListeners(session, tracks) {
@@ -413,11 +1434,8 @@ export class LiveDubbingController {
   _removeTrackListeners(session) {
     for (const listener of session.listeners) {
       try {
-        if (listener.mode === 'event') {
-          listener.track.removeEventListener?.('ended', listener.handler);
-        } else if (listener.track.onended === listener.handler) {
-          listener.track.onended = listener.previous || null;
-        }
+        if (listener.mode === 'event') listener.track.removeEventListener?.('ended', listener.handler);
+        else if (listener.track.onended === listener.handler) listener.track.onended = listener.previous || null;
       } catch {
         // Listener cleanup is best effort and must not block track stopping.
       }
@@ -426,42 +1444,86 @@ export class LiveDubbingController {
   }
 
   _handleTrackEnded(session) {
-    if (!this._isCurrentSession(session)
-      || session.status !== LIVE_DUBBING_STATUS.CAPTURING) {
-      return;
-    }
-
+    if (!this._isCurrentSession(session) || session.terminalRequested || session.disposing) return;
+    if (![
+      LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ].includes(session.status)) return;
     if (this._getLiveAudioTracks(session.stream).length > 0) return;
-
     session.status = LIVE_DUBBING_STATUS.ERROR;
     session.lastError = 'LIVE_DUBBING_CAPTURE_TRACK_ENDED';
-    this._notifyTerminal(session);
+    session.terminalRequested = true;
+    const cleanupDiagnostic = this._createCleanupDiagnostic(session);
+    this._notifyTerminal(session, 'TRACK_ENDED', cleanupDiagnostic);
+    this._cleanupSessionResources(session, cleanupDiagnostic);
   }
 
-  _notifyTerminal(session) {
+  _notifyTerminal(session, event, cleanupDiagnostic = null) {
     if (session.terminalSent) return;
     session.terminalSent = true;
-
     const notification = {
       action: LIVE_DUBBING_ACTIONS.TERMINAL,
       data: {
         sessionId: session.sessionId,
+        eventSequence: session.eventSequence,
         status: session.status,
-        event: 'TRACK_ENDED',
+        event,
         error: session.lastError,
+        ...(session.providerDiagnostic ? { providerDiagnostic: session.providerDiagnostic } : {}),
+        ...(cleanupDiagnostic ? { cleanupDiagnostic } : {}),
       },
     };
-
     try {
       Promise.resolve(this.notify(notification)).catch(() => {});
     } catch {
-      // Terminal notification is best effort; capture state remains fenced.
+      // Terminal notification is best effort; local resources remain fenced.
     }
   }
 
   _isCurrentSession(session) {
     return this.currentSession === session
-      && this.currentSession.sessionId === session.sessionId;
+      && this.currentSession.sessionId === session.sessionId
+      && !session.disposing
+      && !session.terminalRequested;
+  }
+
+  _isCurrentProvider(session, generation) {
+    return this._isCurrentProviderGeneration(session, generation)
+      && session.providerClient !== null;
+  }
+
+  _isCurrentProviderGeneration(session, generation) {
+    return this._isCurrentSession(session)
+      && !session.disposing
+      && session.providerGeneration === generation;
+  }
+
+  _sessionMismatch(sessionId, session) {
+    return {
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      ignored: true,
+      sessionId: isSessionId(sessionId) ? sessionId : null,
+      status: session?.status || IDLE_STATUS,
+    };
+  }
+
+  _sequenceMismatch(sessionId, session) {
+    return {
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+      ignored: true,
+      sessionId,
+      eventSequence: session?.eventSequence ?? 0,
+      status: session?.status || IDLE_STATUS,
+    };
+  }
+
+  _requiredEventSequence(sessionId, eventSequence) {
+    if (isEventSequence(eventSequence)) return null;
+    const session = this.currentSession?.sessionId === sessionId ? this.currentSession : null;
+    return this._sequenceMismatch(sessionId, session);
   }
 }
 

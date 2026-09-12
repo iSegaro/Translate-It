@@ -25,6 +25,7 @@ describe('LiveDubbingControl', () => {
   it('queries status and sends target language and resolved session on start/stop', async () => {
     const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
     await Promise.resolve()
+    await wrapper.vm.$nextTick()
 
     expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
 
@@ -100,5 +101,50 @@ describe('LiveDubbingControl', () => {
       data: { sessionId: 'retained-session' }
     })
     expect(cleanupButton().exists()).toBe(false)
+  })
+
+  it.each([
+    ['PREPARING_CAPTURE', 'Preparing capture…'],
+    ['CONNECTING_PROVIDER', 'Connecting to provider…'],
+    ['RUNNING', 'Running'],
+    ['STOPPING', 'Stopping…'],
+    ['ERROR', 'Error']
+  ])('presents the authoritative %s status', async (status, label) => {
+    sendMessage.mockImplementation(({ action }) => (
+      action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve({ status: { status, sessionId: 'session-1' } })
+        : Promise.resolve({ status: { status, sessionId: 'session-1' } })
+    ))
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+  })
+
+  it('presents safe background errors without remapping status', async () => {
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE'
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Error')
+    expect(wrapper.text()).toContain('A Gemini API key is required for live dubbing.')
+  })
+
+  it('disables start for an unsupported background response', async () => {
+    sendMessage.mockResolvedValue({ success: false, error: 'LIVE_DUBBING_UNSUPPORTED' })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Live dubbing is not supported in this browser.')
   })
 })

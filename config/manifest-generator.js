@@ -158,18 +158,6 @@ function generateChromeManifest(baseManifest) {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; trusted-types default vue dompurify;"
     },
 
-    // Chrome-specific web accessible resources
-    web_accessible_resources: [
-      ...baseManifest.web_accessible_resources,
-      {
-        resources: [
-          'src/html/offscreen.html',
-          'src/html/offscreen.js'
-        ],
-        matches: ['<all_urls>', 'file://*/*'],
-        use_dynamic_url: true
-      }
-    ]
   };
 
   return manifest;

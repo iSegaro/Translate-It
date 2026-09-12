@@ -25,7 +25,7 @@
       v-if="!isRunning && !isStopping"
       size="sm"
       :loading="isStarting"
-      :disabled="isUnavailable || isStopping || isCleanupPending"
+      :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
       text="Start"
       aria-label="Start live dubbing"
       @click="start"
@@ -77,6 +77,7 @@ const props = defineProps({
 const emit = defineEmits(['busy-change'])
 const { sendMessage } = useMessaging(MessageContexts.POPUP)
 const state = ref('loading')
+const authoritativeStatus = ref(null)
 const sessionId = ref(null)
 const sessionDescriptor = ref(null)
 const errorMessage = ref('')
@@ -87,17 +88,28 @@ const isStopping = computed(() => state.value === 'stopping')
 const isCleanupPending = computed(() => state.value === 'cleanup')
 const isTransitioning = computed(() => isStarting.value || isStopping.value)
 const isUnavailable = computed(() => state.value === 'unavailable')
+const isLoading = computed(() => state.value === 'loading')
 const isBusy = computed(() => isTransitioning.value || isRunning.value || isCleanupPending.value)
 const statusText = computed(() => ({
   loading: 'Checking availability…',
   idle: 'Ready',
-  starting: 'Starting…',
-  running: 'Running',
-  stopping: 'Stopping…',
-  cleanup: 'Cleanup needed',
-  unavailable: 'Unavailable',
-  error: 'Error'
-}[state.value] || 'Error'))
+  PREPARING_CAPTURE: 'Preparing capture…',
+  CONNECTING_PROVIDER: 'Connecting to provider…',
+  RUNNING: 'Running',
+  STOPPING: 'Stopping…',
+  ERROR: 'Error',
+  unavailable: 'Unavailable'
+}[authoritativeStatus.value || state.value] || 'Error'))
+
+const ERROR_MESSAGES = {
+  LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
+  INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.',
+  LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE: 'A Gemini API key is required for live dubbing.'
+}
+
+const getErrorMessage = (error, fallback = 'Live dubbing failed.') => (
+  ERROR_MESSAGES[error] || (typeof error === 'string' && error ? error : fallback)
+)
 
 const unwrap = (response) => response?.data || response || {}
 
@@ -113,40 +125,26 @@ const applyStatus = (response, { preserveSession = false } = {}) => {
     sessionDescriptor.value = null
   }
 
-  if (result.available === false || descriptor.status === 'unavailable') {
+  if (result.available === false || result.error === 'LIVE_DUBBING_UNSUPPORTED' || descriptor.status === 'unavailable') {
+    authoritativeStatus.value = null
     state.value = 'unavailable'
-    errorMessage.value = result.error || 'Live dubbing is unavailable.'
+    errorMessage.value = getErrorMessage(result.error, 'Live dubbing is unavailable.')
     return
   }
 
-  if (result.error && result.success === false) {
-    state.value = sessionId.value ? 'cleanup' : 'error'
-    errorMessage.value = result.error
-    return
-  }
-
-  const statusMap = {
-    CAPTURING: 'running',
-    STOPPING: 'stopping',
-    ERROR: 'error',
-    starting: 'starting',
-    running: 'running',
-    stopping: 'stopping'
-  }
   const status = descriptor.status
-  const needsCleanup = sessionId.value && [
-    'PREPARING_CAPTURE',
-    'preparing_capture',
-    'ERROR',
-    'error',
-    'CLEANUP_PENDING',
-    'CLEANUP-PENDING',
-    'cleanup-pending',
-    'cleanup_pending'
-  ].includes(status)
-  state.value = needsCleanup ? 'cleanup' : statusMap[status] || 'idle'
-  errorMessage.value = state.value === 'error' || state.value === 'cleanup'
-    ? descriptor.lastError || result.error || 'Live dubbing failed.'
+  const statuses = ['PREPARING_CAPTURE', 'CONNECTING_PROVIDER', 'RUNNING', 'STOPPING', 'ERROR']
+  authoritativeStatus.value = statuses.includes(status) ? status : null
+  const stateMap = {
+    PREPARING_CAPTURE: 'starting',
+    CONNECTING_PROVIDER: 'starting',
+    RUNNING: 'running',
+    STOPPING: 'stopping',
+    ERROR: sessionId.value ? 'cleanup' : 'error'
+  }
+  state.value = stateMap[status] || (result.error && result.success === false ? 'error' : 'idle')
+  errorMessage.value = status === 'ERROR' || result.error
+    ? getErrorMessage(descriptor.lastError || result.error)
     : ''
 }
 
@@ -156,7 +154,8 @@ const queryStatus = async () => {
     applyStatus(response)
   } catch (error) {
     state.value = 'unavailable'
-    errorMessage.value = error?.message || 'Live dubbing is unavailable.'
+    authoritativeStatus.value = null
+    errorMessage.value = getErrorMessage(error?.message, 'Live dubbing is unavailable.')
   }
 }
 
@@ -172,7 +171,7 @@ const start = async () => {
     if (state.value === 'idle') state.value = 'running'
   } catch (error) {
     state.value = 'error'
-    errorMessage.value = error?.message || 'Unable to start live dubbing.'
+    errorMessage.value = getErrorMessage(error?.message, 'Unable to start live dubbing.')
   }
 }
 
@@ -194,7 +193,7 @@ const stop = async () => {
     // Keep retained session available after transport failure so cleanup can retry.
     applyStatus(error?.data || error?.response?.data || error, { preserveSession: true })
     state.value = sessionId.value ? 'cleanup' : 'error'
-    errorMessage.value = error?.message || 'Unable to stop live dubbing.'
+    errorMessage.value = getErrorMessage(error?.message, 'Unable to stop live dubbing.')
   }
 }
 

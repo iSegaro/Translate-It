@@ -3,9 +3,15 @@ import { ApiKeyManager } from './ApiKeyManager.js';
 import { ProviderRegistryIds } from './ProviderConstants.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 
-const { mockProxyFetch, mockResolveProxyConfig, mockProxyManager } = vi.hoisted(() => {
+const { mockLogger, mockProxyFetch, mockResolveProxyConfig, mockProxyManager } = vi.hoisted(() => {
   const mockProxyFetch = vi.fn();
   return {
+    mockLogger: {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn()
+    },
     mockProxyFetch,
     mockResolveProxyConfig: vi.fn(),
     mockProxyManager: { config: null, fetch: mockProxyFetch }
@@ -34,12 +40,7 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({
 
 // Mock logger
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
+  getScopedLogger: () => mockLogger
 }));
 
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -107,6 +108,25 @@ describe('ApiKeyManager', () => {
     it('should return empty array if no keys in storage', async () => {
       const keys = await ApiKeyManager.getKeys('NON_EXISTENT');
       expect(keys).toEqual([]);
+    });
+
+    it('does not log API key material when loading keys', async () => {
+      const secret = 'secret-api-key-value';
+      mockStorage.set('API_KEY', `${secret}\nsecond-secret-api-key`);
+
+      await ApiKeyManager.getKeys('API_KEY');
+
+      const loggedValues = [
+        ...mockLogger.debug.mock.calls,
+        ...mockLogger.info.mock.calls,
+        ...mockLogger.warn.mock.calls,
+        ...mockLogger.error.mock.calls
+      ].flat().join(' ');
+
+      expect(loggedValues).not.toContain(secret);
+      expect(loggedValues).not.toContain(secret.slice(0, 4));
+      expect(loggedValues).not.toContain(secret.slice(-4));
+      expect(mockLogger.info).not.toHaveBeenCalled();
     });
   });
 

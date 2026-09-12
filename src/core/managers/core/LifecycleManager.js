@@ -278,6 +278,7 @@ class LifecycleManager {
         [MessageActions.LIVE_DUBBING_START]: Handlers.handleLiveDubbingStartLazy,
         [MessageActions.LIVE_DUBBING_STOP]: Handlers.handleLiveDubbingStopLazy,
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
+        [MessageActions.LIVE_DUBBING_REQUEST_PROVIDER_CREDENTIAL]: Handlers.handleLiveDubbingCredentialRequestLazy,
         [LIVE_DUBBING_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
       });
     }

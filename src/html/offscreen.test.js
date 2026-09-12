@@ -63,6 +63,8 @@ async function loadOffscreen({ mediaDevices = null } = {}) {
   }
   globalThis.chrome = {
     runtime: {
+      id: 'extension-id',
+      getURL: (path = '') => `chrome-extension://extension-id/${path}`,
       sendMessage: vi.fn((message) => {
         state.messages.push(message);
         return Promise.resolve();
@@ -92,9 +94,12 @@ async function loadOffscreen({ mediaDevices = null } = {}) {
   await import('./offscreen.js');
 }
 
-function sendMessage(message) {
+function sendMessage(message, sender = {
+  id: 'extension-id',
+  url: 'chrome-extension://extension-id/background.js',
+}) {
   return new Promise((resolve) => {
-    state.listener(message, {}, resolve);
+    state.listener(message, sender, resolve);
   });
 }
 
@@ -446,6 +451,41 @@ describe('offscreen TTS terminal playback lifecycle', () => {
 });
 
 describe('offscreen live-dubbing route', () => {
+  it('ignores untargeted Popup live-dubbing broadcasts before authorization', async () => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+    const sendResponse = vi.fn();
+    const popupSender = {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+      frameId: 0,
+    };
+
+    expect(state.listener({ action: 'START_LIVE_DUBBING' }, popupSender, sendResponse)).toBe(false);
+    expect(sendResponse).not.toHaveBeenCalled();
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('rejects untrusted, tab-bound, and unlisted offscreen actions before routing', async () => {
+    await loadOffscreen();
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_PREPARE',
+      data: { sessionId: 'attacker-session' },
+    }, {
+      id: 'extension-id',
+      url: 'https://example.test/page',
+      tab: { id: 1 },
+    })).resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'UNLISTED_OFFSCREEN_ACTION',
+    })).resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+  });
+
   it('coexists with TTS and does not log or expose stream IDs', async () => {
     const track = {
       kind: 'audio',
@@ -472,7 +512,7 @@ describe('offscreen live-dubbing route', () => {
     await expect(sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_PREPARE',
-      data: { sessionId: 'session-1' },
+      data: { sessionId: 'session-1', eventSequence: 0 },
     })).resolves.toMatchObject({
       success: true,
       ack: 'READY',
@@ -481,7 +521,7 @@ describe('offscreen live-dubbing route', () => {
     await expect(sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_CONSUME',
-      data: { sessionId: 'session-1', streamId: 'stream-secret' },
+      data: { sessionId: 'session-1', streamId: 'stream-secret', eventSequence: 1 },
     })).resolves.toMatchObject({
       success: true,
       ack: 'MEDIA_ACQUIRED',

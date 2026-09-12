@@ -2,6 +2,10 @@
 // Chrome-specific offscreen script
 
 import { liveDubbingController } from '../features/live-dubbing/offscreen/LiveDubbingController.js';
+import {
+  LIVE_DUBBING_OFFSCREEN_ACTIONS,
+} from '../features/live-dubbing/constants.js';
+import { isAuthorizedOffscreenRouterSender } from '../features/live-dubbing/contracts.js';
 
 // Enhanced logging for offscreen document
 const createOffscreenLogger = () => {
@@ -25,6 +29,32 @@ function getSafeAction(action) {
 
 function getSafeErrorName(error) {
   return /^[A-Za-z]+Error$/.test(error?.name || '') ? error.name : 'UnknownError';
+}
+
+const OFFSCREEN_ALLOWED_ACTIONS = new Set([
+  ...LIVE_DUBBING_OFFSCREEN_ACTIONS,
+  'TTS_SPEAK',
+  'TTS_STOP',
+  'handleTTSStop',
+  'TTS_PAUSE',
+  'handleTTSPause',
+  'TTS_RESUME',
+  'handleTTSResume',
+  'handleTTSGetStatus',
+  'TTS_TEST',
+  'playOffscreenAudio',
+  'stopOffscreenAudio',
+  'TTS_GET_VOICES',
+  'playCachedAudio',
+  'OCR_PROCESS',
+  'GENERATE_COMPOSITE_ICON',
+  'GENERATE_SIMPLE_OVERLAY_ICON',
+]);
+
+function isAuthorizedOffscreenMessage(message, sender) {
+  return message?.target === 'offscreen'
+    && OFFSCREEN_ALLOWED_ACTIONS.has(message?.action)
+    && isAuthorizedOffscreenRouterSender(sender, globalThis.chrome);
 }
 
 // Import ResourceTracker for memory management
@@ -273,6 +303,12 @@ if (chrome.runtime) {
 
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.target !== 'offscreen') return false;
+  if (!isAuthorizedOffscreenMessage(message, sender)) {
+    sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    return false;
+  }
+
   logger.debug('Received message', {
     action: getSafeAction(message?.action),
     targeted: message?.target === 'offscreen',
@@ -280,14 +316,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   });
   
 
-  // Only handle messages explicitly targeted to offscreen context
-  if (!message?.target || message.target !== "offscreen") {
-    logger.debug('Message not targeted for offscreen, ignoring', {
-      action: getSafeAction(message?.action),
-    });
-    return false;
-  }
-  
   // Remove forwardedFromBackground flag if present (clean up)
   const cleanMessage = { ...message };
   delete cleanMessage.forwardedFromBackground;

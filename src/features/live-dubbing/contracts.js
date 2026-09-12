@@ -1,17 +1,230 @@
-import { getAvailableTranslationLanguageCodes } from '@/utils/i18n/TranslationLanguageLoader.js';
 import {
   LIVE_DUBBING_ACTIONS,
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_STATUS,
 } from './constants.js';
 
-const availableLanguages = new Set(getAvailableTranslationLanguageCodes());
 const supportedStatuses = new Set(Object.values(LIVE_DUBBING_STATUS));
 const supportedDiagnosticStages = new Set(Object.values(LIVE_DUBBING_CAPTURE_STAGES));
 const safeErrorNamePattern = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 const safeErrorCodePattern = /^[A-Za-z0-9_.-]{1,80}$/;
 const unsafeErrorCodePattern = /(?:stream\s*id|payload|credential|password|secret|token|media)[-_][a-z]/;
 const diagnosticMessageLimit = 160;
+const providerDiagnosticStage = 'CONNECT_PROVIDER';
+const safeProviderDiagnosticTokenPattern = /^[A-Za-z0-9_.-]{1,80}$/;
+const supportedProviderMalformedAt = new Set([
+  'JSON_PARSE',
+  'MESSAGE_ENVELOPE',
+  'SETUP_COMPLETE_SHAPE',
+  'GO_AWAY_SHAPE',
+  'REMOTE_ERROR_SHAPE',
+  'TOP_LEVEL_FIELDS',
+  'SERVER_CONTENT_SHAPE',
+  'SERVER_CONTENT_FIELDS',
+  'MODEL_TURN_SHAPE',
+  'PART_SHAPE',
+  'INLINE_AUDIO_SHAPE',
+  'LIFECYCLE_SHAPE',
+  'METADATA_SHAPE',
+  'SESSION_RESUMPTION_SHAPE',
+  'TOOL_CALL_SHAPE',
+  'TOOL_CALL_CANCELLATION_SHAPE',
+  'UNKNOWN_TOP_LEVEL_FIELD',
+  'MULTIPLE_TOP_LEVEL_FIELDS',
+  'MISSING_TOP_LEVEL_FIELD',
+  'BINARY_BLOB_MESSAGE',
+  'BINARY_UTF8_DECODE',
+  'EMPTY_MESSAGE_OBJECT',
+]);
+const supportedCleanupCauses = new Set([
+  'EXPLICIT_DISPOSE',
+  'LIVE_DUBBING_AUDIO_PIPELINES_FAILED',
+  'LIVE_DUBBING_CAPTURE_FAILED',
+  'LIVE_DUBBING_CAPTURE_TRACK_ENDED',
+  'LIVE_DUBBING_CAPTURE_UNAVAILABLE',
+  'LIVE_DUBBING_INPUT_PIPELINE_ERROR',
+  'LIVE_DUBBING_INPUT_SEND_ERROR',
+  'LIVE_DUBBING_INVALID_OUTPUT_AUDIO',
+  'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK',
+  'LIVE_DUBBING_OUTPUT_AUDIO_ERROR',
+  'LIVE_DUBBING_OUTPUT_PIPELINE_ERROR',
+  'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
+  'LIVE_DUBBING_PROVIDER_CLOSED',
+  'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE',
+  'LIVE_DUBBING_PROVIDER_ERROR',
+  'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
+  'LIVE_DUBBING_PROVIDER_UNAVAILABLE',
+  'GEMINI_LIVE_ALREADY_CONNECTED',
+  'GEMINI_LIVE_AUDIO_ENCODING_FAILED',
+  'GEMINI_LIVE_CLOSED',
+  'GEMINI_LIVE_CLOSED_BEFORE_SETUP',
+  'GEMINI_LIVE_CONNECT_FAILED',
+  'GEMINI_LIVE_GO_AWAY',
+  'GEMINI_LIVE_MALFORMED_MESSAGE',
+  'GEMINI_LIVE_REMOTE_ERROR',
+  'GEMINI_LIVE_SEND_FAILED',
+  'GEMINI_LIVE_SETUP_SEND_FAILED',
+  'GEMINI_LIVE_SETUP_TIMEOUT',
+  'GEMINI_LIVE_SOCKET_ERROR',
+  'GEMINI_LIVE_UNSUPPORTED_TOOL_CALL',
+  'PROVIDER_GO_AWAY',
+]);
+const supportedCleanupProviderSendReasons = new Set(['BACKPRESSURE', 'NOT_READY', 'SEND_FAILED']);
+const supportedCleanupProviderTerminalCategories = new Set([
+  'INPUT_PIPELINE_ERROR',
+  'INPUT_SEND_ERROR',
+  'INVALID_OUTPUT_AUDIO',
+  'OUTPUT_AUDIO_ERROR',
+  'OUTPUT_PIPELINE_ERROR',
+  'PROVIDER_CLOSED',
+  'PROVIDER_ERROR',
+  'PROVIDER_GO_AWAY',
+]);
+
+/** @typedef {'JSON_PARSE'|'MESSAGE_ENVELOPE'|'SETUP_COMPLETE_SHAPE'|'GO_AWAY_SHAPE'|'REMOTE_ERROR_SHAPE'|'TOP_LEVEL_FIELDS'|'SERVER_CONTENT_SHAPE'|'SERVER_CONTENT_FIELDS'|'MODEL_TURN_SHAPE'|'PART_SHAPE'|'INLINE_AUDIO_SHAPE'|'LIFECYCLE_SHAPE'|'METADATA_SHAPE'|'SESSION_RESUMPTION_SHAPE'|'TOOL_CALL_SHAPE'|'TOOL_CALL_CANCELLATION_SHAPE'|'UNKNOWN_TOP_LEVEL_FIELD'|'MULTIPLE_TOP_LEVEL_FIELDS'|'MISSING_TOP_LEVEL_FIELD'|'BINARY_BLOB_MESSAGE'|'BINARY_UTF8_DECODE'|'EMPTY_MESSAGE_OBJECT'} LiveDubbingProviderMalformedAt */
+
+/**
+ * Gemini Live language support is intentionally explicit. Do not fall back to
+ * the general translation language catalog here: Live provider support is a
+ * separate contract and must fail closed for unknown codes.
+ */
+export const LIVE_GEMINI_LANGUAGE_MAP = Object.freeze({
+  af: 'af',
+  ar: 'ar',
+  az: 'az',
+  be: 'be',
+  bn: 'bn',
+  bg: 'bg',
+  ca: 'ca',
+  cs: 'cs',
+  da: 'da',
+  de: 'de',
+  el: 'el',
+  en: 'en',
+  es: 'es',
+  et: 'et',
+  fa: 'fa',
+  fi: 'fi',
+  fil: 'fil',
+  fr: 'fr',
+  he: 'he',
+  hi: 'hi',
+  hr: 'hr',
+  hu: 'hu',
+  id: 'id',
+  it: 'it',
+  ja: 'ja',
+  kk: 'kk',
+  kn: 'kn',
+  ko: 'ko',
+  lt: 'lt',
+  lv: 'lv',
+  ml: 'ml',
+  ms: 'ms',
+  mr: 'mr',
+  ne: 'ne',
+  nl: 'nl',
+  no: 'no',
+  pa: 'pa',
+  pl: 'pl',
+  ro: 'ro',
+  ru: 'ru',
+  si: 'si',
+  sk: 'sk',
+  sl: 'sl',
+  sr: 'sr',
+  sq: 'sq',
+  sv: 'sv',
+  sw: 'sw',
+  ta: 'ta',
+  te: 'te',
+  th: 'th',
+  tr: 'tr',
+  uk: 'uk',
+  ur: 'ur',
+  uz: 'uz',
+  vi: 'vi',
+  'zh-cn': 'zh-Hans',
+  'zh-tw': 'zh-Hant',
+  'zh-hans': 'zh-Hans',
+  'zh-hant': 'zh-Hant',
+});
+
+export const LIVE_GEMINI_TARGET_LANGUAGE_MAP = LIVE_GEMINI_LANGUAGE_MAP;
+
+const trustedUiPaths = Object.freeze([
+  'popup.html',
+  'sidepanel.html',
+  'options.html',
+  'src/html/popup.html',
+  'src/html/sidepanel.html',
+  'src/html/options.html',
+]);
+
+const OFFSCREEN_DOCUMENT_PATH = 'src/html/offscreen.html';
+
+function getRuntime(browserAPI) {
+  return browserAPI?.runtime || globalThis.chrome?.runtime || null;
+}
+
+function getRuntimeId(browserAPI) {
+  const runtime = getRuntime(browserAPI);
+  return typeof runtime?.id === 'string' && runtime.id.trim() ? runtime.id : null;
+}
+
+function getRuntimeUrl(browserAPI, path) {
+  try {
+    const url = getRuntime(browserAPI)?.getURL?.(path);
+    return typeof url === 'string' && url ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function getExtensionOrigin(browserAPI) {
+  const runtimeUrl = getRuntimeUrl(browserAPI, '');
+  if (!runtimeUrl) {
+    const runtimeId = getRuntimeId(browserAPI);
+    return runtimeId ? `chrome-extension://${runtimeId}` : null;
+  }
+
+  try {
+    return new URL(runtimeUrl).origin;
+  } catch {
+    return null;
+  }
+}
+
+function getUrlPath(value) {
+  try {
+    return new URL(value).pathname.replace(/^\//, '');
+  } catch {
+    return null;
+  }
+}
+
+function hasTrustedRuntimeIdentity(sender, browserAPI) {
+  const runtimeId = getRuntimeId(browserAPI);
+  return Boolean(runtimeId && sender?.id === runtimeId);
+}
+
+function hasNoTab(sender) {
+  return sender?.tab === undefined || sender?.tab === null;
+}
+
+function hasExtensionOrigin(sender, browserAPI) {
+  if (sender?.url === undefined) return true;
+  if (typeof sender.url !== 'string') return false;
+
+  const extensionOrigin = getExtensionOrigin(browserAPI);
+  if (!extensionOrigin) return false;
+
+  try {
+    return new URL(sender.url).origin === extensionOrigin;
+  } catch {
+    return false;
+  }
+}
 
 function containsSensitiveValue(value, sensitiveValues) {
   return (Array.isArray(sensitiveValues) ? sensitiveValues : [])
@@ -87,6 +300,119 @@ export function sanitizeLiveDubbingDiagnostic(diagnostic, options = {}) {
   return createLiveDubbingDiagnostic(diagnostic.stage, diagnostic.error, options);
 }
 
+function safeProviderDiagnosticToken(value) {
+  return typeof value === 'string' && safeProviderDiagnosticTokenPattern.test(value)
+    ? value
+    : null;
+}
+
+function safeProviderCloseCode(value) {
+  // 1006 is observable on WebSocket close events even though it cannot be sent.
+  return Number.isInteger(value) && value >= 1000 && value <= 4999 ? value : null;
+}
+
+function safeProviderMalformedAt(value) {
+  return supportedProviderMalformedAt.has(value) ? value : null;
+}
+
+/**
+ * Create the deliberately flat provider-startup diagnostic DTO. Only scalar,
+ * allowlisted fields are read so provider errors, credentials, and payloads
+ * cannot cross a context boundary.
+ * @param {unknown} value
+ * @returns {{stage: 'CONNECT_PROVIDER', code: string|null, closeCode: integer|null, wasClean: boolean|null, terminalCategory: string|null, malformedAt: LiveDubbingProviderMalformedAt|null, wsOpen: boolean, setupSent: boolean, setupComplete: boolean}}
+ */
+export function createLiveDubbingProviderDiagnostic(value = {}) {
+  const source = value && typeof value === 'object' && !(value instanceof Error)
+    ? value
+    : {};
+  const isMalformedFailure = source.code === 'GEMINI_LIVE_MALFORMED_MESSAGE'
+    || source.terminalCategory === 'MALFORMED_MESSAGE';
+  return {
+    stage: providerDiagnosticStage,
+    code: safeProviderDiagnosticToken(source.code),
+    closeCode: safeProviderCloseCode(source.closeCode),
+    wasClean: typeof source.wasClean === 'boolean' ? source.wasClean : null,
+    terminalCategory: safeProviderDiagnosticToken(source.terminalCategory),
+    malformedAt: isMalformedFailure ? safeProviderMalformedAt(source.malformedAt) : null,
+    wsOpen: source.wsOpen === true,
+    setupSent: source.setupSent === true,
+    setupComplete: source.setupComplete === true,
+  };
+}
+
+/**
+ * Re-sanitize a provider-startup diagnostic received from another context.
+ * Unknown fields are intentionally discarded.
+ * @param {unknown} diagnostic
+ * @returns {{stage: 'CONNECT_PROVIDER', code: string|null, closeCode: integer|null, wasClean: boolean|null, terminalCategory: string|null, malformedAt: LiveDubbingProviderMalformedAt|null, wsOpen: boolean, setupSent: boolean, setupComplete: boolean}|null}
+ */
+export function sanitizeLiveDubbingProviderDiagnostic(diagnostic) {
+  if (!diagnostic || typeof diagnostic !== 'object' || diagnostic instanceof Error) return null;
+  return createLiveDubbingProviderDiagnostic(diagnostic);
+}
+
+function readCleanupDiagnosticField(source, field) {
+  try {
+    return source[field];
+  } catch {
+    return undefined;
+  }
+}
+
+function safeCleanupCount(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function safeCleanupToken(allowlist, value) {
+  return allowlist.has(value) ? value : null;
+}
+
+/**
+ * Create the exact terminal cleanup summary DTO. It is intentionally a fresh,
+ * scalar-only object so session ownership, media, credentials, and payloads
+ * cannot cross the offscreen/background boundary.
+ * @param {unknown} value
+ * @returns {{cleanupCause: string, capturedFrames: number, inputSentFrames: number, inputPendingFrames: number, providerLastSendReason: string|null, providerAudioChunks: number, playbackAccepted: boolean, outputSafetyDrops: number, interruptions: number, providerTerminalCategory: string|null}}
+ */
+export function createLiveDubbingCleanupDiagnostic(value = {}) {
+  const source = value && typeof value === 'object' && !(value instanceof Error)
+    ? value
+    : {};
+  const cleanupCause = readCleanupDiagnosticField(source, 'cleanupCause');
+  return {
+    cleanupCause: supportedCleanupCauses.has(cleanupCause)
+      ? cleanupCause
+      : 'EXPLICIT_DISPOSE',
+    capturedFrames: safeCleanupCount(readCleanupDiagnosticField(source, 'capturedFrames')),
+    inputSentFrames: safeCleanupCount(readCleanupDiagnosticField(source, 'inputSentFrames')),
+    inputPendingFrames: safeCleanupCount(readCleanupDiagnosticField(source, 'inputPendingFrames')),
+    providerLastSendReason: safeCleanupToken(
+      supportedCleanupProviderSendReasons,
+      readCleanupDiagnosticField(source, 'providerLastSendReason'),
+    ),
+    providerAudioChunks: safeCleanupCount(readCleanupDiagnosticField(source, 'providerAudioChunks')),
+    playbackAccepted: readCleanupDiagnosticField(source, 'playbackAccepted') === true,
+    outputSafetyDrops: safeCleanupCount(readCleanupDiagnosticField(source, 'outputSafetyDrops')),
+    interruptions: safeCleanupCount(readCleanupDiagnosticField(source, 'interruptions')),
+    providerTerminalCategory: safeCleanupToken(
+      supportedCleanupProviderTerminalCategories,
+      readCleanupDiagnosticField(source, 'providerTerminalCategory'),
+    ),
+  };
+}
+
+/**
+ * Re-sanitize a terminal cleanup summary received from another context.
+ * Unknown fields and unsafe values are discarded by the fresh DTO builder.
+ * @param {unknown} diagnostic
+ * @returns {{cleanupCause: string, capturedFrames: number, inputSentFrames: number, inputPendingFrames: number, providerLastSendReason: string|null, providerAudioChunks: number, playbackAccepted: boolean, outputSafetyDrops: number, interruptions: number, providerTerminalCategory: string|null}|null}
+ */
+export function sanitizeLiveDubbingCleanupDiagnostic(diagnostic) {
+  if (!diagnostic || typeof diagnostic !== 'object' || diagnostic instanceof Error) return null;
+  return createLiveDubbingCleanupDiagnostic(diagnostic);
+}
+
 function hasMatchingSessionField(response, field, sessionId) {
   return !Object.prototype.hasOwnProperty.call(response, field)
     || response[field] === sessionId;
@@ -104,25 +430,78 @@ export function isExactSessionResponse(response, sessionId) {
 }
 
 /**
+ * Validate a message emitted by the offscreen document before it reaches a
+ * background coordinator. The exact URL is required so extension identity
+ * metadata cannot be replaced by only an extension ID and missing tab.
+ */
+export function isAuthorizedOffscreenSender(sender, browserAPI) {
+  if (!hasTrustedRuntimeIdentity(sender, browserAPI) || !hasNoTab(sender)) return false;
+
+  const expectedUrl = getRuntimeUrl(browserAPI, OFFSCREEN_DOCUMENT_PATH);
+  return Boolean(expectedUrl && typeof sender?.url === 'string' && sender.url === expectedUrl);
+}
+
+/**
+ * Validate an internal sender delivering a command to the offscreen router.
+ * The sender is the extension service worker/page, so its exact page URL is
+ * not required; its extension origin is required whenever a URL is supplied.
+ */
+export function isAuthorizedOffscreenRouterSender(sender, browserAPI) {
+  return hasTrustedRuntimeIdentity(sender, browserAPI)
+    && hasNoTab(sender)
+    && hasExtensionOrigin(sender, browserAPI);
+}
+
+/**
+ * Public live-dubbing commands are restricted to the extension's own UI
+ * documents. Content scripts and page callers always carry a tab sender.
+ */
+export function isTrustedLiveDubbingUiSender(sender, browserAPI) {
+  if (!hasTrustedRuntimeIdentity(sender, browserAPI) || !hasNoTab(sender)) return false;
+  if (typeof sender?.url !== 'string' || !hasExtensionOrigin(sender, browserAPI)) return false;
+
+  const path = getUrlPath(sender.url);
+  return Boolean(path && trustedUiPaths.includes(path));
+}
+
+export function hasExactSessionEvent(message, descriptor) {
+  const data = message?.data || message || {};
+  return Boolean(descriptor
+    && data.sessionId === descriptor.sessionId
+    && Number.isInteger(data.eventSequence)
+    && data.eventSequence === descriptor.eventSequence);
+}
+
+/**
  * Normalize and validate target language without loading language data.
  * @param {unknown} language
  * @returns {string}
  */
 export function normalizeTargetLanguage(language) {
+  return normalizeLiveGeminiTargetLanguage(language);
+}
+
+export function normalizeLiveGeminiTargetLanguage(language) {
   if (typeof language !== 'string' || !language.trim()) {
     throw new TypeError('targetLanguage is required');
   }
 
   const normalized = language.trim().toLowerCase();
-  const exact = availableLanguages.has(normalized)
-    ? normalized
-    : normalized.split('-')[0];
+  const exact = LIVE_GEMINI_LANGUAGE_MAP[normalized];
 
-  if (!availableLanguages.has(exact)) {
+  if (!exact) {
     throw new RangeError('Unsupported target language');
   }
 
   return exact;
+}
+
+export function mapLiveGeminiLanguage(language) {
+  try {
+    return normalizeLiveGeminiTargetLanguage(language);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -139,9 +518,11 @@ export function sanitizeDescriptor(value) {
   const tabId = Number.isInteger(value.tabId) && value.tabId >= 0 ? value.tabId : null;
   let targetLanguage = null;
   if (typeof value.targetLanguage === 'string') {
-    const normalized = value.targetLanguage.trim().toLowerCase();
-    const candidate = availableLanguages.has(normalized) ? normalized : normalized.split('-')[0];
-    if (availableLanguages.has(candidate)) targetLanguage = candidate;
+    try {
+      targetLanguage = normalizeTargetLanguage(value.targetLanguage);
+    } catch {
+      targetLanguage = null;
+    }
   }
   const status = supportedStatuses.has(value.status) ? value.status : null;
   const startedAt = Number.isFinite(value.startedAt) ? value.startedAt : null;
@@ -197,6 +578,7 @@ function baseOffscreenMessage(action, descriptor) {
       sessionId: descriptor.sessionId,
       tabId: descriptor.tabId,
       targetLanguage: descriptor.targetLanguage,
+      eventSequence: descriptor.eventSequence,
     },
   };
 }
@@ -216,10 +598,17 @@ export function createConsumeMessage(descriptor, streamId) {
       sessionId: descriptor.sessionId,
       tabId: descriptor.tabId,
       targetLanguage: descriptor.targetLanguage,
+      eventSequence: descriptor.eventSequence,
       streamId,
     },
   };
 }
+
+export function createProviderConnectMessage(descriptor) {
+  return baseOffscreenMessage(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER, descriptor);
+}
+
+export const createConnectProviderMessage = createProviderConnectMessage;
 
 export function createDisposeMessage(descriptor) {
   return baseOffscreenMessage(LIVE_DUBBING_ACTIONS.DISPOSE, descriptor);
@@ -263,6 +652,62 @@ export function createSessionMessage(action, sessionId) {
     action,
     data: { sessionId },
   };
+}
+
+/**
+ * Build the one-time offscreen credential request. Credentials are never
+ * placed in a broadcast action or in a session descriptor.
+ */
+export function createProviderCredentialRequest({ sessionId, targetLanguage, eventSequence }) {
+  if (!isSessionId(sessionId)) throw new TypeError('sessionId is required');
+  if (!Number.isInteger(eventSequence) || eventSequence < 0) {
+    throw new TypeError('eventSequence is required');
+  }
+
+  return {
+    action: LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_CREDENTIAL,
+    data: {
+      sessionId,
+      targetLanguage: normalizeTargetLanguage(targetLanguage),
+      eventSequence,
+    },
+  };
+}
+
+/**
+ * Return the deliberately small credential response DTO. Do not add session,
+ * provider, model, or diagnostic fields to this response.
+ */
+export function createProviderCredentialResponse(apiKey, targetLanguage) {
+  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+    throw new TypeError('apiKey is required');
+  }
+
+  return {
+    success: true,
+    apiKey,
+    targetLanguage: normalizeTargetLanguage(targetLanguage),
+  };
+}
+
+export function parseProviderCredentialResponse(response, expectedTargetLanguage) {
+  if (!response || response.success !== true
+    || typeof response.apiKey !== 'string' || !response.apiKey) return null;
+
+  let targetLanguage;
+  try {
+    targetLanguage = normalizeTargetLanguage(response.targetLanguage);
+    if (expectedTargetLanguage
+      && targetLanguage !== normalizeTargetLanguage(expectedTargetLanguage)) return null;
+  } catch {
+    return null;
+  }
+
+  return { apiKey: response.apiKey, targetLanguage };
+}
+
+function isSessionId(value) {
+  return typeof value === 'string' && Boolean(value.trim());
 }
 
 export function isLiveDubbingAction(action) {
