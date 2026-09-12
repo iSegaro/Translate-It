@@ -36,7 +36,7 @@ import {
   sanitizeDescriptor,
 } from '../contracts.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'LiveDubbingCoordinator');
+const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 
 export const LIVE_DUBBING_CLEAR_OUTCOMES = Object.freeze({
   CLEARED: 'CLEARED',

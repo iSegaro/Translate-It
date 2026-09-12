@@ -195,9 +195,39 @@ terminal operation.
   failures, buffered peaks, safety drops, underruns, interruptions, and
   same-context milestones) is observational only and never affects audio
   or session behavior.
-- Logging is warn-only for provider terminals, no-playback endings, and
-  real capture/startup/disposal failures. There are no routine telemetry
-  logs.
+- Logging is scoped to `LOG_COMPONENTS.LIVE_DUBBING` (Features category):
+  warn for provider terminals, the single background no-playback record, and
+  real capture/startup/disposal failures; debug for lifecycle detail and mint
+  failover; error reserved for unexpected failures only. The offscreen
+  no-playback summary stays at debug so one session end is never logged twice.
+  Keys, tokens, URLs, bootstrap data, PCM, stream ids, transcripts, and raw
+  payloads never reach a logger. There are no routine telemetry logs.
+
+## Runtime Integration
+
+- **Canonical codes.** `LIVE_DUBBING_*` / `GEMINI_LIVE_*` codes are the
+  internal failure identity across background, offscreen, and the adapter.
+- **ErrorTypes classification-only.** Shared `ErrorTypes` are reused only
+  inside Gemini token-mint HTTP classification where an unambiguous generic
+  semantic exists. Failover-relevant mappings cover invalid key (including
+  explicit `PERMISSION_DENIED`), insufficient balance, quota exhaustion, and
+  rate limiting, and feed the existing `ApiKeyManager.shouldFailover`
+  predicate. HTTP 5xx may classify as `SERVER_ERROR` but does not trigger
+  key failover; transport/proxy failures stop directly without shared-type
+  normalization; unsupported language/configuration validation stays
+  feature-local and stops before minting. Surfaced diagnostics keep the
+  canonical codes. `ErrorHandler` and UI presentation (policies, adapters,
+  display strategies, localization) are deferred: live dubbing reports
+  failures through its own DTOs and never presents provider errors to UI.
+- **Explicit async ownership.** Session timers (start timeout, setup
+  timeout), track listeners, sockets, pipelines, and the provider client are
+  created and cleared on the fenced session paths that own them
+  (`clearTimeout` on setup/close, listener removal before track stop, fenced
+  terminal disposal). No WebSocket, AudioContext, MediaStream, pipeline, or
+  provider client is registered with `ResourceTracker`: group cleanup could
+  clear or detach a live fenced resource and change ordering, so explicit
+  ownership remains correct. `ResourceTracker` stays limited to simple
+  synchronous local resources, of which this feature owns none.
 
 ## Stage 3 Note (Historical)
 

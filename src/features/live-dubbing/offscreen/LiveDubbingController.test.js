@@ -746,9 +746,9 @@ describe('LiveDubbingController', () => {
   });
 
   it('logs one bounded cleanup diagnostic when setup completed without playback', async () => {
-    const warn = vi.fn();
+    const debug = vi.fn();
     const notify = vi.fn();
-    const controller = new LiveDubbingController({ logger: { warn }, notify });
+    const controller = new LiveDubbingController({ logger: { debug }, notify });
     controller.prepare('session-1', 'gemini', 'en', 0);
     const session = controller.currentSession;
     session.setupComplete = true;
@@ -775,8 +775,8 @@ describe('LiveDubbingController', () => {
     controller._providerFailed(session, { code: 'LIVE_DUBBING_PROVIDER_ERROR' }, 'PROVIDER_ERROR');
     await session.cleanupPromise;
 
-    expect(warn).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledWith('Live dubbing ended without translated playback', {
+    expect(debug).toHaveBeenCalledOnce();
+    expect(debug).toHaveBeenCalledWith('Live dubbing ended without translated playback', {
       cleanupCause: 'LIVE_DUBBING_PROVIDER_ERROR',
       capturedFrames: 7,
       inputSentFrames: 3,
@@ -788,7 +788,7 @@ describe('LiveDubbingController', () => {
       interruptions: 6,
       providerTerminalCategory: 'PROVIDER_ERROR',
     });
-    const diagnostic = warn.mock.calls[0][1];
+    const diagnostic = debug.mock.calls[0][1];
     expect(Object.values(diagnostic).every(value => value === null || ['string', 'number', 'boolean'].includes(typeof value))).toBe(true);
     expect(JSON.stringify(diagnostic)).not.toContain('session-secret');
     expect(JSON.stringify(diagnostic)).not.toContain('stream-secret');
@@ -807,7 +807,7 @@ describe('LiveDubbingController', () => {
     playedSession.telemetry.milestones.firstTranslatedAudioAcceptedByPlayback = 2;
     await controller.dispose('session-2', 'gemini');
 
-    expect(warn).toHaveBeenCalledOnce();
+    expect(debug).toHaveBeenCalledOnce();
   });
 
   it('cleans up provider failures and fences the old generation', async () => {

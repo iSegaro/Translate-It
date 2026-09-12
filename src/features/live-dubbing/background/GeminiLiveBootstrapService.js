@@ -10,7 +10,7 @@ import {
 import { LIVE_DUBBING_PROVIDER_ID } from '../constants.js';
 import { normalizeProviderTargetLanguage } from '../contracts.js';
 
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'GeminiLiveBootstrapService');
+const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'GeminiLiveBootstrapService');
 const GEMINI_KEYS_SETTING = 'GEMINI_API_KEY';
 const KEY_INVALID_MESSAGE_PATTERN = /api[ -_]?key[^a-z0-9]{0,24}(not valid|invalid|expired|unauthorized)|invalid[^a-z0-9]{0,24}api[ -_]?key/i;
 const PERMISSION_DENIED_MESSAGE_PATTERN = /permission[ -_]?denied/i;

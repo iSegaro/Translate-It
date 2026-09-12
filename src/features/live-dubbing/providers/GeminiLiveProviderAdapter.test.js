@@ -978,6 +978,30 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(socket.url).not.toContain('?key=');
   });
 
+  it('clears the setup timer explicitly on setup completion and close', async () => {
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
+    try {
+      const client = createClient();
+      const connection = client.connect({ bootstrap: { accessToken: 'auth_tokens/token-1' }, targetLanguage: 'fr' });
+      const socket = FakeWebSocket.instances.at(-1);
+      socket.open();
+      socket.receive({ setupComplete: {} });
+      await connection;
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      clearTimeoutSpy.mockClear();
+      const nextClient = createClient();
+      const pendingClose = nextClient.connect({ bootstrap: { accessToken: 'auth_tokens/token-2' }, targetLanguage: 'fr' });
+      const nextSocket = FakeWebSocket.instances.at(-1);
+      nextSocket.open();
+      nextClient.close();
+      await expect(pendingClose).rejects.toMatchObject({ code: 'GEMINI_LIVE_CLOSED' });
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+    } finally {
+      clearTimeoutSpy.mockRestore();
+    }
+  });
+
   it('ignores callbacks from a closed generation', async () => {
     const onAudio = vi.fn();
     const client = createClient({ onAudio });

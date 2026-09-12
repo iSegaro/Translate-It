@@ -30,7 +30,7 @@ const PROVIDER_AUDIO_TERMINAL_REASONS = new Set([
   'INVALID_OUTPUT_AUDIO',
   'OUTPUT_AUDIO_ERROR',
 ]);
-const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'LiveDubbingController');
+const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingController');
 const TELEMETRY_MILESTONES = Object.freeze([
   'captureReady',
   'inputReady',
@@ -1082,7 +1082,10 @@ export class LiveDubbingController {
     const cleanupDiagnostic = this._createCleanupDiagnostic(session);
     if (cleanupDiagnostic && !cleanupDiagnostic.playbackAccepted) {
       try {
-        this.log?.warn?.('Live dubbing ended without translated playback', cleanupDiagnostic);
+        // Lifecycle detail only: the background coordinator owns the single
+        // warn-level terminal record, so this local summary stays at debug to
+        // avoid duplicate terminal logs for one session end.
+        this.log?.debug?.('Live dubbing ended without translated playback', cleanupDiagnostic);
       } catch {
         // Diagnostic logging must not affect resource cleanup.
       }
