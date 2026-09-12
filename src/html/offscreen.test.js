@@ -473,7 +473,7 @@ describe('offscreen live-dubbing route', () => {
     await expect(sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_PREPARE',
-      data: { sessionId: 'attacker-session' },
+      data: { sessionId: 'attacker-session', providerId: 'gemini' },
     }, {
       id: 'extension-id',
       url: 'https://example.test/page',
@@ -512,7 +512,7 @@ describe('offscreen live-dubbing route', () => {
     await expect(sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_PREPARE',
-      data: { sessionId: 'session-1', eventSequence: 0 },
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0 },
     })).resolves.toMatchObject({
       success: true,
       ack: 'READY',
@@ -521,7 +521,7 @@ describe('offscreen live-dubbing route', () => {
     await expect(sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_CONSUME',
-      data: { sessionId: 'session-1', streamId: 'stream-secret', eventSequence: 1 },
+      data: { sessionId: 'session-1', providerId: 'gemini', streamId: 'stream-secret', eventSequence: 1 },
     })).resolves.toMatchObject({
       success: true,
       ack: 'MEDIA_ACQUIRED',
@@ -535,7 +535,7 @@ describe('offscreen live-dubbing route', () => {
     const status = await sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_STATUS',
-      data: { sessionId: 'session-1' },
+      data: { sessionId: 'session-1', providerId: 'gemini' },
     });
     expect(status).toMatchObject({
       success: true,
@@ -548,7 +548,7 @@ describe('offscreen live-dubbing route', () => {
     await expect(sendMessage({
       target: 'offscreen',
       action: 'LIVE_DUBBING_DISPOSE',
-      data: { sessionId: 'session-1', reason: 'STOP' },
+      data: { sessionId: 'session-1', providerId: 'gemini', reason: 'STOP' },
     })).resolves.toMatchObject({
       success: true,
       ack: 'DISPOSED',

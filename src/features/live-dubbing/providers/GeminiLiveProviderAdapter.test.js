@@ -52,7 +52,10 @@ function encodeJson(message) {
 }
 
 async function connectReady(client, targetLanguage = 'fr') {
-  const connection = client.connect('short-lived-secret', targetLanguage);
+  const connection = client.connect({
+    bootstrap: { apiKey: 'short-lived-secret' },
+    targetLanguage,
+  });
   const socket = FakeWebSocket.instances.at(-1);
   socket.open();
   socket.receive({ setupComplete: {} });
@@ -70,7 +73,7 @@ describe('GeminiLiveProviderAdapter', () => {
   it('builds the authenticated setup payload and waits for setupComplete', async () => {
     const onSetupComplete = vi.fn();
     const client = createClient({ onSetupComplete });
-    const connection = client.connect('short-lived-secret', 'zh-CN');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'zh-CN' });
     const socket = FakeWebSocket.instances[0];
 
     expect(socket.binaryType).toBe('arraybuffer');
@@ -99,7 +102,7 @@ describe('GeminiLiveProviderAdapter', () => {
 
   it('accepts ArrayBuffer JSON for setupComplete', async () => {
     const client = createClient();
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
 
     socket.open();
@@ -119,7 +122,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const client = new GeminiLiveProviderAdapter({
       webSocketFactory: () => socket,
     });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
 
     socket.open();
     socket.receive({ setupComplete: {} });
@@ -130,7 +133,7 @@ describe('GeminiLiveProviderAdapter', () => {
   it('accepts ArrayBuffer JSON serverContent audio', async () => {
     const onAudio = vi.fn();
     const client = createClient({ onAudio });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
 
     socket.open();
@@ -165,7 +168,7 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(onAudio).toHaveBeenCalledWith(new Uint8Array([0, 1, 255]));
     client.close();
 
-    const nextConnection = client.connect('next-secret', 'fr');
+    const nextConnection = client.connect({ bootstrap: { apiKey: 'next-secret' }, targetLanguage: 'fr' });
     const nextSocket = FakeWebSocket.instances.at(-1);
     nextSocket.open();
     nextSocket.receive({ setupComplete: {} });
@@ -202,7 +205,7 @@ describe('GeminiLiveProviderAdapter', () => {
   ])('fails closed for %s inline audio shape', async (_label, inlineData) => {
     const onError = vi.fn();
     const client = createClient({ onError });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     socket.receive({ setupComplete: {} });
@@ -299,7 +302,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onError = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
 
     socket.open();
@@ -317,7 +320,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onError = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
 
     socket.open();
@@ -333,7 +336,7 @@ describe('GeminiLiveProviderAdapter', () => {
 
   it('keeps other non-plain record messages as envelope failures', async () => {
     const client = createClient();
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
 
     socket.open();
@@ -347,7 +350,7 @@ describe('GeminiLiveProviderAdapter', () => {
 
   it('gates audio until setup and sends only base64 16k PCM audio', async () => {
     const client = createClient();
-    const connection = client.connect('short-lived-secret', 'en');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'en' });
     const socket = FakeWebSocket.instances[0];
 
     expect(client.sendAudio(new Uint8Array([0, 1, 255]))).toBe(false);
@@ -369,7 +372,7 @@ describe('GeminiLiveProviderAdapter', () => {
 
   it('reports bounded WebSocket backpressure without dropping the caller queue', async () => {
     const client = createClient();
-    const connection = client.connect('short-lived-secret', 'en');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'en' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     socket.receive({ setupComplete: {} });
@@ -385,7 +388,7 @@ describe('GeminiLiveProviderAdapter', () => {
     vi.useFakeTimers();
     const onError = vi.fn();
     const client = createClient({ onError });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
 
@@ -496,7 +499,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onError = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     socket.receive({
@@ -560,7 +563,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onError = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     socket.receive(message);
@@ -645,7 +648,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onError = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     socket.receive(message);
@@ -672,7 +675,7 @@ describe('GeminiLiveProviderAdapter', () => {
       providerDiagnostic: expect.objectContaining({ malformedAt: 'SERVER_CONTENT_FIELDS' }),
     }));
 
-    const nextConnection = client.connect('next-secret', 'fr');
+    const nextConnection = client.connect({ bootstrap: { apiKey: 'next-secret' }, targetLanguage: 'fr' });
     const nextSocket = FakeWebSocket.instances.at(-1);
     nextSocket.open();
     nextSocket.receive({ setupComplete: {} });
@@ -734,7 +737,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onClose = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onClose, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     onError.mockImplementation(() => {
@@ -779,7 +782,7 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(onError).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledOnce();
 
-    const connection = client.connect('another-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'another-secret' }, targetLanguage: 'fr' });
     const nextSocket = FakeWebSocket.instances.at(-1);
     nextSocket.open();
     nextSocket.receive({ setupComplete: {} });
@@ -832,7 +835,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const onClose = vi.fn();
     const onEvent = vi.fn();
     const client = createClient({ onError, onClose, onEvent });
-    const connection = client.connect('short-lived-secret', 'fr');
+    const connection = client.connect({ bootstrap: { apiKey: 'short-lived-secret' }, targetLanguage: 'fr' });
     const socket = FakeWebSocket.instances[0];
     socket.open();
     socket.receive({ error: { message: 'provider-body-secret' } });
@@ -872,12 +875,28 @@ describe('GeminiLiveProviderAdapter', () => {
       },
     });
 
-    const connection = client.connect(apiKey, 'fr');
+    const connection = client.connect({ bootstrap: { apiKey }, targetLanguage: 'fr' });
     await expect(connection).rejects.toMatchObject({ code: 'GEMINI_LIVE_CONNECT_FAILED' });
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({
       message: expect.not.stringContaining(apiKey),
     }));
     expect(onError.mock.calls[0][0].message).not.toContain(GEMINI_LIVE_WEBSOCKET_ENDPOINT);
+  });
+
+  it('rejects positional and top-level key connection arguments', async () => {
+    const client = createClient();
+
+    await expect(client.connect('short-lived-secret', 'fr')).rejects.toThrow(
+      'connect requires a nested bootstrap object',
+    );
+    await expect(client.connect({ apiKey: 'short-lived-secret', targetLanguage: 'fr' })).rejects.toThrow(
+      'connect requires a nested bootstrap object',
+    );
+    await expect(client.connect({
+      bootstrap: { apiKey: 'short-lived-secret' },
+      targetLanguage: 'fr',
+      extra: true,
+    })).rejects.toThrow('connect requires a nested bootstrap object');
   });
 
   it('ignores callbacks from a closed generation', async () => {
@@ -895,7 +914,7 @@ describe('GeminiLiveProviderAdapter', () => {
     });
     expect(onAudio).not.toHaveBeenCalled();
 
-    const nextConnection = client.connect('another-secret', 'fr');
+    const nextConnection = client.connect({ bootstrap: { apiKey: 'another-secret' }, targetLanguage: 'fr' });
     const nextSocket = FakeWebSocket.instances.at(-1);
     nextSocket.open();
     oldSocket.onmessage?.({

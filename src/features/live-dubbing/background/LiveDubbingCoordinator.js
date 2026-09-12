@@ -7,6 +7,7 @@ import {
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_LEASE_REASONS,
   LIVE_DUBBING_OWNER,
+  LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_STATUS,
   LIVE_DUBBING_STORAGE_KEY,
@@ -27,7 +28,7 @@ import {
   isAuthorizedOffscreenSender,
   isAcknowledgedForSession,
   isExactSessionResponse,
-  normalizeTargetLanguage,
+  normalizeProviderTargetLanguage,
   safeFailureCode,
   sanitizeLiveDubbingDiagnostic,
   sanitizeLiveDubbingCleanupDiagnostic,
@@ -44,22 +45,7 @@ export const LIVE_DUBBING_CLEAR_OUTCOMES = Object.freeze({
 });
 
 function sanitizeStoredDescriptor(value) {
-  if (value?.status === 'CAPTURING') {
-    // Never expose the pre-provider internal state as public RUNNING.
-    return sanitizeDescriptor({
-      ...value,
-      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
-    });
-  }
-
-  const sanitized = sanitizeDescriptor(value);
-  if (sanitized || value?.status !== 'CONNECTING') return sanitized;
-
-  const normalized = sanitizeDescriptor({
-    ...value,
-    status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
-  });
-  return normalized;
+  return sanitizeDescriptor(value);
 }
 
 function createCaptureStageFailure(stage, error, diagnostic = null) {
@@ -97,7 +83,7 @@ function defaultUuid() {
 
 /**
  * Owns one Chrome tab-capture control-plane session.
- * No media, provider credential, transcript, WebSocket URL, or stream ID is
+ * No media, provider bootstrap, transcript, WebSocket URL, or stream ID is
  * placed in descriptor storage or returned to UI callers.
  */
 export class LiveDubbingCoordinator {
@@ -115,12 +101,13 @@ export class LiveDubbingCoordinator {
     this.cleanupPromises = new Map();
     this.terminalOperations = new Map();
     this.pendingStarts = new Set();
-    this.credentialRequestSessions = new Set();
+    this.bootstrapRequestSessions = new Set();
   }
 
   start(message = {}, sender = {}) {
     const pendingStart = {
       sessionId: this.uuid(),
+      providerId: LIVE_DUBBING_PROVIDER_ID,
       terminalRequested: false,
       startedAt: this.now(),
     };
@@ -161,8 +148,12 @@ export class LiveDubbingCoordinator {
 
   handleOffscreenTerminal(message = {}, sender = null) {
     const sessionId = message?.data?.sessionId || message?.sessionId;
+    const providerId = message?.data?.providerId || message?.providerId;
     if (typeof sessionId !== 'string' || !sessionId.trim()) {
       return Promise.resolve({ success: false, error: 'INVALID_SESSION_ID' });
+    }
+    if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+      return Promise.resolve({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true });
     }
 
     if (sender) {
@@ -197,13 +188,18 @@ export class LiveDubbingCoordinator {
       });
     }
 
+    if (this.descriptor && this.descriptor.sessionId === sessionId
+      && this.descriptor.providerId !== providerId) {
+      return Promise.resolve({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true });
+    }
+
     return this._stopForSession(sessionId, message?.data?.event || 'OFFSCREEN_TERMINAL');
   }
 
   /**
    * Authorize messages emitted by the offscreen document before terminal or
-   * credential work reaches session coordination. Terminal events use the
-   * owned session identity; credential requests use the descriptor sequence
+   * bootstrap work reaches session coordination. Terminal events use the
+   * owned session identity; bootstrap requests use the descriptor sequence
    * and are one-time per session.
    */
   async authorizeOffscreenControlMessage(message = {}, sender, { type = 'terminal' } = {}) {
@@ -211,10 +207,10 @@ export class LiveDubbingCoordinator {
 
     if (type === 'terminal') return this._authorizeTerminalRequest(message);
 
-    // Credential requests are part of the provider response currently awaited
+    // Bootstrap requests are part of the provider response currently awaited
     // by start(). They must use the already-persisted in-memory fence instead
     // of waiting behind that same transition.
-    if (type === 'credential') return this._authorizeCredentialRequest(message);
+    if (type === 'bootstrap') return this._authorizeBootstrapRequest(message);
 
     return this._enqueue(async () => {
       const descriptor = await this._readDescriptor();
@@ -236,6 +232,7 @@ export class LiveDubbingCoordinator {
     if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT
       || !descriptor
       || data.sessionId !== descriptor.sessionId
+      || data.providerId !== descriptor.providerId
       || this.terminalOperations.has(descriptor.sessionId)) {
       return null;
     }
@@ -260,11 +257,11 @@ export class LiveDubbingCoordinator {
   }
 
   /**
-   * Validate and reserve the one credential request without entering the
+   * Validate and reserve the one bootstrap request without entering the
    * transition queue. This synchronous section is the atomic active-session
    * fence for the CONNECTING_PROVIDER start transaction.
    */
-  _authorizeCredentialRequest(message) {
+  _authorizeBootstrapRequest(message) {
     const descriptor = this.descriptor;
     const data = message?.data || message;
     const state = descriptor?.sessionId
@@ -273,27 +270,29 @@ export class LiveDubbingCoordinator {
 
     if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT
       || !descriptor
+      || message?.action !== LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP
       || descriptor.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
       || !state
       || state.terminalRequested
       || this.terminalOperations.has(descriptor.sessionId)
       || !this._isSameDescriptorFence(state.descriptor, descriptor)
       || !hasExactSessionEvent(message, descriptor)
+      || data.providerId !== descriptor.providerId
       || data.targetLanguage !== descriptor.targetLanguage
-      || this.credentialRequestSessions.has(descriptor.sessionId)) {
+      || this.bootstrapRequestSessions.has(descriptor.sessionId)) {
       return null;
     }
 
-    this.credentialRequestSessions.add(descriptor.sessionId);
+    this.bootstrapRequestSessions.add(descriptor.sessionId);
     return cloneDescriptor(descriptor);
   }
 
   /**
-   * Recheck the fence after credential resolution. A stop or terminal event
+   * Recheck the fence after bootstrap resolution. A stop or terminal event
    * can win while the key manager is awaiting, so the key must not be sent
    * after ownership has changed.
    */
-  isCredentialRequestStillAuthorized(descriptor) {
+  isBootstrapRequestStillAuthorized(descriptor) {
     if (!descriptor?.sessionId) return false;
 
     const current = this.descriptor;
@@ -304,7 +303,8 @@ export class LiveDubbingCoordinator {
       && this._isSameDescriptorFence(state?.descriptor, descriptor)
       && !state?.terminalRequested
       && !this.terminalOperations.has(descriptor.sessionId)
-      && this.credentialRequestSessions.has(descriptor.sessionId);
+      && descriptor.providerId === LIVE_DUBBING_PROVIDER_ID
+      && this.bootstrapRequestSessions.has(descriptor.sessionId);
   }
 
   /**
@@ -373,7 +373,7 @@ export class LiveDubbingCoordinator {
     const targetLanguage = this._getTargetLanguage(message);
     let normalizedLanguage;
     try {
-      normalizedLanguage = normalizeTargetLanguage(targetLanguage);
+      normalizedLanguage = normalizeProviderTargetLanguage(LIVE_DUBBING_PROVIDER_ID, targetLanguage);
     } catch {
       return { success: false, error: 'INVALID_TARGET_LANGUAGE' };
     }
@@ -406,6 +406,7 @@ export class LiveDubbingCoordinator {
     const descriptor = createDescriptor({
       sessionId: pendingStart.sessionId,
       tabId: tab.id,
+      providerId: LIVE_DUBBING_PROVIDER_ID,
       targetLanguage: normalizedLanguage,
       startedAt: this.now(),
     });
@@ -461,7 +462,7 @@ export class LiveDubbingCoordinator {
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
         createPrepareMessage(descriptor),
       );
-      if (!isAcknowledgedForSession(prepareResponse, 'READY', descriptor.sessionId)) {
+      if (!isAcknowledgedForSession(prepareResponse, 'READY', descriptor.sessionId, descriptor.providerId)) {
         throw createCaptureStageFailure(
           LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
           null,
@@ -512,7 +513,7 @@ export class LiveDubbingCoordinator {
         consumeMessage,
         [streamId],
       );
-      if (!isAcknowledgedForSession(consumeResponse, 'MEDIA_ACQUIRED', descriptor.sessionId)) {
+      if (!isAcknowledgedForSession(consumeResponse, 'MEDIA_ACQUIRED', descriptor.sessionId, descriptor.providerId)) {
         throw createCaptureStageFailure(
           LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA,
           null,
@@ -527,7 +528,7 @@ export class LiveDubbingCoordinator {
 
       // Stage 2 returns CONNECTING_PROVIDER only after capture and both local
       // graphs exist. Persist that fence before the offscreen document asks
-      // background for the short-lived provider credential.
+      // background for the short-lived provider bootstrap.
       const integratedPipelines = consumeResponse.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
         && consumeResponse.captureReady === true
         && consumeResponse.inputPipelineReady === true
@@ -558,6 +559,7 @@ export class LiveDubbingCoordinator {
           providerResponse,
           'PROVIDER_READY',
           descriptor.sessionId,
+          descriptor.providerId,
         )
           && providerResponse.status === LIVE_DUBBING_STATUS.RUNNING
           && providerResponse.captureReady === true
@@ -864,7 +866,7 @@ export class LiveDubbingCoordinator {
     try {
       const response = await this._sendOffscreen(createDisposeMessage(descriptor));
       if (response?.ack !== 'DISPOSED'
-        || !isAcknowledgedForSession(response, 'DISPOSED', descriptor.sessionId)
+        || !isAcknowledgedForSession(response, 'DISPOSED', descriptor.sessionId, descriptor.providerId)
         || response.ignored === true) {
         return { success: false };
       }
@@ -951,8 +953,12 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const descriptorStatus = await this._queryStatus(descriptor, descriptor.sessionId);
-    if (this._isSessionMismatch(descriptorStatus, descriptor.sessionId)) {
+    const descriptorStatus = await this._queryStatus(
+      descriptor,
+      descriptor.sessionId,
+      descriptor.providerId,
+    );
+    if (this._isSessionMismatch(descriptorStatus, descriptor.sessionId, descriptor.providerId)) {
       // Never dispose or release while offscreen reports another session.
       return {
         success: false,
@@ -964,7 +970,11 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    if (this._isRecoverableRunningStatus(descriptorStatus, descriptor.sessionId)) {
+    if (this._isRecoverableRunningStatus(
+      descriptorStatus,
+      descriptor.sessionId,
+      descriptor.providerId,
+    )) {
       if (!matchingLease) {
         const acquired = await this._acquireRecoveryLease(descriptor.sessionId);
         if (!acquired) {
@@ -1019,7 +1029,7 @@ export class LiveDubbingCoordinator {
     }
 
     const documentAndSessionAbsent = !matchingLease
-      && this._isProvablyAbsent(descriptorStatus, descriptor.sessionId);
+      && this._isProvablyAbsent(descriptorStatus, descriptor.sessionId, descriptor.providerId);
     if (documentAndSessionAbsent) {
       const cleared = await this._clearDescriptor(descriptor.sessionId);
       if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.CLEARED) {
@@ -1102,12 +1112,13 @@ export class LiveDubbingCoordinator {
     };
   }
 
-  async _queryStatus(descriptor, sessionId) {
+  async _queryStatus(descriptor, sessionId, providerId = descriptor?.providerId) {
     try {
+      if (providerId !== LIVE_DUBBING_PROVIDER_ID) return null;
       const response = await this._sendOffscreen(
         descriptor?.sessionId === sessionId
           ? createStatusMessage(descriptor)
-          : createSessionMessage(LIVE_DUBBING_ACTIONS.STATUS, sessionId),
+          : createSessionMessage(LIVE_DUBBING_ACTIONS.STATUS, sessionId, providerId),
       );
       return response || null;
     } catch {
@@ -1117,12 +1128,18 @@ export class LiveDubbingCoordinator {
 
   async _reconcileLease(lease, stale) {
     const sessionId = lease.leaseId;
-    const status = await this._queryStatus(null, sessionId);
+    // Lease identity is owner + leaseId only. Offscreen status fencing still
+    // uses the fixed Live Dubbing provider; no provider metadata lives on leases.
+    const providerId = LIVE_DUBBING_PROVIDER_ID;
+    const status = await this._queryStatus(null, sessionId, providerId);
     if (!status || status.sessionId !== sessionId || status.success === false
-      || this._isSessionMismatch(status, sessionId)) return false;
-    if (!stale && !this._isExplicitlyInactive(status)) return true;
+      || this._isSessionMismatch(status, sessionId, providerId)) return false;
+    if (!stale && !this._isExplicitlyInactive(status, providerId)) return true;
 
-    const cleanup = await this._disposeAndRelease({ sessionId }, { releaseLease: true });
+    const cleanup = await this._disposeAndRelease(
+      { sessionId, providerId },
+      { releaseLease: true },
+    );
     return cleanup.success;
   }
 
@@ -1163,7 +1180,7 @@ export class LiveDubbingCoordinator {
   _markTerminalState(state) {
     if (!state?.descriptor?.sessionId) return;
     state.terminalRequested = true;
-    this.credentialRequestSessions.delete(state.descriptor.sessionId);
+    this.bootstrapRequestSessions.delete(state.descriptor.sessionId);
   }
 
   _latchProviderDiagnostic(state, diagnostic) {
@@ -1176,7 +1193,7 @@ export class LiveDubbingCoordinator {
   _forgetSessionState(sessionId, expectedState = null) {
     if (expectedState && this.sessionStates.get(sessionId) !== expectedState) return;
     this.sessionStates.delete(sessionId);
-    this.credentialRequestSessions.delete(sessionId);
+    this.bootstrapRequestSessions.delete(sessionId);
   }
 
   _hasLiveLease(sessionId) {
@@ -1189,33 +1206,41 @@ export class LiveDubbingCoordinator {
     }
   }
 
-  _isSessionMismatch(response, sessionId) {
+  _isSessionMismatch(response, sessionId, providerId) {
     return Boolean(response && (
       response.sessionId !== sessionId
+      || response.providerId !== providerId
       || (Object.prototype.hasOwnProperty.call(response, 'requestedSessionId')
         && response.requestedSessionId !== sessionId)
       || (Object.prototype.hasOwnProperty.call(response, 'actualSessionId')
         && response.actualSessionId !== sessionId)
+      || (Object.prototype.hasOwnProperty.call(response, 'requestedProviderId')
+        && response.requestedProviderId !== providerId)
+      || (Object.prototype.hasOwnProperty.call(response, 'actualProviderId')
+        && response.actualProviderId !== providerId)
     ));
   }
 
-  _isExactSessionStatus(response, sessionId) {
+  _isExactSessionStatus(response, sessionId, providerId) {
     return Boolean(response
       && response.success !== false
-      && isExactSessionResponse(response, sessionId)
+      && isExactSessionResponse(response, sessionId, providerId)
       && typeof response.status === 'string');
   }
 
   _isSameDescriptorFence(left, right) {
     return Boolean(left && right
       && left.sessionId === right.sessionId
+      && left.providerId === right.providerId
+      && left.tabId === right.tabId
+      && left.startedAt === right.startedAt
       && left.targetLanguage === right.targetLanguage
       && left.eventSequence === right.eventSequence
       && left.status === right.status);
   }
 
-  _isRecoverableRunningStatus(response, sessionId) {
-    return this._isExactSessionStatus(response, sessionId)
+  _isRecoverableRunningStatus(response, sessionId, providerId) {
+    return this._isExactSessionStatus(response, sessionId, providerId)
       && response.status === LIVE_DUBBING_STATUS.RUNNING
       && response.active === true
       && response.captureReady === true
@@ -1224,14 +1249,14 @@ export class LiveDubbingCoordinator {
       && response.setupComplete === true;
   }
 
-  _isProvablyAbsent(response, sessionId) {
-    return this._isExactSessionStatus(response, sessionId)
+  _isProvablyAbsent(response, sessionId, providerId) {
+    return this._isExactSessionStatus(response, sessionId, providerId)
       && (['IDLE', 'DISPOSED', 'MISSING'].includes(response.status)
         || response.disposed === true);
   }
 
-  _isExplicitlyInactive(response) {
-    return Boolean(response && response.success !== false
+  _isExplicitlyInactive(response, providerId) {
+    return Boolean(this._isExactSessionStatus(response, response?.sessionId, providerId)
       && (response.active === false
         || ['IDLE', 'DISPOSED', 'MISSING'].includes(response.status)
         || response.disposed === true));
@@ -1380,6 +1405,7 @@ export class LiveDubbingCoordinator {
 
     if (expectedDescriptor && (!this.descriptor
       || this.descriptor.sessionId !== expectedDescriptor.sessionId
+      || this.descriptor.providerId !== expectedDescriptor.providerId
       || this.descriptor.eventSequence !== expectedDescriptor.eventSequence
       || this.descriptor.status !== expectedDescriptor.status)) {
       return false;
@@ -1387,6 +1413,7 @@ export class LiveDubbingCoordinator {
 
     if (expectedSessionId && (!this.descriptor
       || this.descriptor.sessionId !== expectedSessionId
+      || this.descriptor.providerId !== sanitized.providerId
       || this.descriptor.eventSequence > sanitized.eventSequence
       || (this.descriptor.eventSequence === sanitized.eventSequence
         && this.descriptor.status !== sanitized.status)

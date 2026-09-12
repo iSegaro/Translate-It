@@ -2,9 +2,10 @@ import { liveDubbingCoordinator } from './LiveDubbingCoordinator.js';
 import * as browserCapabilities from '@/core/browserHandlers.js';
 import {
   LIVE_DUBBING_ACTIONS,
+  LIVE_DUBBING_PROVIDER_ID,
 } from '../constants.js';
 import {
-  createProviderCredentialResponse,
+  createProviderBootstrapResponse,
   isTrustedLiveDubbingUiSender,
 } from '../contracts.js';
 
@@ -51,33 +52,38 @@ export function handleLiveDubbingGetStatus(message, sender) {
 }
 
 /**
- * Resolve one Gemini Live credential request from the authorized offscreen
- * document. The response is intentionally limited to the key and language.
+ * Resolve one Gemini Live provider bootstrap request from the authorized
+ * offscreen document. The response is intentionally limited to the opaque
+ * bootstrap, provider, and language.
  */
-export async function handleLiveDubbingCredentialRequest(message, sender) {
+export async function handleLiveDubbingBootstrapRequest(message, sender) {
   if (!isChromeRuntime()) return unsupported();
 
   const descriptor = await liveDubbingCoordinator.authorizeOffscreenControlMessage(
     message,
     sender,
-    { type: 'credential' },
+    { type: 'bootstrap' },
   );
-  if (!descriptor) return unauthorized();
+  if (!descriptor || descriptor.providerId !== LIVE_DUBBING_PROVIDER_ID) return unauthorized();
 
   try {
     const { ApiKeyManager } = await import('@/features/translation/providers/ApiKeyManager.js');
     const { getApiKeyAsync } = await import('@/shared/config/config.js');
     const apiKey = await ApiKeyManager.getPrimaryKey('GEMINI_API_KEY') || await getApiKeyAsync();
     if (typeof apiKey !== 'string' || !apiKey.trim()) {
-      return { success: false, error: 'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE' };
+      return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
     }
 
-    if (!liveDubbingCoordinator.isCredentialRequestStillAuthorized(descriptor)) {
+    if (!liveDubbingCoordinator.isBootstrapRequestStillAuthorized(descriptor)) {
       return unauthorized();
     }
 
-    return createProviderCredentialResponse(apiKey, descriptor.targetLanguage);
+    return createProviderBootstrapResponse(
+      descriptor.providerId,
+      descriptor.targetLanguage,
+      { apiKey },
+    );
   } catch {
-    return { success: false, error: 'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE' };
+    return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
   }
 }

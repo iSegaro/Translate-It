@@ -1,7 +1,10 @@
-import { LIVE_DUBBING_SETUP_TIMEOUT } from '../constants.js';
+import {
+  LIVE_DUBBING_PROVIDER_ID,
+  LIVE_DUBBING_SETUP_TIMEOUT,
+} from '../constants.js';
 import {
   createLiveDubbingProviderDiagnostic,
-  mapLiveGeminiLanguage,
+  normalizeProviderTargetLanguage,
 } from '../contracts.js';
 
 export const GEMINI_LIVE_MODEL = 'models/gemini-3.5-live-translate-preview';
@@ -309,15 +312,35 @@ export class GeminiLiveProviderAdapter {
 
   /**
    * Open one session and resolve only after Gemini acknowledges setup.
-   * The short-lived credential is used to construct the socket URL and is not
+   * The opaque bootstrap is used to construct the socket URL and is not
    * retained in the client or included in any returned value or callback.
    */
-  connect(apiKeyOrOptions, targetLanguage) {
-    const input = isRecord(apiKeyOrOptions)
-      ? apiKeyOrOptions
-      : { apiKey: apiKeyOrOptions, targetLanguage };
-    const apiKey = input.apiKey;
-    const mappedTargetLanguage = mapLiveGeminiLanguage(input.targetLanguage);
+  connect(connectionOptions) {
+    if (arguments.length !== 1
+      || !isPlainRecord(connectionOptions)
+      || Object.keys(connectionOptions).length !== 2
+      || !Object.prototype.hasOwnProperty.call(connectionOptions, 'bootstrap')
+      || !Object.prototype.hasOwnProperty.call(connectionOptions, 'targetLanguage')
+      || Object.prototype.hasOwnProperty.call(connectionOptions, 'apiKey')
+      || !isPlainRecord(connectionOptions.bootstrap)) {
+      return Promise.reject(new TypeError('connect requires a nested bootstrap object'));
+    }
+
+    let apiKey;
+    try {
+      apiKey = connectionOptions.bootstrap.apiKey;
+    } catch {
+      return Promise.reject(new TypeError('bootstrap apiKey is unavailable'));
+    }
+    let mappedTargetLanguage;
+    try {
+      mappedTargetLanguage = normalizeProviderTargetLanguage(
+        LIVE_DUBBING_PROVIDER_ID,
+        connectionOptions.targetLanguage,
+      );
+    } catch {
+      mappedTargetLanguage = null;
+    }
 
     if (this._socket || this.setupState || this.phase !== 'idle') {
       return Promise.reject(new GeminiLiveProtocolError(

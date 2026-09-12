@@ -6,18 +6,19 @@ import {
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_INTERNAL_STATUS,
   LIVE_DUBBING_OFFSCREEN_ACKS,
+  LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STATUS,
 } from '../constants.js';
 import {
   createLiveDubbingDiagnostic,
   createLiveDubbingCleanupDiagnostic,
   createLiveDubbingProviderDiagnostic,
-  createProviderCredentialRequest,
-  normalizeTargetLanguage,
-  parseProviderCredentialResponse,
+  createProviderBootstrapRequest,
+  normalizeProviderTargetLanguage,
+  parseProviderBootstrapResponse,
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
-import { GeminiLiveProviderAdapter } from '../providers/GeminiLiveProviderAdapter.js';
+import { liveDubbingProviderRegistry } from '../providers/LiveDubbingProviderRegistry.js';
 import { TabAudioPipeline } from './TabAudioPipeline.js';
 import { PcmOutputPlayer } from './PcmOutputPlayer.js';
 
@@ -116,7 +117,7 @@ function safeTelemetrySnapshot(telemetry) {
 /**
  * Build the scalar-only, same-context telemetry snapshot. All inputs are
  * counts, durations, milestones, or the allowlisted terminal category; no
- * session, media, credential, URL, PCM, transcript, or provider payload is
+ * session, media, bootstrap, URL, PCM, transcript, or provider payload is
  * included. Fixed 100ms input framing is production behavior, not a variant.
  */
 function buildTelemetrySnapshot({ telemetry, metrics } = {}) {
@@ -177,6 +178,10 @@ function getFrameDurationMs(frame, byteLength = getFrameByteLength(frame)) {
 
 function isSessionId(value) {
   return typeof value === 'string' && Boolean(value.trim());
+}
+
+function isProviderId(value) {
+  return value === LIVE_DUBBING_PROVIDER_ID;
 }
 
 function isStreamId(value) {
@@ -269,7 +274,7 @@ function hasAudioContext(options) {
 
 /**
  * Owns one offscreen live-dubbing transaction: capture, both local audio
- * graphs, one credential request, and one fenced provider generation.
+ * graphs, one provider bootstrap request, and one fenced provider generation.
  *
  * The controller is deliberately the only owner of these resources. A
  * terminal callback changes the session fence before cleanup so late worklet
@@ -279,8 +284,9 @@ export class LiveDubbingController {
   constructor(options = {}) {
     this.mediaDevices = options.mediaDevices || globalThis.navigator?.mediaDevices;
     this.notify = options.notify || ((message) => globalThis.chrome?.runtime?.sendMessage?.(message));
-    this.requestCredential = options.requestCredential
+    this.requestBootstrap = options.requestBootstrap
       || ((message) => globalThis.chrome?.runtime?.sendMessage?.(message));
+    this.providerRegistry = options.providerRegistry || liveDubbingProviderRegistry;
     this.performanceNow = getPerformanceNow(options);
     this.onPlaybackAccepted = typeof options.onPlaybackAccepted === 'function'
       ? options.onPlaybackAccepted
@@ -316,7 +322,7 @@ export class LiveDubbingController {
 
     this.currentSession = null;
     this.lastTelemetry = null;
-    this.disposedSessionId = null;
+    this.disposedSession = null;
     this.providerGeneration = 0;
   }
 
@@ -333,29 +339,34 @@ export class LiveDubbingController {
       case LIVE_DUBBING_ACTIONS.PREPARE:
         return this.prepare(
           getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
           getMessageValue(message, 'targetLanguage'),
           getEventSequence(message),
         );
       case LIVE_DUBBING_ACTIONS.CONSUME:
         return this.consume(
           getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
           getMessageValue(message, 'streamId'),
           getEventSequence(message),
         );
       case LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER:
         return this.connectProvider(
           getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
           getMessageValue(message, 'targetLanguage'),
           getEventSequence(message),
         );
       case LIVE_DUBBING_ACTIONS.STATUS:
         return this.status(
           getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
           getEventSequence(message),
         );
       case LIVE_DUBBING_ACTIONS.DISPOSE:
         return this.dispose(
           getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
           getMessageValue(message, 'reason'),
           getEventSequence(message),
         );
@@ -364,14 +375,15 @@ export class LiveDubbingController {
     }
   }
 
-  prepare(sessionId, targetLanguage = null, eventSequence = undefined) {
-    const sequenceError = this._requiredEventSequence(sessionId, eventSequence);
+  prepare(sessionId, providerId, targetLanguage = null, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
     if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
 
     const session = this.currentSession;
     if ((!session && eventSequence !== 0)
       || (session?.sessionId === sessionId && eventSequence !== session.eventSequence)) {
-      return this._sequenceMismatch(sessionId, session?.sessionId === sessionId ? session : null);
+      return this._sequenceMismatch(sessionId, session?.sessionId === sessionId ? session : null, providerId);
     }
 
     if (!isSessionId(sessionId)) {
@@ -379,23 +391,26 @@ export class LiveDubbingController {
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
         'INVALID_SESSION_ID',
         { name: 'TypeError', message: 'sessionId is required', code: 'INVALID_SESSION_ID' },
+        { sessionId, providerId },
       );
     }
 
     let mappedTargetLanguage = targetLanguage;
     if (targetLanguage !== null && targetLanguage !== undefined) {
       try {
-        mappedTargetLanguage = normalizeTargetLanguage(targetLanguage);
+        mappedTargetLanguage = normalizeProviderTargetLanguage(providerId, targetLanguage);
       } catch (error) {
         return createCaptureFailure(
           LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
           'INVALID_TARGET_LANGUAGE',
           { name: error?.name || 'RangeError', message: 'Unsupported target language', code: 'INVALID_TARGET_LANGUAGE' },
+          { sessionId, providerId },
         );
       }
     }
 
-    if (this.disposedSessionId === sessionId) {
+    if (this.disposedSession?.sessionId === sessionId
+      && this.disposedSession.providerId === providerId) {
       return createCaptureFailure(
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
         'LIVE_DUBBING_SESSION_DISPOSED',
@@ -403,6 +418,7 @@ export class LiveDubbingController {
         {
           ignored: true,
           sessionId,
+          providerId,
           status: IDLE_STATUS,
         },
       );
@@ -416,6 +432,7 @@ export class LiveDubbingController {
         {
           active: true,
           sessionId,
+          providerId,
           status: this.currentSession.status,
         },
       );
@@ -430,6 +447,7 @@ export class LiveDubbingController {
         error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH',
         ignored: true,
         sessionId,
+        providerId,
         status: this.currentSession.status,
       };
     }
@@ -440,6 +458,7 @@ export class LiveDubbingController {
         error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
         ignored: true,
         sessionId,
+        providerId,
         eventSequence: this.currentSession.eventSequence,
         status: this.currentSession.status,
       };
@@ -448,6 +467,7 @@ export class LiveDubbingController {
     if (!this.currentSession) {
       this.currentSession = {
         sessionId,
+        providerId,
         targetLanguage: mappedTargetLanguage,
         eventSequence,
         status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
@@ -460,8 +480,8 @@ export class LiveDubbingController {
         terminalSent: false,
         terminalRequested: false,
         disposing: false,
-        credentialRequested: false,
-        credentialRequestPromise: null,
+        bootstrapRequested: false,
+        bootstrapRequestPromise: null,
         providerClient: null,
         providerGeneration: 0,
         providerDiagnostic: null,
@@ -504,6 +524,7 @@ export class LiveDubbingController {
       ack: LIVE_DUBBING_OFFSCREEN_ACKS.READY,
       ready: true,
       sessionId,
+      providerId,
       status: this.currentSession.status,
       eventSequence: this.currentSession.eventSequence,
     };
@@ -513,17 +534,19 @@ export class LiveDubbingController {
    * Start getUserMedia immediately. The Chrome tab stream ID remains inside
    * this method and is never returned, stored, or logged.
    */
-  consume(sessionId, streamId, eventSequence = undefined) {
-    const sequenceError = this._requiredEventSequence(sessionId, eventSequence);
+  consume(sessionId, providerId, streamId, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
     if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
 
     const session = this.currentSession;
-    if (!session || session.sessionId !== sessionId) {
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
       return {
         success: false,
         error: 'LIVE_DUBBING_SESSION_MISMATCH',
         ignored: true,
         sessionId: isSessionId(sessionId) ? sessionId : null,
+        providerId,
         status: session?.status || IDLE_STATUS,
       };
     }
@@ -536,7 +559,7 @@ export class LiveDubbingController {
       ].includes(session.status);
     if (captureStarted) {
       if (!isEventSequence(eventSequence) || eventSequence !== session.eventSequence) {
-        return this._sequenceMismatch(sessionId, session);
+        return this._sequenceMismatch(sessionId, session, providerId);
       }
       if (session.capturePromise) return session.capturePromise;
       return this._mediaAcquiredResponse(session);
@@ -544,7 +567,7 @@ export class LiveDubbingController {
 
     if (session.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE
       || eventSequence !== session.eventSequence + 1) {
-      return this._sequenceMismatch(sessionId, session);
+      return this._sequenceMismatch(sessionId, session, providerId);
     }
     session.eventSequence = eventSequence;
 
@@ -553,7 +576,8 @@ export class LiveDubbingController {
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA,
         'INVALID_STREAM_ID',
         { name: 'TypeError', message: 'streamId is required', code: 'INVALID_STREAM_ID' },
-        { sessionId },
+        { sessionId, providerId },
+        [streamId],
       );
     }
 
@@ -580,7 +604,7 @@ export class LiveDubbingController {
     return session.capturePromise;
   }
 
-  /** Initialize both graphs before the provider credential request is made. */
+  /** Initialize both graphs before the provider bootstrap request is made. */
   async _captureResolved(session, stream, streamId) {
     if (!this._isCurrentSession(session)) {
       if (!session.streamStopped) {
@@ -592,6 +616,7 @@ export class LiveDubbingController {
         error: 'LIVE_DUBBING_SESSION_DISPOSED',
         ignored: true,
         sessionId: session.sessionId,
+        providerId: session.providerId,
         status: IDLE_STATUS,
       };
     }
@@ -617,6 +642,7 @@ export class LiveDubbingController {
           error: 'LIVE_DUBBING_SESSION_DISPOSED',
           ignored: true,
           sessionId: session.sessionId,
+          providerId: session.providerId,
           status: IDLE_STATUS,
         };
       }
@@ -714,19 +740,20 @@ export class LiveDubbingController {
     return player;
   }
 
-  connectProvider(sessionId, targetLanguage = null, eventSequence = undefined) {
-    const sequenceError = this._requiredEventSequence(sessionId, eventSequence);
+  connectProvider(sessionId, providerId, targetLanguage = null, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
     if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
 
     const session = this.currentSession;
-    if (!session || session.sessionId !== sessionId) {
-      return this._sessionMismatch(sessionId, session);
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
+      return this._sessionMismatch(sessionId, providerId, session);
     }
     const connectionStarted = Boolean(session.connectPromise)
       || session.status === LIVE_DUBBING_STATUS.RUNNING;
     if (connectionStarted) {
       if (!isEventSequence(eventSequence) || eventSequence !== session.eventSequence) {
-        return this._sequenceMismatch(sessionId, session);
+        return this._sequenceMismatch(sessionId, session, providerId);
       }
       if (session.status === LIVE_DUBBING_STATUS.RUNNING) return this._providerReadyResponse(session);
       return session.connectPromise;
@@ -734,15 +761,28 @@ export class LiveDubbingController {
     if (session.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
       || !session.pipelinesReady
       || eventSequence !== session.eventSequence + 1) {
-      return this._sequenceMismatch(sessionId, session);
+      return this._sequenceMismatch(sessionId, session, providerId);
     }
     if (targetLanguage !== null && targetLanguage !== undefined) {
       try {
-        if (normalizeTargetLanguage(targetLanguage) !== normalizeTargetLanguage(session.targetLanguage)) {
-          return { success: false, error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH', sessionId, status: session.status };
+        if (normalizeProviderTargetLanguage(providerId, targetLanguage)
+          !== normalizeProviderTargetLanguage(session.providerId, session.targetLanguage)) {
+          return {
+            success: false,
+            error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH',
+            sessionId,
+            providerId,
+            status: session.status,
+          };
         }
       } catch {
-        return { success: false, error: 'INVALID_TARGET_LANGUAGE', sessionId, status: session.status };
+        return {
+          success: false,
+          error: 'INVALID_TARGET_LANGUAGE',
+          sessionId,
+          providerId,
+          status: session.status,
+        };
       }
     }
     session.eventSequence = eventSequence;
@@ -760,21 +800,24 @@ export class LiveDubbingController {
         });
       }
       session.providerClient = client;
-      let credential = await this.requestProviderCredentialForSession(session);
+      let bootstrapWrapper = await this.requestProviderBootstrapForSession(session);
       if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
         return this._disposedProviderResponse(session);
       }
-      if (!credential) throw Object.assign(new Error('Provider credential is unavailable'), {
-        code: 'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE',
+      if (!bootstrapWrapper) throw Object.assign(new Error('Provider bootstrap is unavailable'), {
+        code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
       });
 
       let setupPromise;
       try {
-        setupPromise = client.connect(credential.apiKey, credential.targetLanguage);
+        setupPromise = client.connect({
+          bootstrap: bootstrapWrapper.bootstrap,
+          targetLanguage: bootstrapWrapper.targetLanguage,
+        });
       } finally {
-        // The controller never stores the key; this local reference is cleared
+        // The controller never stores bootstrap data; this wrapper is cleared
         // before the provider setup promise is awaited.
-        credential = null;
+        bootstrapWrapper = null;
       }
       await setupPromise;
       if (!this._isCurrentProvider(session, providerGeneration)) {
@@ -839,6 +882,7 @@ export class LiveDubbingController {
     if (!client && typeof this.providerClientFactory === 'function') {
       client = await this.providerClientFactory({
         sessionId: session.sessionId,
+        providerId: session.providerId,
         providerGeneration: generation,
         ...this.providerClientOptions,
         callbacks,
@@ -846,7 +890,7 @@ export class LiveDubbingController {
       });
     }
     if (!client) {
-      client = new GeminiLiveProviderAdapter({
+      client = this.providerRegistry.create(session.providerId, {
         ...this.providerClientOptions,
         performanceNow: this.performanceNow,
         callbacks,
@@ -858,32 +902,36 @@ export class LiveDubbingController {
     return client;
   }
 
-  requestProviderCredentialForSession(session) {
-    if (session.credentialRequestPromise) return session.credentialRequestPromise;
-    if (session.credentialRequested) {
+  requestProviderBootstrapForSession(session) {
+    if (session.bootstrapRequestPromise) return session.bootstrapRequestPromise;
+    if (session.bootstrapRequested) {
       return Promise.resolve(null);
     }
-    session.credentialRequested = true;
-    const request = createProviderCredentialRequest({
+    session.bootstrapRequested = true;
+    const request = createProviderBootstrapRequest({
       sessionId: session.sessionId,
+      providerId: session.providerId,
       targetLanguage: session.targetLanguage,
       eventSequence: session.eventSequence,
     });
-    const credentialRequestPromise = Promise.resolve()
-      .then(() => this.requestCredential(request))
-      .then(response => parseProviderCredentialResponse(response, session.targetLanguage))
+    const bootstrapRequestPromise = Promise.resolve()
+      .then(() => this.requestBootstrap(request))
+      .then(response => parseProviderBootstrapResponse(
+        response,
+        session.providerId,
+        session.targetLanguage,
+      ))
       .catch(() => null);
-    const trackedCredentialRequest = credentialRequestPromise.finally(() => {
-      if (session.credentialRequestPromise === trackedCredentialRequest) {
-        session.credentialRequestPromise = null;
+    const trackedBootstrapRequest = bootstrapRequestPromise.finally(() => {
+      if (session.bootstrapRequestPromise === trackedBootstrapRequest) {
+        session.bootstrapRequestPromise = null;
       }
     });
-    session.credentialRequestPromise = trackedCredentialRequest;
-    return trackedCredentialRequest;
+    session.bootstrapRequestPromise = trackedBootstrapRequest;
+    return trackedBootstrapRequest;
   }
 
-  /** Backwards-compatible public helper; provider starts still use the same request. */
-  requestProviderCredential() {
+  requestProviderBootstrap() {
     const session = this.currentSession;
     if (!session || !isSessionId(session.sessionId) || !isSessionId(session.targetLanguage)) {
       return Promise.resolve({ success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' });
@@ -892,32 +940,38 @@ export class LiveDubbingController {
       || !session.pipelinesReady) {
       return Promise.resolve({ success: false, error: 'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE' });
     }
-    return this.requestProviderCredentialForSession(session);
+    return this.requestProviderBootstrapForSession(session);
   }
 
-  status(requestedSessionId = this.currentSession?.sessionId, requestedEventSequence = undefined) {
+  status(
+    requestedSessionId = this.currentSession?.sessionId,
+    providerId = undefined,
+    requestedEventSequence = undefined,
+  ) {
+    if (arguments.length === 0) providerId = this.currentSession?.providerId;
     if (requestedSessionId === undefined && !this.currentSession) {
       return { success: true, active: false, sessionId: null, status: IDLE_STATUS };
     }
     if (!isSessionId(requestedSessionId)) {
       return { success: false, error: 'INVALID_SESSION_ID', sessionId: requestedSessionId ?? null, status: IDLE_STATUS };
     }
+    if (!isProviderId(providerId)) return this._invalidProvider(requestedSessionId);
 
     const session = this.currentSession;
-    if (!session) return { success: true, active: false, sessionId: requestedSessionId, status: IDLE_STATUS };
-    if (session.sessionId !== requestedSessionId) {
+    if (!session) {
       return {
-        success: false,
-        error: 'LIVE_DUBBING_SESSION_MISMATCH',
-        ignored: true,
+        success: true,
+        active: false,
         sessionId: requestedSessionId,
-        requestedSessionId,
-        actualSessionId: session.sessionId,
-        status: session.status,
+        providerId,
+        status: IDLE_STATUS,
       };
     }
+    if (session.sessionId !== requestedSessionId || session.providerId !== providerId) {
+      return this._sessionMismatch(requestedSessionId, providerId, session);
+    }
     if (requestedEventSequence !== undefined && requestedEventSequence !== session.eventSequence) {
-      return this._sequenceMismatch(requestedSessionId, session);
+      return this._sequenceMismatch(requestedSessionId, session, providerId);
     }
 
     const active = [
@@ -930,6 +984,7 @@ export class LiveDubbingController {
       success: true,
       active,
       sessionId: session.sessionId,
+      providerId: session.providerId,
       status: session?.status || IDLE_STATUS,
       eventSequence: session.eventSequence,
       captureReady: Boolean(session.stream),
@@ -970,6 +1025,7 @@ export class LiveDubbingController {
     return {
       active: Boolean(session),
       sessionId: session?.sessionId || null,
+      ...(session ? { providerId: session.providerId } : {}),
       status: session?.status || IDLE_STATUS,
       telemetry: this.getTelemetry(),
     };
@@ -980,7 +1036,8 @@ export class LiveDubbingController {
    * any resource call. The offscreen router awaits this Promise before
    * returning the exact DISPOSED acknowledgement for the requested session.
    */
-  async dispose(sessionId, reason = null, eventSequence = undefined) {
+  async dispose(sessionId, providerId, reason = null, eventSequence = undefined) {
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
     const session = this.currentSession;
     if (!session || session.sessionId !== sessionId) {
       return {
@@ -990,10 +1047,12 @@ export class LiveDubbingController {
         idempotent: !session,
         ignored: Boolean(session),
         sessionId: isSessionId(sessionId) ? sessionId : null,
+        providerId,
         active: Boolean(session),
         status: session?.status || IDLE_STATUS,
       };
     }
+    if (session.providerId !== providerId) return this._sessionMismatch(sessionId, providerId, session);
     // An exact session identity is the terminal fence; sequence drift is
     // expected when a response is lost while setup is still settling.
     void eventSequence;
@@ -1002,7 +1061,7 @@ export class LiveDubbingController {
     session.terminalRequested = true;
     this._removeTrackListeners(session);
     const cleanup = this._cleanupSessionResources(session);
-    this.disposedSessionId = sessionId;
+    this.disposedSession = { sessionId, providerId };
     this.currentSession = null;
 
     const response = {
@@ -1010,6 +1069,7 @@ export class LiveDubbingController {
       ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
       disposed: true,
       sessionId,
+      providerId,
       active: false,
       status: IDLE_STATUS,
     };
@@ -1052,8 +1112,8 @@ export class LiveDubbingController {
       stopTracks(stream);
       session.streamStopped = true;
     }
-    session.credentialRequestPromise = null;
-    session.credentialRequested = false;
+    session.bootstrapRequestPromise = null;
+    session.bootstrapRequested = false;
 
     try {
       client?.close?.();
@@ -1129,6 +1189,7 @@ export class LiveDubbingController {
       success: false,
       error,
       sessionId: session.sessionId,
+      providerId: session.providerId,
       status: isCurrent ? session.status : IDLE_STATUS,
       diagnostic,
     };
@@ -1149,6 +1210,7 @@ export class LiveDubbingController {
       ack: LIVE_DUBBING_OFFSCREEN_ACKS.MEDIA_ACQUIRED,
       mediaAcquired: true,
       sessionId: session.sessionId,
+      providerId: session.providerId,
       active: true,
       status: session.status,
       eventSequence: session.eventSequence,
@@ -1165,6 +1227,7 @@ export class LiveDubbingController {
       providerReady: true,
       running: true,
       sessionId: session.sessionId,
+      providerId: session.providerId,
       active: true,
       status: LIVE_DUBBING_STATUS.RUNNING,
       eventSequence: session.eventSequence,
@@ -1181,6 +1244,7 @@ export class LiveDubbingController {
       error: 'LIVE_DUBBING_SESSION_DISPOSED',
       ignored: true,
       sessionId: session.sessionId,
+      providerId: session.providerId,
       status: IDLE_STATUS,
       ...(session.providerDiagnostic ? { providerDiagnostic: session.providerDiagnostic } : {}),
     };
@@ -1191,6 +1255,7 @@ export class LiveDubbingController {
       success: false,
       error: errorCode(error, session.lastError || 'LIVE_DUBBING_PROVIDER_FAILED'),
       sessionId: session.sessionId,
+      providerId: session.providerId,
       status: session.status,
       providerDiagnostic: session.providerDiagnostic,
     };
@@ -1705,6 +1770,7 @@ export class LiveDubbingController {
       action: LIVE_DUBBING_ACTIONS.TERMINAL,
       data: {
         sessionId: session.sessionId,
+        providerId: session.providerId,
         eventSequence: session.eventSequence,
         status: session.status,
         event,
@@ -1738,31 +1804,51 @@ export class LiveDubbingController {
       && session.providerGeneration === generation;
   }
 
-  _sessionMismatch(sessionId, session) {
+  _invalidProvider(sessionId) {
+    return {
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_UNSUPPORTED',
+      ignored: true,
+      sessionId: isSessionId(sessionId) ? sessionId : null,
+    };
+  }
+
+  _sessionMismatch(sessionId, providerId, session) {
+    const requestedSessionId = isSessionId(sessionId) ? sessionId : null;
+    const requestedProviderId = isProviderId(providerId) ? providerId : null;
     return {
       success: false,
       error: 'LIVE_DUBBING_SESSION_MISMATCH',
       ignored: true,
-      sessionId: isSessionId(sessionId) ? sessionId : null,
+      sessionId: requestedSessionId,
+      providerId: requestedProviderId,
+      requestedSessionId,
+      actualSessionId: session?.sessionId || null,
+      requestedProviderId,
+      actualProviderId: session?.providerId || null,
       status: session?.status || IDLE_STATUS,
     };
   }
 
-  _sequenceMismatch(sessionId, session) {
+  _sequenceMismatch(sessionId, session, providerId = session?.providerId) {
     return {
       success: false,
       error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
       ignored: true,
       sessionId,
+      providerId: isProviderId(providerId) ? providerId : null,
       eventSequence: session?.eventSequence ?? 0,
       status: session?.status || IDLE_STATUS,
     };
   }
 
-  _requiredEventSequence(sessionId, eventSequence) {
+  _requiredEventSequence(sessionId, eventSequence, providerId) {
     if (isEventSequence(eventSequence)) return null;
-    const session = this.currentSession?.sessionId === sessionId ? this.currentSession : null;
-    return this._sequenceMismatch(sessionId, session);
+    const session = this.currentSession?.sessionId === sessionId
+      && this.currentSession.providerId === providerId
+      ? this.currentSession
+      : null;
+    return this._sequenceMismatch(sessionId, session, providerId);
   }
 }
 

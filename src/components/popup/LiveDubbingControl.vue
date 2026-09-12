@@ -104,7 +104,7 @@ const statusText = computed(() => ({
 const ERROR_MESSAGES = {
   LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
   INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.',
-  LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE: 'A Gemini API key is required for live dubbing.'
+  LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE: 'A Gemini API key is required for live dubbing.'
 }
 
 const getErrorMessage = (error, fallback = 'Live dubbing failed.') => (

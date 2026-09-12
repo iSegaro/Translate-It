@@ -44,7 +44,7 @@ describe('LiveDubbingController', () => {
       action: LIVE_DUBBING_ACTIONS.PREPARE,
       data: { sessionId: 'session-1' },
     });
-    const future = controller.prepare('session-1', null, 1);
+    const future = controller.prepare('session-1', 'gemini', null, 1);
 
     expect(missing).toMatchObject({
       success: false,
@@ -58,7 +58,7 @@ describe('LiveDubbingController', () => {
     });
     expect(controller.currentSession).toBeNull();
 
-    expect(controller.prepare('session-1', null, 0)).toMatchObject({
+    expect(controller.prepare('session-1', 'gemini', null, 0)).toMatchObject({
       success: true,
       eventSequence: 0,
     });
@@ -71,9 +71,9 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia },
     });
 
-    controller.prepare('session-1', null, 0);
+    controller.prepare('session-1', 'gemini', null, 0);
     for (const eventSequence of [undefined, 0, 2]) {
-      const response = controller.consume('session-1', 'stream-secret', eventSequence);
+      const response = controller.consume('session-1', 'gemini', 'stream-secret', eventSequence);
       expect(response).toMatchObject({
         success: false,
         error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
@@ -83,29 +83,29 @@ describe('LiveDubbingController', () => {
     }
     expect(getUserMedia).not.toHaveBeenCalled();
 
-    const firstConsume = controller.consume('session-1', 'stream-secret', 1);
+    const firstConsume = controller.consume('session-1', 'gemini', 'stream-secret', 1);
     expect(controller.currentSession.eventSequence).toBe(1);
-    expect(controller.consume('session-1', 'other-stream-secret', 1)).toBe(firstConsume);
+    expect(controller.consume('session-1', 'gemini', 'other-stream-secret', 1)).toBe(firstConsume);
     await expect(firstConsume).resolves.toMatchObject({
       success: true,
       ack: 'MEDIA_ACQUIRED',
     });
 
-    expect(controller.consume('session-1', 'stream-secret', 0)).toMatchObject({
+    expect(controller.consume('session-1', 'gemini', 'stream-secret', 0)).toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
     });
-    expect(controller.consume('session-1', 'stream-secret', 2)).toMatchObject({
+    expect(controller.consume('session-1', 'gemini', 'stream-secret', 2)).toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
     });
-    expect(controller.consume('session-1', 'stream-secret', 1)).toMatchObject({
+    expect(controller.consume('session-1', 'gemini', 'stream-secret', 1)).toMatchObject({
       success: true,
       ack: 'MEDIA_ACQUIRED',
     });
     expect(getUserMedia).toHaveBeenCalledOnce();
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 
   it('requires the next sequence to start provider connection and current sequence to retry it', async () => {
@@ -119,27 +119,27 @@ describe('LiveDubbingController', () => {
       stop: vi.fn(async () => {}),
       clear: vi.fn(),
     };
-    let resolveCredential;
-    const credential = new Promise(resolve => {
-      resolveCredential = resolve;
+    let resolveBootstrap;
+    const bootstrap = new Promise(resolve => {
+      resolveBootstrap = resolve;
     });
     const provider = {
       connect: vi.fn(async () => provider.onSetupComplete()),
       close: vi.fn(),
     };
-    const requestCredential = vi.fn(() => credential);
+    const requestBootstrap = vi.fn(() => bootstrap);
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
       inputPipeline,
       outputPlayer,
       providerClient: provider,
-      requestCredential,
+      requestBootstrap,
     });
 
-    controller.prepare('session-1', 'en', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
+    controller.prepare('session-1', 'gemini', 'en', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
     for (const eventSequence of [undefined, 1, 3]) {
-      const response = controller.connectProvider('session-1', 'en', eventSequence);
+      const response = controller.connectProvider('session-1', 'gemini', 'en', eventSequence);
       expect(response).toMatchObject({
         success: false,
         error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
@@ -147,35 +147,40 @@ describe('LiveDubbingController', () => {
       expect(controller.currentSession.eventSequence).toBe(1);
       expect(controller.currentSession.status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
     }
-    expect(requestCredential).not.toHaveBeenCalled();
+    expect(requestBootstrap).not.toHaveBeenCalled();
 
-    const firstConnect = controller.connectProvider('session-1', 'en', 2);
-    expect(controller.connectProvider('session-1', 'en', 2)).toBe(firstConnect);
+    const firstConnect = controller.connectProvider('session-1', 'gemini', 'en', 2);
+    expect(controller.connectProvider('session-1', 'gemini', 'en', 2)).toBe(firstConnect);
     expect(controller.currentSession.eventSequence).toBe(2);
-    expect(controller.connectProvider('session-1', 'en', 1)).toMatchObject({
+    expect(controller.connectProvider('session-1', 'gemini', 'en', 1)).toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
     });
 
-    resolveCredential({ success: true, apiKey: 'secret-key', targetLanguage: 'en' });
+    resolveBootstrap({
+      success: true,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      bootstrap: { apiKey: 'secret-key' },
+    });
     await expect(firstConnect).resolves.toMatchObject({
       success: true,
       ack: 'PROVIDER_READY',
       eventSequence: 3,
     });
-    expect(controller.connectProvider('session-1', 'en', 2)).toMatchObject({
+    expect(controller.connectProvider('session-1', 'gemini', 'en', 2)).toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
     });
-    expect(controller.connectProvider('session-1', 'en', 3)).toMatchObject({
+    expect(controller.connectProvider('session-1', 'gemini', 'en', 3)).toMatchObject({
       success: true,
       ack: 'PROVIDER_READY',
     });
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 
-  it('clears settled credentials before pending provider setup resolves', async () => {
+  it('clears settled bootstrap before pending provider setup resolves', async () => {
     const track = new FakeTrack();
     const inputPipeline = {
       start: vi.fn(async () => {}),
@@ -206,35 +211,40 @@ describe('LiveDubbingController', () => {
       close: vi.fn(),
     };
     const providerClientFactory = vi.fn(() => clientReady);
-    const requestCredential = vi.fn().mockResolvedValue({
+    const requestBootstrap = vi.fn().mockResolvedValue({
       success: true,
-      apiKey: 'secret-key',
+      providerId: 'gemini',
       targetLanguage: 'en',
+      bootstrap: { apiKey: 'secret-key' },
     });
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
       inputPipeline,
       outputPlayer,
       providerClientFactory,
-      requestCredential,
+      requestBootstrap,
     });
 
-    controller.prepare('session-1', 'en', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
-    const connecting = controller.connectProvider('session-1', 'en', 2);
+    controller.prepare('session-1', 'gemini', 'en', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const connecting = controller.connectProvider('session-1', 'gemini', 'en', 2);
     await vi.waitFor(() => expect(providerClientFactory).toHaveBeenCalledOnce());
-    expect(requestCredential).not.toHaveBeenCalled();
-    expect(controller.currentSession.credentialRequestPromise).toBeNull();
+    expect(requestBootstrap).not.toHaveBeenCalled();
+    expect(controller.currentSession.bootstrapRequestPromise).toBeNull();
 
     resolveClient(provider);
     await setupStarted;
 
     const session = controller.currentSession;
-    expect(provider.connect).toHaveBeenCalledWith('secret-key', 'en');
-    expect(session.credentialRequestPromise).toBeNull();
-    expect(session.credentialRequested).toBe(true);
-    await expect(controller.requestProviderCredentialForSession(session)).resolves.toBeNull();
-    expect(requestCredential).toHaveBeenCalledOnce();
+    expect(provider.connect).toHaveBeenCalledWith({
+      bootstrap: { apiKey: 'secret-key' },
+      targetLanguage: 'en',
+    });
+    expect(session.bootstrapRequestPromise).toBeNull();
+    expect(session.bootstrapRequested).toBe(true);
+    await expect(controller.requestProviderBootstrapForSession(session)).resolves.toBeNull();
+    expect(requestBootstrap).toHaveBeenCalledOnce();
+    expect(session).not.toHaveProperty('bootstrap');
     expect(session).not.toHaveProperty('apiKey');
     expect(JSON.stringify(session)).not.toContain('secret-key');
 
@@ -244,10 +254,10 @@ describe('LiveDubbingController', () => {
       success: true,
       ack: 'PROVIDER_READY',
     });
-    expect(session.credentialRequestPromise).toBeNull();
+    expect(session.bootstrapRequestPromise).toBeNull();
     expect(JSON.stringify(session)).not.toContain('secret-key');
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 
   it('calls getUserMedia immediately with Chrome tab constraints', async () => {
@@ -257,8 +267,8 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia },
     });
 
-    controller.prepare('session-1', null, 0);
-    const consume = controller.consume('session-1', 'stream-secret', 1);
+    controller.prepare('session-1', 'gemini', null, 0);
+    const consume = controller.consume('session-1', 'gemini', 'stream-secret', 1);
 
     expect(getUserMedia).toHaveBeenCalledOnce();
     expect(getUserMedia).toHaveBeenCalledWith({
@@ -289,9 +299,9 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia },
     });
 
-    controller.prepare('session-1', null, 0);
-    const firstConsume = controller.consume('session-1', 'stream-secret', 1);
-    const duplicateConsume = controller.consume('session-1', 'other-stream-secret', 1);
+    controller.prepare('session-1', 'gemini', null, 0);
+    const firstConsume = controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const duplicateConsume = controller.consume('session-1', 'gemini', 'other-stream-secret', 1);
 
     expect(getUserMedia).toHaveBeenCalledOnce();
     expect(duplicateConsume).toBe(firstConsume);
@@ -304,7 +314,7 @@ describe('LiveDubbingController', () => {
     });
     expect(track.listeners.has('ended')).toBe(true);
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
     expect(track.stop).toHaveBeenCalledOnce();
   });
 
@@ -316,9 +326,9 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia: vi.fn(() => capture) },
     });
 
-    controller.prepare('session-1', null, 0);
-    const consume = controller.consume('session-1', 'stream-secret', 1);
-    const disposed = await controller.dispose('session-1', 'STOP_REQUESTED');
+    controller.prepare('session-1', 'gemini', null, 0);
+    const consume = controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const disposed = await controller.dispose('session-1', 'gemini', 'STOP_REQUESTED');
 
     expect(disposed).toMatchObject({ ack: 'DISPOSED', sessionId: 'session-1' });
     resolveCapture(createStream(track));
@@ -337,8 +347,8 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
     });
 
-    controller.prepare('session-1', null, 0);
-    await expect(controller.consume('session-1', 'stream-secret', 1)).resolves.toMatchObject({
+    controller.prepare('session-1', 'gemini', null, 0);
+    await expect(controller.consume('session-1', 'gemini', 'stream-secret', 1)).resolves.toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK',
       status: LIVE_DUBBING_STATUS.ERROR,
@@ -354,8 +364,8 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia: vi.fn(() => Promise.reject(failure)) },
     });
 
-    controller.prepare('session-1', null, 0);
-    const result = await controller.consume('session-1', streamId, 1);
+    controller.prepare('session-1', 'gemini', null, 0);
+    const result = await controller.consume('session-1', 'gemini', streamId, 1);
 
     expect(result).toMatchObject({
       success: false,
@@ -376,12 +386,12 @@ describe('LiveDubbingController', () => {
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
     });
 
-    controller.prepare('session-1', null, 0);
-    await controller.consume('session-1', 'stream-secret', 1);
+    controller.prepare('session-1', 'gemini', null, 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
 
     const stale = await controller.handle({
       action: LIVE_DUBBING_ACTIONS.DISPOSE,
-      data: { sessionId: 'stale-session', reason: 'STALE' },
+      data: { sessionId: 'stale-session', providerId: 'gemini', reason: 'STALE' },
     });
     expect(stale).toMatchObject({
       success: true,
@@ -394,8 +404,8 @@ describe('LiveDubbingController', () => {
       status: LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
     });
 
-    const disposed = await controller.dispose('session-1', 'STOP');
-    const repeated = await controller.dispose('session-1', 'STOP');
+    const disposed = await controller.dispose('session-1', 'gemini', 'STOP');
+    const repeated = await controller.dispose('session-1', 'gemini', 'STOP');
     expect(disposed).toMatchObject({ success: true, ack: 'DISPOSED', disposed: true });
     expect(repeated).toMatchObject({ success: true, ack: 'DISPOSED', disposed: true });
     expect(track.stop).toHaveBeenCalledOnce();
@@ -415,8 +425,8 @@ describe('LiveDubbingController', () => {
       notify,
     });
 
-    controller.prepare('session-1', null, 0);
-    await controller.consume('session-1', 'stream-secret', 1);
+    controller.prepare('session-1', 'gemini', null, 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
     track.end();
 
     expect(controller.status()).toMatchObject({
@@ -429,6 +439,7 @@ describe('LiveDubbingController', () => {
       action: LIVE_DUBBING_ACTIONS.TERMINAL,
       data: {
         sessionId: 'session-1',
+        providerId: 'gemini',
         eventSequence: 1,
         status: LIVE_DUBBING_STATUS.ERROR,
         event: 'TRACK_ENDED',
@@ -436,21 +447,21 @@ describe('LiveDubbingController', () => {
       },
     });
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
     track.end();
     expect(controller.status().sessionId).toBeNull();
     expect(notify).toHaveBeenCalledOnce();
   });
 
-  it('rejects status requests for another session without exposing current ownership', async () => {
+  it('rejects status requests for another session with explicit mismatch proof', async () => {
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(new FakeTrack())) },
     });
 
-    controller.prepare('session-1', null, 0);
+    controller.prepare('session-1', 'gemini', null, 0);
     const response = controller.handle({
       action: LIVE_DUBBING_ACTIONS.STATUS,
-      data: { sessionId: 'stale-session' },
+      data: { sessionId: 'stale-session', providerId: 'gemini' },
     });
 
     expect(response).toMatchObject({
@@ -458,27 +469,92 @@ describe('LiveDubbingController', () => {
       ignored: true,
       error: 'LIVE_DUBBING_SESSION_MISMATCH',
       sessionId: 'stale-session',
+      providerId: 'gemini',
       requestedSessionId: 'stale-session',
       actualSessionId: 'session-1',
+      requestedProviderId: 'gemini',
+      actualProviderId: 'gemini',
     });
   });
 
-  it('does not request provider credentials before capture pipelines are ready', async () => {
-    const requestCredential = vi.fn().mockResolvedValue({
-      success: true,
-      apiKey: 'secret-key',
-      targetLanguage: 'fil',
+  it('rejects status requests with explicit provider mismatch proof', async () => {
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(new FakeTrack())) },
     });
-    const controller = new LiveDubbingController({ requestCredential });
 
-    controller.prepare('session-1', 'fil', 0);
-    const first = await controller.requestProviderCredential();
+    controller.prepare('session-1', 'gemini', null, 0);
+    // Simulate a future provider owning the active session while the caller
+    // still presents the same sessionId with the fixed background provider.
+    controller.currentSession.providerId = 'future-provider';
+    const response = controller.status('session-1', 'gemini');
+
+    expect(response).toMatchObject({
+      success: false,
+      ignored: true,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      requestedSessionId: 'session-1',
+      actualSessionId: 'session-1',
+      requestedProviderId: 'gemini',
+      actualProviderId: 'future-provider',
+    });
+  });
+
+  it('does not request provider bootstrap before capture pipelines are ready', async () => {
+    const requestBootstrap = vi.fn().mockResolvedValue({
+      success: true,
+      providerId: 'gemini',
+      targetLanguage: 'fil',
+      bootstrap: { apiKey: 'secret-key' },
+    });
+    const controller = new LiveDubbingController({ requestBootstrap });
+
+    controller.prepare('session-1', 'gemini', 'fil', 0);
+    const first = await controller.requestProviderBootstrap();
 
     expect(first).toEqual({
       success: false,
       error: 'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE',
     });
-    expect(requestCredential).not.toHaveBeenCalled();
+    expect(requestBootstrap).not.toHaveBeenCalled();
+  });
+
+  it('passes bootstrap opaquely to the provider adapter', async () => {
+    const bootstrap = {};
+    Object.defineProperty(bootstrap, 'apiKey', {
+      get() {
+        throw new Error('generic controller must not inspect apiKey');
+      },
+    });
+    const provider = {
+      connect: vi.fn(async options => {
+        expect(options.bootstrap).toBe(bootstrap);
+      }),
+      close: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(new FakeTrack())) },
+      inputPipeline: { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) },
+      outputPlayer: { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() },
+      providerClient: provider,
+      requestBootstrap: vi.fn().mockResolvedValue({
+        success: true,
+        providerId: 'gemini',
+        targetLanguage: 'en',
+        bootstrap,
+      }),
+    });
+
+    controller.prepare('opaque-session', 'gemini', 'en', 0);
+    await controller.consume('opaque-session', 'gemini', 'stream-secret', 1);
+
+    await expect(controller.connectProvider('opaque-session', 'gemini', 'en', 2))
+      .resolves.toMatchObject({ success: true, ack: 'PROVIDER_READY' });
+    expect(provider.connect).toHaveBeenCalledOnce();
+    expect(provider.connect.mock.calls[0][0].bootstrap).toBe(bootstrap);
+    expect(provider.connect.mock.calls[0][0].targetLanguage).toBe('en');
+    await controller.dispose('opaque-session', 'gemini');
   });
 
   it('gates provider setup and input until both pipelines and setup complete', async () => {
@@ -501,14 +577,15 @@ describe('LiveDubbingController', () => {
       close: vi.fn(),
     };
     let providerCallbacks;
-    const requestCredential = vi.fn().mockResolvedValue({
+    const requestBootstrap = vi.fn().mockResolvedValue({
       success: true,
-      apiKey: 'secret-key',
+      providerId: 'gemini',
       targetLanguage: 'fr',
+      bootstrap: { apiKey: 'secret-key' },
     });
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => stream) },
-      requestCredential,
+      requestBootstrap,
       inputPipelineFactory: vi.fn(options => {
         inputPipeline.onFrame = options.onFrame;
         return inputPipeline;
@@ -521,8 +598,8 @@ describe('LiveDubbingController', () => {
     });
     const stream = createStream(track);
 
-    controller.prepare('session-1', 'fr', 0);
-    const captured = await controller.consume('session-1', 'stream-secret', 1);
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    const captured = await controller.consume('session-1', 'gemini', 'stream-secret', 1);
     expect(captured).toMatchObject({
       ack: 'MEDIA_ACQUIRED',
       status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
@@ -536,14 +613,17 @@ describe('LiveDubbingController', () => {
       preSetupDroppedDurationMs: expect.closeTo(0.0625, 5),
     });
 
-    const connected = await controller.connectProvider('session-1', 'fr', 2);
+    const connected = await controller.connectProvider('session-1', 'gemini', 'fr', 2);
     expect(connected).toMatchObject({
         ack: 'PROVIDER_READY',
         status: LIVE_DUBBING_STATUS.RUNNING,
         setupComplete: true,
     });
-    expect(requestCredential).toHaveBeenCalledOnce();
-    expect(provider.connect).toHaveBeenCalledWith('secret-key', 'fr');
+    expect(requestBootstrap).toHaveBeenCalledOnce();
+    expect(provider.connect).toHaveBeenCalledWith({
+      bootstrap: { apiKey: 'secret-key' },
+      targetLanguage: 'fr',
+    });
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     expect(provider.sendAudio).toHaveBeenCalledOnce();
 
@@ -556,7 +636,7 @@ describe('LiveDubbingController', () => {
     providerCallbacks.onInterrupted();
     expect(outputPlayer.resetEpoch).toHaveBeenCalledWith(1);
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
     expect(provider.close).toHaveBeenCalledOnce();
     expect(inputPipeline.stop).toHaveBeenCalledOnce();
     expect(outputPlayer.stop).toHaveBeenCalledOnce();
@@ -602,18 +682,19 @@ describe('LiveDubbingController', () => {
         providerCallbacks = options.callbacks;
         return provider;
       }),
-      requestCredential: vi.fn().mockResolvedValue({
+      requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        apiKey: 'secret-key',
+        providerId: 'gemini',
         targetLanguage: 'en',
+        bootstrap: { apiKey: 'secret-key' },
       }),
       onPlaybackAccepted,
     });
 
-    controller.prepare('session-1', 'en', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
+    controller.prepare('session-1', 'gemini', 'en', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
-    await controller.connectProvider('session-1', 'en', 2);
+    await controller.connectProvider('session-1', 'gemini', 'en', 2);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     providerCallbacks.onAudio(new Uint8Array([1]));
     expect(controller.getTelemetry().milestones.firstTranslatedAudioAcceptedByPlayback).toBeNull();
@@ -650,8 +731,8 @@ describe('LiveDubbingController', () => {
     expect(JSON.stringify(telemetry)).not.toContain('AQ==');
 
     const session = controller.currentSession;
-    await controller.dispose('session-1');
-    expect(session.credentialRequested).toBe(false);
+    await controller.dispose('session-1', 'gemini');
+    expect(session.bootstrapRequested).toBe(false);
     expect(controller.getSnapshot()).toMatchObject({
       active: false,
       status: 'IDLE',
@@ -668,7 +749,7 @@ describe('LiveDubbingController', () => {
     const warn = vi.fn();
     const notify = vi.fn();
     const controller = new LiveDubbingController({ logger: { warn }, notify });
-    controller.prepare('session-1', 'en', 0);
+    controller.prepare('session-1', 'gemini', 'en', 0);
     const session = controller.currentSession;
     session.setupComplete = true;
     session.lastError = 'LIVE_DUBBING_PROVIDER_ERROR';
@@ -717,14 +798,14 @@ describe('LiveDubbingController', () => {
       data: expect.objectContaining({ cleanupDiagnostic: diagnostic }),
     }));
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
 
-    controller.prepare('session-2', 'en', 0);
+    controller.prepare('session-2', 'gemini', 'en', 0);
     const playedSession = controller.currentSession;
     playedSession.setupComplete = true;
     playedSession.telemetry.milestones.setupComplete = 1;
     playedSession.telemetry.milestones.firstTranslatedAudioAcceptedByPlayback = 2;
-    await controller.dispose('session-2');
+    await controller.dispose('session-2', 'gemini');
 
     expect(warn).toHaveBeenCalledOnce();
   });
@@ -754,17 +835,18 @@ describe('LiveDubbingController', () => {
       inputPipeline,
       outputPlayer,
       providerClient: provider,
-      requestCredential: vi.fn().mockResolvedValue({
+      requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        apiKey: 'secret-key',
+        providerId: 'gemini',
         targetLanguage: 'de',
+        bootstrap: { apiKey: 'secret-key' },
       }),
       notify,
     });
 
-    controller.prepare('session-1', 'de', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
-    await controller.connectProvider('session-1', 'de', 2);
+    controller.prepare('session-1', 'gemini', 'de', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'gemini', 'de', 2);
     provider.onError(new Error('provider-secret'));
 
     expect(controller.status()).toMatchObject({
@@ -781,7 +863,7 @@ describe('LiveDubbingController', () => {
     const outputCalls = outputPlayer.enqueuePcm16.mock.calls.length;
     provider.onAudio(new Uint8Array([1]));
     expect(outputPlayer.enqueuePcm16).toHaveBeenCalledTimes(outputCalls);
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 
   it.each([
@@ -801,17 +883,18 @@ describe('LiveDubbingController', () => {
       inputPipeline,
       outputPlayer,
       providerClient: provider,
-      requestCredential: vi.fn().mockResolvedValue({
+      requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        apiKey: 'secret-key',
+        providerId: 'gemini',
         targetLanguage: 'fr',
+        bootstrap: { apiKey: 'secret-key' },
       }),
       notify,
     });
 
-    controller.prepare('session-1', 'fr', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
-    await controller.connectProvider('session-1', 'fr', 2);
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'gemini', 'fr', 2);
     provider.onError(Object.assign(new Error('provider output failure'), {
       code,
       providerReason: reason,
@@ -825,7 +908,7 @@ describe('LiveDubbingController', () => {
       data: expect.objectContaining({ event: reason, error: code }),
     }));
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 
   it('returns and notifies the sanitized diagnostic from failed CONNECT_PROVIDER', async () => {
@@ -856,17 +939,18 @@ describe('LiveDubbingController', () => {
       inputPipeline,
       outputPlayer,
       providerClient: provider,
-      requestCredential: vi.fn().mockResolvedValue({
+      requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        apiKey: 'secret-key',
+        providerId: 'gemini',
         targetLanguage: 'fr',
+        bootstrap: { apiKey: 'secret-key' },
       }),
       notify,
     });
 
-    controller.prepare('session-1', 'fr', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
-    const result = await controller.connectProvider('session-1', 'fr', 2);
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const result = await controller.connectProvider('session-1', 'gemini', 'fr', 2);
     const providerDiagnostic = result.providerDiagnostic;
 
     expect(result).toMatchObject({
@@ -888,7 +972,7 @@ describe('LiveDubbingController', () => {
     expect(JSON.stringify(notify.mock.calls)).not.toContain('provider-body-secret');
     expect(provider.close).toHaveBeenCalledOnce();
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 
   it('preserves GoAway as the terminal provider reason when generic callbacks arrive afterward', async () => {
@@ -912,17 +996,18 @@ describe('LiveDubbingController', () => {
       inputPipeline,
       outputPlayer,
       providerClient: provider,
-      requestCredential: vi.fn().mockResolvedValue({
+      requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        apiKey: 'secret-key',
+        providerId: 'gemini',
         targetLanguage: 'fr',
+        bootstrap: { apiKey: 'secret-key' },
       }),
       notify,
     });
 
-    controller.prepare('session-1', 'fr', 0);
-    await controller.consume('session-1', 'stream-secret', 1);
-    await controller.connectProvider('session-1', 'fr', 2);
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'gemini', 'fr', 2);
 
     provider.onGoAway({ timeLeft: '10s' });
     provider.onError(new Error('late generic provider error'));
@@ -949,6 +1034,6 @@ describe('LiveDubbingController', () => {
     }));
     expect(provider.close).toHaveBeenCalledOnce();
 
-    await controller.dispose('session-1');
+    await controller.dispose('session-1', 'gemini');
   });
 });

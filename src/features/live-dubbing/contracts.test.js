@@ -3,12 +3,13 @@ import {
   createLiveDubbingCleanupDiagnostic,
   createDescriptor,
   createLiveDubbingProviderDiagnostic,
-  createProviderCredentialRequest,
-  createProviderCredentialResponse,
+  createProviderBootstrapRequest,
+  createProviderBootstrapResponse,
   isAuthorizedOffscreenRouterSender,
   isAuthorizedOffscreenSender,
+  isExactSessionResponse,
   isTrustedLiveDubbingUiSender,
-  normalizeLiveGeminiTargetLanguage,
+  normalizeProviderTargetLanguage,
   sanitizeLiveDubbingProviderDiagnostic,
   sanitizeDescriptor,
   sanitizeLiveDubbingCleanupDiagnostic,
@@ -45,7 +46,7 @@ describe('live dubbing Stage 2 contracts', () => {
     ['zh-tw', 'zh-Hant'],
     ['fil', 'fil'],
   ])('maps supported Gemini language %s to %s', (input, expected) => {
-    expect(normalizeLiveGeminiTargetLanguage(input)).toBe(expected);
+    expect(normalizeProviderTargetLanguage('gemini', input)).toBe(expected);
   });
 
   it.each([
@@ -57,16 +58,18 @@ describe('live dubbing Stage 2 contracts', () => {
       expect(() => createDescriptor({
         sessionId: 'session-1',
         tabId: 1,
+        providerId: 'gemini',
         targetLanguage: language,
         startedAt: 1,
       })).toThrow('Unsupported target language');
     },
   );
 
-  it('keeps public descriptors free of internal capture and credential fields', () => {
+  it('keeps public descriptors free of internal capture and bootstrap fields', () => {
     const descriptor = sanitizeDescriptor({
       sessionId: 'session-1',
       tabId: 1,
+      providerId: 'gemini',
       targetLanguage: 'zh-cn',
       status: LIVE_DUBBING_STATUS.RUNNING,
       startedAt: 1,
@@ -79,12 +82,25 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(descriptor).toEqual({
       sessionId: 'session-1',
       tabId: 1,
+      providerId: 'gemini',
       targetLanguage: 'zh-Hans',
       status: LIVE_DUBBING_STATUS.RUNNING,
       startedAt: 1,
       lastError: null,
       eventSequence: 1,
     });
+  });
+
+  it('rejects persisted descriptors without an explicit provider identity', () => {
+    expect(sanitizeDescriptor({
+      sessionId: 'session-1',
+      tabId: 1,
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 1,
+    })).toBeNull();
   });
 
   it('redacts provider diagnostics to the exact flat scalar DTO', () => {
@@ -257,7 +273,7 @@ describe('live dubbing Stage 2 contracts', () => {
     }, browserAPI)).toBe(true);
   });
 
-  it('rejects credential-capable Offscreen senders when sender.url is missing', () => {
+  it('rejects bootstrap-capable Offscreen senders when sender.url is missing', () => {
     expect(isAuthorizedOffscreenSender({ id: 'extension-id' }, browserAPI)).toBe(false);
   });
 
@@ -362,24 +378,37 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(isTrustedLiveDubbingUiSender(undefined, browserAPI)).toBe(false);
   });
 
-  it('creates a one-time credential DTO without session metadata in the response', () => {
-    expect(createProviderCredentialRequest({
+  it('creates a one-time provider bootstrap DTO with explicit identity', () => {
+    expect(createProviderBootstrapRequest({
       sessionId: 'session-1',
+      providerId: 'gemini',
       targetLanguage: 'fil',
       eventSequence: 1,
     })).toEqual({
-      action: 'LIVE_DUBBING_REQUEST_PROVIDER_CREDENTIAL',
+      action: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
       data: {
         sessionId: 'session-1',
+        providerId: 'gemini',
         targetLanguage: 'fil',
         eventSequence: 1,
       },
     });
-    expect(createProviderCredentialResponse('secret-key', 'fil')).toEqual({
+    const bootstrap = { apiKey: 'secret-key' };
+    expect(createProviderBootstrapResponse('gemini', 'fil', bootstrap)).toEqual({
       success: true,
-      apiKey: 'secret-key',
+      providerId: 'gemini',
       targetLanguage: 'fil',
+      bootstrap,
     });
+  });
+
+  it('requires exact session and provider identity on internal responses', () => {
+    const response = { success: true, sessionId: 'session-1', providerId: 'gemini' };
+
+    expect(isExactSessionResponse(response, 'session-1', 'gemini')).toBe(true);
+    expect(isExactSessionResponse({ ...response, providerId: 'other' }, 'session-1', 'gemini')).toBe(false);
+    expect(isExactSessionResponse({ sessionId: 'session-1' }, 'session-1', 'gemini')).toBe(false);
+    expect(isExactSessionResponse(response, 'session-2', 'gemini')).toBe(false);
   });
 
   it('exposes the required operation timeout contract', () => {

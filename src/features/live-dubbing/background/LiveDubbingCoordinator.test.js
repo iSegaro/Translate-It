@@ -11,7 +11,9 @@ import {
 } from '../constants.js';
 
 function createHarness({ stored = null, streamId = 'stream-secret', statusResponse, documentExists } = {}) {
-  const storage = new Map(stored ? [[LIVE_DUBBING_STORAGE_KEY, stored]] : []);
+  const storage = new Map(stored
+    ? [[LIVE_DUBBING_STORAGE_KEY, { providerId: 'gemini', ...stored }]]
+    : []);
   const calls = [];
   const logger = { warn: vi.fn() };
   const manager = {
@@ -37,6 +39,7 @@ function createHarness({ stored = null, streamId = 'stream-secret', statusRespon
         success: true,
         ack: 'READY',
         sessionId: message.data.sessionId,
+        providerId: message.data.providerId,
         eventSequence: message.data.eventSequence,
       };
     }
@@ -45,6 +48,7 @@ function createHarness({ stored = null, streamId = 'stream-secret', statusRespon
         success: true,
         ack: 'MEDIA_ACQUIRED',
         sessionId: message.data.sessionId,
+        providerId: message.data.providerId,
         status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
         eventSequence: message.data.eventSequence,
         captureReady: true,
@@ -57,6 +61,7 @@ function createHarness({ stored = null, streamId = 'stream-secret', statusRespon
         success: true,
         ack: 'PROVIDER_READY',
         sessionId: message.data.sessionId,
+        providerId: message.data.providerId,
         status: LIVE_DUBBING_STATUS.RUNNING,
         eventSequence: message.data.eventSequence + 1,
         captureReady: true,
@@ -66,10 +71,17 @@ function createHarness({ stored = null, streamId = 'stream-secret', statusRespon
       };
     }
     if (message.action === 'LIVE_DUBBING_DISPOSE') {
-      return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId };
+      return {
+        success: true,
+        ack: 'DISPOSED',
+        sessionId: message.data.sessionId,
+        providerId: message.data.providerId,
+      };
     }
     if (message.action === 'LIVE_DUBBING_STATUS') {
-      return statusResponse || { success: true, active: false, sessionId: message.data.sessionId };
+      return statusResponse
+        ? { providerId: message.data.providerId, ...statusResponse }
+        : { success: true, active: false, sessionId: message.data.sessionId, providerId: message.data.providerId };
     }
     return { success: true };
   });
@@ -489,6 +501,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'READY',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           eventSequence: message.data.eventSequence,
         };
       }
@@ -497,6 +510,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'MEDIA_ACQUIRED',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
           eventSequence: message.data.eventSequence,
           captureReady: true,
@@ -508,7 +522,12 @@ describe('LiveDubbingCoordinator', () => {
         return new Promise(resolve => { resolveProvider = resolve; });
       }
       if (message.action === 'LIVE_DUBBING_DISPOSE') {
-        return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId };
+        return {
+          success: true,
+          ack: 'DISPOSED',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+        };
       }
       return { success: true };
     });
@@ -525,6 +544,7 @@ describe('LiveDubbingCoordinator', () => {
       success: true,
       ack: 'PROVIDER_READY',
       sessionId: 'session-1',
+      providerId: 'gemini',
       status: LIVE_DUBBING_STATUS.RUNNING,
       eventSequence: 3,
       captureReady: true,
@@ -581,10 +601,11 @@ describe('LiveDubbingCoordinator', () => {
       inputPipeline,
       outputPlayer,
       providerClient: provider,
-      requestCredential: vi.fn().mockResolvedValue({
+      requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        apiKey: 'secret-key',
+        providerId: 'gemini',
         targetLanguage: 'en',
+        bootstrap: { apiKey: 'secret-key' },
       }),
       notify: vi.fn(),
     });
@@ -635,6 +656,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'READY',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           eventSequence: message.data.eventSequence,
         };
       }
@@ -643,6 +665,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'MEDIA_ACQUIRED',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
           eventSequence: message.data.eventSequence,
           captureReady: true,
@@ -654,7 +677,12 @@ describe('LiveDubbingCoordinator', () => {
         return new Promise(resolve => { resolveProvider = resolve; });
       }
       if (message.action === 'LIVE_DUBBING_DISPOSE') {
-        return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId };
+        return {
+          success: true,
+          ack: 'DISPOSED',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+        };
       }
       return { success: true };
     });
@@ -665,6 +693,7 @@ describe('LiveDubbingCoordinator', () => {
     const terminal = harness.coordinator.handleOffscreenTerminal({
       data: {
         sessionId: 'session-1',
+        providerId: 'gemini',
         eventSequence: 1,
         event: 'TRACK_ENDED',
         providerDiagnostic: {
@@ -688,6 +717,7 @@ describe('LiveDubbingCoordinator', () => {
       success: true,
       ack: 'PROVIDER_READY',
       sessionId: 'session-1',
+      providerId: 'gemini',
       status: LIVE_DUBBING_STATUS.RUNNING,
       eventSequence: 3,
       captureReady: true,
@@ -737,6 +767,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'READY',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           eventSequence: message.data.eventSequence,
         };
       }
@@ -745,6 +776,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'MEDIA_ACQUIRED',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
           eventSequence: message.data.eventSequence,
           captureReady: true,
@@ -756,7 +788,12 @@ describe('LiveDubbingCoordinator', () => {
         return new Promise(resolve => { resolveProvider = resolve; });
       }
       if (message.action === 'LIVE_DUBBING_DISPOSE') {
-        return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId };
+        return {
+          success: true,
+          ack: 'DISPOSED',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+        };
       }
       return { success: true };
     });
@@ -765,7 +802,7 @@ describe('LiveDubbingCoordinator', () => {
     while (!resolveProvider) await Promise.resolve();
 
     const terminalPromise = harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', eventSequence: 3, event: 'TRACK_ENDED' },
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 3, event: 'TRACK_ENDED' },
     }, {
       id: 'extension-id',
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
@@ -774,6 +811,7 @@ describe('LiveDubbingCoordinator', () => {
       success: true,
       ack: 'PROVIDER_READY',
       sessionId: 'session-1',
+      providerId: 'gemini',
       status: LIVE_DUBBING_STATUS.RUNNING,
       eventSequence: 3,
       captureReady: true,
@@ -792,7 +830,7 @@ describe('LiveDubbingCoordinator', () => {
       .not.toBe(LIVE_DUBBING_STATUS.RUNNING);
   });
 
-  it('services the credential request during provider setup without transition deadlock', async () => {
+  it('services the bootstrap request during provider setup without transition deadlock', async () => {
     const harness = createHarness();
     const sender = {
       id: 'extension-id',
@@ -812,7 +850,7 @@ describe('LiveDubbingCoordinator', () => {
       clear: vi.fn(),
     };
     const providerClient = { connect: vi.fn(async () => {}) };
-    let credentialRequest;
+    let bootstrapRequest;
     const offscreen = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => ({
         getAudioTracks: () => [track],
@@ -821,11 +859,16 @@ describe('LiveDubbingCoordinator', () => {
       inputPipelineFactory: vi.fn(async () => inputPipeline),
       outputPlayerFactory: vi.fn(async () => outputPlayer),
       providerClient,
-      requestCredential: request => {
-        credentialRequest = request;
-        return harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'credential' })
+      requestBootstrap: request => {
+        bootstrapRequest = request;
+        return harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' })
           .then(descriptor => descriptor
-            ? { success: true, apiKey: 'handler-secret', targetLanguage: descriptor.targetLanguage }
+            ? {
+              success: true,
+              providerId: descriptor.providerId,
+              targetLanguage: descriptor.targetLanguage,
+              bootstrap: { apiKey: 'handler-secret' },
+            }
             : { success: false });
       },
     });
@@ -837,13 +880,17 @@ describe('LiveDubbingCoordinator', () => {
     const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
 
     expect(result).toMatchObject({ success: true, status: { status: LIVE_DUBBING_STATUS.RUNNING } });
-    expect(credentialRequest).toMatchObject({
-      data: { sessionId: 'session-1', targetLanguage: 'en', eventSequence: 2 },
+    expect(bootstrapRequest).toMatchObject({
+      action: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
     });
-    expect(providerClient.connect).toHaveBeenCalledWith('handler-secret', 'en');
+    expect(providerClient.connect).toHaveBeenCalledWith({
+      bootstrap: { apiKey: 'handler-secret' },
+      targetLanguage: 'en',
+    });
   });
 
-  it('rejects stale and stop-fenced credential requests without claiming transition ownership', async () => {
+  it('rejects stale and stop-fenced bootstrap requests without claiming transition ownership', async () => {
     const harness = createHarness();
     let resolveProvider;
     harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
@@ -853,6 +900,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'READY',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           eventSequence: message.data.eventSequence,
         };
       }
@@ -861,6 +909,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'MEDIA_ACQUIRED',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
           eventSequence: message.data.eventSequence,
           captureReady: true,
@@ -872,7 +921,12 @@ describe('LiveDubbingCoordinator', () => {
         return new Promise(resolve => { resolveProvider = resolve; });
       }
       if (message.action === 'LIVE_DUBBING_DISPOSE') {
-        return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId };
+        return {
+          success: true,
+          ack: 'DISPOSED',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+        };
       }
       return { success: true };
     });
@@ -885,34 +939,37 @@ describe('LiveDubbingCoordinator', () => {
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
     };
     const staleRequest = {
-      data: { sessionId: 'stale-session', targetLanguage: 'en', eventSequence: 2 },
+      action: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
+      data: { sessionId: 'stale-session', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
     };
     const transition = harness.coordinator.transition;
     await expect(harness.coordinator.authorizeOffscreenControlMessage(
       staleRequest,
       sender,
-      { type: 'credential' },
+      { type: 'bootstrap' },
     )).resolves.toBeNull();
     expect(harness.coordinator.transition).toBe(transition);
 
     const request = {
-      data: { sessionId: 'session-1', targetLanguage: 'en', eventSequence: 2 },
+      action: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
     };
     const authorized = await harness.coordinator.authorizeOffscreenControlMessage(
       request,
       sender,
-      { type: 'credential' },
+      { type: 'bootstrap' },
     );
     expect(authorized).toMatchObject({ sessionId: 'session-1', status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER });
 
-    await expect(harness.coordinator.stop({ data: { sessionId: 'session-1' } }))
-      .resolves.toMatchObject({ success: true, stopped: true });
-    expect(harness.coordinator.isCredentialRequestStillAuthorized(authorized)).toBe(false);
+    const stopResult = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    expect(stopResult).toEqual({ success: true, stopped: true, status: null, reason: 'STOP_REQUESTED' });
+    expect(harness.coordinator.isBootstrapRequestStillAuthorized(authorized)).toBe(false);
 
     resolveProvider({
       success: true,
       ack: 'PROVIDER_READY',
       sessionId: 'session-1',
+      providerId: 'gemini',
       status: LIVE_DUBBING_STATUS.RUNNING,
       eventSequence: 3,
       captureReady: true,
@@ -946,6 +1003,7 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           ack: 'READY',
           sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
           eventSequence: message.data.eventSequence,
         };
       }
@@ -953,7 +1011,13 @@ describe('LiveDubbingCoordinator', () => {
         return new Promise(resolve => { resolveConsume = resolve; });
       }
       if (message.action === 'LIVE_DUBBING_DISPOSE') {
-        return { success: true, ack: 'DISPOSED', disposed: true, sessionId: message.data.sessionId };
+        return {
+          success: true,
+          ack: 'DISPOSED',
+          disposed: true,
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+        };
       }
       return { success: true };
     });
@@ -969,6 +1033,7 @@ describe('LiveDubbingCoordinator', () => {
       success: true,
       ack: 'MEDIA_ACQUIRED',
       sessionId: 'session-1',
+      providerId: 'gemini',
     });
     await expect(startPromise).resolves.toMatchObject({
       success: false,
@@ -986,7 +1051,7 @@ describe('LiveDubbingCoordinator', () => {
     await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
 
     const result = await harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', event: 'TRACK_ENDED' },
+      data: { sessionId: 'session-1', providerId: 'gemini', event: 'TRACK_ENDED' },
     });
 
     expect(result).toMatchObject({ success: true, stopped: true });
@@ -1001,6 +1066,7 @@ describe('LiveDubbingCoordinator', () => {
     const result = await harness.coordinator.handleOffscreenTerminal({
       data: {
         sessionId: 'session-1',
+        providerId: 'gemini',
         event: 'PROVIDER_ERROR',
         cleanupDiagnostic: {
           cleanupCause: 'LIVE_DUBBING_PROVIDER_ERROR',
@@ -1070,6 +1136,7 @@ describe('LiveDubbingCoordinator', () => {
     const result = await harness.coordinator.handleOffscreenTerminal({
       data: {
         sessionId: 'session-1',
+        providerId: 'gemini',
         event: 'PROVIDER_ERROR',
         providerDiagnostic,
         cleanupDiagnostic: {
@@ -1120,7 +1187,7 @@ describe('LiveDubbingCoordinator', () => {
     const wrongSenderHarness = createHarness();
     await wrongSenderHarness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     await wrongSenderHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', providerDiagnostic: diagnostic },
+      data: { sessionId: 'session-1', providerId: 'gemini', providerDiagnostic: diagnostic },
     }, { ...sender, tab: { id: 42 } });
     expect(wrongSenderHarness.coordinator.sessionStates.get('session-1').providerDiagnostic)
       .toBeNull();
@@ -1140,7 +1207,7 @@ describe('LiveDubbingCoordinator', () => {
     const stopForSession = vi.spyOn(senderlessHarness.coordinator, '_stopForSession')
       .mockResolvedValue({ success: true, stopped: true });
     await senderlessHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', providerDiagnostic: diagnostic },
+      data: { sessionId: 'session-1', providerId: 'gemini', providerDiagnostic: diagnostic },
     });
     expect(stopForSession).toHaveBeenCalledOnce();
     expect(senderlessHarness.coordinator.sessionStates.get('session-1').providerDiagnostic)
@@ -1156,7 +1223,7 @@ describe('LiveDubbingCoordinator', () => {
       stopped: true,
     });
     await invalidHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', providerDiagnostic: new Error('provider-body-secret') },
+      data: { sessionId: 'session-1', providerId: 'gemini', providerDiagnostic: new Error('provider-body-secret') },
     }, sender);
     expect(firstDiagnostic.providerDiagnostic).toMatchObject({
       code: 'GEMINI_LIVE_MALFORMED_MESSAGE',
@@ -1187,10 +1254,10 @@ describe('LiveDubbingCoordinator', () => {
       .mockImplementation(() => new Promise(resolve => { resolveStop = resolve; }));
 
     const firstTerminal = harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', providerDiagnostic: first },
+      data: { sessionId: 'session-1', providerId: 'gemini', providerDiagnostic: first },
     }, sender);
     await expect(harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', providerDiagnostic: later },
+      data: { sessionId: 'session-1', providerId: 'gemini', providerDiagnostic: later },
     }, sender)).resolves.toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_UNAUTHORIZED',
@@ -1230,7 +1297,7 @@ describe('LiveDubbingCoordinator', () => {
     const wrongSenderHarness = createHarness();
     await wrongSenderHarness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     await expect(wrongSenderHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', cleanupDiagnostic: summary },
+      data: { sessionId: 'session-1', providerId: 'gemini', cleanupDiagnostic: summary },
     }, { ...sender, tab: { id: 42 } })).resolves.toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_UNAUTHORIZED',
@@ -1250,10 +1317,10 @@ describe('LiveDubbingCoordinator', () => {
     const duplicateHarness = createHarness();
     await duplicateHarness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     await duplicateHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', cleanupDiagnostic: { ...summary, playbackAccepted: true } },
+      data: { sessionId: 'session-1', providerId: 'gemini', cleanupDiagnostic: { ...summary, playbackAccepted: true } },
     }, sender);
     await expect(duplicateHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', cleanupDiagnostic: summary },
+      data: { sessionId: 'session-1', providerId: 'gemini', cleanupDiagnostic: summary },
     }, sender)).resolves.toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_UNAUTHORIZED',
@@ -1263,7 +1330,7 @@ describe('LiveDubbingCoordinator', () => {
     const senderlessHarness = createHarness();
     await senderlessHarness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     await senderlessHarness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', cleanupDiagnostic: summary },
+      data: { sessionId: 'session-1', providerId: 'gemini', cleanupDiagnostic: summary },
     });
     expect(senderlessHarness.logger.warn).not.toHaveBeenCalled();
   });
@@ -1277,13 +1344,13 @@ describe('LiveDubbingCoordinator', () => {
     };
 
     await expect(harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', eventSequence: 3, event: 'TRACK_ENDED' },
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 3, event: 'TRACK_ENDED' },
     }, sender)).resolves.toMatchObject({
       success: true,
       stopped: true,
     });
     await expect(harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: 'session-1', eventSequence: 0, event: 'TRACK_ENDED' },
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0, event: 'TRACK_ENDED' },
     }, { ...sender, tab: { id: 42 } })).resolves.toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_UNAUTHORIZED',
@@ -1297,7 +1364,7 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.manager.release).toHaveBeenCalledOnce();
   });
 
-  it('authorizes one credential request only for the exact connecting session event', async () => {
+  it('authorizes one bootstrap request only for the exact connecting session event', async () => {
     const harness = createHarness();
     const started = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     const connecting = harness.coordinator._advance(
@@ -1315,9 +1382,10 @@ describe('LiveDubbingCoordinator', () => {
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
     };
     const request = {
-      action: 'LIVE_DUBBING_REQUEST_PROVIDER_CREDENTIAL',
+      action: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
       data: {
         sessionId: started.status.sessionId,
+        providerId: 'gemini',
         targetLanguage: 'en',
         eventSequence: connecting.eventSequence,
       },
@@ -1326,17 +1394,17 @@ describe('LiveDubbingCoordinator', () => {
     await expect(harness.coordinator.authorizeOffscreenControlMessage(
       request,
       sender,
-      { type: 'credential' },
+      { type: 'bootstrap' },
     )).resolves.toMatchObject({ sessionId: 'session-1', status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER });
     await expect(harness.coordinator.authorizeOffscreenControlMessage(
       request,
       sender,
-      { type: 'credential' },
+      { type: 'bootstrap' },
     )).resolves.toBeNull();
     expect(JSON.stringify(harness.storage.get(LIVE_DUBBING_STORAGE_KEY))).not.toContain('secret');
   });
 
-  it('clears credential request ownership across terminal cleanup and a repeated session', async () => {
+  it('clears bootstrap request ownership across terminal cleanup and a repeated session', async () => {
     const harness = createHarness();
     const sender = {
       id: 'extension-id',
@@ -1357,31 +1425,31 @@ describe('LiveDubbingCoordinator', () => {
       harness.coordinator.sessionStates.get(current.sessionId).descriptor = connecting;
       return connecting;
     };
-    const credentialRequest = eventSequence => ({
-      action: 'LIVE_DUBBING_REQUEST_PROVIDER_CREDENTIAL',
-      data: { sessionId: 'session-1', targetLanguage: 'en', eventSequence },
+    const bootstrapRequest = eventSequence => ({
+      action: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence },
     });
 
     const first = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     const firstConnecting = await stageConnecting();
     await expect(harness.coordinator.authorizeOffscreenControlMessage(
-      credentialRequest(firstConnecting.eventSequence),
+      bootstrapRequest(firstConnecting.eventSequence),
       sender,
-      { type: 'credential' },
+      { type: 'bootstrap' },
     )).resolves.toMatchObject({ sessionId: 'session-1' });
-    expect(harness.coordinator.credentialRequestSessions.has('session-1')).toBe(true);
+    expect(harness.coordinator.bootstrapRequestSessions.has('session-1')).toBe(true);
 
     await expect(harness.coordinator.handleOffscreenTerminal({
-      data: { sessionId: first.status.sessionId, eventSequence: 0, event: 'TRACK_ENDED' },
+      data: { sessionId: first.status.sessionId, providerId: 'gemini', eventSequence: 0, event: 'TRACK_ENDED' },
     }, sender)).resolves.toMatchObject({ success: true, stopped: true });
-    expect(harness.coordinator.credentialRequestSessions.has('session-1')).toBe(false);
+    expect(harness.coordinator.bootstrapRequestSessions.has('session-1')).toBe(false);
 
     const second = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
     const secondConnecting = await stageConnecting();
     await expect(harness.coordinator.authorizeOffscreenControlMessage(
-      credentialRequest(secondConnecting.eventSequence),
+      bootstrapRequest(secondConnecting.eventSequence),
       sender,
-      { type: 'credential' },
+      { type: 'bootstrap' },
     )).resolves.toMatchObject({ sessionId: second.status.sessionId });
   });
 
@@ -1408,6 +1476,35 @@ describe('LiveDubbingCoordinator', () => {
     expect(result).toMatchObject({ success: true, stale: true, status: null });
     expect(actions).toEqual(['LIVE_DUBBING_STATUS', 'LIVE_DUBBING_DISPOSE']);
     expect(harness.manager.release).toHaveBeenCalledWith({ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' });
+  });
+
+  it('ignores a status response from a different provider identity', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'old-session',
+      tabId: 42,
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 2,
+    }, statusResponse: {
+      success: true,
+      active: true,
+      sessionId: 'old-session',
+      providerId: 'other-provider',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+    } });
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      retryable: true,
+      isolated: true,
+    });
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).toHaveBeenCalledOnce();
   });
 
   it('cleans up PREPARING_CAPTURE descriptor when status has no recoverable state', async () => {
@@ -1484,8 +1581,8 @@ describe('LiveDubbingCoordinator', () => {
         getTracks: () => [track],
       })) },
     });
-    offscreen.prepare('old-session', 'en', 0);
-    await offscreen.consume('old-session', 'stream-secret', 1);
+    offscreen.prepare('old-session', 'gemini', 'en', 0);
+    await offscreen.consume('old-session', 'gemini', 'stream-secret', 1);
 
     const harness = createHarness({ stored: {
       sessionId: 'old-session',
@@ -1683,13 +1780,14 @@ describe('LiveDubbingCoordinator', () => {
           success: true,
           active: false,
           sessionId: 'old-session',
+          providerId: 'gemini',
           status: 'ERROR',
         };
       })
       .mockImplementationOnce(async message => {
         harness.calls.push(['message', message]);
         expect(message.action).toBe('LIVE_DUBBING_DISPOSE');
-        return { success: false, sessionId: 'old-session' };
+        return { success: false, sessionId: 'old-session', providerId: 'gemini' };
       });
 
     const failed = await harness.coordinator.reconcile();
@@ -1768,6 +1866,64 @@ describe('LiveDubbingCoordinator', () => {
     });
   });
 
+  it('isolates reconciliation when offscreen owns a different session (real controller status)', async () => {
+    const stored = {
+      sessionId: 'session-A',
+      tabId: 42,
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 2,
+    };
+    // Offscreen currently owns session B. The status query for A must return
+    // the real controller mismatch shape, not a hand-mocked status object.
+    const offscreen = new LiveDubbingController();
+    offscreen.prepare('session-B', 'gemini', 'en', 0);
+
+    const harness = createHarness({ stored });
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'session-A' }];
+    const dispose = vi.spyOn(harness.coordinator, '_disposeAndRelease');
+    harness.browserAPI.runtime.sendMessage.mockImplementation(message => {
+      harness.calls.push(['message', message]);
+      return offscreen.handle(message);
+    });
+
+    // Prove the real controller response carries explicit session + provider proof.
+    const direct = offscreen.status('session-A', 'gemini');
+    expect(direct).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      ignored: true,
+      sessionId: 'session-A',
+      providerId: 'gemini',
+      requestedSessionId: 'session-A',
+      actualSessionId: 'session-B',
+      requestedProviderId: 'gemini',
+      actualProviderId: 'gemini',
+    });
+
+    const result = await harness.coordinator.reconcile();
+    const actions = harness.browserAPI.runtime.sendMessage.mock.calls
+      .map(([message]) => message.action);
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      recovered: false,
+      isolated: true,
+      retryable: true,
+      status: { sessionId: 'session-A' },
+    });
+    expect(actions).toEqual(['LIVE_DUBBING_STATUS']);
+    expect(dispose).not.toHaveBeenCalled();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'session-A',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+    });
+  });
+
   it('does not let stale terminal cleanup clear a newer session descriptor', async () => {
     const harness = createHarness();
     await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
@@ -1788,6 +1944,7 @@ describe('LiveDubbingCoordinator', () => {
       [LIVE_DUBBING_STORAGE_KEY]: {
         sessionId: 'new-session',
         tabId: 84,
+        providerId: 'gemini',
         targetLanguage: 'de',
         status: LIVE_DUBBING_STATUS.RUNNING,
         startedAt: 2,
@@ -1799,6 +1956,7 @@ describe('LiveDubbingCoordinator', () => {
       success: true,
       ack: 'DISPOSED',
       sessionId: 'session-1',
+      providerId: 'gemini',
     });
 
     const result = await stopPromise;
@@ -1818,6 +1976,7 @@ describe('LiveDubbingCoordinator', () => {
       success: true,
       active: false,
       sessionId: 'orphan-session',
+      providerId: 'gemini',
     } });
     harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'orphan-session' }];
 

@@ -104,12 +104,12 @@ export async function handleLiveDubbingGetStatusLazy(message, sender) {
     }
 }
 
-export async function handleLiveDubbingCredentialRequestLazy(message, sender) {
+export async function handleLiveDubbingBootstrapRequestLazy(message, sender) {
     try {
-        const { handleLiveDubbingCredentialRequest } = await import('@/features/live-dubbing/background/handlers.js');
-        return handleLiveDubbingCredentialRequest(message, sender);
+        const { handleLiveDubbingBootstrapRequest } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingBootstrapRequest(message, sender);
     } catch (error) {
-        logger.error('Failed to load Live Dubbing credential handler:', error);
+        logger.error('Failed to load Live Dubbing bootstrap handler:', error);
         return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
     }
 }

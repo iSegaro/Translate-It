@@ -1,6 +1,7 @@
 import {
   LIVE_DUBBING_ACTIONS,
   LIVE_DUBBING_CAPTURE_STAGES,
+  LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STATUS,
 } from './constants.js';
 
@@ -50,7 +51,7 @@ const supportedCleanupCauses = new Set([
   'LIVE_DUBBING_OUTPUT_PIPELINE_ERROR',
   'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
   'LIVE_DUBBING_PROVIDER_CLOSED',
-  'LIVE_DUBBING_PROVIDER_CREDENTIAL_UNAVAILABLE',
+  'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
   'LIVE_DUBBING_PROVIDER_ERROR',
   'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
   'LIVE_DUBBING_PROVIDER_UNAVAILABLE',
@@ -149,8 +150,6 @@ export const LIVE_GEMINI_LANGUAGE_MAP = Object.freeze({
   'zh-hans': 'zh-Hans',
   'zh-hant': 'zh-Hant',
 });
-
-export const LIVE_GEMINI_TARGET_LANGUAGE_MAP = LIVE_GEMINI_LANGUAGE_MAP;
 
 const trustedUiPaths = Object.freeze([
   'src/html/popup.html',
@@ -417,11 +416,14 @@ function hasMatchingSessionField(response, field, sessionId) {
 
 /**
  * Require every session identity supplied by an internal response to agree.
- * Missing optional identity fields remain compatible with older acknowledgements.
+ * Session-bound acknowledgements must carry the current session and provider
+ * identities. Optional requested/actual session fields remain diagnostic-only.
  */
-export function isExactSessionResponse(response, sessionId) {
+export function isExactSessionResponse(response, sessionId, providerId) {
   return Boolean(response
+    && providerId === LIVE_DUBBING_PROVIDER_ID
     && response.sessionId === sessionId
+    && response.providerId === providerId
     && hasMatchingSessionField(response, 'requestedSessionId', sessionId)
     && hasMatchingSessionField(response, 'actualSessionId', sessionId));
 }
@@ -467,21 +469,24 @@ export function isTrustedLiveDubbingUiSender(sender, browserAPI) {
 export function hasExactSessionEvent(message, descriptor) {
   const data = message?.data || message || {};
   return Boolean(descriptor
+    && descriptor.providerId === LIVE_DUBBING_PROVIDER_ID
     && data.sessionId === descriptor.sessionId
+    && data.providerId === descriptor.providerId
     && Number.isInteger(data.eventSequence)
     && data.eventSequence === descriptor.eventSequence);
 }
 
 /**
- * Normalize and validate target language without loading language data.
+ * Normalize and validate a provider target language without loading language
+ * data. Unknown providers and languages fail closed.
+ * @param {unknown} providerId
  * @param {unknown} language
  * @returns {string}
  */
-export function normalizeTargetLanguage(language) {
-  return normalizeLiveGeminiTargetLanguage(language);
-}
-
-export function normalizeLiveGeminiTargetLanguage(language) {
+export function normalizeProviderTargetLanguage(providerId, language) {
+  if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+    throw new RangeError('Unsupported live dubbing provider');
+  }
   if (typeof language !== 'string' || !language.trim()) {
     throw new TypeError('targetLanguage is required');
   }
@@ -496,14 +501,6 @@ export function normalizeLiveGeminiTargetLanguage(language) {
   return exact;
 }
 
-export function mapLiveGeminiLanguage(language) {
-  try {
-    return normalizeLiveGeminiTargetLanguage(language);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Keep storage records limited to the public control-plane descriptor.
  * @param {unknown} value
@@ -516,10 +513,13 @@ export function sanitizeDescriptor(value) {
     ? value.sessionId.trim()
     : null;
   const tabId = Number.isInteger(value.tabId) && value.tabId >= 0 ? value.tabId : null;
+  const providerId = value.providerId === LIVE_DUBBING_PROVIDER_ID
+    ? value.providerId
+    : null;
   let targetLanguage = null;
-  if (typeof value.targetLanguage === 'string') {
+  if (providerId && typeof value.targetLanguage === 'string') {
     try {
-      targetLanguage = normalizeTargetLanguage(value.targetLanguage);
+      targetLanguage = normalizeProviderTargetLanguage(providerId, value.targetLanguage);
     } catch {
       targetLanguage = null;
     }
@@ -535,7 +535,7 @@ export function sanitizeDescriptor(value) {
       ? value.lastError.trim() ? sanitizeDiagnosticMessage(value.lastError) : ''
       : null;
 
-  if (!sessionId || tabId === null || !targetLanguage || !status
+  if (!sessionId || tabId === null || !providerId || !targetLanguage || !status
     || startedAt === null || eventSequence === null) {
     return null;
   }
@@ -543,6 +543,7 @@ export function sanitizeDescriptor(value) {
   return {
     sessionId,
     tabId,
+    providerId,
     targetLanguage,
     status,
     startedAt,
@@ -552,13 +553,14 @@ export function sanitizeDescriptor(value) {
 }
 
 /**
- * Create descriptor with no transport or credential fields.
+ * Create descriptor with no transport or provider bootstrap fields.
  */
-export function createDescriptor({ sessionId, tabId, targetLanguage, startedAt }) {
+export function createDescriptor({ sessionId, tabId, providerId, targetLanguage, startedAt }) {
   return {
     sessionId,
     tabId,
-    targetLanguage: normalizeTargetLanguage(targetLanguage),
+    providerId,
+    targetLanguage: normalizeProviderTargetLanguage(providerId, targetLanguage),
     status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
     startedAt,
     lastError: null,
@@ -577,6 +579,7 @@ function baseOffscreenMessage(action, descriptor) {
     data: {
       sessionId: descriptor.sessionId,
       tabId: descriptor.tabId,
+      providerId: descriptor.providerId,
       targetLanguage: descriptor.targetLanguage,
       eventSequence: descriptor.eventSequence,
     },
@@ -597,6 +600,7 @@ export function createConsumeMessage(descriptor, streamId) {
     data: {
       sessionId: descriptor.sessionId,
       tabId: descriptor.tabId,
+      providerId: descriptor.providerId,
       targetLanguage: descriptor.targetLanguage,
       eventSequence: descriptor.eventSequence,
       streamId,
@@ -607,8 +611,6 @@ export function createConsumeMessage(descriptor, streamId) {
 export function createProviderConnectMessage(descriptor) {
   return baseOffscreenMessage(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER, descriptor);
 }
-
-export const createConnectProviderMessage = createProviderConnectMessage;
 
 export function createDisposeMessage(descriptor) {
   return baseOffscreenMessage(LIVE_DUBBING_ACTIONS.DISPOSE, descriptor);
@@ -634,76 +636,102 @@ export function isAcknowledged(response, acknowledgement) {
     || (acknowledgement === 'DISPOSED' && response.disposed === true);
 }
 
-export function isAcknowledgedForSession(response, acknowledgement, sessionId) {
+export function isAcknowledgedForSession(response, acknowledgement, sessionId, providerId) {
   return isAcknowledged(response, acknowledgement)
-    && isExactSessionResponse(response, sessionId);
+    && isExactSessionResponse(response, sessionId, providerId);
 }
 
 /**
  * Build a session-scoped offscreen request when descriptor metadata is absent.
  */
-export function createSessionMessage(action, sessionId) {
+export function createSessionMessage(action, sessionId, providerId) {
   if (typeof sessionId !== 'string' || !sessionId.trim()) {
     throw new TypeError('sessionId is required for offscreen messaging');
+  }
+  if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+    throw new TypeError('providerId is required for offscreen messaging');
   }
 
   return {
     target: 'offscreen',
     action,
-    data: { sessionId },
+    data: { sessionId, providerId },
   };
 }
 
 /**
- * Build the one-time offscreen credential request. Credentials are never
- * placed in a broadcast action or in a session descriptor.
+ * Build the one-time offscreen provider bootstrap request. Bootstrap data is
+ * never placed in a broadcast action or in a session descriptor.
  */
-export function createProviderCredentialRequest({ sessionId, targetLanguage, eventSequence }) {
+export function createProviderBootstrapRequest({ sessionId, providerId, targetLanguage, eventSequence }) {
   if (!isSessionId(sessionId)) throw new TypeError('sessionId is required');
   if (!Number.isInteger(eventSequence) || eventSequence < 0) {
     throw new TypeError('eventSequence is required');
   }
+  if (providerId !== LIVE_DUBBING_PROVIDER_ID) throw new TypeError('providerId is required');
 
   return {
-    action: LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_CREDENTIAL,
+    action: LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP,
     data: {
       sessionId,
-      targetLanguage: normalizeTargetLanguage(targetLanguage),
+      providerId,
+      targetLanguage: normalizeProviderTargetLanguage(providerId, targetLanguage),
       eventSequence,
     },
   };
 }
 
 /**
- * Return the deliberately small credential response DTO. Do not add session,
- * provider, model, or diagnostic fields to this response.
+ * Return the deliberately small provider bootstrap response DTO. The nested
+ * bootstrap remains opaque here; only the provider and language are generic.
  */
-export function createProviderCredentialResponse(apiKey, targetLanguage) {
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
-    throw new TypeError('apiKey is required');
+export function createProviderBootstrapResponse(providerId, targetLanguage, bootstrap) {
+  if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+    throw new TypeError('providerId is required');
+  }
+  if (!isPlainRecord(bootstrap)) {
+    throw new TypeError('bootstrap must be a plain object');
   }
 
   return {
     success: true,
-    apiKey,
-    targetLanguage: normalizeTargetLanguage(targetLanguage),
+    providerId,
+    targetLanguage: normalizeProviderTargetLanguage(providerId, targetLanguage),
+    bootstrap,
   };
 }
 
-export function parseProviderCredentialResponse(response, expectedTargetLanguage) {
-  if (!response || response.success !== true
-    || typeof response.apiKey !== 'string' || !response.apiKey) return null;
+export function parseProviderBootstrapResponse(response, expectedProviderId, expectedTargetLanguage) {
+  if (!isPlainRecord(response) || response.success !== true
+    || Object.keys(response).length !== 4
+    || Object.prototype.hasOwnProperty.call(response, 'apiKey')) return null;
+
+  if (response.providerId !== expectedProviderId) return null;
 
   let targetLanguage;
   try {
-    targetLanguage = normalizeTargetLanguage(response.targetLanguage);
-    if (expectedTargetLanguage
-      && targetLanguage !== normalizeTargetLanguage(expectedTargetLanguage)) return null;
+    targetLanguage = normalizeProviderTargetLanguage(expectedProviderId, response.targetLanguage);
+    if (targetLanguage !== normalizeProviderTargetLanguage(expectedProviderId, expectedTargetLanguage)) return null;
   } catch {
     return null;
   }
+  if (!isPlainRecord(response.bootstrap)) return null;
 
-  return { apiKey: response.apiKey, targetLanguage };
+  return {
+    providerId: response.providerId,
+    targetLanguage,
+    bootstrap: response.bootstrap,
+  };
+}
+
+function isPlainRecord(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
 }
 
 function isSessionId(value) {

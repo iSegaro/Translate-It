@@ -4,7 +4,7 @@ vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
 }));
 import {
   handleLiveDubbingGetStatus,
-  handleLiveDubbingCredentialRequest,
+  handleLiveDubbingBootstrapRequest,
   handleLiveDubbingStart,
   handleLiveDubbingStop,
 } from './handlers.js';
@@ -91,13 +91,13 @@ describe('live dubbing browser gate', () => {
     expect(start).toHaveBeenCalledTimes(2);
   });
 
-  it('rejects credential requests from page/content senders without resolving a key', async () => {
+  it('rejects bootstrap requests from page/content senders without resolving a key', async () => {
     vi.stubGlobal('__BROWSER__', 'chrome');
     browser.runtime.id = 'extension-id';
     browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
 
-    await expect(handleLiveDubbingCredentialRequest({
-      data: { sessionId: 'session-1', targetLanguage: 'en', eventSequence: 1 },
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 1 },
     }, {
       id: 'extension-id',
       url: 'https://example.test/page',
@@ -108,14 +108,14 @@ describe('live dubbing browser gate', () => {
     });
   });
 
-  it('rejects credential requests when the Offscreen sender URL is missing', async () => {
+  it('rejects bootstrap requests when the Offscreen sender URL is missing', async () => {
     vi.stubGlobal('__BROWSER__', 'chrome');
     browser.runtime.id = 'extension-id';
     browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
     const readDescriptor = vi.spyOn(liveDubbingCoordinator, '_readDescriptor');
 
-    await expect(handleLiveDubbingCredentialRequest({
-      data: { sessionId: 'session-1', targetLanguage: 'en', eventSequence: 1 },
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 1 },
     }, {
       id: 'extension-id',
     })).resolves.toEqual({
@@ -137,42 +137,47 @@ describe('live dubbing browser gate', () => {
     });
   });
 
-  it('resolves an authorized credential request with only key and target language', async () => {
+  it('resolves an authorized bootstrap request with provider and target language', async () => {
     vi.stubGlobal('__BROWSER__', 'chrome');
     browser.runtime.id = 'extension-id';
     browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
     const authorize = vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
-      .mockResolvedValue({ sessionId: 'session-1', targetLanguage: 'zh-Hans' });
-    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isCredentialRequestStillAuthorized')
+      .mockResolvedValue({ sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'zh-Hans' });
+    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
       .mockReturnValue(true);
 
-    await expect(handleLiveDubbingCredentialRequest({
-      data: { sessionId: 'session-1', targetLanguage: 'zh-Hans', eventSequence: 1 },
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'zh-Hans', eventSequence: 1 },
     }, {
       id: 'extension-id',
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
     })).resolves.toEqual({
       success: true,
-      apiKey: 'handler-secret',
+      providerId: 'gemini',
       targetLanguage: 'zh-Hans',
+      bootstrap: { apiKey: 'handler-secret' },
     });
     expect(authorize).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
-    }), { type: 'credential' });
-    expect(stillAuthorized).toHaveBeenCalledWith({ sessionId: 'session-1', targetLanguage: 'zh-Hans' });
+    }), { type: 'bootstrap' });
+    expect(stillAuthorized).toHaveBeenCalledWith({
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      targetLanguage: 'zh-Hans',
+    });
   });
 
-  it('rejects a credential response when the active session fence closes first', async () => {
+  it('rejects a bootstrap response when the active session fence closes first', async () => {
     vi.stubGlobal('__BROWSER__', 'chrome');
     browser.runtime.id = 'extension-id';
     browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
     vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
-      .mockResolvedValue({ sessionId: 'session-1', targetLanguage: 'en' });
-    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isCredentialRequestStillAuthorized')
+      .mockResolvedValue({ sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en' });
+    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
       .mockReturnValue(false);
 
-    await expect(handleLiveDubbingCredentialRequest({
-      data: { sessionId: 'session-1', targetLanguage: 'en', eventSequence: 2 },
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
     }, {
       id: 'extension-id',
       url: 'chrome-extension://extension-id/src/html/offscreen.html',

@@ -22,7 +22,8 @@ returns as 24 kHz PCM for local playback.
    `GET_LIVE_DUBBING_STATUS`. All three require a trusted extension-UI
    sender (see Security).
 2. `LiveDubbingCoordinator.start()` creates a session id, persists a
-   `PREPARING_CAPTURE` descriptor to `storage.session`, acquires the
+   `PREPARING_CAPTURE` descriptor (including provider id `gemini`) to
+   `storage.session`, acquires the
    offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK`), and drives the
    offscreen stages `PREPARE` → `CONSUME` → `CONNECT_PROVIDER`, ending in
    `RUNNING`.
@@ -61,29 +62,48 @@ returned, stored, or logged.
   audio stays inaudible while capture runs.
 - The pipeline never connects the raw stream to the destination.
 
+## Provider Identity and Bootstrap
+
+The public live-dubbing contract carries the exact provider identity
+`LIVE_DUBBING_PROVIDER_ID = 'gemini'`. The Popup does not select or transmit a
+provider; the Coordinator owns this value and includes it in every descriptor,
+offscreen request, response, and terminal event. Persisted descriptors without
+the provider id are invalid and are not adopted during reconciliation.
+
+Provider language support is an explicit `LIVE_GEMINI_LANGUAGE_MAP` allowlist,
+separate from the general translation catalog. Unknown provider or language
+codes fail closed before descriptor creation or socket setup.
+
+The one-time `LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP` request is authorized
+only for the exact active `CONNECTING_PROVIDER` session, provider, target
+language, and event sequence. Background resolves the key and returns the
+small DTO `{ success, providerId, targetLanguage, bootstrap }`. The generic
+Controller treats `bootstrap` as opaque; only the Gemini adapter reads
+`bootstrap.apiKey`. No legacy credential action or helper remains.
+
+The `LiveDubbingProviderRegistry` is the feature-local mapping from provider id
+to adapter. It currently contains only Gemini and returns no adapter for an
+unknown provider.
+
 ## Provider
 
-The offscreen `LiveDubbingController` delegates Gemini-specific behavior to
-`GeminiLiveProviderAdapter`, which owns the Gemini protocol over its WebSocket
-transport. This extraction is intentionally bounded to Gemini; it is not a
-generic provider API or registry.
+The offscreen `LiveDubbingController` resolves the provider through
+`LiveDubbingProviderRegistry`. The Gemini adapter owns Gemini-specific behavior
+and the Gemini protocol over its WebSocket transport.
 
-Transport path: `LiveDubbingController` → `GeminiLiveProviderAdapter` → Gemini
-protocol transport.
+Transport path: `LiveDubbingController` → `LiveDubbingProviderRegistry` →
+`GeminiLiveProviderAdapter` → Gemini protocol transport.
 
 Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 
-- **Credential flow.** Background resolves the key (`ApiKeyManager`
-  primary `GEMINI_API_KEY`, else stored key) only after authorizing the
-  one-time offscreen credential request against the persisted
-  `CONNECTING_PROVIDER` fence. The key travels in one targeted response;
-  the controller clears its local reference before awaiting setup and
-  never stores it. Background never places credentials in descriptors.
-- **Language mapping.** `LIVE_GEMINI_LANGUAGE_MAP` is an explicit
-  allowlist, separate from the general translation catalog. Unknown codes
-  fail closed before any descriptor or socket exists.
-- **Setup gate.** Input pipelines must be ready and the descriptor
-  persisted at `CONNECTING_PROVIDER` before the credential is issued;
+- **Bootstrap flow.** Background resolves the key (`ApiKeyManager` primary
+  `GEMINI_API_KEY`, else stored key) only after authorizing the one-time
+  offscreen bootstrap request against the persisted `CONNECTING_PROVIDER`
+  fence. The key travels in one targeted response; the Controller clears its
+  local wrapper before awaiting setup and never stores it. Background never
+  places bootstrap data in descriptors.
+- **Setup gate.** Input pipelines must be ready and the descriptor persisted at
+  `CONNECTING_PROVIDER` before bootstrap is issued;
   `setupComplete` from the provider is required before `RUNNING`.
 - **No pre-setup queue.** Frames arriving before setup are counted and
   dropped (`preSetupDroppedFrames`); nothing is buffered for later send.
