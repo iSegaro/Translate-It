@@ -48,6 +48,19 @@ function createContext(sampleRate = INPUT_SAMPLE_RATE) {
 }
 
 describe('capture PCM primitives', () => {
+  it('fixes capture framing to 1600 samples at 16kHz', () => {
+    expect(INPUT_SAMPLE_RATE).toBe(16_000);
+    expect(INPUT_FRAME_SAMPLES).toBe(1_600);
+    expect(new TabAudioPipeline({}).frameSamples).toBe(1_600);
+    expect(new TabAudioPipeline({ frameSamples: 1_600 }).frameSamples).toBe(1_600);
+    expect(() => new TabAudioPipeline({ frameSamples: 640 }))
+      .toThrow(/fixed to 1600/);
+    expect(() => new TabAudioPipeline({ frameSamples: 800 }))
+      .toThrow(/fixed to 1600/);
+    expect(() => new TabAudioPipeline({ sampleRate: 48_000 }))
+      .toThrow(/fixed at 16000/);
+  });
+
   it('downmixes channel planes deterministically and clamps PCM16 edges', () => {
     expect(Array.from(downmixToMono([
       new Float32Array([2, 0.5, Number.NaN]),

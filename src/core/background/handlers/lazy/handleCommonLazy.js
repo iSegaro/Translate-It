@@ -104,26 +104,6 @@ export async function handleLiveDubbingGetStatusLazy(message, sender) {
     }
 }
 
-export async function handleLiveDubbingGetMeasurementsLazy(message, sender) {
-    try {
-        const { handleLiveDubbingGetMeasurements } = await import('@/features/live-dubbing/background/handlers.js');
-        return handleLiveDubbingGetMeasurements(message, sender);
-    } catch (error) {
-        logger.error('Failed to load Live Dubbing measurements handler:', error);
-        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
-    }
-}
-
-export async function handleLiveDubbingClearMeasurementsLazy(message, sender) {
-    try {
-        const { handleLiveDubbingClearMeasurements } = await import('@/features/live-dubbing/background/handlers.js');
-        return handleLiveDubbingClearMeasurements(message, sender);
-    } catch (error) {
-        logger.error('Failed to load Live Dubbing measurements handler:', error);
-        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
-    }
-}
-
 export async function handleLiveDubbingCredentialRequestLazy(message, sender) {
     try {
         const { handleLiveDubbingCredentialRequest } = await import('@/features/live-dubbing/background/handlers.js');
