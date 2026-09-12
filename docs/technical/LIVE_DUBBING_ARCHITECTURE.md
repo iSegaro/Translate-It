@@ -76,10 +76,13 @@ codes fail closed before descriptor creation or socket setup.
 
 The one-time `LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP` request is authorized
 only for the exact active `CONNECTING_PROVIDER` session, provider, target
-language, and event sequence. Background resolves the key and returns the
-small DTO `{ success, providerId, targetLanguage, bootstrap }`. The generic
-Controller treats `bootstrap` as opaque; only the Gemini adapter reads
-`bootstrap.apiKey`. No legacy credential action or helper remains.
+language, and event sequence. Background mints a constrained, single-use
+ephemeral token (`GeminiLiveBootstrapService`) and returns the small DTO
+`{ success, providerId, targetLanguage, bootstrap: { accessToken } }`. The
+generic Controller treats `bootstrap` as opaque; only the Gemini adapter reads
+`bootstrap.accessToken` and connects to the constrained endpoint with
+`?access_token=`. Long-lived API keys never leave background. No legacy
+credential action or helper remains.
 
 The `LiveDubbingProviderRegistry` is the feature-local mapping from provider id
 to adapter. It currently contains only Gemini and returns no adapter for an
@@ -96,12 +99,20 @@ Transport path: `LiveDubbingController` → `LiveDubbingProviderRegistry` →
 
 Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 
-- **Bootstrap flow.** Background resolves the key (`ApiKeyManager` primary
-  `GEMINI_API_KEY`, else stored key) only after authorizing the one-time
-  offscreen bootstrap request against the persisted `CONNECTING_PROVIDER`
-  fence. The key travels in one targeted response; the Controller clears its
-  local wrapper before awaiting setup and never stores it. Background never
-  places bootstrap data in descriptors.
+- **Bootstrap flow.** Background mints a constrained single-use token
+  (`POST .../v1beta/auth_tokens` with `uses: 1` and the Live Translation
+  model/config constraints) only after authorizing the one-time offscreen
+  bootstrap request against the persisted `CONNECTING_PROVIDER` fence. Minting
+  advances to the next configured Gemini key only on key/project-plausible
+  failures (invalid key, quota exhaustion, rate limiting, per
+  `ApiKeyManager.shouldFailover`); network/proxy, serving (5xx), malformed
+  payload, and request-shape failures stop with no next key (classified
+  mint-time multi-key failover only); keys are read via the existing key
+  facilities without reordering text-translation failover state. The token travels in one
+  targeted response; the Controller clears its local wrapper before awaiting
+  setup and never stores it. Background never places bootstrap data in
+  descriptors. A token or connection failure ends the session: there is no
+  running-session failover, reconnect, or resumption.
 - **Setup gate.** Input pipelines must be ready and the descriptor persisted at
   `CONNECTING_PROVIDER` before bootstrap is issued;
   `setupComplete` from the provider is required before `RUNNING`.
@@ -153,8 +164,12 @@ terminal operation.
 
 ## Security
 
-- **Background-only key.** The provider key is resolved in background and
-  is transient in offscreen memory.
+- **Background-only keys, ephemeral offscreen bootstrap.** Long-lived Gemini
+  keys are resolved and used only in background to mint the token. Offscreen
+  receives only `{ accessToken }`; the adapter rejects any `apiKey` bootstrap
+  form and connects to `BidiGenerateContentConstrained` with `?access_token=`
+  (never `?key=`). Tokens are transient in offscreen memory and are never
+  stored, logged, or included in diagnostics.
 - **Exact sender auth.** Offscreen messages require the exact offscreen
   document URL plus runtime id and no tab. Public commands require the
   exact allowlisted UI document path (`src/html/popup.html`,

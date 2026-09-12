@@ -12,6 +12,16 @@ export const GEMINI_LIVE_AUDIO_MIME_TYPE = 'audio/pcm;rate=16000';
 export const GEMINI_LIVE_OUTPUT_AUDIO_MIME_TYPE = 'audio/pcm;rate=24000';
 export const GEMINI_LIVE_WEBSOCKET_ENDPOINT =
   'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
+/**
+ * Constrained Live Translation transport. Background mints a single-use
+ * ephemeral token for this endpoint; the long-lived API key never leaves
+ * background and must never appear in a `?key=` URL.
+ */
+export const GEMINI_LIVE_CONSTRAINED_WEBSOCKET_ENDPOINT =
+  GEMINI_LIVE_WEBSOCKET_ENDPOINT.replace(/BidiGenerateContent$/, 'BidiGenerateContentConstrained');
+/** Mint endpoint for constrained single-use Live Translation tokens. Background-only. */
+export const GEMINI_LIVE_AUTH_TOKEN_ENDPOINT =
+  'https://generativelanguage.googleapis.com/v1beta/auth_tokens';
 export const GEMINI_LIVE_SETUP_TIMEOUT = LIVE_DUBBING_SETUP_TIMEOUT;
 export const GEMINI_LIVE_MAX_BUFFERED_AMOUNT = 64 * 1024;
 
@@ -312,8 +322,10 @@ export class GeminiLiveProviderAdapter {
 
   /**
    * Open one session and resolve only after Gemini acknowledges setup.
-   * The opaque bootstrap is used to construct the socket URL and is not
-   * retained in the client or included in any returned value or callback.
+   * The bootstrap must carry exactly one ephemeral `{ accessToken }` minted
+   * by background; legacy `apiKey` bootstraps are rejected. The token builds
+   * the constrained socket URL and is never retained in the client or
+   * included in any returned value or callback.
    */
   connect(connectionOptions) {
     if (arguments.length !== 1
@@ -322,15 +334,33 @@ export class GeminiLiveProviderAdapter {
       || !Object.prototype.hasOwnProperty.call(connectionOptions, 'bootstrap')
       || !Object.prototype.hasOwnProperty.call(connectionOptions, 'targetLanguage')
       || Object.prototype.hasOwnProperty.call(connectionOptions, 'apiKey')
+      || Object.prototype.hasOwnProperty.call(connectionOptions, 'accessToken')
       || !isPlainRecord(connectionOptions.bootstrap)) {
       return Promise.reject(new TypeError('connect requires a nested bootstrap object'));
     }
 
-    let apiKey;
+    let hasLegacyKey = false;
+    let bootstrapKeys = null;
     try {
-      apiKey = connectionOptions.bootstrap.apiKey;
+      hasLegacyKey = Object.prototype.hasOwnProperty.call(connectionOptions.bootstrap, 'apiKey');
+      bootstrapKeys = Object.keys(connectionOptions.bootstrap);
     } catch {
-      return Promise.reject(new TypeError('bootstrap apiKey is unavailable'));
+      return Promise.reject(new TypeError('bootstrap accessToken is unavailable'));
+    }
+    if (hasLegacyKey) {
+      return Promise.reject(new TypeError('bootstrap apiKey is unsupported; accessToken is required'));
+    }
+    if (!Array.isArray(bootstrapKeys)
+      || bootstrapKeys.length !== 1
+      || bootstrapKeys[0] !== 'accessToken') {
+      return Promise.reject(new TypeError('bootstrap accessToken is unavailable'));
+    }
+
+    let accessToken;
+    try {
+      accessToken = connectionOptions.bootstrap.accessToken;
+    } catch {
+      return Promise.reject(new TypeError('bootstrap accessToken is unavailable'));
     }
     let mappedTargetLanguage;
     try {
@@ -348,8 +378,8 @@ export class GeminiLiveProviderAdapter {
         'A Gemini Live session is already active',
       ));
     }
-    if (!isNonEmptyString(apiKey)) {
-      return Promise.reject(new TypeError('apiKey is required'));
+    if (!isNonEmptyString(accessToken)) {
+      return Promise.reject(new TypeError('accessToken is required'));
     }
     if (!mappedTargetLanguage) {
       return Promise.reject(new RangeError('Unsupported target language'));
@@ -374,7 +404,7 @@ export class GeminiLiveProviderAdapter {
     let socket;
     try {
       socket = this.webSocketFactory(
-        `${GEMINI_LIVE_WEBSOCKET_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
+        `${GEMINI_LIVE_CONSTRAINED_WEBSOCKET_ENDPOINT}?access_token=${encodeURIComponent(accessToken)}`,
       );
       if (!socket || typeof socket.send !== 'function') {
         throw new TypeError('WebSocket factory did not return a socket');
@@ -385,7 +415,7 @@ export class GeminiLiveProviderAdapter {
         // Binary mode is an optimization; a socket that rejects the hint can still connect.
       }
     } catch (error) {
-      const safeError = createSafeError('GEMINI_LIVE_CONNECT_FAILED', error, apiKey);
+      const safeError = createSafeError('GEMINI_LIVE_CONNECT_FAILED', error, accessToken);
       this._terminateCurrent(
         generation,
         safeError,

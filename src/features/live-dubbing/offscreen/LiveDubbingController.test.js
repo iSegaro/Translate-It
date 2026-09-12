@@ -161,7 +161,7 @@ describe('LiveDubbingController', () => {
       success: true,
       providerId: 'gemini',
       targetLanguage: 'en',
-      bootstrap: { apiKey: 'secret-key' },
+      bootstrap: { accessToken: 'test-token' },
     });
     await expect(firstConnect).resolves.toMatchObject({
       success: true,
@@ -215,7 +215,7 @@ describe('LiveDubbingController', () => {
       success: true,
       providerId: 'gemini',
       targetLanguage: 'en',
-      bootstrap: { apiKey: 'secret-key' },
+      bootstrap: { accessToken: 'test-token' },
     });
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
@@ -237,7 +237,7 @@ describe('LiveDubbingController', () => {
 
     const session = controller.currentSession;
     expect(provider.connect).toHaveBeenCalledWith({
-      bootstrap: { apiKey: 'secret-key' },
+      bootstrap: { accessToken: 'test-token' },
       targetLanguage: 'en',
     });
     expect(session.bootstrapRequestPromise).toBeNull();
@@ -245,8 +245,8 @@ describe('LiveDubbingController', () => {
     await expect(controller.requestProviderBootstrapForSession(session)).resolves.toBeNull();
     expect(requestBootstrap).toHaveBeenCalledOnce();
     expect(session).not.toHaveProperty('bootstrap');
-    expect(session).not.toHaveProperty('apiKey');
-    expect(JSON.stringify(session)).not.toContain('secret-key');
+    expect(session).not.toHaveProperty('accessToken');
+    expect(JSON.stringify(session)).not.toContain('test-token');
 
     provider.onSetupComplete();
     resolveSetup();
@@ -255,7 +255,7 @@ describe('LiveDubbingController', () => {
       ack: 'PROVIDER_READY',
     });
     expect(session.bootstrapRequestPromise).toBeNull();
-    expect(JSON.stringify(session)).not.toContain('secret-key');
+    expect(JSON.stringify(session)).not.toContain('test-token');
 
     await controller.dispose('session-1', 'gemini');
   });
@@ -506,7 +506,7 @@ describe('LiveDubbingController', () => {
       success: true,
       providerId: 'gemini',
       targetLanguage: 'fil',
-      bootstrap: { apiKey: 'secret-key' },
+      bootstrap: { accessToken: 'test-token' },
     });
     const controller = new LiveDubbingController({ requestBootstrap });
 
@@ -522,9 +522,9 @@ describe('LiveDubbingController', () => {
 
   it('passes bootstrap opaquely to the provider adapter', async () => {
     const bootstrap = {};
-    Object.defineProperty(bootstrap, 'apiKey', {
+    Object.defineProperty(bootstrap, 'accessToken', {
       get() {
-        throw new Error('generic controller must not inspect apiKey');
+        throw new Error('generic controller must not inspect accessToken');
       },
     });
     const provider = {
@@ -581,7 +581,7 @@ describe('LiveDubbingController', () => {
       success: true,
       providerId: 'gemini',
       targetLanguage: 'fr',
-      bootstrap: { apiKey: 'secret-key' },
+      bootstrap: { accessToken: 'test-token' },
     });
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => stream) },
@@ -621,7 +621,7 @@ describe('LiveDubbingController', () => {
     });
     expect(requestBootstrap).toHaveBeenCalledOnce();
     expect(provider.connect).toHaveBeenCalledWith({
-      bootstrap: { apiKey: 'secret-key' },
+      bootstrap: { accessToken: 'test-token' },
       targetLanguage: 'fr',
     });
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
@@ -686,7 +686,7 @@ describe('LiveDubbingController', () => {
         success: true,
         providerId: 'gemini',
         targetLanguage: 'en',
-        bootstrap: { apiKey: 'secret-key' },
+        bootstrap: { accessToken: 'test-token' },
       }),
       onPlaybackAccepted,
     });
@@ -726,7 +726,7 @@ describe('LiveDubbingController', () => {
     });
     expect(telemetry.milestones.firstTranslatedAudioAcceptedByPlayback).toBe(acceptedAt);
     expect(onPlaybackAccepted).toHaveBeenCalledWith({ accepted: true, sampleCount: 2 });
-    expect(JSON.stringify(telemetry)).not.toContain('secret-key');
+    expect(JSON.stringify(telemetry)).not.toContain('test-token');
     expect(JSON.stringify(telemetry)).not.toContain('stream-secret');
     expect(JSON.stringify(telemetry)).not.toContain('AQ==');
 
@@ -839,7 +839,7 @@ describe('LiveDubbingController', () => {
         success: true,
         providerId: 'gemini',
         targetLanguage: 'de',
-        bootstrap: { apiKey: 'secret-key' },
+        bootstrap: { accessToken: 'test-token' },
       }),
       notify,
     });
@@ -887,7 +887,7 @@ describe('LiveDubbingController', () => {
         success: true,
         providerId: 'gemini',
         targetLanguage: 'fr',
-        bootstrap: { apiKey: 'secret-key' },
+        bootstrap: { accessToken: 'test-token' },
       }),
       notify,
     });
@@ -943,7 +943,7 @@ describe('LiveDubbingController', () => {
         success: true,
         providerId: 'gemini',
         targetLanguage: 'fr',
-        bootstrap: { apiKey: 'secret-key' },
+        bootstrap: { accessToken: 'test-token' },
       }),
       notify,
     });
@@ -1000,7 +1000,7 @@ describe('LiveDubbingController', () => {
         success: true,
         providerId: 'gemini',
         targetLanguage: 'fr',
-        bootstrap: { apiKey: 'secret-key' },
+        bootstrap: { accessToken: 'test-token' },
       }),
       notify,
     });

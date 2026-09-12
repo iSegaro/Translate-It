@@ -53,8 +53,9 @@ export function handleLiveDubbingGetStatus(message, sender) {
 
 /**
  * Resolve one Gemini Live provider bootstrap request from the authorized
- * offscreen document. The response is intentionally limited to the opaque
- * bootstrap, provider, and language.
+ * offscreen document. Background mints a constrained single-use ephemeral
+ * token; the response is intentionally limited to the opaque bootstrap,
+ * provider, and language. Long-lived keys never leave background.
  */
 export async function handleLiveDubbingBootstrapRequest(message, sender) {
   if (!isChromeRuntime()) return unsupported();
@@ -67,10 +68,9 @@ export async function handleLiveDubbingBootstrapRequest(message, sender) {
   if (!descriptor || descriptor.providerId !== LIVE_DUBBING_PROVIDER_ID) return unauthorized();
 
   try {
-    const { ApiKeyManager } = await import('@/features/translation/providers/ApiKeyManager.js');
-    const { getApiKeyAsync } = await import('@/shared/config/config.js');
-    const apiKey = await ApiKeyManager.getPrimaryKey('GEMINI_API_KEY') || await getApiKeyAsync();
-    if (typeof apiKey !== 'string' || !apiKey.trim()) {
+    const { geminiLiveBootstrapService } = await import('./GeminiLiveBootstrapService.js');
+    const accessToken = await geminiLiveBootstrapService.mintEphemeralToken(descriptor.targetLanguage);
+    if (typeof accessToken !== 'string' || !accessToken) {
       return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
     }
 
@@ -81,7 +81,7 @@ export async function handleLiveDubbingBootstrapRequest(message, sender) {
     return createProviderBootstrapResponse(
       descriptor.providerId,
       descriptor.targetLanguage,
-      { apiKey },
+      { accessToken },
     );
   } catch {
     return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };

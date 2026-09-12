@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
-  ApiKeyManager: { getPrimaryKey: vi.fn().mockResolvedValue('handler-secret') },
+vi.mock('./GeminiLiveBootstrapService.js', () => ({
+  geminiLiveBootstrapService: { mintEphemeralToken: vi.fn() },
 }));
+import { geminiLiveBootstrapService } from './GeminiLiveBootstrapService.js';
 import {
   handleLiveDubbingGetStatus,
   handleLiveDubbingBootstrapRequest,
@@ -137,7 +138,7 @@ describe('live dubbing browser gate', () => {
     });
   });
 
-  it('resolves an authorized bootstrap request with provider and target language', async () => {
+  it('resolves an authorized bootstrap request with an ephemeral access token', async () => {
     vi.stubGlobal('__BROWSER__', 'chrome');
     browser.runtime.id = 'extension-id';
     browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
@@ -145,18 +146,22 @@ describe('live dubbing browser gate', () => {
       .mockResolvedValue({ sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'zh-Hans' });
     const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
       .mockReturnValue(true);
+    geminiLiveBootstrapService.mintEphemeralToken.mockResolvedValue('auth_tokens/ephemeral-token-1');
 
-    await expect(handleLiveDubbingBootstrapRequest({
+    const response = await handleLiveDubbingBootstrapRequest({
       data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'zh-Hans', eventSequence: 1 },
     }, {
       id: 'extension-id',
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
-    })).resolves.toEqual({
+    });
+
+    expect(response).toEqual({
       success: true,
       providerId: 'gemini',
       targetLanguage: 'zh-Hans',
-      bootstrap: { apiKey: 'handler-secret' },
+      bootstrap: { accessToken: 'auth_tokens/ephemeral-token-1' },
     });
+    expect(geminiLiveBootstrapService.mintEphemeralToken).toHaveBeenCalledWith('zh-Hans');
     expect(authorize).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
     }), { type: 'bootstrap' });
@@ -165,6 +170,8 @@ describe('live dubbing browser gate', () => {
       providerId: 'gemini',
       targetLanguage: 'zh-Hans',
     });
+    expect(Object.keys(response.bootstrap)).toEqual(['accessToken']);
+    expect(JSON.stringify(response)).not.toContain('apiKey');
   });
 
   it('rejects a bootstrap response when the active session fence closes first', async () => {
@@ -175,6 +182,32 @@ describe('live dubbing browser gate', () => {
       .mockResolvedValue({ sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en' });
     const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
       .mockReturnValue(false);
+    geminiLiveBootstrapService.mintEphemeralToken.mockResolvedValue('auth_tokens/ephemeral-token-1');
+
+    const response = await handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    });
+
+    expect(response).toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
+    expect(stillAuthorized).toHaveBeenCalledOnce();
+    expect(JSON.stringify(response)).not.toContain('auth_tokens/ephemeral-token-1');
+  });
+
+  it('returns UNAVAILABLE when ephemeral minting fails for every key', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
+      .mockResolvedValue({ sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en' });
+    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
+      .mockReturnValue(true);
+    geminiLiveBootstrapService.mintEphemeralToken.mockResolvedValue(null);
 
     await expect(handleLiveDubbingBootstrapRequest({
       data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
@@ -183,8 +216,27 @@ describe('live dubbing browser gate', () => {
       url: 'chrome-extension://extension-id/src/html/offscreen.html',
     })).resolves.toEqual({
       success: false,
-      error: 'LIVE_DUBBING_UNAUTHORIZED',
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
     });
-    expect(stillAuthorized).toHaveBeenCalledOnce();
+    expect(stillAuthorized).not.toHaveBeenCalled();
+  });
+
+  it('returns UNAVAILABLE when ephemeral minting throws', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
+      .mockResolvedValue({ sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en' });
+    geminiLiveBootstrapService.mintEphemeralToken.mockRejectedValue(new Error('mint failed'));
+
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    })).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+    });
   });
 });

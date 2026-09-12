@@ -605,7 +605,7 @@ describe('LiveDubbingCoordinator', () => {
         success: true,
         providerId: 'gemini',
         targetLanguage: 'en',
-        bootstrap: { apiKey: 'secret-key' },
+        bootstrap: { accessToken: 'test-token' },
       }),
       notify: vi.fn(),
     });
@@ -867,7 +867,7 @@ describe('LiveDubbingCoordinator', () => {
               success: true,
               providerId: descriptor.providerId,
               targetLanguage: descriptor.targetLanguage,
-              bootstrap: { apiKey: 'handler-secret' },
+              bootstrap: { accessToken: 'handler-token' },
             }
             : { success: false });
       },
@@ -885,7 +885,7 @@ describe('LiveDubbingCoordinator', () => {
       data: { sessionId: 'session-1', providerId: 'gemini', targetLanguage: 'en', eventSequence: 2 },
     });
     expect(providerClient.connect).toHaveBeenCalledWith({
-      bootstrap: { apiKey: 'handler-secret' },
+      bootstrap: { accessToken: 'handler-token' },
       targetLanguage: 'en',
     });
   });
