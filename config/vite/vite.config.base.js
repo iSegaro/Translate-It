@@ -69,8 +69,12 @@ export const createBaseConfig = (browser, options = {}) => {
       ...(options.extraPlugins || [])
     ],
 
-    // browser-specific definitions  
+    // browser-specific definitions
     define: {
+      __LIVE_DUBBING_FRAME_SAMPLES__: (() => {
+        const candidate = Number(process.env.LIVE_DUBBING_FRAME_SAMPLES);
+        return candidate === 1600 || candidate === 640 ? candidate : undefined;
+      })(),
       __BROWSER__: JSON.stringify(browser),
       __BUILD_YEAR__: new Date().getFullYear(),
       __IS_PRODUCTION__: isProduction,

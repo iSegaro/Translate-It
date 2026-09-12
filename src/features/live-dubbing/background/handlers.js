@@ -50,6 +50,18 @@ export function handleLiveDubbingGetStatus(message, sender) {
   return liveDubbingCoordinator.getStatus();
 }
 
+export function handleLiveDubbingGetMeasurements(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (!isTrustedUi(sender)) return unauthorized();
+  return liveDubbingCoordinator.getMeasurements();
+}
+
+export function handleLiveDubbingClearMeasurements(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (!isTrustedUi(sender)) return unauthorized();
+  return liveDubbingCoordinator.clearMeasurements();
+}
+
 /**
  * Resolve one Gemini Live credential request from the authorized offscreen
  * document. The response is intentionally limited to the key and language.

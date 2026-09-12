@@ -279,6 +279,10 @@ class LifecycleManager {
         [MessageActions.LIVE_DUBBING_STOP]: Handlers.handleLiveDubbingStopLazy,
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
         [MessageActions.LIVE_DUBBING_REQUEST_PROVIDER_CREDENTIAL]: Handlers.handleLiveDubbingCredentialRequestLazy,
+        [MessageActions.GET_LIVE_DUBBING_MEASUREMENTS]: Handlers.handleLiveDubbingGetMeasurementsLazy,
+        [MessageActions.CLEAR_LIVE_DUBBING_MEASUREMENTS]: Handlers.handleLiveDubbingClearMeasurementsLazy,
+        [LIVE_DUBBING_ACTIONS.GET_MEASUREMENTS]: Handlers.handleLiveDubbingGetMeasurementsLazy,
+        [LIVE_DUBBING_ACTIONS.CLEAR_MEASUREMENTS]: Handlers.handleLiveDubbingClearMeasurementsLazy,
         [LIVE_DUBBING_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
       });
     }

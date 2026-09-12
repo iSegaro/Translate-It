@@ -67,6 +67,28 @@ describe('live dubbing browser gate', () => {
     expect(start).toHaveBeenCalledOnce();
     expect(stop).toHaveBeenCalledOnce();
     expect(status).toHaveBeenCalledOnce();
+
+    // Trusted extension pages opened in a normal browser tab carry
+    // sender.tab; the exact UI document path still authorizes.
+    const tabBoundOptionsSender = {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/options.html',
+      tab: { id: 42 },
+    };
+    await handleLiveDubbingStart({ data: { targetLanguage: 'en' } }, tabBoundOptionsSender);
+    await handleLiveDubbingStop({ data: { sessionId: 'session-1' } }, tabBoundOptionsSender);
+    await handleLiveDubbingGetStatus({}, tabBoundOptionsSender);
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(stop).toHaveBeenCalledTimes(2);
+    expect(status).toHaveBeenCalledTimes(2);
+
+    // Extension origin alone never authorizes arbitrary pages, even tab-bound.
+    expect(handleLiveDubbingStart({ data: { targetLanguage: 'en' } }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/other.html',
+      tab: { id: 42 },
+    })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
+    expect(start).toHaveBeenCalledTimes(2);
   });
 
   it('rejects credential requests from page/content senders without resolving a key', async () => {

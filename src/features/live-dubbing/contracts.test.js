@@ -286,6 +286,82 @@ describe('live dubbing Stage 2 contracts', () => {
     }, browserAPI)).toBe(false);
   });
 
+  it('accepts tab-bound trusted UI documents by exact path, never by origin alone', () => {
+    // Real sender shapes: Options opened in a normal browser tab carries
+    // sender.tab; Sidepanel can too. Both must be accepted.
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/options.html',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(true);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/sidepanel.html',
+      tab: { id: 7 },
+    }, browserAPI)).toBe(true);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+      tab: { id: 9 },
+    }, browserAPI)).toBe(true);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/options.html#api',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(true);
+
+    // Rejections: content scripts (tab-bound or not), arbitrary extension
+    // pages (even tab-bound), offscreen, background/SW (no URL), external
+    // extensions, missing identity, missing URL, wrong runtime id.
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'https://example.test/page',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'https://example.test/page',
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/other.html',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/other.html',
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/popup.html',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/',
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({ id: 'extension-id' }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'other-extension',
+      url: 'chrome-extension://other-extension/src/html/options.html',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      url: 'chrome-extension://extension-id/src/html/options.html',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender({
+      id: 'extension-id',
+      tab: { id: 42 },
+    }, browserAPI)).toBe(false);
+    expect(isTrustedLiveDubbingUiSender(undefined, browserAPI)).toBe(false);
+  });
+
   it('creates a one-time credential DTO without session metadata in the response', () => {
     expect(createProviderCredentialRequest({
       sessionId: 'session-1',

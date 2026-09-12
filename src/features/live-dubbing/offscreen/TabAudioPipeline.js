@@ -1,13 +1,45 @@
+/* global __LIVE_DUBBING_FRAME_SAMPLES__ */
 /**
  * Capture-side audio primitives for live dubbing.
  *
  * The capture context is intentionally fixed-rate. AudioContext is allowed to
  * choose a different rate on some browsers, but accepting that result here
  * would make the source sample clock and the wire format disagree.
+ *
+ * Canonical input framing lives here as the single source of truth for the
+ * offscreen capture boundary. Production default is 100ms (1600 samples at
+ * 16kHz). A build-time measurement override may select 40ms (640 samples);
+ * any other value falls back to the production default. The resolved value
+ * is passed to the capture AudioWorklet via processorOptions.
  */
 
 export const INPUT_SAMPLE_RATE = 16_000;
-export const INPUT_FRAME_SAMPLES = 1_600;
+export const LIVE_DUBBING_FRAME_SAMPLE_OPTIONS = Object.freeze([1_600, 640]);
+export const LIVE_DUBBING_DEFAULT_FRAME_SAMPLES = 1_600;
+
+function readFrameSamplesDefine() {
+  try {
+    if (typeof __LIVE_DUBBING_FRAME_SAMPLES__ !== 'undefined') return __LIVE_DUBBING_FRAME_SAMPLES__;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the canonical capture frame size. Accepts only 1600 or 640;
+ * undefined/invalid values fall back to 1600 (100ms production default).
+ * @param {unknown} [value] Explicit candidate; defaults to the build define.
+ * @returns {number} 1600 or 640.
+ */
+export function resolveLiveDubbingFrameSamples(value = readFrameSamplesDefine()) {
+  return LIVE_DUBBING_FRAME_SAMPLE_OPTIONS.includes(value)
+    ? value
+    : LIVE_DUBBING_DEFAULT_FRAME_SAMPLES;
+}
+
+// Resolved once at module load; the single canonical frame config.
+export const INPUT_FRAME_SAMPLES = resolveLiveDubbingFrameSamples();
 export const CAPTURE_PROCESSOR_NAME = 'live-dubbing-capture-processor';
 export const CAPTURE_WORKLET_URL = new URL('./liveDubbingCapture.worklet.js', import.meta.url).href;
 
@@ -337,11 +369,14 @@ export class TabAudioPipeline {
     if (options.sampleRate !== undefined && options.sampleRate !== INPUT_SAMPLE_RATE) {
       throw createAudioError('INPUT_AUDIO_SAMPLE_RATE_FIXED', 'Capture sample rate is fixed at 16000 Hz');
     }
-    if (options.frameSamples !== undefined && options.frameSamples !== INPUT_FRAME_SAMPLES) {
-      throw createAudioError('INPUT_AUDIO_FRAME_SIZE_FIXED', 'Capture frame size is fixed at 1600 samples');
+    if (options.frameSamples !== undefined
+      && !LIVE_DUBBING_FRAME_SAMPLE_OPTIONS.includes(options.frameSamples)) {
+      throw createAudioError('INPUT_AUDIO_FRAME_SIZE_FIXED', 'Capture frame size is fixed to 1600 or 640 samples');
     }
     this.sampleRate = INPUT_SAMPLE_RATE;
-    this.frameSamples = INPUT_FRAME_SAMPLES;
+    this.frameSamples = options.frameSamples !== undefined
+      ? options.frameSamples
+      : INPUT_FRAME_SAMPLES;
 
     this.audioContextFactory = getAudioContextFactory(options);
     this.audioWorkletNodeFactory = options.audioWorkletNodeFactory

@@ -18,13 +18,19 @@ import {
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
 import { GeminiLiveTranslationClient } from './GeminiLiveTranslationClient.js';
-import { TabAudioPipeline } from './TabAudioPipeline.js';
+import {
+  INPUT_FRAME_SAMPLES as CANONICAL_INPUT_FRAME_SAMPLES,
+  INPUT_SAMPLE_RATE as PIPELINE_INPUT_SAMPLE_RATE,
+  TabAudioPipeline,
+  resolveLiveDubbingFrameSamples,
+} from './TabAudioPipeline.js';
 import { PcmOutputPlayer } from './PcmOutputPlayer.js';
 
 const IDLE_STATUS = 'IDLE';
 const INPUT_SAMPLE_RATE = 16_000;
 const OUTPUT_SAMPLE_RATE = 24_000;
 const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
+const MEASUREMENT_SUMMARY_MESSAGE = 'Live dubbing measurement summary';
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'LiveDubbingController');
 const TELEMETRY_MILESTONES = Object.freeze([
   'captureReady',
@@ -45,17 +51,27 @@ function createTelemetry() {
     milestones: Object.fromEntries(TELEMETRY_MILESTONES.map(name => [name, null])),
     inputQueueCurrentDurationMs: 0,
     inputQueuePeakDurationMs: 0,
+    inputQueuePeakFrames: 0,
     inputDroppedDurationMs: 0,
     preSetupDroppedDurationMs: 0,
     preSetupDroppedFrames: 0,
+    inputBackpressureEvents: 0,
+    sendFailures: 0,
     wsBufferedAmountPeak: 0,
     outputQueueCurrentDurationMs: 0,
     outputQueuePeakDurationMs: 0,
+    outputSafetyDrops: 0,
     underruns: 0,
+    underrunSamples: 0,
     interruptions: 0,
     providerTerminalCategory: null,
     providerBaseline: null,
     outputBaseline: null,
+    // Mirrored counters so the sanitized snapshot survives session cleanup.
+    inputFrames: 0,
+    inputSentFrames: 0,
+    inputPendingFrames: 0,
+    translatedAudioChunks: 0,
   };
 }
 
@@ -83,18 +99,179 @@ function safeTelemetrySnapshot(telemetry) {
     ])),
     inputQueueCurrentDurationMs: safeNonNegativeNumber(source.inputQueueCurrentDurationMs),
     inputQueuePeakDurationMs: safeNonNegativeNumber(source.inputQueuePeakDurationMs),
+    inputQueuePeakFrames: safeInteger(source.inputQueuePeakFrames),
     inputDroppedDurationMs: safeNonNegativeNumber(source.inputDroppedDurationMs),
     preSetupDroppedDurationMs: safeNonNegativeNumber(source.preSetupDroppedDurationMs),
     preSetupDroppedFrames: safeInteger(source.preSetupDroppedFrames),
+    inputBackpressureEvents: safeInteger(source.inputBackpressureEvents),
+    sendFailures: safeInteger(source.sendFailures),
     wsBufferedAmountPeak: safeNonNegativeNumber(source.wsBufferedAmountPeak),
     outputQueueCurrentDurationMs: safeNonNegativeNumber(source.outputQueueCurrentDurationMs),
     outputQueuePeakDurationMs: safeNonNegativeNumber(source.outputQueuePeakDurationMs),
+    outputSafetyDrops: safeInteger(source.outputSafetyDrops),
     underruns: safeInteger(source.underruns),
+    underrunSamples: safeInteger(source.underrunSamples),
     interruptions: safeInteger(source.interruptions),
     providerTerminalCategory: typeof source.providerTerminalCategory === 'string'
       && SAFE_ERROR_CODE.test(source.providerTerminalCategory)
       ? source.providerTerminalCategory
       : null,
+    inputFrames: safeInteger(source.inputFrames),
+    inputSentFrames: safeInteger(source.inputSentFrames),
+    inputPendingFrames: safeInteger(source.inputPendingFrames),
+    translatedAudioChunks: safeInteger(source.translatedAudioChunks),
+  };
+}
+
+function getFiniteMilestone(milestones, name) {
+  const value = milestones?.[name];
+  return Number.isFinite(value) ? value : null;
+}
+
+function diffEndpoints(start, end) {
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return end - start;
+}
+
+/**
+ * Derive Offscreen-only timing deltas from performance.now() milestones.
+ * runDurationMs measures provider-active time: setupComplete → cleanupStart,
+ * falling back to cleanupComplete when cleanupStart is unavailable. Null when
+ * setupComplete or the run end is missing. Worklet currentTime/currentFrame
+ * is never used.
+ */
+export function deriveLiveDubbingTimings(milestones) {
+  const firstInputSent = getFiniteMilestone(milestones, 'firstInputSent');
+  const firstReceived = getFiniteMilestone(milestones, 'firstTranslatedAudioReceived');
+  const firstAccepted = getFiniteMilestone(milestones, 'firstTranslatedAudioAcceptedByPlayback');
+  const setupComplete = getFiniteMilestone(milestones, 'setupComplete');
+  const cleanupStart = getFiniteMilestone(milestones, 'cleanupStart');
+  const cleanupComplete = getFiniteMilestone(milestones, 'cleanupComplete');
+  const runEnd = Number.isFinite(cleanupStart)
+    ? cleanupStart
+    : (Number.isFinite(cleanupComplete) ? cleanupComplete : null);
+  return {
+    firstInputToFirstTranslatedAudioMs: diffEndpoints(firstInputSent, firstReceived),
+    firstInputToPlaybackAcceptedMs: diffEndpoints(firstInputSent, firstAccepted),
+    runDurationMs: diffEndpoints(setupComplete, runEnd),
+  };
+}
+
+export function getLiveDubbingFrameVariant(frameSamples) {
+  return frameSamples === 640 ? '40ms' : '100ms';
+}
+
+export function getLiveDubbingFrameDurationMs(frameSamples, sampleRate = PIPELINE_INPUT_SAMPLE_RATE || INPUT_SAMPLE_RATE) {
+  if (!Number.isInteger(frameSamples) || frameSamples <= 0) return 0;
+  if (!Number.isInteger(sampleRate) || sampleRate <= 0) return 0;
+  return (frameSamples / sampleRate) * 1000;
+}
+
+function getSessionFrameSamples(session) {
+  const candidate = session?.inputPipeline?.frameSamples;
+  if (Number.isInteger(candidate)) {
+    try {
+      if (resolveLiveDubbingFrameSamples(candidate) === candidate) return candidate;
+    } catch {
+      // Fall through to the canonical build-time value.
+    }
+  }
+  return CANONICAL_INPUT_FRAME_SAMPLES;
+}
+
+/**
+ * Build the scalar-only measurement snapshot. All inputs are counts,
+ * durations, milestones, or allowlisted terminal categories; no session,
+ * media, credential, URL, PCM, transcript, or provider payload is included.
+ */
+export function buildLiveDubbingMeasurementSnapshot({ telemetry, metrics, frameSamples } = {}) {
+  const base = safeTelemetrySnapshot(telemetry);
+  const sourceMetrics = metrics && typeof metrics === 'object' ? metrics : {};
+  const inputFrameSamples = Number.isInteger(frameSamples) ? frameSamples : CANONICAL_INPUT_FRAME_SAMPLES;
+  const derived = deriveLiveDubbingTimings(base.milestones);
+  const inputFrames = sourceMetrics.inputFrames !== undefined
+    ? safeInteger(sourceMetrics.inputFrames)
+    : base.inputFrames;
+  const inputSentFrames = sourceMetrics.inputSentFrames !== undefined
+    ? safeInteger(sourceMetrics.inputSentFrames)
+    : base.inputSentFrames;
+  const inputPendingFrames = sourceMetrics.inputPendingFrames !== undefined
+    ? safeInteger(sourceMetrics.inputPendingFrames)
+    : base.inputPendingFrames;
+  const translatedAudioChunks = sourceMetrics.outputChunks !== undefined
+    ? safeInteger(sourceMetrics.outputChunks)
+    : base.translatedAudioChunks;
+  const outputSafetyDrops = Math.max(
+    base.outputSafetyDrops,
+    safeInteger(sourceMetrics.outputSafetyDrops),
+  );
+  const inputQueuePeakFrames = Math.max(
+    base.inputQueuePeakFrames,
+    safeInteger(sourceMetrics.inputQueuePeakFrames),
+  );
+  const inputBackpressureEvents = Math.max(
+    base.inputBackpressureEvents,
+    safeInteger(sourceMetrics.inputBackpressureEvents),
+  );
+  const sendFailures = Math.max(
+    base.sendFailures,
+    safeInteger(sourceMetrics.sendFailures),
+  );
+  const underrunSamples = Math.max(
+    base.underrunSamples,
+    safeInteger(sourceMetrics.underrunSamples),
+  );
+  return {
+    ...base,
+    inputFrameSamples,
+    inputFrameDurationMs: getLiveDubbingFrameDurationMs(inputFrameSamples),
+    inputFrames,
+    inputSentFrames,
+    inputPendingFrames,
+    inputQueuePeakFrames,
+    inputBackpressureEvents,
+    sendFailures,
+    translatedAudioChunks,
+    outputSafetyDrops,
+    underrunSamples,
+    underrunDurationMs: (underrunSamples / OUTPUT_SAMPLE_RATE) * 1000,
+    ...derived,
+    terminalCategory: base.providerTerminalCategory,
+    playbackAccepted: base.milestones.firstTranslatedAudioAcceptedByPlayback !== null,
+  };
+}
+
+/**
+ * Build the exactly-once terminal measurement summary payload. Scalar-only
+ * and free of session/media/credential/URL/PCM/transcript/provider bodies.
+ */
+export function buildLiveDubbingMeasurementSummary({ telemetry, metrics, frameSamples, terminalCategory } = {}) {
+  const snapshot = buildLiveDubbingMeasurementSnapshot({ telemetry, metrics, frameSamples });
+  return {
+    variant: getLiveDubbingFrameVariant(snapshot.inputFrameSamples),
+    runDurationMs: snapshot.runDurationMs,
+    inputFrameSamples: snapshot.inputFrameSamples,
+    inputFrameDurationMs: snapshot.inputFrameDurationMs,
+    inputFrames: snapshot.inputFrames,
+    inputSentFrames: snapshot.inputSentFrames,
+    inputPendingFrames: snapshot.inputPendingFrames,
+    inputQueuePeakFrames: snapshot.inputQueuePeakFrames,
+    inputQueuePeakMs: snapshot.inputQueuePeakDurationMs,
+    inputDroppedDurationMs: snapshot.inputDroppedDurationMs,
+    inputBackpressureEvents: snapshot.inputBackpressureEvents,
+    sendFailures: snapshot.sendFailures,
+    wsBufferedAmountPeak: snapshot.wsBufferedAmountPeak,
+    translatedAudioChunks: snapshot.translatedAudioChunks,
+    outputQueuePeakMs: snapshot.outputQueuePeakDurationMs,
+    outputSafetyDrops: snapshot.outputSafetyDrops,
+    underruns: snapshot.underruns,
+    underrunSamples: snapshot.underrunSamples,
+    underrunDurationMs: snapshot.underrunDurationMs,
+    interruptions: snapshot.interruptions,
+    firstInputToFirstTranslatedAudioMs: snapshot.firstInputToFirstTranslatedAudioMs,
+    firstInputToPlaybackAcceptedMs: snapshot.firstInputToPlaybackAcceptedMs,
+    terminalCategory: terminalCategory !== undefined ? terminalCategory : snapshot.terminalCategory,
+    playbackAccepted: snapshot.playbackAccepted,
   };
 }
 
@@ -435,16 +612,21 @@ export class LiveDubbingController {
           inputPendingBytes: 0,
           inputPendingDurationMs: 0,
           inputQueuePeakDurationMs: 0,
+          inputQueuePeakFrames: 0,
           inputDroppedFrames: 0,
           inputDroppedBytes: 0,
           inputBackpressureEvents: 0,
+          sendFailures: 0,
           inputDroppedDurationMs: 0,
           preSetupDroppedFrames: 0,
           preSetupDroppedDurationMs: 0,
           outputChunks: 0,
           outputBytes: 0,
           outputSafetyDrops: 0,
+          outputAcceptedChunks: 0,
+          outputEpochResets: 0,
         },
+        measurementSummaryEmitted: false,
         telemetry: createTelemetry(),
       };
     }
@@ -895,8 +1077,29 @@ export class LiveDubbingController {
   /** Return scalar-only, same-context diagnostics for local validation. */
   getTelemetry() {
     const session = this.currentSession;
-    if (session) this._syncProviderTelemetry(session);
-    return safeTelemetrySnapshot(session?.telemetry || this.lastTelemetry);
+    if (session) {
+      this._syncProviderTelemetry(session);
+      this._syncProviderSendMetrics(session);
+      this._syncOutputMetricsFromPlayer(session);
+      this._syncMeasurementCounters(session);
+      return buildLiveDubbingMeasurementSnapshot({
+        telemetry: session.telemetry,
+        metrics: session.metrics,
+        frameSamples: getSessionFrameSamples(session),
+      });
+    }
+    if (this.lastTelemetry && Number.isInteger(this.lastTelemetry.inputFrameSamples)) {
+      return buildLiveDubbingMeasurementSnapshot({
+        telemetry: this.lastTelemetry,
+        metrics: this.lastTelemetry,
+        frameSamples: this.lastTelemetry.inputFrameSamples,
+      });
+    }
+    return buildLiveDubbingMeasurementSnapshot({
+      telemetry: this.lastTelemetry,
+      metrics: null,
+      frameSamples: CANONICAL_INPUT_FRAME_SAMPLES,
+    });
   }
 
   getTelemetrySnapshot() {
@@ -952,6 +1155,12 @@ export class LiveDubbingController {
       status: IDLE_STATUS,
     };
     await cleanup;
+    // Transport the sanitized terminal summary to Background inside the
+    // dispose acknowledgement so it arrives before lease release. The
+    // session identity stays on the envelope and never enters the payload.
+    if (session.measurementSummary) {
+      response.measurementSummary = { ...session.measurementSummary };
+    }
     return response;
   }
 
@@ -966,6 +1175,13 @@ export class LiveDubbingController {
       }
     }
     this._markMilestone(session, 'cleanupStart');
+    this._syncProviderSendMetrics(session);
+    this._syncOutputMetricsFromPlayer(session);
+    this._syncMeasurementCounters(session);
+    // Capture the actual capture framing before resources are fenced; the
+    // canonical build-time value is the fallback for injected test doubles.
+    session.measuredFrameSamples = getSessionFrameSamples(session);
+    this._maybeEmitMeasurementSummary(session);
     session.disposing = true;
     session.providerGeneration = ++this.providerGeneration;
     session.setupComplete = false;
@@ -1008,10 +1224,51 @@ export class LiveDubbingController {
     ]).then(() => {
       session.telemetry.outputQueueCurrentDurationMs = 0;
       this._markMilestone(session, 'cleanupComplete');
-      this.lastTelemetry = safeTelemetrySnapshot(session.telemetry);
+      this._syncMeasurementCounters(session);
+      this.lastTelemetry = buildLiveDubbingMeasurementSnapshot({
+        telemetry: session.telemetry,
+        metrics: session.metrics,
+        frameSamples: Number.isInteger(session.measuredFrameSamples)
+          ? session.measuredFrameSamples
+          : CANONICAL_INPUT_FRAME_SAMPLES,
+      });
       return true;
     });
     return session.cleanupPromise;
+  }
+
+  /**
+   * Build the Stage 3 measurement summary once per completed session for
+   * transport inside the dispose acknowledgement. Only authenticated
+   * sessions (setup acknowledged) are measured; early prepare/consume
+   * failures never emit. Provider/cleanup diagnostics stay separate and are
+   * never merged into this scalar-only payload. Background owns the
+   * canonical persisted log; this local debug line is not canonical.
+   */
+  _maybeEmitMeasurementSummary(session) {
+    if (!session || session.measurementSummaryEmitted) return null;
+    const setupDone = session.setupComplete === true
+      || session.telemetry.milestones.setupComplete !== null;
+    if (!setupDone) return null;
+    const frameSamples = Number.isInteger(session.measuredFrameSamples)
+      ? session.measuredFrameSamples
+      : getSessionFrameSamples(session);
+    const summary = buildLiveDubbingMeasurementSummary({
+      telemetry: session.telemetry,
+      metrics: session.metrics,
+      frameSamples,
+      terminalCategory: session.telemetry.providerTerminalCategory,
+    });
+    session.measurementSummaryEmitted = true;
+    session.measurementSummary = summary;
+    try {
+      // Local-debug only: single-string line, never the canonical log and
+      // never an object arg. Background owns canonical persistence/logging.
+      this.log?.debug?.(`${MEASUREMENT_SUMMARY_MESSAGE} ${JSON.stringify(summary)}`);
+    } catch {
+      // Measurement logging must not affect resource cleanup.
+    }
+    return summary;
   }
 
   _createCleanupDiagnostic(session) {
@@ -1156,6 +1413,7 @@ export class LiveDubbingController {
     };
     session.metrics.inputFrames += 1;
     session.metrics.inputBytes += buffer.byteLength;
+    session.telemetry.inputFrames = safeInteger(session.metrics.inputFrames);
     session.pendingInput.push(queued);
     session.pendingInputMs += (sampleCount / sampleRate) * 1000;
     this._trimPendingInput(session);
@@ -1192,6 +1450,10 @@ export class LiveDubbingController {
       if (!sent) {
         if (session.providerClient.lastSendReason === 'BACKPRESSURE') {
           session.metrics.inputBackpressureEvents += 1;
+          session.telemetry.inputBackpressureEvents = Math.max(
+            safeInteger(session.telemetry.inputBackpressureEvents),
+            session.metrics.inputBackpressureEvents,
+          );
         }
         break;
       }
@@ -1199,9 +1461,11 @@ export class LiveDubbingController {
       session.pendingInputMs -= getFrameDurationMs(frame);
       session.metrics.inputSentFrames += 1;
       session.metrics.inputSentBytes += frame.buffer.byteLength;
+      session.telemetry.inputSentFrames = safeInteger(session.metrics.inputSentFrames);
       this._markMilestone(session, 'firstInputSent');
     }
     this._updatePendingInputMetrics(session);
+    session.telemetry.inputPendingFrames = safeInteger(session.metrics.inputPendingFrames);
   }
 
   _updatePendingInputMetrics(session) {
@@ -1215,10 +1479,18 @@ export class LiveDubbingController {
       session.metrics.inputQueuePeakDurationMs || 0,
       session.metrics.inputPendingDurationMs,
     );
+    session.metrics.inputQueuePeakFrames = Math.max(
+      safeInteger(session.metrics.inputQueuePeakFrames),
+      session.pendingInput.length,
+    );
     session.telemetry.inputQueueCurrentDurationMs = session.metrics.inputPendingDurationMs;
     session.telemetry.inputQueuePeakDurationMs = Math.max(
       session.telemetry.inputQueuePeakDurationMs,
       session.metrics.inputPendingDurationMs,
+    );
+    session.telemetry.inputQueuePeakFrames = Math.max(
+      safeInteger(session.telemetry.inputQueuePeakFrames),
+      session.pendingInput.length,
     );
   }
 
@@ -1240,10 +1512,145 @@ export class LiveDubbingController {
         ? {
           queuedSamples: safeInteger(metrics.queuedSamples),
           underruns: safeInteger(metrics.underruns),
+          underrunSamples: safeInteger(metrics.underrunSamples),
+          safetyDrops: safeInteger(metrics.safetyDrops),
+          acceptedChunks: safeInteger(metrics.acceptedChunks),
+          epochResets: safeInteger(metrics.epochResets),
+          peakQueuedSamples: safeInteger(metrics.peakQueuedSamples),
         }
         : null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Read WS send facts from the Gemini client, the source of truth for
+   * backpressure and send failures. Returns null for injected doubles
+   * without getMetrics so local fallback counting still applies.
+   */
+  _readProviderSendMetrics(client) {
+    try {
+      const metrics = client?.getMetrics?.();
+      if (!metrics || typeof metrics !== 'object') return null;
+      if (!Number.isInteger(metrics.backpressureEvents) && !Number.isInteger(metrics.sendFailures)) {
+        return null;
+      }
+      return {
+        backpressureEvents: safeInteger(metrics.backpressureEvents),
+        sendFailures: safeInteger(metrics.sendFailures),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _syncProviderSendMetrics(session) {
+    const child = this._readProviderSendMetrics(session.providerClient);
+    const localBackpressure = safeInteger(session.metrics.inputBackpressureEvents);
+    if (child) {
+      session.telemetry.inputBackpressureEvents = Math.max(
+        safeInteger(session.telemetry.inputBackpressureEvents),
+        localBackpressure,
+        child.backpressureEvents,
+      );
+      session.telemetry.sendFailures = Math.max(
+        safeInteger(session.telemetry.sendFailures),
+        safeInteger(session.metrics.sendFailures),
+        child.sendFailures,
+      );
+    } else {
+      session.telemetry.inputBackpressureEvents = Math.max(
+        safeInteger(session.telemetry.inputBackpressureEvents),
+        localBackpressure,
+      );
+      session.telemetry.sendFailures = Math.max(
+        safeInteger(session.telemetry.sendFailures),
+        safeInteger(session.metrics.sendFailures),
+      );
+    }
+    session.metrics.inputBackpressureEvents = Math.max(
+      localBackpressure,
+      safeInteger(session.telemetry.inputBackpressureEvents),
+    );
+    session.metrics.sendFailures = safeInteger(session.telemetry.sendFailures);
+  }
+
+  _syncMeasurementCounters(session) {
+    session.telemetry.inputFrames = safeInteger(session.metrics.inputFrames);
+    session.telemetry.inputSentFrames = safeInteger(session.metrics.inputSentFrames);
+    session.telemetry.inputPendingFrames = safeInteger(session.metrics.inputPendingFrames);
+    session.telemetry.inputQueuePeakFrames = Math.max(
+      safeInteger(session.telemetry.inputQueuePeakFrames),
+      safeInteger(session.metrics.inputQueuePeakFrames),
+    );
+    session.telemetry.translatedAudioChunks = safeInteger(session.metrics.outputChunks);
+    session.telemetry.outputSafetyDrops = Math.max(
+      safeInteger(session.telemetry.outputSafetyDrops),
+      safeInteger(session.metrics.outputSafetyDrops),
+    );
+  }
+
+  /**
+   * Pull output queue facts directly from the player when available.
+   * Playback behavior is unchanged; this is observational only. Current
+   * queue duration stays driven by onMetrics notifications so a stale
+   * getMetrics mock cannot regress a fresher pushed update; peak and
+   * cumulative counters are merged with max semantics.
+   */
+  _syncOutputMetricsFromPlayer(session) {
+    let playerMetrics = null;
+    try {
+      playerMetrics = session.outputPlayer?.getMetrics?.();
+    } catch {
+      playerMetrics = null;
+    }
+    if (!playerMetrics || typeof playerMetrics !== 'object') return;
+    const queuedSamples = safeInteger(playerMetrics.queuedSamples);
+    const peakSamples = safeInteger(playerMetrics.peakQueuedSamples);
+    const peakDurationMs = (Math.max(queuedSamples, peakSamples) / OUTPUT_SAMPLE_RATE) * 1000;
+    if (playerMetrics.peakQueuedSamples !== undefined
+      && Number.isFinite(peakDurationMs) && peakDurationMs >= 0) {
+      session.telemetry.outputQueuePeakDurationMs = Math.max(
+        safeNonNegativeNumber(session.telemetry.outputQueuePeakDurationMs),
+        peakDurationMs,
+      );
+    }
+    const baselineUnderruns = safeInteger(session.telemetry.outputBaseline?.underruns);
+    const underruns = Math.max(0, safeInteger(playerMetrics.underruns) - baselineUnderruns);
+    session.telemetry.underruns = Math.max(safeInteger(session.telemetry.underruns), underruns);
+    // Observational only: raw worklet underrun sample count, baseline-relative
+    // like underruns. Existing underruns counting is unchanged.
+    if (playerMetrics.underrunSamples !== undefined) {
+      const baselineSamples = safeInteger(session.telemetry.outputBaseline?.underrunSamples);
+      const samples = Math.max(0, safeInteger(playerMetrics.underrunSamples) - baselineSamples);
+      session.telemetry.underrunSamples = Math.max(
+        safeInteger(session.telemetry.underrunSamples),
+        samples,
+      );
+    }
+    const baselineSafety = safeInteger(session.telemetry.outputBaseline?.safetyDrops);
+    const childSafety = Math.max(0, safeInteger(playerMetrics.safetyDrops) - baselineSafety);
+    const mergedSafety = Math.max(
+      safeInteger(session.metrics.outputSafetyDrops),
+      childSafety,
+      safeInteger(session.telemetry.outputSafetyDrops),
+    );
+    session.metrics.outputSafetyDrops = mergedSafety;
+    session.telemetry.outputSafetyDrops = mergedSafety;
+    if (Number.isInteger(playerMetrics.epochResets)) {
+      const baselineEpoch = safeInteger(session.telemetry.outputBaseline?.epochResets);
+      session.metrics.outputEpochResets = Math.max(
+        0,
+        safeInteger(playerMetrics.epochResets) - baselineEpoch,
+      );
+    }
+    if (Number.isInteger(playerMetrics.acceptedChunks)) {
+      const baselineAccepted = safeInteger(session.telemetry.outputBaseline?.acceptedChunks);
+      session.metrics.outputAcceptedChunks = Math.max(
+        safeInteger(session.metrics.outputAcceptedChunks),
+        Math.max(0, safeInteger(playerMetrics.acceptedChunks) - baselineAccepted),
+      );
     }
   }
 
@@ -1305,9 +1712,42 @@ export class LiveDubbingController {
       session.telemetry.outputQueuePeakDurationMs,
       durationMs,
     );
+    const peakSamples = safeInteger(metrics.peakQueuedSamples);
+    if (metrics.peakQueuedSamples !== undefined) {
+      const peakDurationMs = (Math.max(queuedSamples, peakSamples) / OUTPUT_SAMPLE_RATE) * 1000;
+      if (Number.isFinite(peakDurationMs) && peakDurationMs >= 0) {
+        session.telemetry.outputQueuePeakDurationMs = Math.max(
+          session.telemetry.outputQueuePeakDurationMs,
+          peakDurationMs,
+        );
+      }
+    }
     const baselineUnderruns = safeInteger(session.telemetry.outputBaseline?.underruns);
     const underruns = Math.max(0, safeInteger(metrics.underruns) - baselineUnderruns);
     session.telemetry.underruns = Math.max(session.telemetry.underruns, underruns);
+    if (metrics.underrunSamples !== undefined) {
+      const baselineSamples = safeInteger(session.telemetry.outputBaseline?.underrunSamples);
+      const samples = Math.max(0, safeInteger(metrics.underrunSamples) - baselineSamples);
+      session.telemetry.underrunSamples = Math.max(
+        safeInteger(session.telemetry.underrunSamples),
+        samples,
+      );
+    }
+    if (metrics.safetyDrops !== undefined) {
+      const baselineSafety = safeInteger(session.telemetry.outputBaseline?.safetyDrops);
+      const childSafety = Math.max(0, safeInteger(metrics.safetyDrops) - baselineSafety);
+      const mergedSafety = Math.max(
+        safeInteger(session.metrics.outputSafetyDrops),
+        childSafety,
+      );
+      session.metrics.outputSafetyDrops = mergedSafety;
+      session.telemetry.outputSafetyDrops = mergedSafety;
+    } else {
+      session.telemetry.outputSafetyDrops = Math.max(
+        safeInteger(session.telemetry.outputSafetyDrops),
+        safeInteger(session.metrics.outputSafetyDrops),
+      );
+    }
   }
 
   _handlePlaybackAccepted(session, details = {}) {
@@ -1340,7 +1780,14 @@ export class LiveDubbingController {
       });
       session.metrics.outputChunks += 1;
       session.metrics.outputBytes += bytes.byteLength;
-      if (result?.accepted === false) session.metrics.outputSafetyDrops += 1;
+      session.telemetry.translatedAudioChunks = safeInteger(session.metrics.outputChunks);
+      if (result?.accepted === false) {
+        session.metrics.outputSafetyDrops += 1;
+        session.telemetry.outputSafetyDrops = Math.max(
+          safeInteger(session.telemetry.outputSafetyDrops),
+          session.metrics.outputSafetyDrops,
+        );
+      }
     } catch (error) {
       this._providerFailed(session, error, 'OUTPUT_AUDIO_ERROR');
     }
@@ -1405,6 +1852,10 @@ export class LiveDubbingController {
     if (reason === 'OUTPUT_PIPELINE_ERROR'
       && error?.code === 'OUTPUT_AUDIO_QUEUE_SAFETY_LIMIT') {
       session.metrics.outputSafetyDrops += 1;
+      session.telemetry.outputSafetyDrops = Math.max(
+        safeInteger(session.telemetry.outputSafetyDrops),
+        session.metrics.outputSafetyDrops,
+      );
       return;
     }
     this._providerFailed(session, error, reason);

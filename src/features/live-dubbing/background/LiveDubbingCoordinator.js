@@ -6,6 +6,8 @@ import {
   LIVE_DUBBING_ACTIONS,
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_LEASE_REASONS,
+  LIVE_DUBBING_MEASUREMENT_HISTORY_KEY,
+  LIVE_DUBBING_MEASUREMENT_HISTORY_LIMIT,
   LIVE_DUBBING_OWNER,
   LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_STATUS,
@@ -31,6 +33,7 @@ import {
   safeFailureCode,
   sanitizeLiveDubbingDiagnostic,
   sanitizeLiveDubbingCleanupDiagnostic,
+  sanitizeLiveDubbingMeasurementSummary,
   sanitizeLiveDubbingProviderDiagnostic,
   sanitizeDescriptor,
 } from '../contracts.js';
@@ -116,6 +119,9 @@ export class LiveDubbingCoordinator {
     this.terminalOperations = new Map();
     this.pendingStarts = new Set();
     this.credentialRequestSessions = new Set();
+    // Ephemeral runtime dedup for measurement summaries. Session ids are
+    // never persisted or exported; only sanitized DTOs reach storage/logs.
+    this.recordedMeasurementSessions = new Set();
   }
 
   start(message = {}, sender = {}) {
@@ -149,6 +155,39 @@ export class LiveDubbingCoordinator {
         status: cloneDescriptor(this.descriptor),
       };
     });
+  }
+
+  /**
+   * Return the bounded, oldest→newest sanitized measurement history.
+   * Emits one copy-friendly single-line log per call. Storage failures
+   * yield an empty list and never reject.
+   */
+  async getMeasurements() {
+    const measurements = await this._readMeasurementHistory();
+    try {
+      this.log?.info?.(`LIVE_DUBBING_MEASUREMENTS ${JSON.stringify(measurements)}`);
+    } catch {
+      // Copy-friendly logging is best effort and never affects callers.
+    }
+    return { success: true, measurements };
+  }
+
+  /**
+   * Clear the persisted measurement history. Storage failures are
+   * swallowed so cleanup/session semantics are never affected.
+   */
+  async clearMeasurements() {
+    try {
+      const storage = this.browserAPI.storage?.session;
+      if (typeof storage?.remove === 'function') {
+        await storage.remove(LIVE_DUBBING_MEASUREMENT_HISTORY_KEY);
+      } else if (typeof storage?.set === 'function') {
+        await storage.set({ [LIVE_DUBBING_MEASUREMENT_HISTORY_KEY]: [] });
+      }
+    } catch {
+      // Measurement storage is best effort and never affects callers.
+    }
+    return { success: true, cleared: true };
   }
 
   handleTabRemoved(tabId) {
@@ -869,6 +908,19 @@ export class LiveDubbingCoordinator {
         return { success: false };
       }
 
+      // Transport-then-dispose: the sanitized terminal summary travels
+      // inside the dispose acknowledgement and is accepted/persisted here,
+      // before lease release can destroy the offscreen document. Failures
+      // never affect cleanup or session semantics.
+      try {
+        await this._recordMeasurementSummary(
+          descriptor.sessionId,
+          response?.measurementSummary ?? response?.data?.measurementSummary,
+        );
+      } catch {
+        // Measurement persistence is best effort; cleanup continues.
+      }
+
       if (leaseAcquired) {
         const released = await this.leaseManager.release({
           owner: LIVE_DUBBING_OWNER,
@@ -1171,6 +1223,72 @@ export class LiveDubbingCoordinator {
     const sanitized = sanitizeLiveDubbingProviderDiagnostic(diagnostic);
     if (sanitized) state.providerDiagnostic = sanitized;
     return state.providerDiagnostic || null;
+  }
+
+  /**
+   * Accept one sanitized measurement summary per completed measurable
+   * session. The ephemeral session id is runtime dedup only and is never
+   * persisted or exported. Exactly-once across duplicate terminal/dispose/
+   * stale messages; malformed candidates and storage failures are swallowed
+   * so Stop/cleanup semantics are never affected. On accept, emits exactly
+   * one single-string canonical log line.
+   * @returns {Promise<boolean>} true when a summary was accepted.
+   */
+  async _recordMeasurementSummary(sessionId, candidate) {
+    if (typeof sessionId !== 'string' || !sessionId.trim()) return false;
+    if (this.recordedMeasurementSessions.has(sessionId)) return false;
+    const sanitized = sanitizeLiveDubbingMeasurementSummary(candidate);
+    if (!sanitized) return false;
+    this.recordedMeasurementSessions.add(sessionId);
+    this._trimRecordedSessions();
+
+    const history = await this._readMeasurementHistory();
+    history.push(sanitized);
+    while (history.length > LIVE_DUBBING_MEASUREMENT_HISTORY_LIMIT) history.shift();
+    try {
+      await this.browserAPI.storage?.session?.set({
+        [LIVE_DUBBING_MEASUREMENT_HISTORY_KEY]: history,
+      });
+    } catch {
+      // Persist failures never affect Stop/cleanup or session semantics.
+    }
+    try {
+      this.log?.info?.(`LIVE_DUBBING_MEASUREMENT ${JSON.stringify(sanitized)}`);
+    } catch {
+      // Canonical logging is best effort after acceptance.
+    }
+    return true;
+  }
+
+  _trimRecordedSessions() {
+    while (this.recordedMeasurementSessions.size > 100) {
+      const oldest = this.recordedMeasurementSessions.values().next().value;
+      this.recordedMeasurementSessions.delete(oldest);
+    }
+  }
+
+  /**
+   * Read the bounded measurement history oldest→newest, re-sanitizing every
+   * entry so corrupt storage or foreign writes recover safely to [] or to
+   * the valid subset. Never throws and never touches storage.local.
+   */
+  async _readMeasurementHistory() {
+    try {
+      const storage = this.browserAPI.storage?.session;
+      if (typeof storage?.get !== 'function') return [];
+      const result = await storage.get(LIVE_DUBBING_MEASUREMENT_HISTORY_KEY);
+      const stored = result?.[LIVE_DUBBING_MEASUREMENT_HISTORY_KEY];
+      if (!Array.isArray(stored)) return [];
+      const history = [];
+      for (const entry of stored) {
+        const sanitized = sanitizeLiveDubbingMeasurementSummary(entry);
+        if (sanitized) history.push(sanitized);
+      }
+      while (history.length > LIVE_DUBBING_MEASUREMENT_HISTORY_LIMIT) history.shift();
+      return history;
+    } catch {
+      return [];
+    }
   }
 
   _forgetSessionState(sessionId, expectedState = null) {
