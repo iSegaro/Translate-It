@@ -4,8 +4,8 @@ import {
   GEMINI_LIVE_MODEL,
   GEMINI_LIVE_SETUP_TIMEOUT,
   GEMINI_LIVE_WEBSOCKET_ENDPOINT,
-  GeminiLiveTranslationClient,
-} from './GeminiLiveTranslationClient.js';
+  GeminiLiveProviderAdapter,
+} from './GeminiLiveProviderAdapter.js';
 
 class FakeWebSocket {
   static OPEN = 1;
@@ -41,7 +41,7 @@ class FakeWebSocket {
 FakeWebSocket.instances = [];
 
 function createClient(callbacks = {}) {
-  return new GeminiLiveTranslationClient({
+  return new GeminiLiveProviderAdapter({
     WebSocket: FakeWebSocket,
     ...callbacks,
   });
@@ -60,9 +60,10 @@ async function connectReady(client, targetLanguage = 'fr') {
   return socket;
 }
 
-describe('GeminiLiveTranslationClient', () => {
+describe('GeminiLiveProviderAdapter', () => {
   afterEach(() => {
     FakeWebSocket.instances = [];
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -115,7 +116,7 @@ describe('GeminiLiveTranslationClient', () => {
         throw new Error('binaryType is unsupported');
       },
     });
-    const client = new GeminiLiveTranslationClient({
+    const client = new GeminiLiveProviderAdapter({
       webSocketFactory: () => socket,
     });
     const connection = client.connect('short-lived-secret', 'fr');
@@ -144,10 +145,107 @@ describe('GeminiLiveTranslationClient', () => {
       },
     }) });
 
-    expect(onAudio).toHaveBeenCalledWith({
-      mimeType: 'audio/pcm;rate=24000',
-      data: 'AQ==',
+    expect(onAudio).toHaveBeenCalledWith(new Uint8Array([1]));
+  });
+
+  it('decodes only validated 24k PCM output before invoking playback callbacks', async () => {
+    const onAudio = vi.fn();
+    const onError = vi.fn();
+    const client = createClient({ onAudio, onError });
+    const socket = await connectReady(client);
+
+    socket.receive({
+      serverContent: {
+        modelTurn: {
+          parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000;foo=bar', data: 'AAH/' } }],
+        },
+      },
     });
+
+    expect(onAudio).toHaveBeenCalledWith(new Uint8Array([0, 1, 255]));
+    client.close();
+
+    const nextConnection = client.connect('next-secret', 'fr');
+    const nextSocket = FakeWebSocket.instances.at(-1);
+    nextSocket.open();
+    nextSocket.receive({ setupComplete: {} });
+    await expect(nextConnection).resolves.toBeUndefined();
+    nextSocket.receive({
+      serverContent: {
+        modelTurn: {
+          parts: [{ inlineData: { mimeType: 'audio/pcm;rate=16000', data: 'AQ==' } }],
+        },
+      },
+    });
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'LIVE_DUBBING_INVALID_OUTPUT_AUDIO',
+      name: 'GeminiLiveOutputAudioError',
+      providerReason: 'INVALID_OUTPUT_AUDIO',
+      providerDiagnostic: expect.objectContaining({
+        terminalCategory: 'INVALID_OUTPUT_AUDIO',
+        closeCode: null,
+        wasClean: null,
+        malformedAt: null,
+      }),
+    }));
+    expect(onError).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['empty inline data', {}],
+    ['missing MIME type', { data: 'AQ==' }],
+    ['empty MIME type', { mimeType: '', data: 'AQ==' }],
+    ['missing data', { mimeType: 'audio/pcm;rate=24000' }],
+    ['empty data', { mimeType: 'audio/pcm;rate=24000', data: '' }],
+    ['non-PCM MIME type', { mimeType: 'audio/wav', data: 'AQ==' }],
+  ])('fails closed for %s inline audio shape', async (_label, inlineData) => {
+    const onError = vi.fn();
+    const client = createClient({ onError });
+    const connection = client.connect('short-lived-secret', 'fr');
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+    socket.receive({ setupComplete: {} });
+    await connection;
+
+    socket.receive({ serverContent: { modelTurn: { parts: [{ inlineData }] } } });
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'GEMINI_LIVE_MALFORMED_MESSAGE',
+      providerDiagnostic: expect.objectContaining({
+        terminalCategory: 'MALFORMED_MESSAGE',
+        malformedAt: 'INLINE_AUDIO_SHAPE',
+      }),
+    }));
+  });
+
+  it('normalizes syntactically valid PCM base64 decode failures', async () => {
+    const onError = vi.fn();
+    const client = createClient({ onError });
+    const socket = await connectReady(client);
+    vi.stubGlobal('atob', () => {
+      throw new Error('decoder-secret');
+    });
+
+    socket.receive({
+      serverContent: {
+        modelTurn: {
+          parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: 'AQ==' } }],
+        },
+      },
+    });
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'LIVE_DUBBING_OUTPUT_AUDIO_ERROR',
+      name: 'GeminiLiveOutputAudioError',
+      providerReason: 'OUTPUT_AUDIO_ERROR',
+      providerDiagnostic: expect.objectContaining({
+        closeCode: null,
+        wasClean: null,
+        terminalCategory: 'OUTPUT_AUDIO_ERROR',
+      }),
+    }));
+    expect(JSON.stringify(onError.mock.calls)).not.toContain('decoder-secret');
   });
 
   it('ignores empty serverContent and continues with subsequent 24k PCM audio', async () => {
@@ -193,10 +291,7 @@ describe('GeminiLiveTranslationClient', () => {
     });
 
     expect(onAudio).toHaveBeenCalledOnce();
-    expect(onAudio).toHaveBeenCalledWith({
-      mimeType: 'audio/pcm;rate=24000',
-      data: 'AQ==',
-    });
+    expect(onAudio).toHaveBeenCalledWith(new Uint8Array([1]));
     expect(client.phase).toBe('ready');
   });
 
@@ -282,7 +377,7 @@ describe('GeminiLiveTranslationClient', () => {
 
     socket.bufferedAmount = 64 * 1024;
     expect(client.sendAudio(new Uint8Array([0, 1]))).toBe(false);
-    expect(client.lastSendReason).toBe('BACKPRESSURE');
+    expect(client.getSendState()).toEqual({ lastReason: 'BACKPRESSURE' });
     expect(client.getMetrics()).toMatchObject({ backpressureEvents: 1, sentAudioChunks: 0 });
   });
 
@@ -329,14 +424,8 @@ describe('GeminiLiveTranslationClient', () => {
       },
     });
 
-    expect(onAudio).toHaveBeenNthCalledWith(1, {
-      mimeType: 'audio/pcm;rate=24000',
-      data: 'AQ==',
-    });
-    expect(onAudio).toHaveBeenNthCalledWith(2, {
-      mimeType: 'audio/pcm;rate=24000',
-      data: 'Ag==',
-    });
+    expect(onAudio).toHaveBeenNthCalledWith(1, new Uint8Array([1]));
+    expect(onAudio).toHaveBeenNthCalledWith(2, new Uint8Array([2]));
     expect(onInterrupted).toHaveBeenCalledOnce();
     expect(onGenerationComplete).toHaveBeenCalledOnce();
     expect(onTurnComplete).toHaveBeenCalledOnce();
@@ -572,7 +661,7 @@ describe('GeminiLiveTranslationClient', () => {
     expect(JSON.stringify(client.getTelemetry())).not.toContain('secret');
   });
 
-  it('rejects unknown server metadata and malformed audio base64', async () => {
+  it('rejects unknown server metadata and normalizes audio decode failures', async () => {
     const onError = vi.fn();
     const client = createClient({ onError });
     const socket = await connectReady(client);
@@ -586,10 +675,18 @@ describe('GeminiLiveTranslationClient', () => {
     const nextConnection = client.connect('next-secret', 'fr');
     const nextSocket = FakeWebSocket.instances.at(-1);
     nextSocket.open();
+    nextSocket.receive({ setupComplete: {} });
+    await nextConnection;
     nextSocket.receive({ serverContent: {
-      modelTurn: { parts: [{ inlineData: { mimeType: 'audio/pcm', data: 'not-base64!' } }] },
+      modelTurn: { parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: 'not-base64!' } }] },
     } });
-    await expect(nextConnection).rejects.toMatchObject({ code: 'GEMINI_LIVE_MALFORMED_MESSAGE' });
+    expect(onError).toHaveBeenLastCalledWith(expect.objectContaining({
+      code: 'GEMINI_LIVE_MALFORMED_MESSAGE',
+      providerDiagnostic: expect.objectContaining({
+        terminalCategory: 'MALFORMED_MESSAGE',
+        malformedAt: 'INLINE_AUDIO_SHAPE',
+      }),
+    }));
   });
 
   it('keeps lifecycle events scalar-only and records same-context milestones', async () => {
@@ -768,7 +865,7 @@ describe('GeminiLiveTranslationClient', () => {
   it('redacts the key and URL from connection errors', async () => {
     const apiKey = 'short-lived-secret';
     const onError = vi.fn();
-    const client = new GeminiLiveTranslationClient({
+    const client = new GeminiLiveProviderAdapter({
       onError,
       webSocketFactory: url => {
         throw new Error(`failed to open ${url}`);
@@ -792,7 +889,7 @@ describe('GeminiLiveTranslationClient', () => {
     oldSocket.receive({
       serverContent: {
         modelTurn: {
-          parts: [{ inlineData: { mimeType: 'audio/pcm', data: 'AQ==' } }],
+          parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: 'AQ==' } }],
         },
       },
     });
@@ -805,7 +902,7 @@ describe('GeminiLiveTranslationClient', () => {
       data: JSON.stringify({
         serverContent: {
           modelTurn: {
-            parts: [{ inlineData: { mimeType: 'audio/pcm', data: 'Ag==' } }],
+            parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: 'Ag==' } }],
           },
         },
       }),

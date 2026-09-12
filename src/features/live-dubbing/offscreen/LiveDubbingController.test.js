@@ -547,8 +547,12 @@ describe('LiveDubbingController', () => {
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     expect(provider.sendAudio).toHaveBeenCalledOnce();
 
-    providerCallbacks.onAudio({ mimeType: 'audio/pcm;rate=24000', data: 'AQ==' });
+    providerCallbacks.onAudio(new Uint8Array([1]));
     expect(outputPlayer.enqueuePcm16).toHaveBeenCalledOnce();
+    expect(outputPlayer.enqueuePcm16).toHaveBeenCalledWith(
+      new Uint8Array([1]),
+      expect.objectContaining({ epoch: 0, sequence: 1 }),
+    );
     providerCallbacks.onInterrupted();
     expect(outputPlayer.resetEpoch).toHaveBeenCalledWith(1);
 
@@ -611,9 +615,9 @@ describe('LiveDubbingController', () => {
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     await controller.connectProvider('session-1', 'en', 2);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
-    providerCallbacks.onAudio({ mimeType: 'audio/pcm;rate=24000', data: 'AQ==' });
+    providerCallbacks.onAudio(new Uint8Array([1]));
     expect(controller.getTelemetry().milestones.firstTranslatedAudioAcceptedByPlayback).toBeNull();
-    providerCallbacks.onAudio({ mimeType: 'audio/pcm;rate=24000', data: 'Ag==' });
+    providerCallbacks.onAudio(new Uint8Array([2]));
     expect(controller.getTelemetry().milestones.firstTranslatedAudioAcceptedByPlayback).toBeNull();
     outputPlayer.onMetrics({ queuedSamples: 4_800, underruns: 4 });
     outputPlayer.onPlaybackAccepted({ accepted: false, sampleCount: 2 });
@@ -670,7 +674,7 @@ describe('LiveDubbingController', () => {
     session.lastError = 'LIVE_DUBBING_PROVIDER_ERROR';
     session.stream = { streamId: 'stream-secret', transcript: 'private transcript' };
     session.providerClient = {
-      lastSendReason: 'BACKPRESSURE',
+      getSendState: vi.fn(() => ({ lastReason: 'BACKPRESSURE' })),
       sessionId: 'session-secret',
       data: 'AQ==',
     };
@@ -775,8 +779,52 @@ describe('LiveDubbingController', () => {
     expect(JSON.stringify(notify.mock.calls)).not.toContain('provider-secret');
 
     const outputCalls = outputPlayer.enqueuePcm16.mock.calls.length;
-    provider.onAudio({ mimeType: 'audio/pcm;rate=24000', data: 'AQ==' });
+    provider.onAudio(new Uint8Array([1]));
     expect(outputPlayer.enqueuePcm16).toHaveBeenCalledTimes(outputCalls);
+    await controller.dispose('session-1');
+  });
+
+  it.each([
+    ['LIVE_DUBBING_INVALID_OUTPUT_AUDIO', 'INVALID_OUTPUT_AUDIO'],
+    ['LIVE_DUBBING_OUTPUT_AUDIO_ERROR', 'OUTPUT_AUDIO_ERROR'],
+  ])('preserves typed provider output failure %s and reason %s', async (code, reason) => {
+    const track = new FakeTrack();
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    const provider = {
+      connect: vi.fn(async () => provider.onSetupComplete()),
+      close: vi.fn(),
+    };
+    const notify = vi.fn();
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipeline,
+      outputPlayer,
+      providerClient: provider,
+      requestCredential: vi.fn().mockResolvedValue({
+        success: true,
+        apiKey: 'secret-key',
+        targetLanguage: 'fr',
+      }),
+      notify,
+    });
+
+    controller.prepare('session-1', 'fr', 0);
+    await controller.consume('session-1', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'fr', 2);
+    provider.onError(Object.assign(new Error('provider output failure'), {
+      code,
+      providerReason: reason,
+    }));
+
+    expect(controller.status()).toMatchObject({
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: code,
+    });
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ event: reason, error: code }),
+    }));
+
     await controller.dispose('session-1');
   });
 

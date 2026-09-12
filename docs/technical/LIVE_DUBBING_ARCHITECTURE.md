@@ -63,6 +63,14 @@ returned, stored, or logged.
 
 ## Provider
 
+The offscreen `LiveDubbingController` delegates Gemini-specific behavior to
+`GeminiLiveProviderAdapter`, which owns the Gemini protocol over its WebSocket
+transport. This extraction is intentionally bounded to Gemini; it is not a
+generic provider API or registry.
+
+Transport path: `LiveDubbingController` → `GeminiLiveProviderAdapter` → Gemini
+protocol transport.
+
 Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 
 - **Credential flow.** Background resolves the key (`ApiKeyManager`
@@ -80,9 +88,10 @@ Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 - **No pre-setup queue.** Frames arriving before setup are counted and
   dropped (`preSetupDroppedFrames`); nothing is buffered for later send.
 - **Streaming.** `realtimeInput.audio` carries base64 PCM declared as
-  16 kHz; the socket send path enforces a buffered-amount bound and
-  reports `BACKPRESSURE` / `NOT_READY` / `SEND_FAILED` without throwing
-  into the audio path.
+  16 kHz; the adapter's socket send path enforces a buffered-amount bound and
+  reports `BACKPRESSURE` / `NOT_READY` / `SEND_FAILED` without throwing into
+  the controller's audio path. Valid 24 kHz `inlineData` PCM is base64-decoded
+  and validated by the adapter before byte buffers reach playback.
 - **Parsing.** Strict top-level union parsing: `setupComplete`,
   `serverContent`, `toolCall`, `toolCallCancellation`, `goAway`,
   `sessionResumptionUpdate`, with optional accompanying `usageMetadata`.

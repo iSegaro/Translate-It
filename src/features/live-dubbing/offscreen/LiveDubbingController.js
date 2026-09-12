@@ -17,7 +17,7 @@ import {
   parseProviderCredentialResponse,
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
-import { GeminiLiveTranslationClient } from './GeminiLiveTranslationClient.js';
+import { GeminiLiveProviderAdapter } from '../providers/GeminiLiveProviderAdapter.js';
 import { TabAudioPipeline } from './TabAudioPipeline.js';
 import { PcmOutputPlayer } from './PcmOutputPlayer.js';
 
@@ -25,6 +25,10 @@ const IDLE_STATUS = 'IDLE';
 const INPUT_SAMPLE_RATE = 16_000;
 const OUTPUT_SAMPLE_RATE = 24_000;
 const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
+const PROVIDER_AUDIO_TERMINAL_REASONS = new Set([
+  'INVALID_OUTPUT_AUDIO',
+  'OUTPUT_AUDIO_ERROR',
+]);
 const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'LiveDubbingController');
 const TELEMETRY_MILESTONES = Object.freeze([
   'captureReady',
@@ -247,19 +251,6 @@ function getFrameBuffer(frame) {
   return null;
 }
 
-function decodeBase64(value) {
-  if (typeof value !== 'string' || !value) throw new TypeError('PCM data is required');
-
-  if (typeof globalThis.atob === 'function') {
-    const binary = globalThis.atob(value);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
-  }
-  if (typeof globalThis.Buffer !== 'undefined') return new Uint8Array(globalThis.Buffer.from(value, 'base64'));
-  throw new Error('PCM decoding is unavailable');
-}
-
 function errorCode(error, fallback) {
   return typeof error?.code === 'string' && SAFE_ERROR_CODE.test(error.code)
     ? error.code
@@ -278,7 +269,7 @@ function hasAudioContext(options) {
 
 /**
  * Owns one offscreen live-dubbing transaction: capture, both local audio
- * graphs, one credential request, and one fenced Gemini provider generation.
+ * graphs, one credential request, and one fenced provider generation.
  *
  * The controller is deliberately the only owner of these resources. A
  * terminal callback changes the session fence before cleanup so late worklet
@@ -764,7 +755,7 @@ export class LiveDubbingController {
         return this._disposedProviderResponse(session);
       }
       if (!client || typeof client.connect !== 'function') {
-        throw Object.assign(new Error('Gemini Live client is unavailable'), {
+        throw Object.assign(new Error('Live dubbing provider is unavailable'), {
           code: 'LIVE_DUBBING_PROVIDER_UNAVAILABLE',
         });
       }
@@ -787,7 +778,7 @@ export class LiveDubbingController {
       }
       await setupPromise;
       if (!this._isCurrentProvider(session, providerGeneration)) {
-        throw Object.assign(new Error('Gemini Live setup was not acknowledged'), {
+        throw Object.assign(new Error('Live dubbing provider setup was not acknowledged'), {
           code: 'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
         });
       }
@@ -855,7 +846,7 @@ export class LiveDubbingController {
       });
     }
     if (!client) {
-      client = new GeminiLiveTranslationClient({
+      client = new GeminiLiveProviderAdapter({
         ...this.providerClientOptions,
         performanceNow: this.performanceNow,
         callbacks,
@@ -1098,7 +1089,7 @@ export class LiveDubbingController {
       && session.telemetry.milestones.setupComplete === null) return null;
     let providerLastSendReason;
     try {
-      providerLastSendReason = session.providerClient?.lastSendReason;
+      providerLastSendReason = session.providerClient?.getSendState?.().lastReason;
     } catch {
       providerLastSendReason = undefined;
     }
@@ -1268,8 +1259,12 @@ export class LiveDubbingController {
         return;
       }
       if (!sent) {
-        if (session.providerClient.lastSendReason === 'BACKPRESSURE') {
-          session.metrics.inputBackpressureEvents += 1;
+        const providerSendMetrics = this._readProviderSendMetrics(session.providerClient);
+        if (providerSendMetrics) {
+          session.metrics.inputBackpressureEvents = Math.max(
+            session.metrics.inputBackpressureEvents,
+            providerSendMetrics.backpressureEvents,
+          );
           session.telemetry.inputBackpressureEvents = Math.max(
             safeInteger(session.telemetry.inputBackpressureEvents),
             session.metrics.inputBackpressureEvents,
@@ -1327,8 +1322,8 @@ export class LiveDubbingController {
   }
 
   /**
-   * Read WS send facts from the Gemini client, the source of truth for
-   * backpressure and send failures. Returns null for injected doubles
+   * Read provider send facts, the source of truth for backpressure and send
+   * failures. Returns null for injected doubles
    * without getMetrics so local fallback counting still applies.
    */
   _readProviderSendMetrics(client) {
@@ -1560,23 +1555,16 @@ export class LiveDubbingController {
     }
   }
 
-  _handleProviderAudio(session, generation, audio) {
+  _handleProviderAudio(session, generation, audioBytes) {
     if (!this._isCurrentProvider(session, generation) || !session.setupComplete) return;
-    if (typeof audio?.mimeType !== 'string' || !/audio\/pcm(?:;\s*rate=24000\b)/i.test(audio.mimeType)) {
-      this._providerFailed(session, Object.assign(new Error('Gemini Live returned unsupported PCM audio'), {
-        code: 'LIVE_DUBBING_INVALID_OUTPUT_AUDIO',
-      }), 'INVALID_OUTPUT_AUDIO');
-      return;
-    }
     try {
-      const bytes = decodeBase64(audio.data);
       this._markMilestone(session, 'firstTranslatedAudioReceived');
-      const result = session.outputPlayer?.enqueuePcm16(bytes, {
+      const result = session.outputPlayer?.enqueuePcm16(audioBytes, {
         epoch: session.outputEpoch,
         sequence: ++session.outputSequence,
       });
       session.metrics.outputChunks += 1;
-      session.metrics.outputBytes += bytes.byteLength;
+      session.metrics.outputBytes += audioBytes?.byteLength || 0;
       session.telemetry.translatedAudioChunks = safeInteger(session.metrics.outputChunks);
       if (result?.accepted === false) {
         session.metrics.outputSafetyDrops += 1;
@@ -1599,12 +1587,15 @@ export class LiveDubbingController {
 
   _handleProviderError(session, generation, error, providerDiagnostic = null) {
     if (!this._isCurrentProvider(session, generation)) return;
-    this._providerFailed(session, error, 'PROVIDER_ERROR', providerDiagnostic);
+    const reason = PROVIDER_AUDIO_TERMINAL_REASONS.has(error?.providerReason)
+      ? error.providerReason
+      : 'PROVIDER_ERROR';
+    this._providerFailed(session, error, reason, providerDiagnostic);
   }
 
   _handleProviderClose(session, generation, details = {}, providerDiagnostic = null) {
     if (!this._isCurrentProvider(session, generation) || session.disposing) return;
-    this._providerFailed(session, Object.assign(new Error('Gemini Live connection closed'), {
+    this._providerFailed(session, Object.assign(new Error('Live dubbing provider connection closed'), {
       code: 'LIVE_DUBBING_PROVIDER_CLOSED',
     }), 'PROVIDER_CLOSED', providerDiagnostic, details);
   }
@@ -1612,7 +1603,7 @@ export class LiveDubbingController {
   _handleProviderTerminal(session, generation, reason, details = {}, providerDiagnostic = null) {
     if (!this._isCurrentProvider(session, generation)) return;
     providerDiagnostic ||= details?.providerDiagnostic;
-    this._providerFailed(session, Object.assign(new Error('Gemini Live requested termination'), {
+    this._providerFailed(session, Object.assign(new Error('Live dubbing provider requested termination'), {
       code: reason,
     }), reason, providerDiagnostic);
   }
