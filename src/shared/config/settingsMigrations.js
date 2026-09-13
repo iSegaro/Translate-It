@@ -22,6 +22,7 @@ import { getPersistedDefaultSettings } from './settingsDefaults.js';
 import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { LIVE_DUBBING_PROVIDER_ID, LIVE_DUBBING_PROVIDER_IDS } from '@/features/live-dubbing/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
@@ -67,6 +68,19 @@ function migrateMouseHoverTrigger(currentSettings, updates, migrationLog) {
 
   updates.MOUSE_HOVER_TRIGGER = 'primary';
   migrationLog.push('Migrated MOUSE_HOVER_TRIGGER from ctrl to primary');
+}
+
+/**
+ * Normalize an explicitly stored Live Dubbing provider without affecting
+ * unrelated translation-provider settings. Missing values are filled by the
+ * canonical persisted-default pass below.
+ */
+function normalizeLiveDubbingProvider(currentSettings, updates, migrationLog) {
+  if (!Object.prototype.hasOwnProperty.call(currentSettings, 'LIVE_DUBBING_PROVIDER')) return;
+  if (LIVE_DUBBING_PROVIDER_IDS.includes(currentSettings.LIVE_DUBBING_PROVIDER)) return;
+
+  updates.LIVE_DUBBING_PROVIDER = LIVE_DUBBING_PROVIDER_ID;
+  migrationLog.push(`Normalized LIVE_DUBBING_PROVIDER to ${LIVE_DUBBING_PROVIDER_ID}`);
 }
 
 /**
@@ -237,6 +251,10 @@ function runMainMigration(currentSettings) {
 
   // Migrate legacy Mouse Hover trigger values before filling missing defaults.
   migrateMouseHoverTrigger(currentSettings, updates, migrationLog);
+
+  // Normalize only an explicitly stored invalid provider. Missing values are
+  // handled by the generic persisted-default migration below.
+  normalizeLiveDubbingProvider(currentSettings, updates, migrationLog);
   
   // Migrate Bilingual Mode keys
   migrateBilingualModeKeys(currentSettings, updates, migrationLog);

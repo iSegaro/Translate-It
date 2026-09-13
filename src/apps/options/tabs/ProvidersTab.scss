@@ -46,6 +46,19 @@
     }
   }
 
+  .live-dubbing-provider-group {
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: $spacing-lg;
+      width: 100%;
+    }
+
+    .setting-info { flex: 1; }
+    .setting-control { flex: 0 0 200px; }
+  }
+
   .api-settings-section {
     margin-top: $spacing-md;
     width: 100%;
@@ -364,8 +377,12 @@
     .settings-container > .setting-group,
     .settings-container > .section-separator,
     .api-settings-section,
-    .primary-service-selection {
+    .primary-service-selection,
+    .live-dubbing-provider-group {
       width: 100% !important;
     }
+
+    .live-dubbing-provider-group .setting-row { align-items: flex-start; flex-direction: column; }
+    .live-dubbing-provider-group .setting-control { flex-basis: auto; width: 100%; }
   }
 }

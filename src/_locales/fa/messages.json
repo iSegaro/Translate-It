@@ -248,6 +248,18 @@
   "providers_tab_title": {
     "message": "سرویس‌ها"
   },
+  "live_dubbing_provider_label": {
+    "message": "ارائه‌دهنده دوبله زنده"
+  },
+  "live_dubbing_provider_description": {
+    "message": "برای جلسه‌های جدید دوبله زنده استفاده می‌شود."
+  },
+  "live_dubbing_provider_bootstrap_gemini_error": {
+    "message": "امکان راه‌اندازی دوبله زنده Gemini وجود ندارد. کلید API Gemini و اتصال خود را بررسی کنید و دوباره تلاش کنید."
+  },
+  "live_dubbing_provider_bootstrap_openai_error": {
+    "message": "امکان راه‌اندازی دوبله زنده OpenAI وجود ندارد. کلید API OpenAI و اتصال خود را بررسی کنید و دوباره تلاش کنید."
+  },
   "configure_service_button": {
     "message": "تنظیم سرویس ⚙️"
   },

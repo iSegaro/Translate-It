@@ -66,11 +66,20 @@ import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import './LiveDubbingControl.scss'
+import { LIVE_DUBBING_PROVIDER_IDS, LIVE_DUBBING_PROVIDER_ID } from '@/features/live-dubbing/constants.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+
+const { t } = useUnifiedI18n()
 
 const props = defineProps({
   targetLanguage: {
     type: String,
     required: true
+  },
+  providerId: {
+    type: String,
+    default: LIVE_DUBBING_PROVIDER_ID,
+    validator: (value) => LIVE_DUBBING_PROVIDER_IDS.includes(value)
   }
 })
 
@@ -80,6 +89,7 @@ const state = ref('loading')
 const authoritativeStatus = ref(null)
 const sessionId = ref(null)
 const sessionDescriptor = ref(null)
+const sessionProviderId = ref(null)
 const errorMessage = ref('')
 
 const isStarting = computed(() => state.value === 'starting')
@@ -101,15 +111,18 @@ const statusText = computed(() => ({
   unavailable: 'Unavailable'
 }[authoritativeStatus.value || state.value] || 'Error'))
 
-const ERROR_MESSAGES = {
-  LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
-  INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.',
-  LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE: 'A Gemini API key is required for live dubbing.'
+const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = sessionProviderId.value || props.providerId) => {
+  if (error === 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE') {
+    return providerId === 'openai'
+      ? t('live_dubbing_provider_bootstrap_openai_error')
+      : t('live_dubbing_provider_bootstrap_gemini_error')
+  }
+  const hardcoded = {
+    LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
+    INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.'
+  }
+  return hardcoded[error] || (typeof error === 'string' && error ? error : fallback)
 }
-
-const getErrorMessage = (error, fallback = 'Live dubbing failed.') => (
-  ERROR_MESSAGES[error] || (typeof error === 'string' && error ? error : fallback)
-)
 
 const unwrap = (response) => response?.data || response || {}
 
@@ -120,9 +133,11 @@ const applyStatus = (response, { preserveSession = false } = {}) => {
   if (nextSessionId) {
     sessionId.value = nextSessionId
     sessionDescriptor.value = descriptor
+    if (LIVE_DUBBING_PROVIDER_IDS.includes(descriptor.providerId)) sessionProviderId.value = descriptor.providerId
   } else if (!preserveSession) {
     sessionId.value = null
     sessionDescriptor.value = null
+    sessionProviderId.value = null
   }
 
   if (result.available === false || result.error === 'LIVE_DUBBING_UNSUPPORTED' || descriptor.status === 'unavailable') {
@@ -165,7 +180,7 @@ const start = async () => {
   try {
     const response = await sendMessage({
       action: 'START_LIVE_DUBBING',
-      data: { targetLanguage: props.targetLanguage }
+      data: { targetLanguage: props.targetLanguage, providerId: props.providerId }
     })
     applyStatus(response)
     if (state.value === 'idle') state.value = 'running'
@@ -188,6 +203,7 @@ const stop = async () => {
     if (state.value === 'idle') {
       sessionId.value = null
       sessionDescriptor.value = null
+      sessionProviderId.value = null
     }
   } catch (error) {
     // Keep retained session available after transport failure so cleanup can retry.

@@ -129,6 +129,14 @@ vi.mock('@/components/popup/TranslationForm.vue', () => ({
   }
 }))
 
+vi.mock('@/components/popup/LiveDubbingControl.vue', () => ({
+  default: {
+    name: 'LiveDubbingControl',
+    props: ['targetLanguage', 'providerId'],
+    template: '<div class="live-dubbing-control-stub" />'
+  }
+}))
+
 vi.mock('webextension-polyfill', () => ({
   default: {
     runtime: {
@@ -150,6 +158,7 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('PopupApp', () => {
   beforeEach(() => {
+    vi.stubGlobal('__BROWSER__', 'chrome')
     mockUnifiedTranslation = {
       sourceLanguage: ref('fr'),
       targetLanguage: ref('de'),
@@ -173,6 +182,7 @@ describe('PopupApp', () => {
       settings: {
         DEEPL_BETA_LANGUAGES_ENABLED: false,
         TRANSLATION_API: 'google',
+        LIVE_DUBBING_PROVIDER: 'openai',
         THEME: 'auto'
       },
       loadSettings: vi.fn().mockResolvedValue(undefined),
@@ -216,5 +226,23 @@ describe('PopupApp', () => {
 
     expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('fr')
     expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('de')
+  })
+
+  it('passes the normalized live dubbing provider without affecting translation provider', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('openai')
+    expect(wrapper.findComponent({ name: 'TranslationForm' }).props('provider')).toBe('google')
+  })
+
+  it('falls back to Gemini for an unknown live dubbing provider', async () => {
+    mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'unsupported'
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('gemini')
   })
 })

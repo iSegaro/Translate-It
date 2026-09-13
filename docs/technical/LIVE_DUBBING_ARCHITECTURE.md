@@ -40,6 +40,19 @@ playback.
    10 s. Service-worker restarts reconcile via descriptor + lease snapshot
    (`reconcile()`), never trusting a stale session.
 
+## Provider Setting
+
+- `LIVE_DUBBING_PROVIDER` is the canonical persisted provider selection and is
+  edited only in Options. Its default is `gemini`; the supported values are
+  `gemini` and `openai`.
+- Popup passes the persisted value through as `providerId`; it does not select,
+  rewrite, or silently fall back between providers. A provider change applies
+  only to a future session; the provider identity is immutable after an active
+  session starts.
+- Invalid persisted values are normalized to `gemini` during settings
+  migration. Runtime setup rejects unknown values; there is no silent provider
+  fallback.
+
 ## Runtime Ownership
 
 - `LiveDubbingCoordinator` (background) owns session identity, descriptor

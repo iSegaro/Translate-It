@@ -248,6 +248,18 @@
   "providers_tab_title": {
     "message": "サービス"
   },
+  "live_dubbing_provider_label": {
+    "message": "ライブ吹き替えプロバイダー"
+  },
+  "live_dubbing_provider_description": {
+    "message": "新しいライブ吹き替えセッションで使用されます。"
+  },
+  "live_dubbing_provider_bootstrap_gemini_error": {
+    "message": "Geminiライブ吹き替えを初期化できません。Gemini APIキーと接続を確認して、もう一度お試しください。"
+  },
+  "live_dubbing_provider_bootstrap_openai_error": {
+    "message": "OpenAIライブ吹き替えを初期化できません。OpenAI APIキーと接続を確認して、もう一度お試しください。"
+  },
   "configure_service_button": {
     "message": "サービスを設定 ⚙️"
   },

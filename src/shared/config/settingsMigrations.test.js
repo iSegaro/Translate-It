@@ -32,6 +32,56 @@ describe('Settings Migrations', () => {
     expect(updates.CHANGELOG_URL).toBeUndefined();
   });
 
+  it('should add the missing Live Dubbing provider through canonical defaults', async () => {
+    const { updates, logs } = await runSettingsMigrations({});
+
+    expect(updates.LIVE_DUBBING_PROVIDER).toBe('gemini');
+    expect(logs).toContain('Added missing setting: LIVE_DUBBING_PROVIDER');
+    expect(logs).not.toContain('Normalized LIVE_DUBBING_PROVIDER to gemini');
+  });
+
+  it.each(['gemini', 'openai'])('should preserve valid Live Dubbing provider %s', async (provider) => {
+    const { updates } = await runSettingsMigrations({
+      LIVE_DUBBING_PROVIDER: provider
+    });
+
+    expect(updates.LIVE_DUBBING_PROVIDER).toBeUndefined();
+  });
+
+  it.each([
+    '',
+    'stale-provider',
+    null,
+    undefined,
+    {},
+    42
+  ])('should normalize invalid Live Dubbing provider %o to Gemini', async (provider) => {
+    const baseSettings = {
+      TRANSLATION_API: 'openai',
+      MODE_PROVIDERS: { ...CONFIG.MODE_PROVIDERS }
+    };
+    const baseline = await runSettingsMigrations(baseSettings);
+    const { updates, logs } = await runSettingsMigrations({
+      ...baseSettings,
+      LIVE_DUBBING_PROVIDER: provider,
+    });
+
+    expect(updates.LIVE_DUBBING_PROVIDER).toBe('gemini');
+    expect(updates.TRANSLATION_API).toBe(baseline.updates.TRANSLATION_API);
+    expect(updates.MODE_PROVIDERS).toEqual(baseline.updates.MODE_PROVIDERS);
+    expect(logs).toContain('Normalized LIVE_DUBBING_PROVIDER to gemini');
+  });
+
+  it('should make Live Dubbing provider normalization idempotent', async () => {
+    const first = await runSettingsMigrations({ LIVE_DUBBING_PROVIDER: 'stale-provider' });
+    const second = await runSettingsMigrations({
+      LIVE_DUBBING_PROVIDER: first.updates.LIVE_DUBBING_PROVIDER
+    });
+
+    expect(first.updates.LIVE_DUBBING_PROVIDER).toBe('gemini');
+    expect(second.updates.LIVE_DUBBING_PROVIDER).toBeUndefined();
+  });
+
   it('should remove obsolete Microsoft Edge endpoint overrides', async () => {
     const { removals, logs } = await runSettingsMigrations({
       MICROSOFT_EDGE_AUTH_URL: 'https://edge.microsoft.com/translate/auth',

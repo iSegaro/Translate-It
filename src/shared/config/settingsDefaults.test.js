@@ -23,6 +23,8 @@ describe('getPersistedDefaultSettings', () => {
 
     expect(defaults.THEME).toBe(CONFIG.THEME);
     expect(defaults.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(CONFIG.LIVE_DUBBING_PROVIDER).toBe('gemini');
+    expect(defaults.LIVE_DUBBING_PROVIDER).toBe(CONFIG.LIVE_DUBBING_PROVIDER);
     expect(defaults.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
     expect(defaults.GEMINI_API_URL).toBe(CONFIG.GEMINI_API_URL);
     expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);

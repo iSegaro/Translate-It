@@ -71,6 +71,10 @@ describe('Config Module', () => {
       expect(CONFIG.APP_NAME).toBe('Translate It');
     });
 
+    it('should default Live Dubbing to Gemini', () => {
+      expect(CONFIG.LIVE_DUBBING_PROVIDER).toBe('gemini');
+    });
+
     it('should expose the current Microsoft Edge translation endpoint without auth config', () => {
       expect(CONFIG.MICROSOFT_EDGE_TRANSLATE_URL).toBe(
         'https://edge.microsoft.com/translate/translatetext'

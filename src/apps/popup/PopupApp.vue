@@ -95,6 +95,7 @@
         <LiveDubbingControl
           v-if="isLiveDubbingSupported"
           :target-language="targetLanguage"
+          :provider-id="liveDubbingProvider"
           @busy-change="isLiveDubbingBusy = $event"
         />
         
@@ -198,6 +199,11 @@ const errorType = ref(null)
 const canTranslateFromForm = ref(false)
 const isLiveDubbingBusy = ref(false)
 const isLiveDubbingSupported = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'chrome'
+const liveDubbingProvider = computed(() => (
+  ['gemini', 'openai'].includes(settingsStore.settings?.LIVE_DUBBING_PROVIDER)
+    ? settingsStore.settings.LIVE_DUBBING_PROVIDER
+    : 'gemini'
+))
 
 // Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {

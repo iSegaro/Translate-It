@@ -8,6 +8,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { TRANSLATION_HTML, MOBILE_CONSTANTS, TTS_ENGINES } from './constants.js';
 import { isMobile } from '@/shared/utils/device.js';
+import { LIVE_DUBBING_PROVIDER_ID } from '@/features/live-dubbing/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'config');
 logger.info('Config module initialized');
@@ -103,6 +104,9 @@ export const CONFIG = {
 
   // --- API Settings ---
   TRANSLATION_API: isFirefox ? ProviderRegistryIds.YANDEX : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
+
+  // --- Live Dubbing Settings ---
+  LIVE_DUBBING_PROVIDER: LIVE_DUBBING_PROVIDER_ID,
 
   // --- Mode Specific Provider Settings (Generated Dynamically) ---
   MODE_PROVIDERS: Object.fromEntries(
