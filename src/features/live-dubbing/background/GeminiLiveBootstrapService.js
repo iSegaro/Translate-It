@@ -111,9 +111,9 @@ function classifyMintFailure(status, metadata) {
 function buildMintBody(targetLanguage) {
   return {
     uses: 1,
-    liveConnectConstraints: {
+    bidiGenerateContentSetup: {
       model: GEMINI_LIVE_MODEL,
-      config: {
+      generationConfig: {
         responseModalities: ['AUDIO'],
         translationConfig: {
           targetLanguageCode: targetLanguage,

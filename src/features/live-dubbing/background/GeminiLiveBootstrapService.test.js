@@ -67,11 +67,12 @@ describe('GeminiLiveBootstrapService', () => {
       'Content-Type': 'application/json',
       'x-goog-api-key': 'key-1',
     });
-    expect(JSON.parse(calls[0].options.body)).toEqual({
+    const body = JSON.parse(calls[0].options.body);
+    expect(body).toEqual({
       uses: 1,
-      liveConnectConstraints: {
+      bidiGenerateContentSetup: {
         model: GEMINI_LIVE_MODEL,
-        config: {
+        generationConfig: {
           responseModalities: ['AUDIO'],
           translationConfig: {
             targetLanguageCode: 'zh-Hans',
@@ -79,6 +80,12 @@ describe('GeminiLiveBootstrapService', () => {
           },
         },
       },
+    });
+    expect(body).not.toHaveProperty('liveConnectConstraints');
+    expect(body.bidiGenerateContentSetup.model).toBe(GEMINI_LIVE_MODEL);
+    expect(body.bidiGenerateContentSetup.generationConfig.translationConfig).toEqual({
+      targetLanguageCode: 'zh-Hans',
+      echoTargetLanguage: false,
     });
   });
 
@@ -143,7 +150,7 @@ describe('GeminiLiveBootstrapService', () => {
 
   it('stops without a next key on plain request-shape (400) failures', async () => {
     const fetchImpl = vi.fn(async () => failMintWith(400, googleErrorBody({
-      message: 'Invalid liveConnectConstraints.',
+      message: 'Invalid bidiGenerateContentSetup.',
       status: 'INVALID_ARGUMENT',
     })));
     const { service } = createService({ keys: ['key-1', 'key-2'], fetchImpl });
