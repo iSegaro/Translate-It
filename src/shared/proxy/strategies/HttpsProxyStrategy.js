@@ -85,7 +85,10 @@ export class HttpsProxyStrategy extends BaseProxyStrategy {
     try {
       const response = await fetch(proxyUrl, proxyOptions);
 
-      // Check if proxy responded with an error
+      // The existing HTTPS proxy protocol returns a raw response and has no
+      // response marker or envelope proving that an error came from the
+      // target. Fail closed rather than classifying proxy-generated 401/429
+      // responses as target authentication or rate-limit failures.
       if (!response.ok && response.status >= 400) {
         throw new Error(`HTTPS proxy returned error status: ${response.status}`);
       }

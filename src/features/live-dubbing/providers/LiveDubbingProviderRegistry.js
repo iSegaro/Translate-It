@@ -1,11 +1,20 @@
-import { LIVE_DUBBING_AUDIO_MODES, LIVE_DUBBING_PROVIDER_ID } from '../constants.js';
+import {
+  LIVE_DUBBING_AUDIO_MODES,
+  LIVE_DUBBING_OPENAI_PROVIDER_ID,
+  LIVE_DUBBING_PROVIDER_ID,
+} from '../constants.js';
 import { isLiveDubbingAudioMode } from '../contracts.js';
 import { GeminiLiveProviderAdapter } from './GeminiLiveProviderAdapter.js';
+import { OpenAIRealtimeProviderAdapter } from './OpenAIRealtimeProviderAdapter.js';
 
 const PROVIDER_DEFINITIONS = Object.freeze({
   [LIVE_DUBBING_PROVIDER_ID]: Object.freeze({
     audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
     create: (options) => new GeminiLiveProviderAdapter(options),
+  }),
+  [LIVE_DUBBING_OPENAI_PROVIDER_ID]: Object.freeze({
+    audioMode: LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM,
+    create: (options) => new OpenAIRealtimeProviderAdapter(options),
   }),
 });
 

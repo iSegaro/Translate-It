@@ -1,8 +1,9 @@
 # Live Dubbing Architecture
 
-Chrome-only real-time tab-audio translation. Captured tab audio is streamed
-to the Gemini Live translation model as 16 kHz PCM and translated speech
-returns as 24 kHz PCM for local playback.
+Chrome-only real-time tab-audio translation. Captured tab audio is delivered
+to one of two internal providers: Gemini as 16 kHz PCM with local 24 kHz PCM
+playback, or OpenAI as a browser-neutral media stream with WebRTC remote audio
+playback.
 
 ## Scope
 
@@ -21,10 +22,13 @@ returns as 24 kHz PCM for local playback.
    (target language), `STOP_LIVE_DUBBING` (session id), or
    `GET_LIVE_DUBBING_STATUS`. All three require a trusted extension-UI
    sender (see Security).
-2. `LiveDubbingCoordinator.start()` creates a session id, persists a
-   `PREPARING_CAPTURE` descriptor (including provider id `gemini`) to
-   `storage.session`, acquires the
-   offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK`), and drives the
+2. `LiveDubbingCoordinator.start()` fixes the provider identity in the pending
+   start and descriptor. An absent `providerId` defaults to `gemini`; the
+   only other supported internal id is `openai`. The Popup has no provider
+   selector and does not expose this choice. The Coordinator persists a
+   `PREPARING_CAPTURE` descriptor to `storage.session`, acquires the
+   provider-specific offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK` for
+   Gemini; OpenAI additionally requires `WEB_RTC`), and drives the
    offscreen stages `PREPARE` → `CONSUME` → `CONNECT_PROVIDER`, ending in
    `RUNNING`.
 3. `stop()`, tab removal, top-level navigation, capture-track end, and
@@ -64,42 +68,57 @@ returned, stored, or logged.
 
 ## Provider Identity and Bootstrap
 
-The public live-dubbing contract carries the exact provider identity
-`LIVE_DUBBING_PROVIDER_ID = 'gemini'`. The Popup does not select or transmit a
-provider; the Coordinator owns this value and includes it in every descriptor,
-offscreen request, response, and terminal event. Persisted descriptors without
-the provider id are invalid and are not adopted during reconciliation.
+The internal live-dubbing contract supports exactly two provider ids:
+`gemini` (the default) and `openai`. The Popup does not select or expose a
+provider; an absent START `providerId` uses Gemini, while an empty or unknown
+value is rejected. Once START creates a pending descriptor, the provider,
+session id, tab id, canonical target language, and `startedAt` identity tuple
+are fixed for the session and carried through every offscreen request,
+response, terminal event, status, stop, and recovery path. Persisted
+descriptors without a supported provider id are invalid and are not adopted.
 
-Provider language support is an explicit `LIVE_GEMINI_LANGUAGE_MAP` allowlist,
-separate from the general translation catalog. Unknown provider or language
-codes fail closed before descriptor creation or socket setup.
+Provider language support is provider-local and separate from the general
+translation catalog. Gemini keeps the explicit `LIVE_GEMINI_LANGUAGE_MAP`
+allowlist and its existing mappings. OpenAI uses its own explicit well-formed
+language-tag normalization policy; it never falls back to Gemini's allowlist
+or a general catalog. Unknown provider or language values fail closed before
+descriptor creation or provider setup.
 
 The one-time `LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP` request is authorized
 only for the exact active `CONNECTING_PROVIDER` session, provider, target
-language, and event sequence. Background mints a constrained, single-use
-ephemeral token (`GeminiLiveBootstrapService`) and returns the small DTO
-`{ success, providerId, targetLanguage, bootstrap: { accessToken } }`. The
-generic Controller treats `bootstrap` as opaque; only the Gemini adapter reads
-`bootstrap.accessToken` and connects to the constrained endpoint with
-`?access_token=`. Long-lived API keys never leave background. No legacy
-credential action or helper remains.
+language, and event sequence. Background selects the provider-specific
+bootstrap service and returns the provider-neutral DTO
+`{ success, providerId, targetLanguage, bootstrap }`. The generic Controller
+treats `bootstrap` as opaque; each adapter owns its local contract: Gemini
+receives `{ accessToken }` and connects to the constrained endpoint with
+`?access_token=`, while OpenAI receives `{ secret }` containing an ephemeral
+client secret for its WebRTC SDP exchange. Long-lived API keys never leave
+background. No legacy credential action or helper remains.
 
 The `LiveDubbingProviderRegistry` is the feature-local mapping from provider id
-to adapter. It currently contains only Gemini and returns no adapter for an
-unknown provider. Each entry declares `{ create, audioMode }` (`pcm` for
-Gemini); unknown providers and unsupported modes fail closed at PREPARE —
-before getUserMedia, pipelines, provider creation, or bootstrap. Factory
-exceptions propagate to the Controller error boundary instead of masking
-as null. See Audio Paths.
+to adapter. It contains Gemini (`pcm`) and the production OpenAI adapter
+(`media-stream`); it returns no adapter for an unknown provider. Each entry
+declares `{ create, audioMode }`; unknown providers and unsupported modes fail
+closed at PREPARE — before getUserMedia, pipelines, provider creation, or
+bootstrap. Factory exceptions propagate to the Controller error boundary
+instead of masking as null. OpenAI is registered as a production adapter in
+this registry, while remaining absent from Settings with no UI selection
+surface. See Audio Paths.
 
 ## Provider
 
-The offscreen `LiveDubbingController` resolves the provider through
-`LiveDubbingProviderRegistry`. The Gemini adapter owns Gemini-specific behavior
-and the Gemini protocol over its WebSocket transport.
+The offscreen `LiveDubbingController` resolves the fixed provider through
+`LiveDubbingProviderRegistry`. Gemini owns its protocol over WebSocket; the
+OpenAI adapter owns its WebRTC SDP exchange, `oai-events` data channel, and
+remote audio element playback. The provider registry is the activation point;
+no provider id is inferred from client methods.
 
-Transport path: `LiveDubbingController` → `LiveDubbingProviderRegistry` →
-`GeminiLiveProviderAdapter` → Gemini protocol transport.
+Transport paths:
+
+- `LiveDubbingController` → `LiveDubbingProviderRegistry` →
+  `GeminiLiveProviderAdapter` → Gemini protocol transport.
+- `LiveDubbingController` → `LiveDubbingProviderRegistry` →
+  `OpenAIRealtimeProviderAdapter` → OpenAI WebRTC translations endpoint.
 
 Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 
@@ -118,8 +137,8 @@ Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
   descriptors. A token or connection failure ends the session: there is no
   running-session failover, reconnect, or resumption.
 - **Setup gate.** The audio path must be ready (`audioPathReady` — the PCM
-  input/output pipelines for Gemini) and the descriptor persisted at
-  `CONNECTING_PROVIDER` before bootstrap is issued;
+  input/output pipelines for Gemini, or the retained media stream for OpenAI)
+  and the descriptor persisted at `CONNECTING_PROVIDER` before bootstrap is issued;
   `setupComplete` from the provider is required before `RUNNING`.
 - **No pre-setup queue.** Frames arriving before setup are counted and
   dropped (`preSetupDroppedFrames`); nothing is buffered for later send.
@@ -154,7 +173,8 @@ metadata only and never drive session semantics.
 ## Audio Paths (`pcm` | `media-stream`)
 
 Providers declare exactly one audio path in `LiveDubbingProviderRegistry`
-as `{ create, audioMode }`; Gemini declares `pcm`. Unknown providers and
+as `{ create, audioMode }`; Gemini declares `pcm` and OpenAI declares
+`media-stream`. Unknown providers and
 unsupported modes fail closed before any audio resource is built. The
 controller resolves the mode only through `registry.getAudioMode()` —
 never by inspecting client methods and never by provider id.
@@ -164,7 +184,7 @@ never by inspecting client methods and never by provider id.
   provider's `sendAudio` contract, with the pre-setup drop counting,
   pending queue, and backpressure accounting above. The provider receives
   `{ bootstrap, targetLanguage }` at connect and owns no media.
-- **`media-stream`.** The retained capture `MediaStream` is handed to the
+- **`media-stream` (OpenAI).** The retained capture `MediaStream` is handed to the
   provider, which consumes audio and manages playback itself. No local PCM
   graphs are built, no frames are queued, and `sendAudio` is never called
   (it is a pcm-only contract, not a universal one). The connect input is
@@ -173,6 +193,15 @@ never by inspecting client methods and never by provider id.
   Provider-managed playback acceptance arrives through the generic
   `onPlaybackAccepted` callback with the same milestone semantics as
   player acceptance and no media objects in diagnostics or logs.
+
+OpenAI setup uses the authorized `{ secret }` bootstrap contract as an opaque
+ephemeral client secret. The adapter creates one `RTCPeerConnection`, adds only
+source audio tracks, creates `oai-events`, POSTs the raw local SDP to the
+official translations calls endpoint with an ephemeral bearer, applies the raw
+SDP answer, and plays the remote track through an offscreen audio element. The
+adapter has no `sendAudio` method and never stops or removes Controller-owned
+source tracks. OpenAI setup and playback failures use the existing generic
+provider error lifecycle and generation fencing.
 
 Ownership split: the controller owns the capture tracks in both modes
 and stops them only in Controller cleanup; providers never own the
@@ -188,6 +217,13 @@ by `firstTranslatedAudioAcceptedByPlayback`, which a media-stream provider
 reports through the generic `onPlaybackAccepted` callback (rejected on the
 pcm path, where the player owns it). Status, telemetry, and cleanup
 diagnostics expose scalars only — no provider, media, or stream objects.
+
+Lease and bootstrap ownership are provider-specific but remain one control
+plane: Gemini requires `USER_MEDIA` + `AUDIO_PLAYBACK`; OpenAI adds `WEB_RTC`.
+Bootstrap authorization always uses the provider stored in the descriptor.
+OpenAI is not routed through the Gemini minting service; no API key, client
+secret, SDP, stream, media object, transcript text, or raw provider payload is
+persisted or emitted in diagnostics.
 
 ## Playback (pcm path)
 
@@ -209,10 +245,12 @@ terminal operation.
 
 - **Background-only keys, ephemeral offscreen bootstrap.** Long-lived Gemini
   keys are resolved and used only in background to mint the token. Offscreen
-  receives only `{ accessToken }`; the adapter rejects any `apiKey` bootstrap
-  form and connects to `BidiGenerateContentConstrained` with `?access_token=`
-  (never `?key=`). Tokens are transient in offscreen memory and are never
-  stored, logged, or included in diagnostics.
+  receives only `{ accessToken }`; the Gemini adapter rejects any `apiKey`
+  bootstrap form and connects to `BidiGenerateContentConstrained` with
+  `?access_token=` (never `?key=`). OpenAI receives only its authorized opaque
+  ephemeral client secret and uses it in the short-lived SDP bearer request.
+  Tokens/secrets are transient in offscreen memory and are never stored,
+  logged, or included in diagnostics.
 - **Exact sender auth.** Offscreen messages require the exact offscreen
   document URL plus runtime id and no tab. Public commands require the
   exact allowlisted UI document path (`src/html/popup.html`,
@@ -224,7 +262,7 @@ terminal operation.
   name/message/code), provider diagnostics (stage `CONNECT_PROVIDER` +
   token/code/close-code/flags), and cleanup diagnostics (counts +
   playback + terminal category).
-  Session/tab identity, stream ids, credentials, URLs, PCM, transcripts,
+  Session/tab identity, stream ids, credentials, URLs, SDP, PCM, transcripts,
   provider bodies, and errors never cross a context boundary and are
   never logged.
 
@@ -248,12 +286,15 @@ terminal operation.
 
 ## Runtime Integration
 
-- **Canonical codes.** `LIVE_DUBBING_*` / `GEMINI_LIVE_*` codes are the
-  internal failure identity across background, offscreen, and the adapter.
+- **Canonical codes.** `LIVE_DUBBING_*`, `GEMINI_LIVE_*`, and
+  `OPENAI_REALTIME_*` codes are the internal failure identity across
+  background, offscreen, and the adapter. Phase E capture, readiness,
+  terminal, cleanup, and provider-diagnostic categories remain unchanged.
 - **ErrorTypes classification-only.** Shared `ErrorTypes` are reused only
-  inside Gemini token-mint HTTP classification where an unambiguous generic
-  semantic exists. Failover-relevant mappings cover invalid key (including
-  explicit `PERMISSION_DENIED`), insufficient balance, quota exhaustion, and
+  inside Gemini and OpenAI provider-bootstrap HTTP classification where an
+  unambiguous generic semantic exists. Failover-relevant mappings cover invalid
+  key (including explicit `PERMISSION_DENIED`), insufficient balance, quota
+  exhaustion, and
   rate limiting, and feed the existing `ApiKeyManager.shouldFailover`
   predicate. HTTP 5xx may classify as `SERVER_ERROR` but does not trigger
   key failover; transport/proxy failures stop directly without shared-type

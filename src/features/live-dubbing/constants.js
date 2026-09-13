@@ -7,6 +7,11 @@
 export const LIVE_DUBBING_OWNER = 'live-dubbing';
 export const LIVE_DUBBING_STORAGE_KEY = '__translateItLiveDubbingSession';
 export const LIVE_DUBBING_PROVIDER_ID = 'gemini';
+export const LIVE_DUBBING_OPENAI_PROVIDER_ID = 'openai';
+export const LIVE_DUBBING_PROVIDER_IDS = Object.freeze([
+  LIVE_DUBBING_PROVIDER_ID,
+  LIVE_DUBBING_OPENAI_PROVIDER_ID,
+]);
 
 export const LIVE_DUBBING_LEASE_REASONS = Object.freeze([
   'USER_MEDIA',

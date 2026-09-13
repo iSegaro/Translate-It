@@ -6,7 +6,9 @@ import {
   LIVE_DUBBING_ACTIONS,
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_LEASE_REASONS,
+  LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_OWNER,
+  LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_STATUS,
@@ -28,6 +30,7 @@ import {
   isAuthorizedOffscreenSender,
   isAcknowledgedForSession,
   isExactSessionResponse,
+  isLiveDubbingProviderId,
   normalizeProviderTargetLanguage,
   safeFailureCode,
   sanitizeLiveDubbingDiagnostic,
@@ -81,6 +84,21 @@ function defaultUuid() {
   return `${hex.slice(0, 8).join('')}-${hex.slice(8, 12).join('')}-${hex.slice(12, 16).join('')}-${hex.slice(16, 20).join('')}-${hex.slice(20).join('')}`;
 }
 
+function getStartProviderId(message) {
+  const data = message?.data && typeof message.data === 'object' ? message.data : null;
+  if (data && Object.prototype.hasOwnProperty.call(data, 'providerId')) return data.providerId;
+  if (message && Object.prototype.hasOwnProperty.call(message, 'providerId')) return message.providerId;
+  return LIVE_DUBBING_PROVIDER_ID;
+}
+
+// Lease reasons describe acquisition capabilities only; lease snapshots do
+// not provide trusted provider identity for recovery.
+function getLeaseReasons(providerId) {
+  return providerId === LIVE_DUBBING_OPENAI_PROVIDER_ID
+    ? [...LIVE_DUBBING_LEASE_REASONS, 'WEB_RTC']
+    : [...LIVE_DUBBING_LEASE_REASONS];
+}
+
 /**
  * Owns one Chrome tab-capture control-plane session.
  * No media, provider bootstrap, transcript, WebSocket URL, or stream ID is
@@ -105,9 +123,10 @@ export class LiveDubbingCoordinator {
   }
 
   start(message = {}, sender = {}) {
+    const requestedProviderId = getStartProviderId(message);
     const pendingStart = {
       sessionId: this.uuid(),
-      providerId: LIVE_DUBBING_PROVIDER_ID,
+      providerId: isLiveDubbingProviderId(requestedProviderId) ? requestedProviderId : null,
       terminalRequested: false,
       startedAt: this.now(),
     };
@@ -152,7 +171,7 @@ export class LiveDubbingCoordinator {
     if (typeof sessionId !== 'string' || !sessionId.trim()) {
       return Promise.resolve({ success: false, error: 'INVALID_SESSION_ID' });
     }
-    if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+    if (!isLiveDubbingProviderId(providerId)) {
       return Promise.resolve({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true });
     }
 
@@ -303,7 +322,7 @@ export class LiveDubbingCoordinator {
       && this._isSameDescriptorFence(state?.descriptor, descriptor)
       && !state?.terminalRequested
       && !this.terminalOperations.has(descriptor.sessionId)
-      && descriptor.providerId === LIVE_DUBBING_PROVIDER_ID
+      && isLiveDubbingProviderId(descriptor.providerId)
       && this.bootstrapRequestSessions.has(descriptor.sessionId);
   }
 
@@ -370,10 +389,15 @@ export class LiveDubbingCoordinator {
   }
 
   async _startTransaction(message, sender, pendingStart) {
+    const providerId = pendingStart.providerId;
+    if (!isLiveDubbingProviderId(providerId)) {
+      return { success: false, error: 'LIVE_DUBBING_PROVIDER_UNSUPPORTED' };
+    }
+
     const targetLanguage = this._getTargetLanguage(message);
     let normalizedLanguage;
     try {
-      normalizedLanguage = normalizeProviderTargetLanguage(LIVE_DUBBING_PROVIDER_ID, targetLanguage);
+      normalizedLanguage = normalizeProviderTargetLanguage(providerId, targetLanguage);
     } catch {
       return { success: false, error: 'INVALID_TARGET_LANGUAGE' };
     }
@@ -406,9 +430,9 @@ export class LiveDubbingCoordinator {
     const descriptor = createDescriptor({
       sessionId: pendingStart.sessionId,
       tabId: tab.id,
-      providerId: LIVE_DUBBING_PROVIDER_ID,
+      providerId,
       targetLanguage: normalizedLanguage,
-      startedAt: this.now(),
+      startedAt: pendingStart.startedAt,
     });
     const sessionState = {
       descriptor,
@@ -451,7 +475,7 @@ export class LiveDubbingCoordinator {
       sessionState.leasePromise = Promise.resolve(this.leaseManager.acquire({
         owner: LIVE_DUBBING_OWNER,
         leaseId: descriptor.sessionId,
-        requiredReasons: [...LIVE_DUBBING_LEASE_REASONS],
+        requiredReasons: getLeaseReasons(descriptor.providerId),
       }));
       leaseAcquired = await sessionState.leasePromise;
       sessionState.leaseAcquired = leaseAcquired;
@@ -531,8 +555,7 @@ export class LiveDubbingCoordinator {
       // background for the short-lived provider bootstrap.
       const integratedPipelines = consumeResponse.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
         && consumeResponse.captureReady === true
-        && consumeResponse.inputPipelineReady === true
-        && consumeResponse.outputPipelineReady === true
+        && consumeResponse.audioPathReady === true
         && consumeResponse.eventSequence === captureDescriptor.eventSequence;
       let activeDescriptor = descriptor;
       if (integratedPipelines) {
@@ -563,8 +586,7 @@ export class LiveDubbingCoordinator {
         )
           && providerResponse.status === LIVE_DUBBING_STATUS.RUNNING
           && providerResponse.captureReady === true
-          && providerResponse.inputPipelineReady === true
-          && providerResponse.outputPipelineReady === true
+          && providerResponse.audioPathReady === true
           && providerResponse.setupComplete === true
           && providerResponse.eventSequence === connectingDescriptor.eventSequence + 1;
         if (!providerReady) {
@@ -916,7 +938,15 @@ export class LiveDubbingCoordinator {
       for (const lease of liveLeases) {
         cleaned = (await this._reconcileLease(lease, true)) && cleaned;
       }
-      return { success: cleaned, status: null, recovered: false, stale: liveLeases.length > 0 };
+      return {
+        success: cleaned,
+        status: null,
+        recovered: false,
+        stale: liveLeases.length > 0,
+        ...(liveLeases.length > 0 && !cleaned
+          ? { providerIdentityRequired: true, retryable: true }
+          : {}),
+      };
     }
 
     let matchingLease = liveLeases.find(item => item.leaseId === descriptor.sessionId);
@@ -976,7 +1006,7 @@ export class LiveDubbingCoordinator {
       descriptor.providerId,
     )) {
       if (!matchingLease) {
-        const acquired = await this._acquireRecoveryLease(descriptor.sessionId);
+        const acquired = await this._acquireRecoveryLease(descriptor);
         if (!acquired) {
           this._rememberReconciledSession(descriptor, false);
           const failed = this._advance(
@@ -996,7 +1026,6 @@ export class LiveDubbingCoordinator {
         matchingLease = {
           owner: LIVE_DUBBING_OWNER,
           leaseId: descriptor.sessionId,
-          requiredReasons: [...LIVE_DUBBING_LEASE_REASONS],
         };
       }
 
@@ -1016,13 +1045,22 @@ export class LiveDubbingCoordinator {
         };
       }
 
-      let cleaned = true;
+      let unmatchedCleaned = true;
       for (const lease of liveLeases.filter(item => item.leaseId !== descriptor.sessionId)) {
-        cleaned = (await this._reconcileLease(lease, true)) && cleaned;
+        unmatchedCleaned = (await this._reconcileLease(lease, true)) && unmatchedCleaned;
+      }
+      if (!unmatchedCleaned) {
+        return {
+          success: false,
+          status: cloneDescriptor(activeDescriptor),
+          recovered: true,
+          providerIdentityRequired: true,
+          retryable: true,
+        };
       }
 
       return {
-        success: cleaned,
+        success: true,
         status: cloneDescriptor(activeDescriptor),
         recovered: true,
       };
@@ -1114,7 +1152,6 @@ export class LiveDubbingCoordinator {
 
   async _queryStatus(descriptor, sessionId, providerId = descriptor?.providerId) {
     try {
-      if (providerId !== LIVE_DUBBING_PROVIDER_ID) return null;
       const response = await this._sendOffscreen(
         descriptor?.sessionId === sessionId
           ? createStatusMessage(descriptor)
@@ -1126,29 +1163,59 @@ export class LiveDubbingCoordinator {
     }
   }
 
-  async _reconcileLease(lease, stale) {
-    const sessionId = lease.leaseId;
-    // Lease identity is owner + leaseId only. Offscreen status fencing still
-    // uses the fixed Live Dubbing provider; no provider metadata lives on leases.
-    const providerId = LIVE_DUBBING_PROVIDER_ID;
-    const status = await this._queryStatus(null, sessionId, providerId);
-    if (!status || status.sessionId !== sessionId || status.success === false
-      || this._isSessionMismatch(status, sessionId, providerId)) return false;
-    if (!stale && !this._isExplicitlyInactive(status, providerId)) return true;
+  async _reconcileLease(lease, stale, providerId = null) {
+    const sessionId = lease?.leaseId;
+    const resolved = await this._resolveLeaseStatus(lease, providerId);
+    if (!resolved) return false;
+
+    const { providerId: resolvedProviderId, status } = resolved;
+    if (!stale && !this._isExplicitlyInactive(status, resolvedProviderId)) return true;
 
     const cleanup = await this._disposeAndRelease(
-      { sessionId, providerId },
+      { sessionId, providerId: resolvedProviderId },
       { releaseLease: true },
     );
     return cleanup.success;
   }
 
-  async _acquireRecoveryLease(sessionId) {
+  async _resolveLeaseStatus(lease, providerId = null) {
+    const sessionId = lease?.leaseId;
+    if (typeof sessionId !== 'string' || !sessionId.trim()) return null;
+
+    const candidates = isLiveDubbingProviderId(providerId)
+      ? [providerId]
+      : [...LIVE_DUBBING_PROVIDER_IDS];
+    const exactStatuses = [];
+
+    for (const candidate of candidates) {
+      const status = await this._queryStatus(null, sessionId, candidate);
+      if (this._isExactSessionStatus(status, sessionId, candidate)) {
+        if (candidates.length === 1) return { providerId: candidate, status };
+        exactStatuses.push({ providerId: candidate, status });
+      }
+    }
+
+    if (exactStatuses.length === 1) return exactStatuses[0];
+    if (exactStatuses.length > 1
+      && exactStatuses.every(({ providerId: candidate, status }) => (
+        this._isExplicitlyInactive(status, candidate)
+      ))) {
+      // Both exact probes prove that no supported provider owns this session;
+      // idempotent disposal is safe before releasing the stale lease.
+      return exactStatuses[0];
+    }
+    return null;
+  }
+
+  async _acquireRecoveryLease(descriptor) {
+    const sessionId = descriptor?.sessionId;
+    const providerId = descriptor?.providerId;
+    if (!sessionId || !isLiveDubbingProviderId(providerId)) return false;
     try {
       return await this.leaseManager.acquire({
         owner: LIVE_DUBBING_OWNER,
         leaseId: sessionId,
-        requiredReasons: [...LIVE_DUBBING_LEASE_REASONS],
+        requiredReasons: getLeaseReasons(providerId),
       }) === true;
     } catch {
       this.log.warn('Live dubbing recovery lease acquisition failed');
@@ -1244,8 +1311,7 @@ export class LiveDubbingCoordinator {
       && response.status === LIVE_DUBBING_STATUS.RUNNING
       && response.active === true
       && response.captureReady === true
-      && response.inputPipelineReady === true
-      && response.outputPipelineReady === true
+      && response.audioPathReady === true
       && response.setupComplete === true;
   }
 

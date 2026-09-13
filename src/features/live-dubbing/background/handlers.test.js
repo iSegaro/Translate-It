@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./GeminiLiveBootstrapService.js', () => ({
   geminiLiveBootstrapService: { mintEphemeralToken: vi.fn() },
 }));
+vi.mock('./OpenAIRealtimeBootstrapService.js', () => ({
+  openAIRealtimeBootstrapService: { mintClientSecret: vi.fn() },
+}));
 import { geminiLiveBootstrapService } from './GeminiLiveBootstrapService.js';
+import { openAIRealtimeBootstrapService } from './OpenAIRealtimeBootstrapService.js';
 import {
   handleLiveDubbingGetStatus,
   handleLiveDubbingBootstrapRequest,
@@ -172,6 +176,51 @@ describe('live dubbing browser gate', () => {
     });
     expect(Object.keys(response.bootstrap)).toEqual(['accessToken']);
     expect(JSON.stringify(response)).not.toContain('apiKey');
+  });
+
+  it('routes an authorized OpenAI identity to the OpenAI bootstrap service', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    geminiLiveBootstrapService.mintEphemeralToken.mockClear();
+    openAIRealtimeBootstrapService.mintClientSecret.mockResolvedValue('ek_openai-secret');
+    vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized').mockReturnValue(true);
+    vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
+      .mockResolvedValue({ sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US' });
+
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US', eventSequence: 1 },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    })).resolves.toEqual({
+      success: true,
+      providerId: 'openai',
+      targetLanguage: 'en-US',
+      bootstrap: { secret: 'ek_openai-secret' },
+    });
+    expect(geminiLiveBootstrapService.mintEphemeralToken).not.toHaveBeenCalled();
+    expect(openAIRealtimeBootstrapService.mintClientSecret).toHaveBeenCalledWith('en-US');
+  });
+
+  it('does not return an OpenAI secret when the active session fence closes first', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
+      .mockResolvedValue({ sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US' });
+    vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized').mockReturnValue(false);
+    openAIRealtimeBootstrapService.mintClientSecret.mockResolvedValue('ek_openai-secret');
+
+    await expect(handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US', eventSequence: 1 },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    })).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
   });
 
   it('rejects a bootstrap response when the active session fence closes first', async () => {

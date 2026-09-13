@@ -5,12 +5,16 @@ import {
   createLiveDubbingProviderDiagnostic,
   createProviderBootstrapRequest,
   createProviderBootstrapResponse,
+  createSessionMessage,
+  hasExactSessionEvent,
   isAuthorizedOffscreenRouterSender,
   isAuthorizedOffscreenSender,
   isExactSessionResponse,
+  isLiveDubbingProviderId,
   isLiveDubbingAudioMode,
   isTrustedLiveDubbingUiSender,
   normalizeProviderTargetLanguage,
+  normalizeOpenAITargetLanguage,
   sanitizeLiveDubbingProviderDiagnostic,
   sanitizeDescriptor,
   sanitizeLiveDubbingCleanupDiagnostic,
@@ -29,6 +33,30 @@ const browserAPI = {
 };
 
 describe('live dubbing Stage 2 contracts', () => {
+  it('accepts only the Phase F provider identities', () => {
+    expect(isLiveDubbingProviderId('gemini')).toBe(true);
+    expect(isLiveDubbingProviderId('openai')).toBe(true);
+    expect(isLiveDubbingProviderId('')).toBe(false);
+    expect(isLiveDubbingProviderId('unknown')).toBe(false);
+    expect(isLiveDubbingProviderId(null)).toBe(false);
+  });
+
+  it.each([
+    ['es', 'es'],
+    [' en-US ', 'en-US'],
+    ['zh-Hant', 'zh-Hant'],
+  ])('normalizes OpenAI language %s with its own policy', (input, expected) => {
+    expect(normalizeOpenAITargetLanguage(input)).toBe(expected);
+    expect(normalizeProviderTargetLanguage('openai', input)).toBe(expected);
+  });
+
+  it.each(['', '!!', 'english language', 'en_US', 'a'])('rejects unsupported OpenAI language %s', language => {
+    expect(() => normalizeProviderTargetLanguage('openai', language)).toThrow('Unsupported target language');
+  });
+
+  it('does not apply a language policy to unknown providers', () => {
+    expect(() => normalizeProviderTargetLanguage('unknown', 'en')).toThrow('Unsupported live dubbing provider');
+  });
   it.each([
     ['af', 'af'],
     ['sq', 'sq'],
@@ -90,6 +118,33 @@ describe('live dubbing Stage 2 contracts', () => {
       lastError: null,
       eventSequence: 1,
     });
+  });
+
+  it('sanitizes an OpenAI descriptor while retaining its immutable identity tuple', () => {
+    const descriptor = sanitizeDescriptor({
+      sessionId: 'session-openai',
+      tabId: 7,
+      providerId: 'openai',
+      targetLanguage: 'en-US',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 123,
+      lastError: null,
+      eventSequence: 3,
+      sdp: 'private-sdp',
+      transcript: 'private transcript',
+    });
+
+    expect(descriptor).toEqual({
+      sessionId: 'session-openai',
+      tabId: 7,
+      providerId: 'openai',
+      targetLanguage: 'en-US',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 123,
+      lastError: null,
+      eventSequence: 3,
+    });
+    expect(JSON.stringify(descriptor)).not.toContain('private');
   });
 
   it('rejects persisted descriptors without an explicit provider identity', () => {
@@ -401,6 +456,29 @@ describe('live dubbing Stage 2 contracts', () => {
       targetLanguage: 'fil',
       bootstrap,
     });
+
+    const openAiMessage = createSessionMessage('LIVE_DUBBING_STATUS', 'session-openai', 'openai');
+    expect(openAiMessage.data).toEqual({ sessionId: 'session-openai', providerId: 'openai' });
+    expect(createProviderBootstrapRequest({
+      sessionId: 'session-openai',
+      providerId: 'openai',
+      targetLanguage: 'en-US',
+      eventSequence: 2,
+    })).toMatchObject({
+      data: {
+        sessionId: 'session-openai',
+        providerId: 'openai',
+        targetLanguage: 'en-US',
+        eventSequence: 2,
+      },
+    });
+    expect(hasExactSessionEvent({
+      data: { sessionId: 'session-openai', providerId: 'openai', eventSequence: 0 },
+    }, {
+      sessionId: 'session-openai',
+      providerId: 'openai',
+      eventSequence: 0,
+    })).toBe(true);
   });
 
   it('requires exact session and provider identity on internal responses', () => {
@@ -410,6 +488,8 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(isExactSessionResponse({ ...response, providerId: 'other' }, 'session-1', 'gemini')).toBe(false);
     expect(isExactSessionResponse({ sessionId: 'session-1' }, 'session-1', 'gemini')).toBe(false);
     expect(isExactSessionResponse(response, 'session-2', 'gemini')).toBe(false);
+    expect(isExactSessionResponse({ success: true, sessionId: 'session-1', providerId: 'openai' }, 'session-1', 'openai')).toBe(true);
+    expect(isExactSessionResponse({ success: true, sessionId: 'session-1', providerId: 'gemini', actualProviderId: 'openai' }, 'session-1', 'gemini')).toBe(false);
   });
 
   it('exposes the required operation timeout contract', () => {

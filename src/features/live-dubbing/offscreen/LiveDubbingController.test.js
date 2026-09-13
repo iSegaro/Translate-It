@@ -1179,6 +1179,20 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(mediaClient.dispose).toHaveBeenCalledOnce();
   });
 
+  it('rejects a same-session PREPARE that changes provider identity', () => {
+    const { controller, registry } = createMediaStreamHarness();
+
+    expect(controller.prepare('session-1', 'gemini', 'en', 0)).toMatchObject({ success: true });
+    expect(controller.prepare('session-1', 'openai', 'en-US', 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      requestedProviderId: 'openai',
+      actualProviderId: 'gemini',
+    });
+    expect(controller.currentSession.providerId).toBe('gemini');
+    expect(registry.getAudioMode).toHaveBeenCalledOnce();
+  });
+
   it('awaits async provider dispose and fences late callbacks', async () => {
     let resolveDispose;
     const { controller, track, clients, callbacks } = createMediaStreamHarness({

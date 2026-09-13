@@ -2,10 +2,12 @@ import { liveDubbingCoordinator } from './LiveDubbingCoordinator.js';
 import * as browserCapabilities from '@/core/browserHandlers.js';
 import {
   LIVE_DUBBING_ACTIONS,
+  LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_PROVIDER_ID,
 } from '../constants.js';
 import {
   createProviderBootstrapResponse,
+  isLiveDubbingProviderId,
   isTrustedLiveDubbingUiSender,
 } from '../contracts.js';
 
@@ -52,10 +54,10 @@ export function handleLiveDubbingGetStatus(message, sender) {
 }
 
 /**
- * Resolve one Gemini Live provider bootstrap request from the authorized
- * offscreen document. Background mints a constrained single-use ephemeral
- * token; the response is intentionally limited to the opaque bootstrap,
- * provider, and language. Long-lived keys never leave background.
+ * Resolve the provider bootstrap request from the authorized offscreen
+ * document. The descriptor selects the bootstrap service, while the
+ * coordinator's pre-mint and post-mint fences retain session ownership.
+ * Long-lived keys never leave background.
  */
 export async function handleLiveDubbingBootstrapRequest(message, sender) {
   if (!isChromeRuntime()) return unsupported();
@@ -65,12 +67,21 @@ export async function handleLiveDubbingBootstrapRequest(message, sender) {
     sender,
     { type: 'bootstrap' },
   );
-  if (!descriptor || descriptor.providerId !== LIVE_DUBBING_PROVIDER_ID) return unauthorized();
+  if (!descriptor || !isLiveDubbingProviderId(descriptor.providerId)) return unauthorized();
 
   try {
-    const { geminiLiveBootstrapService } = await import('./GeminiLiveBootstrapService.js');
-    const accessToken = await geminiLiveBootstrapService.mintEphemeralToken(descriptor.targetLanguage);
-    if (typeof accessToken !== 'string' || !accessToken) {
+    let bootstrap;
+    if (descriptor.providerId === LIVE_DUBBING_PROVIDER_ID) {
+      const { geminiLiveBootstrapService } = await import('./GeminiLiveBootstrapService.js');
+      const accessToken = await geminiLiveBootstrapService.mintEphemeralToken(descriptor.targetLanguage);
+      if (typeof accessToken === 'string' && accessToken) bootstrap = { accessToken };
+    } else if (descriptor.providerId === LIVE_DUBBING_OPENAI_PROVIDER_ID) {
+      const { openAIRealtimeBootstrapService } = await import('./OpenAIRealtimeBootstrapService.js');
+      const secret = await openAIRealtimeBootstrapService.mintClientSecret(descriptor.targetLanguage);
+      if (typeof secret === 'string' && secret) bootstrap = { secret };
+    }
+
+    if (!bootstrap) {
       return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
     }
 
@@ -81,7 +92,7 @@ export async function handleLiveDubbingBootstrapRequest(message, sender) {
     return createProviderBootstrapResponse(
       descriptor.providerId,
       descriptor.targetLanguage,
-      { accessToken },
+      bootstrap,
     );
   } catch {
     return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };

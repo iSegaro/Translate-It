@@ -2,6 +2,8 @@ import {
   LIVE_DUBBING_ACTIONS,
   LIVE_DUBBING_AUDIO_MODES,
   LIVE_DUBBING_CAPTURE_STAGES,
+  LIVE_DUBBING_OPENAI_PROVIDER_ID,
+  LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STATUS,
 } from './constants.js';
@@ -151,6 +153,22 @@ export const LIVE_GEMINI_LANGUAGE_MAP = Object.freeze({
   'zh-hans': 'zh-Hans',
   'zh-hant': 'zh-Hant',
 });
+
+const OPENAI_TARGET_LANGUAGE_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{2,8})*$/;
+
+/**
+ * OpenAI delivery owns a deliberately separate language policy. Its phase-1
+ * contract accepts a well-formed language tag and preserves the provider
+ * spelling; it never falls back to Gemini's allowlist or the general catalog.
+ */
+export function normalizeOpenAITargetLanguage(language) {
+  if (typeof language !== 'string') throw new TypeError('targetLanguage is required');
+  const trimmed = language.trim();
+  if (!trimmed || trimmed.length > 32 || !OPENAI_TARGET_LANGUAGE_PATTERN.test(trimmed)) {
+    throw new RangeError('Unsupported target language');
+  }
+  return trimmed;
+}
 
 const trustedUiPaths = Object.freeze([
   'src/html/popup.html',
@@ -422,11 +440,13 @@ function hasMatchingSessionField(response, field, sessionId) {
  */
 export function isExactSessionResponse(response, sessionId, providerId) {
   return Boolean(response
-    && providerId === LIVE_DUBBING_PROVIDER_ID
+    && isLiveDubbingProviderId(providerId)
     && response.sessionId === sessionId
     && response.providerId === providerId
     && hasMatchingSessionField(response, 'requestedSessionId', sessionId)
-    && hasMatchingSessionField(response, 'actualSessionId', sessionId));
+    && hasMatchingSessionField(response, 'actualSessionId', sessionId)
+    && hasMatchingSessionField(response, 'requestedProviderId', providerId)
+    && hasMatchingSessionField(response, 'actualProviderId', providerId));
 }
 
 /**
@@ -470,7 +490,7 @@ export function isTrustedLiveDubbingUiSender(sender, browserAPI) {
 export function hasExactSessionEvent(message, descriptor) {
   const data = message?.data || message || {};
   return Boolean(descriptor
-    && descriptor.providerId === LIVE_DUBBING_PROVIDER_ID
+    && isLiveDubbingProviderId(descriptor.providerId)
     && data.sessionId === descriptor.sessionId
     && data.providerId === descriptor.providerId
     && Number.isInteger(data.eventSequence)
@@ -485,6 +505,7 @@ export function hasExactSessionEvent(message, descriptor) {
  * @returns {string}
  */
 export function normalizeProviderTargetLanguage(providerId, language) {
+  if (providerId === LIVE_DUBBING_OPENAI_PROVIDER_ID) return normalizeOpenAITargetLanguage(language);
   if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
     throw new RangeError('Unsupported live dubbing provider');
   }
@@ -515,6 +536,15 @@ export function isLiveDubbingAudioMode(value) {
 }
 
 /**
+ * Provider identity is a control-plane contract, not an adapter registry
+ * lookup. Keeping it here lets descriptors and messages validate OpenAI
+ * without registering an OpenAI adapter in this delivery phase.
+ */
+export function isLiveDubbingProviderId(value) {
+  return LIVE_DUBBING_PROVIDER_IDS.includes(value);
+}
+
+/**
  * Keep storage records limited to the public control-plane descriptor.
  * @param {unknown} value
  * @returns {object|null}
@@ -526,7 +556,7 @@ export function sanitizeDescriptor(value) {
     ? value.sessionId.trim()
     : null;
   const tabId = Number.isInteger(value.tabId) && value.tabId >= 0 ? value.tabId : null;
-  const providerId = value.providerId === LIVE_DUBBING_PROVIDER_ID
+  const providerId = isLiveDubbingProviderId(value.providerId)
     ? value.providerId
     : null;
   let targetLanguage = null;
@@ -661,7 +691,7 @@ export function createSessionMessage(action, sessionId, providerId) {
   if (typeof sessionId !== 'string' || !sessionId.trim()) {
     throw new TypeError('sessionId is required for offscreen messaging');
   }
-  if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+  if (!isLiveDubbingProviderId(providerId)) {
     throw new TypeError('providerId is required for offscreen messaging');
   }
 
@@ -681,7 +711,7 @@ export function createProviderBootstrapRequest({ sessionId, providerId, targetLa
   if (!Number.isInteger(eventSequence) || eventSequence < 0) {
     throw new TypeError('eventSequence is required');
   }
-  if (providerId !== LIVE_DUBBING_PROVIDER_ID) throw new TypeError('providerId is required');
+  if (!isLiveDubbingProviderId(providerId)) throw new TypeError('providerId is required');
 
   return {
     action: LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP,
@@ -699,7 +729,7 @@ export function createProviderBootstrapRequest({ sessionId, providerId, targetLa
  * bootstrap remains opaque here; only the provider and language are generic.
  */
 export function createProviderBootstrapResponse(providerId, targetLanguage, bootstrap) {
-  if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+  if (!isLiveDubbingProviderId(providerId)) {
     throw new TypeError('providerId is required');
   }
   if (!isPlainRecord(bootstrap)) {

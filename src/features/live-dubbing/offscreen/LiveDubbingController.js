@@ -7,7 +7,6 @@ import {
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_INTERNAL_STATUS,
   LIVE_DUBBING_OFFSCREEN_ACKS,
-  LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STATUS,
 } from '../constants.js';
 import {
@@ -15,6 +14,7 @@ import {
   createLiveDubbingCleanupDiagnostic,
   createLiveDubbingProviderDiagnostic,
   createProviderBootstrapRequest,
+  isLiveDubbingProviderId,
   isLiveDubbingAudioMode,
   normalizeProviderTargetLanguage,
   parseProviderBootstrapResponse,
@@ -183,7 +183,7 @@ function isSessionId(value) {
 }
 
 function isProviderId(value) {
-  return value === LIVE_DUBBING_PROVIDER_ID;
+  return isLiveDubbingProviderId(value);
 }
 
 function isStreamId(value) {
@@ -383,6 +383,9 @@ export class LiveDubbingController {
     if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
 
     const session = this.currentSession;
+    if (session?.sessionId === sessionId && session.providerId !== providerId) {
+      return this._sessionMismatch(sessionId, providerId, session);
+    }
     // Matching PREPARE is idempotent: its session is already validated and
     // owns the immutable audio mode. Only a new session queries the registry.
     // The audio path is validated before any audio resource exists, so an

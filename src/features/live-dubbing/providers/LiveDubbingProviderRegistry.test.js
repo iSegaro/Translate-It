@@ -2,12 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { LIVE_DUBBING_AUDIO_MODES } from '../constants.js';
 import { GeminiLiveProviderAdapter } from './GeminiLiveProviderAdapter.js';
 import { LiveDubbingProviderRegistry } from './LiveDubbingProviderRegistry.js';
+import { OpenAIRealtimeProviderAdapter } from './OpenAIRealtimeProviderAdapter.js';
 
 describe('LiveDubbingProviderRegistry', () => {
   it('creates the Gemini adapter for the canonical provider id', () => {
     const registry = new LiveDubbingProviderRegistry();
 
     expect(registry.create('gemini')).toBeInstanceOf(GeminiLiveProviderAdapter);
+  });
+
+  it('creates the OpenAI media-stream adapter without a PCM sendAudio contract', () => {
+    const registry = new LiveDubbingProviderRegistry();
+    const adapter = registry.create('openai', {
+      peerConnectionFactory: () => ({}),
+    });
+
+    expect(adapter).toBeInstanceOf(OpenAIRealtimeProviderAdapter);
+    expect(registry.getAudioMode('openai')).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
+    expect(adapter.sendAudio).toBeUndefined();
   });
 
   it('fails closed for unknown providers', () => {
