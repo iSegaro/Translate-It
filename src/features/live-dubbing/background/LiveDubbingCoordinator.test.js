@@ -554,6 +554,150 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('only cancels a pending start for its exact tab during tab resolution', async () => {
+    const harness = createHarness();
+    let resolveTab;
+    harness.browserAPI.tabs.get.mockImplementationOnce(() => new Promise(resolve => {
+      resolveTab = resolve;
+    }));
+    const startPromise = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {
+      tab: { id: 42 },
+      url: 'https://example.test',
+    });
+
+    while (!resolveTab) await Promise.resolve();
+
+    await expect(harness.coordinator.handleTabRemoved(99)).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+    });
+    await expect(harness.coordinator.handleTopLevelNavigation(99)).resolves.toMatchObject({
+      success: true,
+      ignored: true,
+    });
+    expect([...harness.coordinator.pendingStarts][0].terminalRequested).toBe(false);
+
+    await expect(harness.coordinator.handleTopLevelNavigation(42)).resolves.toMatchObject({
+      success: true,
+      pending: true,
+      stopped: false,
+      reason: 'TOP_LEVEL_NAVIGATION',
+    });
+    resolveTab({ id: 42, url: 'https://example.test' });
+
+    await expect(startPromise).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_START_CANCELLED',
+    });
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each(['TAB_REMOVED', 'TOP_LEVEL_NAVIGATION'])
+    ('cancels an extension-sender start only when the delayed authoritative tab matches (%s)', async event => {
+      const harness = createHarness();
+      let resolveTabs;
+      harness.browserAPI.tabs.query.mockImplementationOnce(() => new Promise(resolve => {
+        resolveTabs = resolve;
+      }));
+      const startPromise = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {
+        id: 'extension-id',
+        url: 'chrome-extension://extension-id/src/html/popup.html',
+      });
+
+      while (!resolveTabs) await Promise.resolve();
+
+      await expect(harness.coordinator.handleTabRemoved(99)).resolves.toMatchObject({
+        success: true,
+        pending: true,
+        stopped: false,
+      });
+      await expect(harness.coordinator.handleTopLevelNavigation(99)).resolves.toMatchObject({
+        success: true,
+        pending: true,
+        stopped: false,
+      });
+      expect([...harness.coordinator.pendingStarts][0].terminalRequested).toBe(false);
+
+      const matchingEvent = event === 'TAB_REMOVED'
+        ? harness.coordinator.handleTabRemoved(42)
+        : harness.coordinator.handleTopLevelNavigation(42);
+      await expect(matchingEvent).resolves.toMatchObject({
+        success: true,
+        pending: true,
+        stopped: false,
+      });
+      expect([...harness.coordinator.pendingStarts][0].terminalRequested).toBe(false);
+
+      resolveTabs([{ id: 42, url: 'https://example.test' }]);
+
+      await expect(startPromise).resolves.toEqual({
+        success: false,
+        error: 'LIVE_DUBBING_START_CANCELLED',
+      });
+      expect(harness.browserAPI.tabs.query).toHaveBeenCalledOnce();
+      expect(harness.manager.acquire).not.toHaveBeenCalled();
+      expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+      expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
+  it.each(['TAB_REMOVED', 'TOP_LEVEL_NAVIGATION'])
+    ('records delayed tab events for queued unresolved starts after a different known start (%s)', async event => {
+      const harness = createHarness();
+      harness.coordinator.uuid = vi.fn()
+        .mockReturnValueOnce('session-a')
+        .mockReturnValueOnce('session-b');
+      let resolveKnownTab;
+      harness.browserAPI.tabs.get.mockImplementationOnce(() => new Promise(resolve => {
+        resolveKnownTab = resolve;
+      }));
+
+      const startA = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {
+        tab: { id: 41 },
+        url: 'https://example.test',
+      });
+      while (!resolveKnownTab) await Promise.resolve();
+
+      const startB = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {
+        id: 'extension-id',
+        url: 'chrome-extension://extension-id/src/html/popup.html',
+      });
+      const pendingB = [...harness.coordinator.pendingStarts]
+        .find(pending => pending.sessionId === 'session-b');
+
+      const tabEvent = event === 'TAB_REMOVED'
+        ? harness.coordinator.handleTabRemoved(42)
+        : harness.coordinator.handleTopLevelNavigation(42);
+      await expect(tabEvent).resolves.toMatchObject({
+        success: true,
+        pending: true,
+        stopped: false,
+        reason: event,
+      });
+      expect(pendingB.terminalRequested).toBe(false);
+      expect(pendingB.tabEventIds).toContain(42);
+
+      await expect(harness.coordinator.stop({ data: { sessionId: 'session-a' } })).resolves.toMatchObject({
+        success: true,
+        pending: true,
+        stopped: false,
+      });
+      resolveKnownTab({ id: 41, url: 'https://example.test' });
+
+      await expect(startA).resolves.toEqual({
+        success: false,
+        error: 'LIVE_DUBBING_START_CANCELLED',
+      });
+      await expect(startB).resolves.toEqual({
+        success: false,
+        error: 'LIVE_DUBBING_START_CANCELLED',
+      });
+      expect(harness.browserAPI.tabs.query).toHaveBeenCalledOnce();
+      expect(harness.manager.acquire).not.toHaveBeenCalled();
+      expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+      expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+    });
+
   it('does not release lease after stale ignored dispose response', async () => {
     const harness = createHarness();
     await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
@@ -1941,6 +2085,76 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
   });
 
+  it('clears an inactive persisted OpenAI descriptor without probing Gemini', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'openai-session',
+      tabId: 42,
+      providerId: LIVE_DUBBING_OPENAI_PROVIDER_ID,
+      targetLanguage: 'en-US',
+      status: LIVE_DUBBING_STATUS.ERROR,
+      startedAt: 1,
+      lastError: 'START_FAILED',
+      eventSequence: 1,
+    }, statusResponse: {
+      success: true,
+      active: false,
+      sessionId: 'openai-session',
+      providerId: LIVE_DUBBING_OPENAI_PROVIDER_ID,
+      status: 'IDLE',
+    } });
+
+    const result = await harness.coordinator.reconcile();
+    const messages = harness.browserAPI.runtime.sendMessage.mock.calls
+      .map(([message]) => message);
+
+    expect(result).toMatchObject({ success: true, stale: true, status: null });
+    expect(messages).toEqual([
+      expect.objectContaining({
+        action: 'LIVE_DUBBING_STATUS',
+        data: expect.objectContaining({
+          sessionId: 'openai-session',
+          providerId: LIVE_DUBBING_OPENAI_PROVIDER_ID,
+        }),
+      }),
+    ]);
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+  });
+
+  it('isolates a persisted OpenAI descriptor from a Gemini status mismatch', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'openai-session',
+      tabId: 42,
+      providerId: LIVE_DUBBING_OPENAI_PROVIDER_ID,
+      targetLanguage: 'en-US',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 2,
+    }, statusResponse: {
+      success: true,
+      active: false,
+      sessionId: 'openai-session',
+      providerId: 'gemini',
+      status: 'IDLE',
+    } });
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      isolated: true,
+      retryable: true,
+    });
+    expect(harness.browserAPI.runtime.sendMessage).toHaveBeenCalledOnce();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'openai-session',
+      providerId: LIVE_DUBBING_OPENAI_PROVIDER_ID,
+    });
+  });
+
   it('clears descriptor after crash before lease acquisition when offscreen document is absent', async () => {
     const stored = {
       sessionId: 'old-session',
@@ -2261,6 +2475,24 @@ describe('LiveDubbingCoordinator', () => {
       leaseId: 'orphan-session',
     });
     expect(harness.manager.activeLeases).toEqual([]);
+  });
+
+  it('ignores foreign-owner leases during reconciliation', async () => {
+    const harness = createHarness();
+    const foreignLease = { owner: 'other-owner', leaseId: 'foreign-session' };
+    harness.manager.activeLeases = [foreignLease];
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toEqual({
+      success: true,
+      status: null,
+      recovered: false,
+      stale: false,
+    });
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.manager.activeLeases).toEqual([foreignLease]);
   });
 
   it('releases an untrusted lease only after an exact provider probe proves it is inactive', async () => {

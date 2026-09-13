@@ -126,6 +126,8 @@ export class LiveDubbingCoordinator {
     const requestedProviderId = getStartProviderId(message);
     const pendingStart = {
       sessionId: this.uuid(),
+      tabId: this._getPendingStartTabId(sender),
+      tabEventIds: new Set(),
       providerId: isLiveDubbingProviderId(requestedProviderId) ? requestedProviderId : null,
       terminalRequested: false,
       startedAt: this.now(),
@@ -414,7 +416,7 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const tab = await this._resolveAuthoritativeTab(sender);
+    const tab = await this._resolveAuthoritativeTab(sender, pendingStart);
     if (pendingStart.terminalRequested) {
       return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
     }
@@ -753,9 +755,15 @@ export class LiveDubbingCoordinator {
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
     if (!current || current.tabId !== tabId) {
       if (!current) {
-        const pending = this._findPendingStart();
+        const pending = this._findPendingStart(null, tabId);
         if (pending) {
           pending.terminalRequested = true;
+        }
+        const unresolved = [...this.pendingStarts].filter(item => item.tabId === null);
+        for (const pendingStart of unresolved) {
+          pendingStart.tabEventIds.add(tabId);
+        }
+        if (pending || unresolved.length > 0) {
           return { success: true, stopped: false, pending: true, status: null, reason };
         }
       }
@@ -1337,27 +1345,46 @@ export class LiveDubbingCoordinator {
     };
   }
 
-  async _resolveAuthoritativeTab(sender) {
+  async _resolveAuthoritativeTab(sender, pendingStart = null) {
     const senderTabId = sender?.tab?.id;
-    const extensionUrl = this.browserAPI.runtime?.getURL?.('');
-    const senderIsExtensionPage = typeof sender?.url === 'string'
-      && typeof extensionUrl === 'string'
-      && sender.url.startsWith(extensionUrl);
+    const senderIsExtensionPage = this._isExtensionPageSender(sender);
+    let tab = null;
 
     if (!senderIsExtensionPage && Number.isInteger(senderTabId) && senderTabId >= 0) {
       if (typeof this.browserAPI.tabs?.get === 'function') {
         try {
-          return await this.browserAPI.tabs.get(senderTabId);
+          tab = await this.browserAPI.tabs.get(senderTabId);
         } catch {
-          return null;
+          tab = null;
         }
+      } else {
+        tab = sender.tab;
       }
-      return sender.tab;
+    } else {
+      if (typeof this.browserAPI.tabs?.query !== 'function') return null;
+      const tabs = await this.browserAPI.tabs.query({ active: true, currentWindow: true });
+      tab = tabs?.[0] || null;
     }
 
-    if (typeof this.browserAPI.tabs?.query !== 'function') return null;
-    const tabs = await this.browserAPI.tabs.query({ active: true, currentWindow: true });
-    return tabs?.[0] || null;
+    if (pendingStart && Number.isInteger(tab?.id) && tab.id >= 0) {
+      pendingStart.tabId = tab.id;
+      if (pendingStart.tabEventIds.has(tab.id)) pendingStart.terminalRequested = true;
+    }
+    return tab;
+  }
+
+  _isExtensionPageSender(sender) {
+    const extensionUrl = this.browserAPI.runtime?.getURL?.('');
+    return typeof sender?.url === 'string'
+      && typeof extensionUrl === 'string'
+      && sender.url.startsWith(extensionUrl);
+  }
+
+  _getPendingStartTabId(sender) {
+    const tabId = sender?.tab?.id;
+    return !this._isExtensionPageSender(sender) && Number.isInteger(tabId) && tabId >= 0
+      ? tabId
+      : null;
   }
 
   _getTargetLanguage(message) {
@@ -1365,8 +1392,11 @@ export class LiveDubbingCoordinator {
       ?? message?.targetLanguage;
   }
 
-  _findPendingStart(sessionId) {
-    return [...this.pendingStarts].find(pending => !sessionId || pending.sessionId === sessionId);
+  _findPendingStart(sessionId, tabId = null) {
+    return [...this.pendingStarts].find(pending => (
+      (!sessionId || pending.sessionId === sessionId)
+      && (tabId === null || pending.tabId === tabId)
+    ));
   }
 
   async _sendOffscreen(message) {

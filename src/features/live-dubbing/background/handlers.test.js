@@ -223,6 +223,36 @@ describe('live dubbing browser gate', () => {
     });
   });
 
+  it.each(['null', 'throw'])('returns the generic OpenAI bootstrap failure when minting %s', async outcome => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
+      .mockResolvedValue({ sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US' });
+    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
+      .mockReturnValue(true);
+    if (outcome === 'null') {
+      openAIRealtimeBootstrapService.mintClientSecret.mockResolvedValue(null);
+    } else {
+      openAIRealtimeBootstrapService.mintClientSecret.mockRejectedValue(
+        new Error('openai-secret network failure'),
+      );
+    }
+
+    const response = await handleLiveDubbingBootstrapRequest({
+      data: { sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US', eventSequence: 2 },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    });
+    expect(response).toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+    });
+    expect(stillAuthorized).not.toHaveBeenCalled();
+    expect(JSON.stringify(response)).not.toContain('openai-secret');
+  });
+
   it('rejects a bootstrap response when the active session fence closes first', async () => {
     vi.stubGlobal('__BROWSER__', 'chrome');
     browser.runtime.id = 'extension-id';

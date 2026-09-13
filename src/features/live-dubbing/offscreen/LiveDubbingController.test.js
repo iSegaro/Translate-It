@@ -1179,6 +1179,91 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(mediaClient.dispose).toHaveBeenCalledOnce();
   });
 
+  it('drives the production OpenAI identity through the media-stream path', async () => {
+    const track = new FakeTrack();
+    const stream = createStream(track);
+    const inputPipelineFactory = vi.fn();
+    const outputPlayerFactory = vi.fn();
+    const accepted = vi.fn();
+    const providerClientFactory = vi.fn();
+    const client = {
+      connect: vi.fn(),
+      dispose: vi.fn(async () => {}),
+    };
+    let providerCallbacks;
+    providerClientFactory.mockImplementation(options => {
+      expect(options.providerId).toBe('openai');
+      providerCallbacks = options.callbacks;
+      client.connect.mockImplementationOnce(async () => providerCallbacks.onSetupComplete());
+      return client;
+    });
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => stream) },
+      inputPipelineFactory,
+      outputPlayerFactory,
+      providerClientFactory,
+      requestBootstrap: vi.fn().mockResolvedValue({
+        success: true,
+        providerId: 'openai',
+        targetLanguage: 'en-US',
+        bootstrap: { secret: 'openai-secret' },
+      }),
+      onPlaybackAccepted: accepted,
+      notify: vi.fn(),
+    });
+
+    expect(controller.prepare('session-openai', 'openai', 'en-US', 0)).toMatchObject({
+      success: true,
+      providerId: 'openai',
+    });
+    expect(controller.currentSession.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
+
+    const captured = await controller.consume('session-openai', 'openai', 'stream-secret', 1);
+    expect(captured).toMatchObject({
+      ack: 'MEDIA_ACQUIRED',
+      status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      audioPathReady: true,
+      inputPipelineReady: false,
+      outputPipelineReady: false,
+    });
+    expect(inputPipelineFactory).not.toHaveBeenCalled();
+    expect(outputPlayerFactory).not.toHaveBeenCalled();
+
+    const connected = await controller.connectProvider('session-openai', 'openai', 'en-US', 2);
+    expect(connected).toMatchObject({
+      ack: 'PROVIDER_READY',
+      providerId: 'openai',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      audioPathReady: true,
+      inputPipelineReady: false,
+      outputPipelineReady: false,
+      setupComplete: true,
+    });
+    expect(client.connect).toHaveBeenCalledWith({
+      bootstrap: { secret: 'openai-secret' },
+      targetLanguage: 'en-US',
+      sourceStream: stream,
+    });
+    expect(JSON.stringify(controller.currentSession)).not.toContain('openai-secret');
+
+    providerCallbacks.onPlaybackAccepted({ accepted: true, sampleCount: 480 });
+    expect(accepted).toHaveBeenCalledWith({ accepted: true, sampleCount: 480 });
+    expect(controller.getTelemetry().milestones.firstTranslatedAudioAcceptedByPlayback)
+      .toEqual(expect.any(Number));
+    expect(controller.status()).toMatchObject({
+      active: true,
+      providerId: 'openai',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      audioPathReady: true,
+      inputPipelineReady: false,
+      outputPipelineReady: false,
+    });
+
+    await controller.dispose('session-openai', 'openai');
+    expect(client.dispose).toHaveBeenCalledOnce();
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
+
   it('rejects a same-session PREPARE that changes provider identity', () => {
     const { controller, registry } = createMediaStreamHarness();
 
