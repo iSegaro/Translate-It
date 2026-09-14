@@ -5,6 +5,7 @@ import {
   LIVE_DUBBING_AUDIO_MODES,
   LIVE_DUBBING_INTERNAL_STATUS,
   LIVE_DUBBING_STATUS,
+  LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 
 class FakeTrack {
@@ -1304,6 +1305,249 @@ describe('LiveDubbingController media-stream audio path', () => {
     await expect(stopped).resolves.toMatchObject({ ack: 'DISPOSED' });
     expect(track.stop).toHaveBeenCalledOnce();
     expect(clients[0].dispose).toHaveBeenCalledOnce();
+  });
+
+  it('joins exact pending disposal and blocks PREPARE through its tombstone', async () => {
+    let resolveDispose;
+    const { controller, clients } = createMediaStreamHarness({
+      makeClient: clientCallbacks => ({
+        connect: vi.fn(async () => clientCallbacks.onSetupComplete()),
+        dispose: vi.fn(() => new Promise(resolve => { resolveDispose = resolve; })),
+      }),
+    });
+
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'gemini', 'fr', 2);
+
+    const first = controller.dispose('session-1', 'gemini');
+    const repeated = controller.dispose('session-1', 'gemini');
+    let repeatedResult;
+    repeated.then(result => { repeatedResult = result; });
+    await Promise.resolve();
+
+    expect(clients[0].dispose).toHaveBeenCalledOnce();
+    expect(repeatedResult).toBeUndefined();
+    expect(controller.disposedSession.cleanupPromise).toBe(controller.disposedSession.session.cleanupPromise);
+    expect(controller.prepare('session-2', 'gemini', 'fr', 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_DISPOSED',
+      ignored: true,
+    });
+    expect(controller.prepare('session-1', 'gemini', 'fr', 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_DISPOSED',
+      ignored: true,
+    });
+
+    resolveDispose();
+    await expect(first).resolves.toMatchObject({ ack: 'DISPOSED' });
+    await expect(repeated).resolves.toMatchObject({ ack: 'DISPOSED', idempotent: true });
+    expect(clients[0].dispose).toHaveBeenCalledOnce();
+  });
+
+  it('blocks a new session until stale cleanup settles', async () => {
+    let resolveDispose;
+    const { controller, clients } = createMediaStreamHarness({
+      makeClient: clientCallbacks => ({
+        connect: vi.fn(async () => clientCallbacks.onSetupComplete()),
+        dispose: vi.fn(() => new Promise(resolve => { resolveDispose = resolve; })),
+      }),
+    });
+
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'gemini', 'fr', 2);
+    controller.currentSession.metrics.outputChunks = 7;
+
+    const oldCleanup = controller.dispose('session-1', 'gemini');
+    while (!resolveDispose) await Promise.resolve();
+    expect(controller.prepare('session-2', 'gemini', 'fr', 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_DISPOSED',
+      ignored: true,
+    });
+
+    const repeatedOldCleanup = controller.dispose('session-1', 'gemini');
+    resolveDispose();
+    await expect(oldCleanup).resolves.toMatchObject({ ack: 'DISPOSED' });
+    await expect(repeatedOldCleanup).resolves.toMatchObject({ ack: 'DISPOSED' });
+
+    expect(controller.prepare('session-2', 'gemini', 'fr', 0)).toMatchObject({
+      success: true,
+      sessionId: 'session-2',
+    });
+
+    expect(clients[0].dispose).toHaveBeenCalledOnce();
+    expect(controller.currentSession).toMatchObject({ sessionId: 'session-2' });
+    expect(controller.getTelemetry()).toMatchObject({ translatedAudioChunks: 0 });
+  });
+
+  it('bounds repeated exact DISPOSE while provider teardown is slow/delayed', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveDispose;
+      const { controller, clients } = createMediaStreamHarness({
+        makeClient: clientCallbacks => ({
+          connect: vi.fn(async () => clientCallbacks.onSetupComplete()),
+          dispose: vi.fn(() => new Promise(resolve => { resolveDispose = resolve; })),
+        }),
+      });
+
+      controller.prepare('session-1', 'gemini', 'fr', 0);
+      await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+      await controller.connectProvider('session-1', 'gemini', 'fr', 2);
+
+      const first = controller.dispose('session-1', 'gemini');
+      // Let the first disposal reach its bounded wait so the physical
+      // teardown is provably single-flight before the retry joins it.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(clients[0].dispose).toHaveBeenCalledOnce();
+
+      const second = controller.dispose('session-1', 'gemini');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(clients[0].dispose).toHaveBeenCalledOnce();
+
+      // Both externally visible waits are bounded even though the single
+      // physical teardown is slow/delayed. Neither falsely reports DISPOSED
+      // and neither reruns provider.dispose.
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(first).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_CLEANUP_PENDING',
+        cleanupPending: true,
+        retryable: true,
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        disposed: false,
+      });
+      await expect(second).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_CLEANUP_PENDING',
+        cleanupPending: true,
+        retryable: true,
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        disposed: false,
+      });
+      expect(clients[0].dispose).toHaveBeenCalledOnce();
+      expect(controller.disposedSession.cleanupComplete).toBe(false);
+      // Ownership is retained via the pending tombstone: any new PREPARE
+      // is rejected while physical cleanup is unresolved.
+      expect(controller.prepare('session-2', 'gemini', 'fr', 0)).toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_DISPOSED',
+        ignored: true,
+      });
+
+      // Authoritative success: resolving the single physical teardown lets
+      // a fresh exact DISPOSE acknowledge and unblocks the next session.
+      // Stale pending results above never become DISPOSED on their own.
+      resolveDispose();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(controller.disposedSession.cleanupComplete).toBe(true);
+
+      await expect(controller.dispose('session-1', 'gemini')).resolves.toMatchObject({
+        success: true,
+        ack: 'DISPOSED',
+        disposed: true,
+      });
+      expect(clients[0].dispose).toHaveBeenCalledOnce();
+      expect(controller.prepare('session-2', 'gemini', 'fr', 0)).toMatchObject({
+        success: true,
+        sessionId: 'session-2',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds repeated exact DISPOSE while pipeline teardown is slow/delayed', async () => {
+    vi.useFakeTimers();
+    try {
+      const track = new FakeTrack();
+      let resolvePipelineStop;
+      const inputPipeline = {
+        start: vi.fn(async () => {}),
+        stop: vi.fn(() => new Promise(resolve => { resolvePipelineStop = resolve; })),
+      };
+      const outputPlayer = {
+        start: vi.fn(async () => {}),
+        stop: vi.fn(async () => {}),
+        clear: vi.fn(),
+      };
+      const controller = new LiveDubbingController({
+        mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+        inputPipeline,
+        outputPlayer,
+        providerClient: { connect: vi.fn(), close: vi.fn() },
+        requestBootstrap: vi.fn(),
+      });
+
+      controller.prepare('session-1', 'gemini', null, 0);
+      await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+
+      const first = controller.dispose('session-1', 'gemini');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(inputPipeline.stop).toHaveBeenCalledOnce();
+
+      // Same single-flight mode as AudioContext.close() inside pipeline
+      // teardown: the retry joins the canonical promise, it does not rerun
+      // stop while the old teardown is still executing.
+      const second = controller.dispose('session-1', 'gemini');
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(first).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_CLEANUP_PENDING',
+        cleanupPending: true,
+        retryable: true,
+      });
+      await expect(second).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_CLEANUP_PENDING',
+        cleanupPending: true,
+        retryable: true,
+      });
+      expect(inputPipeline.stop).toHaveBeenCalledOnce();
+      expect(outputPlayer.stop).toHaveBeenCalledOnce();
+
+      resolvePipelineStop();
+      await vi.advanceTimersByTimeAsync(0);
+      await expect(controller.dispose('session-1', 'gemini')).resolves.toMatchObject({
+        success: true,
+        ack: 'DISPOSED',
+      });
+      expect(inputPipeline.stop).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles cleanup canonically when pipeline and player stops throw synchronously', async () => {
+    const track = new FakeTrack();
+    const inputPipeline = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(() => { throw new Error('input stop failed'); }),
+    };
+    const outputPlayer = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(() => { throw new Error('output stop failed'); }),
+      clear: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipeline,
+      outputPlayer,
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const disposed = await controller.dispose('session-1', 'gemini');
+
+    expect(disposed).toMatchObject({ success: true, ack: 'DISPOSED' });
+    expect(inputPipeline.stop).toHaveBeenCalledOnce();
+    expect(outputPlayer.stop).toHaveBeenCalledOnce();
+    expect(controller.disposedSession.cleanupComplete).toBe(true);
   });
 
   it('ignores late provider callbacks after disposal', async () => {

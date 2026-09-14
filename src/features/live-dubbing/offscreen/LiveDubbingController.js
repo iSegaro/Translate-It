@@ -8,6 +8,7 @@ import {
   LIVE_DUBBING_INTERNAL_STATUS,
   LIVE_DUBBING_OFFSCREEN_ACKS,
   LIVE_DUBBING_STATUS,
+  LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 import {
   createLiveDubbingDiagnostic,
@@ -382,6 +383,22 @@ export class LiveDubbingController {
     if (sequenceError) return sequenceError;
     if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
 
+    const tombstone = this.disposedSession;
+    if (tombstone && (!tombstone.cleanupComplete
+      || (tombstone.sessionId === sessionId && tombstone.providerId === providerId))) {
+      return createCaptureFailure(
+        LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
+        'LIVE_DUBBING_SESSION_DISPOSED',
+        { name: 'SessionDisposedError', message: 'Session was disposed', code: 'LIVE_DUBBING_SESSION_DISPOSED' },
+        {
+          ignored: true,
+          sessionId,
+          providerId,
+          status: IDLE_STATUS,
+        },
+      );
+    }
+
     const session = this.currentSession;
     if (session?.sessionId === sessionId && session.providerId !== providerId) {
       return this._sessionMismatch(sessionId, providerId, session);
@@ -428,21 +445,6 @@ export class LiveDubbingController {
           { sessionId, providerId },
         );
       }
-    }
-
-    if (this.disposedSession?.sessionId === sessionId
-      && this.disposedSession.providerId === providerId) {
-      return createCaptureFailure(
-        LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
-        'LIVE_DUBBING_SESSION_DISPOSED',
-        { name: 'SessionDisposedError', message: 'Session was disposed', code: 'LIVE_DUBBING_SESSION_DISPOSED' },
-        {
-          ignored: true,
-          sessionId,
-          providerId,
-          status: IDLE_STATUS,
-        },
-      );
     }
 
     if (this.currentSession && this.currentSession.sessionId !== sessionId) {
@@ -1112,9 +1114,34 @@ export class LiveDubbingController {
    * The one authoritative, idempotent disposal path. Fencing happens before
    * any resource call. The offscreen router awaits this Promise before
    * returning the exact DISPOSED acknowledgement for the requested session.
+   *
+   * Transport retry (fresh DISPOSE delivery) only joins the single canonical
+   * physical promise; it never reruns provider.dispose/inputPipeline.stop/
+   * outputPlayer.stop (and therefore never reruns the AudioContext.close()
+   * inside pipeline/player teardown) while the old teardown is still
+   * executing. Every externally visible wait here is bounded by
+   * LIVE_DUBBING_STOP_TIMEOUT: a still-executing physical teardown returns an
+   * explicit cleanupPending/retryable pending response, never a false
+   * DISPOSED. The tombstone and its canonical promise continue in the
+   * background; late settlement finalizes only the exact old session.
    */
   async dispose(sessionId, providerId, reason = null, eventSequence = undefined) {
     if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
+    const disposed = this.disposedSession;
+    if (disposed?.sessionId === sessionId && disposed.providerId === providerId) {
+      const settled = await this._awaitBoundedPhysicalCleanup(disposed.cleanupPromise);
+      if (!settled) return this._cleanupPendingResponse(sessionId, providerId);
+      return {
+        success: true,
+        ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
+        disposed: true,
+        idempotent: true,
+        sessionId,
+        providerId,
+        active: false,
+        status: IDLE_STATUS,
+      };
+    }
     const session = this.currentSession;
     if (!session || session.sessionId !== sessionId) {
       return {
@@ -1138,7 +1165,22 @@ export class LiveDubbingController {
     session.terminalRequested = true;
     this._removeTrackListeners(session);
     const cleanup = this._cleanupSessionResources(session);
-    this.disposedSession = { sessionId, providerId };
+    const tombstone = {
+      session,
+      sessionId,
+      providerId,
+      cleanupPromise: cleanup,
+      cleanupComplete: false,
+    };
+    this.disposedSession = tombstone;
+    cleanup.then(
+      () => {
+        if (this.disposedSession === tombstone) tombstone.cleanupComplete = true;
+      },
+      () => {
+        if (this.disposedSession === tombstone) tombstone.cleanupComplete = true;
+      },
+    );
     this.currentSession = null;
 
     const response = {
@@ -1150,8 +1192,34 @@ export class LiveDubbingController {
       active: false,
       status: IDLE_STATUS,
     };
-    await cleanup;
+    const settled = await this._awaitBoundedPhysicalCleanup(cleanup);
+    if (!settled) return this._cleanupPendingResponse(sessionId, providerId);
     return response;
+  }
+
+  _awaitBoundedPhysicalCleanup(cleanupPromise) {
+    let timeoutId;
+    const timeout = new Promise(resolve => {
+      timeoutId = setTimeout(() => resolve(false), LIVE_DUBBING_STOP_TIMEOUT);
+    });
+    return Promise.race([
+      Promise.resolve(cleanupPromise).then(() => true, () => true),
+      timeout,
+    ]).finally(() => clearTimeout(timeoutId));
+  }
+
+  _cleanupPendingResponse(sessionId, providerId) {
+    return {
+      success: false,
+      error: 'LIVE_DUBBING_CLEANUP_PENDING',
+      cleanupPending: true,
+      retryable: true,
+      sessionId: isSessionId(sessionId) ? sessionId : null,
+      providerId,
+      active: false,
+      status: IDLE_STATUS,
+      disposed: false,
+    };
   }
 
   _cleanupSessionResources(session) {
@@ -1215,18 +1283,30 @@ export class LiveDubbingController {
       // Queue clearing is best effort before graph teardown.
     }
 
+    const stopResource = resource => {
+      try {
+        return Promise.resolve(resource?.stop?.());
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    };
+
     session.cleanupPromise = Promise.allSettled([
       providerShutdown,
-      inputPipeline?.stop?.(),
-      outputPlayer?.stop?.(),
+      stopResource(inputPipeline),
+      stopResource(outputPlayer),
     ]).then(() => {
       session.telemetry.outputQueueCurrentDurationMs = 0;
       this._markMilestone(session, 'cleanupComplete');
       this._syncTelemetryCounters(session);
-      this.lastTelemetry = buildTelemetrySnapshot({
-        telemetry: session.telemetry,
-        metrics: session.metrics,
-      });
+      if (this.currentSession === session || (
+        this.currentSession === null && this.disposedSession?.session === session
+      )) {
+        this.lastTelemetry = buildTelemetrySnapshot({
+          telemetry: session.telemetry,
+          metrics: session.metrics,
+        });
+      }
       return true;
     });
     return session.cleanupPromise;

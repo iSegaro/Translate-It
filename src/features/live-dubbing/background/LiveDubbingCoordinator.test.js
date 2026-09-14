@@ -10,6 +10,7 @@ import {
   LIVE_DUBBING_INTERNAL_STATUS,
   LIVE_DUBBING_STATUS,
   LIVE_DUBBING_START_TIMEOUT,
+  LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 
 function createHarness({ stored = null, streamId = 'stream-secret', statusResponse, documentExists } = {}) {
@@ -438,6 +439,123 @@ describe('LiveDubbingCoordinator', () => {
     vi.useRealTimers();
   });
 
+  it('bounds START timeout cleanup when lease acquisition is slow/delayed', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      let resolveLease;
+      const lease = new Promise(resolve => { resolveLease = resolve; });
+      harness.manager.acquire.mockImplementationOnce(() => lease);
+
+      const start = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+      while (!resolveLease) await Promise.resolve();
+
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_START_TIMEOUT + LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(start).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_START_TIMEOUT',
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'session-1' },
+      });
+      expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+        sessionId: 'session-1',
+      });
+      expect(harness.browserAPI.runtime.sendMessage.mock.calls
+        .map(([message]) => message)
+        .filter(message => message.action === 'LIVE_DUBBING_DISPOSE'))
+        .toHaveLength(1);
+      expect(harness.manager.release).not.toHaveBeenCalled();
+
+      await expect(harness.coordinator.getStatus()).resolves.toMatchObject({
+        success: true,
+        status: { sessionId: 'session-1' },
+      });
+
+      resolveLease(true);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(harness.manager.release).toHaveBeenCalledWith({
+        owner: LIVE_DUBBING_OWNER,
+        leaseId: 'session-1',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds reconciliation cleanup and leaves the transition queue available', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness({
+        stored: {
+          sessionId: 'old-session',
+          tabId: 42,
+          targetLanguage: 'en',
+          status: LIVE_DUBBING_STATUS.ERROR,
+          startedAt: 1,
+          lastError: 'START_FAILED',
+          eventSequence: 1,
+        },
+        documentExists: true,
+        statusResponse: {
+          success: true,
+          active: false,
+          sessionId: 'old-session',
+          status: LIVE_DUBBING_STATUS.ERROR,
+        },
+      });
+      harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' }];
+      const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+      let disposeAttempts = 0;
+      let resolveFirstDispose;
+      let resolveSecondDispose;
+      harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+        if (message.action === 'LIVE_DUBBING_DISPOSE') {
+          disposeAttempts += 1;
+          return new Promise(resolve => {
+            if (disposeAttempts === 1) resolveFirstDispose = resolve;
+            else resolveSecondDispose = resolve;
+          });
+        }
+        return originalSendMessage(message);
+      });
+
+      const reconcile = harness.coordinator.reconcile();
+      while (!resolveFirstDispose) await Promise.resolve();
+
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(reconcile).resolves.toMatchObject({
+        success: false,
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'old-session' },
+      });
+      await expect(harness.coordinator.getStatus()).resolves.toMatchObject({
+        success: true,
+        status: { sessionId: 'old-session' },
+      });
+      expect(harness.manager.release).not.toHaveBeenCalled();
+
+      const retry = harness.coordinator.reconcile();
+      while (!resolveSecondDispose) await Promise.resolve();
+      expect(disposeAttempts).toBe(2);
+      resolveSecondDispose({
+        success: true,
+        ack: 'DISPOSED',
+        sessionId: 'old-session',
+        providerId: 'gemini',
+      });
+      await expect(retry).resolves.toMatchObject({ success: true, status: null });
+      expect(resolveFirstDispose).toEqual(expect.any(Function));
+      expect(harness.manager.release).toHaveBeenCalledWith({
+        owner: LIVE_DUBBING_OWNER,
+        leaseId: 'old-session',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fails closed when storage becomes unreadable while a session is active', async () => {
     const harness = createHarness();
     await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
@@ -525,6 +643,336 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
   });
 
+  it('bounds STOP while canonical disposal is pending and releases only after it settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+      let resolveDispose;
+      harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+        if (message.action === 'LIVE_DUBBING_DISPOSE') {
+          return new Promise(resolve => { resolveDispose = resolve; });
+        }
+        return originalSendMessage(message);
+      });
+
+      await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+      const firstStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      while (!resolveDispose) await Promise.resolve();
+
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(firstStop).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_STOP_TIMEOUT',
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'session-1', status: LIVE_DUBBING_STATUS.STOPPING },
+      });
+      expect(harness.manager.release).not.toHaveBeenCalled();
+      expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+        sessionId: 'session-1',
+        status: LIVE_DUBBING_STATUS.STOPPING,
+      });
+
+      const secondStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(secondStop).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_STOP_TIMEOUT',
+        cleanupPending: true,
+      });
+      expect(harness.browserAPI.runtime.sendMessage.mock.calls
+        .map(([message]) => message)
+        .filter(message => message.action === 'LIVE_DUBBING_DISPOSE'))
+        .toHaveLength(2);
+
+      resolveDispose({
+        success: true,
+        ack: 'DISPOSED',
+        sessionId: 'session-1',
+        providerId: 'gemini',
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(harness.manager.release).toHaveBeenCalledOnce();
+      expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+      await expect(harness.coordinator.stop({ data: { sessionId: 'session-1' } }))
+        .resolves.toMatchObject({ success: true, idempotent: true });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds STOP retries while controller physical teardown is slow/delayed', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      const track = {
+        kind: 'audio',
+        readyState: 'live',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        stop: vi.fn(),
+      };
+      let resolveProviderDispose;
+      const providerDispose = vi.fn(() => new Promise(resolve => { resolveProviderDispose = resolve; }));
+      const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+      const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+      const providerClient = { connect: vi.fn(async () => {}), dispose: providerDispose, close: vi.fn() };
+      const sender = {
+        id: 'extension-id',
+        url: 'chrome-extension://extension-id/src/html/offscreen.html',
+      };
+      const offscreen = new LiveDubbingController({
+        mediaDevices: { getUserMedia: vi.fn(async () => ({
+          getAudioTracks: () => [track],
+          getTracks: () => [track],
+        })) },
+        inputPipelineFactory: vi.fn(async () => inputPipeline),
+        outputPlayerFactory: vi.fn(async () => outputPlayer),
+        providerClient,
+        requestBootstrap: request => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' })
+          .then(descriptor => descriptor
+            ? {
+              success: true,
+              providerId: descriptor.providerId,
+              targetLanguage: descriptor.targetLanguage,
+              bootstrap: { accessToken: 'handler-token' },
+            }
+            : { success: false }),
+        notify: vi.fn(),
+      });
+      harness.browserAPI.runtime.sendMessage.mockImplementation(message => {
+        harness.calls.push(['message', message]);
+        return offscreen.handle(message);
+      });
+
+      const started = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+      expect(started).toMatchObject({ success: true, status: { sessionId: 'session-1' } });
+
+      // First STOP: the single physical teardown starts but is slow/delayed.
+      // The externally visible wait is bounded; ownership is retained.
+      const firstStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      while (!resolveProviderDispose) await Promise.resolve();
+      expect(providerDispose).toHaveBeenCalledOnce();
+      expect(offscreen.prepare('session-2', 'gemini', 'en', 0)).toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_DISPOSED',
+        ignored: true,
+      });
+
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(firstStop).resolves.toMatchObject({
+        success: false,
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'session-1' },
+      });
+      expect(harness.manager.release).not.toHaveBeenCalled();
+      expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ sessionId: 'session-1' });
+
+      // Second attempt: fresh transport delivery joins the same canonical
+      // physical promise. No concurrent duplicate teardown, no false success.
+      const secondStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(providerDispose).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(secondStop).resolves.toMatchObject({
+        success: false,
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'session-1' },
+      });
+      expect(providerDispose).toHaveBeenCalledOnce();
+      expect(harness.manager.release).not.toHaveBeenCalled();
+      expect(offscreen.prepare('session-2', 'gemini', 'en', 0)).toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_DISPOSED',
+      });
+
+      // Authoritative success: resolving the single physical teardown lets a
+      // fresh exact DISPOSE acknowledge exactly once. Stale pending results
+      // never became DISPOSED on their own and never corrupted a new session.
+      resolveProviderDispose();
+      await vi.advanceTimersByTimeAsync(0);
+
+      const thirdStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      await expect(thirdStop).resolves.toMatchObject({ success: true, stopped: true, status: null });
+      expect(providerDispose).toHaveBeenCalledOnce();
+      expect(harness.manager.release).toHaveBeenCalledOnce();
+      expect(harness.manager.release).toHaveBeenCalledWith({
+        owner: LIVE_DUBBING_OWNER,
+        leaseId: 'session-1',
+      });
+      expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+      expect(offscreen.prepare('session-2', 'gemini', 'en', 0)).toMatchObject({
+        success: true,
+        sessionId: 'session-2',
+      });
+      expect(offscreen.currentSession).toMatchObject({ sessionId: 'session-2' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('recovers permanently hung physical teardown via offscreen recreation and reconciliation', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      const track = {
+        kind: 'audio',
+        readyState: 'live',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        stop: vi.fn(),
+      };
+      // NEVER resolved by design: the old physical teardown stays pending
+      // forever. No resolver is captured and nothing resolves it below.
+      const providerDispose = vi.fn(() => new Promise(() => {}));
+      const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+      const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+      const providerClient = { connect: vi.fn(async () => {}), dispose: providerDispose, close: vi.fn() };
+      const sender = {
+        id: 'extension-id',
+        url: 'chrome-extension://extension-id/src/html/offscreen.html',
+      };
+      const authorizeBootstrap = request => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' })
+        .then(descriptor => descriptor
+          ? {
+            success: true,
+            providerId: descriptor.providerId,
+            targetLanguage: descriptor.targetLanguage,
+            bootstrap: { accessToken: 'handler-token' },
+          }
+          : { success: false });
+      const oldNotify = vi.fn();
+      const oldController = new LiveDubbingController({
+        mediaDevices: { getUserMedia: vi.fn(async () => ({
+          getAudioTracks: () => [track],
+          getTracks: () => [track],
+        })) },
+        inputPipelineFactory: vi.fn(async () => inputPipeline),
+        outputPlayerFactory: vi.fn(async () => outputPlayer),
+        providerClient,
+        requestBootstrap: authorizeBootstrap,
+        notify: oldNotify,
+      });
+      harness.browserAPI.runtime.sendMessage.mockImplementation(message => {
+        harness.calls.push(['message', message]);
+        return oldController.handle(message);
+      });
+
+      const started = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+      expect(started).toMatchObject({ success: true, status: { sessionId: 'session-1' } });
+
+      const firstStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      while (providerDispose.mock.calls.length === 0) await Promise.resolve();
+      expect(providerDispose).toHaveBeenCalledOnce();
+
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(firstStop).resolves.toMatchObject({
+        success: false,
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'session-1' },
+      });
+      expect(harness.manager.release).not.toHaveBeenCalled();
+      expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ sessionId: 'session-1' });
+
+      const secondStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(providerDispose).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(secondStop).resolves.toMatchObject({
+        success: false,
+        retryable: true,
+        cleanupPending: true,
+        status: { sessionId: 'session-1' },
+      });
+      expect(providerDispose).toHaveBeenCalledOnce();
+      expect(harness.manager.release).not.toHaveBeenCalled();
+      expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ sessionId: 'session-1' });
+
+      // Simulate offscreen destruction/recreation: swap in a fresh controller
+      // with healthy doubles. The old permanently pending physical promise is
+      // abandoned by design; it is never resolved and never retried
+      // concurrently.
+      const freshTrack = {
+        kind: 'audio',
+        readyState: 'live',
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        stop: vi.fn(),
+      };
+      const freshInputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+      const freshOutputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+      const freshProvider = { connect: vi.fn(async () => {}), dispose: vi.fn(async () => {}), close: vi.fn() };
+      const freshController = new LiveDubbingController({
+        mediaDevices: { getUserMedia: vi.fn(async () => ({
+          getAudioTracks: () => [freshTrack],
+          getTracks: () => [freshTrack],
+        })) },
+        inputPipelineFactory: vi.fn(async () => freshInputPipeline),
+        outputPlayerFactory: vi.fn(async () => freshOutputPlayer),
+        providerClient: freshProvider,
+        requestBootstrap: authorizeBootstrap,
+        notify: vi.fn(),
+      });
+      harness.browserAPI.runtime.sendMessage.mockImplementation(message => {
+        harness.calls.push(['message', message]);
+        return freshController.handle(message);
+      });
+      harness.manager.documentExists = true;
+
+      expect(oldController.disposedSession.cleanupComplete).toBe(false);
+      expect(freshController.currentSession).toBeNull();
+      expect(freshController.disposedSession).toBeNull();
+
+      // Existing production recovery path, no new contract.
+      const reconciled = await harness.coordinator.reconcile();
+      expect(reconciled).toMatchObject({ success: true, status: null, stale: true, retryable: false });
+      expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+      expect(harness.manager.release).toHaveBeenCalledTimes(1);
+      expect(harness.manager.release).toHaveBeenCalledWith({
+        owner: LIVE_DUBBING_OWNER,
+        leaseId: 'session-1',
+      });
+
+      // No false provider/session inference: exactly one STATUS probe for the
+      // exact old session/provider.
+      const statusProbes = harness.browserAPI.runtime.sendMessage.mock.calls
+        .map(([message]) => message)
+        .filter(message => message.action === 'LIVE_DUBBING_STATUS');
+      expect(statusProbes).toHaveLength(1);
+      expect(statusProbes[0]).toMatchObject({ data: { sessionId: 'session-1', providerId: 'gemini' } });
+
+      // Abandoned old-controller callbacks cannot affect cleared state.
+      const oldSession = oldController.disposedSession.session;
+      oldController._handleTrackEnded(oldSession);
+      providerClient.onError?.(new Error('abandoned old controller'));
+      providerClient.onClose?.({ code: 1000, wasClean: false });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+      expect(harness.manager.release).toHaveBeenCalledTimes(1);
+      expect(freshController.currentSession).toBeNull();
+      expect(oldNotify).not.toHaveBeenCalled();
+
+      // New session works after recovery.
+      expect(freshController.prepare('session-2', 'gemini', 'en', 0)).toMatchObject({
+        success: true,
+        sessionId: 'session-2',
+      });
+      await freshController.dispose('session-2', 'gemini');
+      harness.coordinator.uuid = () => 'session-3';
+      const restarted = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+      expect(restarted).toMatchObject({ success: true, status: { sessionId: 'session-3' } });
+      expect(providerDispose).toHaveBeenCalledOnce();
+      expect(freshProvider.dispose).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('cancels a pre-capture start before creating a descriptor', async () => {
     const harness = createHarness();
     let resolveTabs;
@@ -593,8 +1041,7 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
   });
 
-  it.each(['TAB_REMOVED', 'TOP_LEVEL_NAVIGATION'])
-    ('cancels an extension-sender start only when the delayed authoritative tab matches (%s)', async event => {
+  it.each(['TAB_REMOVED', 'TOP_LEVEL_NAVIGATION'])('cancels an extension-sender start only when the delayed authoritative tab matches (%s)', async event => {
       const harness = createHarness();
       let resolveTabs;
       harness.browserAPI.tabs.query.mockImplementationOnce(() => new Promise(resolve => {
@@ -641,8 +1088,7 @@ describe('LiveDubbingCoordinator', () => {
       expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
     });
 
-  it.each(['TAB_REMOVED', 'TOP_LEVEL_NAVIGATION'])
-    ('records delayed tab events for queued unresolved starts after a different known start (%s)', async event => {
+  it.each(['TAB_REMOVED', 'TOP_LEVEL_NAVIGATION'])('records delayed tab events for queued unresolved starts after a different known start (%s)', async event => {
       const harness = createHarness();
       harness.coordinator.uuid = vi.fn()
         .mockReturnValueOnce('session-a')
@@ -714,7 +1160,12 @@ describe('LiveDubbingCoordinator', () => {
 
     const result = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
 
-    expect(result).toMatchObject({ success: false, error: 'STOP_FAILED', cleanupPending: true });
+    expect(result).toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+    });
     expect(harness.manager.release).not.toHaveBeenCalled();
     expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
       sessionId: 'session-1',
@@ -2407,6 +2858,68 @@ describe('LiveDubbingCoordinator', () => {
       owner: LIVE_DUBBING_OWNER,
       leaseId: 'session-1',
     });
+  });
+
+  it('fences a late first cleanup attempt after a newer session takes ownership', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness();
+      await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+      let resolveDispose;
+      const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+      harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+        if (message.action === 'LIVE_DUBBING_DISPOSE') {
+          return new Promise(resolve => { resolveDispose = resolve; });
+        }
+        return originalSendMessage(message);
+      });
+
+      const stop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+      while (!resolveDispose) await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(LIVE_DUBBING_STOP_TIMEOUT);
+      await expect(stop).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_STOP_TIMEOUT',
+        cleanupPending: true,
+      });
+
+      harness.manager.activeLeases = [
+        { owner: LIVE_DUBBING_OWNER, leaseId: 'session-1' },
+        { owner: LIVE_DUBBING_OWNER, leaseId: 'new-session' },
+      ];
+      await harness.browserAPI.storage.session.set({
+        [LIVE_DUBBING_STORAGE_KEY]: {
+          sessionId: 'new-session',
+          tabId: 84,
+          providerId: 'gemini',
+          targetLanguage: 'de',
+          status: LIVE_DUBBING_STATUS.RUNNING,
+          startedAt: 2,
+          lastError: null,
+          eventSequence: 1,
+        },
+      });
+      resolveDispose({
+        success: true,
+        ack: 'DISPOSED',
+        sessionId: 'session-1',
+        providerId: 'gemini',
+      });
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+        sessionId: 'new-session',
+      });
+      expect(harness.manager.activeLeases).toEqual([
+        { owner: LIVE_DUBBING_OWNER, leaseId: 'new-session' },
+      ]);
+      expect(harness.manager.release).toHaveBeenCalledWith({
+        owner: LIVE_DUBBING_OWNER,
+        leaseId: 'session-1',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects a foreign-provider terminal without impacting the active OpenAI session', async () => {
