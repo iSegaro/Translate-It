@@ -556,3 +556,193 @@ describe('offscreen live-dubbing route', () => {
     expect(track.stop).toHaveBeenCalledOnce();
   });
 });
+
+describe('offscreen live-dubbing control sender authorization', () => {
+  // Document senders always carry browser-generated documentId on supported
+  // Chromium; the SW carries none. Fixtures mirror those platform shapes.
+  const swSender = { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' };
+  const swSenderNoUrl = { id: 'extension-id' };
+  const popupSender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/popup.html', documentId: 'doc-popup' };
+  const optionsSender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/options.html', documentId: 'doc-options' };
+  const sidepanelSender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/sidepanel.html', documentId: 'doc-sidepanel' };
+  const contentScriptSender = { id: 'extension-id', url: 'https://example.test/page', tab: { id: 1 }, frameId: 0, documentId: 'doc-content' };
+  const offscreenSelfSender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html', documentId: 'doc-offscreen' };
+  const arbitraryDocumentSender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/arbitrary.html', documentId: 'doc-arbitrary' };
+
+  function liveDubbingMessage(action, sessionId = 'auth-session', extraData = {}) {
+    return {
+      target: 'offscreen',
+      action,
+      data: { sessionId, providerId: 'gemini', eventSequence: 0, ...extraData },
+    };
+  }
+
+  it('accepts SW/background PREPARE/CONNECT/DISPOSE lifecycle', async () => {
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      listeners: new Map(),
+      stop: vi.fn(() => {
+        track.readyState = 'ended';
+      }),
+      addEventListener: vi.fn((type, handler) => track.listeners.set(type, handler)),
+      removeEventListener: vi.fn(),
+    };
+    const mediaDevices = {
+      getUserMedia: vi.fn(() => Promise.resolve({
+        getAudioTracks: () => [track],
+        getTracks: () => [track],
+      })),
+    };
+    await loadOffscreen({ mediaDevices });
+
+    await expect(sendMessage(
+      liveDubbingMessage('LIVE_DUBBING_PREPARE', 'sw-session'),
+      swSender,
+    )).resolves.toMatchObject({ success: true, ack: 'READY' });
+
+    // The URL-less Service Worker shape drives the same session idempotently.
+    await expect(sendMessage(
+      liveDubbingMessage('LIVE_DUBBING_PREPARE', 'sw-session'),
+      swSenderNoUrl,
+    )).resolves.toMatchObject({ success: true, ack: 'READY' });
+
+    // CONNECT reaches the controller (sequence fence, not authorization):
+    // any non-UNAUTHORIZED controller response proves router acceptance.
+    const connectResponse = await sendMessage(
+      liveDubbingMessage('LIVE_DUBBING_CONNECT_PROVIDER', 'unknown-session', { eventSequence: 2 }),
+      swSender,
+    );
+    expect(connectResponse.error).not.toBe('OFFSCREEN_UNAUTHORIZED');
+
+    await expect(sendMessage(
+      liveDubbingMessage('LIVE_DUBBING_CONSUME', 'sw-session', { streamId: 'stream-secret', eventSequence: 1 }),
+      swSender,
+    )).resolves.toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_DISPOSE',
+      data: { sessionId: 'sw-session', providerId: 'gemini', reason: 'STOP' },
+    }, swSender)).resolves.toMatchObject({ success: true, ack: 'DISPOSED' });
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['popup', popupSender],
+    ['options', optionsSender],
+    ['sidepanel', sidepanelSender],
+  ])('rejects %s UI senders for control commands', async (_label, sender) => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+
+    for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_DISPOSE']) {
+      await expect(sendMessage(liveDubbingMessage(action, `ui-attack-${action}`), sender))
+        .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    }
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('rejects content-script/tab and offscreen-self control invocation', async () => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+
+    const rejectedSenders = [
+      contentScriptSender,
+      { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/options.html', tab: { id: 42 }, frameId: 0, documentId: 'doc-options-tab' },
+      offscreenSelfSender,
+      arbitraryDocumentSender,
+    ];
+    for (const sender of rejectedSenders) {
+      for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_DISPOSE']) {
+        await expect(sendMessage(liveDubbingMessage(action, `self-attack-${action}`), sender))
+          .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+      }
+    }
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on missing/malformed sender metadata', async () => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+    // Bypass the sendMessage helper default sender so undefined/null are
+    // delivered verbatim and must still fail closed.
+    const rawSend = (message, sender) => new Promise((resolve) => {
+      state.listener(message, sender, resolve);
+    });
+
+    const malformedSenders = [
+      undefined,
+      null,
+      {},
+      { id: 'other-extension', url: 'chrome-extension://other-extension/background.js' },
+      { id: 'extension-id', url: 'not a valid url %%' },
+      { id: 'extension-id', tab: { id: 1 } },
+      'string-sender',
+    ];
+    for (const sender of malformedSenders) {
+      await expect(rawSend(liveDubbingMessage('LIVE_DUBBING_PREPARE', 'malformed-attack'), sender))
+        .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    }
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it('rejection mutates no session/provider/capture/lease state', async () => {
+    const getUserMedia = vi.fn(() => Promise.resolve({
+      getAudioTracks: () => [],
+      getTracks: () => [],
+    }));
+    await loadOffscreen({ mediaDevices: { getUserMedia } });
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+
+    for (const sender of [popupSender, optionsSender, contentScriptSender, offscreenSelfSender]) {
+      await expect(sendMessage(liveDubbingMessage('LIVE_DUBBING_PREPARE', 'untouched-session'), sender))
+        .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    }
+    expect(handle).not.toHaveBeenCalled();
+    expect(getUserMedia).not.toHaveBeenCalled();
+
+    // No session was created: a trusted STATUS probe observes IDLE/inactive.
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_STATUS',
+      data: { sessionId: 'untouched-session', providerId: 'gemini' },
+    }, swSender)).resolves.toMatchObject({
+      success: true,
+      active: false,
+      sessionId: 'untouched-session',
+      status: 'IDLE',
+    });
+
+    // The attacked identity remains fully usable by its rightful owner.
+    await expect(sendMessage(
+      liveDubbingMessage('LIVE_DUBBING_PREPARE', 'untouched-session'),
+      swSender,
+    )).resolves.toMatchObject({ success: true, ack: 'READY' });
+  });
+
+  it('rejects arbitrary same-extension documents by document context, not path', async () => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+
+    // chrome-extension://.../arbitrary.html appears in no allowlist or
+    // denylist: rejection must come from its document metadata alone.
+    for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_DISPOSE']) {
+      await expect(sendMessage(liveDubbingMessage(action, 'arbitrary-attack'), arbitraryDocumentSender))
+        .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    }
+    expect(handle).not.toHaveBeenCalled();
+
+    // Foreign extensions fail closed even with document metadata present.
+    await expect(sendMessage(
+      liveDubbingMessage('LIVE_DUBBING_PREPARE', 'arbitrary-attack'),
+      { id: 'other-extension', url: 'chrome-extension://other-extension/src/html/arbitrary.html', documentId: 'doc-foreign' },
+    )).resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    expect(handle).not.toHaveBeenCalled();
+  });
+});

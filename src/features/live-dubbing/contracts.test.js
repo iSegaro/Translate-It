@@ -8,6 +8,7 @@ import {
   createSessionMessage,
   hasExactSessionEvent,
   isAuthorizedOffscreenRouterSender,
+  isAuthorizedLiveDubbingOffscreenControlSender,
   isAuthorizedOffscreenSender,
   isExactSessionResponse,
   isLiveDubbingProviderId,
@@ -331,6 +332,86 @@ describe('live dubbing Stage 2 contracts', () => {
 
   it('rejects bootstrap-capable Offscreen senders when sender.url is missing', () => {
     expect(isAuthorizedOffscreenSender({ id: 'extension-id' }, browserAPI)).toBe(false);
+  });
+
+  it('restricts live-dubbing offscreen control to Background/SW senders', () => {
+    // Accepted: Service Worker shapes carry no document context (no URL, or
+    // background page URL without document/frame metadata).
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({ id: 'extension-id' }, browserAPI)).toBe(true);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/background.js',
+    }, browserAPI)).toBe(true);
+
+    // Rejected: UI documents always carry browser-generated documentId on
+    // supported Chromium, which positively identifies a document sender.
+    for (const page of ['popup.html', 'sidepanel.html', 'options.html']) {
+      expect(isAuthorizedLiveDubbingOffscreenControlSender({
+        id: 'extension-id',
+        url: `chrome-extension://extension-id/src/html/${page}`,
+        documentId: `doc-${page}`,
+      }, browserAPI)).toBe(false);
+      expect(isAuthorizedLiveDubbingOffscreenControlSender({
+        id: 'extension-id',
+        url: `chrome-extension://extension-id/src/html/${page}`,
+        tab: { id: 42 },
+        frameId: 0,
+        documentId: `doc-${page}-tab`,
+      }, browserAPI)).toBe(false);
+    }
+
+    // Rejected: offscreen-self control invocation carries document metadata.
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+      documentId: 'doc-offscreen',
+    }, browserAPI)).toBe(false);
+
+    // Rejected: content-script/tab and foreign senders.
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({
+      id: 'extension-id',
+      url: 'https://example.test/page',
+      tab: { id: 1 },
+      frameId: 0,
+      documentId: 'doc-content',
+    }, browserAPI)).toBe(false);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({
+      id: 'other-extension',
+      url: 'chrome-extension://other-extension/background.js',
+    }, browserAPI)).toBe(false);
+
+    // Fail closed: missing/malformed sender metadata.
+    expect(isAuthorizedLiveDubbingOffscreenControlSender(undefined, browserAPI)).toBe(false);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender(null, browserAPI)).toBe(false);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({}, browserAPI)).toBe(false);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({ id: 'extension-id', tab: { id: 1 } }, browserAPI)).toBe(false);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({ id: 'extension-id', url: 'not a valid url %%' }, browserAPI)).toBe(false);
+  });
+
+  it('proves control auth depends on document context, not UI path recognition', () => {
+    // Unknown same-extension paths the codebase never allowlists or denylists
+    // are still rejected once they carry document metadata.
+    for (const path of ['src/html/arbitrary.html', 'src/html/brand-new-page.html']) {
+      expect(isAuthorizedLiveDubbingOffscreenControlSender({
+        id: 'extension-id',
+        url: `chrome-extension://extension-id/${path}`,
+        documentId: 'doc-arbitrary',
+      }, browserAPI)).toBe(false);
+    }
+
+    // Frame-bound senders are rejected even with a trusted id and origin.
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/background.js',
+      frameId: 0,
+    }, browserAPI)).toBe(false);
+
+    // Non-document SW shapes stay accepted regardless of URL presence.
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({ id: 'extension-id' }, browserAPI)).toBe(true);
+    expect(isAuthorizedLiveDubbingOffscreenControlSender({
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/background.js',
+    }, browserAPI)).toBe(true);
   });
 
   it('fails closed when the exact Offscreen URL cannot be resolved', () => {

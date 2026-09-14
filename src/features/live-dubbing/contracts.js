@@ -473,6 +473,40 @@ export function isAuthorizedOffscreenRouterSender(sender, browserAPI) {
 }
 
 /**
+ * Validate a sender delivering Live Dubbing lifecycle/control commands to
+ * the offscreen router (PREPARE/CONSUME/CONNECT_PROVIDER/STATUS/DISPOSE).
+ * Only the Background Service Worker may drive these, identified positively
+ * via browser-generated document-context metadata — never via URL path
+ * denylists and never via message contents.
+ *
+ * Positive rule: trusted runtime id, no tab, no document context
+ * (sender.documentId absent), no frame binding (sender.frameId absent),
+ * and extension origin whenever a URL is present. On supported Chromium
+ * (sender.documentId exists since Chrome 106; this extension requires
+ * Chrome 116+ for offscreen tab-capture, and Firefox exposes no offscreen
+ * document) every document context — extension pages such as
+ * popup/options/sidepanel/offscreen and content scripts — carries a
+ * browser-generated documentId, while the service worker is not a document
+ * and carries none. Presence therefore proves a document sender and
+ * rejects; absence, combined with the remaining fences, positively
+ * identifies the SW. Missing or malformed sender metadata fails closed.
+ */
+export function isAuthorizedLiveDubbingOffscreenControlSender(sender, browserAPI) {
+  try {
+    if (!hasTrustedRuntimeIdentity(sender, browserAPI)) return false;
+    if (!hasNoTab(sender)) return false;
+    const documentId = sender?.documentId;
+    if (documentId !== undefined && documentId !== null) return false;
+    const frameId = sender?.frameId;
+    if (frameId !== undefined && frameId !== null) return false;
+    if (!hasExtensionOrigin(sender, browserAPI)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Public live-dubbing commands are restricted to the extension's own UI
  * documents. Trusted extension pages (e.g. Options) can be tab-bound when
  * opened in a normal browser tab, so sender.tab presence is not a signal;

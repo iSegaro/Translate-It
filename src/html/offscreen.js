@@ -5,7 +5,7 @@ import { liveDubbingController } from '../features/live-dubbing/offscreen/LiveDu
 import {
   LIVE_DUBBING_OFFSCREEN_ACTIONS,
 } from '../features/live-dubbing/constants.js';
-import { isAuthorizedOffscreenRouterSender } from '../features/live-dubbing/contracts.js';
+import { isAuthorizedOffscreenRouterSender, isAuthorizedLiveDubbingOffscreenControlSender } from '../features/live-dubbing/contracts.js';
 
 // Enhanced logging for offscreen document
 const createOffscreenLogger = () => {
@@ -304,6 +304,14 @@ if (chrome.runtime) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target !== 'offscreen') return false;
+  if (LIVE_DUBBING_OFFSCREEN_ACTIONS.includes(message?.action)
+    && !isAuthorizedLiveDubbingOffscreenControlSender(sender, globalThis.chrome)) {
+    // Live Dubbing lifecycle/control commands are Background-SW-only. UI
+    // documents, content-script/tab senders, and offscreen-self invocation
+    // are rejected here before any session/provider/capture state is touched.
+    sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    return false;
+  }
   if (!isAuthorizedOffscreenMessage(message, sender)) {
     sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
     return false;
