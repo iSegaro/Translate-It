@@ -34,6 +34,18 @@ const browserAPI = {
 };
 
 describe('live dubbing Stage 2 contracts', () => {
+  it('keeps provider language policies independent', () => {
+    expect(normalizeProviderTargetLanguage('gemini', 'zh-Hans')).toBe('zh-Hans');
+    expect(normalizeProviderTargetLanguage('openai', 'de-DE')).toBe('de-DE');
+
+    // de-DE is intentionally valid for OpenAI but outside Gemini's finite
+    // canonical map; an OpenAI-shaped tag must not widen Gemini support.
+    expect(() => normalizeProviderTargetLanguage('gemini', 'de-DE'))
+      .toThrow('Unsupported target language');
+    expect(() => normalizeProviderTargetLanguage('openai', 'de_DE'))
+      .toThrow('Unsupported target language');
+  });
+
   it('accepts only the Phase F provider identities', () => {
     expect(isLiveDubbingProviderId('gemini')).toBe(true);
     expect(isLiveDubbingProviderId('openai')).toBe(true);

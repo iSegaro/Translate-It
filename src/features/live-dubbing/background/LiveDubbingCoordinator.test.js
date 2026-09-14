@@ -137,7 +137,7 @@ describe('LiveDubbingCoordinator', () => {
 
   it('acquires lease, prepares offscreen, forwards stream ID only to consume, then reports active', async () => {
     const harness = createHarness();
-    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'zh-Hans' } }, {});
 
     expect(result.success).toBe(true);
     expect(harness.manager.acquire).toHaveBeenCalledWith({
@@ -158,9 +158,12 @@ describe('LiveDubbingCoordinator', () => {
     expect(messages[2].data).not.toHaveProperty('streamId');
     expect(messages.map(message => message.data.eventSequence)).toEqual([0, 1, 2]);
     expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).not.toHaveProperty('streamId');
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).targetLanguage).toBe('zh-Hans');
+    expect(messages.map(message => message.data.targetLanguage)).toEqual(['zh-Hans', 'zh-Hans', 'zh-Hans']);
     expect(result.status.status).toBe(LIVE_DUBBING_STATUS.RUNNING);
     expect(result.status.eventSequence).toBe(3);
     expect(result.status.providerId).toBe('gemini');
+    expect(result.status.targetLanguage).toBe('zh-Hans');
   });
 
   it('defaults START without providerId to Gemini and rejects explicit unknown providers', async () => {
@@ -233,16 +236,43 @@ describe('LiveDubbingCoordinator', () => {
     });
 
     const result = await harness.coordinator.start({
-      data: { providerId: 'openai', targetLanguage: 'en-US' },
+      data: { providerId: 'openai', targetLanguage: 'de-DE' },
     }, {});
 
-    expect(result).toMatchObject({ success: true, status: { providerId: 'openai', status: LIVE_DUBBING_STATUS.RUNNING } });
+    expect(result).toMatchObject({
+      success: true,
+      status: {
+        providerId: 'openai',
+        targetLanguage: 'de-DE',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+      },
+    });
     expect(harness.manager.acquire).toHaveBeenCalledWith({
       owner: LIVE_DUBBING_OWNER,
       leaseId: 'session-1',
       requiredReasons: ['USER_MEDIA', 'AUDIO_PLAYBACK', 'WEB_RTC'],
     });
-    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ providerId: 'openai' });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      providerId: 'openai',
+      targetLanguage: 'de-DE',
+    });
+  });
+
+  it.each([
+    ['gemini', 'de-DE'],
+    ['openai', 'en_US'],
+  ])('rejects invalid %s target language before descriptor and runtime side effects', async (providerId, targetLanguage) => {
+    const harness = createHarness();
+
+    await expect(harness.coordinator.start({ data: { providerId, targetLanguage } }, {}))
+      .resolves.toEqual({ success: false, error: 'INVALID_TARGET_LANGUAGE' });
+
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(harness.coordinator.descriptor).toBeNull();
   });
 
   it('returns current status for duplicate start and ignores stale stop', async () => {
