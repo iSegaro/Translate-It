@@ -187,6 +187,206 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     expect(JSON.stringify(telemetry)).not.toContain('private text');
   });
 
+  it('fails bounded setup when SDP succeeds but the peer stays connecting', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ setupTimeout: 40, callbacks: { onError } });
+    harness.peerConnection.connectionState = 'connecting';
+    harness.peerConnection.iceConnectionState = 'checking';
+    harness.peerConnection.channel.readyState = 'connecting';
+
+    await expect(harness.connect()).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SETUP_TIMEOUT' });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'OPENAI_REALTIME_SETUP_TIMEOUT',
+    }));
+    expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.channel.close).toHaveBeenCalledOnce();
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+    expect(harness.adapter.active).toBe(false);
+  });
+
+  it('requires the events channel itself, not just a connected peer, for viability', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ setupTimeout: 40, callbacks: { onError } });
+    harness.peerConnection.channel.readyState = 'connecting';
+
+    await expect(harness.connect()).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SETUP_TIMEOUT' });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
+  it('terminalizes immediately on non-viable ICE during setup without waiting out the watchdog', async () => {
+    const onError = vi.fn();
+    let resolveAnswer;
+    const fetchImpl = vi.fn(() => new Promise(resolve => { resolveAnswer = resolve; }));
+    const harness = createHarness({ fetchImpl, setupTimeout: 500, callbacks: { onError } });
+    harness.peerConnection.channel.readyState = 'connecting';
+    const connect = harness.connect();
+    while (!fetchImpl.mock.calls.length) await Promise.resolve();
+    resolveAnswer({ ok: true, text: async () => 'answer-sdp' });
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    harness.peerConnection.iceConnectionState = 'failed';
+    harness.peerConnection.oniceconnectionstatechange();
+
+    await expect(connect).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SETUP_CANCELLED' });
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'OPENAI_REALTIME_PROVIDER_UNAVAILABLE',
+    }));
+    expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
+  it('resolves setup when the channel opens late and cancels the watchdog', async () => {
+    const onError = vi.fn();
+    const onSetupComplete = vi.fn();
+    const harness = createHarness({ setupTimeout: 60, callbacks: { onError, onSetupComplete } });
+    harness.peerConnection.channel.readyState = 'connecting';
+    const connect = harness.connect();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    harness.peerConnection.channel.readyState = 'open';
+    harness.peerConnection.channel.onopen?.();
+
+    await expect(connect).resolves.toBeUndefined();
+    expect(onSetupComplete).toHaveBeenCalledOnce();
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(onError).not.toHaveBeenCalled();
+    expect(harness.adapter.active).toBe(true);
+    expect(harness.peerConnection.close).not.toHaveBeenCalled();
+    await harness.adapter.dispose();
+  });
+
+  it('terminalizes a server error event once with sanitized diagnostics', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    await harness.connect();
+
+    harness.peerConnection.channel.onmessage({
+      data: JSON.stringify({
+        type: 'error',
+        error: { message: 'super secret failure transcript', code: 'server_blowup_42', sdp: 'private-sdp' },
+      }),
+    });
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'OPENAI_REALTIME_PROVIDER_UNAVAILABLE',
+    }));
+    const serialized = JSON.stringify(onError.mock.calls);
+    expect(serialized).not.toContain('super secret');
+    expect(serialized).not.toContain('server_blowup_42');
+    expect(serialized).not.toContain('private-sdp');
+    expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.channel.close).toHaveBeenCalledOnce();
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+    expect(harness.adapter.active).toBe(false);
+  });
+
+  it('ignores non-terminal oai-events without failing', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    await harness.connect();
+
+    const events = [
+      JSON.stringify({ type: 'response.output_audio_transcript.delta', delta: 'secret words' }),
+      JSON.stringify({ type: 'response.output_audio.delta', delta: 'QUJD' }),
+      { type: 'session.created', session: { id: 'sess-secret' } },
+      { type: 'rate_limits.updated' },
+      { type: 'response.done' },
+      'not-json{{{',
+      {},
+    ];
+    for (const data of events) harness.peerConnection.channel.onmessage({ data });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(harness.adapter.active).toBe(true);
+    expect(JSON.stringify(harness.adapter.getTelemetry())).not.toContain('secret words');
+  });
+
+  it('emits a single terminal on raced failure signals', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    await harness.connect();
+    const iceHandler = harness.peerConnection.oniceconnectionstatechange;
+    const messageHandler = harness.peerConnection.channel.onmessage;
+
+    harness.peerConnection.channel.onmessage({ data: JSON.stringify({ type: 'error', error: {} }) });
+    harness.peerConnection.iceConnectionState = 'failed';
+    iceHandler?.();
+    messageHandler?.({ data: JSON.stringify({ type: 'error', error: {} }) });
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a stale viability watchdog after dispose', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ setupTimeout: 40, callbacks: { onError } });
+    harness.peerConnection.channel.readyState = 'connecting';
+    const connect = harness.connect();
+    await new Promise(resolve => setTimeout(resolve, 5));
+
+    await expect(harness.adapter.dispose()).resolves.toEqual({ success: true });
+    await expect(connect).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SETUP_CANCELLED' });
+    expect(onError).not.toHaveBeenCalled();
+
+    await new Promise(resolve => setTimeout(resolve, 80));
+    expect(onError).not.toHaveBeenCalled();
+    expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
+  it('ignores old-generation channel and peer events after a new session starts', async () => {
+    const onError = vi.fn();
+    const firstPeer = new FakePeerConnection();
+    const secondPeer = new FakePeerConnection();
+    firstPeer.channel.readyState = 'connecting';
+    const peerConnectionFactory = vi.fn()
+      .mockResolvedValueOnce(firstPeer)
+      .mockResolvedValueOnce(secondPeer);
+    const adapter = new OpenAIRealtimeProviderAdapter({
+      peerConnectionFactory,
+      fetchImpl: vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
+      audioElementFactory: vi.fn(() => createAudioElement()),
+      setupTimeout: 50,
+      callbacks: { onError },
+    });
+    const audioTrack = createTrack();
+    const sourceStream = { getAudioTracks: () => [audioTrack] };
+    const options = {
+      bootstrap: { secret: 'ephemeral-client-secret' },
+      targetLanguage: 'en-US',
+      sourceStream,
+    };
+
+    const first = adapter.connect(options);
+    await new Promise(resolve => setTimeout(resolve, 5));
+    const oldOnOpen = firstPeer.channel.onopen;
+    const oldOnMessage = firstPeer.channel.onmessage;
+    const oldPeerState = firstPeer.onconnectionstatechange;
+    await adapter.dispose();
+    await expect(first).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SETUP_CANCELLED' });
+
+    await expect(adapter.connect(options)).resolves.toBeUndefined();
+    expect(adapter.active).toBe(true);
+
+    firstPeer.channel.readyState = 'open';
+    oldOnOpen?.();
+    firstPeer.connectionState = 'failed';
+    oldPeerState?.();
+    oldOnMessage?.({ data: JSON.stringify({ type: 'error', error: {} }) });
+    await Promise.resolve();
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(adapter.active).toBe(true);
+    expect(secondPeer.close).not.toHaveBeenCalled();
+    expect(audioTrack.stop).not.toHaveBeenCalled();
+    await adapter.dispose();
+  });
+
   it('rejects SDP exchange failures through a sanitized generic error callback', async () => {
     const onError = vi.fn();
     const harness = createHarness({

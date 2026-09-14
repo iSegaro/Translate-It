@@ -18,6 +18,9 @@ const TELEMETRY_MILESTONES = Object.freeze([
   'firstTranslatedAudioAcceptedByPlayback',
   'cleanupComplete',
 ]);
+// Only oai-events types that terminally fail the session. Progress,
+// transcript, audio, session, and rate-limit events are never terminal.
+const TERMINAL_EVENT_TYPES = new Set(['error']);
 const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
 const RUNTIME_FAILURE_STATES = new Set(['closed', 'disconnected', 'failed']);
 const NOOP = () => {};
@@ -181,19 +184,28 @@ function snapshotTelemetry(telemetry) {
   };
 }
 
-function isTranscriptEvent(data) {
+function readEventType(data) {
   let type = null;
   if (typeof data === 'string') {
     try {
       const parsed = JSON.parse(data);
       type = parsed && typeof parsed === 'object' ? parsed.type : null;
     } catch {
-      return false;
+      return null;
     }
   } else if (isRecord(data)) {
     type = data.type ?? data.data?.type;
   }
+  return typeof type === 'string' ? type : null;
+}
+
+function isTranscriptEvent(data) {
+  const type = readEventType(data);
   return typeof type === 'string' && type.toLowerCase().includes('transcript');
+}
+
+function isTerminalEvent(data) {
+  return TERMINAL_EVENT_TYPES.has(readEventType(data));
 }
 
 function closePeerConnection(peerConnection) {
@@ -244,8 +256,11 @@ export class OpenAIRealtimeProviderAdapter {
   }
 
   /**
-   * Establish one WebRTC translation session. Setup failures reject so the
-   * Controller's existing provider error boundary owns terminal cleanup.
+   * Establish one WebRTC translation session. Setup resolves only after the
+   * SDP exchange plus minimum transport viability (open oai-events channel)
+   * within the setup timeout, so the Controller never observes a falsely
+   * RUNNING session. Setup failures reject so the Controller's existing
+   * provider error boundary owns terminal cleanup.
    */
   connect(connectionOptions = {}) {
     return this._connect(connectionOptions);
@@ -292,6 +307,8 @@ export class OpenAIRealtimeProviderAdapter {
       playbackAccepted: false,
       telemetry: createTelemetry(),
       cancelReject: null,
+      viability: null,
+      viabilityTimer: null,
     };
     const cancellation = new Promise((_, reject) => {
       session.cancelReject = reject;
@@ -368,8 +385,20 @@ export class OpenAIRealtimeProviderAdapter {
     try {
       const dataChannel = peerConnection.createDataChannel(OPENAI_REALTIME_EVENTS_CHANNEL);
       session.dataChannel = dataChannel;
+      dataChannel.onopen = () => this._handleChannelViable(session, isCurrent);
       dataChannel.onmessage = event => {
         if (!isCurrent()) return;
+        // Only terminal/error event types fail the session. Progress,
+        // transcript, and audio events are observed (transcript counting) or
+        // ignored; their payloads are never read beyond the type field.
+        if (isTerminalEvent(event?.data)) {
+          this._reportRuntimeFailure(
+            session,
+            isCurrent,
+            createProviderError('OPENAI_REALTIME_PROVIDER_UNAVAILABLE'),
+          );
+          return;
+        }
         if (isTranscriptEvent(event?.data)) session.telemetry.transcriptEvents += 1;
       };
       dataChannel.onerror = () => this._reportRuntimeFailure(
@@ -423,8 +452,64 @@ export class OpenAIRealtimeProviderAdapter {
       await peerConnection.setRemoteDescription({ type: 'answer', sdp: answerSdp });
       if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
       session.telemetry.answerApplied = true;
+      // SDP success alone never completes setup: the translations transport
+      // is only viable once the oai-events channel is open (which transitively
+      // proves ICE/DTLS/SCTP connectivity). Remote audio is opportunistic —
+      // silence yields no track — so it never gates viability.
+      await this._awaitTransportViable(session, isCurrent);
     } catch (error) {
       throw normalizeProviderError(error, 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED');
+    }
+  }
+
+  _isTransportViable(session) {
+    try {
+      return session?.dataChannel?.readyState === 'open';
+    } catch {
+      return false;
+    }
+  }
+
+  _awaitTransportViable(session, isCurrent) {
+    if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
+    if (this._isTransportViable(session)) return Promise.resolve(true);
+    return new Promise((resolve, reject) => {
+      session.viability = { resolve, reject };
+      session.viabilityTimer = setTimeout(() => {
+        session.viabilityTimer = null;
+        session.viability = null;
+        if (!isCurrent()) return;
+        reject(createProviderError('OPENAI_REALTIME_SETUP_TIMEOUT'));
+      }, this.setupTimeout);
+    });
+  }
+
+  _handleChannelViable(session, isCurrent) {
+    if (!isCurrent()) return;
+    const viability = session.viability;
+    if (!viability) return;
+    session.viability = null;
+    this._clearViabilityWatchdog(session);
+    viability.resolve(true);
+  }
+
+  _clearViabilityWatchdog(session) {
+    if (session?.viabilityTimer) {
+      clearTimeout(session.viabilityTimer);
+      session.viabilityTimer = null;
+    }
+  }
+
+  _rejectViabilityWaiter(session) {
+    const viability = session?.viability;
+    if (session) {
+      session.viability = null;
+      this._clearViabilityWatchdog(session);
+    }
+    if (viability) {
+      try {
+        viability.reject(createProviderError('OPENAI_REALTIME_SETUP_CANCELLED'));
+      } catch { /* best effort */ }
     }
   }
 
@@ -562,9 +647,13 @@ export class OpenAIRealtimeProviderAdapter {
     if (!session || session.cleaned) return Promise.resolve();
     session.cleaned = true;
     abortSessionSdp(session);
+    // Settle a pending viability wait as stale so setup cannot hang past
+    // teardown; the watchdog timer is cleared with it.
+    this._rejectViabilityWaiter(session);
     try { session.dataChannel && (session.dataChannel.onmessage = null); } catch { /* best effort */ }
     try {
       if (session.dataChannel) {
+        session.dataChannel.onopen = null;
         session.dataChannel.onerror = null;
         session.dataChannel.onclose = null;
       }
