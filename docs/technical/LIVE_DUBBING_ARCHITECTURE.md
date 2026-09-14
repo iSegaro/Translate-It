@@ -74,8 +74,12 @@ playback.
 - The offscreen document exists only while the lease is held; disposal
   always precedes lease release.
 - Background handlers are the offscreen control boundary for terminal and
-  provider-bootstrap requests: exact sender, session, provider, target-language,
-  and event-sequence fences are checked before control-plane work proceeds.
+  provider-bootstrap requests. Terminal notifications require the authorized
+  offscreen sender and an exact authoritative `sessionId` + `providerId` match.
+  They intentionally tolerate event-sequence drift so lifecycle races do not
+  discard a legitimate terminal signal; target language and event sequence are
+  not terminal-authorization requirements. Stale or wrong-session/provider
+  terminal notifications still fail closed and are ignored.
 
 ## Capture
 
