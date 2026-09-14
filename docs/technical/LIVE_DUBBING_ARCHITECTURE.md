@@ -19,13 +19,14 @@ playback.
 ## Popup Start / Stop Flow
 
 1. The Popup (`LiveDubbingControl.vue`) sends `START_LIVE_DUBBING`
-   (target language), `STOP_LIVE_DUBBING` (session id), or
-   `GET_LIVE_DUBBING_STATUS`. All three require a trusted extension-UI
-   sender (see Security).
+   (target language and the persisted provider choice), `STOP_LIVE_DUBBING`
+   (session id), or `GET_LIVE_DUBBING_STATUS`. All three require a trusted
+   extension-UI sender (see Security).
 2. `LiveDubbingCoordinator.start()` fixes the provider identity in the pending
    start and descriptor. An absent `providerId` defaults to `gemini`; the
-   only other supported internal id is `openai`. The Popup has no provider
-   selector and does not expose this choice. The Coordinator persists a
+   only other supported internal id is `openai`. The dedicated Live Dubbing
+   control in the Popup has no provider selector: it forwards the persisted
+   Options choice to a new session. The Coordinator persists a
    `PREPARING_CAPTURE` descriptor to `storage.session`, acquires the
    provider-specific offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK` for
    Gemini; OpenAI additionally requires `WEB_RTC`), and drives the
@@ -39,18 +40,27 @@ playback.
 4. Operation timeouts: start 30 s, stop 10 s, status 5 s, setup stages
    10 s. Service-worker restarts reconcile via descriptor + lease snapshot
    (`reconcile()`), never trusting a stale session.
+5. `GET_LIVE_DUBBING_STATUS` is a read-only recovery read and is not queued
+   behind START or STOP. A reopened Popup can reconstruct a persisted pending,
+   connecting, stopping, or retained-error session. STOP can cancel an in-flight
+   pending START; terminal fencing prevents a late response from reaching
+   `RUNNING`. If cleanup cannot finish, the Coordinator retains the authoritative
+   descriptor and exact lease ownership as `cleanupPending`; a later STOP retries
+   disposal before release and descriptor clearing.
 
 ## Provider Setting
 
 - `LIVE_DUBBING_PROVIDER` is the canonical persisted provider selection and is
-  edited only in Options. Its default is `gemini`; the supported values are
-  `gemini` and `openai`.
-- Popup passes the persisted value through as `providerId`; it does not select,
-  rewrite, or silently fall back between providers. A provider change applies
-  only to a future session; the provider identity is immutable after an active
-  session starts.
-- Invalid persisted values are normalized to `gemini` during settings
-  migration. Runtime setup rejects unknown values; there is no silent provider
+  edited and persisted in Options. Its default is `gemini`; the valid persisted
+  values are `gemini` and `openai`.
+- For a valid persisted value, Popup forwards that value as `providerId` for a
+  future session; the dedicated Live Dubbing control has no provider selector.
+  A provider change applies only to a future session; the provider identity is
+  immutable after an active descriptor is created.
+- Settings migration normalizes an invalid persisted value to `gemini`. Popup
+  also has a defensive `gemini` fallback when its in-memory setting is
+  malformed; that UI guard is not provider negotiation. A direct START carrying
+  an unknown provider is rejected by the Coordinator, with no runtime provider
   fallback.
 
 ## Runtime Ownership
@@ -63,6 +73,9 @@ playback.
   socket events cannot affect a subsequent session.
 - The offscreen document exists only while the lease is held; disposal
   always precedes lease release.
+- Background handlers are the offscreen control boundary for terminal and
+  provider-bootstrap requests: exact sender, session, provider, target-language,
+  and event-sequence fences are checked before control-plane work proceeds.
 
 ## Capture
 
@@ -82,9 +95,10 @@ returned, stored, or logged.
 ## Provider Identity and Bootstrap
 
 The internal live-dubbing contract supports exactly two provider ids:
-`gemini` (the default) and `openai`. The Popup does not select or expose a
-provider; an absent START `providerId` uses Gemini, while an empty or unknown
-value is rejected. Once START creates a pending descriptor, the provider,
+`gemini` (the default) and `openai`. The dedicated Live Dubbing control in the
+Popup does not select a provider; it forwards the valid persisted Options
+choice. An absent direct START `providerId` uses Gemini, while an empty or
+unknown value is rejected. Once START creates a pending descriptor, the provider,
 session id, tab id, canonical target language, and `startedAt` identity tuple
 are fixed for the session and carried through every offscreen request,
 response, terminal event, status, stop, and recovery path. Persisted
@@ -95,7 +109,10 @@ translation catalog. Gemini keeps the explicit `LIVE_GEMINI_LANGUAGE_MAP`
 allowlist and its existing mappings. OpenAI uses its own explicit well-formed
 language-tag normalization policy; it never falls back to Gemini's allowlist
 or a general catalog. Unknown provider or language values fail closed before
-descriptor creation or provider setup.
+descriptor creation or provider setup. The Coordinator performs this
+provider-specific validation before descriptor persistence, lease acquisition,
+capture, PREPARE, or bootstrap; bootstrap services and adapters revalidate at
+their own boundaries.
 
 The one-time `LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP` request is authorized
 only for the exact active `CONNECTING_PROVIDER` session, provider, target
@@ -115,16 +132,16 @@ declares `{ create, audioMode }`; unknown providers and unsupported modes fail
 closed at PREPARE — before getUserMedia, pipelines, provider creation, or
 bootstrap. Factory exceptions propagate to the Controller error boundary
 instead of masking as null. OpenAI is registered as a production adapter in
-this registry, while remaining absent from Settings with no UI selection
-surface. See Audio Paths.
+this registry, while its valid choice is persisted by Options and forwarded
+by Popup without a dedicated Live Dubbing selector. See Audio Paths.
 
 ## Provider
 
 The offscreen `LiveDubbingController` resolves the fixed provider through
 `LiveDubbingProviderRegistry`. Gemini owns its protocol over WebSocket; the
-OpenAI adapter owns its WebRTC SDP exchange, `oai-events` data channel, and
-remote audio element playback. The provider registry is the activation point;
-no provider id is inferred from client methods.
+OpenAI adapter owns its WebRTC SDP exchange, viable `oai-events` data channel,
+and remote audio element playback. The provider registry is the activation
+point; no provider id is inferred from client methods.
 
 Transport paths:
 
@@ -209,12 +226,14 @@ never by inspecting client methods and never by provider id.
 
 OpenAI setup uses the authorized `{ secret }` bootstrap contract as an opaque
 ephemeral client secret. The adapter creates one `RTCPeerConnection`, adds only
-source audio tracks, creates `oai-events`, POSTs the raw local SDP to the
+source audio tracks, creates `oai-events`, and considers transport setup viable
+only after that channel opens. It POSTs the raw local SDP to the
 official translations calls endpoint with an ephemeral bearer, applies the raw
 SDP answer, and plays the remote track through an offscreen audio element. The
 adapter has no `sendAudio` method and never stops or removes Controller-owned
 source tracks. OpenAI setup and playback failures use the existing generic
-provider error lifecycle and generation fencing.
+provider error lifecycle and generation fencing; transcript events are counted
+as scalar telemetry and transcript text is not retained.
 
 Ownership split: the controller owns the capture tracks in both modes
 and stops them only in Controller cleanup; providers never own the
@@ -270,6 +289,13 @@ terminal operation.
   `src/html/sidepanel.html`, `src/html/options.html`) with runtime id and
   extension origin; tab-bound trusted pages are accepted by path, while
   extension origin alone never authorizes.
+- **Background-only Offscreen control.** Live Dubbing `PREPARE`, `CONSUME`,
+  `CONNECT_PROVIDER`, `STATUS`, and `DISPOSE` actions accept only the
+  authoritative Background/Service Worker sender. Popup, Options, Side Panel,
+  content-script/tab contexts, arbitrary extension documents, and the
+  Offscreen document itself cannot directly drive these actions. Authorization
+  uses browser-generated sender metadata, never message contents or URL-path
+  denylists.
 - **Sanitized diagnostics.** Cross-context diagnostic payloads are limited
   to three sanitized scalar DTOs: capture diagnostics (stage + redacted
   name/message/code), provider diagnostics (stage `CONNECT_PROVIDER` +

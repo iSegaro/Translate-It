@@ -22,7 +22,10 @@
       >
         <div class="setting-row">
           <div class="setting-info">
-            <label class="setting-label" for="LIVE_DUBBING_PROVIDER">
+            <label
+              class="setting-label"
+              for="LIVE_DUBBING_PROVIDER"
+            >
               {{ t('live_dubbing_provider_label') || 'Live Dubbing Provider' }}
             </label>
             <p class="setting-description">
