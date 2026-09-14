@@ -152,18 +152,24 @@ export class LiveDubbingCoordinator {
     return this._stop(message);
   }
 
-  getStatus() {
-    return this._enqueue(async () => {
-      const available = typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
-      await this._readDescriptor();
-      if (this._storageReadFailed()) return this._storageReadFailure();
-      if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
-      return {
-        success: true,
-        available,
-        status: cloneDescriptor(this.descriptor),
-      };
-    });
+  /**
+   * Read-only authoritative status snapshot. Intentionally independent of the
+   * serialized START/STOP mutation queue: a reopened popup must recover the
+   * preparing/connecting/pending/stopping/cleanupPending descriptor
+   * immediately even while a START is still pending. Only reads storage and
+   * the in-memory cache; never writes storage and never touches session,
+   * cleanup, or terminal state, so mutation serialization is unaffected.
+   */
+  async getStatus() {
+    const available = typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
+    await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    return {
+      success: true,
+      available,
+      status: cloneDescriptor(this.descriptor),
+    };
   }
 
   handleTabRemoved(tabId) {

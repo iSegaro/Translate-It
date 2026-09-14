@@ -112,6 +112,138 @@ describe('LiveDubbingControl', () => {
     expect(cleanupButton().exists()).toBe(false)
   })
 
+  it('retains session and offers cleanup after a structured START failure', async () => {
+    const retained = {
+      status: 'ERROR',
+      sessionId: 'session-9',
+      providerId: 'gemini',
+      lastError: 'LIVE_DUBBING_START_FAILED'
+    }
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+      if (action === 'START_LIVE_DUBBING') {
+        const failure = {
+          success: false,
+          error: 'LIVE_DUBBING_START_FAILED',
+          retryable: true,
+          cleanupPending: true,
+          status: retained,
+          providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_REMOTE_ERROR' }
+        }
+        return Promise.reject(Object.assign(new Error('LIVE_DUBBING_START_FAILED'), { data: failure }))
+      }
+      if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // Failed START with a retained session stays stoppable, never clean idle.
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+    const cleanupButton = wrapper.find('button[aria-label="Clean up live dubbing"]')
+    expect(cleanupButton.exists()).toBe(true)
+    expect(wrapper.text()).toContain('LIVE_DUBBING_START_FAILED')
+
+    await cleanupButton.trigger('click')
+    expect(sendMessage).toHaveBeenLastCalledWith({
+      action: 'STOP_LIVE_DUBBING',
+      data: { sessionId: 'session-9' }
+    })
+
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(false)
+  })
+
+  it('keeps retained error session provider for guidance across prop flips', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+      if (action === 'START_LIVE_DUBBING') {
+        const failure = {
+          success: false,
+          error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+          retryable: true,
+          cleanupPending: true,
+          status: {
+            status: 'ERROR',
+            sessionId: 'session-1',
+            providerId: 'openai',
+            lastError: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE'
+          }
+        }
+        return Promise.reject(Object.assign(new Error('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE'), { data: failure }))
+      }
+      if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de', providerId: 'openai' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Unable to initialize OpenAI Live Dubbing.')
+    sendMessage.mockClear()
+
+    // A future provider change never alters the authoritative active identity.
+    await wrapper.setProps({ providerId: 'gemini' })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'START_LIVE_DUBBING' }))
+    expect(wrapper.text()).toContain('Unable to initialize OpenAI Live Dubbing.')
+    expect(wrapper.text()).not.toContain('Unable to initialize Gemini Live Dubbing.')
+    expect(wrapper.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(true)
+
+    await wrapper.find('button[aria-label="Clean up live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // Session cleared — the next START uses the current prop.
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    expect(sendMessage).toHaveBeenLastCalledWith({
+      action: 'START_LIVE_DUBBING',
+      data: { targetLanguage: 'de', providerId: 'gemini' }
+    })
+  })
+
+  it('reconstructs retained cleanup on close/reopen from authoritative STATUS', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({ status: { status: 'ERROR', sessionId: 'retained-session', lastError: 'Capture failed' } })
+      }
+      if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const first = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await first.vm.$nextTick()
+    expect(first.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(true)
+    first.unmount()
+
+    const second = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await second.vm.$nextTick()
+    expect(second.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(true)
+
+    await second.find('button[aria-label="Clean up live dubbing"]').trigger('click')
+    expect(sendMessage).toHaveBeenLastCalledWith({
+      action: 'STOP_LIVE_DUBBING',
+      data: { sessionId: 'retained-session' }
+    })
+  })
+
   it.each([
     ['PREPARING_CAPTURE', 'Preparing capture…'],
     ['CONNECTING_PROVIDER', 'Connecting to provider…'],

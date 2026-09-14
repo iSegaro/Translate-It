@@ -185,8 +185,18 @@ const start = async () => {
     applyStatus(response)
     if (state.value === 'idle') state.value = 'running'
   } catch (error) {
-    state.value = 'error'
-    errorMessage.value = getErrorMessage(error?.message, 'Unable to start live dubbing.')
+    // Preserve structured START failure context (session, cleanupPending,
+    // retryable, status, safe diagnostics) so a retained session stays
+    // stoppable instead of resetting to clean idle.
+    const failure = error?.data || error?.response?.data
+    if (failure && typeof failure === 'object') {
+      applyStatus(failure, { preserveSession: true })
+      if (state.value === 'idle') state.value = 'error'
+      if (!errorMessage.value) errorMessage.value = getErrorMessage(error?.message, 'Unable to start live dubbing.')
+    } else {
+      state.value = 'error'
+      errorMessage.value = getErrorMessage(error?.message, 'Unable to start live dubbing.')
+    }
   }
 }
 

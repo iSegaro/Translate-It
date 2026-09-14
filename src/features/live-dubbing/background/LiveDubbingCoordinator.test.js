@@ -703,6 +703,135 @@ describe('LiveDubbingCoordinator', () => {
     }
   });
 
+  it('serves STATUS immediately while START is pending without joining its queue', async () => {
+    const harness = createHarness();
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    let resolvePrepare;
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_PREPARE') {
+        return new Promise(resolve => { resolvePrepare = resolve; });
+      }
+      return originalSendMessage(message);
+    });
+
+    const startPromise = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    while (!resolvePrepare) await Promise.resolve();
+
+    // A reopened popup recovers from this authoritative snapshot instead of
+    // waiting behind the pending START mutation.
+    let statusSettled = false;
+    const statusPromise = harness.coordinator.getStatus().then(result => {
+      statusSettled = true;
+      return result;
+    });
+    for (let i = 0; i < 10 && !statusSettled; i += 1) await Promise.resolve();
+    expect(statusSettled).toBe(true);
+    await expect(statusPromise).resolves.toMatchObject({
+      success: true,
+      status: { sessionId: 'session-1', status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE },
+    });
+
+    resolvePrepare({
+      success: true,
+      ack: 'READY',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+    });
+    await expect(startPromise).resolves.toMatchObject({ success: true });
+  });
+
+  it('cancels a pending START via authoritative STOP with cleanup, release, and no late RUNNING', async () => {
+    const harness = createHarness();
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    let resolveConsume;
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_PREPARE') {
+        return {
+          success: true,
+          ack: 'READY',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          eventSequence: message.data.eventSequence,
+        };
+      }
+      if (message.action === 'LIVE_DUBBING_CONSUME') {
+        return new Promise(resolve => { resolveConsume = resolve; });
+      }
+      return originalSendMessage(message);
+    });
+
+    const startPromise = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    while (!resolveConsume) await Promise.resolve();
+
+    const stopped = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    expect(stopped).toMatchObject({ success: true, stopped: true, status: null });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+
+    resolveConsume({
+      success: true,
+      ack: 'MEDIA_ACQUIRED',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      eventSequence: 1,
+      captureReady: true,
+      audioPathReady: true,
+      inputPipelineReady: true,
+      outputPipelineReady: true,
+    });
+    const started = await startPromise;
+    expect(started.success).toBe(false);
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    const persistedStatuses = harness.browserAPI.storage.session.set.mock.calls
+      .flatMap(([record]) => Object.values(record))
+      .filter(value => value && typeof value === 'object' && typeof value.status === 'string')
+      .map(value => value.status);
+    expect(persistedStatuses).not.toContain(LIVE_DUBBING_STATUS.RUNNING);
+    expect(harness.manager.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a failed START with pending cleanup stoppable and reconstructs it from STATUS', async () => {
+    const harness = createHarness();
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    let disposeCalls = 0;
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONSUME') {
+        return { success: false, error: 'LIVE_DUBBING_OFFSCREEN_BUSY' };
+      }
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        disposeCalls += 1;
+        if (disposeCalls === 1) return { success: false, error: 'DISPOSE_TRANSPORT_FAILED' };
+      }
+      return originalSendMessage(message);
+    });
+
+    const failed = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(failed).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_START_FAILED',
+      retryable: true,
+      cleanupPending: true,
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'session-1',
+      status: LIVE_DUBBING_STATUS.ERROR,
+    });
+    expect(harness.manager.release).not.toHaveBeenCalled();
+
+    await expect(harness.coordinator.getStatus()).resolves.toMatchObject({
+      success: true,
+      status: { sessionId: 'session-1', status: LIVE_DUBBING_STATUS.ERROR },
+    });
+
+    const stopped = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    expect(stopped).toMatchObject({ success: true, stopped: true, status: null });
+    expect(disposeCalls).toBe(2);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+  });
+
   it('bounds STOP retries while controller physical teardown is slow/delayed', async () => {
     vi.useFakeTimers();
     try {
