@@ -132,6 +132,9 @@ export const LIVE_DUBBING_INPUT_MAX_BUFFERED_AMOUNT = LIVE_DUBBING_AUDIO_LIMITS.
 export const LIVE_DUBBING_DESCRIPTOR_FIELDS = Object.freeze([
   'sessionId',
   'tabId',
+  'runtimeHost',
+  'frameId',
+  'documentId',
   'providerId',
   'targetLanguage',
   'status',
@@ -139,6 +142,18 @@ export const LIVE_DUBBING_DESCRIPTOR_FIELDS = Object.freeze([
   'lastError',
   'eventSequence',
 ]);
+
+/**
+ * Live Dubbing runtime-host discriminator. Persisted on the session
+ * descriptor so every lifecycle path selects the same owner. Chrome keeps
+ * the offscreen host; the Firefox Desktop Phase 2 control plane uses the
+ * isolated content-runtime host. No site, capture, or provider meaning is
+ * attached to this value.
+ */
+export const LIVE_DUBBING_RUNTIME_HOSTS = Object.freeze({
+  OFFSCREEN: 'offscreen',
+  FIREFOX_CONTENT: 'firefox-content',
+});
 
 /**
  * Provider audio paths. `pcm` pumps capture frames through the local

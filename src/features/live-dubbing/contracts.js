@@ -5,6 +5,7 @@ import {
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
+  LIVE_DUBBING_RUNTIME_HOSTS,
   LIVE_DUBBING_STATUS,
 } from './constants.js';
 
@@ -579,7 +580,37 @@ export function isLiveDubbingProviderId(value) {
 }
 
 /**
+ * Whether a descriptor is owned by the Firefox content-runtime host.
+ * Ownership is descriptor-persisted so all lifecycle paths select the same
+ * owner; descriptors without a discriminator predate Phase 2 and remain
+ * offscreen-owned.
+ * @param {unknown} descriptor
+ * @returns {boolean}
+ */
+export function isFirefoxContentDescriptor(descriptor) {
+  return Boolean(descriptor
+    && typeof descriptor === 'object'
+    && descriptor.runtimeHost === LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT);
+}
+
+function sanitizeRuntimeHost(value) {
+  if (value === undefined || value === null) return LIVE_DUBBING_RUNTIME_HOSTS.OFFSCREEN;
+  return value === LIVE_DUBBING_RUNTIME_HOSTS.OFFSCREEN
+    || value === LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT
+    ? value
+    : null;
+}
+
+function sanitizeDocumentId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed && trimmed.length <= 256 ? trimmed : null;
+}
+
+/**
  * Keep storage records limited to the public control-plane descriptor.
+ * Firefox content-owned descriptors additionally persist their exact
+ * frame/document identity; offscreen descriptors never carry it.
  * @param {unknown} value
  * @returns {object|null}
  */
@@ -590,6 +621,7 @@ export function sanitizeDescriptor(value) {
     ? value.sessionId.trim()
     : null;
   const tabId = Number.isInteger(value.tabId) && value.tabId >= 0 ? value.tabId : null;
+  const runtimeHost = sanitizeRuntimeHost(value.runtimeHost);
   const providerId = isLiveDubbingProviderId(value.providerId)
     ? value.providerId
     : null;
@@ -612,14 +644,34 @@ export function sanitizeDescriptor(value) {
       ? value.lastError.trim() ? sanitizeDiagnosticMessage(value.lastError) : ''
       : null;
 
-  if (!sessionId || tabId === null || !providerId || !targetLanguage || !status
+  if (!sessionId || tabId === null || !runtimeHost || !providerId || !targetLanguage || !status
     || startedAt === null || eventSequence === null) {
     return null;
+  }
+
+  if (runtimeHost === LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT) {
+    const frameId = Number.isInteger(value.frameId) && value.frameId >= 0 ? value.frameId : null;
+    const documentId = sanitizeDocumentId(value.documentId);
+    if (frameId === null || !documentId) return null;
+    return {
+      sessionId,
+      tabId,
+      runtimeHost,
+      frameId,
+      documentId,
+      providerId,
+      targetLanguage,
+      status,
+      startedAt,
+      lastError,
+      eventSequence,
+    };
   }
 
   return {
     sessionId,
     tabId,
+    runtimeHost,
     providerId,
     targetLanguage,
     status,
@@ -631,11 +683,52 @@ export function sanitizeDescriptor(value) {
 
 /**
  * Create descriptor with no transport or provider bootstrap fields.
+ * Chrome/offscreen ownership is the default; Firefox content ownership uses
+ * createFirefoxContentDescriptor so its exact frame/document identity is
+ * persisted alongside the runtime-host discriminator.
  */
 export function createDescriptor({ sessionId, tabId, providerId, targetLanguage, startedAt }) {
   return {
     sessionId,
     tabId,
+    runtimeHost: LIVE_DUBBING_RUNTIME_HOSTS.OFFSCREEN,
+    providerId,
+    targetLanguage: normalizeProviderTargetLanguage(providerId, targetLanguage),
+    status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+    startedAt,
+    lastError: null,
+    eventSequence: 0,
+  };
+}
+
+/**
+ * Create a Firefox content-runtime owned descriptor. The exact
+ * tab/frame/document identity is part of the fence: addressing and every
+ * lifecycle authorization must match it, and stale documents fail closed.
+ */
+export function createFirefoxContentDescriptor({
+  sessionId,
+  tabId,
+  frameId,
+  documentId,
+  providerId,
+  targetLanguage,
+  startedAt,
+}) {
+  if (!Number.isInteger(frameId) || frameId < 0) {
+    throw new TypeError('frameId is required for Firefox content descriptors');
+  }
+  const sanitizedDocumentId = sanitizeDocumentId(documentId);
+  if (!sanitizedDocumentId) {
+    throw new TypeError('documentId is required for Firefox content descriptors');
+  }
+
+  return {
+    sessionId,
+    tabId,
+    runtimeHost: LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT,
+    frameId,
+    documentId: sanitizedDocumentId,
     providerId,
     targetLanguage: normalizeProviderTargetLanguage(providerId, targetLanguage),
     status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,

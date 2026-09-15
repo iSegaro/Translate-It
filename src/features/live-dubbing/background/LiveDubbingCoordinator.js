@@ -9,6 +9,7 @@ import {
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_OWNER,
   LIVE_DUBBING_PROVIDER_IDS,
+  LIVE_DUBBING_RUNTIME_HOSTS,
   LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_STATUS,
@@ -31,6 +32,7 @@ import {
   isAuthorizedOffscreenSender,
   isAcknowledgedForSession,
   isExactSessionResponse,
+  isFirefoxContentDescriptor,
   isLiveDubbingProviderId,
   normalizeProviderTargetLanguage,
   safeFailureCode,
@@ -39,6 +41,11 @@ import {
   sanitizeLiveDubbingProviderDiagnostic,
   sanitizeDescriptor,
 } from '../contracts.js';
+import {
+  hasExactFirefoxContentEvent,
+  isAuthorizedFirefoxContentSender,
+} from '../firefox/firefoxContentContract.js';
+import { sendFirefoxContentMessage } from '../firefox/firefoxContentAddressing.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 const CLEANUP_LEASE_STATES = Object.freeze({
@@ -237,6 +244,11 @@ export class LiveDubbingCoordinator {
    * and are one-time per session.
    */
   async authorizeOffscreenControlMessage(message = {}, sender, { type = 'terminal' } = {}) {
+    // Firefox content-runtime senders are tab-bound and own a separate Live
+    // Dubbing namespace. They must never enter the offscreen control route,
+    // even when sender metadata is partial, so any tab binding fails closed
+    // here before offscreen identity is considered.
+    if (sender?.tab !== undefined && sender.tab !== null) return null;
     if (!isAuthorizedOffscreenSender(sender, this.browserAPI)) return null;
 
     if (type === 'terminal') return this._authorizeTerminalRequest(message);
@@ -340,6 +352,59 @@ export class LiveDubbingCoordinator {
       && !this.terminalOperations.has(descriptor.sessionId)
       && isLiveDubbingProviderId(descriptor.providerId)
       && this.bootstrapRequestSessions.has(descriptor.sessionId);
+  }
+
+  /**
+   * Whether a descriptor is owned by the Firefox content-runtime host.
+   * Ownership is descriptor-persisted; the Chrome offscreen path never
+   * matches here.
+   */
+  isFirefoxContentSession(descriptor) {
+    return isFirefoxContentDescriptor(descriptor || this.descriptor);
+  }
+
+  /**
+   * Targeted one-shot control send to the exact addressed Firefox document.
+   * Disappearance maps to a bounded controlled failure, never a throw and
+   * never a false success. The Chrome offscreen path is unchanged.
+   */
+  _sendFirefoxContent(descriptor, message, options = {}) {
+    return sendFirefoxContentMessage(this.browserAPI, descriptor, message, options);
+  }
+
+  /**
+   * Exact-session bootstrap route scaffold for the Firefox content host.
+   * Validation only: Background minting stays authoritative (public bootstrap
+   * handling remains Chrome-gated in Phase 2) and no secret crosses here.
+   * Repeated validation preserves one-time bootstrap eligibility; atomic
+   * reservation belongs to the Phase 3 mint/delivery path.
+   */
+  authorizeFirefoxContentBootstrapRequest(message = {}, sender = null) {
+    if (!isAuthorizedFirefoxContentSender(sender, this.browserAPI)) return null;
+
+    const descriptor = this.descriptor;
+    const data = message?.data || message;
+    const state = descriptor?.sessionId
+      ? this.sessionStates.get(descriptor.sessionId)
+      : null;
+
+    if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT
+      || !descriptor
+      || !isFirefoxContentDescriptor(descriptor)
+      || message?.action !== LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP
+      || !state
+      || state.terminalRequested
+      || this.terminalOperations.has(descriptor.sessionId)
+      || !this._isSameDescriptorFence(state.descriptor, descriptor)
+      || !hasExactSessionEvent(message, descriptor)
+      || !hasExactFirefoxContentEvent(message, descriptor)
+      || data.providerId !== descriptor.providerId
+      || data.targetLanguage !== descriptor.targetLanguage
+      || this.bootstrapRequestSessions.has(descriptor.sessionId)) {
+      return null;
+    }
+
+    return cloneDescriptor(descriptor);
   }
 
   /**
@@ -1550,10 +1615,18 @@ export class LiveDubbingCoordinator {
   }
 
   _isSameDescriptorFence(left, right) {
+    // Descriptors without a discriminator predate Phase 2 and are
+    // offscreen-owned; the Firefox frame/document identity participates only
+    // when the fence is content-owned on either side.
+    const leftHost = left?.runtimeHost || LIVE_DUBBING_RUNTIME_HOSTS.OFFSCREEN;
+    const rightHost = right?.runtimeHost || LIVE_DUBBING_RUNTIME_HOSTS.OFFSCREEN;
     return Boolean(left && right
       && left.sessionId === right.sessionId
       && left.providerId === right.providerId
       && left.tabId === right.tabId
+      && leftHost === rightHost
+      && (leftHost !== LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT
+        || (left.frameId === right.frameId && left.documentId === right.documentId))
       && left.startedAt === right.startedAt
       && left.targetLanguage === right.targetLanguage
       && left.eventSequence === right.eventSequence

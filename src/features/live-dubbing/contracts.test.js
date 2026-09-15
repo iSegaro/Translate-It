@@ -124,6 +124,7 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(descriptor).toEqual({
       sessionId: 'session-1',
       tabId: 1,
+      runtimeHost: 'offscreen',
       providerId: 'gemini',
       targetLanguage: 'zh-Hans',
       status: LIVE_DUBBING_STATUS.RUNNING,
@@ -150,6 +151,7 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(descriptor).toEqual({
       sessionId: 'session-openai',
       tabId: 7,
+      runtimeHost: 'offscreen',
       providerId: 'openai',
       targetLanguage: 'en-US',
       status: LIVE_DUBBING_STATUS.RUNNING,
