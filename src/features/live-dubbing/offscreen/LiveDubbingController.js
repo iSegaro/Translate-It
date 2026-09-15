@@ -243,6 +243,72 @@ function stopTracks(stream) {
   }
 }
 
+/**
+ * Transfer ownership of an external source into the Controller without
+ * exposing the source through the runtime message contract. The wrapper also
+ * makes an externally supplied disposer single-flight, including when the
+ * disposer throws or returns a promise.
+ */
+function createOwnedSourceHandle(sourceHandle, captureStage) {
+  if (!sourceHandle || typeof sourceHandle !== 'object') return null;
+
+  let stream;
+  let dispose;
+  try {
+    stream = sourceHandle.stream;
+    dispose = sourceHandle.dispose;
+  } catch {
+    return null;
+  }
+  if (!stream || (typeof stream.getAudioTracks !== 'function'
+    && typeof stream.getTracks !== 'function') || typeof dispose !== 'function') {
+    return null;
+  }
+
+  let resolveDispose;
+  let rejectDispose;
+  const disposePromise = new Promise((resolve, reject) => {
+    resolveDispose = resolve;
+    rejectDispose = reject;
+  });
+  let disposeStarted = false;
+  return {
+    sourceHandle,
+    captureStage,
+    stream,
+    dispose: () => {
+      if (!disposeStarted) {
+        disposeStarted = true;
+        try {
+          Promise.resolve(dispose.call(sourceHandle)).then(resolveDispose, rejectDispose);
+        } catch (error) {
+          rejectDispose(error);
+        }
+      }
+      return disposePromise;
+    },
+  };
+}
+
+async function disposeSourceHandle(sourceHandle) {
+  try {
+    await sourceHandle?.dispose?.();
+  } catch {
+    // Source cleanup is best effort and must not reopen a fenced session.
+  }
+}
+
+function createChromeSourceHandle(session, stream) {
+  return createOwnedSourceHandle({
+    stream,
+    dispose: () => {
+      if (session.streamStopped) return;
+      stopTracks(stream);
+      session.streamStopped = true;
+    },
+  }, LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA);
+}
+
 function isArrayBuffer(value) {
   return value instanceof ArrayBuffer
     || (typeof SharedArrayBuffer !== 'undefined' && value instanceof SharedArrayBuffer);
@@ -276,8 +342,8 @@ function hasAudioContext(options) {
 }
 
 /**
- * Owns one offscreen live-dubbing transaction: capture, both local audio
- * graphs, one provider bootstrap request, and one fenced provider generation.
+ * Owns one offscreen live-dubbing transaction: source acquisition, both local
+ * audio graphs, one provider bootstrap request, and one fenced provider generation.
  *
  * The controller is deliberately the only owner of these resources. A
  * terminal callback changes the session fence before cleanup so late worklet
@@ -327,6 +393,7 @@ export class LiveDubbingController {
     this.lastTelemetry = null;
     this.disposedSession = null;
     this.providerGeneration = 0;
+    this.sourceHandleWrappers = new WeakMap();
   }
 
   handles(action) {
@@ -496,6 +563,7 @@ export class LiveDubbingController {
         status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
         lastError: null,
         stream: null,
+        sourceHandle: null,
         streamStopped: false,
         capturePromise: null,
         connectPromise: null,
@@ -555,25 +623,21 @@ export class LiveDubbingController {
     };
   }
 
-  /**
-   * Start getUserMedia immediately. The Chrome tab stream ID remains inside
-   * this method and is never returned, stored, or logged.
-   */
-  consume(sessionId, providerId, streamId, eventSequence = undefined) {
+  _beginCapture(sessionId, providerId, eventSequence) {
     const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
-    if (sequenceError) return sequenceError;
-    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
+    if (sequenceError) return { response: sequenceError };
+    if (!isProviderId(providerId)) return { response: this._invalidProvider(sessionId) };
 
     const session = this.currentSession;
     if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
-      return {
+      return { response: {
         success: false,
         error: 'LIVE_DUBBING_SESSION_MISMATCH',
         ignored: true,
         sessionId: isSessionId(sessionId) ? sessionId : null,
         providerId,
         status: session?.status || IDLE_STATUS,
-      };
+      } };
     }
 
     const captureStarted = Boolean(session.capturePromise)
@@ -584,17 +648,36 @@ export class LiveDubbingController {
       ].includes(session.status);
     if (captureStarted) {
       if (!isEventSequence(eventSequence) || eventSequence !== session.eventSequence) {
-        return this._sequenceMismatch(sessionId, session, providerId);
+        return { response: this._sequenceMismatch(sessionId, session, providerId) };
       }
-      if (session.capturePromise) return session.capturePromise;
-      return this._mediaAcquiredResponse(session);
+      return { response: session.capturePromise || this._mediaAcquiredResponse(session) };
     }
 
     if (session.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE
       || eventSequence !== session.eventSequence + 1) {
-      return this._sequenceMismatch(sessionId, session, providerId);
+      return { response: this._sequenceMismatch(sessionId, session, providerId) };
     }
     session.eventSequence = eventSequence;
+    return { session };
+  }
+
+  _getOwnedSourceHandle(sourceHandle, captureStage) {
+    if (!sourceHandle || typeof sourceHandle !== 'object') return null;
+    const existing = this.sourceHandleWrappers.get(sourceHandle);
+    if (existing) return existing;
+    const owned = createOwnedSourceHandle(sourceHandle, captureStage);
+    if (owned) this.sourceHandleWrappers.set(sourceHandle, owned);
+    return owned;
+  }
+
+  /**
+   * Start getUserMedia immediately. The Chrome tab stream ID remains inside
+   * this method and is never returned, stored, or logged.
+   */
+  consume(sessionId, providerId, streamId, eventSequence = undefined) {
+    const capture = this._beginCapture(sessionId, providerId, eventSequence);
+    if (capture.response !== undefined) return capture.response;
+    const { session } = capture;
 
     if (!isStreamId(streamId)) {
       return createCaptureFailure(
@@ -620,7 +703,7 @@ export class LiveDubbingController {
     }
 
     session.capturePromise = Promise.resolve(capturePromise).then(
-      stream => this._captureResolved(session, stream, streamId),
+      stream => this._captureResolved(session, createChromeSourceHandle(session, stream), streamId),
       error => this._captureFailed(session, 'LIVE_DUBBING_CAPTURE_FAILED', {
         cause: error,
         streamId,
@@ -629,13 +712,55 @@ export class LiveDubbingController {
     return session.capturePromise;
   }
 
-  /** Initialize both graphs before the provider bootstrap request is made. */
-  async _captureResolved(session, stream, streamId) {
-    if (!this._isCurrentSession(session)) {
-      if (!session.streamStopped) {
-        stopTracks(stream);
-        session.streamStopped = true;
+  /**
+   * Adopt a browser-neutral source already acquired by a trusted host. The
+   * handle never enters runtime messaging; its disposer is retained by this
+   * Controller and invoked once after provider cleanup.
+   */
+  consumeSource(sessionId, providerId, sourceHandle, eventSequence = undefined) {
+    const ownedSource = this._getOwnedSourceHandle(
+      sourceHandle,
+      LIVE_DUBBING_CAPTURE_STAGES.EXTERNAL_SOURCE,
+    );
+    const capture = this._beginCapture(sessionId, providerId, eventSequence);
+    if (capture.response !== undefined) {
+      const activeSource = this.currentSession?.sourceHandle;
+      if (!ownedSource) return capture.response;
+      if (activeSource?.sourceHandle === sourceHandle) return capture.response;
+      // The handle object, not its stream, is the retry identity. Stream
+      // equality only protects an active source from a distinct wrapper.
+      if (activeSource?.stream === ownedSource.stream) {
+        return this._sourceOwnershipConflict(
+          sessionId,
+          providerId,
+          capture.session || this.currentSession,
+        );
       }
+      return disposeSourceHandle(ownedSource).then(() => capture.response);
+    }
+    const { session } = capture;
+    if (!ownedSource) {
+      return this._captureFailed(session, 'LIVE_DUBBING_SOURCE_HANDLE_INVALID', {
+        stage: LIVE_DUBBING_CAPTURE_STAGES.EXTERNAL_SOURCE,
+        cause: {
+          name: 'TypeError',
+          message: 'A source handle with a stream and disposer is required',
+          code: 'LIVE_DUBBING_SOURCE_HANDLE_INVALID',
+        },
+      });
+    }
+
+    session.sourceHandle = ownedSource;
+    session.capturePromise = Promise.resolve()
+      .then(() => this._captureResolved(session, ownedSource, null));
+    return session.capturePromise;
+  }
+
+  /** Initialize both graphs before the provider bootstrap request is made. */
+  async _captureResolved(session, sourceHandle, streamId) {
+    const stream = sourceHandle?.stream;
+    if (!this._isCurrentSession(session)) {
+      await disposeSourceHandle(sourceHandle);
       return {
         success: false,
         error: 'LIVE_DUBBING_SESSION_DISPOSED',
@@ -648,11 +773,15 @@ export class LiveDubbingController {
 
     const liveAudioTracks = this._getLiveAudioTracks(stream);
     if (liveAudioTracks.length === 0) {
-      stopTracks(stream);
-      return this._captureFailed(session, 'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK', { streamId });
+      await disposeSourceHandle(sourceHandle);
+      return this._captureFailed(session, 'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK', {
+        streamId,
+        stage: sourceHandle.captureStage,
+      });
     }
 
     session.stream = stream;
+    session.sourceHandle = sourceHandle;
     session.streamStopped = false;
     session.status = LIVE_DUBBING_INTERNAL_STATUS.CAPTURING;
     this._markMilestone(session, 'captureReady');
@@ -674,7 +803,7 @@ export class LiveDubbingController {
       session.capturePromise = null;
       return this._mediaAcquiredResponse(session);
     } catch (error) {
-      return this._pipelineFailed(session, error, streamId);
+      return this._pipelineFailed(session, error, streamId, sourceHandle.captureStage);
     }
   }
 
@@ -910,9 +1039,19 @@ export class LiveDubbingController {
       session.eventSequence += 1;
       this._drainPendingInput(session);
       return this._providerReadyResponse(session);
-    }).catch(error => {
+    }).catch(async error => {
       if (this._isCurrentProviderGeneration(session, providerGeneration)) {
         this._providerFailed(session, error, 'PROVIDER_ERROR', error?.providerDiagnostic);
+        const cleanupSettled = await this._awaitBoundedPhysicalCleanup(session.cleanupPromise);
+        if (!cleanupSettled) {
+          session.terminalRequested = true;
+          this._removeTrackListeners(session);
+          this._retainDisposedSession(session, session.sessionId, session.providerId);
+          return {
+            ...this._cleanupPendingResponse(session.sessionId, session.providerId),
+            ...(session.providerDiagnostic ? { providerDiagnostic: session.providerDiagnostic } : {}),
+          };
+        }
       }
       if (session.providerDiagnostic) return this._providerFailureResponse(session, error);
       return this._disposedProviderResponse(session);
@@ -1164,6 +1303,23 @@ export class LiveDubbingController {
 
     session.terminalRequested = true;
     this._removeTrackListeners(session);
+    const { cleanup } = this._retainDisposedSession(session, sessionId, providerId);
+
+    const response = {
+      success: true,
+      ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
+      disposed: true,
+      sessionId,
+      providerId,
+      active: false,
+      status: IDLE_STATUS,
+    };
+    const settled = await this._awaitBoundedPhysicalCleanup(cleanup);
+    if (!settled) return this._cleanupPendingResponse(sessionId, providerId);
+    return response;
+  }
+
+  _retainDisposedSession(session, sessionId, providerId) {
     const cleanup = this._cleanupSessionResources(session);
     const tombstone = {
       session,
@@ -1182,19 +1338,7 @@ export class LiveDubbingController {
       },
     );
     this.currentSession = null;
-
-    const response = {
-      success: true,
-      ack: LIVE_DUBBING_OFFSCREEN_ACKS.DISPOSED,
-      disposed: true,
-      sessionId,
-      providerId,
-      active: false,
-      status: IDLE_STATUS,
-    };
-    const settled = await this._awaitBoundedPhysicalCleanup(cleanup);
-    if (!settled) return this._cleanupPendingResponse(sessionId, providerId);
-    return response;
+    return { cleanup, tombstone };
   }
 
   _awaitBoundedPhysicalCleanup(cleanupPromise) {
@@ -1251,17 +1395,17 @@ export class LiveDubbingController {
     const client = session.providerClient;
     const inputPipeline = session.inputPipeline;
     const outputPlayer = session.outputPlayer;
-    const stream = session.stream;
+    const sourceHandle = session.sourceHandle;
     session.providerClient = null;
     session.inputPipeline = null;
     session.outputPlayer = null;
     session.stream = null;
+    session.sourceHandle = null;
 
     // Provider resources shut down first: dispose is initiated here so
-    // close-only clients still terminate synchronously, while async
-    // provider shutdown is awaited in the chain below. Tracks stay
-    // Controller-owned — the provider never owns the capture stream —
-    // and stop synchronously right after.
+    // close-only clients still terminate synchronously, while async provider
+    // shutdown is awaited before the owned source handle is disposed. Chrome
+    // capture uses the same disposer, whose implementation stops its tracks.
     let providerShutdown = null;
     try {
       providerShutdown = typeof client?.dispose === 'function'
@@ -1269,10 +1413,6 @@ export class LiveDubbingController {
         : client?.close?.();
     } catch {
       // Provider teardown is best effort; callbacks are already fenced.
-    }
-    if (stream && !session.streamStopped) {
-      stopTracks(stream);
-      session.streamStopped = true;
     }
     session.bootstrapRequestPromise = null;
     session.bootstrapRequested = false;
@@ -1290,9 +1430,17 @@ export class LiveDubbingController {
         return Promise.reject(error);
       }
     };
+    const providerCleanup = Promise.resolve(providerShutdown).then(
+      () => undefined,
+      () => undefined,
+    );
+    const sourceCleanup = providerShutdown && typeof providerShutdown.then === 'function'
+      ? providerCleanup.then(() => disposeSourceHandle(sourceHandle))
+      : disposeSourceHandle(sourceHandle);
 
     session.cleanupPromise = Promise.allSettled([
       providerShutdown,
+      sourceCleanup,
       stopResource(inputPipeline),
       stopResource(outputPlayer),
     ]).then(() => {
@@ -1344,9 +1492,8 @@ export class LiveDubbingController {
 
   _captureFailed(session, error, options = {}) {
     const isCurrent = this._isCurrentSession(session);
-    if (options.stream && session.stream !== options.stream) stopTracks(options.stream);
     const diagnostic = createLiveDubbingDiagnostic(
-      LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA,
+      options.stage || LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_GET_USER_MEDIA,
       options.cause || { name: 'CaptureError', message: error, code: error },
       { sensitiveValues: options.streamId ? [options.streamId] : [] },
     );
@@ -1365,10 +1512,11 @@ export class LiveDubbingController {
     };
   }
 
-  _pipelineFailed(session, error, streamId) {
+  _pipelineFailed(session, error, streamId, stage) {
     const result = this._captureFailed(session, errorCode(error, 'LIVE_DUBBING_AUDIO_PIPELINES_FAILED'), {
       cause: error,
       streamId,
+      stage,
     });
     this._cleanupSessionResources(session);
     return result;
@@ -2028,6 +2176,20 @@ export class LiveDubbingController {
       requestedProviderId,
       actualProviderId: session?.providerId || null,
       status: session?.status || IDLE_STATUS,
+    };
+  }
+
+  _sourceOwnershipConflict(sessionId, providerId, session) {
+    return {
+      success: false,
+      error: 'LIVE_DUBBING_SOURCE_OWNERSHIP_CONFLICT',
+      ignored: true,
+      ownershipConflict: true,
+      sourceAccepted: false,
+      sessionId: isSessionId(sessionId) ? sessionId : null,
+      providerId: isProviderId(providerId) ? providerId : null,
+      status: session?.status || IDLE_STATUS,
+      ...(session ? { eventSequence: session.eventSequence } : {}),
     };
   }
 
