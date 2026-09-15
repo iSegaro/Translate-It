@@ -73,16 +73,16 @@ async function initializeLogger(subComponent = 'Main') {
       return;
     }
 
-    // Production Firefox Live Dubbing content-runtime host (Phase 2): closed
-    // scalar control plane only. No capture, provider, site, or page-world
-    // API; the host answers exact-identity Background control messages.
+    // Content-runtime infrastructure bootstrap (Phase 2.5 hybrid):
+    // browser-localized, idempotent, fail-closed host registration. No
+    // feature, site, capture, provider, media, or page-world logic here.
     // Fail-closed browser gate: unknown build targets never register.
     if (typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox') {
-      import('@/features/live-dubbing/firefox/registerFirefoxContentRuntime.js').then(
+      import('@/core/content-scripts/contentRuntimeBootstrap.js').then(
         (module) => {
           try {
-            module.registerFirefoxLiveDubbingContentRuntime?.();
-          } catch { /* production registration is best effort */ }
+            module.bootstrapContentRuntimeInfrastructure?.();
+          } catch { /* production bootstrap is best effort */ }
         },
       ).catch(() => {});
     }

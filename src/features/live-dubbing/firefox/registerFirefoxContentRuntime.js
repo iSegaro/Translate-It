@@ -48,10 +48,22 @@ export function registerFirefoxLiveDubbingContentRuntime(options = {}) {
     if (!message || typeof message !== 'object') return undefined;
     if (message.target !== FIREFOX_CONTENT_TARGET) return undefined;
     if (!supportedActions.has(message.action)) return undefined;
+    // The host resolves asynchronously (PREPARE awaits lazy feature
+    // activation); a rejected settlement still fails closed and scalar.
     try {
-      return host.handle(message, sender);
+      return Promise.resolve(host.handle(message, sender)).catch(() => ({
+        success: false,
+        error: 'LIVE_DUBBING_ACTION_UNSUPPORTED',
+        sessionId: null,
+        providerId: null,
+      }));
     } catch {
-      return { success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED', sessionId: null, providerId: null };
+      return Promise.resolve({
+        success: false,
+        error: 'LIVE_DUBBING_ACTION_UNSUPPORTED',
+        sessionId: null,
+        providerId: null,
+      });
     }
   };
 

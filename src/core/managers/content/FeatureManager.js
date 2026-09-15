@@ -417,6 +417,12 @@ export class FeatureManager extends ResourceTracker {
     }
   }
 
+  /**
+   * Deactivate a feature and report whether its handler confirmed cleanup.
+   * A false handler result retains the manager state so a later controlled
+   * retry can invoke the same handler again.
+   * @returns {Promise<boolean>} whether cleanup was explicitly successful
+   */
   async deactivateFeature(featureName) {
     this._incrementFeatureRevision(featureName);
 
@@ -438,12 +444,12 @@ export class FeatureManager extends ResourceTracker {
         // Maybe in iframe or other context where lazy-features isn't used
       }
       logger.info(`Feature ${featureName} deactivated successfully`);
-      return;
+      return true;
     }
 
     if (!wasActive && !hadHandler) {
       logger.debug(`Feature ${featureName} not active (revision invalidated for pending)`);
-      return;
+      return true;
     }
 
     try {
@@ -505,7 +511,8 @@ export class FeatureManager extends ResourceTracker {
           }
         }
         if (success === false) {
-          logger.warn(`Feature ${featureName} deactivation returned false, but proceeding with cleanup`);
+          logger.warn(`Feature ${featureName} deactivation returned false; retaining state for retry`);
+          return false;
         }
       } else if (featureName === 'selectElement') {
         const ok = await this._requestSelectElementGlobalDeactivation();
@@ -527,6 +534,7 @@ export class FeatureManager extends ResourceTracker {
       }
 
       logger.info(`Feature ${featureName} deactivated successfully`);
+      return true;
 
     } catch (error) {
       if (featureName === 'selectElement') {
@@ -538,6 +546,7 @@ export class FeatureManager extends ResourceTracker {
         context: `FeatureManager-deactivateFeature-${featureName}`,
         showToast: false
       });
+      return false;
     }
   }
 
@@ -612,6 +621,12 @@ export class FeatureManager extends ResourceTracker {
         case 'mouseHover': {
           const { hoverTranslationManager } = await import('@/features/mouse-hover/HoverTranslationManager.js');
           return hoverTranslationManager;
+        }
+
+        case 'liveDubbing': {
+          const { LiveDubbingFeatureHandler } = await import('@/features/live-dubbing/handlers/LiveDubbingFeatureHandler.js');
+          HandlerClass = LiveDubbingFeatureHandler;
+          break;
         }
         default:
           logger.error(`Unknown feature: ${featureName}`);

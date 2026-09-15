@@ -12,6 +12,7 @@ const PRODUCTION_FILES = [
   'src/features/live-dubbing/firefox/FirefoxContentRuntimeHost.js',
   'src/features/live-dubbing/firefox/firefoxContentAddressing.js',
   'src/features/live-dubbing/firefox/registerFirefoxContentRuntime.js',
+  'src/core/content-scripts/contentRuntimeBootstrap.js',
 ];
 
 function createRuntime() {
@@ -45,6 +46,18 @@ function createWindowStub() {
   };
 }
 
+function createActiveLifecycle() {
+  return {
+    requestActivation: async () => ({ activated: true }),
+    deactivateFeature: async () => true,
+    isFeatureActive: () => true,
+  };
+}
+
+function createHost(browserAPI, featureLifecycle = createActiveLifecycle()) {
+  return new FirefoxLiveDubbingContentHost({ browserAPI, featureLifecycle });
+}
+
 function prepareMessage() {
   return {
     target: FIREFOX_CONTENT_TARGET,
@@ -61,72 +74,92 @@ function prepareMessage() {
   };
 }
 
-function emit(runtime, message, sender = { id: 'extension-id' }) {
+async function emit(runtime, message, sender = { id: 'extension-id' }) {
   const [listener] = [...runtime.onMessage.listeners];
   expect(listener).toBeTypeOf('function');
   return listener(message, sender);
 }
 
 describe('Firefox content runtime registration', () => {
-  it('owns a per-document host instead of the offscreen singleton', () => {
+  it('owns a per-document host instead of the offscreen singleton', async () => {
     const runtime = createRuntime();
-    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime } });
+    const host = createHost({ runtime });
+    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime }, host });
     try {
       expect(runtime.onMessage.addListener).toHaveBeenCalledTimes(1);
-      const response = emit(runtime, prepareMessage());
+      const response = await emit(runtime, prepareMessage());
       expect(response).toMatchObject({ success: true, ack: 'READY', sessionId: 'session-1' });
-      const repeat = emit(runtime, prepareMessage());
+      const repeat = await emit(runtime, prepareMessage());
       expect(repeat).toMatchObject({ success: true, idempotent: true });
     } finally {
       unregister();
     }
   });
 
-  it('accepts an injected host and answers STATUS through it', () => {
+  it('fails PREPARE closed when the registered host has no lifecycle seam', async () => {
+    const runtime = createRuntime();
+    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime } });
+    try {
+      expect(await emit(runtime, prepareMessage()))
+        .toMatchObject({ success: false, error: 'LIVE_DUBBING_ACTIVATION_BLOCKED' });
+    } finally {
+      unregister();
+    }
+  });
+
+  it('accepts an injected host and answers STATUS through it', async () => {
     const runtime = createRuntime();
     const host = new FirefoxLiveDubbingContentHost({
       browserAPI: { runtime: { id: 'extension-id' } },
+      featureLifecycle: createActiveLifecycle(),
     });
     const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime }, host });
     try {
-      expect(emit(runtime, prepareMessage())).toMatchObject({ success: true });
-      expect(emit(runtime, { ...prepareMessage(), action: LIVE_DUBBING_ACTIONS.STATUS }))
+      expect(await emit(runtime, prepareMessage())).toMatchObject({ success: true });
+      expect(await emit(runtime, { ...prepareMessage(), action: LIVE_DUBBING_ACTIONS.STATUS }))
         .toMatchObject({ success: true, active: true });
     } finally {
       unregister();
     }
   });
 
-  it('ignores unrelated traffic and rejects unauthorized senders closed', () => {
+  it('ignores unrelated traffic and rejects unauthorized senders closed', async () => {
     const runtime = createRuntime();
-    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime } });
+    const host = createHost({ runtime });
+    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime }, host });
     try {
-      expect(emit(runtime, { target: 'offscreen', action: LIVE_DUBBING_ACTIONS.PREPARE, data: {} }))
+      expect(await emit(runtime, { target: 'offscreen', action: LIVE_DUBBING_ACTIONS.PREPARE, data: {} }))
         .toBeUndefined();
-      expect(emit(runtime, { target: FIREFOX_CONTENT_TARGET, action: 'LIVE_DUBBING_CONSUME', data: {} }))
+      expect(await emit(runtime, { target: FIREFOX_CONTENT_TARGET, action: 'LIVE_DUBBING_CONSUME', data: {} }))
         .toBeUndefined();
-      expect(emit(runtime, null)).toBeUndefined();
-      expect(emit(runtime, prepareMessage(), { id: 'extension-id', tab: { id: 7 } }))
+      expect(await emit(runtime, null)).toBeUndefined();
+      expect(await emit(runtime, prepareMessage(), { id: 'extension-id', tab: { id: 7 } }))
         .toMatchObject({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
     } finally {
       unregister();
     }
   });
 
-  it('invalidates the host on navigation and unregisters cleanly', () => {
+  it('invalidates the host on navigation and unregisters cleanly', async () => {
     // Node/vitest has no globalThis.window; stub the minimal
     // addEventListener/dispatchEvent/removeEventListener surface the
     // registration uses, then restore it.
     const windowStub = createWindowStub();
     vi.stubGlobal('window', windowStub);
     const runtime = createRuntime();
-    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime } });
+    const featureLifecycle = createActiveLifecycle();
+    const deactivate = vi.spyOn(featureLifecycle, 'deactivateFeature');
+    const host = createHost({ runtime }, featureLifecycle);
+    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime }, host });
     try {
-      expect(emit(runtime, prepareMessage())).toMatchObject({ success: true });
+      expect(await emit(runtime, prepareMessage())).toMatchObject({ success: true });
       windowStub.dispatchEvent({ type: 'pagehide' });
-      expect(emit(runtime, { ...prepareMessage(), action: LIVE_DUBBING_ACTIONS.STATUS }))
+      windowStub.dispatchEvent({ type: 'pagehide' });
+      // Navigation teardown deactivates the managed feature exactly once.
+      expect(deactivate).toHaveBeenCalledTimes(1);
+      expect(await emit(runtime, { ...prepareMessage(), action: LIVE_DUBBING_ACTIONS.STATUS }))
         .toMatchObject({ success: true, active: false, status: 'IDLE' });
-      expect(emit(runtime, prepareMessage()))
+      expect(await emit(runtime, prepareMessage()))
         .toMatchObject({ success: false, error: 'LIVE_DUBBING_SESSION_DISPOSED' });
     } finally {
       unregister();
@@ -135,12 +168,13 @@ describe('Firefox content runtime registration', () => {
     expect(runtime.onMessage.removeListener).toHaveBeenCalledTimes(1);
   });
 
-  it('answers for any site without site-specific logic', () => {
+  it('answers for any site without site-specific logic', async () => {
     const runtime = createRuntime();
-    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime } });
+    const host = createHost({ runtime });
+    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime }, host });
     try {
       const sender = { id: 'extension-id' };
-      expect(emit(runtime, prepareMessage(), sender)).toMatchObject({ success: true });
+      expect(await emit(runtime, prepareMessage(), sender)).toMatchObject({ success: true });
     } finally {
       unregister();
     }
@@ -167,6 +201,7 @@ describe('Firefox content runtime registration', () => {
       'BootstrapService',
       'mintEphemeral',
       'mintClientSecret',
+      'window.top',
     ];
     for (const source of sources) {
       for (const token of forbiddenTokens) {
@@ -180,21 +215,30 @@ describe('Firefox content runtime registration', () => {
     }
   });
 
-  it('wires production registration in the top-frame content entry without site gates', async () => {
+  it('wires one generic infrastructure bootstrap in the content entry', async () => {
     const source = await readFile(join(process.cwd(), 'src/core/content-scripts/index-main.js'), 'utf8');
-    expect(source).toContain('firefox/registerFirefoxContentRuntime.js');
-    expect(source).toContain('registerFirefoxLiveDubbingContentRuntime');
+    // Exactly one generic call site; the DEV-only spike wiring below it is
+    // a separate, explicitly gated block and stays untouched.
+    expect(source.match(/bootstrapContentRuntimeInfrastructure/g)?.length ?? 0).toBe(1);
+    const anchor = source.indexOf('Content-runtime infrastructure bootstrap');
+    const importIndex = source.indexOf('core/content-scripts/contentRuntimeBootstrap.js');
+    expect(anchor).toBeGreaterThan(-1);
+    expect(importIndex).toBeGreaterThan(anchor);
+    const region = source.slice(anchor, importIndex).toLowerCase();
+    expect(region).not.toContain('livedubbing');
+    expect(region).not.toContain('live-dubbing');
+    expect(region).not.toContain('registerfirefox');
   });
 
-  it('gates production registration fail-closed to Firefox builds only', async () => {
+  it('gates the generic bootstrap fail-closed to Firefox builds only', async () => {
     const source = await readFile(join(process.cwd(), 'src/core/content-scripts/index-main.js'), 'utf8');
-    const anchor = source.indexOf('content-runtime host (Phase 2)');
-    const importIndex = source.indexOf('firefox/registerFirefoxContentRuntime.js');
+    const anchor = source.indexOf('Content-runtime infrastructure bootstrap');
+    const importIndex = source.indexOf('core/content-scripts/contentRuntimeBootstrap.js');
     expect(anchor).toBeGreaterThan(-1);
     expect(importIndex).toBeGreaterThan(anchor);
     const guard = source.slice(anchor, importIndex);
     // Fail-closed: unknown build targets (including undefined __BROWSER__)
-    // never register the production host. No undefined-as-Firefox fallback.
+    // never bootstrap. No undefined-as-Firefox fallback.
     expect(guard).toContain("typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox'");
     expect(guard).not.toContain('||');
   });

@@ -166,6 +166,7 @@ export async function loadFeatureOnDemand(featureName) {
     shortcut: async () => await loadFeature('shortcut'),
     textFieldIcon: async () => await loadFeature('textFieldIcon'),
     mouseHover: async () => await loadFeature('mouseHover'),
+    liveDubbing: async () => await loadFeature('liveDubbing'),
     vue: async () => {
       if (window.translateItContentCore?.loadVueApp) {
         await window.translateItContentCore.loadVueApp();

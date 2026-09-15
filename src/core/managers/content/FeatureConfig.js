@@ -68,6 +68,16 @@ export const FEATURE_CONFIG = {
   mouseHover: {
     settings: ['MOUSE_HOVER_TRANSLATION_ENABLED'],
     settingKey: 'MOUSE_HOVER_TRANSLATION_ENABLED'
+  },
+
+  liveDubbing: {
+    // Host-addressable infrastructure only: no user setting, no settingKey,
+    // and no startup category. The feature stays inactive until an explicit
+    // Background PREPARE control message activates it through the
+    // content-runtime host; page-level exclusion still applies, so excluded
+    // pages fail closed.
+    settings: [],
+    isEnabled: () => true,
   }
 };
 

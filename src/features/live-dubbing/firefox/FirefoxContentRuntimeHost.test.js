@@ -14,8 +14,16 @@ const browserAPI = {
 
 const backgroundSender = { id: 'extension-id' };
 
-function createHost() {
-  return new FirefoxLiveDubbingContentHost({ browserAPI });
+function createActiveLifecycle() {
+  return {
+    requestActivation: async () => ({ activated: true }),
+    deactivateFeature: async () => true,
+    isFeatureActive: () => true,
+  };
+}
+
+function createHost(featureLifecycle = createActiveLifecycle()) {
+  return new FirefoxLiveDubbingContentHost({ browserAPI, featureLifecycle });
 }
 
 function prepareMessage(overrides = {}) {
@@ -62,9 +70,9 @@ describe('Firefox content runtime host lifecycle', () => {
     expect(host.handles(LIVE_DUBBING_ACTIONS.CONSUME)).toBe(false);
   });
 
-  it('prepares idempotently for the exact identity', () => {
+  it('prepares idempotently for the exact identity', async () => {
     const host = createHost();
-    const first = host.handle(prepareMessage(), backgroundSender);
+    const first = await host.handle(prepareMessage(), backgroundSender);
     expect(first).toMatchObject({
       success: true,
       ack: 'READY',
@@ -76,107 +84,107 @@ describe('Firefox content runtime host lifecycle', () => {
       eventSequence: 0,
       status: 'PREPARING_CAPTURE',
     });
-    const second = host.handle(prepareMessage(), backgroundSender);
+    const second = await host.handle(prepareMessage(), backgroundSender);
     expect(second).toMatchObject({ success: true, ack: 'READY', idempotent: true });
     assertScalarResponse(first);
     assertScalarResponse(second);
   });
 
-  it('fails closed on conflicting, stale, or wrong identity', () => {
+  it('fails closed on conflicting, stale, or wrong identity', async () => {
     const host = createHost();
-    expect(host.handle(prepareMessage(), backgroundSender).success).toBe(true);
+    expect((await host.handle(prepareMessage(), backgroundSender)).success).toBe(true);
 
-    expect(host.handle(prepareMessage({ providerId: 'openai' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ providerId: 'openai' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH', ignored: true });
-    expect(host.handle(prepareMessage({ eventSequence: 4 }), backgroundSender))
+    expect(await host.handle(prepareMessage({ eventSequence: 4 }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH', ignored: true });
-    expect(host.handle(statusMessage({ sessionId: 'other' }), backgroundSender))
+    expect(await host.handle(statusMessage({ sessionId: 'other' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH', ignored: true });
-    expect(host.handle(prepareMessage({ sessionId: 'session-2', targetLanguage: 'en' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ sessionId: 'session-2', targetLanguage: 'en' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_SESSION_BUSY', ignored: true });
-    expect(host.handle(prepareMessage({ targetLanguage: 'es' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ targetLanguage: 'es' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH', ignored: true });
     // The conflicting attempts never disturb the adopted session.
-    expect(host.handle(statusMessage(), backgroundSender))
+    expect(await host.handle(statusMessage(), backgroundSender))
       .toMatchObject({ success: true, active: true, status: 'PREPARING_CAPTURE' });
   });
 
-  it('rejects new-session PREPARE with a non-zero sequence', () => {
+  it('rejects new-session PREPARE with a non-zero sequence', async () => {
     const host = createHost();
-    expect(host.handle(prepareMessage({ eventSequence: 2 }), backgroundSender))
+    expect(await host.handle(prepareMessage({ eventSequence: 2 }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' });
   });
 
-  it('reports STATUS without false success for unknown sessions', () => {
+  it('reports STATUS without false success for unknown sessions', async () => {
     const host = createHost();
-    expect(host.handle(statusMessage(), backgroundSender))
+    expect(await host.handle(statusMessage(), backgroundSender))
       .toMatchObject({ success: true, active: false, prepared: false, status: 'IDLE' });
 
-    host.handle(prepareMessage(), backgroundSender);
-    expect(host.handle(statusMessage(), backgroundSender))
+    await host.handle(prepareMessage(), backgroundSender);
+    expect(await host.handle(statusMessage(), backgroundSender))
       .toMatchObject({ success: true, active: true, prepared: true, status: 'PREPARING_CAPTURE' });
   });
 
-  it('disposes idempotently and terminalizes the exact session', () => {
+  it('disposes idempotently and terminalizes the exact session', async () => {
     const host = createHost();
-    host.handle(prepareMessage(), backgroundSender);
+    await host.handle(prepareMessage(), backgroundSender);
 
-    const first = host.handle(disposeMessage(), backgroundSender);
+    const first = await host.handle(disposeMessage(), backgroundSender);
     expect(first).toMatchObject({ success: true, ack: 'DISPOSED', disposed: true });
-    const second = host.handle(disposeMessage(), backgroundSender);
+    const second = await host.handle(disposeMessage(), backgroundSender);
     expect(second).toMatchObject({ success: true, ack: 'DISPOSED', disposed: true, idempotent: true });
 
     // The disposed identity cannot resurrect on this document.
-    expect(host.handle(prepareMessage(), backgroundSender))
+    expect(await host.handle(prepareMessage(), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_SESSION_DISPOSED' });
-    expect(host.handle(statusMessage(), backgroundSender))
+    expect(await host.handle(statusMessage(), backgroundSender))
       .toMatchObject({ success: true, active: false, status: 'IDLE' });
 
     // A fresh session id may still prepare after an explicit dispose.
-    expect(host.handle(prepareMessage({ sessionId: 'session-2' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ sessionId: 'session-2' }), backgroundSender))
       .toMatchObject({ success: true, ack: 'READY' });
   });
 
-  it('isolates stale documents: a foreign document identity fails closed', () => {
+  it('isolates stale documents: a foreign document identity fails closed', async () => {
     const host = createHost();
-    expect(host.handle(prepareMessage(), backgroundSender).success).toBe(true);
+    expect((await host.handle(prepareMessage(), backgroundSender)).success).toBe(true);
 
-    expect(host.handle(prepareMessage({ documentId: 'doc-2' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ documentId: 'doc-2' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_STALE_DOCUMENT', ignored: true });
-    expect(host.handle(statusMessage({ documentId: 'doc-2' }), backgroundSender))
+    expect(await host.handle(statusMessage({ documentId: 'doc-2' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_STALE_DOCUMENT' });
-    expect(host.handle(disposeMessage({ documentId: 'doc-2' }), backgroundSender))
+    expect(await host.handle(disposeMessage({ documentId: 'doc-2' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_STALE_DOCUMENT' });
 
     // The bound document session is undisturbed by the stale attempt.
-    expect(host.handle(statusMessage(), backgroundSender))
+    expect(await host.handle(statusMessage(), backgroundSender))
       .toMatchObject({ success: true, active: true, status: 'PREPARING_CAPTURE' });
   });
 
-  it('invalidates the old host on navigation without resurrecting it', () => {
+  it('invalidates the old host on navigation without resurrecting it', async () => {
     const host = createHost();
-    host.handle(prepareMessage(), backgroundSender);
+    await host.handle(prepareMessage(), backgroundSender);
     host.invalidate('NAVIGATION');
 
-    expect(host.handle(statusMessage(), backgroundSender))
+    expect(await host.handle(statusMessage(), backgroundSender))
       .toMatchObject({ success: true, active: false, status: 'IDLE' });
-    expect(host.handle(prepareMessage(), backgroundSender))
+    expect(await host.handle(prepareMessage(), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_SESSION_DISPOSED' });
-    expect(host.handle(prepareMessage({ sessionId: 'session-2' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ sessionId: 'session-2' }), backgroundSender))
       .toMatchObject({ success: true, ack: 'READY' });
   });
 
-  it('rejects non-Background senders and malformed traffic without throwing', () => {
+  it('rejects non-Background senders and malformed traffic without throwing', async () => {
     const host = createHost();
-    expect(host.handle(prepareMessage(), { id: 'extension-id', tab: { id: 7 } }))
+    expect(await host.handle(prepareMessage(), { id: 'extension-id', tab: { id: 7 } }))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true });
-    expect(host.handle(prepareMessage(), { id: 'other-id' }))
+    expect(await host.handle(prepareMessage(), { id: 'other-id' }))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
-    expect(host.handle({ target: FIREFOX_CONTENT_TARGET, action: 'LIVE_DUBBING_CONNECT_PROVIDER', data: {} }, backgroundSender))
+    expect(await host.handle({ target: FIREFOX_CONTENT_TARGET, action: 'LIVE_DUBBING_CONNECT_PROVIDER', data: {} }, backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED' });
-    expect(host.handle(null, backgroundSender))
+    expect(await host.handle(null, backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED' });
-    expect(host.handle(prepareMessage({ streamId: 'stream-secret' }), backgroundSender))
+    expect(await host.handle(prepareMessage({ streamId: 'stream-secret' }), backgroundSender))
       .toMatchObject({ success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED' });
   });
 
