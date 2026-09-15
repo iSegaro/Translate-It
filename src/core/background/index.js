@@ -251,4 +251,18 @@ if (typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__) {
   ).catch(() => {});
 }
 
+// Phase 2 Firefox transport/runtime capability receiver (DEV + Firefox only).
+// It accepts only the spike-local action namespace; no production router is
+// changed and no media object is logged, persisted, or returned.
+if (typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__
+  && typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox') {
+  import('@/features/live-dubbing/spikes/firefox/spikeDevBackground.js').then(
+    (module) => {
+      try {
+        module.installFirefoxSpikeBackgroundReceiver?.({ browserAPI: browser });
+      } catch { /* dev-only install is best effort */ }
+    },
+  ).catch(() => {});
+}
+
 export { backgroundService };

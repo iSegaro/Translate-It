@@ -73,6 +73,22 @@ async function initializeLogger(subComponent = 'Main') {
       return;
     }
 
+    // Firefox YouTube captureStream probe (DEV ONLY): content/page-local and
+    // deliberately outside production messaging, providers, and Coordinator.
+    const hostname = window.location?.hostname;
+    const isYouTubePage = typeof hostname === 'string'
+      && (hostname === 'youtube.com' || hostname.endsWith('.youtube.com'));
+    if (typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__
+      && (typeof __BROWSER__ === 'undefined' || __BROWSER__ === 'firefox') && isYouTubePage) {
+      import('@/features/live-dubbing/spikes/firefox/spikeDevContent.js').then(
+        (module) => {
+          try {
+            module.installFirefoxYouTubeCaptureStreamSpikeHook?.();
+          } catch { /* dev-only install is best effort */ }
+        },
+      ).catch(() => {});
+    }
+
     const scriptLogger = await initializeLogger('Main');
 
     if (process.env.NODE_ENV === 'development') {

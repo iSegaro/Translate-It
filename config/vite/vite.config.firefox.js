@@ -15,6 +15,10 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 const baseConfig = createBaseConfig('firefox')
+const includeFirefoxDevSpike = process.env.NODE_ENV !== 'production';
+const firefoxDevSpikeInputs = includeFirefoxDevSpike
+  ? ['src/features/live-dubbing/spikes/firefox/spikeDevIframe.html']
+  : [];
 
 // Use production config if in production, otherwise use base config
 const finalConfig = process.env.NODE_ENV === 'production' && productionConfig
@@ -65,10 +69,17 @@ export default defineConfig({
     copyFirefoxAssets(),
     
     webExtension({
-      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/subtitle.html', 'src/html/pdf.html'],
+      additionalInputs: [
+        'src/core/content-scripts/index-iframe.js',
+        'src/html/subtitle.html',
+        'src/html/pdf.html',
+        ...firefoxDevSpikeInputs,
+      ],
       // Generate dynamic manifest for Firefox
       manifest: () => {
-        const manifest = generateValidatedManifest('firefox');
+        const manifest = generateValidatedManifest('firefox', {
+          includeFirefoxDevSpikeIframe: includeFirefoxDevSpike,
+        });
         console.log('✅ Firefox manifest generated');
         return manifest;
       },

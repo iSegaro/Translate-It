@@ -8,7 +8,7 @@ import pkg from '../package.json' with { type: 'json' };
  * @param {string} browser - Target browser ('chrome' or 'firefox')
  * @returns {Object} Generated manifest object
  */
-export function generateManifest(browser = 'chrome') {
+export function generateManifest(browser = 'chrome', options = {}) {
   // Base manifest shared across browsers
   const baseManifest = {
     name: browser === 'firefox' ? '__MSG_nameFirefox__' : '__MSG_nameChrome__',
@@ -99,7 +99,7 @@ export function generateManifest(browser = 'chrome') {
 
   // browser-specific configurations
   if (browser === 'firefox') {
-    return generateFirefoxManifest(baseManifest);
+    return generateFirefoxManifest(baseManifest, options);
   } else {
     return generateChromeManifest(baseManifest);
   }
@@ -167,7 +167,7 @@ function generateChromeManifest(baseManifest) {
  * Generate Firefox-specific manifest (MV3 with compatibility layer)
  * @private
  */
-function generateFirefoxManifest(baseManifest) {
+function generateFirefoxManifest(baseManifest, { includeFirefoxDevSpikeIframe = false } = {}) {
   const manifest = {
     ...baseManifest,
     manifest_version: 3,
@@ -243,6 +243,17 @@ function generateFirefoxManifest(baseManifest) {
       return rest;
     })
   };
+
+  if (includeFirefoxDevSpikeIframe) {
+    manifest.web_accessible_resources = [
+      ...manifest.web_accessible_resources,
+      {
+        // The Firefox DEV build emits this additional input at the extension root.
+        resources: ['spikeDevIframe.html'],
+        matches: ['*://youtube.com/*', '*://*.youtube.com/*'],
+      },
+    ];
+  }
 
   // Ensure no persistent key is present for Firefox MV3
   if (manifest.background && manifest.background.persistent) {
@@ -344,8 +355,8 @@ export function validateManifest(manifest, browser) {
  * @param {string} browser - Target browser
  * @returns {Object} Generated and validated manifest
  */
-export function generateValidatedManifest(browser) {
-  const manifest = generateManifest(browser);
+export function generateValidatedManifest(browser, options = {}) {
+  const manifest = generateManifest(browser, options);
   const validation = validateManifest(manifest, browser);
   
   if (!validation.valid) {
