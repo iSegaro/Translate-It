@@ -1253,6 +1253,7 @@ describe('LiveDubbingController media-stream audio path', () => {
       success: true,
       ack: 'MEDIA_ACQUIRED',
       status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      sourceAccepted: true,
     });
     expect(controller.mediaDevices.getUserMedia).not.toHaveBeenCalled();
 
@@ -1260,7 +1261,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(clients[0].connect.mock.calls[0][0].sourceStream).toBe(stream);
 
     expect(controller.consumeSource('session-1', 'gemini', sourceHandle, 3))
-      .toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
+      .toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED', sourceAccepted: true });
     expect(sourceDispose).not.toHaveBeenCalled();
 
     const disposing = controller.dispose('session-1', 'gemini');
@@ -1275,6 +1276,79 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.dispose('session-1', 'gemini');
     expect(sourceDispose).toHaveBeenCalledOnce();
   });
+
+  it('reports exact source-handle ownership for retries and rejected requests', async () => {
+    const { controller, stream } = createMediaStreamHarness();
+    const { controller: invalidController } = createMediaStreamHarness();
+    const sourceDispose = vi.fn();
+    const sourceHandle = { stream, dispose: sourceDispose };
+    const wrapperDispose = vi.fn();
+    const sameStreamWrapper = { stream, dispose: wrapperDispose };
+
+    invalidController.prepare('invalid-session', 'gemini', 'fr', 0);
+    expect(invalidController.consumeSource('invalid-session', 'gemini', null, 1))
+      .toMatchObject({
+        sourceAccepted: false,
+        error: 'LIVE_DUBBING_SOURCE_HANDLE_INVALID',
+      });
+
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    expect(await controller.consumeSource('other-session', 'gemini', sourceHandle, 1))
+      .toMatchObject({ sourceAccepted: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' });
+    expect(controller.consumeSource('session-1', 'gemini', sourceHandle, 3))
+      .toMatchObject({ sourceAccepted: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' });
+
+    await expect(controller.consumeSource('session-1', 'gemini', sourceHandle, 1))
+      .resolves.toMatchObject({ success: true, sourceAccepted: true });
+    expect(controller.consumeSource('session-1', 'gemini', sourceHandle, 1))
+      .toMatchObject({ success: true, sourceAccepted: true });
+    expect(controller.consumeSource('session-1', 'gemini', sameStreamWrapper, 1))
+      .toMatchObject({ sourceAccepted: false, error: 'LIVE_DUBBING_SOURCE_OWNERSHIP_CONFLICT' });
+    expect(wrapperDispose).not.toHaveBeenCalled();
+
+    await controller.dispose('session-1', 'gemini');
+    expect(controller.consumeSource('session-1', 'gemini', sourceHandle, 1))
+      .toMatchObject({ sourceAccepted: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' });
+  });
+
+  it('marks post-adoption capture failures as Controller-owned', async () => {
+    const { controller, stream, track } = createMediaStreamHarness();
+    track.readyState = 'ended';
+    const sourceDispose = vi.fn();
+
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await expect(controller.consumeSource('session-1', 'gemini', {
+      stream,
+      dispose: sourceDispose,
+    }, 1)).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK',
+      sourceAccepted: true,
+    });
+    expect(sourceDispose).toHaveBeenCalledOnce();
+  });
+
+  it.each(['_getLiveAudioTracks', '_addTrackListeners'])('normalizes %s exceptions after source adoption', async helperName => {
+      const { controller, stream } = createMediaStreamHarness();
+      const sourceDispose = vi.fn();
+      vi.spyOn(controller, helperName).mockImplementation(() => {
+        throw new Error(`${helperName} failed`);
+      });
+
+      controller.prepare('session-1', 'gemini', 'fr', 0);
+      await expect(controller.consumeSource('session-1', 'gemini', {
+        stream,
+        dispose: sourceDispose,
+      }, 1)).resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_AUDIO_PIPELINES_FAILED',
+        sourceAccepted: true,
+      });
+      expect(sourceDispose).toHaveBeenCalledOnce();
+
+      await controller.dispose('session-1', 'gemini');
+      expect(sourceDispose).toHaveBeenCalledOnce();
+    });
 
   it('disposes a direct source exactly once when disposal races source adoption', async () => {
     const sourceDispose = vi.fn();
@@ -1296,7 +1370,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(sourceDispose).toHaveBeenCalledOnce();
   });
 
-  it('disposes distinct replacement streams without disturbing the adopted handle', async () => {
+  it('rejects distinct replacement streams without disturbing the adopted handle', async () => {
     const adoptedDispose = vi.fn();
     const replacementDispose = vi.fn();
     const { controller, stream } = createMediaStreamHarness();
@@ -1313,23 +1387,36 @@ describe('LiveDubbingController media-stream audio path', () => {
       1,
     );
 
-    await expect(firstCapture).resolves.toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
-    await expect(inFlightReplacement).resolves.toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
+    await expect(firstCapture).resolves.toMatchObject({
+      success: true,
+      ack: 'MEDIA_ACQUIRED',
+      sourceAccepted: true,
+    });
+    await expect(inFlightReplacement).resolves.toMatchObject({
+      success: true,
+      ack: 'MEDIA_ACQUIRED',
+      sourceAccepted: false,
+    });
+    expect(replacementDispose).not.toHaveBeenCalled();
+    await replacementHandle.dispose();
     expect(replacementDispose).toHaveBeenCalledOnce();
-    await expect(controller.consumeSource('session-1', 'gemini', replacementHandle, 1))
-      .resolves.toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
+    expect(controller.consumeSource('session-1', 'gemini', replacementHandle, 1))
+      .toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED', sourceAccepted: false });
     expect(replacementDispose).toHaveBeenCalledOnce();
     expect(adoptedDispose).not.toHaveBeenCalled();
     expect(controller.consumeSource('session-1', 'gemini', adoptedHandle, 1))
-      .toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
+      .toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED', sourceAccepted: true });
 
     const settledReplacementDispose = vi.fn();
     const settledReplacementStream = createStream(new FakeTrack());
-    await expect(controller.consumeSource('session-1', 'gemini', {
+    const settledReplacementHandle = {
       stream: settledReplacementStream,
       dispose: settledReplacementDispose,
-    }, 1))
-      .resolves.toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
+    };
+    expect(controller.consumeSource('session-1', 'gemini', settledReplacementHandle, 1))
+      .toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED', sourceAccepted: false });
+    expect(settledReplacementDispose).not.toHaveBeenCalled();
+    await settledReplacementHandle.dispose();
     expect(settledReplacementDispose).toHaveBeenCalledOnce();
     expect(adoptedDispose).not.toHaveBeenCalled();
     expect(controller.currentSession.sourceHandle.sourceHandle).toBe(adoptedHandle);
@@ -1569,6 +1656,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     const firstDispose = vi.fn();
     const secondDispose = vi.fn();
     const staleDispose = vi.fn();
+    const staleHandle = { stream: staleStream, dispose: staleDispose };
 
     controller.prepare('session-1', 'gemini', 'fr', 0);
     await controller.consumeSource('session-1', 'gemini', {
@@ -1584,14 +1672,14 @@ describe('LiveDubbingController media-stream audio path', () => {
       dispose: secondDispose,
     }, 1)).resolves.toMatchObject({ success: true, ack: 'MEDIA_ACQUIRED' });
 
-    await expect(controller.consumeSource('session-1', 'gemini', {
-      stream: staleStream,
-      dispose: staleDispose,
-    }, 1)).resolves.toMatchObject({
+    expect(controller.consumeSource('session-1', 'gemini', staleHandle, 1)).toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_SESSION_MISMATCH',
       ignored: true,
+      sourceAccepted: false,
     });
+    expect(staleDispose).not.toHaveBeenCalled();
+    await staleHandle.dispose();
     expect(staleDispose).toHaveBeenCalledOnce();
     expect(secondDispose).not.toHaveBeenCalled();
     expect(controller.status()).toMatchObject({ sessionId: 'session-2', active: true });

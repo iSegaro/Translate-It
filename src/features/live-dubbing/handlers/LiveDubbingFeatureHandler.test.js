@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { FEATURE_CONFIG } from '@/core/managers/content/FeatureConfig.js';
@@ -7,6 +7,26 @@ import {
   LIVE_DUBBING_FEATURE_NAME,
   LiveDubbingFeatureHandler,
 } from './LiveDubbingFeatureHandler.js';
+
+function descriptor(overrides = {}) {
+  return {
+    sessionId: 'session-1',
+    providerId: 'gemini',
+    tabId: 7,
+    frameId: 0,
+    documentId: 'document-1',
+    targetLanguage: 'en',
+    eventSequence: 0,
+    ...overrides,
+  };
+}
+
+function sourceHandle() {
+  return {
+    stream: { getTracks: () => [] },
+    dispose: vi.fn(),
+  };
+}
 
 describe('LiveDubbingFeatureHandler lifecycle', () => {
   it('exposes the shared feature name', () => {
@@ -30,6 +50,146 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     expect(handler.isActive()).toBe(false);
     expect(await handler.deactivate()).toBe(true);
   });
+
+  it('prepares through the injected local runtime in order and retries without recapture', async () => {
+    const calls = [];
+    const source = sourceHandle();
+    const controller = {
+      prepare: vi.fn(async (...args) => {
+        calls.push(['prepare', ...args]);
+        return { success: true };
+      }),
+      consumeSource: vi.fn(async (...args) => {
+        calls.push(['consumeSource', ...args]);
+        return { success: true, sourceAccepted: true };
+      }),
+      dispose: vi.fn(async () => ({ success: true, disposed: true })),
+    };
+    const resolver = { resolve: vi.fn(() => {
+      calls.push(['resolve']);
+      return { success: true, source: 'media-element' };
+    }) };
+    const captureAdapter = { capture: vi.fn(() => {
+      calls.push(['capture', 'media-element']);
+      return source;
+    }) };
+    const handler = new LiveDubbingFeatureHandler({ controller, resolver, captureAdapter });
+    const localDescriptor = descriptor();
+    await handler.activate();
+
+    await expect(handler.prepareRuntime(localDescriptor)).resolves.toBe(true);
+    expect(calls.map(([name]) => name)).toEqual([
+      'prepare',
+      'resolve',
+      'capture',
+      'consumeSource',
+    ]);
+    expect(controller.consumeSource).toHaveBeenCalledWith(
+      localDescriptor.sessionId,
+      localDescriptor.providerId,
+      source,
+      localDescriptor.eventSequence + 1,
+    );
+
+    await expect(handler.prepareRuntime({ ...localDescriptor })).resolves.toBe(true);
+    expect(resolver.resolve).toHaveBeenCalledOnce();
+    expect(captureAdapter.capture).toHaveBeenCalledOnce();
+    expect(controller.consumeSource).toHaveBeenCalledOnce();
+  });
+
+  it('disposes an unadopted source once when controller adoption rejects', async () => {
+    const source = sourceHandle();
+    const controller = {
+      prepare: vi.fn(async () => ({ success: true })),
+      consumeSource: vi.fn(async () => ({ success: false, sourceAccepted: false })),
+      dispose: vi.fn(async () => ({ success: true, disposed: true })),
+    };
+    const handler = new LiveDubbingFeatureHandler({
+      controller,
+      resolver: { resolve: () => ({ success: true, source: 'media-element' }) },
+      captureAdapter: { capture: () => source },
+    });
+    await handler.activate();
+
+    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(false);
+    expect(source.dispose).toHaveBeenCalledOnce();
+    expect(controller.dispose).toHaveBeenCalledOnce();
+    await handler.deactivate();
+    expect(source.dispose).toHaveBeenCalledOnce();
+    expect(controller.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('defers source cleanup to Controller after accepted adoption even on failure', async () => {
+    const source = sourceHandle();
+    const controller = {
+      prepare: vi.fn(async () => ({ success: true })),
+      consumeSource: vi.fn(async () => ({
+        success: false,
+        error: 'LIVE_DUBBING_AUDIO_PIPELINES_FAILED',
+        sourceAccepted: true,
+      })),
+      dispose: vi.fn(async () => ({ success: true, disposed: true })),
+    };
+    const handler = new LiveDubbingFeatureHandler({
+      controller,
+      resolver: { resolve: () => ({ success: true, source: 'media-element' }) },
+      captureAdapter: { capture: () => source },
+    });
+    await handler.activate();
+
+    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(false);
+
+    expect(source.dispose).not.toHaveBeenCalled();
+    expect(controller.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('fences a late capture and disposes it without handing it to the Controller', async () => {
+    let resolveCapture;
+    const captureResult = new Promise(resolve => { resolveCapture = resolve; });
+    const source = sourceHandle();
+    const controller = {
+      prepare: vi.fn(async () => ({ success: true })),
+      consumeSource: vi.fn(),
+      dispose: vi.fn(async () => ({ success: true, disposed: true })),
+    };
+    const handler = new LiveDubbingFeatureHandler({
+      controller,
+      resolver: { resolve: () => ({ success: true, source: 'media-element' }) },
+      captureAdapter: { capture: () => captureResult },
+    });
+    await handler.activate();
+
+    const preparation = handler.prepareRuntime(descriptor());
+    await vi.waitFor(() => expect(controller.prepare).toHaveBeenCalledOnce());
+    const deactivation = handler.deactivate();
+    resolveCapture(source);
+
+    await expect(preparation).resolves.toBe(false);
+    await expect(deactivation).resolves.toBe(true);
+    expect(controller.consumeSource).not.toHaveBeenCalled();
+    expect(source.dispose).toHaveBeenCalledOnce();
+    expect(controller.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps Controller ownership after exact source adoption during deactivation', async () => {
+    const source = sourceHandle();
+    const controller = {
+      prepare: vi.fn(async () => ({ success: true })),
+      consumeSource: vi.fn(async () => ({ success: true, sourceAccepted: true })),
+      dispose: vi.fn(async () => ({ success: true, disposed: true })),
+    };
+    const handler = new LiveDubbingFeatureHandler({
+      controller,
+      resolver: { resolve: () => ({ success: true, source: 'media-element' }) },
+      captureAdapter: { capture: () => source },
+    });
+    await handler.activate();
+
+    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(true);
+    await expect(handler.deactivate()).resolves.toBe(true);
+    expect(controller.dispose).toHaveBeenCalledOnce();
+    expect(source.dispose).not.toHaveBeenCalled();
+  });
 });
 
 describe('liveDubbing feature registration conventions', () => {
@@ -48,7 +208,7 @@ describe('liveDubbing feature registration conventions', () => {
     expect(categorized).not.toContain(LIVE_DUBBING_FEATURE_NAME);
   });
 
-  it('keeps the handler free of Firefox, site, capture, provider, media, DOM, and page APIs', async () => {
+  it('keeps the handler free of Firefox, site, browser messaging, and page APIs', async () => {
     const source = await readFile(
       join(process.cwd(), 'src/features/live-dubbing/handlers/LiveDubbingFeatureHandler.js'),
       'utf8',
@@ -56,25 +216,25 @@ describe('liveDubbing feature registration conventions', () => {
     const forbiddenTokens = [
       'firefox',
       'youtube',
-      'captureStream',
       'getUserMedia',
       'MediaStream',
       'AudioContext',
-      'provider',
-      'Provider',
       'transcript',
       'sdp',
       'payload',
-      'document.',
       'window.',
       'window.top',
       'querySelector',
       'chrome.',
       'browser.',
       'tabs.',
+      'currentSession',
+      '_controllerOwnsSource',
+      '.sourceHandle',
     ];
     for (const token of forbiddenTokens) {
       expect(source).not.toContain(token);
     }
+    expect(source).toContain('consumed?.sourceAccepted === true');
   });
 });

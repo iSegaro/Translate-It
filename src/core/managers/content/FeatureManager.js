@@ -211,6 +211,27 @@ export class FeatureManager extends ResourceTracker {
     return this.getFeatureHandler(featureName);
   }
 
+  /**
+   * Prepare only the active Live Dubbing handler's local runtime. This is a
+   * deliberately closed seam for the content-runtime host, not a generic
+   * feature-method dispatcher.
+   * @param {string} featureName
+   * @param {object} descriptor validated local-runtime descriptor
+   * @returns {Promise<boolean>} whether the handler adopted its source
+   */
+  async prepareFeatureRuntime(featureName, descriptor) {
+    if (featureName !== 'liveDubbing' || !this.activeFeatures.has(featureName)) return false;
+
+    const handler = this.featureHandlers.get(featureName);
+    if (!handler || typeof handler.prepareRuntime !== 'function') return false;
+
+    try {
+      return await handler.prepareRuntime(descriptor) === true;
+    } catch {
+      return false;
+    }
+  }
+
   async injectDependencies() {
     const contentMessageHandler = this.featureHandlers.get('contentMessageHandler');
     const selectElementManager = this.featureHandlers.get('selectElement');

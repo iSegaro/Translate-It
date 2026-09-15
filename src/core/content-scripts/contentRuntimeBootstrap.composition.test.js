@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIVE_DUBBING_ACTIONS } from '@/features/live-dubbing/constants.js';
 import { FIREFOX_CONTENT_TARGET } from '@/features/live-dubbing/firefox/firefoxContentContract.js';
 import { LIVE_DUBBING_FEATURE_NAME } from '@/features/live-dubbing/handlers/LiveDubbingFeatureHandler.js';
@@ -99,7 +99,28 @@ function statusMessage() {
   return { ...prepareMessage(), action: LIVE_DUBBING_ACTIONS.STATUS };
 }
 
+function createMediaDocument() {
+  const track = { kind: 'audio', readyState: 'live', stop: vi.fn() };
+  const stream = {
+    getTracks: () => [track],
+    getAudioTracks: () => [track],
+  };
+  const media = {
+    isConnected: true,
+    paused: false,
+    ended: false,
+    readyState: 2,
+    captureStream: vi.fn(() => stream),
+  };
+  return {
+    querySelectorAll: selector => (selector === 'video' ? [media] : []),
+  };
+}
+
 describe('content runtime production composition', () => {
+  beforeEach(() => vi.stubGlobal('document', createMediaDocument()));
+  afterEach(() => vi.unstubAllGlobals());
+
   it('PREPARE activates, manager-side deactivation surfaces on STATUS without reactivation', async () => {
     const runtime = createRuntime();
     const record = bootstrapContentRuntimeInfrastructure({
@@ -123,6 +144,33 @@ describe('content runtime production composition', () => {
       const status = await listener(statusMessage(), sender);
       expect(status).toMatchObject({ success: true, prepared: true, active: false });
       expect(FeatureManager.getInstance().isFeatureActive(LIVE_DUBBING_FEATURE_NAME)).toBe(false);
+    } finally {
+      record.unregister();
+      await FeatureManager.resetInstance();
+    }
+  });
+
+  it('uses the real manager/handler path and does not recapture an exact retry', async () => {
+    const runtime = createRuntime();
+    const record = bootstrapContentRuntimeInfrastructure({
+      browserName: 'firefox',
+      browserAPI: { runtime },
+    });
+    expect(record).not.toBeNull();
+    try {
+      const [listener] = [...runtime.onMessage.listeners];
+      const sender = { id: 'extension-id' };
+      const media = globalThis.document.querySelectorAll('video')[0];
+
+      await expect(listener(prepareMessage(), sender)).resolves.toMatchObject({
+        success: true,
+        prepared: true,
+      });
+      await expect(listener(prepareMessage(), sender)).resolves.toMatchObject({
+        success: true,
+        idempotent: true,
+      });
+      expect(media.captureStream).toHaveBeenCalledOnce();
     } finally {
       record.unregister();
       await FeatureManager.resetInstance();

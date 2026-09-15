@@ -67,6 +67,8 @@ function getFeatureManagerInstance() {
  * inactive afterwards; a throw or a still-active feature resolves false so
  * the host barrier stays barred instead of converting settlement into
  * success.
+ * `prepareRuntime` is deliberately limited to the active Live Dubbing
+ * handler; it never exposes generic feature invocation through the host seam.
  */
 function createFeatureManagerLifecycle() {
   return {
@@ -80,6 +82,16 @@ function createFeatureManagerLifecycle() {
         const deactivationSucceeded = await featureManager.deactivateFeature(featureName);
         return deactivationSucceeded === true
           && featureManager.isFeatureActive(featureName) === false;
+      } catch {
+        return false;
+      }
+    },
+    prepareRuntime: async (featureName = LIVE_DUBBING_FEATURE_NAME, descriptor) => {
+      if (featureName !== LIVE_DUBBING_FEATURE_NAME) return false;
+      try {
+        const featureManager = await getFeatureManagerInstance();
+        if (typeof featureManager.prepareFeatureRuntime !== 'function') return false;
+        return await featureManager.prepareFeatureRuntime(featureName, descriptor) === true;
       } catch {
         return false;
       }

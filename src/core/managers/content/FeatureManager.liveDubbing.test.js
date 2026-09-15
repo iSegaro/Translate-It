@@ -107,4 +107,21 @@ describe('FeatureManager liveDubbing hybrid lifecycle', () => {
     await manager.deactivateFeature(LIVE_DUBBING_FEATURE_NAME);
     expect(manager.isFeatureActive(LIVE_DUBBING_FEATURE_NAME)).toBe(false);
   });
+
+  it('exposes only the Live Dubbing runtime preparation seam', async () => {
+    const manager = FeatureManager.getInstance();
+    const handler = { prepareRuntime: vi.fn().mockResolvedValue(true) };
+    const descriptor = { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0 };
+    manager.featureHandlers.set(LIVE_DUBBING_FEATURE_NAME, handler);
+    manager.activeFeatures.add(LIVE_DUBBING_FEATURE_NAME);
+
+    await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toBe(true);
+    expect(handler.prepareRuntime).toHaveBeenCalledWith(descriptor);
+    await expect(manager.prepareFeatureRuntime('selectElement', descriptor)).resolves.toBe(false);
+    expect(handler.prepareRuntime).toHaveBeenCalledOnce();
+
+    manager.activeFeatures.delete(LIVE_DUBBING_FEATURE_NAME);
+    await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toBe(false);
+    expect(handler.prepareRuntime).toHaveBeenCalledOnce();
+  });
 });

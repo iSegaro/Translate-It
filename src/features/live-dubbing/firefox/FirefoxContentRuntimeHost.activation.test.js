@@ -17,6 +17,7 @@ function createCountingLifecycle({ activateWith = {}, active = true } = {}) {
   return {
     requestActivation: vi.fn(async () => activateWith),
     deactivateFeature: vi.fn(async () => true),
+    prepareRuntime: vi.fn(async () => true),
     isFeatureActive: vi.fn(() => active),
   };
 }
@@ -53,6 +54,31 @@ function disposeMessage(overrides = {}) {
 }
 
 describe('Firefox content host feature activation', () => {
+  it('fences DISPOSE against a PREPARE that has not adopted local media yet', async () => {
+    let resolvePreparation;
+    const preparation = new Promise(resolve => { resolvePreparation = resolve; });
+    const lifecycle = createCountingLifecycle();
+    lifecycle.prepareRuntime.mockReturnValueOnce(preparation);
+    const host = createHost(lifecycle);
+
+    const preparing = host.handle(prepareMessage(), backgroundSender);
+    await vi.waitFor(() => expect(lifecycle.prepareRuntime).toHaveBeenCalledOnce());
+
+    await expect(host.handle(disposeMessage(), backgroundSender)).resolves.toMatchObject({
+      success: true,
+      ack: 'DISPOSED',
+      disposed: true,
+    });
+    resolvePreparation(true);
+
+    await expect(preparing).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_DISPOSED',
+    });
+    expect(host.session).toBeNull();
+    expect(lifecycle.deactivateFeature).toHaveBeenCalledOnce();
+  });
+
   it('fails PREPARE closed without a lifecycle and creates no partial session', async () => {
     const host = createHost(null);
 

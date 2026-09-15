@@ -298,6 +298,16 @@ async function disposeSourceHandle(sourceHandle) {
   }
 }
 
+function withSourceAcceptance(response, sourceAccepted) {
+  const addAcceptance = result => ({
+    ...result,
+    sourceAccepted: sourceAccepted === true,
+  });
+  return response && typeof response.then === 'function'
+    ? response.then(addAcceptance)
+    : addAcceptance(response);
+}
+
 function createChromeSourceHandle(session, stream) {
   return createOwnedSourceHandle({
     stream,
@@ -650,7 +660,11 @@ export class LiveDubbingController {
       if (!isEventSequence(eventSequence) || eventSequence !== session.eventSequence) {
         return { response: this._sequenceMismatch(sessionId, session, providerId) };
       }
-      return { response: session.capturePromise || this._mediaAcquiredResponse(session) };
+      return {
+        response: session.capturePromise || this._mediaAcquiredResponse(session),
+        captureRetry: true,
+        session,
+      };
     }
 
     if (session.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE
@@ -714,8 +728,8 @@ export class LiveDubbingController {
 
   /**
    * Adopt a browser-neutral source already acquired by a trusted host. The
-   * handle never enters runtime messaging; its disposer is retained by this
-   * Controller and invoked once after provider cleanup.
+   * handle never enters runtime messaging. Ownership transfers only when the
+   * exact handle is accepted; rejected handles remain the caller's resource.
    */
   consumeSource(sessionId, providerId, sourceHandle, eventSequence = undefined) {
     const ownedSource = this._getOwnedSourceHandle(
@@ -724,24 +738,26 @@ export class LiveDubbingController {
     );
     const capture = this._beginCapture(sessionId, providerId, eventSequence);
     if (capture.response !== undefined) {
-      const activeSource = this.currentSession?.sourceHandle;
-      if (!ownedSource) return capture.response;
-      if (activeSource?.sourceHandle === sourceHandle) return capture.response;
-      // The handle object, not its stream, is the retry identity. Stream
-      // equality only protects an active source from a distinct wrapper.
-      if (activeSource?.stream === ownedSource.stream) {
-        return this._sourceOwnershipConflict(
-          sessionId,
-          providerId,
-          capture.session || this.currentSession,
-        );
+      const exactRetry = capture.captureRetry
+        && capture.session?.sourceHandle?.sourceHandle === sourceHandle;
+      // The handle object, not its stream, is the retry identity. A distinct
+      // wrapper around the active stream remains caller-owned and is rejected.
+      if (exactRetry) {
+        return capture.response && typeof capture.response.then === 'function'
+          ? capture.response
+          : withSourceAcceptance(capture.response, true);
       }
-      return disposeSourceHandle(ownedSource).then(() => capture.response);
+      if (capture.captureRetry
+        && capture.session?.sourceHandle?.stream === ownedSource?.stream) {
+        return this._sourceOwnershipConflict(sessionId, providerId, capture.session);
+      }
+      return withSourceAcceptance(capture.response, false);
     }
     const { session } = capture;
     if (!ownedSource) {
       return this._captureFailed(session, 'LIVE_DUBBING_SOURCE_HANDLE_INVALID', {
         stage: LIVE_DUBBING_CAPTURE_STAGES.EXTERNAL_SOURCE,
+        sourceAccepted: false,
         cause: {
           name: 'TypeError',
           message: 'A source handle with a stream and disposer is required',
@@ -752,31 +768,43 @@ export class LiveDubbingController {
 
     session.sourceHandle = ownedSource;
     session.capturePromise = Promise.resolve()
-      .then(() => this._captureResolved(session, ownedSource, null));
+      .then(() => this._captureResolved(session, ownedSource, null, true));
     return session.capturePromise;
   }
 
   /** Initialize both graphs before the provider bootstrap request is made. */
-  async _captureResolved(session, sourceHandle, streamId) {
+  async _captureResolved(session, sourceHandle, streamId, sourceAccepted = undefined) {
     const stream = sourceHandle?.stream;
     if (!this._isCurrentSession(session)) {
       await disposeSourceHandle(sourceHandle);
-      return {
+      return withSourceAcceptance({
         success: false,
         error: 'LIVE_DUBBING_SESSION_DISPOSED',
         ignored: true,
         sessionId: session.sessionId,
         providerId: session.providerId,
         status: IDLE_STATUS,
-      };
+      }, sourceAccepted);
     }
 
-    const liveAudioTracks = this._getLiveAudioTracks(stream);
+    let liveAudioTracks;
+    try {
+      liveAudioTracks = this._getLiveAudioTracks(stream);
+    } catch (error) {
+      return this._pipelineFailed(
+        session,
+        error,
+        streamId,
+        sourceHandle.captureStage,
+        sourceAccepted,
+      );
+    }
     if (liveAudioTracks.length === 0) {
       await disposeSourceHandle(sourceHandle);
       return this._captureFailed(session, 'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK', {
         streamId,
         stage: sourceHandle.captureStage,
+        sourceAccepted,
       });
     }
 
@@ -786,24 +814,41 @@ export class LiveDubbingController {
     session.status = LIVE_DUBBING_INTERNAL_STATUS.CAPTURING;
     this._markMilestone(session, 'captureReady');
     session.lastError = null;
-    this._addTrackListeners(session, liveAudioTracks);
+    try {
+      this._addTrackListeners(session, liveAudioTracks);
+    } catch (error) {
+      this._removeTrackListeners(session);
+      return this._pipelineFailed(
+        session,
+        error,
+        streamId,
+        sourceHandle.captureStage,
+        sourceAccepted,
+      );
+    }
 
     try {
       await this._initializePipelines(session);
       if (!this._isCurrentSession(session)) {
-        return {
+        return withSourceAcceptance({
           success: false,
           error: 'LIVE_DUBBING_SESSION_DISPOSED',
           ignored: true,
           sessionId: session.sessionId,
           providerId: session.providerId,
           status: IDLE_STATUS,
-        };
+        }, sourceAccepted);
       }
       session.capturePromise = null;
-      return this._mediaAcquiredResponse(session);
+      return this._mediaAcquiredResponse(session, sourceAccepted);
     } catch (error) {
-      return this._pipelineFailed(session, error, streamId, sourceHandle.captureStage);
+      return this._pipelineFailed(
+        session,
+        error,
+        streamId,
+        sourceHandle.captureStage,
+        sourceAccepted,
+      );
     }
   }
 
@@ -1502,7 +1547,7 @@ export class LiveDubbingController {
       session.status = LIVE_DUBBING_STATUS.ERROR;
       session.lastError = error;
     }
-    return {
+    const response = {
       success: false,
       error,
       sessionId: session.sessionId,
@@ -1510,20 +1555,24 @@ export class LiveDubbingController {
       status: isCurrent ? session.status : IDLE_STATUS,
       diagnostic,
     };
+    return options.sourceAccepted === undefined
+      ? response
+      : withSourceAcceptance(response, options.sourceAccepted);
   }
 
-  _pipelineFailed(session, error, streamId, stage) {
+  _pipelineFailed(session, error, streamId, stage, sourceAccepted = undefined) {
     const result = this._captureFailed(session, errorCode(error, 'LIVE_DUBBING_AUDIO_PIPELINES_FAILED'), {
       cause: error,
       streamId,
       stage,
+      sourceAccepted,
     });
     this._cleanupSessionResources(session);
     return result;
   }
 
-  _mediaAcquiredResponse(session) {
-    return {
+  _mediaAcquiredResponse(session, sourceAccepted = undefined) {
+    const response = {
       success: true,
       ack: LIVE_DUBBING_OFFSCREEN_ACKS.MEDIA_ACQUIRED,
       mediaAcquired: true,
@@ -1535,6 +1584,9 @@ export class LiveDubbingController {
       captureReady: Boolean(session.stream),
       ...this._audioReadiness(session),
     };
+    return sourceAccepted === undefined
+      ? response
+      : withSourceAcceptance(response, sourceAccepted);
   }
 
   _providerReadyResponse(session) {

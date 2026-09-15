@@ -11,9 +11,9 @@
  *
  * Feature lifecycle is never owned here: PREPARE activates the lazy
  * `liveDubbing` feature through the injected `featureLifecycle` seam and the
- * session is marked PREPARED only on confirmed activation (fail closed, no
- * partial PREPARED). DISPOSE deactivates exactly once, then disposes host
- * state. STATUS is lightweight and never activates.
+ * session is marked PREPARED only on confirmed activation and local runtime
+ * preparation (fail closed, no partial PREPARED). DISPOSE deactivates exactly
+ * once, then disposes host state. STATUS is lightweight and never activates.
  */
 
 import {
@@ -63,14 +63,16 @@ function isSameDocument(identity, data) {
  * later message must match it; a document mismatch fails closed so a stale
  * document can never observe or disturb another document's session.
  * Feature activation is delegated to the injected `featureLifecycle` seam
- * (`{ requestActivation, deactivateFeature, isFeatureActive? }`); without
- * it, PREPARE fails closed while STATUS/DISPOSE stay safe and terminal.
+ * (`{ requestActivation, deactivateFeature, prepareRuntime,
+ * isFeatureActive? }`); without it, PREPARE fails closed while
+ * STATUS/DISPOSE stay safe and terminal.
  */
 export class FirefoxLiveDubbingContentHost {
   constructor(options = {}) {
     this.browserAPI = options.browserAPI || null;
     this.featureLifecycle = options.featureLifecycle || null;
     this.session = null;
+    this.pendingPreparation = null;
     this.documentIdentity = null;
     this.disposedSession = null;
     // Retained single-flight teardown barrier: null, or
@@ -102,8 +104,8 @@ export class FirefoxLiveDubbingContentHost {
   /**
    * Handle one Background control message. Always resolves a fresh
    * scalar-only response; never throws and never exposes media, payloads,
-   * or exception objects. PREPARE resolves only after the lazy feature
-   * activation settles; STATUS never activates.
+   * or exception objects. PREPARE resolves only after lazy feature activation
+   * and local source adoption settle; STATUS never activates.
    * @param {object} message closed control message
    * @param {object|null} sender Background sender metadata
    * @returns {Promise<object>} sanitized scalar response
@@ -132,7 +134,8 @@ export class FirefoxLiveDubbingContentHost {
       });
     }
 
-    if (this.documentIdentity && !isSameDocument(this.documentIdentity, parsed.data)) {
+    const documentBinding = this.documentIdentity || this.pendingPreparation?.data;
+    if (documentBinding && !isSameDocument(documentBinding, parsed.data)) {
       return this._respond({
         success: false,
         error: 'LIVE_DUBBING_STALE_DOCUMENT',
@@ -176,14 +179,25 @@ export class FirefoxLiveDubbingContentHost {
    * teardown cannot reopen it, and a later explicit DISPOSE reuses the same
    * cleanup through the tombstone. Fresh adoption waits on the retained
    * barrier (bounded, fail-closed) instead of overlapping the teardown.
-   * With no session there is nothing to tear down, which keeps repeated
-   * invalidation idempotent.
+   * With no session or pending preparation there is nothing to tear down,
+   * which keeps repeated invalidation idempotent.
    * @param {string|null} reason scalar reason, unused beyond logging fences
    */
   invalidate(reason = null) {
     void reason;
     const session = this.session;
-    if (!session) return;
+    const pending = this.pendingPreparation;
+    if (!session && !pending) return;
+    if (!session && pending) {
+      pending.cancelled = true;
+      this.pendingPreparation = null;
+      this.disposedSession = {
+        sessionId: pending.data.sessionId,
+        providerId: pending.data.providerId,
+      };
+      void this._deactivateFeatureOnce();
+      return;
+    }
     this.disposedSession = {
       sessionId: session.sessionId,
       providerId: session.providerId,
@@ -206,6 +220,41 @@ export class FirefoxLiveDubbingContentHost {
     // Re-fence after the wait: a concurrent terminal path may have landed
     // while this adoption waited.
     if (this._isTombstoned(data)) return this._disposedFailure(data);
+
+    const pendingPreparation = this.pendingPreparation;
+    if (pendingPreparation) {
+      if (pendingPreparation.data.sessionId !== data.sessionId) return this._sessionBusy(data);
+      if (pendingPreparation.data.providerId !== data.providerId
+        || pendingPreparation.data.tabId !== data.tabId) {
+        return this._sessionMismatch(data);
+      }
+      if (pendingPreparation.data.eventSequence !== data.eventSequence) {
+        return this._sequenceMismatch(data);
+      }
+      if (data.targetLanguage !== undefined && data.targetLanguage !== null) {
+        try {
+          if (normalizeProviderTargetLanguage(data.providerId, data.targetLanguage)
+            !== pendingPreparation.data.targetLanguage) {
+            return this._respond({
+              success: false,
+              error: 'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH',
+              ignored: true,
+              sessionId: data.sessionId,
+              providerId: data.providerId,
+              tabId: data.tabId,
+              frameId: data.frameId,
+              documentId: data.documentId,
+              eventSequence: pendingPreparation.data.eventSequence,
+              status: TERMINAL_STATUS,
+            });
+          }
+        } catch {
+          return this._activationBlocked(data, pendingPreparation.data.eventSequence, TERMINAL_STATUS);
+        }
+      }
+      return pendingPreparation.promise
+        || this._activationBlocked(data, data.eventSequence, TERMINAL_STATUS);
+    }
 
     const session = this.session;
     if (session) {
@@ -252,9 +301,13 @@ export class FirefoxLiveDubbingContentHost {
         });
       }
       // Every PREPARE — first or retry — re-validates through feature
-      // activation. A refused activation fails closed without disturbing
-      // the existing control session; explicit DISPOSE is the teardown path.
+      // activation and local runtime preparation. A refused step fails closed
+      // without disturbing the existing control session; explicit DISPOSE is
+      // the teardown path.
       if (!await this._requestFeatureActivation()) {
+        return this._activationBlocked(data, session.eventSequence, session.status);
+      }
+      if (!await this._prepareFeatureRuntime({ ...data, targetLanguage: session.targetLanguage })) {
         return this._activationBlocked(data, session.eventSequence, session.status);
       }
       return this._respond({
@@ -296,10 +349,39 @@ export class FirefoxLiveDubbingContentHost {
       });
     }
 
-    // The session is adopted only on confirmed activation: fail closed with
-    // no partial PREPARED state when activation is unavailable or refused.
-    if (!await this._requestFeatureActivation()) {
-      return this._activationBlocked(data, data.eventSequence, TERMINAL_STATUS);
+    const pending = {
+      data: { ...data, targetLanguage },
+      cancelled: false,
+      promise: null,
+    };
+    this.pendingPreparation = pending;
+    const preparation = this._prepareNewSession(pending);
+    pending.promise = preparation;
+    try {
+      return await preparation;
+    } finally {
+      if (this.pendingPreparation === pending) this.pendingPreparation = null;
+    }
+  }
+
+  async _prepareNewSession(pending) {
+    const { data } = pending;
+    const activated = await this._requestFeatureActivation();
+    if (!activated) {
+      return pending.cancelled || this._isTombstoned(data)
+        ? this._disposedFailure(data)
+        : this._activationBlocked(data, data.eventSequence, TERMINAL_STATUS);
+    }
+    if (pending.cancelled || this.pendingPreparation !== pending || this._isTombstoned(data)) {
+      return this._disposedFailure(data);
+    }
+    if (!await this._prepareFeatureRuntime(data)) {
+      return pending.cancelled || this._isTombstoned(data)
+        ? this._disposedFailure(data)
+        : this._activationBlocked(data, data.eventSequence, TERMINAL_STATUS);
+    }
+    if (pending.cancelled || this.pendingPreparation !== pending || this._isTombstoned(data)) {
+      return this._disposedFailure(data);
     }
 
     this.session = {
@@ -308,7 +390,7 @@ export class FirefoxLiveDubbingContentHost {
       tabId: data.tabId,
       frameId: data.frameId,
       documentId: data.documentId,
-      targetLanguage,
+      targetLanguage: data.targetLanguage,
       eventSequence: data.eventSequence,
       status: PREPARED_STATUS,
     };
@@ -394,6 +476,30 @@ export class FirefoxLiveDubbingContentHost {
       });
     }
 
+    const pending = this.pendingPreparation;
+    if (pending
+      && pending.data.sessionId === data.sessionId
+      && pending.data.providerId === data.providerId
+      && pending.data.tabId === data.tabId) {
+      pending.cancelled = true;
+      this.pendingPreparation = null;
+      this.disposedSession = { sessionId: pending.data.sessionId, providerId: pending.data.providerId };
+      await this._deactivateFeatureOnce();
+      return this._respond({
+        success: true,
+        ack: FIREFOX_CONTENT_ACKS.DISPOSED,
+        disposed: true,
+        sessionId: data.sessionId,
+        providerId: data.providerId,
+        tabId: data.tabId,
+        frameId: data.frameId,
+        documentId: data.documentId,
+        eventSequence: data.eventSequence,
+        active: false,
+        status: TERMINAL_STATUS,
+      });
+    }
+
     const session = this.session;
     if (!session || session.sessionId !== data.sessionId) {
       return this._respond({
@@ -455,6 +561,23 @@ export class FirefoxLiveDubbingContentHost {
       if (typeof lifecycle.isFeatureActive === 'function'
         && lifecycle.isFeatureActive(LIVE_DUBBING_FEATURE_NAME) !== true) return false;
       return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Ask only the active Live Dubbing handler to prepare its local runtime.
+   * The host passes the already-validated descriptor but never inspects or
+   * owns the handler's DOM, media, or Controller resources.
+   * @param {object} descriptor validated content descriptor
+   * @returns {Promise<boolean>}
+   */
+  async _prepareFeatureRuntime(descriptor) {
+    const lifecycle = this.featureLifecycle;
+    if (!lifecycle || typeof lifecycle.prepareRuntime !== 'function') return false;
+    try {
+      return await lifecycle.prepareRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor) === true;
     } catch {
       return false;
     }

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LIVE_DUBBING_ACTIONS } from '@/features/live-dubbing/constants.js';
 import { FIREFOX_CONTENT_TARGET } from '@/features/live-dubbing/firefox/firefoxContentContract.js';
 import { LIVE_DUBBING_FEATURE_NAME } from '@/features/live-dubbing/handlers/LiveDubbingFeatureHandler.js';
@@ -100,11 +100,32 @@ function statusMessage(sessionId) {
   return { ...prepareMessage(sessionId), action: LIVE_DUBBING_ACTIONS.STATUS };
 }
 
+function createMediaDocument() {
+  const track = { kind: 'audio', readyState: 'live', stop: vi.fn() };
+  const stream = {
+    getTracks: () => [track],
+    getAudioTracks: () => [track],
+  };
+  const media = {
+    isConnected: true,
+    paused: false,
+    ended: false,
+    readyState: 2,
+    captureStream: vi.fn(() => stream),
+  };
+  return {
+    querySelectorAll: selector => (selector === 'video' ? [media] : []),
+  };
+}
+
 async function flushMicrotasks(rounds = 10) {
   for (let i = 0; i < rounds; i += 1) await Promise.resolve();
 }
 
 describe('content runtime teardown barrier with the real FeatureManager', () => {
+  beforeEach(() => vi.stubGlobal('document', createMediaDocument()));
+  afterEach(() => vi.unstubAllGlobals());
+
   it('fresh PREPARE cannot adopt the old active handler while teardown is pending', async () => {
     // Controllably-pending handler teardown; everything else is the real
     // production composition (bootstrap seam, host, manager, handler).

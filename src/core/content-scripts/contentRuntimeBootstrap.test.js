@@ -19,6 +19,7 @@ function createActiveLifecycle() {
   return {
     requestActivation: async () => ({ activated: true }),
     deactivateFeature: async () => true,
+    prepareRuntime: async () => true,
     isFeatureActive: () => true,
   };
 }
