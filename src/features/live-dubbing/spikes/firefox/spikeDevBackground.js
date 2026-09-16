@@ -286,7 +286,13 @@ export function installFirefoxSpikeBackgroundReceiver({
   const runtime = browserAPI?.runtime;
   if (!runtime?.onMessage?.addListener || !runtime?.onConnect?.addListener) return undefined;
   const receiver = new FirefoxSpikeBackgroundReceiver({ browserAPI, ...options });
-  const onMessage = (message, sender) => receiver.handleMessage(message, sender);
+  const onMessage = (message, sender) => {
+    if (!message || typeof message !== 'object') return undefined;
+    if (message.target !== FIREFOX_YOUTUBE_SPIKE_MESSAGE_TARGET) return undefined;
+    const transport = transportForAction(message.action);
+    if (!transport) return undefined;
+    return receiver.handleMessage(message, sender);
+  };
   runtime.onMessage.addListener(onMessage);
   runtime.onConnect.addListener(port => receiver.handlePort(port));
   return receiver;
