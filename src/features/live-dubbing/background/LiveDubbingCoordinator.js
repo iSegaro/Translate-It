@@ -44,6 +44,7 @@ import {
 } from '../contracts.js';
 import {
   FIREFOX_CONTENT_ACKS,
+  FIREFOX_CONTENT_ERRORS,
   FIREFOX_CONTENT_STATUS,
   createFirefoxContentMessage,
   hasExactFirefoxContentEvent,
@@ -54,6 +55,30 @@ import { getTrustedFirefoxContentRuntimeIdentity } from '../firefox/FirefoxConte
 import { FIREFOX_CONTENT_BACKGROUND_ACTIONS } from '../firefox/firefoxContentRuntimeMessenger.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
+
+const FIREFOX_START_REASON_ALLOWLIST = new Set([
+  ...FIREFOX_CONTENT_ERRORS,
+  'LIVE_DUBBING_CONTENT_UNAVAILABLE',
+  'LIVE_DUBBING_START_FAILED',
+  'LIVE_DUBBING_START_CANCELLED',
+  'LIVE_DUBBING_RUNTIME_PREPARE_FAILED',
+]);
+const SAFE_STAGE_REASON_PATTERN = /^[A-Z0-9_.-]{1,80}$/;
+function sanitizeFirefoxStartReason(code) {
+  if (typeof code !== 'string' || !SAFE_STAGE_REASON_PATTERN.test(code) || code.includes('://') || code.includes('/')) return null;
+  return FIREFOX_START_REASON_ALLOWLIST.has(code) ? code : null;
+}
+function extractCanonicalReason(error) {
+  const candidate = typeof error?.message === 'string'
+    ? error.message
+    : typeof error?.error === 'string'
+      ? error.error
+      : typeof error === 'string'
+        ? error
+        : null;
+  return sanitizeFirefoxStartReason(candidate);
+}
+
 const CLEANUP_LEASE_STATES = Object.freeze({
   PENDING: 'PENDING',
   ACQUIRED: 'ACQUIRED',
@@ -1014,10 +1039,13 @@ export class LiveDubbingCoordinator {
       }
       sessionState.descriptor = runningDescriptor;
       return { success: true, status: cloneDescriptor(runningDescriptor) };
-    } catch {
+    } catch (caught) {
       const failureCode = pendingStart.terminalRequested || sessionState.terminalRequested
         ? 'LIVE_DUBBING_START_CANCELLED'
         : safeFailureCode('START');
+      const safeReason = extractCanonicalReason(caught);
+      const reasonField = safeReason && safeReason !== failureCode ? { reason: safeReason } : {};
+      // Preserve exact canonical stage failure for diagnostics; keep primary error as START_FAILED for compatibility.
       if (!sessionState.terminalRequested) {
         const failedBase = sessionState.descriptor || descriptor;
         const failedDescriptor = this._advance(failedBase, LIVE_DUBBING_STATUS.ERROR, failureCode);
@@ -1038,6 +1066,7 @@ export class LiveDubbingCoordinator {
         return {
           success: false,
           error: failureCode,
+          ...reasonField,
           retryable: true,
           cleanupPending: true,
           status: cloneDescriptor(this.descriptor || cleanupDescriptor),
@@ -1046,19 +1075,20 @@ export class LiveDubbingCoordinator {
 
       const cleared = await this._clearDescriptor(descriptor.sessionId);
       if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE) {
-        return this._storageClearFailure(descriptor, failureCode);
+        return { ...this._storageClearFailure(descriptor, failureCode), ...reasonField };
       }
       if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.SESSION_MISMATCH) {
         this._forgetSessionState(descriptor.sessionId, sessionState);
         return {
           success: false,
           error: failureCode,
+          ...reasonField,
           ignored: true,
           status: cloneDescriptor(this.descriptor),
         };
       }
       this._forgetSessionState(descriptor.sessionId, sessionState);
-      return { success: false, error: failureCode };
+      return { success: false, error: failureCode, ...reasonField };
     }
   }
 

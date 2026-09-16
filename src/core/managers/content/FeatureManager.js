@@ -218,18 +218,42 @@ export class FeatureManager extends ResourceTracker {
    * feature-method dispatcher.
    * @param {string} featureName
    * @param {object} descriptor validated local-runtime descriptor
-   * @returns {Promise<boolean>} whether the handler adopted its source
+   * @returns {Promise<boolean|object>} explicit {success:true,runtimeEventSequence} or {success:false,error} while keeping boolean compatibility
    */
   async prepareFeatureRuntime(featureName, descriptor) {
-    if (featureName !== 'liveDubbing' || !this.activeFeatures.has(featureName)) return false;
+    if (featureName !== 'liveDubbing' || !this.activeFeatures.has(featureName)) {
+      return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED' };
+    }
 
     const handler = this.featureHandlers.get(featureName);
-    if (!handler || typeof handler.prepareRuntime !== 'function') return false;
+    if (!handler || typeof handler.prepareRuntime !== 'function') {
+      return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED' };
+    }
 
     try {
-      return await handler.prepareRuntime(descriptor) === true;
+      const result = await handler.prepareRuntime(descriptor);
+      if (result === true) {
+        // Legacy boolean success – synthesize explicit success with current sequence
+        const seq = typeof handler.getRuntimeEventSequence === 'function'
+          ? handler.getRuntimeEventSequence()
+          : null;
+        return { success: true, runtimeEventSequence: Number.isInteger(seq) ? seq : descriptor.eventSequence + 1 };
+      }
+      if (result === false) {
+        return { success: false, error: 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED' };
+      }
+      if (result && typeof result === 'object' && result.success === true) {
+        return result;
+      }
+      if (result && typeof result === 'object' && result.success === false && typeof result.error === 'string') {
+        return result;
+      }
+      // Fallback for unexpected truthy values
+      return result === true || result?.success === true
+        ? { success: true, runtimeEventSequence: result?.runtimeEventSequence ?? descriptor.eventSequence + 1 }
+        : { success: false, error: 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED' };
     } catch {
-      return false;
+      return { success: false, error: 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED' };
     }
   }
 

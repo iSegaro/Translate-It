@@ -94,13 +94,21 @@ function createFeatureManagerLifecycle(browserAPI) {
       }
     },
     prepareRuntime: async (featureName = LIVE_DUBBING_FEATURE_NAME, descriptor) => {
-      if (featureName !== LIVE_DUBBING_FEATURE_NAME) return false;
+      if (featureName !== LIVE_DUBBING_FEATURE_NAME) {
+        return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED' };
+      }
       try {
         const featureManager = await getConfiguredFeatureManager();
-        if (typeof featureManager.prepareFeatureRuntime !== 'function') return false;
-        return await featureManager.prepareFeatureRuntime(featureName, descriptor) === true;
+        if (typeof featureManager.prepareFeatureRuntime !== 'function') {
+          return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED' };
+        }
+        const result = await featureManager.prepareFeatureRuntime(featureName, descriptor);
+        if (result === true) return { success: true, runtimeEventSequence: descriptor.eventSequence + 1 };
+        if (result === false) return { success: false, error: 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED' };
+        if (result && typeof result === 'object') return result;
+        return { success: false, error: 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED' };
       } catch {
-        return false;
+        return { success: false, error: 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED' };
       }
     },
     isFeatureActive: (featureName = LIVE_DUBBING_FEATURE_NAME) => {

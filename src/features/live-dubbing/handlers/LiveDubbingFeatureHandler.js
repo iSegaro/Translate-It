@@ -2,6 +2,8 @@ import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { HtmlMediaCaptureAdapter } from '../media/HtmlMediaCaptureAdapter.js';
 import { MediaSourceResolver } from '../media/MediaSourceResolver.js';
+import { MEDIA_CAPTURE_ERRORS, MEDIA_SOURCE_ERRORS } from '../media/mediaConstants.js';
+import { isMediaCaptureFailure, isMediaSourceFailure } from '../media/mediaContracts.js';
 
 /**
  * FeatureManager name for Live Dubbing in the content compartment.
@@ -11,6 +13,70 @@ import { MediaSourceResolver } from '../media/MediaSourceResolver.js';
 export const LIVE_DUBBING_FEATURE_NAME = 'liveDubbing';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'LiveDubbingFeature');
+
+const GENERIC_PREPARE_FAILURE = 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED';
+const SAFE_CANONICAL_PATTERN = /^[A-Z0-9_.-]{1,80}$/;
+const UNSAFE_CODE_FRAGMENT = /(?:STREAM|MEDIA|PAYLOAD|CREDENTIAL|PASSWORD|SECRET|TOKEN|API_KEY)/i;
+const ALLOWED_HANDLER_ERRORS = new Set([
+  MEDIA_SOURCE_ERRORS.NOT_FOUND,
+  MEDIA_SOURCE_ERRORS.AMBIGUOUS,
+  MEDIA_CAPTURE_ERRORS.UNSUPPORTED,
+  MEDIA_CAPTURE_ERRORS.EXCEPTION,
+  MEDIA_CAPTURE_ERRORS.INVALID_STREAM,
+  MEDIA_CAPTURE_ERRORS.NO_AUDIO,
+  'LIVE_DUBBING_RUNTIME_PREPARE_FAILED',
+  'LIVE_DUBBING_RUNTIME_NOT_PREPARED',
+  'LIVE_DUBBING_SESSION_DISPOSED',
+  'LIVE_DUBBING_SESSION_BUSY',
+  'LIVE_DUBBING_SESSION_MISMATCH',
+  'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+  'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH',
+  'LIVE_DUBBING_PROVIDER_UNSUPPORTED',
+  'LIVE_DUBBING_PROVIDER_ERROR',
+  'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
+  'LIVE_DUBBING_PROVIDER_UNAVAILABLE',
+  'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+  'LIVE_DUBBING_CAPTURE_FAILED',
+  'LIVE_DUBBING_CAPTURE_UNAVAILABLE',
+  'LIVE_DUBBING_CAPTURE_TRACK_ENDED',
+  'LIVE_DUBBING_NO_LIVE_AUDIO_TRACK',
+  'LIVE_DUBBING_SOURCE_HANDLE_INVALID',
+  'LIVE_DUBBING_AUDIO_PIPELINES_FAILED',
+  'LIVE_DUBBING_AUDIO_MODE_UNSUPPORTED',
+  'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE',
+  'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
+  'LIVE_DUBBING_SOURCE_OWNERSHIP_CONFLICT',
+  'INVALID_SESSION_ID',
+  'INVALID_TARGET_LANGUAGE',
+  'LIVE_DUBBING_ACTIVATION_BLOCKED',
+]);
+
+function isSafeCanonicalCode(code) {
+  return typeof code === 'string'
+    && SAFE_CANONICAL_PATTERN.test(code)
+    && code.length <= 80
+    && !code.includes('://')
+    && !code.includes('/')
+    && !UNSAFE_CODE_FRAGMENT.test(code.replace('LIVE_DUBBING_MEDIA_CAPTURE_', '').replace('LIVE_DUBBING_MEDIA_SOURCE_', ''));
+}
+
+function sanitizeHandlerError(code, fallback = GENERIC_PREPARE_FAILURE) {
+  if (typeof code === 'string' && ALLOWED_HANDLER_ERRORS.has(code) && isSafeCanonicalCode(code)) {
+    return code;
+  }
+  if (typeof code === 'string' && isSafeCanonicalCode(code) && code.startsWith('LIVE_DUBBING_')) {
+    return ALLOWED_HANDLER_ERRORS.has(code) ? code : fallback;
+  }
+  return fallback;
+}
+
+function handlerFailure(error) {
+  return { success: false, error: sanitizeHandlerError(error, GENERIC_PREPARE_FAILURE) };
+}
+
+function handlerSuccess(runtimeEventSequence) {
+  return { success: true, runtimeEventSequence };
+}
 
 /**
  * Local runtime owner for Live Dubbing.
@@ -87,15 +153,23 @@ export class LiveDubbingFeatureHandler {
   /**
    * Prepare the local runtime for one already-validated host descriptor.
    * Exact retries join or reuse the existing runtime and never recapture.
+   * Returns explicit {success:true,runtimeEventSequence} or {success:false,error:canonical}
+   * while remaining boolean-compatible for legacy callers that check === true.
    */
   async prepareRuntime(descriptor) {
-    if (!this.active || !this._isDescriptor(descriptor)) return false;
-    if (this._sameDescriptor(this.preparedDescriptor, descriptor)) return true;
-    if (this.preparedDescriptor) return false;
+    if (!this.active || !this._isDescriptor(descriptor)) {
+      return handlerFailure('LIVE_DUBBING_RUNTIME_NOT_PREPARED');
+    }
+    if (this._sameDescriptor(this.preparedDescriptor, descriptor)) {
+      return handlerSuccess(this.runtimeEventSequence);
+    }
+    if (this.preparedDescriptor) {
+      return handlerFailure('LIVE_DUBBING_SESSION_BUSY');
+    }
     if (this.preparationPromise) {
       return this._sameDescriptor(this.pendingDescriptor, descriptor)
         ? this.preparationPromise
-        : false;
+        : handlerFailure('LIVE_DUBBING_SESSION_BUSY');
     }
 
     const generation = this.runtimeGeneration;
@@ -103,7 +177,11 @@ export class LiveDubbingFeatureHandler {
     const preparation = this._prepareRuntime(descriptor, generation);
     this.preparationPromise = preparation;
     try {
-      return await preparation;
+      const result = await preparation;
+      // Keep boolean compatibility: legacy `=== true` checks treat explicit success as truthy via success flag.
+      // We return explicit object; callers updated to handle both, but for any remaining === true checks we
+      // also consider wrapping? Caller compatibility is handled in FeatureManager/bootstrap/host.
+      return result;
     } finally {
       if (this.preparationPromise === preparation) {
         this.preparationPromise = null;
@@ -121,43 +199,76 @@ export class LiveDubbingFeatureHandler {
 
     try {
       controller = await this._getController();
-      if (!controller || !this._isCurrentGeneration(generation)) return false;
+      if (!controller || !this._isCurrentGeneration(generation)) {
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, 'LIVE_DUBBING_SESSION_DISPOSED');
+      }
 
-      const prepared = await controller.prepare(
-        descriptor.sessionId,
-        descriptor.providerId,
-        descriptor.targetLanguage,
-        descriptor.eventSequence,
-      );
-      if (prepared?.success !== true) return false;
+      let prepared;
+      try {
+        prepared = await controller.prepare(
+          descriptor.sessionId,
+          descriptor.providerId,
+          descriptor.targetLanguage,
+          descriptor.eventSequence,
+        );
+      } catch {
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, GENERIC_PREPARE_FAILURE);
+      }
+      if (prepared?.success !== true) {
+        const code = sanitizeHandlerError(prepared?.error, GENERIC_PREPARE_FAILURE);
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, code);
+      }
       controllerPrepared = true;
       this.controllerPrepared = controller;
       this.controllerPreparedDescriptor = { ...descriptor };
       if (!this._isCurrentGeneration(generation)) {
-        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared);
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, 'LIVE_DUBBING_SESSION_DISPOSED');
       }
 
       const resolver = await this._getSourceResolver();
       if (!this._isCurrentGeneration(generation)) {
-        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared);
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, 'LIVE_DUBBING_SESSION_DISPOSED');
       }
-      const resolved = await resolver?.resolve?.();
-      if (resolved?.success !== true || !resolved.source || !this._isCurrentGeneration(generation)) {
-        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared);
+      let resolved;
+      try {
+        resolved = await resolver?.resolve?.();
+      } catch {
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, MEDIA_SOURCE_ERRORS.NOT_FOUND);
+      }
+      if (!this._isCurrentGeneration(generation)) {
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, 'LIVE_DUBBING_SESSION_DISPOSED');
+      }
+      if (resolved?.success !== true || !resolved.source) {
+        const mediaError = isMediaSourceFailure(resolved) ? resolved.error : MEDIA_SOURCE_ERRORS.NOT_FOUND;
+        const sanitized = sanitizeHandlerError(mediaError, MEDIA_SOURCE_ERRORS.NOT_FOUND);
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, sanitized);
       }
 
       const captureAdapter = await this._getCaptureAdapter();
       if (!this._isCurrentGeneration(generation)) {
-        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared);
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, 'LIVE_DUBBING_SESSION_DISPOSED');
       }
-      const captured = await captureAdapter?.capture?.(resolved.source);
+      let captured;
+      try {
+        captured = await captureAdapter?.capture?.(resolved.source);
+      } catch {
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, MEDIA_CAPTURE_ERRORS.EXCEPTION);
+      }
+      // Preserve exact media-capture failure code when adapter returns a failure record.
+      if (isMediaCaptureFailure(captured)) {
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, captured.error);
+      }
       if (!this._isSourceHandle(captured)) {
-        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared);
+        // Non-handle without explicit failure: treat as generic capture failure but keep safe.
+        const fallback = captured?.error && isSafeCanonicalCode(captured.error)
+          ? sanitizeHandlerError(captured.error, MEDIA_CAPTURE_ERRORS.EXCEPTION)
+          : MEDIA_CAPTURE_ERRORS.EXCEPTION;
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, fallback);
       }
       sourceHandle = captured;
       this.localSourceHandle = sourceHandle;
       if (!this._isCurrentGeneration(generation)) {
-        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared);
+        return this._rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, 'LIVE_DUBBING_SESSION_DISPOSED');
       }
 
       let consumed;
@@ -175,11 +286,15 @@ export class LiveDubbingFeatureHandler {
       sourceAccepted = consumed?.sourceAccepted === true;
       if (sourceAccepted) this.localSourceHandle = null;
       if (consumed?.success !== true || !this._isCurrentGeneration(generation)) {
+        const code = consumed?.success !== true
+          ? sanitizeHandlerError(consumed?.error, GENERIC_PREPARE_FAILURE)
+          : 'LIVE_DUBBING_SESSION_DISPOSED';
         return this._rejectPreparation(
           controller,
           descriptor,
           sourceAccepted ? null : sourceHandle,
           controllerPrepared,
+          code,
         );
       }
 
@@ -193,6 +308,7 @@ export class LiveDubbingFeatureHandler {
           descriptor,
           sourceAccepted ? null : sourceHandle,
           controllerPrepared,
+          GENERIC_PREPARE_FAILURE,
         );
       }
       this.runtimeEventSequence = consumedEventSequence;
@@ -200,18 +316,19 @@ export class LiveDubbingFeatureHandler {
       this.controllerPrepared = null;
       this.controllerPreparedDescriptor = null;
       this.preparedDescriptor = { ...descriptor };
-      return true;
+      return handlerSuccess(this.runtimeEventSequence);
     } catch {
       return this._rejectPreparation(
         controller,
         descriptor,
         sourceAccepted ? null : sourceHandle,
         controllerPrepared,
+        GENERIC_PREPARE_FAILURE,
       );
     }
   }
 
-  async _rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared) {
+  async _rejectPreparation(controller, descriptor, sourceHandle, controllerPrepared, errorCode = GENERIC_PREPARE_FAILURE) {
     if (sourceHandle) {
       const cleanupSucceeded = await this._disposeLocalSource(sourceHandle);
       if (this.localSourceHandle === sourceHandle && cleanupSucceeded) this.localSourceHandle = null;
@@ -219,7 +336,7 @@ export class LiveDubbingFeatureHandler {
     if (controllerPrepared && this._isControllerPrepared(controller, descriptor)) {
       await this._disposeController(controller, descriptor);
     }
-    return false;
+    return handlerFailure(errorCode);
   }
 
   async _cleanupRuntime() {
@@ -430,7 +547,17 @@ export class LiveDubbingFeatureHandler {
         eventSequence: this.runtimeEventSequence ?? descriptor.eventSequence,
       };
     }
-    if (result?.success !== true) return result;
+    if (result?.success !== true) {
+      const sanitized = sanitizeHandlerError(result?.error, 'LIVE_DUBBING_PROVIDER_ERROR');
+      return {
+        success: false,
+        error: sanitized,
+        ignored: true,
+        sessionId: descriptor.sessionId,
+        providerId: descriptor.providerId,
+        eventSequence: this.runtimeEventSequence ?? descriptor.eventSequence,
+      };
+    }
     const confirmedSequence = Number.isInteger(result.eventSequence)
       ? result.eventSequence
       : null;

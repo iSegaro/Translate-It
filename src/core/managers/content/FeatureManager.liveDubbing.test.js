@@ -115,13 +115,13 @@ describe('FeatureManager liveDubbing hybrid lifecycle', () => {
     manager.featureHandlers.set(LIVE_DUBBING_FEATURE_NAME, handler);
     manager.activeFeatures.add(LIVE_DUBBING_FEATURE_NAME);
 
-    await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toBe(true);
+    await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toMatchObject({ success: true });
     expect(handler.prepareRuntime).toHaveBeenCalledWith(descriptor);
-    await expect(manager.prepareFeatureRuntime('selectElement', descriptor)).resolves.toBe(false);
+    await expect(manager.prepareFeatureRuntime('selectElement', descriptor)).resolves.toMatchObject({ success: false });
     expect(handler.prepareRuntime).toHaveBeenCalledOnce();
 
     manager.activeFeatures.delete(LIVE_DUBBING_FEATURE_NAME);
-    await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toBe(false);
+    await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toMatchObject({ success: false });
     expect(handler.prepareRuntime).toHaveBeenCalledOnce();
   });
 

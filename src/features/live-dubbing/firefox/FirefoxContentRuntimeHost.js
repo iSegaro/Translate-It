@@ -33,6 +33,7 @@ import {
 } from '../handlers/LiveDubbingFeatureHandler.js';
 import {
   FIREFOX_CONTENT_ACKS,
+  FIREFOX_CONTENT_ERRORS,
   FIREFOX_CONTENT_STATUS,
   isAuthorizedFirefoxContentControlSender,
   parseFirefoxContentMessage,
@@ -41,6 +42,12 @@ import {
 
 const TERMINAL_STATUS = FIREFOX_CONTENT_STATUS.IDLE;
 const PREPARED_STATUS = FIREFOX_CONTENT_STATUS.PREPARING_CAPTURE;
+
+const ALLOWED_PREPARATION_ERRORS = new Set(FIREFOX_CONTENT_ERRORS);
+const GENERIC_PREPARATION_FAILURE = 'LIVE_DUBBING_RUNTIME_PREPARE_FAILED';
+function sanitizePreparationError(code) {
+  return typeof code === 'string' && ALLOWED_PREPARATION_ERRORS.has(code) ? code : GENERIC_PREPARATION_FAILURE;
+}
 
 function readBestEffortSessionId(message) {
   const sessionId = message?.data?.sessionId ?? message?.sessionId;
@@ -315,8 +322,11 @@ export class FirefoxLiveDubbingContentHost {
       if (!await this._requestFeatureActivation()) {
         return this._activationBlocked(data, session.eventSequence, session.status);
       }
-      if (!await this._prepareFeatureRuntime({ ...data, targetLanguage: session.targetLanguage })) {
-        return this._activationBlocked(data, session.eventSequence, session.status);
+      {
+        const preparation = await this._prepareFeatureRuntime({ ...data, targetLanguage: session.targetLanguage });
+        if (preparation?.success !== true) {
+          return this._preparationFailed(data, session.eventSequence, session.status, preparation?.error);
+        }
       }
       return this._respond({
         success: true,
@@ -384,10 +394,13 @@ export class FirefoxLiveDubbingContentHost {
     if (pending.cancelled || this.pendingPreparation !== pending || this._isTombstoned(data)) {
       return this._disposedFailure(data);
     }
-    if (!await this._prepareFeatureRuntime(data)) {
-      return pending.cancelled || this._isTombstoned(data)
-        ? this._disposedFailure(data)
-        : this._activationBlocked(data, data.eventSequence, TERMINAL_STATUS);
+    {
+      const preparation = await this._prepareFeatureRuntime(data);
+      if (preparation?.success !== true) {
+        return pending.cancelled || this._isTombstoned(data)
+          ? this._disposedFailure(data)
+          : this._preparationFailed(data, data.eventSequence, TERMINAL_STATUS, preparation?.error);
+      }
     }
     if (pending.cancelled || this.pendingPreparation !== pending || this._isTombstoned(data)) {
       return this._disposedFailure(data);
@@ -775,18 +788,52 @@ export class FirefoxLiveDubbingContentHost {
   /**
    * Ask only the active Live Dubbing handler to prepare its local runtime.
    * The host passes the already-validated descriptor but never inspects or
-   * owns the handler's DOM, media, or Controller resources.
+   * owns the handler's DOM, media, or Controller resources. Returns explicit
+   * {success:true,runtimeEventSequence} or {success:false,error:canonical}
+   * preserving safe scalar failure codes; never exposes raw exceptions or media.
    * @param {object} descriptor validated content descriptor
-   * @returns {Promise<boolean>}
+   * @returns {Promise<{success:boolean,error?:string,runtimeEventSequence?:number}>}
    */
   async _prepareFeatureRuntime(descriptor) {
     const lifecycle = this.featureLifecycle;
-    if (!lifecycle || typeof lifecycle.prepareRuntime !== 'function') return false;
-    try {
-      return await lifecycle.prepareRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor) === true;
-    } catch {
-      return false;
+    if (!lifecycle || typeof lifecycle.prepareRuntime !== 'function') {
+      return { success: false, error: GENERIC_PREPARATION_FAILURE };
     }
+    try {
+      const result = await lifecycle.prepareRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor);
+      if (result === true) {
+        return { success: true, runtimeEventSequence: this._readRuntimeEventSequence(descriptor.eventSequence) };
+      }
+      if (result === false) {
+        return { success: false, error: GENERIC_PREPARATION_FAILURE };
+      }
+      if (result && typeof result === 'object' && result.success === true) {
+        return result;
+      }
+      if (result && typeof result === 'object' && result.success === false) {
+        const sanitized = sanitizePreparationError(result.error);
+        return { success: false, error: sanitized };
+      }
+      return { success: false, error: GENERIC_PREPARATION_FAILURE };
+    } catch {
+      return { success: false, error: GENERIC_PREPARATION_FAILURE };
+    }
+  }
+
+  _preparationFailed(data, eventSequence, status, errorCode) {
+    const sanitized = sanitizePreparationError(errorCode);
+    return this._respond({
+      success: false,
+      error: sanitized,
+      ignored: true,
+      sessionId: data.sessionId,
+      providerId: data.providerId,
+      tabId: data.tabId,
+      frameId: data.frameId,
+      documentId: data.documentId,
+      eventSequence,
+      status,
+    });
   }
 
   /**

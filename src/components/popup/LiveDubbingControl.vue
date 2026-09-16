@@ -132,9 +132,25 @@ const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = 
   }
   const hardcoded = {
     LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
-    INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.'
+    INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.',
+    LIVE_DUBBING_MEDIA_SOURCE_NOT_FOUND: 'No media found to dub.',
+    LIVE_DUBBING_MEDIA_SOURCE_AMBIGUOUS: 'Multiple media sources found; please focus one.',
+    LIVE_DUBBING_MEDIA_CAPTURE_UNSUPPORTED: 'Media capture is not supported in this context.',
+    LIVE_DUBBING_MEDIA_CAPTURE_EXCEPTION: 'Media capture failed unexpectedly.',
+    LIVE_DUBBING_MEDIA_CAPTURE_INVALID_STREAM: 'Captured media is invalid.',
+    LIVE_DUBBING_MEDIA_CAPTURE_NO_AUDIO: 'No live audio track available for dubbing.',
+    LIVE_DUBBING_CAPTURE_FAILED: 'Capturing media failed.',
+    LIVE_DUBBING_RUNTIME_PREPARE_FAILED: 'Preparing live dubbing failed.',
+    LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE: 'Provider setup did not complete.',
+    LIVE_DUBBING_PROVIDER_ERROR: 'Provider reported an error.',
   }
   return hardcoded[error] || (typeof error === 'string' && error ? error : fallback)
+}
+
+const resolveCanonicalReason = (result) => {
+  if (!result || typeof result !== 'object') return null
+  const candidate = result.reason || result.error || result.lastError
+  return typeof candidate === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(candidate) ? candidate : null
 }
 
 const unwrap = (response) => response?.data || response || {}
@@ -171,8 +187,15 @@ const applyStatus = (response, { preserveSession = false } = {}) => {
     ERROR: sessionId.value ? 'cleanup' : 'error'
   }
   state.value = stateMap[status] || (result.error && result.success === false ? 'error' : 'idle')
-  errorMessage.value = status === 'ERROR' || result.error
-    ? getErrorMessage(descriptor.lastError || result.error)
+  const canonical = resolveCanonicalReason(result) || descriptor.lastError || result.error
+  // Always surface canonical for diagnostics; dev console gets structured reason,
+  // UI shows human-readable when known, raw canonical otherwise.
+  if (canonical && (status === 'ERROR' || result.error || result.reason)) {
+    // Minimal structured visibility for E2E/manual debugging – never leaks media/URL/credentials
+    try { console.warn('[LiveDubbing] START failure reason', canonical) } catch (_) { void _ }
+  }
+  errorMessage.value = status === 'ERROR' || result.error || result.reason
+    ? getErrorMessage(canonical)
     : ''
 }
 
@@ -215,20 +238,33 @@ const start = async () => {
       action: 'START_LIVE_DUBBING',
       data: { targetLanguage: props.targetLanguage, providerId: props.providerId }
     })
+    // Surface canonical diagnostics in dev console even on success path (no leak)
+    const unwrapDiag = response?.data || response || {}
+    const diagReason = resolveCanonicalReason(unwrapDiag) || resolveCanonicalReason(unwrapDiag.status)
+    if (diagReason) try { console.debug('[LiveDubbing] START response', diagReason) } catch (_) { void _ }
     applyStatus(response)
-    if (state.value === 'idle') state.value = 'running'
+    // Do not auto-enable Start after a failed transaction: if START returned a structured failure
+    // (success:false) we remain in error/cleanup, never flip idle→running.
+    const startedOk = unwrapDiag?.success !== false && !unwrapDiag?.error && !unwrapDiag?.reason
+    if (state.value === 'idle' && startedOk) state.value = 'running'
+    else if (unwrapDiag?.success === false) {
+      const canonical = resolveCanonicalReason(unwrapDiag)
+      if (canonical) try { console.warn('[LiveDubbing] START failure reason', canonical) } catch (_) { void _ }
+    }
   } catch (error) {
     // Preserve structured START failure context (session, cleanupPending,
     // retryable, status, safe diagnostics) so a retained session stays
     // stoppable instead of resetting to clean idle.
     const failure = error?.data || error?.response?.data
+    const canonical = resolveCanonicalReason(failure) || (typeof error?.message === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(error.message) ? error.message : null)
+    if (canonical) try { console.warn('[LiveDubbing] START failure reason', canonical) } catch (_) { void _ }
     if (failure && typeof failure === 'object') {
       applyStatus(failure, { preserveSession: true })
       if (state.value === 'idle') state.value = 'error'
-      if (!errorMessage.value) errorMessage.value = getErrorMessage(error?.message, 'Unable to start live dubbing.')
+      if (!errorMessage.value) errorMessage.value = getErrorMessage(canonical || error?.message, 'Unable to start live dubbing.')
     } else {
       state.value = 'error'
-      errorMessage.value = getErrorMessage(error?.message, 'Unable to start live dubbing.')
+      errorMessage.value = getErrorMessage(canonical || error?.message, 'Unable to start live dubbing.')
     }
   }
 }

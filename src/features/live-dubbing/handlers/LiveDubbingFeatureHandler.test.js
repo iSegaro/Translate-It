@@ -83,7 +83,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     const localDescriptor = descriptor();
     await handler.activate();
 
-    await expect(handler.prepareRuntime(localDescriptor)).resolves.toBe(true);
+    await expect(handler.prepareRuntime(localDescriptor)).resolves.toMatchObject({ success: true, runtimeEventSequence: 1 });
     expect(calls.map(([name]) => name)).toEqual([
       'prepare',
       'resolve',
@@ -97,7 +97,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
       localDescriptor.eventSequence + 1,
     );
 
-    await expect(handler.prepareRuntime({ ...localDescriptor })).resolves.toBe(true);
+    await expect(handler.prepareRuntime({ ...localDescriptor })).resolves.toMatchObject({ success: true, runtimeEventSequence: 1 });
     expect(resolver.resolve).toHaveBeenCalledOnce();
     expect(captureAdapter.capture).toHaveBeenCalledOnce();
     expect(controller.consumeSource).toHaveBeenCalledOnce();
@@ -147,7 +147,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
       captureAdapter: { capture: () => sourceHandle() },
     });
     await handler.activate();
-    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(true);
+    await expect(handler.prepareRuntime(descriptor())).resolves.toMatchObject({ success: true });
 
     await expect(handler.connectRuntime({
       ...descriptor(),
@@ -175,7 +175,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     });
     await handler.activate();
 
-    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(false);
+    await expect(handler.prepareRuntime(descriptor())).resolves.toMatchObject({ success: false });
     expect(source.dispose).toHaveBeenCalledOnce();
     expect(controller.dispose).toHaveBeenCalledOnce();
     await handler.deactivate();
@@ -201,7 +201,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     });
     await handler.activate();
 
-    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(false);
+    await expect(handler.prepareRuntime(descriptor())).resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_AUDIO_PIPELINES_FAILED' });
 
     expect(source.dispose).not.toHaveBeenCalled();
     expect(controller.dispose).toHaveBeenCalledOnce();
@@ -228,7 +228,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     const deactivation = handler.deactivate();
     resolveCapture(source);
 
-    await expect(preparation).resolves.toBe(false);
+    await expect(preparation).resolves.toMatchObject({ success: false });
     await expect(deactivation).resolves.toBe(true);
     expect(controller.consumeSource).not.toHaveBeenCalled();
     expect(source.dispose).toHaveBeenCalledOnce();
@@ -249,7 +249,7 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     });
     await handler.activate();
 
-    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(true);
+    await expect(handler.prepareRuntime(descriptor())).resolves.toMatchObject({ success: true });
     await expect(handler.deactivate()).resolves.toBe(true);
     expect(controller.dispose).toHaveBeenCalledOnce();
     expect(source.dispose).not.toHaveBeenCalled();
