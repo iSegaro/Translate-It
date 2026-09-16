@@ -73,7 +73,7 @@ async function initializeLogger(subComponent = 'Main') {
       return;
     }
 
-    // Content-runtime infrastructure bootstrap (Phase 2.5 hybrid):
+    // Content-runtime infrastructure bootstrap (Phase 4 content control):
     // browser-localized, idempotent, fail-closed host registration. No
     // feature, site, capture, provider, media, or page-world logic here.
     // Fail-closed browser gate: unknown build targets never register.

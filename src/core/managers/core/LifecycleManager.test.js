@@ -59,15 +59,17 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.has('undefined')).toBe(false)
   })
 
-  it('does not register live-dubbing routes in Firefox builds', () => {
+  it('registers Firefox public and dedicated live dubbing routes', () => {
     vi.stubGlobal('__BROWSER__', 'firefox')
     const manager = new LifecycleManager()
 
     manager.registerMessageHandlers()
 
-    expect(registeredHandlers.has(MessageActions.START_LIVE_DUBBING)).toBe(false)
-    expect(registeredHandlers.has(MessageActions.STOP_LIVE_DUBBING)).toBe(false)
-    expect(registeredHandlers.has(MessageActions.GET_LIVE_DUBBING_STATUS)).toBe(false)
+    expect(registeredHandlers.has(MessageActions.START_LIVE_DUBBING)).toBe(true)
+    expect(registeredHandlers.has(MessageActions.STOP_LIVE_DUBBING)).toBe(true)
+    expect(registeredHandlers.has(MessageActions.GET_LIVE_DUBBING_STATUS)).toBe(true)
+    expect(registeredHandlers.has('FIREFOX_CONTENT_REQUEST_PROVIDER_BOOTSTRAP')).toBe(true)
+    expect(registeredHandlers.has('FIREFOX_CONTENT_TERMINAL')).toBe(true)
     vi.unstubAllGlobals()
   })
 })

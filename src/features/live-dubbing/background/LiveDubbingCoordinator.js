@@ -23,6 +23,7 @@ import {
   createLiveDubbingProviderDiagnostic,
   createConsumeMessage,
   createDescriptor,
+  createFirefoxContentDescriptor,
   createDisposeMessage,
   createProviderConnectMessage,
   createPrepareMessage,
@@ -42,10 +43,15 @@ import {
   sanitizeDescriptor,
 } from '../contracts.js';
 import {
+  FIREFOX_CONTENT_ACKS,
+  FIREFOX_CONTENT_STATUS,
+  createFirefoxContentMessage,
   hasExactFirefoxContentEvent,
-  isAuthorizedFirefoxContentSender,
+  isExactFirefoxContentResponse,
 } from '../firefox/firefoxContentContract.js';
 import { sendFirefoxContentMessage } from '../firefox/firefoxContentAddressing.js';
+import { getTrustedFirefoxContentRuntimeIdentity } from '../firefox/FirefoxContentRuntimeRegistry.js';
+import { FIREFOX_CONTENT_BACKGROUND_ACTIONS } from '../firefox/firefoxContentRuntimeMessenger.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 const CLEANUP_LEASE_STATES = Object.freeze({
@@ -113,7 +119,8 @@ function getLeaseReasons(providerId) {
 }
 
 /**
- * Owns one Chrome tab-capture control-plane session.
+ * Owns one browser-specific Live Dubbing control-plane session. Chrome uses
+ * the offscreen/tab-capture host; Firefox uses the exact content-runtime host.
  * No media, provider bootstrap, transcript, WebSocket URL, or stream ID is
  * placed in descriptor storage or returned to UI callers.
  */
@@ -122,6 +129,12 @@ export class LiveDubbingCoordinator {
     this.browserAPI = options.browserAPI || browser;
     this.chromeAPI = options.chromeAPI || globalThis.chrome || this.browserAPI;
     this.leaseManager = options.leaseManager || offscreenRuntimeLeaseManager;
+    this.runtimeHost = options.runtimeHost
+      || (options.firefoxContentRuntimeRegistration
+        || (typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox')
+        ? LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT
+        : LIVE_DUBBING_RUNTIME_HOSTS.OFFSCREEN);
+    this.firefoxContentRuntimeRegistration = options.firefoxContentRuntimeRegistration || null;
     this.now = options.now || (() => Date.now());
     this.uuid = options.uuid || defaultUuid;
     this.log = options.logger || logger;
@@ -134,6 +147,16 @@ export class LiveDubbingCoordinator {
     this.terminalOperations = new Map();
     this.pendingStarts = new Set();
     this.bootstrapRequestSessions = new Set();
+  }
+
+  /**
+   * Attach the Background-owned Firefox discovery registry after the service
+   * worker has installed its readiness listener. The registry is deliberately
+   * replaceable so worker restart tests and recovery can use a fresh instance.
+   */
+  setFirefoxContentRuntimeRegistration(registration) {
+    this.firefoxContentRuntimeRegistration = registration || null;
+    if (registration) this.runtimeHost = LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT;
   }
 
   start(message = {}, sender = {}) {
@@ -168,7 +191,9 @@ export class LiveDubbingCoordinator {
    * cleanup, or terminal state, so mutation serialization is unaffected.
    */
   async getStatus() {
-    const available = typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
+    const available = this._isFirefoxContentRuntime()
+      ? typeof this.browserAPI?.tabs?.sendMessage === 'function'
+      : typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
     await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -339,11 +364,12 @@ export class LiveDubbingCoordinator {
    * can win while the key manager is awaiting, so the key must not be sent
    * after ownership has changed.
    */
-  isBootstrapRequestStillAuthorized(descriptor) {
+  isBootstrapRequestStillAuthorized(descriptor, sender = null) {
     if (!descriptor?.sessionId) return false;
 
     const current = this.descriptor;
     const state = this.sessionStates.get(descriptor.sessionId);
+    const firefoxContent = isFirefoxContentDescriptor(descriptor);
     return this.storageState === LIVE_DUBBING_STORAGE_STATE.PRESENT
       && current?.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
       && this._isSameDescriptorFence(current, descriptor)
@@ -351,6 +377,11 @@ export class LiveDubbingCoordinator {
       && !state?.terminalRequested
       && !this.terminalOperations.has(descriptor.sessionId)
       && isLiveDubbingProviderId(descriptor.providerId)
+      && (!firefoxContent || (
+        descriptor.providerId === LIVE_DUBBING_PROVIDER_ID
+        && (descriptor.eventSequence === 2 || descriptor.eventSequence === 3)
+        && this._hasExactFirefoxContentSender(sender, descriptor)
+      ))
       && this.bootstrapRequestSessions.has(descriptor.sessionId);
   }
 
@@ -363,6 +394,14 @@ export class LiveDubbingCoordinator {
     return isFirefoxContentDescriptor(descriptor || this.descriptor);
   }
 
+  _hasExactFirefoxContentSender(sender, descriptor) {
+    const identity = getTrustedFirefoxContentRuntimeIdentity(sender, this.browserAPI);
+    return Boolean(identity
+      && identity.tabId === descriptor?.tabId
+      && identity.frameId === descriptor?.frameId
+      && identity.documentId === descriptor?.documentId);
+  }
+
   /**
    * Targeted one-shot control send to the exact addressed Firefox document.
    * Disappearance maps to a bounded controlled failure, never a throw and
@@ -372,18 +411,32 @@ export class LiveDubbingCoordinator {
     return sendFirefoxContentMessage(this.browserAPI, descriptor, message, options);
   }
 
+  _hasExactFirefoxTerminalEvent(message, descriptor) {
+    const data = message?.data || message || {};
+    const sequenceMatches = data.eventSequence === descriptor.eventSequence
+      || (descriptor.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+        && descriptor.eventSequence === 3
+        && data.eventSequence === 2)
+      || (descriptor.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+        && descriptor.eventSequence === 2
+        && data.eventSequence === 3);
+    if (!sequenceMatches) return false;
+
+    const identityMessage = data.eventSequence === descriptor.eventSequence
+      ? message
+      : { ...message, data: { ...data, eventSequence: descriptor.eventSequence } };
+    return hasExactSessionEvent(identityMessage, descriptor)
+      && hasExactFirefoxContentEvent(identityMessage, descriptor);
+  }
+
   /**
-   * Exact-session bootstrap route scaffold for the Firefox content host.
-   * Validation only: Background minting stays authoritative (public bootstrap
-   * handling remains Chrome-gated in Phase 2) and no secret crosses here.
-   * Repeated validation preserves one-time bootstrap eligibility; atomic
-   * reservation belongs to the Phase 3 mint/delivery path.
+   * Exact-session bootstrap route for the Firefox content host. The native
+   * sender and persisted descriptor are checked before atomically reserving the
+   * one Gemini mint; no secret crosses this authorization boundary.
    */
   authorizeFirefoxContentBootstrapRequest(message = {}, sender = null) {
-    if (!isAuthorizedFirefoxContentSender(sender, this.browserAPI)) return null;
-
     const descriptor = this.descriptor;
-    const data = message?.data || message;
+    const data = message?.data || message || {};
     const state = descriptor?.sessionId
       ? this.sessionStates.get(descriptor.sessionId)
       : null;
@@ -391,20 +444,72 @@ export class LiveDubbingCoordinator {
     if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT
       || !descriptor
       || !isFirefoxContentDescriptor(descriptor)
-      || message?.action !== LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP
+      || descriptor.providerId !== LIVE_DUBBING_PROVIDER_ID
+      || descriptor.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || (descriptor.eventSequence !== 2 && descriptor.eventSequence !== 3)
+      || data.eventSequence !== 3
+      || !this._hasExactFirefoxContentSender(sender, descriptor)
+      || message?.action !== FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP
       || !state
       || state.terminalRequested
       || this.terminalOperations.has(descriptor.sessionId)
       || !this._isSameDescriptorFence(state.descriptor, descriptor)
-      || !hasExactSessionEvent(message, descriptor)
-      || !hasExactFirefoxContentEvent(message, descriptor)
+      || !hasExactSessionEvent(message, { ...descriptor, eventSequence: data.eventSequence })
+      || !hasExactFirefoxContentEvent(message, { ...descriptor, eventSequence: data.eventSequence })
       || data.providerId !== descriptor.providerId
       || data.targetLanguage !== descriptor.targetLanguage
       || this.bootstrapRequestSessions.has(descriptor.sessionId)) {
       return null;
     }
 
+    this.bootstrapRequestSessions.add(descriptor.sessionId);
     return cloneDescriptor(descriptor);
+  }
+
+  /**
+   * Authorize a Firefox content terminal without dispatching host cleanup.
+   * Native sender identity is part of the fence, so an old document cannot
+   * terminalize a newer persisted session in the same tab.
+   */
+  authorizeFirefoxContentTerminal(message = {}, sender = null) {
+    const descriptor = this.descriptor;
+    const data = message?.data || message || {};
+    if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT
+      || !descriptor
+      || !isFirefoxContentDescriptor(descriptor)
+      || descriptor.providerId !== LIVE_DUBBING_PROVIDER_ID
+      || message?.action !== FIREFOX_CONTENT_BACKGROUND_ACTIONS.TERMINAL
+      || !this._hasExactFirefoxContentSender(sender, descriptor)
+      || !this._hasExactFirefoxTerminalEvent(message, descriptor)
+      || data.sessionId !== descriptor.sessionId
+      || data.providerId !== descriptor.providerId) {
+      return null;
+    }
+
+    return this._authorizeTerminalRequest(message);
+  }
+
+  /**
+   * Consume a terminal notification from the Firefox content host. Authorization
+   * is synchronous and reserves the terminal fence before the exact persisted
+   * descriptor is used for DISPOSE, preventing a late provider notification
+   * from racing a new session.
+   */
+  handleFirefoxContentTerminal(message = {}, sender = null) {
+    const descriptor = this.authorizeFirefoxContentTerminal(message, sender);
+    if (!descriptor) return Promise.resolve(null);
+
+    const state = this.sessionStates.get(descriptor.sessionId) || null;
+    const reason = message?.data?.event || 'FIREFOX_CONTENT_TERMINAL';
+    return this._stopForSession(
+      descriptor.sessionId,
+      reason,
+      descriptor,
+      state,
+    ).then(result => ({
+      ...result,
+      terminalAuthorized: true,
+    }));
   }
 
   /**
@@ -505,6 +610,16 @@ export class LiveDubbingCoordinator {
     }
     if (!tab || !Number.isInteger(tab.id) || tab.id < 0) {
       return { success: false, error: 'TARGET_TAB_UNAVAILABLE' };
+    }
+
+    if (this._isFirefoxContentRuntime()) {
+      return this._startFirefoxTransaction({
+        message,
+        pendingStart,
+        tab,
+        providerId,
+        targetLanguage: normalizedLanguage,
+      });
     }
 
     const getMediaStreamId = this.chromeAPI?.tabCapture?.getMediaStreamId;
@@ -783,6 +898,167 @@ export class LiveDubbingCoordinator {
       if (this.sessionStates.get(descriptor.sessionId) === sessionState) {
         sessionState.leasePromise = null;
       }
+    }
+  }
+
+  /**
+   * Start the Firefox content-owned session. This is intentionally a separate
+   * transaction after shared provider/language/target admission: Firefox never
+   * acquires an offscreen lease, asks tabCapture for a stream id, or sends a
+   * Chrome offscreen message.
+   */
+  async _startFirefoxTransaction({ pendingStart, tab, providerId, targetLanguage }) {
+    if (providerId !== LIVE_DUBBING_PROVIDER_ID) {
+      return { success: false, error: 'LIVE_DUBBING_PROVIDER_UNSUPPORTED' };
+    }
+
+    const target = await this._resolveFirefoxContentTarget(tab.id, 0);
+    if (pendingStart.terminalRequested) {
+      return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
+    }
+    if (!target) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_CONTENT_UNAVAILABLE',
+        retryable: true,
+      };
+    }
+
+    const descriptor = createFirefoxContentDescriptor({
+      sessionId: pendingStart.sessionId,
+      tabId: target.tabId,
+      frameId: target.frameId,
+      documentId: target.documentId,
+      providerId,
+      targetLanguage,
+      startedAt: pendingStart.startedAt,
+    });
+    const sessionState = {
+      descriptor,
+      leasePromise: null,
+      leaseAcquired: false,
+      prepared: false,
+      terminalRequested: false,
+      cleanupCompleted: false,
+      providerDiagnostic: null,
+      cleanupFacts: null,
+    };
+    this.sessionStates.set(descriptor.sessionId, sessionState);
+
+    // Persist the complete address before the first host message. This is the
+    // authoritative restart/cleanup fence and prevents document rebinding.
+    if (!await this._writeDescriptor(descriptor)) {
+      this._forgetSessionState(descriptor.sessionId, sessionState);
+      return this._storageWriteFailure();
+    }
+
+    try {
+      if (pendingStart.terminalRequested) throw new Error('live dubbing terminal requested');
+
+      const prepareResponse = await this._sendFirefoxContent(
+        descriptor,
+        createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.PREPARE, descriptor),
+      );
+      const prepared = prepareResponse?.success === true
+        && prepareResponse.ack === FIREFOX_CONTENT_ACKS.READY
+        && isExactFirefoxContentResponse(prepareResponse, descriptor)
+        && prepareResponse.prepared === true
+        && prepareResponse.status === FIREFOX_CONTENT_STATUS.PREPARING_CAPTURE
+        && prepareResponse.runtimeEventSequence === 1;
+      if (!prepared) throw new Error(prepareResponse?.error || 'Firefox content prepare failed');
+      sessionState.prepared = true;
+
+      if (pendingStart.terminalRequested || sessionState.terminalRequested) {
+        throw new Error('live dubbing terminal requested');
+      }
+
+      // The host owns runtime sequence 1. Background persists the provider
+      // fence as sequence 2 before asking the host to connect the provider.
+      const connectingDescriptor = this._advance(
+        descriptor,
+        LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        null,
+        2,
+      );
+      if (!await this._writeDescriptor(connectingDescriptor, descriptor.sessionId, descriptor)) {
+        throw new Error('Live dubbing descriptor persistence failed');
+      }
+      sessionState.descriptor = connectingDescriptor;
+
+      const providerResponse = await this._sendFirefoxContent(
+        connectingDescriptor,
+        createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER, connectingDescriptor),
+      );
+      const providerReady = providerResponse?.success === true
+        && providerResponse.ack === FIREFOX_CONTENT_ACKS.PROVIDER_READY
+        && isExactFirefoxContentResponse(providerResponse, connectingDescriptor)
+        && providerResponse.status === FIREFOX_CONTENT_STATUS.RUNNING
+        && providerResponse.providerReady === true
+        && providerResponse.setupComplete === true
+        && providerResponse.active === true
+        && providerResponse.runtimeEventSequence === 3;
+      if (!providerReady) throw new Error(providerResponse?.error || 'Firefox provider setup failed');
+
+      if (pendingStart.terminalRequested || sessionState.terminalRequested) {
+        throw new Error('live dubbing terminal requested');
+      }
+
+      const runningDescriptor = this._advance(
+        connectingDescriptor,
+        LIVE_DUBBING_STATUS.RUNNING,
+        null,
+        3,
+      );
+      if (!await this._writeDescriptor(runningDescriptor, descriptor.sessionId, connectingDescriptor)) {
+        throw new Error('Live dubbing descriptor persistence failed');
+      }
+      sessionState.descriptor = runningDescriptor;
+      return { success: true, status: cloneDescriptor(runningDescriptor) };
+    } catch {
+      const failureCode = pendingStart.terminalRequested || sessionState.terminalRequested
+        ? 'LIVE_DUBBING_START_CANCELLED'
+        : safeFailureCode('START');
+      if (!sessionState.terminalRequested) {
+        const failedBase = sessionState.descriptor || descriptor;
+        const failedDescriptor = this._advance(failedBase, LIVE_DUBBING_STATUS.ERROR, failureCode);
+        await this._writeDescriptor(
+          failedDescriptor,
+          descriptor.sessionId,
+          failedBase,
+        ).catch(() => {});
+      }
+
+      const cleanupDescriptor = sessionState.descriptor || descriptor;
+      const cleanup = await this._awaitCleanup(
+        this._disposeAndRelease(cleanupDescriptor, { releaseLease: false }),
+        cleanupDescriptor,
+      );
+      if (!cleanup.success) {
+        this.log.warn('Live dubbing Firefox cleanup remains pending');
+        return {
+          success: false,
+          error: failureCode,
+          retryable: true,
+          cleanupPending: true,
+          status: cloneDescriptor(this.descriptor || cleanupDescriptor),
+        };
+      }
+
+      const cleared = await this._clearDescriptor(descriptor.sessionId);
+      if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE) {
+        return this._storageClearFailure(descriptor, failureCode);
+      }
+      if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.SESSION_MISMATCH) {
+        this._forgetSessionState(descriptor.sessionId, sessionState);
+        return {
+          success: false,
+          error: failureCode,
+          ignored: true,
+          status: cloneDescriptor(this.descriptor),
+        };
+      }
+      this._forgetSessionState(descriptor.sessionId, sessionState);
+      return { success: false, error: failureCode };
     }
   }
 
@@ -1072,9 +1348,19 @@ export class LiveDubbingCoordinator {
     this._trackLeaseSettlement(capturedState, capturedFacts);
 
     try {
-      const response = await this._sendOffscreen(createDisposeMessage(descriptor));
-      if (response?.ack !== 'DISPOSED'
-        || !isAcknowledgedForSession(response, 'DISPOSED', descriptor.sessionId, descriptor.providerId)
+      const response = isFirefoxContentDescriptor(descriptor)
+        ? await this._sendFirefoxContent(
+          descriptor,
+          createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.DISPOSE, descriptor),
+        )
+        : await this._sendOffscreen(createDisposeMessage(descriptor));
+      const acknowledged = isFirefoxContentDescriptor(descriptor)
+        ? response?.ack === FIREFOX_CONTENT_ACKS.DISPOSED
+          && response.success === true
+          && isExactFirefoxContentResponse(response, descriptor)
+        : response?.ack === 'DISPOSED'
+          && isAcknowledgedForSession(response, 'DISPOSED', descriptor.sessionId, descriptor.providerId);
+      if (!acknowledged
         || response.ignored === true
         || !this._isCurrentCleanup(capturedState, capturedFacts)) {
         return { success: false };
@@ -1107,6 +1393,15 @@ export class LiveDubbingCoordinator {
       this.cleanupFacts.set(sessionId, facts);
     }
     if (state) state.cleanupFacts = facts;
+
+    // Firefox has no Background-owned offscreen lease. Keep this invariant
+    // even when a stale caller supplies a releaseLease option.
+    if (isFirefoxContentDescriptor(descriptor)) {
+      facts.leaseState = CLEANUP_LEASE_STATES.ABSENT;
+      facts.leaseSettlementPromise = null;
+      facts.releasePromise = null;
+      return { state, facts };
+    }
 
     if (options.releaseLease === true) {
       facts.leaseState = CLEANUP_LEASE_STATES.ACQUIRED;
@@ -1204,6 +1499,22 @@ export class LiveDubbingCoordinator {
     const descriptor = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+
+    if (this._isFirefoxContentRuntime() || isFirefoxContentDescriptor(descriptor)) {
+      if (!descriptor) {
+        return { success: true, status: null, recovered: false, stale: false };
+      }
+      if (!isFirefoxContentDescriptor(descriptor)) {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_RUNTIME_HOST_MISMATCH',
+          retryable: true,
+          status: cloneDescriptor(descriptor),
+        };
+      }
+      return this._reconcileFirefox(descriptor);
+    }
+
     const terminalState = descriptor && this.sessionStates.get(descriptor.sessionId);
     if (terminalState?.terminalRequested && terminalState.cleanupCompleted) {
       const cleanupRetry = await this._stopDescriptor(descriptor, 'RECONCILE_CLEANUP');
@@ -1456,8 +1767,201 @@ export class LiveDubbingCoordinator {
     };
   }
 
+  /**
+   * Recover a Firefox-owned descriptor after service-worker restart. The
+   * persisted document identity is authoritative: a registry record for a
+   * newer document is stale, never a reason to rebind. Recovery only repeats
+   * the idempotent PREPARE/CONNECT control messages for the same address.
+   *
+   * Firefox content recovery is Gemini-only. A persisted non-Gemini
+   * descriptor (e.g. OpenAI) never reaches PREPARE/CONNECT_PROVIDER or any
+   * runtime activation; it routes directly to the exact content DISPOSE
+   * cleanup path. Unconfirmed cleanup retains the descriptor per the bounded
+   * terminal policy, same as any other Firefox cleanup failure.
+   */
+  async _reconcileFirefox(descriptor) {
+    if (descriptor?.providerId !== LIVE_DUBBING_PROVIDER_ID) {
+      const unsupportedState = this._rememberFirefoxSession(descriptor);
+      return this._reconcileFirefoxCleanup(
+        descriptor,
+        unsupportedState,
+        'RECONCILE_FIREFOX_PROVIDER_UNSUPPORTED',
+      );
+    }
+
+    const target = await this._resolveFirefoxContentTarget(descriptor.tabId, descriptor.frameId);
+    if (!target) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_CONTENT_UNAVAILABLE',
+        retryable: true,
+        cleanupPending: true,
+        status: cloneDescriptor(descriptor),
+        recovered: false,
+      };
+    }
+    if (target.tabId !== descriptor.tabId
+      || target.frameId !== descriptor.frameId
+      || target.documentId !== descriptor.documentId) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_STALE_DOCUMENT',
+        retryable: true,
+        cleanupPending: true,
+        status: cloneDescriptor(descriptor),
+        recovered: false,
+      };
+    }
+
+    const state = this._rememberFirefoxSession(descriptor);
+    if (state.terminalRequested
+      || [LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR].includes(descriptor.status)) {
+      return this._reconcileFirefoxCleanup(descriptor, state, 'RECONCILE_FIREFOX_CLEANUP');
+    }
+
+    if (descriptor.status === LIVE_DUBBING_STATUS.PREPARING_CAPTURE) {
+      const prepareResponse = await this._sendFirefoxContent(
+        descriptor,
+        createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.PREPARE, descriptor),
+      );
+      const prepared = prepareResponse?.success === true
+        && prepareResponse.ack === FIREFOX_CONTENT_ACKS.READY
+        && isExactFirefoxContentResponse(prepareResponse, descriptor)
+        && prepareResponse.prepared === true
+        && ((prepareResponse.status === FIREFOX_CONTENT_STATUS.PREPARING_CAPTURE
+          && prepareResponse.runtimeEventSequence === 1)
+          || (prepareResponse.status === FIREFOX_CONTENT_STATUS.RUNNING
+            && prepareResponse.runtimeEventSequence === 3));
+      if (!prepared) {
+        return this._reconcileFirefoxCleanup(descriptor, state, 'RECONCILE_FIREFOX_PREPARE_FAILED');
+      }
+      state.prepared = true;
+      const connecting = this._advance(
+        descriptor,
+        LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        null,
+        2,
+      );
+      if (!await this._writeDescriptor(connecting, descriptor.sessionId, descriptor)) {
+        return this._storageWriteFailure();
+      }
+      state.descriptor = connecting;
+      descriptor = connecting;
+    }
+
+    if (descriptor.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER) {
+      const providerResponse = await this._sendFirefoxContent(
+        descriptor,
+        createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER, descriptor),
+      );
+      const providerReady = providerResponse?.success === true
+        && providerResponse.ack === FIREFOX_CONTENT_ACKS.PROVIDER_READY
+        && isExactFirefoxContentResponse(providerResponse, descriptor)
+        && providerResponse.status === FIREFOX_CONTENT_STATUS.RUNNING
+        && providerResponse.providerReady === true
+        && providerResponse.setupComplete === true
+        && providerResponse.active === true
+        && providerResponse.runtimeEventSequence === 3;
+      if (!providerReady) {
+        return this._reconcileFirefoxCleanup(descriptor, state, 'RECONCILE_FIREFOX_PROVIDER_FAILED');
+      }
+
+      const running = this._advance(
+        descriptor,
+        LIVE_DUBBING_STATUS.RUNNING,
+        null,
+        3,
+      );
+      if (!await this._writeDescriptor(running, descriptor.sessionId, descriptor)) {
+        return this._storageWriteFailure();
+      }
+      state.descriptor = running;
+      return { success: true, status: cloneDescriptor(running), recovered: true };
+    }
+
+    if (descriptor.status === LIVE_DUBBING_STATUS.RUNNING) {
+      const statusResponse = await this._queryStatus(descriptor, descriptor.sessionId, descriptor.providerId);
+      const active = statusResponse?.success === true
+        && isExactFirefoxContentResponse(statusResponse, descriptor)
+        && statusResponse.status === FIREFOX_CONTENT_STATUS.RUNNING
+        && statusResponse.active === true
+        && statusResponse.prepared === true
+        && statusResponse.runtimeEventSequence === 3;
+      if (active) {
+        state.prepared = true;
+        return { success: true, status: cloneDescriptor(descriptor), recovered: true };
+      }
+
+      const inactive = statusResponse?.success === true
+        && isExactFirefoxContentResponse(statusResponse, descriptor)
+        && (statusResponse.active === false || statusResponse.status === FIREFOX_CONTENT_STATUS.IDLE);
+      if (statusResponse?.error === 'LIVE_DUBBING_CONTENT_UNAVAILABLE') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_CONTENT_UNAVAILABLE',
+          retryable: true,
+          cleanupPending: true,
+          status: cloneDescriptor(descriptor),
+          recovered: false,
+        };
+      }
+      if (inactive) {
+        return this._reconcileFirefoxCleanup(descriptor, state, 'RECONCILE_FIREFOX_STATUS');
+      }
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_MISMATCH',
+        retryable: true,
+        cleanupPending: true,
+        status: cloneDescriptor(descriptor),
+        recovered: false,
+      };
+    }
+
+    return this._reconcileFirefoxCleanup(descriptor, state, 'RECONCILE_FIREFOX_UNKNOWN_STATE');
+  }
+
+  _reconcileFirefoxCleanup(descriptor, state, reason) {
+    return this._stopDescriptor(descriptor, reason).then(result => ({
+      ...result,
+      recovered: false,
+    }));
+  }
+
+  _rememberFirefoxSession(descriptor) {
+    const current = this.sessionStates.get(descriptor.sessionId);
+    if (current) {
+      current.descriptor = descriptor;
+      current.leaseAcquired = false;
+      current.leasePromise = null;
+      current.prepared = descriptor.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE;
+      current.cleanupCompleted = false;
+      return current;
+    }
+
+    const state = {
+      descriptor,
+      leasePromise: null,
+      leaseAcquired: false,
+      prepared: descriptor.status !== LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      terminalRequested: [LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR]
+        .includes(descriptor.status),
+      cleanupCompleted: false,
+      providerDiagnostic: null,
+      cleanupFacts: null,
+    };
+    this.sessionStates.set(descriptor.sessionId, state);
+    return state;
+  }
+
   async _queryStatus(descriptor, sessionId, providerId = descriptor?.providerId) {
     try {
+      if (isFirefoxContentDescriptor(descriptor)) {
+        return this._sendFirefoxContent(
+          descriptor,
+          createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.STATUS, descriptor),
+        );
+      }
       const response = await this._sendOffscreen(
         descriptor?.sessionId === sessionId
           ? createStatusMessage(descriptor)
@@ -1592,6 +2096,41 @@ export class LiveDubbingCoordinator {
     }
   }
 
+  _isFirefoxContentRuntime() {
+    return this.runtimeHost === LIVE_DUBBING_RUNTIME_HOSTS.FIREFOX_CONTENT;
+  }
+
+  async _resolveFirefoxContentTarget(tabId, frameId = 0) {
+    const registration = this.firefoxContentRuntimeRegistration;
+    if (!registration
+      || !Number.isInteger(tabId) || tabId < 0
+      || !Number.isInteger(frameId) || frameId < 0) return null;
+
+    try {
+      const registered = registration.get?.(tabId, frameId);
+      if (registered) return this._sanitizeFirefoxContentTarget(registered, tabId, frameId);
+
+      const discovered = await registration.discover?.(tabId, frameId);
+      return this._sanitizeFirefoxContentTarget(discovered, tabId, frameId);
+    } catch {
+      return null;
+    }
+  }
+
+  _sanitizeFirefoxContentTarget(target, tabId, frameId) {
+    if (!target
+      || target.tabId !== tabId
+      || target.frameId !== frameId
+      || typeof target.documentId !== 'string'
+      || !target.documentId.trim()
+      || target.documentId.trim().length > 256) return null;
+    return {
+      tabId,
+      frameId,
+      documentId: target.documentId.trim(),
+    };
+  }
+
   _isSessionMismatch(response, sessionId, providerId) {
     return Boolean(response && (
       response.sessionId !== sessionId
@@ -1681,8 +2220,12 @@ export class LiveDubbingCoordinator {
       }
     } else {
       if (typeof this.browserAPI.tabs?.query !== 'function') return null;
-      const tabs = await this.browserAPI.tabs.query({ active: true, currentWindow: true });
-      tab = tabs?.[0] || null;
+      try {
+        const tabs = await this.browserAPI.tabs.query({ active: true, currentWindow: true });
+        tab = tabs?.[0] || null;
+      } catch {
+        tab = null;
+      }
     }
 
     if (pendingStart && Number.isInteger(tab?.id) && tab.id >= 0) {

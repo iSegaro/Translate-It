@@ -97,6 +97,7 @@ describe('Firefox content host feature activation', () => {
     const host = createHost(lifecycle);
 
     const first = await host.handle(prepareMessage(), backgroundSender);
+    if (!first.success) throw new Error(`DEBUG PREPARE ${JSON.stringify(first)} ${JSON.stringify(host.session)}`);
     expect(first).toMatchObject({ success: true, ack: 'READY', active: true, prepared: true });
     expect(lifecycle.requestActivation).toHaveBeenCalledTimes(1);
     expect(lifecycle.requestActivation).toHaveBeenCalledWith(LIVE_DUBBING_FEATURE_NAME);

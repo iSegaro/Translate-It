@@ -1,5 +1,5 @@
 // src/core/content-scripts/contentRuntimeBootstrap.js
-// Generic content-runtime infrastructure bootstrap (Phase 2.5 hybrid).
+// Generic content-runtime infrastructure bootstrap (Phase 4 content control).
 //
 // Single generic entry for browser-localized host registration in content
 // compartments. Idempotent, fail-closed, and side-effect-free at import:
@@ -16,6 +16,7 @@
 
 import { FirefoxLiveDubbingContentHost } from '@/features/live-dubbing/firefox/FirefoxContentRuntimeHost.js';
 import { registerFirefoxLiveDubbingContentRuntime } from '@/features/live-dubbing/firefox/registerFirefoxContentRuntime.js';
+import { createFirefoxContentRuntimeMessenger } from '@/features/live-dubbing/firefox/firefoxContentRuntimeMessenger.js';
 import { LIVE_DUBBING_FEATURE_NAME } from '@/features/live-dubbing/handlers/LiveDubbingFeatureHandler.js';
 
 const FIREFOX_BROWSER_NAME = 'firefox';
@@ -70,15 +71,21 @@ function getFeatureManagerInstance() {
  * `prepareRuntime` is deliberately limited to the active Live Dubbing
  * handler; it never exposes generic feature invocation through the host seam.
  */
-function createFeatureManagerLifecycle() {
+function createFeatureManagerLifecycle(browserAPI) {
+  const runtimeMessenger = createFirefoxContentRuntimeMessenger({ browserAPI });
+  const getConfiguredFeatureManager = async () => {
+    const featureManager = await getFeatureManagerInstance();
+    featureManager.setLiveDubbingRuntimeMessenger?.(runtimeMessenger);
+    return featureManager;
+  };
   return {
     requestActivation: async (featureName = LIVE_DUBBING_FEATURE_NAME) => {
-      const featureManager = await getFeatureManagerInstance();
+      const featureManager = await getConfiguredFeatureManager();
       return featureManager.requestFeatureActivation(featureName);
     },
     deactivateFeature: async (featureName = LIVE_DUBBING_FEATURE_NAME) => {
       try {
-        const featureManager = await getFeatureManagerInstance();
+        const featureManager = await getConfiguredFeatureManager();
         const deactivationSucceeded = await featureManager.deactivateFeature(featureName);
         return deactivationSucceeded === true
           && featureManager.isFeatureActive(featureName) === false;
@@ -89,7 +96,7 @@ function createFeatureManagerLifecycle() {
     prepareRuntime: async (featureName = LIVE_DUBBING_FEATURE_NAME, descriptor) => {
       if (featureName !== LIVE_DUBBING_FEATURE_NAME) return false;
       try {
-        const featureManager = await getFeatureManagerInstance();
+        const featureManager = await getConfiguredFeatureManager();
         if (typeof featureManager.prepareFeatureRuntime !== 'function') return false;
         return await featureManager.prepareFeatureRuntime(featureName, descriptor) === true;
       } catch {
@@ -102,6 +109,25 @@ function createFeatureManagerLifecycle() {
         return manager?.isFeatureActive?.(featureName) === true;
       } catch {
         return false;
+      }
+    },
+    connectFeatureRuntime: async (featureName = LIVE_DUBBING_FEATURE_NAME, descriptor) => {
+      try {
+        const featureManager = await getConfiguredFeatureManager();
+        if (typeof featureManager.connectFeatureRuntime !== 'function') {
+          return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED', ignored: true };
+        }
+        return featureManager.connectFeatureRuntime(featureName, descriptor);
+      } catch {
+        return { success: false, error: 'LIVE_DUBBING_PROVIDER_ERROR', ignored: true };
+      }
+    },
+    getRuntimeEventSequence: (featureName = LIVE_DUBBING_FEATURE_NAME) => {
+      try {
+        const manager = featureManagerModule?.FeatureManager?.getInstance?.();
+        return manager?.getLiveDubbingRuntimeEventSequence?.(featureName) ?? null;
+      } catch {
+        return null;
       }
     },
   };
@@ -134,7 +160,7 @@ export function bootstrapContentRuntimeInfrastructure(options = {}) {
     return activeBootstrap;
   }
 
-  const featureLifecycle = options.featureLifecycle || createFeatureManagerLifecycle();
+  const featureLifecycle = options.featureLifecycle || createFeatureManagerLifecycle(browserAPI);
   const host = options.host
     || new FirefoxLiveDubbingContentHost({ browserAPI, featureLifecycle });
   const unregisterRegistration = registerFirefoxLiveDubbingContentRuntime({ browserAPI, host });

@@ -3,6 +3,11 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { LIVE_DUBBING_ACTIONS } from '../constants.js';
 import { FIREFOX_CONTENT_TARGET } from './firefoxContentContract.js';
+import {
+  createFirefoxContentRuntimeDiscoveryMessage,
+  FIREFOX_CONTENT_RUNTIME_ACTIONS,
+  FIREFOX_CONTENT_RUNTIME_TARGET,
+} from './firefoxContentRuntimeContract.js';
 import { FirefoxLiveDubbingContentHost } from './FirefoxContentRuntimeHost.js';
 import { registerFirefoxLiveDubbingContentRuntime } from './registerFirefoxContentRuntime.js';
 
@@ -11,6 +16,10 @@ import { registerFirefoxLiveDubbingContentRuntime } from './registerFirefoxConte
 const PRODUCTION_FILES = [
   'src/features/live-dubbing/firefox/FirefoxContentRuntimeHost.js',
   'src/features/live-dubbing/firefox/firefoxContentAddressing.js',
+  'src/features/live-dubbing/firefox/FirefoxContentRuntimeRegistry.js',
+  'src/features/live-dubbing/firefox/firefoxContentRuntimeContract.js',
+  'src/features/live-dubbing/firefox/firefoxContentRuntimeRegistration.js',
+  'src/features/live-dubbing/firefox/firefoxContentRuntimeMessenger.js',
   'src/features/live-dubbing/firefox/registerFirefoxContentRuntime.js',
   'src/core/content-scripts/contentRuntimeBootstrap.js',
 ];
@@ -20,6 +29,7 @@ function createRuntime() {
   return {
     id: 'extension-id',
     getURL: (path = '') => `chrome-extension://extension-id/${path}`,
+    sendMessage: vi.fn(() => Promise.resolve()),
     onMessage: {
       addListener: vi.fn(listener => listeners.add(listener)),
       removeListener: vi.fn(listener => listeners.delete(listener)),
@@ -82,6 +92,53 @@ async function emit(runtime, message, sender = { id: 'extension-id' }) {
 }
 
 describe('Firefox content runtime registration', () => {
+  it('emits readiness only after the host listener is installed', async () => {
+    const events = [];
+    const runtime = createRuntime();
+    runtime.onMessage.addListener = vi.fn(listener => {
+      events.push('listener-installed');
+      runtime.onMessage.listeners.add(listener);
+    });
+    runtime.sendMessage.mockImplementation(message => {
+      events.push('ready-emitted');
+      return Promise.resolve(message);
+    });
+
+    const unregister = registerFirefoxLiveDubbingContentRuntime({
+      browserAPI: { runtime },
+      host: createHost({ runtime }),
+    });
+    try {
+      expect(events).toEqual(['listener-installed', 'ready-emitted']);
+      expect(runtime.sendMessage).toHaveBeenCalledWith({
+        target: FIREFOX_CONTENT_RUNTIME_TARGET,
+        action: FIREFOX_CONTENT_RUNTIME_ACTIONS.READY,
+        data: {},
+      });
+    } finally {
+      unregister();
+    }
+  });
+
+  it('answers discovery through a separate nonce-bearing ready message', async () => {
+    const runtime = createRuntime();
+    const host = createHost({ runtime });
+    const unregister = registerFirefoxLiveDubbingContentRuntime({ browserAPI: { runtime }, host });
+    try {
+      runtime.sendMessage.mockClear();
+      expect(await emit(runtime, createFirefoxContentRuntimeDiscoveryMessage('nonce-1')))
+        .toBeUndefined();
+      expect(runtime.sendMessage).toHaveBeenCalledWith({
+        target: FIREFOX_CONTENT_RUNTIME_TARGET,
+        action: FIREFOX_CONTENT_RUNTIME_ACTIONS.READY,
+        data: { nonce: 'nonce-1' },
+      });
+      expect(host.session).toBeNull();
+    } finally {
+      unregister();
+    }
+  });
+
   it('owns a per-document host instead of the offscreen singleton', async () => {
     const runtime = createRuntime();
     const host = createHost({ runtime });

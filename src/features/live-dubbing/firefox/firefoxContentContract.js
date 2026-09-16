@@ -1,15 +1,17 @@
 /**
- * Phase 2 Firefox content-runtime control contract (production).
+ * Phase 4 Firefox content-runtime control contract (production).
  *
  * Closed, scalar-only control plane between the Background Coordinator
  * (authoritative) and the isolated Live Dubbing content-runtime host. This
  * module owns no capture, provider execution, site logic, media transport,
- * or page-world API: only PREPARE/STATUS/DISPOSE control data with exact
+ * or page-world API: only PREPARE/STATUS/CONNECT_PROVIDER/DISPOSE control data with exact
  * session/provider/tab/frame/document/event identity crosses it.
  *
- * CONNECT/CONSUME are deliberately absent: they imply source/provider
- * execution, which Phase 2 forbids. Bootstrap minting stays Background-side;
- * the Coordinator exposes an exact-session route scaffold only.
+ * Generic CONNECT/CONSUME are deliberately absent: they imply source/provider
+ * execution, which the content control boundary does not expose. The
+ * control-only CONNECT_PROVIDER action delegates setup to the active local
+ * runtime. Bootstrap minting stays Background-side; the Coordinator owns the
+ * exact-session route and the persisted lifecycle descriptor.
  */
 
 import {
@@ -31,17 +33,21 @@ export const FIREFOX_CONTENT_TARGET = 'live-dubbing-firefox-content';
 export const FIREFOX_CONTENT_ACTIONS = Object.freeze([
   LIVE_DUBBING_ACTIONS.PREPARE,
   LIVE_DUBBING_ACTIONS.STATUS,
+  LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER,
   LIVE_DUBBING_ACTIONS.DISPOSE,
 ]);
 
 export const FIREFOX_CONTENT_ACKS = Object.freeze({
   READY: 'READY',
+  PROVIDER_READY: 'PROVIDER_READY',
   DISPOSED: 'DISPOSED',
 });
 
 export const FIREFOX_CONTENT_STATUS = Object.freeze({
   IDLE: 'IDLE',
   PREPARING_CAPTURE: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+  CONNECTING_PROVIDER: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+  RUNNING: LIVE_DUBBING_STATUS.RUNNING,
 });
 
 /**
@@ -61,6 +67,11 @@ export const FIREFOX_CONTENT_ERRORS = Object.freeze([
   'LIVE_DUBBING_STALE_DOCUMENT',
   'LIVE_DUBBING_TARGET_LANGUAGE_MISMATCH',
   'LIVE_DUBBING_UNAUTHORIZED',
+  'LIVE_DUBBING_PROVIDER_UNAVAILABLE',
+  'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+  'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
+  'LIVE_DUBBING_PROVIDER_ERROR',
+  'LIVE_DUBBING_RUNTIME_NOT_PREPARED',
 ]);
 
 const supportedErrors = new Set(FIREFOX_CONTENT_ERRORS);
@@ -125,6 +136,9 @@ const ALLOWED_RESPONSE_KEYS = Object.freeze([
   'documentId',
   'targetLanguage',
   'eventSequence',
+  'runtimeEventSequence',
+  'providerReady',
+  'setupComplete',
   'active',
   'prepared',
   'disposed',
@@ -368,10 +382,13 @@ export function sanitizeFirefoxContentResponse(response) {
     && (typeof response.error !== 'string' || !supportedErrors.has(response.error))) return null;
   if (response.ack !== undefined
     && response.ack !== FIREFOX_CONTENT_ACKS.READY
+    && response.ack !== FIREFOX_CONTENT_ACKS.PROVIDER_READY
     && response.ack !== FIREFOX_CONTENT_ACKS.DISPOSED) return null;
   if (response.status !== undefined
     && response.status !== FIREFOX_CONTENT_STATUS.IDLE
-    && response.status !== FIREFOX_CONTENT_STATUS.PREPARING_CAPTURE) return null;
+    && response.status !== FIREFOX_CONTENT_STATUS.PREPARING_CAPTURE
+    && response.status !== FIREFOX_CONTENT_STATUS.CONNECTING_PROVIDER
+    && response.status !== FIREFOX_CONTENT_STATUS.RUNNING) return null;
 
   return {
     success: response.success,
@@ -390,6 +407,13 @@ export function sanitizeFirefoxContentResponse(response) {
     ...(response.eventSequence === undefined
       ? {}
       : { eventSequence: isEventSequence(response.eventSequence) ? response.eventSequence : null }),
+    ...(response.runtimeEventSequence === undefined
+      ? {}
+      : { runtimeEventSequence: isEventSequence(response.runtimeEventSequence)
+        ? response.runtimeEventSequence
+        : null }),
+    ...(response.providerReady === undefined ? {} : { providerReady: response.providerReady === true }),
+    ...(response.setupComplete === undefined ? {} : { setupComplete: response.setupComplete === true }),
     ...(response.active === undefined ? {} : { active: response.active === true }),
     ...(response.prepared === undefined ? {} : { prepared: response.prepared === true }),
     ...(response.disposed === undefined ? {} : { disposed: response.disposed === true }),
@@ -417,5 +441,7 @@ export function isExactFirefoxContentResponse(response, descriptor) {
     && response.frameId === descriptor.frameId
     && typeof response.documentId === 'string'
     && response.documentId.trim() === descriptor.documentId.trim()
-    && (response.eventSequence === undefined || response.eventSequence === descriptor.eventSequence));
+    && (response.targetLanguage === undefined
+      || response.targetLanguage === descriptor.targetLanguage)
+    && response.eventSequence === descriptor.eventSequence);
 }

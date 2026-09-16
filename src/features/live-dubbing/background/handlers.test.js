@@ -15,6 +15,10 @@ import {
 } from './handlers.js';
 import browser from 'webextension-polyfill';
 import { liveDubbingCoordinator } from './LiveDubbingCoordinator.js';
+import {
+  FIREFOX_CONTENT_BACKGROUND_ACTIONS,
+  FIREFOX_CONTENT_BACKGROUND_TARGET,
+} from '../firefox/firefoxContentRuntimeMessenger.js';
 
 describe('live dubbing browser gate', () => {
   afterEach(() => {
@@ -22,20 +26,20 @@ describe('live dubbing browser gate', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns unsupported without routing Firefox background requests', () => {
+  it('routes Firefox public controls through the trusted UI gate', () => {
     vi.stubGlobal('__BROWSER__', 'firefox');
 
     expect(handleLiveDubbingStart()).toEqual({
       success: false,
-      error: 'LIVE_DUBBING_UNSUPPORTED',
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
     });
     expect(handleLiveDubbingStop()).toEqual({
       success: false,
-      error: 'LIVE_DUBBING_UNSUPPORTED',
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
     });
     expect(handleLiveDubbingGetStatus()).toEqual({
       success: false,
-      error: 'LIVE_DUBBING_UNSUPPORTED',
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
     });
   });
 
@@ -94,6 +98,27 @@ describe('live dubbing browser gate', () => {
       tab: { id: 42 },
     })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
     expect(start).toHaveBeenCalledTimes(2);
+  });
+
+  it('routes trusted Firefox UI controls to the Coordinator', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `moz-extension://extension-id/${path}`;
+    const start = vi.spyOn(liveDubbingCoordinator, 'start').mockResolvedValue({ success: true });
+    const stop = vi.spyOn(liveDubbingCoordinator, 'stop').mockResolvedValue({ success: true });
+    const status = vi.spyOn(liveDubbingCoordinator, 'getStatus').mockResolvedValue({ success: true });
+    const sender = {
+      id: 'extension-id',
+      url: 'moz-extension://extension-id/src/html/popup.html',
+    };
+
+    await handleLiveDubbingStart({ data: { targetLanguage: 'en' } }, sender);
+    await handleLiveDubbingStop({ data: { sessionId: 'session-1' } }, sender);
+    await handleLiveDubbingGetStatus({}, sender);
+
+    expect(start).toHaveBeenCalledOnce();
+    expect(stop).toHaveBeenCalledOnce();
+    expect(status).toHaveBeenCalledOnce();
   });
 
   it('rejects bootstrap requests from page/content senders without resolving a key', async () => {
@@ -317,5 +342,191 @@ describe('live dubbing browser gate', () => {
       success: false,
       error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
     });
+  });
+
+  it('routes an exact Firefox content bootstrap to Gemini and returns only the ephemeral token', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox');
+    browser.runtime.id = 'extension-id';
+    const descriptor = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      tabId: 7,
+      frameId: 0,
+      documentId: 'doc-1',
+      targetLanguage: 'en',
+      runtimeHost: 'firefox-content',
+      status: 'CONNECTING_PROVIDER',
+      eventSequence: 3,
+    };
+    const sender = {
+      id: 'extension-id',
+      tab: { id: 7 },
+      frameId: 0,
+      documentId: 'doc-1',
+    };
+    const authorize = vi.spyOn(liveDubbingCoordinator, 'authorizeFirefoxContentBootstrapRequest')
+      .mockReturnValue(descriptor);
+    const stillAuthorized = vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized')
+      .mockReturnValue(true);
+    geminiLiveBootstrapService.mintEphemeralToken.mockReset();
+    geminiLiveBootstrapService.mintEphemeralToken.mockResolvedValue('auth_tokens/firefox-token');
+    openAIRealtimeBootstrapService.mintClientSecret.mockClear();
+
+    const response = await handleLiveDubbingBootstrapRequest({
+      target: FIREFOX_CONTENT_BACKGROUND_TARGET,
+      action: FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        tabId: 7,
+        frameId: 0,
+        documentId: 'doc-1',
+        targetLanguage: 'en',
+        eventSequence: 3,
+      },
+    }, sender);
+
+    expect(response).toEqual({
+      success: true,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      bootstrap: { accessToken: 'auth_tokens/firefox-token' },
+    });
+    expect(Object.keys(response)).toEqual(['success', 'providerId', 'targetLanguage', 'bootstrap']);
+    expect(JSON.stringify(response)).not.toContain('apiKey');
+    expect(JSON.stringify(response)).not.toContain('secret');
+    expect(authorize).toHaveBeenCalledWith(expect.objectContaining({
+      action: FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP,
+    }), sender);
+    expect(stillAuthorized).toHaveBeenCalledWith(descriptor, sender);
+    expect(geminiLiveBootstrapService.mintEphemeralToken).toHaveBeenCalledWith('en');
+    expect(openAIRealtimeBootstrapService.mintClientSecret).not.toHaveBeenCalled();
+  });
+
+  it('reserves Firefox minting across concurrent requests and fails closed after a stop', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox');
+    browser.runtime.id = 'extension-id';
+    const descriptor = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      tabId: 7,
+      frameId: 0,
+      documentId: 'doc-1',
+      targetLanguage: 'en',
+      runtimeHost: 'firefox-content',
+      status: 'CONNECTING_PROVIDER',
+      eventSequence: 3,
+    };
+    const request = {
+      target: FIREFOX_CONTENT_BACKGROUND_TARGET,
+      action: FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        tabId: 7,
+        frameId: 0,
+        documentId: 'doc-1',
+        targetLanguage: 'en',
+        eventSequence: 3,
+      },
+    };
+    const sender = { id: 'extension-id', tab: { id: 7 }, frameId: 0, documentId: 'doc-1' };
+    const authorize = vi.spyOn(liveDubbingCoordinator, 'authorizeFirefoxContentBootstrapRequest')
+      .mockReturnValueOnce(descriptor)
+      .mockReturnValueOnce(null);
+    vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized').mockReturnValue(false);
+    let resolveMint;
+    geminiLiveBootstrapService.mintEphemeralToken.mockReset();
+    geminiLiveBootstrapService.mintEphemeralToken.mockReturnValue(new Promise(resolve => {
+      resolveMint = resolve;
+    }));
+
+    const first = handleLiveDubbingBootstrapRequest(request, sender);
+    const second = await handleLiveDubbingBootstrapRequest(request, sender);
+    expect(second).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
+    resolveMint('firefox-token-after-stop');
+    await expect(first).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(geminiLiveBootstrapService.mintEphemeralToken).toHaveBeenCalledOnce();
+  });
+
+  it('does not retry a reserved Firefox bootstrap after mint failure', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox');
+    browser.runtime.id = 'extension-id';
+    const descriptor = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      tabId: 7,
+      frameId: 0,
+      documentId: 'doc-1',
+      targetLanguage: 'en',
+      runtimeHost: 'firefox-content',
+      status: 'CONNECTING_PROVIDER',
+      eventSequence: 3,
+    };
+    const request = {
+      target: FIREFOX_CONTENT_BACKGROUND_TARGET,
+      action: FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        tabId: 7,
+        frameId: 0,
+        documentId: 'doc-1',
+        targetLanguage: 'en',
+        eventSequence: 3,
+      },
+    };
+    const sender = { id: 'extension-id', tab: { id: 7 }, frameId: 0, documentId: 'doc-1' };
+    const authorize = vi.spyOn(liveDubbingCoordinator, 'authorizeFirefoxContentBootstrapRequest')
+      .mockReturnValueOnce(descriptor)
+      .mockReturnValueOnce(null);
+    geminiLiveBootstrapService.mintEphemeralToken.mockReset();
+    geminiLiveBootstrapService.mintEphemeralToken.mockResolvedValue(null);
+
+    await expect(handleLiveDubbingBootstrapRequest(request, sender)).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+    });
+    await expect(handleLiveDubbingBootstrapRequest(request, sender)).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
+    expect(authorize).toHaveBeenCalledTimes(2);
+    expect(geminiLiveBootstrapService.mintEphemeralToken).toHaveBeenCalledOnce();
+  });
+
+  it('routes an authorized Firefox terminal into host-aware cleanup', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox');
+    browser.runtime.id = 'extension-id';
+    const terminal = vi.spyOn(liveDubbingCoordinator, 'handleFirefoxContentTerminal')
+      .mockResolvedValue({ success: true, terminalAuthorized: true, stopped: true });
+    const offscreenTerminal = vi.spyOn(liveDubbingCoordinator, 'handleOffscreenTerminal');
+
+    await expect(handleLiveDubbingStop({
+      target: FIREFOX_CONTENT_BACKGROUND_TARGET,
+      action: FIREFOX_CONTENT_BACKGROUND_ACTIONS.TERMINAL,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        tabId: 7,
+        frameId: 0,
+        documentId: 'doc-1',
+        eventSequence: 3,
+        event: 'PROVIDER_ERROR',
+        status: 'RUNNING',
+        error: 'LIVE_DUBBING_PROVIDER_ERROR',
+      },
+    }, {
+      id: 'extension-id',
+      tab: { id: 7 },
+      frameId: 0,
+      documentId: 'doc-1',
+    })).resolves.toEqual({ success: true, terminalAuthorized: true, stopped: true });
+    expect(terminal).toHaveBeenCalledOnce();
+    expect(offscreenTerminal).not.toHaveBeenCalled();
   });
 });

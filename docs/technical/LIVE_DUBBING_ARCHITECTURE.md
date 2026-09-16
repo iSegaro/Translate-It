@@ -1,20 +1,52 @@
 # Live Dubbing Architecture
 
-Chrome-only real-time tab-audio translation. Captured tab audio is delivered
-to one of two internal providers: Gemini as 16 kHz PCM with local 24 kHz PCM
-playback, or OpenAI as a browser-neutral media stream with WebRTC remote audio
-playback.
+Real-time audio translation. Chrome captures tab audio through the offscreen
+tab-capture host; Firefox Desktop captures audio from an active HTML media
+element through the content-runtime host. Captured audio is delivered to
+Gemini as 16 kHz PCM or to OpenAI as a browser-neutral media stream with
+WebRTC remote audio playback.
 
 ## Scope
 
-- **Chrome only.** Every background entry point returns
-  `LIVE_DUBBING_UNSUPPORTED` outside Chrome runtimes, and handler
-  registration is skipped on other browsers.
+- **Browser-specific hosts.** Chrome supports Gemini and OpenAI through the
+  offscreen host. Firefox Desktop supports Gemini through the content-runtime
+  host; OpenAI remains unsupported there.
 - **One active session.** `LiveDubbingCoordinator` owns a single
-  tab-capture control-plane session at a time; a second start is rejected
-  as busy.
-- **No pre-recorded or microphone input.** The only audio source is the
-  active tab's capture stream.
+  control-plane session at a time; a second start is rejected as busy.
+- **No pre-recorded or microphone input.** Chrome uses the active tab's capture stream; Firefox Desktop uses the active supported HTML media element (`<video>` / `<audio>`). No microphone input and no pre-recorded/uploaded input is supported.
+
+### Firefox Content-Runtime Registration (Phase 4, Delivery 1)
+
+Firefox exposes the content-runtime readiness/discovery seam, closed
+content-side Gemini provider control, and Background Coordinator lifecycle.
+Firefox START is restricted to trusted extension UI and Gemini. The content registration installs the
+closed Live Dubbing host listener before emitting readiness. Background keeps
+an ephemeral per-frame registry containing only native `tabId`, `frameId`, and
+`documentId`; URL, media, provider, and credential data never enter it.
+
+A new document may replace a stale registration for the same frame, but the
+registry is discovery-only and cannot rebind an active descriptor. When a
+worker has an empty registry, a bounded `tabs.sendMessage` challenge carries a
+random scalar nonce to the known top frame. Content answers separately through
+`runtime.sendMessage`; Background accepts only the active matching nonce and
+native extension sender identity. Stale/out-of-order nonces, missing document
+identity, wrong-extension senders, and subframes fail closed. The registry is
+in-memory and can be rebuilt by a later challenge after worker restart.
+
+### Firefox Content-Side Provider Control (Phase 4, Delivery 2)
+
+`CONNECT_PROVIDER` is accepted only by a prepared, active `liveDubbing` content
+runtime. It is Gemini-only, does not activate or capture, and cannot switch a
+session. The local Controller sequence is `0 → 1 → 2 → 3`; PREPARE reports the
+post-adoption scalar sequence, while CONNECT echoes its request sequence and
+returns the confirmed runtime sequence. Exact successful CONNECT retries are
+idempotent; stale, foreign, newer, and not-prepared requests fail closed.
+
+The content Handler delegates setup to the browser-neutral Controller through a
+narrow FeatureManager seam. Firefox injects only `requestBootstrap` and
+`notifyTerminal` messenger callbacks with exact scalar descriptor identity.
+Bootstrap minting remains Background-only; terminal authentication dispatches
+exact host cleanup, and OpenAI Firefox support remains deferred.
 
 ## Popup Start / Stop Flow
 
@@ -23,23 +55,24 @@ playback.
    (session id), or `GET_LIVE_DUBBING_STATUS`. All three require a trusted
    extension-UI sender (see Security).
 2. `LiveDubbingCoordinator.start()` fixes the provider identity in the pending
-   start and descriptor. An absent `providerId` defaults to `gemini`; the
-   only other supported internal id is `openai`. The dedicated Live Dubbing
-   control in the Popup has no provider selector: it forwards the persisted
-   Options choice to a new session. The Coordinator persists a
-   `PREPARING_CAPTURE` descriptor to `storage.session`, acquires the
-   provider-specific offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK` for
-   Gemini; OpenAI additionally requires `WEB_RTC`), and drives the
-   offscreen stages `PREPARE` → `CONSUME` → `CONNECT_PROVIDER`, ending in
-   `RUNNING`.
+   start and descriptor. On Chrome, an absent `providerId` defaults to `gemini`;
+   the persisted choice may also select `openai`, and the Coordinator drives
+   the offscreen stages `PREPARE` → `CONSUME` → `CONNECT_PROVIDER`. On Firefox,
+   only Gemini is admitted: the Coordinator resolves the trusted active tab's
+   exact content document, persists `PREPARING_CAPTURE` sequence 0, sends
+   `PREPARE`, persists `CONNECTING_PROVIDER` sequence 2, sends
+   `CONNECT_PROVIDER`, and persists `RUNNING` sequence 3. Firefox acquires no
+   offscreen lease and never calls tabCapture.
 3. `stop()`, tab removal, top-level navigation, capture-track end, and
-   provider terminal events all funnel into one idempotent terminal path:
-   mark terminal → `DISPOSE` the offscreen session → release the exact
-   lease → clear the descriptor. Duplicate, stale, and wrong-session
-   terminal messages are ignored without side effects.
+   provider terminal events all funnel into one idempotent terminal path. Chrome
+   disposes offscreen then releases its exact lease. Firefox sends exact
+   content-host `DISPOSE` and never releases an offscreen lease. Descriptors
+   clear only after confirmed terminal acknowledgement; duplicate, stale, and
+   wrong-session/provider terminal messages are ignored.
 4. Operation timeouts: start 30 s, stop 10 s, status 5 s, setup stages
-   10 s. Service-worker restarts reconcile via descriptor + lease snapshot
-   (`reconcile()`), never trusting a stale session.
+   10 s. Service-worker restarts reconcile via the persisted descriptor and its
+   owning host; Chrome additionally uses the lease snapshot, while Firefox
+   rediscoveries must match the persisted document and never rebind a newer one.
 5. `GET_LIVE_DUBBING_STATUS` is a read-only recovery read and is not queued
    behind START or STOP. A reopened Popup can reconstruct a persisted pending,
    connecting, stopping, or retained-error session. STOP can cancel an in-flight
@@ -66,33 +99,36 @@ playback.
 ## Runtime Ownership
 
 - `LiveDubbingCoordinator` (background) owns session identity, descriptor
-  persistence, lease acquisition/release, and terminal fencing.
-- `LiveDubbingController` (offscreen document) owns the only media,
-  provider-socket, and audio-graph resources for the current session.
+  persistence, host dispatch, and terminal fencing. Lease acquisition/release
+  belongs only to Chrome's offscreen host.
+- `LiveDubbingController` (offscreen document on Chrome, content-owned handler
+  on Firefox) owns the media, provider-socket, and audio-graph resources for
+  the current session.
   A terminal callback re-fences the session first, so late worklet and
   socket events cannot affect a subsequent session.
-- The offscreen document exists only while the lease is held; disposal
-  always precedes lease release.
-- Background handlers are the offscreen control boundary for terminal and
-  provider-bootstrap requests. Terminal notifications require the authorized
-  offscreen sender and an exact authoritative `sessionId` + `providerId` match.
-  They intentionally tolerate event-sequence drift so lifecycle races do not
-  discard a legitimate terminal signal; target language and event sequence are
-  not terminal-authorization requirements. Stale or wrong-session/provider
-  terminal notifications still fail closed and are ignored.
+- The Chrome offscreen document exists only while its lease is held; disposal
+  always precedes lease release. Firefox has no offscreen document or lease.
+- Background handlers are the host control boundary for terminal and
+  provider-bootstrap requests. Chrome requires the authorized offscreen sender;
+  Firefox requires the native content sender and exact tab/frame/document
+  identity. Firefox terminal authorization permits only the documented
+  CONNECTING_PROVIDER sequence drift; stale or wrong-session/provider
+  notifications fail closed and are ignored.
 
 ## Capture
 
-`chrome.tabCapture.getMediaStreamId` (background, authoritative tab) hands
-a one-time stream id to exactly one targeted `CONSUME` message. The
+On Chrome, `chrome.tabCapture.getMediaStreamId` (background, authoritative tab)
+hands a one-time stream id to exactly one targeted `CONSUME` message. The
 offscreen controller calls `getUserMedia` with that id; the id is never
-returned, stored, or logged.
+returned, stored, or logged. On Firefox, the content-owned handler uses the
+accepted local HTML source handle; no tabCapture, stream id, or media object
+crosses the Background boundary.
 
 - `TabAudioPipeline` verifies a fixed 16 kHz `AudioContext` and fails
   closed on any other rate.
 - The capture AudioWorklet emits fixed PCM16 mono frames of **1600
   samples (100 ms at 16 kHz)**.
-- The source graph terminates in a **zero-gain sink**, so captured tab
+- The source graph terminates in a **zero-gain sink**, so captured
   audio stays inaudible while capture runs.
 - The pipeline never connects the raw stream to the destination.
 
@@ -104,8 +140,9 @@ Popup does not select a provider; it forwards the valid persisted Options
 choice. An absent direct START `providerId` uses Gemini, while an empty or
 unknown value is rejected. Once START creates a pending descriptor, the provider,
 session id, tab id, canonical target language, and `startedAt` identity tuple
-are fixed for the session and carried through every offscreen request,
-response, terminal event, status, stop, and recovery path. Persisted
+are fixed for the session and carried through every host request, response,
+terminal event, status, stop, and recovery path. Firefox persists the exact
+frame/document address alongside the runtime-host discriminator. Persisted
 descriptors without a supported provider id are invalid and are not adopted.
 
 Provider language support is provider-local and separate from the general
@@ -120,8 +157,9 @@ their own boundaries.
 
 The one-time `LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP` request is authorized
 only for the exact active `CONNECTING_PROVIDER` session, provider, target
-language, and event sequence. Background selects the provider-specific
-bootstrap service and returns the provider-neutral DTO
+language, and event sequence. Firefox accepts the content runtime's provider
+sequence 3 request while its persisted Background fence is CONNECTING sequence
+2. Background selects the provider-specific bootstrap service and returns the provider-neutral DTO
 `{ success, providerId, targetLanguage, bootstrap }`. The generic Controller
 treats `bootstrap` as opaque; each adapter owns its local contract: Gemini
 receives `{ accessToken }` and connects to the constrained endpoint with

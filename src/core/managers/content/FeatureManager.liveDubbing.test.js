@@ -124,4 +124,35 @@ describe('FeatureManager liveDubbing hybrid lifecycle', () => {
     await expect(manager.prepareFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor)).resolves.toBe(false);
     expect(handler.prepareRuntime).toHaveBeenCalledOnce();
   });
+
+  it('exposes only the prepared Live Dubbing connect seam', async () => {
+    const manager = FeatureManager.getInstance();
+    const handler = {
+      connectRuntime: vi.fn().mockResolvedValue({ success: true, runtimeEventSequence: 3 }),
+      getRuntimeEventSequence: vi.fn(() => 1),
+    };
+    const descriptor = { sessionId: 'session-1', providerId: 'gemini', eventSequence: 2 };
+    manager.featureHandlers.set(LIVE_DUBBING_FEATURE_NAME, handler);
+    manager.activeFeatures.add(LIVE_DUBBING_FEATURE_NAME);
+
+    await expect(manager.connectFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor))
+      .resolves.toEqual({ success: true, runtimeEventSequence: 3 });
+    expect(handler.connectRuntime).toHaveBeenCalledWith(descriptor);
+    await expect(manager.connectFeatureRuntime('selectElement', descriptor))
+      .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED' });
+    expect(handler.connectRuntime).toHaveBeenCalledOnce();
+  });
+
+  it('injects the Firefox messenger only when constructing Live Dubbing', async () => {
+    const manager = FeatureManager.getInstance();
+    const messenger = {
+      requestBootstrap: vi.fn(),
+      notifyTerminal: vi.fn(),
+    };
+
+    expect(manager.setLiveDubbingRuntimeMessenger(messenger)).toBe(true);
+    const handler = await manager.loadFeatureHandler(LIVE_DUBBING_FEATURE_NAME);
+
+    expect(handler.runtimeMessenger).toBe(messenger);
+  });
 });

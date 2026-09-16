@@ -48,6 +48,10 @@ function statusMessage(overrides = {}) {
   return { ...prepareMessage(overrides), action: LIVE_DUBBING_ACTIONS.STATUS };
 }
 
+function connectMessage(overrides = {}) {
+  return { ...prepareMessage({ eventSequence: 2, ...overrides }), action: LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER };
+}
+
 function disposeMessage(overrides = {}) {
   const data = { ...prepareMessage(overrides).data };
   delete data.targetLanguage;
@@ -67,7 +71,7 @@ describe('Firefox content runtime host lifecycle', () => {
     expect(host.handles(LIVE_DUBBING_ACTIONS.PREPARE)).toBe(true);
     expect(host.handles(LIVE_DUBBING_ACTIONS.STATUS)).toBe(true);
     expect(host.handles(LIVE_DUBBING_ACTIONS.DISPOSE)).toBe(true);
-    expect(host.handles(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER)).toBe(false);
+    expect(host.handles(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER)).toBe(true);
     expect(host.handles(LIVE_DUBBING_ACTIONS.CONSUME)).toBe(false);
   });
 
@@ -89,6 +93,98 @@ describe('Firefox content runtime host lifecycle', () => {
     expect(second).toMatchObject({ success: true, ack: 'READY', idempotent: true });
     assertScalarResponse(first);
     assertScalarResponse(second);
+  });
+
+  it('connects only the prepared Gemini runtime, reports runtime sequence, and retries idempotently', async () => {
+    const lifecycle = {
+      ...createActiveLifecycle(),
+      getRuntimeEventSequence: () => 1,
+      connectFeatureRuntime: vi.fn(async () => ({
+        success: true,
+        ack: 'PROVIDER_READY',
+        eventSequence: 3,
+        runtimeEventSequence: 3,
+        setupComplete: true,
+        status: 'RUNNING',
+      })),
+    };
+    const host = createHost(lifecycle);
+
+    expect(await host.handle(prepareMessage(), backgroundSender)).toMatchObject({
+      success: true,
+      eventSequence: 0,
+      runtimeEventSequence: 1,
+    });
+    await expect(host.handle(connectMessage(), backgroundSender)).resolves.toMatchObject({
+      success: true,
+      ack: 'PROVIDER_READY',
+      eventSequence: 2,
+      runtimeEventSequence: 3,
+      status: 'RUNNING',
+    });
+    await expect(host.handle(connectMessage(), backgroundSender)).resolves.toMatchObject({
+      success: true,
+      idempotent: true,
+      runtimeEventSequence: 3,
+    });
+    expect(lifecycle.connectFeatureRuntime).toHaveBeenCalledOnce();
+
+    await expect(host.handle(statusMessage({ eventSequence: 3 }), backgroundSender)).resolves.toMatchObject({
+      success: true,
+      eventSequence: 3,
+      runtimeEventSequence: 3,
+      status: 'RUNNING',
+    });
+    await expect(host.handle(statusMessage({ eventSequence: 2 }), backgroundSender))
+      .resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+        eventSequence: 3,
+        runtimeEventSequence: 3,
+      });
+
+    await expect(host.handle(connectMessage({ eventSequence: 1 }), backgroundSender))
+      .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' });
+    await expect(host.handle(connectMessage({ eventSequence: 4 }), backgroundSender))
+      .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' });
+    await expect(host.handle(connectMessage({ documentId: 'doc-2' }), backgroundSender))
+      .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_STALE_DOCUMENT' });
+    await expect(host.handle(connectMessage({ providerId: 'openai' }), backgroundSender))
+      .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_PROVIDER_UNSUPPORTED' });
+  });
+
+  it('rejects CONNECT_PROVIDER before preparation', async () => {
+    const host = createHost({
+      ...createActiveLifecycle(),
+      connectFeatureRuntime: vi.fn(),
+    });
+    await expect(host.handle(connectMessage(), backgroundSender)).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED',
+    });
+  });
+
+  it('fences late connect completion after DISPOSE', async () => {
+    let resolveConnect;
+    const lifecycle = {
+      ...createActiveLifecycle(),
+      getRuntimeEventSequence: () => 1,
+      connectFeatureRuntime: vi.fn(() => new Promise(resolve => { resolveConnect = resolve; })),
+    };
+    const host = createHost(lifecycle);
+    await host.handle(prepareMessage(), backgroundSender);
+
+    const connecting = host.handle(connectMessage(), backgroundSender);
+    await vi.waitFor(() => expect(lifecycle.connectFeatureRuntime).toHaveBeenCalledOnce());
+    await expect(host.handle(disposeMessage(), backgroundSender)).resolves.toMatchObject({
+      success: true,
+      ack: 'DISPOSED',
+    });
+    resolveConnect({ success: true, eventSequence: 3, runtimeEventSequence: 3, setupComplete: true });
+    await expect(connecting).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_DISPOSED',
+    });
   });
 
   it('fails closed on conflicting, stale, or wrong identity', async () => {

@@ -1,8 +1,9 @@
 /**
- * Firefox Live Dubbing content-runtime host (production, Phase 2.5 hybrid).
+ * Firefox Live Dubbing content-runtime host (production, Phase 4 control).
  *
  * Per-document control host owned by the content compartment. It accepts
- * only the closed scalar PREPARE/STATUS/DISPOSE vocabulary with exact
+ * only the closed scalar PREPARE/STATUS/CONNECT_PROVIDER/DISPOSE vocabulary
+ * with exact
  * session/provider/tab/frame/document/event identity and performs no
  * capture, provider execution, site handling, media transport, or page-world
  * exposure. This instance is deliberately independent of the production
@@ -12,12 +13,16 @@
  * Feature lifecycle is never owned here: PREPARE activates the lazy
  * `liveDubbing` feature through the injected `featureLifecycle` seam and the
  * session is marked PREPARED only on confirmed activation and local runtime
- * preparation (fail closed, no partial PREPARED). DISPOSE deactivates exactly
- * once, then disposes host state. STATUS is lightweight and never activates.
+ * preparation (fail closed, no partial PREPARED). CONNECT_PROVIDER is allowed
+ * only for that prepared liveDubbing runtime and reports confirmed provider
+ * setup. The local sequence remains 0 → 1 → 2 → 3; the host never advances it
+ * from an inexact Controller result. DISPOSE deactivates exactly once, then
+ * disposes host state. STATUS is lightweight and never activates.
  */
 
 import {
   LIVE_DUBBING_ACTIONS,
+  LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 import {
@@ -98,6 +103,7 @@ export class FirefoxLiveDubbingContentHost {
   handles(action) {
     return action === LIVE_DUBBING_ACTIONS.PREPARE
       || action === LIVE_DUBBING_ACTIONS.STATUS
+      || action === LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER
       || action === LIVE_DUBBING_ACTIONS.DISPOSE;
   }
 
@@ -155,6 +161,8 @@ export class FirefoxLiveDubbingContentHost {
         return this._prepare(parsed.data);
       case LIVE_DUBBING_ACTIONS.STATUS:
         return this._status(parsed.data);
+      case LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER:
+        return this._connect(parsed.data);
       case LIVE_DUBBING_ACTIONS.DISPOSE:
         return this._dispose(parsed.data);
       default:
@@ -320,6 +328,7 @@ export class FirefoxLiveDubbingContentHost {
         documentId: session.documentId,
         targetLanguage: session.targetLanguage,
         eventSequence: session.eventSequence,
+        runtimeEventSequence: session.runtimeEventSequence,
         active: true,
         prepared: true,
         idempotent: true,
@@ -392,6 +401,7 @@ export class FirefoxLiveDubbingContentHost {
       documentId: data.documentId,
       targetLanguage: data.targetLanguage,
       eventSequence: data.eventSequence,
+      runtimeEventSequence: this._readRuntimeEventSequence(data.eventSequence),
       status: PREPARED_STATUS,
     };
     this.documentIdentity = {
@@ -410,9 +420,198 @@ export class FirefoxLiveDubbingContentHost {
       documentId: this.session.documentId,
       targetLanguage: this.session.targetLanguage,
       eventSequence: this.session.eventSequence,
+      runtimeEventSequence: this.session.runtimeEventSequence,
       active: true,
       prepared: true,
       status: this.session.status,
+    });
+  }
+
+  async _connect(data) {
+    const session = this.session;
+    if (!session || !this._isLiveDubbingActive()) {
+      return this._runtimeNotPrepared(data);
+    }
+    if (data.providerId !== LIVE_DUBBING_PROVIDER_ID) {
+      return this._respond({
+        success: false,
+        error: 'LIVE_DUBBING_PROVIDER_UNSUPPORTED',
+        ignored: true,
+        sessionId: data.sessionId,
+        providerId: data.providerId,
+        tabId: data.tabId,
+        frameId: data.frameId,
+        documentId: data.documentId,
+        eventSequence: data.eventSequence,
+        runtimeEventSequence: session.runtimeEventSequence,
+        status: session.status,
+      });
+    }
+    if (session.sessionId !== data.sessionId
+      || session.providerId !== data.providerId
+      || session.tabId !== data.tabId
+      || session.frameId !== data.frameId
+      || session.documentId !== data.documentId) {
+      return this._sessionMismatch(data);
+    }
+
+    if (session.connectResult && session.connectRequestEventSequence === data.eventSequence) {
+      return this._respond({ ...session.connectResult, idempotent: true });
+    }
+    if (session.connectResult) {
+      return this._runtimeSequenceMismatch(data, session);
+    }
+    if (session.connectPromise) {
+      if (session.connectRequestEventSequence !== data.eventSequence) {
+        return this._runtimeSequenceMismatch(data, session);
+      }
+      return session.connectPromise;
+    }
+    if (data.eventSequence !== session.runtimeEventSequence + 1) {
+      return this._runtimeSequenceMismatch(data, session);
+    }
+
+    const descriptor = {
+      ...data,
+      targetLanguage: session.targetLanguage,
+      runtimeEventSequence: session.runtimeEventSequence,
+    };
+    session.connectRequestEventSequence = data.eventSequence;
+    session.connectPromise = Promise.resolve()
+      .then(() => this._connectFeatureRuntime(descriptor))
+      .then(result => {
+        if (this.session !== session || session.connectInvalidated || this._isTombstoned(data)) {
+          return this._disposedFailure(data);
+        }
+        if (!result || result.success !== true) {
+          return this._respond({
+            success: false,
+            error: result?.error || 'LIVE_DUBBING_PROVIDER_ERROR',
+            ignored: true,
+            sessionId: data.sessionId,
+            providerId: data.providerId,
+            tabId: data.tabId,
+            frameId: data.frameId,
+            documentId: data.documentId,
+            eventSequence: data.eventSequence,
+            runtimeEventSequence: session.runtimeEventSequence,
+            status: session.status,
+          });
+        }
+        const runtimeEventSequence = Number.isInteger(result.runtimeEventSequence)
+          ? result.runtimeEventSequence
+          : Number.isInteger(result.eventSequence) ? result.eventSequence : null;
+        if (runtimeEventSequence === null
+          || runtimeEventSequence !== data.eventSequence + 1
+          || result.setupComplete !== true) {
+          return this._respond({
+            success: false,
+            error: 'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
+            ignored: true,
+            sessionId: data.sessionId,
+            providerId: data.providerId,
+            tabId: data.tabId,
+            frameId: data.frameId,
+            documentId: data.documentId,
+            eventSequence: data.eventSequence,
+            runtimeEventSequence: session.runtimeEventSequence,
+            status: session.status,
+          });
+        }
+
+        session.runtimeEventSequence = runtimeEventSequence;
+        session.status = FIREFOX_CONTENT_STATUS.RUNNING;
+        const response = {
+          success: true,
+          ack: FIREFOX_CONTENT_ACKS.PROVIDER_READY,
+          providerReady: true,
+          active: true,
+          prepared: true,
+          sessionId: session.sessionId,
+          providerId: session.providerId,
+          tabId: session.tabId,
+          frameId: session.frameId,
+          documentId: session.documentId,
+          targetLanguage: session.targetLanguage,
+          eventSequence: data.eventSequence,
+          runtimeEventSequence,
+          setupComplete: true,
+          status: session.status,
+        };
+        session.connectResult = response;
+        return this._respond(response);
+      })
+      .catch(() => this._respond({
+        success: false,
+        error: 'LIVE_DUBBING_PROVIDER_ERROR',
+        ignored: true,
+        sessionId: data.sessionId,
+        providerId: data.providerId,
+        eventSequence: data.eventSequence,
+        runtimeEventSequence: session.runtimeEventSequence,
+        status: session.status,
+      }))
+      .finally(() => {
+        session.connectPromise = null;
+      });
+    return session.connectPromise;
+  }
+
+  _connectFeatureRuntime(descriptor) {
+    const lifecycle = this.featureLifecycle;
+    if (!lifecycle || typeof lifecycle.connectFeatureRuntime !== 'function') {
+      return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED', ignored: true };
+    }
+    return lifecycle.connectFeatureRuntime(LIVE_DUBBING_FEATURE_NAME, descriptor);
+  }
+
+  _readRuntimeEventSequence(fallbackEventSequence) {
+    try {
+      const sequence = this.featureLifecycle?.getRuntimeEventSequence?.(LIVE_DUBBING_FEATURE_NAME);
+      return Number.isInteger(sequence) && sequence >= 0 ? sequence : fallbackEventSequence + 1;
+    } catch {
+      return fallbackEventSequence + 1;
+    }
+  }
+
+  _isLiveDubbingActive() {
+    try {
+      return typeof this.featureLifecycle?.isFeatureActive !== 'function'
+        || this.featureLifecycle.isFeatureActive(LIVE_DUBBING_FEATURE_NAME) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  _runtimeNotPrepared(data) {
+    return this._respond({
+      success: false,
+      error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED',
+      ignored: true,
+      sessionId: data.sessionId,
+      providerId: data.providerId,
+      tabId: data.tabId,
+      frameId: data.frameId,
+      documentId: data.documentId,
+      eventSequence: data.eventSequence,
+      runtimeEventSequence: this.session?.runtimeEventSequence ?? null,
+      status: this.session?.status || TERMINAL_STATUS,
+    });
+  }
+
+  _runtimeSequenceMismatch(data, session) {
+    return this._respond({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+      ignored: true,
+      sessionId: data.sessionId,
+      providerId: data.providerId,
+      tabId: data.tabId,
+      frameId: data.frameId,
+      documentId: data.documentId,
+      eventSequence: session.runtimeEventSequence,
+      runtimeEventSequence: session.runtimeEventSequence,
+      status: session.status,
     });
   }
 
@@ -437,8 +636,13 @@ export class FirefoxLiveDubbingContentHost {
       || session.tabId !== data.tabId) {
       return this._sessionMismatch(data);
     }
-    if (session.eventSequence !== data.eventSequence) {
-      return this._sequenceMismatch(data);
+    const statusEventSequence = session.connectResult
+      ? session.runtimeEventSequence
+      : session.eventSequence;
+    if (statusEventSequence !== data.eventSequence) {
+      return session.connectResult
+        ? this._runtimeSequenceMismatch(data, session)
+        : this._sequenceMismatch(data);
     }
 
     return this._respond({
@@ -449,7 +653,8 @@ export class FirefoxLiveDubbingContentHost {
       frameId: session.frameId,
       documentId: session.documentId,
       targetLanguage: session.targetLanguage,
-      eventSequence: session.eventSequence,
+      eventSequence: statusEventSequence,
+      runtimeEventSequence: session.runtimeEventSequence,
       active: this._activeFact(),
       prepared: true,
       status: session.status,
@@ -457,6 +662,7 @@ export class FirefoxLiveDubbingContentHost {
   }
 
   async _dispose(data) {
+    if (this.session?.connectPromise) this.session.connectInvalidated = true;
     if (this.disposedSession
       && this.disposedSession.sessionId === data.sessionId
       && this.disposedSession.providerId === data.providerId) {

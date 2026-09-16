@@ -43,6 +43,7 @@ export class FeatureManager extends ResourceTracker {
     this._activeEvaluationPromise = null;
     this._selectElementAuthorityCleanupPending = false;
     this._policyChangeCallbacks = new Set();
+    this.liveDubbingRuntimeMessenger = null;
 
     // Store singleton instance
     featureManagerInstance = this;
@@ -230,6 +231,60 @@ export class FeatureManager extends ResourceTracker {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Connect only the active, already-prepared Live Dubbing runtime. This is a
+   * dedicated lifecycle seam; it is not a generic handler method dispatcher.
+   * @param {string} featureName
+   * @param {object} descriptor validated runtime descriptor
+   * @returns {Promise<object>}
+   */
+  async connectFeatureRuntime(featureName, descriptor) {
+    if (featureName !== 'liveDubbing' || !this.activeFeatures.has(featureName)) {
+      return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED', ignored: true };
+    }
+
+    const handler = this.featureHandlers.get(featureName);
+    if (!handler || typeof handler.connectRuntime !== 'function') {
+      return { success: false, error: 'LIVE_DUBBING_RUNTIME_NOT_PREPARED', ignored: true };
+    }
+
+    try {
+      return await handler.connectRuntime(descriptor);
+    } catch {
+      return { success: false, error: 'LIVE_DUBBING_PROVIDER_ERROR', ignored: true };
+    }
+  }
+
+  /**
+   * Read the scalar Controller sequence produced by local preparation.
+   * @param {string} featureName
+   * @returns {number|null}
+   */
+  getLiveDubbingRuntimeEventSequence(featureName) {
+    if (featureName !== 'liveDubbing') return null;
+    const handler = this.featureHandlers.get(featureName);
+    return Number.isInteger(handler?.getRuntimeEventSequence?.())
+      ? handler.getRuntimeEventSequence()
+      : null;
+  }
+
+  /**
+   * Inject the Firefox boundary's two narrow Controller callbacks. Chrome
+   * construction leaves this unset and keeps its existing defaults.
+   * @param {{requestBootstrap?: Function, notifyTerminal?: Function}|null} messenger
+   * @returns {boolean}
+   */
+  setLiveDubbingRuntimeMessenger(messenger) {
+    if (!messenger
+      || typeof messenger.requestBootstrap !== 'function'
+      || typeof messenger.notifyTerminal !== 'function') {
+      this.liveDubbingRuntimeMessenger = null;
+      return false;
+    }
+    this.liveDubbingRuntimeMessenger = messenger;
+    return true;
   }
 
   async injectDependencies() {
@@ -654,7 +709,12 @@ export class FeatureManager extends ResourceTracker {
           return null;
       }
       
-      return new HandlerClass({ featureManager: this });
+      return new HandlerClass({
+        featureManager: this,
+        ...(featureName === 'liveDubbing' && this.liveDubbingRuntimeMessenger
+          ? { runtimeMessenger: this.liveDubbingRuntimeMessenger }
+          : {}),
+      });
       
     } catch (error) {
       logger.error(`Failed to load handler for feature ${featureName}:`, error);

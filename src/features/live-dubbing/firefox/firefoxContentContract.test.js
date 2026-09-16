@@ -61,29 +61,30 @@ function contentMessage(overrides = {}) {
 }
 
 describe('Firefox content contract closed vocabulary', () => {
-  it('accepts only PREPARE/STATUS/DISPOSE and omits any CONNECT scaffold', () => {
+  it('accepts only the closed PREPARE/STATUS/CONNECT_PROVIDER/DISPOSE vocabulary', () => {
     expect([...FIREFOX_CONTENT_ACTIONS]).toEqual([
       LIVE_DUBBING_ACTIONS.PREPARE,
       LIVE_DUBBING_ACTIONS.STATUS,
+      LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER,
       LIVE_DUBBING_ACTIONS.DISPOSE,
     ]);
     expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.PREPARE)).toBe(true);
     expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.STATUS)).toBe(true);
     expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.DISPOSE)).toBe(true);
-    expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER)).toBe(false);
+    expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER)).toBe(true);
     expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.CONSUME)).toBe(false);
     expect(isFirefoxContentAction(LIVE_DUBBING_ACTIONS.START)).toBe(false);
     expect(parseFirefoxContentMessage(contentMessage({}))).not.toBeNull();
     expect(parseFirefoxContentMessage({
       ...contentMessage(),
       action: LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER,
-    })).toBeNull();
+    })).not.toBeNull();
     expect(parseFirefoxContentMessage({
       ...contentMessage(),
       action: LIVE_DUBBING_ACTIONS.CONSUME,
     })).toBeNull();
-    expect(() => createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER, firefoxDescriptor()))
-      .toThrow('Unsupported Firefox content action');
+    expect(createFirefoxContentMessage(LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER, firefoxDescriptor()))
+      .toMatchObject({ action: LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER });
   });
 
   it('parses exact scalar identity and rejects unknown keys', () => {
@@ -219,6 +220,36 @@ describe('Firefox content contract closed vocabulary', () => {
       providerId: 'gemini',
     })).toBeNull();
     expect(sanitizeFirefoxContentResponse({ success: 'yes', sessionId: 'session-1' })).toBeNull();
+
+    expect(sanitizeFirefoxContentResponse({
+      success: true,
+      ack: 'PROVIDER_READY',
+      status: 'RUNNING',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      tabId: 7,
+      frameId: 0,
+      documentId: 'doc-1',
+      eventSequence: 2,
+      runtimeEventSequence: 3,
+      providerReady: true,
+      setupComplete: true,
+    })).toMatchObject({
+      ack: 'PROVIDER_READY',
+      runtimeEventSequence: 3,
+      providerReady: true,
+      setupComplete: true,
+    });
+    expect(parseFirefoxContentMessage({
+      ...contentMessage(),
+      data: { ...contentMessage().data, apiKey: 'long-lived-key' },
+    })).toBeNull();
+    expect(sanitizeFirefoxContentResponse({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      accessToken: 'ephemeral-token',
+    })).toBeNull();
   });
 
   it('never treats an inexact response as a success', () => {
@@ -239,6 +270,9 @@ describe('Firefox content contract closed vocabulary', () => {
     expect(isExactFirefoxContentResponse({ ...exact, frameId: 2 }, descriptor)).toBe(false);
     expect(isExactFirefoxContentResponse({ ...exact, sessionId: 'other' }, descriptor)).toBe(false);
     expect(isExactFirefoxContentResponse({ ...exact, eventSequence: 9 }, descriptor)).toBe(false);
+    const missingSequence = { ...exact };
+    delete missingSequence.eventSequence;
+    expect(isExactFirefoxContentResponse(missingSequence, descriptor)).toBe(false);
     expect(isExactFirefoxContentResponse(null, descriptor)).toBe(false);
   });
 });

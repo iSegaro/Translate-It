@@ -14,6 +14,7 @@ import ExtensionContextManager from '@/core/extensionContext.js'
 import { initializeBackgroundService } from './backgroundStartup.js';
 import { liveDubbingCoordinator } from '@/features/live-dubbing/background/LiveDubbingCoordinator.js';
 import { registerLiveDubbingTabLifecycle } from '@/features/live-dubbing/background/tabLifecycle.js';
+import { installFirefoxContentRuntimeRegistration } from '@/features/live-dubbing/firefox/firefoxContentRuntimeRegistration.js';
 import * as browserCapabilities from '@/core/browserHandlers.js';
 
 // Import context menu click listener
@@ -34,8 +35,28 @@ function isChromeRuntime() {
   return typeof detector === 'function' ? detector() : true;
 }
 
+function isFirefoxRuntime() {
+  if (typeof __BROWSER__ !== 'undefined') return __BROWSER__ === 'firefox';
+  const detector = Object.prototype.hasOwnProperty.call(browserCapabilities, 'isFirefox')
+    ? browserCapabilities.isFirefox
+    : null;
+  return typeof detector === 'function' ? detector() : false;
+}
+
 // Live dubbing owns tab teardown, independent of popup/sidepanel lifetime.
-if (isChromeRuntime()) registerLiveDubbingTabLifecycle();
+if (isChromeRuntime() || isFirefoxRuntime()) registerLiveDubbingTabLifecycle();
+
+// Firefox content readiness/discovery is a separate closed path. It records
+// native tab/frame/document identity and supplies the Coordinator's exact
+// host address; no media or provider payload crosses this registration path.
+const firefoxContentRuntimeRegistration = isFirefoxRuntime()
+  ? installFirefoxContentRuntimeRegistration({ browserAPI: browser })
+  : null;
+if (firefoxContentRuntimeRegistration) {
+  liveDubbingCoordinator.setFirefoxContentRuntimeRegistration(
+    firefoxContentRuntimeRegistration,
+  );
+}
 
 // Import Memory Garbage Collector
 import { initializeGlobalCleanup } from '@/core/memory/GlobalCleanup.js';
@@ -164,7 +185,7 @@ browser.runtime.onInstalled.addListener(async (details) => {
 async function postInitializeBackgroundService() {
   logger.info("[Background] Background service initialization completed!");
 
-  if (isChromeRuntime()) {
+  if (isChromeRuntime() || isFirefoxRuntime()) {
     // Service workers can restart while a capture session remains in session storage.
     await liveDubbingCoordinator.reconcile().catch(error => {
       logger.debug('[Background] Live dubbing reconciliation skipped:', error);
@@ -265,4 +286,4 @@ if (typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__
   ).catch(() => {});
 }
 
-export { backgroundService };
+export { backgroundService, firefoxContentRuntimeRegistration };

@@ -5,7 +5,9 @@
  * the closed Live Dubbing Firefox content vocabulary from the Background
  * service worker. All other traffic returns undefined so unrelated listeners
  * are unaffected. The host instance is per-document and host-owned — never
- * the production offscreen singleton — and navigation invalidates it.
+ * the production offscreen singleton — and navigation invalidates it. After
+ * the listener is installed, the content runtime sends a scalar readiness
+ * signal on the separate registration path; discovery replies use a nonce.
  *
  * No site logic, no capture, no provider execution, no media handling, and
  * no page-world API (no window globals, DOM queries, or script bridging).
@@ -15,6 +17,11 @@ import {
   FIREFOX_CONTENT_ACTIONS,
   FIREFOX_CONTENT_TARGET,
 } from './firefoxContentContract.js';
+import {
+  FIREFOX_CONTENT_RUNTIME_ACTIONS,
+  createFirefoxContentRuntimeReadyMessage,
+  parseFirefoxContentRuntimeMessage,
+} from './firefoxContentRuntimeContract.js';
 import { FirefoxLiveDubbingContentHost } from './FirefoxContentRuntimeHost.js';
 
 const supportedActions = new Set(FIREFOX_CONTENT_ACTIONS);
@@ -27,6 +34,16 @@ function resolveRuntime(browserAPI) {
       || null;
   } catch {
     return null;
+  }
+}
+
+function sendRuntimeReady(runtime, nonce = null) {
+  if (typeof runtime?.sendMessage !== 'function') return;
+  try {
+    Promise.resolve(runtime.sendMessage(createFirefoxContentRuntimeReadyMessage(nonce)))
+      .catch(() => {});
+  } catch {
+    // A disappearing worker must not affect the content host registration.
   }
 }
 
@@ -44,7 +61,13 @@ export function registerFirefoxLiveDubbingContentRuntime(options = {}) {
   const runtime = resolveRuntime(browserAPI);
   if (!runtime?.onMessage?.addListener) return () => {};
 
+  let unregistered = false;
   const listener = (message, sender) => {
+    const runtimeMessage = parseFirefoxContentRuntimeMessage(message);
+    if (runtimeMessage?.action === FIREFOX_CONTENT_RUNTIME_ACTIONS.DISCOVER) {
+      if (!unregistered) sendRuntimeReady(runtime, runtimeMessage.nonce);
+      return undefined;
+    }
     if (!message || typeof message !== 'object') return undefined;
     if (message.target !== FIREFOX_CONTENT_TARGET) return undefined;
     if (!supportedActions.has(message.action)) return undefined;
@@ -68,6 +91,8 @@ export function registerFirefoxLiveDubbingContentRuntime(options = {}) {
   };
 
   runtime.onMessage.addListener(listener);
+  // Readiness is emitted only after the closed host listener is installed.
+  sendRuntimeReady(runtime);
 
   // Navigation invalidates the old host: a stale document must never answer
   // for a session it no longer owns. Full navigations also discard this
@@ -82,7 +107,6 @@ export function registerFirefoxLiveDubbingContentRuntime(options = {}) {
     pageHideListener = null;
   }
 
-  let unregistered = false;
   return () => {
     if (unregistered) return;
     unregistered = true;

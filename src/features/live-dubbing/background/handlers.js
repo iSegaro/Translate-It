@@ -10,6 +10,10 @@ import {
   isLiveDubbingProviderId,
   isTrustedLiveDubbingUiSender,
 } from '../contracts.js';
+import {
+  FIREFOX_CONTENT_BACKGROUND_ACTIONS,
+  parseFirefoxContentBackgroundMessage,
+} from '../firefox/firefoxContentRuntimeMessenger.js';
 
 function isChromeRuntime() {
   if (typeof __BROWSER__ !== 'undefined') return __BROWSER__ === 'chrome';
@@ -17,6 +21,14 @@ function isChromeRuntime() {
     ? browserCapabilities.isChrome
     : null;
   return typeof detector === 'function' ? detector() : true;
+}
+
+function isFirefoxRuntime() {
+  if (typeof __BROWSER__ !== 'undefined') return __BROWSER__ === 'firefox';
+  const detector = Object.prototype.hasOwnProperty.call(browserCapabilities, 'isFirefox')
+    ? browserCapabilities.isFirefox
+    : null;
+  return typeof detector === 'function' ? detector() : false;
 }
 
 function unsupported() {
@@ -32,13 +44,16 @@ function isTrustedUi(sender) {
 }
 
 export function handleLiveDubbingStart(message, sender) {
-  if (!isChromeRuntime()) return unsupported();
+  if (!isChromeRuntime() && !isFirefoxRuntime()) return unsupported();
   if (!isTrustedUi(sender)) return unauthorized();
   return liveDubbingCoordinator.start(message, sender);
 }
 
 export function handleLiveDubbingStop(message, sender) {
-  if (!isChromeRuntime()) return unsupported();
+  if (message?.action === FIREFOX_CONTENT_BACKGROUND_ACTIONS.TERMINAL) {
+    return handleFirefoxContentTerminal(message, sender);
+  }
+  if (!isChromeRuntime() && !isFirefoxRuntime()) return unsupported();
   if (message?.action === LIVE_DUBBING_ACTIONS.TERMINAL) {
     if (!sender) return unauthorized();
     return liveDubbingCoordinator.handleOffscreenTerminal(message, sender);
@@ -48,7 +63,7 @@ export function handleLiveDubbingStop(message, sender) {
 }
 
 export function handleLiveDubbingGetStatus(message, sender) {
-  if (!isChromeRuntime()) return unsupported();
+  if (!isChromeRuntime() && !isFirefoxRuntime()) return unsupported();
   if (!isTrustedUi(sender)) return unauthorized();
   return liveDubbingCoordinator.getStatus();
 }
@@ -60,6 +75,9 @@ export function handleLiveDubbingGetStatus(message, sender) {
  * Long-lived keys never leave background.
  */
 export async function handleLiveDubbingBootstrapRequest(message, sender) {
+  if (message?.action === FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP) {
+    return handleFirefoxContentBootstrapRequest(message, sender);
+  }
   if (!isChromeRuntime()) return unsupported();
 
   const descriptor = await liveDubbingCoordinator.authorizeOffscreenControlMessage(
@@ -97,4 +115,57 @@ export async function handleLiveDubbingBootstrapRequest(message, sender) {
   } catch {
     return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
   }
+}
+
+/**
+ * Mint one Gemini bootstrap for the exact Firefox content runtime. The
+ * coordinator reserves the request before this await; every failure therefore
+ * remains one-shot and a stop can invalidate the post-mint fence.
+ */
+export async function handleFirefoxContentBootstrapRequest(message, sender) {
+  if (!isFirefoxRuntime()) return unsupported();
+
+  const parsed = parseFirefoxContentBackgroundMessage(message);
+  if (!parsed || parsed.action !== FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP) {
+    return unauthorized();
+  }
+
+  const descriptor = liveDubbingCoordinator.authorizeFirefoxContentBootstrapRequest(parsed, sender);
+  if (!descriptor || descriptor.providerId !== LIVE_DUBBING_PROVIDER_ID) return unauthorized();
+
+  try {
+    const { geminiLiveBootstrapService } = await import('./GeminiLiveBootstrapService.js');
+    const accessToken = await geminiLiveBootstrapService.mintEphemeralToken(descriptor.targetLanguage);
+    if (typeof accessToken !== 'string' || !accessToken) {
+      return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
+    }
+
+    if (!liveDubbingCoordinator.isBootstrapRequestStillAuthorized(descriptor, sender)) {
+      return unauthorized();
+    }
+
+    return createProviderBootstrapResponse(
+      LIVE_DUBBING_PROVIDER_ID,
+      descriptor.targetLanguage,
+      { accessToken },
+    );
+  } catch {
+    return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
+  }
+}
+
+/**
+ * Authenticate a Firefox content terminal and dispatch exact host-aware
+ * disposal. Tab-bound senders never enter the offscreen route.
+ */
+export function handleFirefoxContentTerminal(message, sender) {
+  if (!isFirefoxRuntime()) return unsupported();
+
+  const parsed = parseFirefoxContentBackgroundMessage(message);
+  if (!parsed || parsed.action !== FIREFOX_CONTENT_BACKGROUND_ACTIONS.TERMINAL) {
+    return unauthorized();
+  }
+
+  return Promise.resolve(liveDubbingCoordinator.handleFirefoxContentTerminal(parsed, sender))
+    .then(result => result || unauthorized());
 }

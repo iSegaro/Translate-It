@@ -61,8 +61,14 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
       }),
       consumeSource: vi.fn(async (...args) => {
         calls.push(['consumeSource', ...args]);
-        return { success: true, sourceAccepted: true };
+        return { success: true, sourceAccepted: true, eventSequence: 1 };
       }),
+      connectProvider: vi.fn(async () => ({
+        success: true,
+        ack: 'PROVIDER_READY',
+        eventSequence: 3,
+        setupComplete: true,
+      })),
       dispose: vi.fn(async () => ({ success: true, disposed: true })),
     };
     const resolver = { resolve: vi.fn(() => {
@@ -95,6 +101,64 @@ describe('LiveDubbingFeatureHandler lifecycle', () => {
     expect(resolver.resolve).toHaveBeenCalledOnce();
     expect(captureAdapter.capture).toHaveBeenCalledOnce();
     expect(controller.consumeSource).toHaveBeenCalledOnce();
+
+    await expect(handler.connectRuntime({
+      ...localDescriptor,
+      eventSequence: 2,
+      runtimeEventSequence: 1,
+    })).resolves.toMatchObject({
+      success: true,
+      runtimeEventSequence: 3,
+    });
+    expect(handler.getRuntimeEventSequence()).toBe(3);
+    expect(controller.connectProvider).toHaveBeenCalledWith('session-1', 'gemini', 'en', 2);
+  });
+
+  it('passes only the injected runtime callbacks to the browser-neutral Controller', async () => {
+    const requestBootstrap = vi.fn(async request => ({ request }));
+    const notifyTerminal = vi.fn(async notification => ({ notification }));
+    const handler = new LiveDubbingFeatureHandler({
+      runtimeMessenger: { requestBootstrap, notifyTerminal },
+    });
+    const controller = await handler._getController();
+    const request = { action: 'BOOTSTRAP', data: { eventSequence: 2 } };
+    const notification = { action: 'TERMINAL', data: { eventSequence: 3 } };
+
+    await expect(controller.requestBootstrap(request)).resolves.toEqual({ request });
+    await expect(controller.notify(notification)).resolves.toEqual({ notification });
+    expect(requestBootstrap).toHaveBeenCalledWith(request, null);
+    expect(notifyTerminal).toHaveBeenCalledWith(notification, null);
+  });
+
+  it('rejects a provider result that skips the next local runtime sequence', async () => {
+    const controller = {
+      prepare: vi.fn(async () => ({ success: true })),
+      consumeSource: vi.fn(async () => ({ success: true, sourceAccepted: true, eventSequence: 1 })),
+      connectProvider: vi.fn(async () => ({
+        success: true,
+        eventSequence: 9,
+        setupComplete: true,
+      })),
+      dispose: vi.fn(async () => ({ success: true, disposed: true })),
+    };
+    const handler = new LiveDubbingFeatureHandler({
+      controller,
+      resolver: { resolve: () => ({ success: true, source: 'media-element' }) },
+      captureAdapter: { capture: () => sourceHandle() },
+    });
+    await handler.activate();
+    await expect(handler.prepareRuntime(descriptor())).resolves.toBe(true);
+
+    await expect(handler.connectRuntime({
+      ...descriptor(),
+      eventSequence: 2,
+      runtimeEventSequence: 1,
+    })).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_INCOMPLETE',
+    });
+    expect(handler.getRuntimeEventSequence()).toBe(1);
+    await handler.deactivate();
   });
 
   it('disposes an unadopted source once when controller adoption rejects', async () => {

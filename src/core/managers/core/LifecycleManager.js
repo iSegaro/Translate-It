@@ -11,6 +11,7 @@ import * as browserCapabilities from '@/core/browserHandlers.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { utilsFactory } from '@/utils/UtilsFactory.js';
 import { LIVE_DUBBING_ACTIONS } from '@/features/live-dubbing/constants.js';
+import { FIREFOX_CONTENT_BACKGROUND_ACTIONS } from '@/features/live-dubbing/firefox/firefoxContentRuntimeMessenger.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'LifecycleManager');
 
@@ -20,6 +21,14 @@ function isChromeRuntime() {
     ? browserCapabilities.isChrome
     : null;
   return typeof detector === 'function' ? detector() : true;
+}
+
+function isFirefoxRuntime() {
+  if (typeof __BROWSER__ !== 'undefined') return __BROWSER__ === 'firefox';
+  const detector = Object.prototype.hasOwnProperty.call(browserCapabilities, 'isFirefox')
+    ? browserCapabilities.isFirefox
+    : null;
+  return typeof detector === 'function' ? detector() : false;
 }
 
 class LifecycleManager {
@@ -270,7 +279,7 @@ class LifecycleManager {
       [MessageActions.SUBTITLE_TRANSLATE_CANCEL]: Handlers.handleSubtitleTranslation
     };
 
-    if (isChromeRuntime()) {
+    if (isChromeRuntime() || isFirefoxRuntime()) {
       Object.assign(handlerMappings, {
         [MessageActions.START_LIVE_DUBBING]: Handlers.handleLiveDubbingStartLazy,
         [MessageActions.STOP_LIVE_DUBBING]: Handlers.handleLiveDubbingStopLazy,
@@ -280,6 +289,13 @@ class LifecycleManager {
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
         [MessageActions.LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP]: Handlers.handleLiveDubbingBootstrapRequestLazy,
         [LIVE_DUBBING_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
+      });
+    }
+
+    if (isFirefoxRuntime()) {
+      Object.assign(handlerMappings, {
+        [FIREFOX_CONTENT_BACKGROUND_ACTIONS.REQUEST_BOOTSTRAP]: Handlers.handleLiveDubbingBootstrapRequestLazy,
+        [FIREFOX_CONTENT_BACKGROUND_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
       });
     }
     
