@@ -93,9 +93,11 @@
         </div>
 
         <LiveDubbingControl
-          v-if="isLiveDubbingSupported"
+          v-if="isLiveDubbingVisible"
           :target-language="targetLanguage"
           :provider-id="liveDubbingProvider"
+          :is-supported="isLiveDubbingSupported"
+          :unsupported-reason="liveDubbingUnsupportedReason"
           @busy-change="isLiveDubbingBusy = $event"
         />
         
@@ -198,12 +200,27 @@ const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
 const isLiveDubbingBusy = ref(false)
-const isLiveDubbingSupported = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'chrome'
+// Explicit browser/provider capability at the Popup boundary (Phase 4 Firefox gate).
+// Chrome: gemini + openai supported; Firefox: gemini only; unknown: fail-closed (not visible).
+const liveDubbingBrowser = typeof __BROWSER__ !== 'undefined' ? __BROWSER__ : null
+const isLiveDubbingVisible = liveDubbingBrowser === 'chrome' || liveDubbingBrowser === 'firefox'
 const liveDubbingProvider = computed(() => (
   ['gemini', 'openai'].includes(settingsStore.settings?.LIVE_DUBBING_PROVIDER)
     ? settingsStore.settings.LIVE_DUBBING_PROVIDER
     : 'gemini'
 ))
+const isLiveDubbingSupported = computed(() => {
+  if (!isLiveDubbingVisible) return false
+  if (liveDubbingBrowser === 'firefox' && liveDubbingProvider.value === 'openai') return false
+  return true
+})
+const liveDubbingUnsupportedReason = computed(() => {
+  if (isLiveDubbingSupported.value) return ''
+  if (liveDubbingBrowser === 'firefox' && liveDubbingProvider.value === 'openai') {
+    return 'OpenAI Live Dubbing is not supported on Firefox yet.'
+  }
+  return ''
+})
 
 // Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {

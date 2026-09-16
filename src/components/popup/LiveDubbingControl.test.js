@@ -393,4 +393,329 @@ describe('LiveDubbingControl', () => {
       data: { targetLanguage: 'de', providerId: 'gemini' }
     }))
   })
+
+  // Phase 4 Firefox capability gate — Popup/UI boundary owns browser/provider check
+  // Recovery fix: STATUS always runs when visible; unsupported UI only when no session.
+  describe('Firefox capability gate (Popup/UI boundary)', () => {
+    it('Firefox+Gemini is supported: queries status and Start is usable with providerId gemini', async () => {
+      const wrapper = mount(LiveDubbingControl, {
+        props: { targetLanguage: 'de', providerId: 'gemini', isSupported: true, unsupportedReason: '' }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeUndefined()
+      sendMessage.mockClear()
+      await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'START_LIVE_DUBBING',
+        data: { targetLanguage: 'de', providerId: 'gemini' }
+      })
+    })
+
+    it('Firefox+OpenAI unsupported with no session: still queries STATUS, Start disabled, shows message, no START', async () => {
+      // No session (idle) + unsupported must still send GET and then show unsupported UI
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      // Must not silently replace persisted openai with gemini
+      expect(wrapper.props('providerId')).toBe('openai')
+      // Always queries authoritative status even when capability unsupported
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      expect(wrapper.text()).toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      const startBtn = wrapper.find('button[aria-label="Start live dubbing"]')
+      expect(startBtn.exists()).toBe(true)
+      expect(startBtn.attributes('disabled')).toBeDefined()
+      // Attempting Start must not send unsupported START to discover incompatibility
+      sendMessage.mockClear()
+      await startBtn.trigger('click')
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'START_LIVE_DUBBING' }))
+      expect(wrapper.text()).toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+    })
+
+    it('Firefox+OpenAI unsupported recovers to supported when provider flips to Gemini (queries status)', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      expect(wrapper.text()).toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      sendMessage.mockClear()
+      await wrapper.setProps({ providerId: 'gemini', isSupported: true, unsupportedReason: '' })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeUndefined()
+      expect(wrapper.text()).not.toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+    })
+
+    it('Chrome+OpenAI remains supported (normal Start)', async () => {
+      const wrapper = mount(LiveDubbingControl, {
+        props: { targetLanguage: 'de', providerId: 'openai', isSupported: true, unsupportedReason: '' }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'START_LIVE_DUBBING',
+        data: { targetLanguage: 'de', providerId: 'openai' }
+      })
+    })
+  })
+
+  // Popup recovery: Firefox+OpenAI must still allow Gemini session recovery
+  describe('Popup recovery (Firefox+OpenAI must still query STATUS)', () => {
+    it('1 Firefox+OpenAI still sends GET_LIVE_DUBBING_STATUS', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      wrapper.unmount()
+    })
+
+    it('2 no-session → unsupported disabled (shows Firefox OpenAI message, Start disabled)', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.text()).toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      const startBtn = wrapper.find('button[aria-label="Start live dubbing"]')
+      expect(startBtn.exists()).toBe(true)
+      expect(startBtn.attributes('disabled')).toBeDefined()
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Unavailable')
+      wrapper.unmount()
+    })
+
+    it('3 RUNNING Gemini shows Running+Stop even though props providerId is openai unsupported', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          return Promise.resolve({ status: { status: 'RUNNING', sessionId: 'gemini-sess-1', providerId: 'gemini' } })
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      // Authoritative Gemini session overrides capability gate
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Running')
+      expect(wrapper.text()).not.toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      const stopBtn = wrapper.find('button[aria-label="Stop live dubbing"]')
+      expect(stopBtn.exists()).toBe(true)
+      expect(stopBtn.attributes('disabled')).toBeUndefined()
+      // Start should not be shown when running
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('4 STOP sends Gemini session id (descriptor provider, not props openai)', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          return Promise.resolve({ status: { status: 'RUNNING', sessionId: 'gemini-sess-1', providerId: 'gemini' } })
+        }
+        if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      await wrapper.find('button[aria-label="Stop live dubbing"]').trigger('click')
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'STOP_LIVE_DUBBING',
+        data: { sessionId: 'gemini-sess-1' }
+      })
+      wrapper.unmount()
+    })
+
+    it('5 no START with OpenAI when unsupported (Firefox)', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      sendMessage.mockClear()
+      const startBtn = wrapper.find('button[aria-label="Start live dubbing"]')
+      await startBtn.trigger('click')
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'START_LIVE_DUBBING' }))
+      expect(sendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'GET_LIVE_DUBBING_STATUS' }) && expect.objectContaining({ data: expect.objectContaining({ providerId: 'openai' }) }))
+      wrapper.unmount()
+    })
+
+    it('6 cleanupPending remains cleanable under Firefox+OpenAI unsupported', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          return Promise.resolve({ status: { status: 'ERROR', sessionId: 'retained-gemini', providerId: 'gemini', lastError: 'Capture failed' } })
+        }
+        if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      // Must show authoritative cleanup, not unsupported
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Error')
+      expect(wrapper.text()).toContain('Capture failed')
+      expect(wrapper.text()).not.toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      const cleanupBtn = wrapper.find('button[aria-label="Clean up live dubbing"]')
+      expect(cleanupBtn.exists()).toBe(true)
+      expect(cleanupBtn.attributes('disabled')).toBeUndefined()
+      await cleanupBtn.trigger('click')
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'STOP_LIVE_DUBBING',
+        data: { sessionId: 'retained-gemini' }
+      })
+      wrapper.unmount()
+    })
+
+    it('7 OpenAI→Gemini flip with no active session returns to normal Ready flow', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = mount(LiveDubbingControl, {
+        props: {
+          targetLanguage: 'de',
+          providerId: 'openai',
+          isSupported: false,
+          unsupportedReason: 'OpenAI Live Dubbing is not supported on Firefox yet.'
+        }
+      })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.text()).toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      expect(wrapper.props('providerId')).toBe('openai')
+      sendMessage.mockClear()
+      // Flip to Gemini supported
+      await wrapper.setProps({ providerId: 'gemini', isSupported: true, unsupportedReason: '' })
+      await Promise.resolve()
+      await wrapper.vm.$nextTick()
+      // Must not silently keep unsupported UI; should be Ready and Start enabled
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Ready')
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeUndefined()
+      expect(wrapper.text()).not.toContain('OpenAI Live Dubbing is not supported on Firefox yet.')
+      // Must not silently switch persisted provider check still passes (props is gemini now, but previous openai persisted not mutated)
+      expect(wrapper.props('providerId')).toBe('gemini')
+      wrapper.unmount()
+    })
+
+    it('8 Chrome unchanged (Chrome+OpenAI normal, Chrome+Gemini normal)', async () => {
+      // Chrome+OpenAI
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        if (action === 'START_LIVE_DUBBING') return Promise.resolve({ status: { status: 'RUNNING', sessionId: 's1', providerId: 'openai' } })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const chromeOpenAI = mount(LiveDubbingControl, {
+        props: { targetLanguage: 'de', providerId: 'openai', isSupported: true, unsupportedReason: '' }
+      })
+      await Promise.resolve()
+      await chromeOpenAI.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      await chromeOpenAI.find('button[aria-label="Start live dubbing"]').trigger('click')
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'START_LIVE_DUBBING',
+        data: { targetLanguage: 'de', providerId: 'openai' }
+      })
+      chromeOpenAI.unmount()
+      sendMessage.mockClear()
+      // Chrome+Gemini
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        if (action === 'START_LIVE_DUBBING') return Promise.resolve({ status: { status: 'RUNNING', sessionId: 's2', providerId: 'gemini' } })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const chromeGemini = mount(LiveDubbingControl, {
+        props: { targetLanguage: 'de', providerId: 'gemini', isSupported: true, unsupportedReason: '' }
+      })
+      await Promise.resolve()
+      await chromeGemini.vm.$nextTick()
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'GET_LIVE_DUBBING_STATUS' })
+      await chromeGemini.find('button[aria-label="Start live dubbing"]').trigger('click')
+      expect(sendMessage).toHaveBeenCalledWith({
+        action: 'START_LIVE_DUBBING',
+        data: { targetLanguage: 'de', providerId: 'gemini' }
+      })
+      chromeGemini.unmount()
+    })
+  })
 })

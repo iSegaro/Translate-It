@@ -132,7 +132,7 @@ vi.mock('@/components/popup/TranslationForm.vue', () => ({
 vi.mock('@/components/popup/LiveDubbingControl.vue', () => ({
   default: {
     name: 'LiveDubbingControl',
-    props: ['targetLanguage', 'providerId'],
+    props: ['targetLanguage', 'providerId', 'isSupported', 'unsupportedReason'],
     template: '<div class="live-dubbing-control-stub" />'
   }
 }))
@@ -244,5 +244,118 @@ describe('PopupApp', () => {
     await flushPromises()
 
     expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('gemini')
+  })
+
+  // Phase 4 Popup UI gate — Firefox Live Dubbing (explicit browser/provider capability)
+  describe('Phase 4 Live Dubbing Popup gate', () => {
+    it('1) Chrome renders LiveDubbingControl', async () => {
+      vi.stubGlobal('__BROWSER__', 'chrome')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'gemini'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    })
+
+    it('2) Firefox renders LiveDubbingControl', async () => {
+      vi.stubGlobal('__BROWSER__', 'firefox')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'gemini'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    })
+
+    it('3) Firefox+Gemini passes providerId="gemini" and Start is supported', async () => {
+      vi.stubGlobal('__BROWSER__', 'firefox')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'gemini'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+      expect(control.exists()).toBe(true)
+      expect(control.props('providerId')).toBe('gemini')
+      expect(control.props('isSupported')).toBe(true)
+      expect(control.props('unsupportedReason')).toBe('')
+    })
+
+    it('4) Firefox+OpenAI does not silently change persisted provider (remains openai)', async () => {
+      vi.stubGlobal('__BROWSER__', 'firefox')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'openai'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+      expect(control.exists()).toBe(true)
+      expect(control.props('providerId')).toBe('openai')
+      expect(control.props('providerId')).not.toBe('gemini')
+    })
+
+    it('5) Firefox+OpenAI reports unsupported and cannot START (disabled with message)', async () => {
+      vi.stubGlobal('__BROWSER__', 'firefox')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'openai'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+      expect(control.props('isSupported')).toBe(false)
+      expect(control.props('unsupportedReason')).toBe('OpenAI Live Dubbing is not supported on Firefox yet.')
+    })
+
+    it('6) Chrome+OpenAI remains supported (unchanged)', async () => {
+      vi.stubGlobal('__BROWSER__', 'chrome')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'openai'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+      expect(control.props('providerId')).toBe('openai')
+      expect(control.props('isSupported')).toBe(true)
+      expect(control.props('unsupportedReason')).toBe('')
+    })
+
+    it('7) unknown browser does not render LiveDubbingControl (fail-closed)', async () => {
+      vi.stubGlobal('__BROWSER__', 'safari')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'gemini'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(false)
+
+      vi.stubGlobal('__BROWSER__', undefined)
+      const wrapper2 = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper2.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(false)
+    })
+
+    it('8) translation provider remains independent from Live Dubbing provider', async () => {
+      vi.stubGlobal('__BROWSER__', 'firefox')
+      mockSettingsStore.settings.TRANSLATION_API = 'google'
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'openai'
+      const wrapper = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('openai')
+      expect(wrapper.findComponent({ name: 'TranslationForm' }).props('provider')).toBe('google')
+
+      // Flip translation provider — live dubbing still openai (no silent gemini fallback)
+      mockSettingsStore.settings.TRANSLATION_API = 'deepl'
+      const wrapper2 = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper2.findComponent({ name: 'TranslationForm' }).props('provider')).toBe('deepl')
+      expect(wrapper2.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('openai')
+
+      // Flip live dubbing provider — translation stays independent
+      vi.stubGlobal('__BROWSER__', 'chrome')
+      mockSettingsStore.settings.LIVE_DUBBING_PROVIDER = 'gemini'
+      mockSettingsStore.settings.TRANSLATION_API = 'yandex'
+      const wrapper3 = mount(PopupApp)
+      await flushPromises()
+      await flushPromises()
+      expect(wrapper3.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('gemini')
+      expect(wrapper3.findComponent({ name: 'TranslationForm' }).props('provider')).toBe('yandex')
+    })
   })
 })

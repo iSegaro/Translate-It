@@ -25,7 +25,7 @@
       v-if="!isRunning && !isStopping"
       size="sm"
       :loading="isStarting"
-      :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
+      :disabled="isCapabilityUnsupported || isUnavailable || isLoading || isStopping || isCleanupPending"
       text="Start"
       aria-label="Start live dubbing"
       @click="start"
@@ -80,6 +80,18 @@ const props = defineProps({
     type: String,
     default: LIVE_DUBBING_PROVIDER_ID,
     validator: (value) => LIVE_DUBBING_PROVIDER_IDS.includes(value)
+  },
+  // Popup capability gate (Phase 4): Firefox supports Gemini only. When false,
+  // control remains visible but Start is unavailable with an explicit reason.
+  // Capability only gates new START; STATUS/STOP always use authoritative
+  // descriptor state so existing Gemini sessions remain recoverable.
+  isSupported: {
+    type: Boolean,
+    default: true
+  },
+  unsupportedReason: {
+    type: String,
+    default: ''
   }
 })
 
@@ -100,6 +112,7 @@ const isTransitioning = computed(() => isStarting.value || isStopping.value)
 const isUnavailable = computed(() => state.value === 'unavailable')
 const isLoading = computed(() => state.value === 'loading')
 const isBusy = computed(() => isTransitioning.value || isRunning.value || isCleanupPending.value)
+const isCapabilityUnsupported = computed(() => props.isSupported === false)
 const statusText = computed(() => ({
   loading: 'Checking availability…',
   idle: 'Ready',
@@ -163,18 +176,38 @@ const applyStatus = (response, { preserveSession = false } = {}) => {
     : ''
 }
 
+const syncCapabilityUnsupported = () => {
+  if (!isCapabilityUnsupported.value) return false
+  state.value = 'unavailable'
+  authoritativeStatus.value = null
+  errorMessage.value = props.unsupportedReason || 'Live dubbing is not supported in this browser.'
+  return true
+}
+
 const queryStatus = async () => {
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
     applyStatus(response)
+    // Capability only gates new START; always run STATUS when visible.
+    // Show unsupported UI only when no active/retained session exists.
+    if (isCapabilityUnsupported.value && !sessionId.value && !authoritativeStatus.value) {
+      syncCapabilityUnsupported()
+    }
   } catch (error) {
     state.value = 'unavailable'
     authoritativeStatus.value = null
     errorMessage.value = getErrorMessage(error?.message, 'Live dubbing is unavailable.')
+    if (isCapabilityUnsupported.value && !sessionId.value && !authoritativeStatus.value) {
+      syncCapabilityUnsupported()
+    }
   }
 }
 
 const start = async () => {
+  if (isCapabilityUnsupported.value) {
+    syncCapabilityUnsupported()
+    return
+  }
   state.value = 'starting'
   errorMessage.value = ''
   try {
@@ -223,7 +256,27 @@ const stop = async () => {
   }
 }
 
-onMounted(queryStatus)
+onMounted(() => {
+  queryStatus()
+})
+
+watch(() => props.isSupported, () => {
+  // Capability flip must re-query authoritative status; preserve active session UI
+  // until STATUS returns. Reset to loading only when no session exists so an
+  // OpenAI→Gemini flip with no active session refreshes to the normal Ready flow.
+  if (!sessionId.value && !authoritativeStatus.value) {
+    state.value = 'loading'
+    authoritativeStatus.value = null
+    errorMessage.value = ''
+  }
+  queryStatus()
+})
+
+watch(() => props.unsupportedReason, (reason) => {
+  if (isCapabilityUnsupported.value && !sessionId.value && !authoritativeStatus.value) {
+    errorMessage.value = reason || 'Live dubbing is not supported in this browser.'
+  }
+})
 
 watch(isBusy, (busy) => emit('busy-change', busy), { immediate: true })
 
