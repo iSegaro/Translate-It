@@ -55,6 +55,34 @@ function isCanonicalError(error) {
   return typeof error?.code === 'string' && SAFE_CANONICAL_CODE.test(error.code);
 }
 
+const OUTPUT_WORKLET_NODE_ERROR_MAP = Object.freeze({
+  NotSupportedError: 'OUTPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED',
+  IndexSizeError: 'OUTPUT_AUDIO_WORKLET_NODE_INDEX_SIZE',
+  InvalidStateError: 'OUTPUT_AUDIO_WORKLET_NODE_INVALID_STATE',
+  OperationError: 'OUTPUT_AUDIO_WORKLET_NODE_OPERATION_FAILED',
+});
+
+function getOutputWorkletNodeErrorCode(error) {
+  if (isCanonicalError(error)) return null;
+  const name = typeof error?.name === 'string' ? error.name : '';
+  return OUTPUT_WORKLET_NODE_ERROR_MAP[name] || 'OUTPUT_AUDIO_WORKLET_NODE_FAILED';
+}
+
+function getSafeOutputWorkletNodeMessage(code) {
+  switch (code) {
+    case 'OUTPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED':
+      return 'Playback worklet node not supported';
+    case 'OUTPUT_AUDIO_WORKLET_NODE_INDEX_SIZE':
+      return 'Playback worklet node index size error';
+    case 'OUTPUT_AUDIO_WORKLET_NODE_INVALID_STATE':
+      return 'Playback worklet node invalid state';
+    case 'OUTPUT_AUDIO_WORKLET_NODE_OPERATION_FAILED':
+      return 'Playback worklet node operation failed';
+    default:
+      return 'Failed to create playback worklet node';
+  }
+}
+
 function getAudioContextFactory(options) {
   if (typeof options.audioContextFactory === 'function') return options.audioContextFactory;
   if (typeof options.contextFactory === 'function') return options.contextFactory;
@@ -297,7 +325,8 @@ export class PcmOutputPlayer {
         this.workletNode = this._createWorkletNode();
       } catch (error) {
         if (isCanonicalError(error)) throw error;
-        throw createAudioError('OUTPUT_AUDIO_WORKLET_NODE_FAILED', 'Failed to create playback worklet node');
+        const mappedCode = getOutputWorkletNodeErrorCode(error);
+        throw createAudioError(mappedCode, getSafeOutputWorkletNodeMessage(mappedCode));
       }
       if (typeof this.workletNode.connect !== 'function' || !this.context.destination) {
         throw createAudioError('OUTPUT_AUDIO_GRAPH_UNAVAILABLE', 'Playback audio graph is unavailable');

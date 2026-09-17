@@ -116,18 +116,19 @@ describe('pipeline native PCM mapping - input TabAudioPipeline', () => {
     expect(fake.context.close).toHaveBeenCalled();
   });
 
-  it('4 input AudioWorkletNode → INPUT_AUDIO_WORKLET_NODE_FAILED', async () => {
+  it('4 input AudioWorkletNode → INPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED (native NotSupportedError sanitized)', async () => {
     const fake = createInputContext();
     const pipeline = new TabAudioPipeline({
       audioContextFactory: vi.fn(async () => fake.context),
       audioWorkletNodeFactory: vi.fn(() => { throw new DOMException('AudioWorkletNode failed https://evil.com', 'NotSupportedError'); }),
     });
-    await expect(pipeline.start({ getTracks: () => [] })).rejects.toMatchObject({ code: 'INPUT_AUDIO_WORKLET_NODE_FAILED' });
+    await expect(pipeline.start({ getTracks: () => [] })).rejects.toMatchObject({ code: 'INPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED' });
     try {
       await pipeline.start({ getTracks: () => [] });
     } catch (e) {
-      expect(e.code).toBe('INPUT_AUDIO_WORKLET_NODE_FAILED');
+      expect(e.code).toBe('INPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED');
       expect(isLeakFree(e)).toBe(true);
+      expect(e.message).not.toContain('evil.com');
     }
     expect(fake.context.close).toHaveBeenCalled();
   });
@@ -181,11 +182,11 @@ describe('pipeline native PCM mapping - output PcmOutputPlayer', () => {
     try { await player.start(); } catch (e) { expect(e.code).toBe('OUTPUT_AUDIO_WORKLET_LOAD_FAILED'); expect(isLeakFree(e)).toBe(true); expect(JSON.stringify(e)).not.toContain('liveDubbingPlayback'); }
     expect(fake.context.close).toHaveBeenCalled();
   });
-  it('8 output AudioWorkletNode → OUTPUT_AUDIO_WORKLET_NODE_FAILED', async () => {
+  it('8 output AudioWorkletNode → OUTPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED (native NotSupportedError sanitized)', async () => {
     const fake = createOutputContext();
     const player = new PcmOutputPlayer({ audioContextFactory: vi.fn(async () => fake.context), audioWorkletNodeFactory: vi.fn(() => { throw new DOMException('node failed https://evil.com', 'NotSupportedError'); }) });
-    await expect(player.start()).rejects.toMatchObject({ code: 'OUTPUT_AUDIO_WORKLET_NODE_FAILED' });
-    try { await player.start(); } catch (e) { expect(e.code).toBe('OUTPUT_AUDIO_WORKLET_NODE_FAILED'); expect(isLeakFree(e)).toBe(true); }
+    await expect(player.start()).rejects.toMatchObject({ code: 'OUTPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED' });
+    try { await player.start(); } catch (e) { expect(e.code).toBe('OUTPUT_AUDIO_WORKLET_NODE_NOT_SUPPORTED'); expect(isLeakFree(e)).toBe(true); expect(e.message).not.toContain('evil.com'); }
     expect(fake.context.close).toHaveBeenCalled();
   });
   it('9 output resume → OUTPUT_AUDIO_CONTEXT_RESUME_FAILED', async () => {
