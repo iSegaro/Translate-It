@@ -3,13 +3,9 @@
  *
  * PCM is decoded here and handed to a local AudioWorklet ring buffer. There is
  * no MediaStream input in this class, so captured tab audio cannot accidentally
- * become an output source.
+ * become an output source. Playback configuration is delivered via MessagePort
+ * `configure` after worklet node construction.
  */
-
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'PcmOutputPlayer');
 
 export const OUTPUT_SAMPLE_RATE = 24_000;
 export const PLAYBACK_PROCESSOR_NAME = 'live-dubbing-playback-processor';
@@ -89,82 +85,6 @@ function getSafeOutputWorkletNodeMessage(code) {
     default:
       return 'Failed to create playback worklet node';
   }
-}
-
-function sanitizeDomExceptionName(error) {
-  const name = typeof error?.name === 'string' ? error.name : 'Error';
-  return /^[A-Za-z]+Error$/.test(name) ? name : 'Error';
-}
-
-function isDevFirefoxProbeEnabled() {
-  try {
-    if (typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__ && typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox') return true;
-  } catch {
-    // environment check is best effort
-  }
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox') return true;
-  } catch {
-    // environment check is best effort
-  }
-  return false;
-}
-
-function probeOutputWorkletNodeShapes(context, processorName, sampleRate, maxQueuedSamples, epoch, factory, AudioWorkletNodeCtor) {
-  if (!isDevFirefoxProbeEnabled()) return null;
-  if (!context) return null;
-  const Constructor = AudioWorkletNodeCtor || globalThis.AudioWorkletNode;
-  const useFactory = typeof factory === 'function';
-  const tryCreate = (options) => {
-    let node = null;
-    try {
-      if (useFactory) {
-        node = options === undefined
-          ? factory(context, processorName)
-          : factory(context, processorName, options);
-      } else if (typeof Constructor === 'function') {
-        node = options === undefined
-          ? new Constructor(context, processorName)
-          : new Constructor(context, processorName, options);
-      } else {
-        throw new DOMException('Unavailable', 'NotSupportedError');
-      }
-      return { outcome: 'success', node };
-    } catch (error) {
-      return { outcome: sanitizeDomExceptionName(error), error };
-    }
-  };
-
-  const shapes = [
-    { label: 'A', options: undefined },
-    { label: 'B', options: { processorOptions: { sampleRate, maxBufferSamples: maxQueuedSamples, epoch } } },
-    { label: 'C', options: { numberOfInputs: 0, numberOfOutputs: 1, processorOptions: { sampleRate, maxBufferSamples: maxQueuedSamples, epoch } } },
-    { label: 'D', options: { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1], processorOptions: { sampleRate, maxBufferSamples: maxQueuedSamples, epoch } } },
-  ];
-
-  const results = {};
-  for (const shape of shapes) {
-    const result = tryCreate(shape.options);
-    results[shape.label] = result.outcome;
-    if (result.node) {
-      try { result.node.disconnect?.(); } catch {
-        // probe cleanup is best effort
-      }
-      try { result.node.port?.close?.(); } catch {
-        // probe cleanup is best effort
-      }
-      try { if (result.node.port) result.node.port.onmessage = null; } catch {
-        // probe cleanup is best effort
-      }
-    }
-  }
-  const diagnostic = `A=${results.A} B=${results.B} C=${results.C} D=${results.D}`;
-  try {
-    logger.debug('[PcmOutputPlayer] Firefox worklet probe', { probe: diagnostic });
-  } catch {
-    // logging is best effort
-  }
-  return results;
 }
 
 function getAudioContextFactory(options) {
@@ -409,15 +329,18 @@ export class PcmOutputPlayer {
         this.workletNode = this._createWorkletNode();
       } catch (error) {
         if (isCanonicalError(error)) throw error;
-        if (isDevFirefoxProbeEnabled()) {
-          try {
-            probeOutputWorkletNodeShapes(this.context, this.processorName, this.sampleRate, this.maxQueuedSamples, this.epoch, this.audioWorkletNodeFactory, this.AudioWorkletNode);
-          } catch {
-            // probe is best effort and never affects production error
-          }
-        }
         const mappedCode = getOutputWorkletNodeErrorCode(error);
         throw createAudioError(mappedCode, getSafeOutputWorkletNodeMessage(mappedCode));
+      }
+      try {
+        this.workletNode.port.postMessage({
+          type: 'configure',
+          sampleRate: this.sampleRate,
+          maxBufferSamples: this.maxQueuedSamples,
+          epoch: this.epoch,
+        });
+      } catch {
+        // Configure is best effort prior to graph connect; port availability is verified in _attachPort
       }
       if (typeof this.workletNode.connect !== 'function' || !this.context.destination) {
         throw createAudioError('OUTPUT_AUDIO_GRAPH_UNAVAILABLE', 'Playback audio graph is unavailable');
@@ -450,11 +373,6 @@ export class PcmOutputPlayer {
     const nodeOptions = {
       numberOfInputs: 0,
       numberOfOutputs: 1,
-      processorOptions: {
-        sampleRate: this.sampleRate,
-        maxBufferSamples: this.maxQueuedSamples,
-        epoch: this.epoch,
-      },
     };
     if (typeof this.audioWorkletNodeFactory === 'function') {
       return this.audioWorkletNodeFactory(this.context, this.processorName, nodeOptions);

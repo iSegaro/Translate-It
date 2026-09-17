@@ -92,7 +92,46 @@ class LiveDubbingPlaybackProcessor extends AudioWorkletProcessor {
     this.port.onmessage = event => this.handleMessage(event?.data || {});
   }
 
+  applyConfigure(data) {
+    let updatedSampleRate = false;
+    if (finite(data.sampleRate) && data.sampleRate > 0) {
+      this.sampleRateValue = data.sampleRate;
+      this.metricsIntervalSamples = Math.max(
+        1,
+        Math.ceil(this.sampleRateValue * METRICS_INTERVAL_SECONDS),
+      );
+      updatedSampleRate = true;
+    }
+    void updatedSampleRate;
+    if (Number.isInteger(data.maxBufferSamples) && data.maxBufferSamples > 0) {
+      if (data.maxBufferSamples !== this.maxBufferSamples) {
+        this.maxBufferSamples = data.maxBufferSamples;
+        const nextRing = new FloatRingBuffer(this.maxBufferSamples);
+        // Configure is expected before any audio; preserve any already-queued content best-effort
+        if (this.ring && this.ring.available > 0) {
+          const tmp = new Float32Array(this.ring.available);
+          this.ring.readInto(tmp);
+          nextRing.write(tmp);
+        }
+        // Preserve pending queue if it still fits
+        if (this.pendingSamples > this.maxBufferSamples) {
+          // Too much pending for new limit: drop pending to avoid overrun; keep underrun accounting unaffected
+          this.pending = [];
+          this.pendingSamples = 0;
+        }
+        this.ring = nextRing;
+      }
+    }
+    if (data.epoch !== undefined) {
+      this.epoch = data.epoch ?? 0;
+    }
+  }
+
   handleMessage(message) {
+    if (message.type === 'configure') {
+      this.applyConfigure(message);
+      return;
+    }
     if (message.type === 'dispose') {
       this.pending = [];
       this.pendingSamples = 0;

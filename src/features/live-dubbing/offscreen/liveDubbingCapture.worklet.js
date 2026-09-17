@@ -38,13 +38,18 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
     this.frameSourceTime = null;
 
     this.port.onmessage = event => {
-      if (event?.data?.type === 'flush') {
+      const data = event?.data || {};
+      if (data.type === 'configure') {
+        this.applyConfigure(data);
+        return;
+      }
+      if (data.type === 'flush') {
         const sampleCount = this.emitFrame(true);
         this.port.postMessage({
           type: 'flushed',
           sampleCount,
         });
-      } else if (event?.data?.type === 'reset') {
+      } else if (data.type === 'reset') {
         this.pendingSamples = 0;
         this.nextSourceSample = null;
         this.nextSourceTime = null;
@@ -52,6 +57,30 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
         this.frameSourceTime = null;
       }
     };
+  }
+
+  applyConfigure(data) {
+    const nextSampleRate = data.sampleRate;
+    const nextFrameSamples = data.frameSamples;
+    let updated = false;
+    if (finite(nextSampleRate) && nextSampleRate > 0) {
+      this.sampleRateValue = nextSampleRate;
+      updated = true;
+    }
+    if (Number.isInteger(nextFrameSamples) && nextFrameSamples > 0) {
+      if (nextFrameSamples !== this.frameSamples) {
+        this.frameSamples = nextFrameSamples;
+        const nextFrame = new Int16Array(nextFrameSamples);
+        if (this.pendingSamples > 0) {
+          const copyCount = Math.min(this.pendingSamples, nextFrameSamples);
+          nextFrame.set(this.frame.subarray(0, copyCount));
+          this.pendingSamples = copyCount;
+        }
+        this.frame = nextFrame;
+      }
+      updated = true;
+    }
+    void updated;
   }
 
   process(inputs, outputs) {

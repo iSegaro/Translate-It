@@ -59,18 +59,20 @@ describe('PCM output primitives', () => {
       audioWorkletNodeFactory: vi.fn(() => fake.node),
     });
     await player.start();
+    expect(fake.port.postMessage).toHaveBeenCalledTimes(1);
+    expect(fake.port.postMessage.mock.calls[0][0]).toMatchObject({ type: 'configure', sampleRate: 24000 });
 
     player.enqueuePcm16(pcmBytes(1000), { sequence: 1 });
     player.enqueuePcm16(pcmBytes(2000), { sequence: 2 });
-    expect(fake.port.postMessage).toHaveBeenCalledTimes(1);
-    const first = fake.port.postMessage.mock.calls[0];
+    expect(fake.port.postMessage).toHaveBeenCalledTimes(2);
+    const first = fake.port.postMessage.mock.calls[1];
     expect(first[0]).toMatchObject({ type: 'enqueue', sequence: 1, sampleCount: 1 });
     expect(first[1]).toEqual([first[0].buffer]);
     expect(new Float32Array(first[0].buffer)[0]).toBe(1000 / 32768);
 
     fake.port.onmessage({ data: { type: 'accepted', id: first[0].id, queuedSamples: 1 } });
-    expect(fake.port.postMessage).toHaveBeenCalledTimes(2);
-    expect(fake.port.postMessage.mock.calls[1][0]).toMatchObject({ sequence: 2 });
+    expect(fake.port.postMessage).toHaveBeenCalledTimes(3);
+    expect(fake.port.postMessage.mock.calls[2][0]).toMatchObject({ sequence: 2 });
 
     fake.port.onmessage({ data: { type: 'accepted', id: 2, queuedSamples: 2 } });
     expect(player.getMetrics()).toMatchObject({
@@ -92,6 +94,7 @@ describe('PCM output primitives', () => {
       onPlaybackAccepted,
     });
     await player.start();
+    expect(fake.port.postMessage.mock.calls[0][0]).toMatchObject({ type: 'configure', epoch: 3 });
 
     player.enqueuePcm16(pcmBytes(1000, 2000), {
       epoch: 3,
@@ -107,7 +110,7 @@ describe('PCM output primitives', () => {
       peakQueuedDurationMs: (2 / OUTPUT_SAMPLE_RATE) * 1000,
     });
 
-    const enqueueMessage = fake.port.postMessage.mock.calls[0][0];
+    const enqueueMessage = fake.port.postMessage.mock.calls[1][0];
     fake.port.onmessage({ data: {
       type: 'accepted',
       id: enqueueMessage.id,
@@ -157,9 +160,10 @@ describe('PCM output primitives', () => {
       onError,
     });
     await player.start();
+    expect(fake.port.postMessage.mock.calls[0][0]).toMatchObject({ type: 'configure' });
 
     player.enqueuePcm16(pcmBytes(1000));
-    const first = fake.port.postMessage.mock.calls[0][0];
+    const first = fake.port.postMessage.mock.calls[1][0];
     expect(() => fake.port.onmessage({ data: {
       type: 'rejected',
       id: first.id,
@@ -170,7 +174,7 @@ describe('PCM output primitives', () => {
     expect(onError).toHaveBeenCalledOnce();
 
     expect(player.enqueuePcm16(pcmBytes(2000)).accepted).toBe(true);
-    expect(fake.port.postMessage).toHaveBeenCalledTimes(2);
+    expect(fake.port.postMessage).toHaveBeenCalledTimes(3);
   });
 
   it('keeps metrics observers from interrupting output queue delivery', async () => {
@@ -183,9 +187,10 @@ describe('PCM output primitives', () => {
       },
     });
     await player.start();
+    expect(fake.port.postMessage.mock.calls[0][0]).toMatchObject({ type: 'configure' });
 
     expect(player.enqueuePcm16(pcmBytes(1000)).accepted).toBe(true);
-    const enqueueMessage = fake.port.postMessage.mock.calls[0][0];
+    const enqueueMessage = fake.port.postMessage.mock.calls[1][0];
     fake.port.onmessage({ data: {
       type: 'accepted',
       id: enqueueMessage.id,

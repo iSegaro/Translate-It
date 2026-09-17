@@ -7,13 +7,10 @@
  *
  * Canonical input framing lives here as the single source of truth for the
  * offscreen capture boundary: fixed 100ms frames (1600 samples at 16kHz).
- * The frame size is passed to the capture AudioWorklet via processorOptions.
+ * The frame size is delivered to the capture AudioWorklet via MessagePort
+ * `configure` after construction (processorOptions cloning is not reliably
+ * available in all content AudioWorklet runtimes).
  */
-
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-
-const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'TabAudioPipeline');
 
 export const INPUT_SAMPLE_RATE = 16_000;
 export const INPUT_FRAME_SAMPLES = 1_600;
@@ -77,6 +74,7 @@ const INPUT_WORKLET_NODE_ERROR_MAP = Object.freeze({
   IndexSizeError: 'INPUT_AUDIO_WORKLET_NODE_INDEX_SIZE',
   InvalidStateError: 'INPUT_AUDIO_WORKLET_NODE_INVALID_STATE',
   OperationError: 'INPUT_AUDIO_WORKLET_NODE_OPERATION_FAILED',
+  TypeError: 'INPUT_AUDIO_WORKLET_NODE_TYPE_ERROR',
 });
 
 function getInputWorkletNodeErrorCode(error) {
@@ -95,85 +93,11 @@ function getSafeInputWorkletNodeMessage(code) {
       return 'Capture worklet node invalid state';
     case 'INPUT_AUDIO_WORKLET_NODE_OPERATION_FAILED':
       return 'Capture worklet node operation failed';
+    case 'INPUT_AUDIO_WORKLET_NODE_TYPE_ERROR':
+      return 'Capture worklet node type error';
     default:
       return 'Failed to create capture worklet node';
   }
-}
-
-function sanitizeDomExceptionName(error) {
-  const name = typeof error?.name === 'string' ? error.name : 'Error';
-  return /^[A-Za-z]+Error$/.test(name) ? name : 'Error';
-}
-
-function isDevFirefoxProbeEnabled() {
-  try {
-    if (typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__ && typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox') return true;
-  } catch {
-    // environment check is best effort
-  }
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV && typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox') return true;
-  } catch {
-    // environment check is best effort
-  }
-  return false;
-}
-
-function probeInputWorkletNodeShapes(context, processorName, sampleRate, frameSamples, factory, AudioWorkletNodeCtor) {
-  if (!isDevFirefoxProbeEnabled()) return null;
-  if (!context) return null;
-  const Constructor = AudioWorkletNodeCtor || globalThis.AudioWorkletNode;
-  const useFactory = typeof factory === 'function';
-  const tryCreate = (options) => {
-    let node = null;
-    try {
-      if (useFactory) {
-        node = options === undefined
-          ? factory(context, processorName)
-          : factory(context, processorName, options);
-      } else if (typeof Constructor === 'function') {
-        node = options === undefined
-          ? new Constructor(context, processorName)
-          : new Constructor(context, processorName, options);
-      } else {
-        throw new DOMException('Unavailable', 'NotSupportedError');
-      }
-      return { outcome: 'success', node };
-    } catch (error) {
-      return { outcome: sanitizeDomExceptionName(error), error };
-    }
-  };
-
-  const shapes = [
-    { label: 'A', options: undefined },
-    { label: 'B', options: { processorOptions: { sampleRate, frameSamples } } },
-    { label: 'C', options: { numberOfInputs: 1, numberOfOutputs: 1, processorOptions: { sampleRate, frameSamples } } },
-    { label: 'D', options: { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], processorOptions: { sampleRate, frameSamples } } },
-  ];
-
-  const results = {};
-  for (const shape of shapes) {
-    const result = tryCreate(shape.options);
-    results[shape.label] = result.outcome;
-    if (result.node) {
-      try { result.node.disconnect?.(); } catch {
-        // probe cleanup is best effort
-      }
-      try { result.node.port?.close?.(); } catch {
-        // probe cleanup is best effort
-      }
-      try { if (result.node.port) result.node.port.onmessage = null; } catch {
-        // probe cleanup is best effort
-      }
-    }
-  }
-  const diagnostic = `A=${results.A} B=${results.B} C=${results.C} D=${results.D}`;
-  try {
-    logger.debug('[TabAudioPipeline] Firefox worklet probe', { probe: diagnostic });
-  } catch {
-    // logging is best effort
-  }
-  return results;
 }
 
 function getAudioContextFactory(options) {
@@ -561,15 +485,17 @@ export class TabAudioPipeline {
         this.workletNode = this._createWorkletNode();
       } catch (error) {
         if (isCanonicalError(error)) throw error;
-        if (isDevFirefoxProbeEnabled()) {
-          try {
-            probeInputWorkletNodeShapes(this.context, this.processorName, this.sampleRate, this.frameSamples, this.audioWorkletNodeFactory, this.AudioWorkletNode);
-          } catch {
-            // probe is best effort and never affects production error
-          }
-        }
         const mappedCode = getInputWorkletNodeErrorCode(error);
         throw createAudioError(mappedCode, getSafeInputWorkletNodeMessage(mappedCode));
+      }
+      try {
+        this.workletNode.port.postMessage({
+          type: 'configure',
+          sampleRate: this.sampleRate,
+          frameSamples: this.frameSamples,
+        });
+      } catch {
+        // Configure is best effort prior to graph connect; port availability is verified in _attachPort
       }
       try {
         this.sink = this.context.createGain();
@@ -605,10 +531,6 @@ export class TabAudioPipeline {
     const nodeOptions = {
       numberOfInputs: 1,
       numberOfOutputs: 1,
-      processorOptions: {
-        sampleRate: this.sampleRate,
-        frameSamples: this.frameSamples,
-      },
     };
     if (typeof this.audioWorkletNodeFactory === 'function') {
       return this.audioWorkletNodeFactory(this.context, this.processorName, nodeOptions);
