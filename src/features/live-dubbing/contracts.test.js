@@ -16,9 +16,11 @@ import {
   isTrustedLiveDubbingUiSender,
   normalizeProviderTargetLanguage,
   normalizeOpenAITargetLanguage,
+  sanitizeLiveDubbingTerminalOutcome,
   sanitizeLiveDubbingProviderDiagnostic,
   sanitizeDescriptor,
   sanitizeLiveDubbingCleanupDiagnostic,
+  toPublicLiveDubbingTerminalOutcome,
 } from './contracts.js';
 import {
   LIVE_DUBBING_ACTION_TIMEOUTS,
@@ -238,6 +240,93 @@ describe('live dubbing Stage 2 contracts', () => {
       setupSent: false,
       setupComplete: false,
     });
+  });
+
+  it('keeps terminal outcomes scalar, bounded, and separate from descriptors', () => {
+    const outcome = sanitizeLiveDubbingTerminalOutcome({
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'GEMINI_LIVE_REMOTE_ERROR',
+      occurredAt: 123,
+      providerDiagnostic: {
+        code: 'GEMINI_LIVE_REMOTE_ERROR',
+        closeCode: 1011,
+        wasClean: false,
+        terminalCategory: 'REMOTE_ERROR',
+        wsOpen: true,
+        setupSent: true,
+        setupComplete: false,
+        payload: 'private-payload',
+      },
+      payload: 'private-payload',
+    });
+
+    expect(outcome).toBeNull();
+
+    const valid = sanitizeLiveDubbingTerminalOutcome({
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'GEMINI_LIVE_REMOTE_ERROR',
+      occurredAt: 123,
+      providerDiagnostic: {
+        code: 'GEMINI_LIVE_REMOTE_ERROR',
+        closeCode: 1011,
+        wasClean: false,
+        terminalCategory: 'REMOTE_ERROR',
+        wsOpen: true,
+        setupSent: true,
+        setupComplete: false,
+        payload: 'private-payload',
+      },
+    });
+
+    expect(valid).toEqual({
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'GEMINI_LIVE_REMOTE_ERROR',
+      occurredAt: 123,
+      providerDiagnostic: {
+        stage: 'CONNECT_PROVIDER',
+        code: 'GEMINI_LIVE_REMOTE_ERROR',
+        closeCode: 1011,
+        wasClean: false,
+        terminalCategory: 'REMOTE_ERROR',
+        malformedAt: null,
+        wsOpen: true,
+        setupSent: true,
+        setupComplete: false,
+      },
+    });
+    expect(toPublicLiveDubbingTerminalOutcome(valid)).toEqual({
+      providerId: 'gemini',
+      error: 'GEMINI_LIVE_REMOTE_ERROR',
+      occurredAt: 123,
+      providerDiagnostic: valid.providerDiagnostic,
+    });
+    expect(toPublicLiveDubbingTerminalOutcome(valid)).not.toHaveProperty('sourceSessionId');
+  });
+
+  it('accepts symbolic OpenAI data-channel failure codes', () => {
+    expect(sanitizeLiveDubbingTerminalOutcome({
+      sourceSessionId: 'session-openai',
+      providerId: 'openai',
+      error: 'OPENAI_REALTIME_DATA_CHANNEL_FAILED',
+      occurredAt: 123,
+    })).toMatchObject({
+      providerId: 'openai',
+      error: 'OPENAI_REALTIME_DATA_CHANNEL_FAILED',
+    });
+  });
+
+  it.each([
+    new Error('private error'),
+    { sourceSessionId: 'session-1', providerId: 'gemini', error: 'https://secret.test', occurredAt: 1 },
+    { sourceSessionId: 'session-1', providerId: 'gemini', error: 'SECRET_KEY', occurredAt: 1 },
+    { sourceSessionId: 'session-1', providerId: 'gemini', error: 'MEDIA_STREAM_ID', occurredAt: 1 },
+    { sourceSessionId: 'session-1', providerId: 'gemini', error: { message: 'private' }, occurredAt: 1 },
+    { sourceSessionId: 'session-1', providerId: 'gemini', error: 'ERROR', occurredAt: Infinity },
+  ])('rejects unsafe terminal outcome %s', value => {
+    expect(sanitizeLiveDubbingTerminalOutcome(value)).toBeNull();
   });
 
   it('accepts only the fixed malformed branch enum for malformed failures', () => {

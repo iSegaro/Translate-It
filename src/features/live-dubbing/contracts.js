@@ -13,6 +13,15 @@ const supportedDiagnosticStages = new Set(Object.values(LIVE_DUBBING_CAPTURE_STA
 const safeErrorNamePattern = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 const safeErrorCodePattern = /^[A-Za-z0-9_.-]{1,80}$/;
 const unsafeErrorCodePattern = /(?:stream\s*id|payload|credential|password|secret|token|media)[-_][a-z]/;
+const safeTerminalOutcomeErrorPattern = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/;
+const unsafeTerminalOutcomeErrorPattern = /(?:stream|media|payload|credential|password|secret|token|api[-_ ]?key|https?|javascript)/i;
+const terminalOutcomeFields = new Set([
+  'sourceSessionId',
+  'providerId',
+  'error',
+  'occurredAt',
+  'providerDiagnostic',
+]);
 const diagnosticMessageLimit = 160;
 const providerDiagnosticStage = 'CONNECT_PROVIDER';
 const safeProviderDiagnosticTokenPattern = /^[A-Za-z0-9_.-]{1,80}$/;
@@ -365,6 +374,83 @@ export function createLiveDubbingProviderDiagnostic(value = {}) {
 export function sanitizeLiveDubbingProviderDiagnostic(diagnostic) {
   if (!diagnostic || typeof diagnostic !== 'object' || diagnostic instanceof Error) return null;
   return createLiveDubbingProviderDiagnostic(diagnostic);
+}
+
+function sanitizeTerminalOutcomeError(value) {
+  return typeof value === 'string'
+    && safeTerminalOutcomeErrorPattern.test(value)
+    && !unsafeTerminalOutcomeErrorPattern.test(value)
+    ? value
+    : null;
+}
+
+function hasOnlyTerminalOutcomeFields(value) {
+  try {
+    return Object.keys(value).every(field => terminalOutcomeFields.has(field));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Create the internal terminal outcome retained in session storage. The
+ * source session fence is intentionally not part of the public DTO.
+ * @param {unknown} value
+ * @returns {{sourceSessionId: string, providerId: string, error: string, occurredAt: number, providerDiagnostic: object|null}|null}
+ */
+export function sanitizeLiveDubbingTerminalOutcome(value) {
+  if (!isPlainRecord(value) || !hasOnlyTerminalOutcomeFields(value)) return null;
+
+  const sourceSessionId = isSessionId(value.sourceSessionId)
+    ? value.sourceSessionId.trim()
+    : null;
+  const error = sanitizeTerminalOutcomeError(value.error);
+  const providerId = isLiveDubbingProviderId(value.providerId) ? value.providerId : null;
+  const occurredAt = Number.isFinite(value.occurredAt) ? value.occurredAt : null;
+  const hasDiagnostic = Object.prototype.hasOwnProperty.call(value, 'providerDiagnostic');
+  if (hasDiagnostic && value.providerDiagnostic !== null
+    && (!isPlainRecord(value.providerDiagnostic)
+      || !sanitizeLiveDubbingProviderDiagnostic(value.providerDiagnostic))) {
+    return null;
+  }
+
+  if (!sourceSessionId || !providerId || !error || occurredAt === null) return null;
+
+  return {
+    sourceSessionId,
+    providerId,
+    error,
+    occurredAt,
+    providerDiagnostic: hasDiagnostic
+      ? sanitizeLiveDubbingProviderDiagnostic(value.providerDiagnostic)
+      : null,
+  };
+}
+
+/**
+ * Build an internal terminal outcome and fail closed for untrusted input.
+ * @param {unknown} value
+ * @returns {{sourceSessionId: string, providerId: string, error: string, occurredAt: number, providerDiagnostic: object|null}|null}
+ */
+export function createLiveDubbingTerminalOutcome(value) {
+  return sanitizeLiveDubbingTerminalOutcome(value);
+}
+
+/**
+ * Remove the internal source-session fence before exposing an outcome to UI.
+ * @param {unknown} value
+ * @returns {{providerId: string, error: string, occurredAt: number, providerDiagnostic: object|null}|null}
+ */
+export function toPublicLiveDubbingTerminalOutcome(value) {
+  const outcome = sanitizeLiveDubbingTerminalOutcome(value);
+  return outcome
+    ? {
+      providerId: outcome.providerId,
+      error: outcome.error,
+      occurredAt: outcome.occurredAt,
+      providerDiagnostic: outcome.providerDiagnostic,
+    }
+    : null;
 }
 
 function readCleanupDiagnosticField(source, field) {

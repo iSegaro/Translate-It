@@ -6,6 +6,7 @@
  */
 export const LIVE_DUBBING_OWNER = 'live-dubbing';
 export const LIVE_DUBBING_STORAGE_KEY = '__translateItLiveDubbingSession';
+export const LIVE_DUBBING_OUTCOME_STORAGE_KEY = '__translateItLiveDubbingTerminalOutcome';
 export const LIVE_DUBBING_PROVIDER_ID = 'gemini';
 export const LIVE_DUBBING_OPENAI_PROVIDER_ID = 'openai';
 export const LIVE_DUBBING_PROVIDER_IDS = Object.freeze([
@@ -28,6 +29,13 @@ export const LIVE_DUBBING_STORAGE_STATE = Object.freeze({
   ABSENT: 'ABSENT',
   PRESENT: 'PRESENT',
   UNREADABLE: 'UNREADABLE',
+});
+
+export const LIVE_DUBBING_OUTCOME_STORAGE_STATE = Object.freeze({
+  ABSENT: 'ABSENT',
+  PRESENT: 'PRESENT',
+  READ_FAILED: 'READ_FAILED',
+  WRITE_FAILED: 'WRITE_FAILED',
 });
 
 const publicLiveDubbingStatus = {
@@ -68,6 +76,7 @@ export const LIVE_DUBBING_ACTIONS = Object.freeze({
   DISPOSE: 'LIVE_DUBBING_DISPOSE',
   STATUS: 'LIVE_DUBBING_STATUS',
   TERMINAL: 'LIVE_DUBBING_TERMINAL',
+  TERMINAL_OUTCOME: 'LIVE_DUBBING_TERMINAL_OUTCOME',
   REQUEST_PROVIDER_BOOTSTRAP: 'LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP',
 });
 

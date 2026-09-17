@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import LiveDubbingControl from './LiveDubbingControl.vue'
 
 const sendMessage = vi.hoisted(() => vi.fn())
+let runtimeListener
 
 vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
   useMessaging: () => ({ sendMessage })
@@ -23,6 +24,17 @@ vi.mock('webextension-polyfill', () => ({
 
 describe('LiveDubbingControl', () => {
   beforeEach(() => {
+    runtimeListener = null
+    vi.stubGlobal('browser', {
+      runtime: {
+        id: 'extension-id',
+        getURL: (path = '') => `chrome-extension://extension-id/${path}`,
+        onMessage: {
+          addListener: vi.fn(listener => { runtimeListener = listener }),
+          removeListener: vi.fn()
+        }
+      }
+    })
     sendMessage.mockReset()
     sendMessage.mockImplementation(({ action }) => {
       if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
@@ -392,5 +404,244 @@ describe('LiveDubbingControl', () => {
       action: 'START_LIVE_DUBBING',
       data: { targetLanguage: 'de', providerId: 'gemini' }
     }))
+  })
+
+  it('shows a reopened idle terminal outcome without blocking Start', async () => {
+    sendMessage.mockResolvedValue({
+      success: true,
+      status: 'idle',
+      terminalOutcome: {
+        providerId: 'gemini',
+        error: 'PROVIDER_SESSION_ENDED',
+        occurredAt: 123,
+        providerDiagnostic: { raw: 'must not render' }
+      }
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(browser.runtime.onMessage.addListener).toHaveBeenCalledWith(runtimeListener)
+    expect(browser.runtime.onMessage.addListener.mock.invocationCallOrder[0])
+      .toBeLessThan(sendMessage.mock.invocationCallOrder[0])
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('PROVIDER_SESSION_ENDED')
+    expect(wrapper.text()).not.toContain('must not render')
+  })
+
+  it('ignores unsafe terminal error prose and provider diagnostics', async () => {
+    sendMessage.mockResolvedValue({
+      status: 'idle',
+      terminalOutcome: {
+        providerId: 'gemini',
+        error: 'Provider session ended.',
+        occurredAt: 123,
+        providerDiagnostic: { raw: 'must not render' }
+      }
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.terminalOutcome).toBe(null)
+    expect(wrapper.text()).not.toContain('Provider session ended.')
+    expect(wrapper.text()).not.toContain('must not render')
+  })
+
+  it('treats an authenticated terminal notification as invalidation and re-reads status', async () => {
+    let statusReads = 0
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        statusReads += 1
+        return Promise.resolve(statusReads === 1
+          ? { status: { status: 'RUNNING', sessionId: 'session-1' } }
+          : { status: 'idle', terminalOutcome: { providerId: 'gemini', error: 'PROVIDER_SESSION_ENDED', occurredAt: 2 } })
+      }
+      return Promise.resolve({ status: { status: 'RUNNING', sessionId: 'session-1' } })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: { error: 'do not render' } }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(statusReads).toBe(2)
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('PROVIDER_SESSION_ENDED')
+    expect(wrapper.text()).not.toContain('do not render')
+  })
+
+  it('ignores invalid or untrusted terminal notifications', async () => {
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    const initialReads = sendMessage.mock.calls.filter(([message]) => message.action === 'GET_LIVE_DUBBING_STATUS').length
+
+    runtimeListener({ action: 'OTHER_ACTION', data: {} }, { id: 'extension-id' })
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, { id: 'other-id' })
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, { id: 'extension-id', documentId: 'popup' })
+
+    expect(sendMessage.mock.calls.filter(([message]) => message.action === 'GET_LIVE_DUBBING_STATUS')).toHaveLength(initialReads)
+  })
+
+  it('removes the exact runtime listener on unmount', async () => {
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    wrapper.unmount()
+
+    expect(browser.runtime.onMessage.removeListener).toHaveBeenCalledWith(runtimeListener)
+  })
+
+  it('keeps cleanup pending when notification status retains a session', async () => {
+    let statusReads = 0
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        statusReads += 1
+        return Promise.resolve(statusReads === 1
+          ? { status: 'idle' }
+          : {
+              status: { status: 'ERROR', sessionId: 'retained-session', lastError: 'Cleanup is required.' },
+              terminalOutcome: { providerId: 'gemini', error: 'PROVIDER_SESSION_ENDED', occurredAt: 3 }
+            })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(true)
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain('Cleanup is required.')
+  })
+
+  it('does not let a late notification read overwrite a newer start', async () => {
+    let resolveNotificationStatus
+    let statusReads = 0
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        statusReads += 1
+        return statusReads === 1 ? Promise.resolve({ status: 'idle' }) : new Promise(resolve => {
+          resolveNotificationStatus = resolve
+        })
+      }
+      if (action === 'START_LIVE_DUBBING') return Promise.resolve({ status: 'running', sessionId: 'new-session' })
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    resolveNotificationStatus({ status: { status: 'ERROR', sessionId: 'old-session', lastError: 'stale' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('stale')
+  })
+
+  it('clears historical outcome only after a successful new start', async () => {
+    sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+      ? Promise.resolve({ status: 'idle', terminalOutcome: { providerId: 'gemini', error: 'OLD_OUTCOME', occurredAt: 1 } })
+      : Promise.resolve({ status: 'running', sessionId: 'new-session' }))
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('OLD_OUTCOME')
+  })
+
+  it('does not clear historical outcome when a new start fails', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({
+        status: 'idle',
+        terminalOutcome: { providerId: 'gemini', error: 'PREVIOUS_TERMINAL_FAILURE', occurredAt: 1 }
+      })
+      const failure = { success: false, error: 'START_FAILED', status: 'idle', terminalOutcome: {
+        providerId: 'gemini', error: 'PREVIOUS_TERMINAL_FAILURE', occurredAt: 1
+      } }
+      return Promise.reject(Object.assign(new Error('START_FAILED'), { data: failure }))
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.terminalOutcome.error).toBe('PREVIOUS_TERMINAL_FAILURE')
+    expect(wrapper.text()).toContain('START_FAILED')
+  })
+
+  it('does not resurrect history when notification status clears it during a pending start', async () => {
+    let resolveStart
+    let statusReads = 0
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        statusReads += 1
+        return statusReads === 1
+          ? Promise.resolve({
+              status: 'idle',
+              terminalOutcome: { providerId: 'gemini', error: 'OLD_OUTCOME', occurredAt: 1 }
+            })
+          : Promise.resolve({
+              status: { status: 'RUNNING', sessionId: 'session-1' },
+              terminalOutcome: null
+            })
+      }
+      if (action === 'START_LIVE_DUBBING') return new Promise(resolve => { resolveStart = resolve })
+      if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle', terminalOutcome: null })
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.vm.terminalOutcome).toBe(null)
+
+    resolveStart({ status: 'running', sessionId: 'late-session' })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('button[aria-label="Stop live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.terminalOutcome).toBe(null)
+    expect(wrapper.text()).not.toContain('OLD_OUTCOME')
   })
 })

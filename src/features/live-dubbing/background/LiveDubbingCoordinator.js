@@ -13,12 +13,15 @@ import {
   LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_STATUS,
   LIVE_DUBBING_STORAGE_KEY,
+  LIVE_DUBBING_OUTCOME_STORAGE_KEY,
+  LIVE_DUBBING_OUTCOME_STORAGE_STATE,
   LIVE_DUBBING_START_TIMEOUT,
   LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 import {
   cloneDescriptor,
   createLiveDubbingDiagnostic,
+  createLiveDubbingTerminalOutcome,
   createLiveDubbingProviderDiagnostic,
   createConsumeMessage,
   createDescriptor,
@@ -37,6 +40,7 @@ import {
   sanitizeLiveDubbingDiagnostic,
   sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
+  toPublicLiveDubbingTerminalOutcome,
   sanitizeDescriptor,
 } from '../contracts.js';
 
@@ -120,6 +124,9 @@ export class LiveDubbingCoordinator {
     this.log = options.logger || logger;
     this.descriptor = null;
     this.storageState = LIVE_DUBBING_STORAGE_STATE.ABSENT;
+    this.terminalOutcome = null;
+    this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT;
+    this.outcomeMutation = Promise.resolve();
     this.transition = Promise.resolve();
     this.sessionStates = new Map();
     this.cleanupFacts = new Map();
@@ -162,13 +169,15 @@ export class LiveDubbingCoordinator {
    */
   async getStatus() {
     const available = typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
-    await this._readDescriptor();
+    await this._readStatusSnapshot();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    const terminalOutcome = this._getStatusTerminalOutcome();
     return {
       success: true,
       available,
       status: cloneDescriptor(this.descriptor),
+      terminalOutcome,
     };
   }
 
@@ -180,7 +189,7 @@ export class LiveDubbingCoordinator {
     return this._stopForTab(tabId, 'TOP_LEVEL_NAVIGATION');
   }
 
-  handleOffscreenTerminal(message = {}, sender = null) {
+  async handleOffscreenTerminal(message = {}, sender = null) {
     const sessionId = message?.data?.sessionId || message?.sessionId;
     const providerId = message?.data?.providerId || message?.providerId;
     if (typeof sessionId !== 'string' || !sessionId.trim()) {
@@ -202,8 +211,22 @@ export class LiveDubbingCoordinator {
       const providerDiagnostic = sanitizeLiveDubbingProviderDiagnostic(
         message?.data?.providerDiagnostic || message?.providerDiagnostic,
       );
-      this._latchProviderDiagnostic(this.sessionStates.get(sessionId), providerDiagnostic);
+      const state = this.sessionStates.get(sessionId);
+      const latchedProviderDiagnostic = this._latchProviderDiagnostic(state, providerDiagnostic);
       if (providerDiagnostic) this.log.warn('Live dubbing provider terminal', providerDiagnostic);
+
+      const data = message?.data || message;
+      const outcome = data.status === LIVE_DUBBING_STATUS.ERROR
+        ? createLiveDubbingTerminalOutcome({
+          sourceSessionId: sessionId,
+          providerId,
+          error: data.error,
+          occurredAt: this.now(),
+          providerDiagnostic: latchedProviderDiagnostic,
+        })
+        : null;
+      const publicOutcome = toPublicLiveDubbingTerminalOutcome(outcome);
+      const outcomeMutation = outcome ? this._queueOutcomeMutation(() => this._writeTerminalOutcome(outcome)) : null;
 
       const cleanupDiagnostic = sanitizeLiveDubbingCleanupDiagnostic(
         message?.data?.cleanupDiagnostic || message?.cleanupDiagnostic,
@@ -217,6 +240,9 @@ export class LiveDubbingCoordinator {
         if (result?.success === true && result.stopped === true
           && cleanupDiagnostic?.playbackAccepted === false) {
           this.log.warn('Live dubbing ended without translated playback', cleanupDiagnostic);
+        }
+        if (publicOutcome && (result?.stopped === true || result?.cleanupPending === true)) {
+          void outcomeMutation?.then(() => this._notifyTerminalOutcome(publicOutcome));
         }
         return result;
       });
@@ -434,6 +460,21 @@ export class LiveDubbingCoordinator {
       };
     }
 
+    // Complete any terminal outcome write before a new lifecycle can start.
+    // This keeps a late old write ahead of the final RUNNING+clear commit.
+    await this.outcomeMutation;
+    const currentAfterOutcome = await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (currentAfterOutcome) {
+      return {
+        success: false,
+        busy: true,
+        status: cloneDescriptor(currentAfterOutcome),
+        current: cloneDescriptor(currentAfterOutcome),
+      };
+    }
+
     const tab = await this._resolveAuthoritativeTab(sender, pendingStart);
     if (pendingStart.terminalRequested) {
       return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
@@ -634,6 +675,7 @@ export class LiveDubbingCoordinator {
         activeDescriptor,
         descriptor.sessionId,
         sessionState.descriptor,
+        { clearOutcome: true },
       )) {
         throw new Error('Live dubbing descriptor persistence failed');
       }
@@ -1710,6 +1752,125 @@ export class LiveDubbingCoordinator {
     };
   }
 
+  async _readStatusSnapshot() {
+    const storage = this.browserAPI.storage?.session;
+    if (typeof storage?.get !== 'function') {
+      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
+      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.READ_FAILED;
+      this.terminalOutcome = null;
+      return;
+    }
+
+    try {
+      const result = await storage.get([
+        LIVE_DUBBING_STORAGE_KEY,
+        LIVE_DUBBING_OUTCOME_STORAGE_KEY,
+      ]);
+      const storedDescriptor = result?.[LIVE_DUBBING_STORAGE_KEY];
+      if (storedDescriptor === undefined || storedDescriptor === null) {
+        this.storageState = LIVE_DUBBING_STORAGE_STATE.ABSENT;
+        this.descriptor = null;
+      } else {
+        this.storageState = LIVE_DUBBING_STORAGE_STATE.PRESENT;
+        this.descriptor = sanitizeStoredDescriptor(storedDescriptor);
+      }
+
+      const storedOutcome = result?.[LIVE_DUBBING_OUTCOME_STORAGE_KEY];
+      if (storedOutcome === undefined || storedOutcome === null) {
+        this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT;
+        this.terminalOutcome = null;
+      } else {
+        const outcome = createLiveDubbingTerminalOutcome(storedOutcome);
+        if (!outcome) {
+          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.READ_FAILED;
+          this.terminalOutcome = null;
+        } else {
+          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.PRESENT;
+          this.terminalOutcome = outcome;
+        }
+      }
+    } catch {
+      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
+      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.READ_FAILED;
+      this.terminalOutcome = null;
+    }
+  }
+
+  _getStatusTerminalOutcome() {
+    if (!this.terminalOutcome || (this.descriptor
+      && (this.terminalOutcome.sourceSessionId !== this.descriptor.sessionId
+        || this.terminalOutcome.providerId !== this.descriptor.providerId))) {
+      return null;
+    }
+    return toPublicLiveDubbingTerminalOutcome(this.terminalOutcome);
+  }
+
+  _queueOutcomeMutation(operation) {
+    const next = this.outcomeMutation.then(operation, operation).catch(() => false);
+    this.outcomeMutation = next;
+    return next;
+  }
+
+  async _writeTerminalOutcome(outcome) {
+    const sanitized = createLiveDubbingTerminalOutcome(outcome);
+    const storage = this.browserAPI.storage?.session;
+    if (!sanitized || typeof storage?.get !== 'function' || typeof storage?.set !== 'function') {
+      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
+      return false;
+    }
+
+    try {
+      // The active descriptor is the lifecycle fence. An old terminal may not
+      // write after a newer session has taken ownership of the descriptor.
+      const descriptorResult = await storage.get(LIVE_DUBBING_STORAGE_KEY);
+      const active = sanitizeStoredDescriptor(descriptorResult?.[LIVE_DUBBING_STORAGE_KEY]);
+      if (active && (active.sessionId !== sanitized.sourceSessionId
+        || active.providerId !== sanitized.providerId)) {
+        this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
+        return false;
+      }
+
+      const outcomeResult = await storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY);
+      const stored = outcomeResult?.[LIVE_DUBBING_OUTCOME_STORAGE_KEY];
+      if (stored !== undefined && stored !== null) {
+        const existing = createLiveDubbingTerminalOutcome(stored);
+        if (!existing) {
+          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
+          return false;
+        }
+        if (existing.sourceSessionId !== sanitized.sourceSessionId) {
+          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
+          return false;
+        }
+        this.terminalOutcome = existing;
+        this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.PRESENT;
+        return true;
+      }
+
+      await storage.set({ [LIVE_DUBBING_OUTCOME_STORAGE_KEY]: sanitized });
+      this.terminalOutcome = sanitized;
+      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.PRESENT;
+      return true;
+    } catch {
+      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
+      return false;
+    }
+  }
+
+  async _notifyTerminalOutcome(terminalOutcome = toPublicLiveDubbingTerminalOutcome(this.terminalOutcome)) {
+    const sendMessage = this.browserAPI.runtime?.sendMessage;
+    if (!terminalOutcome || typeof sendMessage !== 'function') return;
+
+    try {
+      await sendMessage.call(this.browserAPI.runtime, {
+        action: LIVE_DUBBING_ACTIONS.TERMINAL_OUTCOME,
+        data: terminalOutcome,
+      });
+    } catch {
+      // Outcome notification is best effort and cannot change cleanup state.
+    }
+  }
+
   async _readDescriptor() {
     const storage = this.browserAPI.storage?.session;
     if (typeof storage?.get !== 'function') {
@@ -1734,7 +1895,7 @@ export class LiveDubbingCoordinator {
     return this.descriptor;
   }
 
-  async _writeDescriptor(descriptor, expectedSessionId = null, expectedDescriptor = null) {
+  async _writeDescriptor(descriptor, expectedSessionId = null, expectedDescriptor = null, options = {}) {
     if (expectedSessionId) {
       const current = await this._readDescriptor();
       if (this._storageReadFailed()) return false;
@@ -1778,8 +1939,21 @@ export class LiveDubbingCoordinator {
     }
 
     const previousDescriptor = this.descriptor;
+    const clearOutcome = options.clearOutcome === true && sanitized.status === LIVE_DUBBING_STATUS.RUNNING;
+    if (clearOutcome) {
+      await this.outcomeMutation;
+      if (state?.terminalRequested) return false;
+      const current = expectedSessionId ? await this._readDescriptor() : this.descriptor;
+      if (expectedSessionId && (!current || current.sessionId !== expectedSessionId
+        || (expectedDescriptor && !this._isSameDescriptorFence(current, expectedDescriptor)))) {
+        return false;
+      }
+    }
     try {
-      await storage.set({ [LIVE_DUBBING_STORAGE_KEY]: cloneDescriptor(sanitized) });
+      await storage.set({
+        [LIVE_DUBBING_STORAGE_KEY]: cloneDescriptor(sanitized),
+        ...(clearOutcome ? { [LIVE_DUBBING_OUTCOME_STORAGE_KEY]: null } : {}),
+      });
     } catch {
       // Keep last known descriptor; a failed write cannot establish ownership.
       this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
@@ -1789,6 +1963,10 @@ export class LiveDubbingCoordinator {
 
     this.descriptor = sanitized;
     this.storageState = LIVE_DUBBING_STORAGE_STATE.PRESENT;
+    if (clearOutcome) {
+      this.terminalOutcome = null;
+      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT;
+    }
     return true;
   }
 
