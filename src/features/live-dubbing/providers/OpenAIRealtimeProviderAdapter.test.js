@@ -588,6 +588,21 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     expect(JSON.stringify(playbackError.mock.calls)).not.toContain('private playback detail');
   });
 
+  it('reports a data-channel close immediately', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    await harness.connect();
+
+    harness.peerConnection.channel.onclose();
+
+    expect(onError).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'OPENAI_REALTIME_DATA_CHANNEL_FAILED',
+    }));
+    expect(harness.adapter.active).toBe(false);
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
   it('reports an ICE failure when the peer connection remains connected', async () => {
     const onError = vi.fn();
     const harness = createHarness({ callbacks: { onError } });
@@ -599,6 +614,275 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({
       code: 'OPENAI_REALTIME_PROVIDER_UNAVAILABLE',
     }));
+  });
+
+  it('waits three seconds before reporting a persistent disconnected transport', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2999);
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(harness.adapter.active).toBe(false);
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not cancel the grace timer when connection recovers before ICE', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+      vi.advanceTimersByTime(1000);
+
+      harness.peerConnection.connectionState = 'connected';
+      harness.peerConnection.onconnectionstatechange();
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1999);
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(harness.adapter.active).toBe(false);
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not cancel the grace timer when ICE connects before the connection', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'connected';
+      harness.peerConnection.onconnectionstatechange();
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2999);
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(harness.adapter.active).toBe(false);
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels the grace timer only after both transports recover', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+      vi.advanceTimersByTime(1000);
+
+      harness.peerConnection.connectionState = 'connected';
+      harness.peerConnection.onconnectionstatechange();
+      vi.advanceTimersByTime(1000);
+      expect(onError).not.toHaveBeenCalled();
+
+      harness.peerConnection.iceConnectionState = 'completed';
+      harness.peerConnection.oniceconnectionstatechange();
+      vi.advanceTimersByTime(3000);
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(harness.adapter.active).toBe(true);
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports failed peer state immediately', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'failed';
+      harness.peerConnection.onconnectionstatechange();
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(harness.adapter.active).toBe(false);
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports closed peer state immediately', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'closed';
+      harness.peerConnection.onconnectionstatechange();
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(harness.adapter.active).toBe(false);
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports one failure for duplicate disconnected signals', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+      harness.peerConnection.oniceconnectionstatechange();
+      harness.peerConnection.onconnectionstatechange();
+      vi.advanceTimersByTime(3000);
+
+      expect(onError).toHaveBeenCalledOnce();
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts a fresh grace timer after recovery and a later disconnect', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+      vi.advanceTimersByTime(2000);
+
+      harness.peerConnection.connectionState = 'connected';
+      harness.peerConnection.onconnectionstatechange();
+      harness.peerConnection.iceConnectionState = 'connected';
+      harness.peerConnection.oniceconnectionstatechange();
+      vi.advanceTimersByTime(2000);
+      expect(onError).not.toHaveBeenCalled();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.oniceconnectionstatechange();
+      vi.advanceTimersByTime(2999);
+      expect(onError).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+
+      expect(onError).toHaveBeenCalledOnce();
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('suppresses a disconnected grace failure after dispose', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    try {
+      await harness.connect();
+
+      harness.peerConnection.connectionState = 'disconnected';
+      harness.peerConnection.iceConnectionState = 'disconnected';
+      harness.peerConnection.onconnectionstatechange();
+      await harness.adapter.dispose();
+      vi.advanceTimersByTime(3000);
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+    } finally {
+      await harness.adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('fences stale disconnected callbacks and timers across generations', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const firstPeer = new FakePeerConnection();
+    const secondPeer = new FakePeerConnection();
+    const peerConnectionFactory = vi.fn()
+      .mockResolvedValueOnce(firstPeer)
+      .mockResolvedValueOnce(secondPeer);
+    const adapter = new OpenAIRealtimeProviderAdapter({
+      peerConnectionFactory,
+      fetchImpl: vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
+      audioElementFactory: vi.fn(() => createAudioElement()),
+      callbacks: { onError },
+    });
+    const audioTrack = createTrack();
+    const sourceStream = { getAudioTracks: () => [audioTrack] };
+    const options = {
+      bootstrap: { secret: 'ephemeral-client-secret' },
+      targetLanguage: 'en-US',
+      sourceStream,
+    };
+    try {
+      await adapter.connect(options);
+      const oldPeerState = firstPeer.onconnectionstatechange;
+      firstPeer.connectionState = 'disconnected';
+      firstPeer.iceConnectionState = 'disconnected';
+      oldPeerState();
+
+      await adapter.dispose();
+      await expect(adapter.connect(options)).resolves.toBeUndefined();
+
+      oldPeerState();
+      vi.advanceTimersByTime(3000);
+
+      expect(onError).not.toHaveBeenCalled();
+      expect(adapter.active).toBe(true);
+      expect(secondPeer.close).not.toHaveBeenCalled();
+      expect(audioTrack.stop).not.toHaveBeenCalled();
+    } finally {
+      await adapter.dispose();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   it('ignores late peer-state transitions after disposal', async () => {

@@ -22,7 +22,7 @@ const TELEMETRY_MILESTONES = Object.freeze([
 // transcript, audio, session, and rate-limit events are never terminal.
 const TERMINAL_EVENT_TYPES = new Set(['error']);
 const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
-const RUNTIME_FAILURE_STATES = new Set(['closed', 'disconnected', 'failed']);
+const DISCONNECTED_GRACE_PERIOD = 3000;
 const NOOP = () => {};
 const PROVIDER_ERROR_MESSAGES = Object.freeze({
   OPENAI_REALTIME_PROVIDER_UNAVAILABLE: 'OpenAI Realtime provider is unavailable',
@@ -309,6 +309,7 @@ export class OpenAIRealtimeProviderAdapter {
       cancelReject: null,
       viability: null,
       viabilityTimer: null,
+      disconnectedTimer: null,
     };
     const cancellation = new Promise((_, reject) => {
       session.cancelReject = reject;
@@ -594,12 +595,44 @@ export class OpenAIRealtimeProviderAdapter {
     const peerConnection = session.peerConnection;
     const connectionState = peerConnection?.connectionState;
     const iceConnectionState = peerConnection?.iceConnectionState;
-    if ([connectionState, iceConnectionState].some(state => RUNTIME_FAILURE_STATES.has(state))) {
+    if ([connectionState, iceConnectionState].some(state => state === 'closed' || state === 'failed')) {
       this._reportRuntimeFailure(
         session,
         isCurrent,
         createProviderError('OPENAI_REALTIME_PROVIDER_UNAVAILABLE'),
       );
+      return;
+    }
+
+    if (connectionState === 'disconnected' || iceConnectionState === 'disconnected') {
+      if (session.disconnectedTimer !== null) return;
+
+      const disconnectedTimer = setTimeout(() => {
+        if (session.disconnectedTimer !== disconnectedTimer) return;
+        session.disconnectedTimer = null;
+        if (!isCurrent()) return;
+
+        const currentStates = [
+          session.peerConnection?.connectionState,
+          session.peerConnection?.iceConnectionState,
+        ];
+        if (!currentStates.some(state => state === 'disconnected'
+          || state === 'closed'
+          || state === 'failed')) return;
+
+        this._reportRuntimeFailure(
+          session,
+          isCurrent,
+          createProviderError('OPENAI_REALTIME_PROVIDER_UNAVAILABLE'),
+        );
+      }, DISCONNECTED_GRACE_PERIOD);
+      session.disconnectedTimer = disconnectedTimer;
+      return;
+    }
+
+    if (session.disconnectedTimer !== null) {
+      clearTimeout(session.disconnectedTimer);
+      session.disconnectedTimer = null;
     }
   }
 
@@ -646,6 +679,10 @@ export class OpenAIRealtimeProviderAdapter {
   _cleanupSession(session) {
     if (!session || session.cleaned) return Promise.resolve();
     session.cleaned = true;
+    if (session.disconnectedTimer !== null) {
+      clearTimeout(session.disconnectedTimer);
+      session.disconnectedTimer = null;
+    }
     abortSessionSdp(session);
     // Settle a pending viability wait as stale so setup cannot hang past
     // teardown; the watchdog timer is cleared with it.
