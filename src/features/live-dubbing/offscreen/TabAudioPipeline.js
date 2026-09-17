@@ -116,6 +116,55 @@ function getBufferLength(channel) {
   return channel && Number.isInteger(channel.length) ? channel.length : 0;
 }
 
+// DEV-only scalar diagnostics (Firefox) - safe scalars only, no identifiers / audio
+function isDevFirefoxDiagnostics() {
+  try {
+    return typeof __IS_DEVELOPMENT__ !== 'undefined' && __IS_DEVELOPMENT__ && typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'firefox';
+  } catch {
+    return false;
+  }
+}
+
+function getContextStateScalar(context) {
+  const s = context?.state;
+  return s === 'running' || s === 'suspended' || s === 'closed' ? s : 'other';
+}
+
+function getStreamDiagnostics(stream) {
+  let audioTracks = 0;
+  let liveAudioTracks = 0;
+  let trackReady = false;
+  let trackMuted = false;
+  let trackEnabled = false;
+  try {
+    const audioList = typeof stream?.getAudioTracks === 'function'
+      ? stream.getAudioTracks()
+      : (typeof stream?.getTracks === 'function' ? (stream.getTracks() || []).filter(t => t?.kind === 'audio') : []);
+    const list = Array.isArray(audioList) ? audioList : [...(audioList || [])];
+    audioTracks = list.length;
+    for (const track of list) {
+      try {
+        if (track?.readyState === 'live') trackReady = true;
+        if (track?.muted === true) trackMuted = true;
+        // aggregated enabled: true if any track enabled
+        if (track?.enabled === true) trackEnabled = true;
+      } catch { /* diagnostic ignore */ }
+    }
+    try {
+      liveAudioTracks = list.filter(t => t?.readyState === 'live').length;
+    } catch {
+      liveAudioTracks = trackReady ? audioTracks : 0;
+    }
+    // if no explicit enabled true but tracks exist, consider enabled if not explicitly false
+    if (!trackEnabled && list.length > 0) {
+      try {
+        trackEnabled = list.some(t => t?.enabled !== false);
+      } catch { /* diagnostic ignore */ }
+    }
+  } catch { /* diagnostic ignore */ }
+  return { audioTracks, liveAudioTracks, trackReady, trackMuted, trackEnabled };
+}
+
 /**
  * Clamp a floating point audio sample to the PCM domain.
  * Non-finite samples are silence rather than an invalid PCM value.
@@ -425,6 +474,25 @@ export class TabAudioPipeline {
     this._flushWaiters = [];
     this._startPromise = null;
     this.generation = 0;
+    // DEV-only capture diagnostics scalars (bounded, no identifiers)
+    this._captureDiagnostics = {
+      sourceCreated: 0,
+      workletCreated: 0,
+      configurePosted: 0,
+      configuredAck: 0,
+      captureConfigured: false,
+      sourceConnected: 0,
+      sinkConnected: 0,
+      contextResumed: 0,
+      pcmMessages: 0,
+      heartbeatCount: 0,
+      lastHeartbeat: null,
+      contextState: 'other',
+      streamDiagnostics: null,
+      processNeverObserved: false,
+    };
+    this._devHeartbeatTimeout = null;
+    this._devLogEmitted = false;
   }
 
   async start(stream) {
@@ -446,7 +514,112 @@ export class TabAudioPipeline {
     }
   }
 
+  _getDiagnosticsSnapshot() {
+    // safe scalar snapshot only, no identifiers / raw audio
+    const d = this._captureDiagnostics || {};
+    const s = d.streamDiagnostics || { audioTracks: 0, liveAudioTracks: 0, trackReady: false, trackMuted: false, trackEnabled: false };
+    return {
+      sourceCreated: d.sourceCreated ? 1 : 0,
+      workletCreated: d.workletCreated ? 1 : 0,
+      configurePosted: d.configurePosted ? 1 : 0,
+      configuredAck: d.configuredAck ? 1 : 0,
+      captureConfigured: d.captureConfigured === true,
+      sourceConnected: d.sourceConnected ? 1 : 0,
+      sinkConnected: d.sinkConnected ? 1 : 0,
+      contextResumed: d.contextResumed ? 1 : 0,
+      pcmMessages: Number.isInteger(d.pcmMessages) ? d.pcmMessages : 0,
+      heartbeatCount: Number.isInteger(d.heartbeatCount) ? d.heartbeatCount : 0,
+      lastHeartbeat: d.lastHeartbeat ? { ...d.lastHeartbeat } : null,
+      contextState: d.contextState || 'other',
+      audioTracks: s.audioTracks,
+      liveAudioTracks: s.liveAudioTracks,
+      trackReady: s.trackReady,
+      trackMuted: s.trackMuted,
+      trackEnabled: s.trackEnabled,
+      processNeverObserved: d.processNeverObserved === true,
+      sampleRate: this.context?.sampleRate ?? this.sampleRate,
+      expectedSampleRate: this.sampleRate,
+    };
+  }
+
+  _maybeLogDiagnostics(stage) {
+    if (!isDevFirefoxDiagnostics() || this._devLogEmitted) return;
+    // bounded single emission per session at RUNNING or when process never observed
+    try {
+      const snapshot = this._getDiagnosticsSnapshot();
+      // structured log via console.debug (guarded, DEV-only) - no identifiers
+      console.debug(`[LiveDubbing][CaptureDiagnostics][${stage}]`, snapshot);
+    } catch { /* diagnostic ignore */ }
+  }
+
+  _clearDevHeartbeatTimeout() {
+    if (this._devHeartbeatTimeout) {
+      try { clearTimeout(this._devHeartbeatTimeout); } catch { /* diagnostic ignore */ }
+      this._devHeartbeatTimeout = null;
+    }
+  }
+
+  _scheduleProcessObserveCheck(generation) {
+    if (!isDevFirefoxDiagnostics()) return;
+    this._clearDevHeartbeatTimeout();
+    // bounded one-shot check, does not keep session alive (cleared on teardown)
+    try {
+      this._devHeartbeatTimeout = setTimeout(() => {
+        this._devHeartbeatTimeout = null;
+        if (this.generation !== generation || this.state !== 'running') return;
+        const d = this._captureDiagnostics;
+        if (!d) return;
+        const neverObserved = d.heartbeatCount === 0 && d.pcmMessages === 0;
+        if (neverObserved) {
+          d.processNeverObserved = true;
+          this._maybeLogDiagnostics('processNeverObserved');
+          // also log classification hint
+          try {
+            const snap = this._getDiagnosticsSnapshot();
+            console.debug('[LiveDubbing][CaptureDiagnostics][classificationHint]', {
+              // A track muted/inactive if trackReady false or muted true
+              hintA_trackInactive: snap.trackReady === false || snap.trackMuted === true || snap.trackEnabled === false,
+              // B graph not pulled if context not running or sink not connected
+              hintB_graphNotPulled: snap.contextState !== 'running' || snap.sinkConnected === 0 || snap.sourceConnected === 0,
+              // C zero input channels if heartbeat shows 0
+              hintC_zeroInput: snap.heartbeatCount > 0 && snap.lastHeartbeat && snap.lastHeartbeat.channelCount === 0,
+              // D samples but no PCM if heartbeat has samples but pcmMessages 0
+              hintD_noPcmEmit: snap.heartbeatCount > 0 && snap.lastHeartbeat && snap.lastHeartbeat.sampleCount > 0 && snap.pcmMessages === 0,
+              // E PCM leaves worklet but not received (would be Controller side)
+              hintE_pcmNotReceived: snap.pcmMessages > 0,
+            });
+          } catch { /* diagnostic ignore */ }
+        }
+      }, 1200);
+      // do not keep process alive if environment supports unref
+      if (typeof this._devHeartbeatTimeout?.unref === 'function') {
+        try { this._devHeartbeatTimeout.unref(); } catch { /* diagnostic ignore */ }
+      }
+    } catch { /* diagnostic ignore */ }
+  }
+
   async _start(stream, generation) {
+    // reset per-session DEV diagnostics
+    if (isDevFirefoxDiagnostics()) {
+      this._captureDiagnostics = {
+        sourceCreated: 0,
+        workletCreated: 0,
+        configurePosted: 0,
+        configuredAck: 0,
+        captureConfigured: false,
+        sourceConnected: 0,
+        sinkConnected: 0,
+        contextResumed: 0,
+        pcmMessages: 0,
+        heartbeatCount: 0,
+        lastHeartbeat: null,
+        contextState: 'other',
+        streamDiagnostics: getStreamDiagnostics(stream),
+        processNeverObserved: false,
+      };
+      this._devLogEmitted = false;
+      this._clearDevHeartbeatTimeout();
+    }
     try {
       try {
         this.context = await this.audioContextFactory({
@@ -458,6 +631,10 @@ export class TabAudioPipeline {
       }
       this._assertCurrentGeneration(generation);
       verifyInputAudioContext(this.context, this.sampleRate);
+      if (isDevFirefoxDiagnostics()) {
+        this._captureDiagnostics.contextState = getContextStateScalar(this.context);
+        this._captureDiagnostics.streamDiagnostics = getStreamDiagnostics(stream);
+      }
 
       if (typeof this.context.audioWorklet?.addModule !== 'function') {
         throw createAudioError('INPUT_AUDIO_WORKLET_UNAVAILABLE', 'AudioWorklet is unavailable');
@@ -477,12 +654,14 @@ export class TabAudioPipeline {
 
       try {
         this.source = this.context.createMediaStreamSource(stream);
+        if (isDevFirefoxDiagnostics()) this._captureDiagnostics.sourceCreated = 1;
       } catch (error) {
         if (isCanonicalError(error)) throw error;
         throw createAudioError('INPUT_AUDIO_MEDIA_STREAM_SOURCE_FAILED', 'Failed to create capture media stream source');
       }
       try {
         this.workletNode = this._createWorkletNode();
+        if (isDevFirefoxDiagnostics()) this._captureDiagnostics.workletCreated = 1;
       } catch (error) {
         if (isCanonicalError(error)) throw error;
         const mappedCode = getInputWorkletNodeErrorCode(error);
@@ -493,7 +672,9 @@ export class TabAudioPipeline {
           type: 'configure',
           sampleRate: this.sampleRate,
           frameSamples: this.frameSamples,
+          diagnosticsEnabled: isDevFirefoxDiagnostics() === true,
         });
+        if (isDevFirefoxDiagnostics()) this._captureDiagnostics.configurePosted = 1;
       } catch {
         // Configure is best effort prior to graph connect; port availability is verified in _attachPort
       }
@@ -503,8 +684,10 @@ export class TabAudioPipeline {
         this.sink.gain.setValueAtTime?.(0, this.context.currentTime || 0);
 
         this.source.connect(this.workletNode);
+        if (isDevFirefoxDiagnostics()) this._captureDiagnostics.sourceConnected = 1;
         this.workletNode.connect(this.sink);
         this.sink.connect(this.context.destination);
+        if (isDevFirefoxDiagnostics()) this._captureDiagnostics.sinkConnected = 1;
         this._attachPort(this.workletNode.port, this.workletNode, generation);
       } catch (error) {
         if (isCanonicalError(error)) throw error;
@@ -513,12 +696,22 @@ export class TabAudioPipeline {
 
       try {
         await this.context.resume?.();
+        if (isDevFirefoxDiagnostics()) {
+          this._captureDiagnostics.contextResumed = 1;
+          this._captureDiagnostics.contextState = getContextStateScalar(this.context);
+        }
       } catch (error) {
         if (isCanonicalError(error)) throw error;
         throw createAudioError('INPUT_AUDIO_CONTEXT_RESUME_FAILED', 'Failed to resume input AudioContext');
       }
       this._assertCurrentGeneration(generation);
       this.state = 'running';
+      if (isDevFirefoxDiagnostics()) {
+        this._scheduleProcessObserveCheck(generation);
+        // emit initial checkpoint (bounded, single)
+        this._maybeLogDiagnostics('running');
+        this._devLogEmitted = true;
+      }
       return this.getGraphInfo();
     } catch (error) {
       await this._teardown();
@@ -566,10 +759,55 @@ export class TabAudioPipeline {
       this.onError?.(error);
       return;
     }
+    // DEV diagnostics: captureConfigured ack (safe scalar, no payload)
+    if (data.type === 'configured') {
+      if (isDevFirefoxDiagnostics() && this._captureDiagnostics) {
+        this._captureDiagnostics.configuredAck = 1;
+        this._captureDiagnostics.captureConfigured = true;
+      }
+      return;
+    }
+    // DEV diagnostics: one-shot heartbeat (bounded, DEV Firefox only)
+    if (data.type === 'captureHeartbeat' || data.type === 'heartbeat') {
+      if (isDevFirefoxDiagnostics() && this._captureDiagnostics) {
+        const count = Number.isInteger(data.channelCount) ? data.channelCount : 0;
+        const samples = Number.isInteger(data.sampleCount) ? data.sampleCount : 0;
+        const hasNonZero = data.hasNonZeroInput === true;
+        // bounded: keep only first 3 heartbeats
+        if (this._captureDiagnostics.heartbeatCount < 3) {
+          this._captureDiagnostics.heartbeatCount += 1;
+          this._captureDiagnostics.lastHeartbeat = {
+            processCalled: true,
+            channelCount: count,
+            sampleCount: samples,
+            hasNonZeroInput: hasNonZero,
+          };
+          // if we now have heartbeat, cancel never-observed flag
+          this._captureDiagnostics.processNeverObserved = false;
+          this._clearDevHeartbeatTimeout();
+          // emit bounded diagnostic once when first heartbeat arrives
+          if (this._captureDiagnostics.heartbeatCount === 1) {
+            try {
+              const snap = this._getDiagnosticsSnapshot();
+              console.debug('[LiveDubbing][CaptureDiagnostics][heartbeat]', snap.lastHeartbeat);
+            } catch { /* diagnostic ignore */ }
+          }
+        }
+      }
+      return;
+    }
     if (data.type !== 'pcm') return;
 
     const buffer = getMessageBuffer(data);
     if (!buffer) return;
+    if (isDevFirefoxDiagnostics() && this._captureDiagnostics) {
+      this._captureDiagnostics.pcmMessages += 1;
+      // if PCM now observed, clear never-observed check
+      if (this._captureDiagnostics.pcmMessages === 1) {
+        this._captureDiagnostics.processNeverObserved = false;
+        this._clearDevHeartbeatTimeout();
+      }
+    }
     const frame = { ...data, buffer };
     delete frame.pcm;
     try {
@@ -594,14 +832,29 @@ export class TabAudioPipeline {
     });
   }
 
+  getCaptureDiagnostics() {
+    if (!isDevFirefoxDiagnostics() || !this._captureDiagnostics) return null;
+    return this._getDiagnosticsSnapshot();
+  }
+
+  // alias for tests
+  getDiagnostics() {
+    return this.getCaptureDiagnostics();
+  }
+
   getGraphInfo() {
-    return {
+    const info = {
       state: this.state,
       sampleRate: this.sampleRate,
       frameSamples: this.frameSamples,
       channels: 1,
       processorName: this.processorName,
     };
+    // DEV-only diagnostics exposure for tests / classification (safe scalars)
+    if (isDevFirefoxDiagnostics() && this._captureDiagnostics) {
+      info.captureDiagnostics = this._getDiagnosticsSnapshot();
+    }
+    return info;
   }
 
   async stop() {
@@ -632,6 +885,7 @@ export class TabAudioPipeline {
     this.context = null;
     this.stream = null;
 
+    this._clearDevHeartbeatTimeout();
     if (workletNode?.port) workletNode.port.onmessage = null;
 
     disconnect(source);

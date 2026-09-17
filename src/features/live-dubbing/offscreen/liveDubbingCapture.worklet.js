@@ -36,6 +36,10 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
     this.nextSourceTime = null;
     this.frameSourceSample = null;
     this.frameSourceTime = null;
+    // ponytail: bounded DEV Firefox heartbeat, 3 emits max then stop
+    this._heartbeatCount = 0;
+    this._heartbeatLimit = 3;
+    this.diagnosticsEnabled = false;
 
     this.port.onmessage = event => {
       const data = event?.data || {};
@@ -62,6 +66,7 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
   applyConfigure(data) {
     const nextSampleRate = data.sampleRate;
     const nextFrameSamples = data.frameSamples;
+    this.diagnosticsEnabled = data.diagnosticsEnabled === true;
     let updated = false;
     if (finite(nextSampleRate) && nextSampleRate > 0) {
       this.sampleRateValue = nextSampleRate;
@@ -81,18 +86,46 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
       updated = true;
     }
     void updated;
+    // prove configure delivery: safe ack without payload
+    if (updated) {
+      try {
+        this.port.postMessage({ type: 'configured' });
+      } catch { /* diagnostic ignore */ }
+    }
   }
 
   process(inputs, outputs) {
     for (const channel of outputs?.[0] || []) channel.fill(0);
     const channels = inputs?.[0] || [];
     const channelCount = channels.length;
-    if (channelCount === 0) return true;
-
     const sampleCount = channels.reduce(
       (largest, channel) => Math.max(largest, channel?.length || 0),
       0,
     );
+    // DEV-only one-shot heartbeat, bounded, scalar only (no raw samples)
+    if (this.diagnosticsEnabled === true && this._heartbeatCount < this._heartbeatLimit) {
+      let hasNonZeroInput = false;
+      if (channelCount > 0 && sampleCount > 0) {
+        heartbeatScan: for (const ch of channels) {
+          if (!ch) continue;
+          for (let i = 0; i < ch.length; i += 1) {
+            const v = ch[i];
+            if (finite(v) && v !== 0) { hasNonZeroInput = true; break heartbeatScan; }
+          }
+        }
+      }
+      try {
+        this.port.postMessage({
+          type: 'captureHeartbeat',
+          processCalled: true,
+          channelCount,
+          sampleCount,
+          hasNonZeroInput,
+        });
+      } catch { /* diagnostic ignore */ }
+      this._heartbeatCount += 1;
+    }
+    if (channelCount === 0) return true;
     if (sampleCount === 0) return true;
 
     const renderFrame = finite(currentFrame) ? currentFrame : null;
