@@ -8,7 +8,24 @@
 
 export const OUTPUT_SAMPLE_RATE = 24_000;
 export const PLAYBACK_PROCESSOR_NAME = 'live-dubbing-playback-processor';
-export const PLAYBACK_WORKLET_URL = new URL('./liveDubbingPlayback.worklet.js', import.meta.url).href;
+function resolvePlaybackWorkletUrl() {
+  const stablePath = 'assets/live-dubbing/liveDubbingPlayback.worklet.js';
+  try {
+    const runtime = globalThis.browser?.runtime ?? globalThis.chrome?.runtime;
+    if (runtime?.getURL) {
+      const url = runtime.getURL(stablePath);
+      if (typeof url === 'string' && url && !url.includes('://invalid/')) return url;
+    }
+  } catch {
+    // runtime unavailable in test environments
+  }
+  try {
+    return new URL('./liveDubbingPlayback.worklet.js', import.meta.url).href;
+  } catch {
+    return stablePath;
+  }
+}
+export const PLAYBACK_WORKLET_URL = resolvePlaybackWorkletUrl();
 export const DEFAULT_MAX_QUEUED_SAMPLES = OUTPUT_SAMPLE_RATE * 10;
 
 function isArrayBuffer(value) {
@@ -30,6 +47,12 @@ function createAudioError(code, message, fields = {}) {
   error.code = code;
   Object.assign(error, fields);
   return error;
+}
+
+const SAFE_CANONICAL_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
+
+function isCanonicalError(error) {
+  return typeof error?.code === 'string' && SAFE_CANONICAL_CODE.test(error.code);
 }
 
 function getAudioContextFactory(options) {
@@ -250,23 +273,48 @@ export class PcmOutputPlayer {
 
   async _start(generation) {
     try {
-      this.context = await this.audioContextFactory({
-        sampleRate: this.sampleRate,
-      });
+      try {
+        this.context = await this.audioContextFactory({
+          sampleRate: this.sampleRate,
+        });
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('OUTPUT_AUDIO_CONTEXT_CREATE_FAILED', 'Failed to create output AudioContext');
+      }
       this._assertCurrentGeneration(generation);
       verifyOutputAudioContext(this.context, this.sampleRate);
       if (typeof this.context.audioWorklet?.addModule !== 'function') {
         throw createAudioError('OUTPUT_AUDIO_WORKLET_UNAVAILABLE', 'AudioWorklet is unavailable');
       }
-      await this.context.audioWorklet.addModule(this.workletUrl);
+      try {
+        await this.context.audioWorklet.addModule(this.workletUrl);
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('OUTPUT_AUDIO_WORKLET_LOAD_FAILED', 'Failed to load playback worklet');
+      }
       this._assertCurrentGeneration(generation);
-      this.workletNode = this._createWorkletNode();
+      try {
+        this.workletNode = this._createWorkletNode();
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('OUTPUT_AUDIO_WORKLET_NODE_FAILED', 'Failed to create playback worklet node');
+      }
       if (typeof this.workletNode.connect !== 'function' || !this.context.destination) {
         throw createAudioError('OUTPUT_AUDIO_GRAPH_UNAVAILABLE', 'Playback audio graph is unavailable');
       }
-      this.workletNode.connect(this.context.destination);
-      this._attachPort(this.workletNode.port, this.workletNode, generation);
-      await this.context.resume?.();
+      try {
+        this.workletNode.connect(this.context.destination);
+        this._attachPort(this.workletNode.port, this.workletNode, generation);
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('OUTPUT_AUDIO_GRAPH_FAILED', 'Failed to connect playback audio graph');
+      }
+      try {
+        await this.context.resume?.();
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('OUTPUT_AUDIO_CONTEXT_RESUME_FAILED', 'Failed to resume output AudioContext');
+      }
       this._assertCurrentGeneration(generation);
       this.state = 'running';
       this._pump();

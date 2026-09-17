@@ -103,6 +103,10 @@ export default defineConfig({
                 const info = assetInfo.name.split('.')
                 const ext = info[info.length - 1]
 
+                if (/liveDubbing.*\.worklet\.js$/i.test(assetInfo.name)) {
+                  return 'assets/live-dubbing/[name].[ext]'
+                }
+
                 if (/\.(css)$/i.test(assetInfo.name)) {
                   return 'css/[name].[hash].[ext]'
                 }

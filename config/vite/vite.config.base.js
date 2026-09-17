@@ -2,6 +2,7 @@ import { defineConfig, createLogger } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 import babel from '@rollup/plugin-babel'
+import { liveDubbingWorkletsPlugin } from './plugins/live-dubbing-worklets.js'
 // import enhancedTreeShaking from './plugins/enhanced-tree-shaking.js'
 
 // Base configuration shared across all builds
@@ -62,6 +63,7 @@ export const createBaseConfig = (browser, options = {}) => {
           ['@babel/plugin-proposal-decorators', { legacy: true }]
         ]
       }),
+      liveDubbingWorkletsPlugin(),
       // enhancedTreeShaking({
       //   include: ['src/**/*.{js,vue}'],
       //   exclude: ['node_modules/**']
@@ -221,6 +223,12 @@ export const createBaseConfig = (browser, options = {}) => {
           assetFileNames: (assetInfo) => {
             const info = assetInfo.name.split('.')
             const ext = info[info.length - 1]
+
+            // Live-dubbing worklets must be stable and web-accessible; avoid hash
+            // so manifest can declare an exact narrow pattern.
+            if (/liveDubbing.*\.worklet\.js$/i.test(assetInfo.name)) {
+              return 'assets/live-dubbing/[name].[ext]'
+            }
             
             if (/\.(css)$/i.test(assetInfo.name)) {
               return 'css/[name].[hash].[ext]'
@@ -261,6 +269,9 @@ export const createBaseConfig = (browser, options = {}) => {
       
       cssCodeSplit: false,
       cssMinify: isProduction,
+      // Live-dubbing worklets are published via liveDubbingWorkletsPlugin() to
+      // stable assets/live-dubbing/ and resolved with runtime.getURL(), so they
+      // no longer rely on Vite asset inlining.
       assetsInlineLimit: 4096,
       reportCompressedSize: isProduction
     },

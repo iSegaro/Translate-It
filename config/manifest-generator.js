@@ -74,6 +74,17 @@ export function generateManifest(browser = 'chrome', options = {}) {
         ],
         matches: ['<all_urls>', 'file://*/*'],
         use_dynamic_url: false
+      },
+      {
+        // Live-dubbing AudioWorklets — capture (16kHz) and playback (24kHz) must be
+        // web-accessible for Firefox content AudioWorklet.addModule to load them.
+        // Stable copied assets via liveDubbingWorkletsPlugin().
+        resources: [
+          'assets/live-dubbing/liveDubbingCapture.worklet.js',
+          'assets/live-dubbing/liveDubbingPlayback.worklet.js'
+        ],
+        matches: ['<all_urls>', 'file://*/*'],
+        use_dynamic_url: true
       }
     ],
     

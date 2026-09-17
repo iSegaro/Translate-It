@@ -13,7 +13,27 @@
 export const INPUT_SAMPLE_RATE = 16_000;
 export const INPUT_FRAME_SAMPLES = 1_600;
 export const CAPTURE_PROCESSOR_NAME = 'live-dubbing-capture-processor';
-export const CAPTURE_WORKLET_URL = new URL('./liveDubbingCapture.worklet.js', import.meta.url).href;
+// Stable, web-accessible worklet location. Prefer extension URL via runtime.getURL
+// (Firefox content AudioWorklet requires web_accessible_resources); fallback to
+// Vite-transformed relative URL for tests and non-extension environments.
+function resolveCaptureWorkletUrl() {
+  const stablePath = 'assets/live-dubbing/liveDubbingCapture.worklet.js';
+  try {
+    const runtime = globalThis.browser?.runtime ?? globalThis.chrome?.runtime;
+    if (runtime?.getURL) {
+      const url = runtime.getURL(stablePath);
+      if (typeof url === 'string' && url && !url.includes('://invalid/')) return url;
+    }
+  } catch {
+    // runtime unavailable in test environments
+  }
+  try {
+    return new URL('./liveDubbingCapture.worklet.js', import.meta.url).href;
+  } catch {
+    return stablePath;
+  }
+}
+export const CAPTURE_WORKLET_URL = resolveCaptureWorkletUrl();
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
@@ -39,6 +59,12 @@ function createAudioError(code, message, fields = {}) {
   error.code = code;
   Object.assign(error, fields);
   return error;
+}
+
+const SAFE_CANONICAL_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
+
+function isCanonicalError(error) {
+  return typeof error?.code === 'string' && SAFE_CANONICAL_CODE.test(error.code);
 }
 
 function getAudioContextFactory(options) {
@@ -389,16 +415,26 @@ export class TabAudioPipeline {
 
   async _start(stream, generation) {
     try {
-      this.context = await this.audioContextFactory({
-        sampleRate: this.sampleRate,
-      });
+      try {
+        this.context = await this.audioContextFactory({
+          sampleRate: this.sampleRate,
+        });
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('INPUT_AUDIO_CONTEXT_CREATE_FAILED', 'Failed to create input AudioContext');
+      }
       this._assertCurrentGeneration(generation);
       verifyInputAudioContext(this.context, this.sampleRate);
 
       if (typeof this.context.audioWorklet?.addModule !== 'function') {
         throw createAudioError('INPUT_AUDIO_WORKLET_UNAVAILABLE', 'AudioWorklet is unavailable');
       }
-      await this.context.audioWorklet.addModule(this.workletUrl);
+      try {
+        await this.context.audioWorklet.addModule(this.workletUrl);
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('INPUT_AUDIO_WORKLET_LOAD_FAILED', 'Failed to load capture worklet');
+      }
       this._assertCurrentGeneration(generation);
 
       if (typeof this.context.createMediaStreamSource !== 'function'
@@ -406,18 +442,38 @@ export class TabAudioPipeline {
         throw createAudioError('INPUT_AUDIO_GRAPH_UNAVAILABLE', 'Capture audio graph is unavailable');
       }
 
-      this.source = this.context.createMediaStreamSource(stream);
-      this.workletNode = this._createWorkletNode();
-      this.sink = this.context.createGain();
-      this.sink.gain.value = 0;
-      this.sink.gain.setValueAtTime?.(0, this.context.currentTime || 0);
+      try {
+        this.source = this.context.createMediaStreamSource(stream);
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('INPUT_AUDIO_MEDIA_STREAM_SOURCE_FAILED', 'Failed to create capture media stream source');
+      }
+      try {
+        this.workletNode = this._createWorkletNode();
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('INPUT_AUDIO_WORKLET_NODE_FAILED', 'Failed to create capture worklet node');
+      }
+      try {
+        this.sink = this.context.createGain();
+        this.sink.gain.value = 0;
+        this.sink.gain.setValueAtTime?.(0, this.context.currentTime || 0);
 
-      this.source.connect(this.workletNode);
-      this.workletNode.connect(this.sink);
-      this.sink.connect(this.context.destination);
-      this._attachPort(this.workletNode.port, this.workletNode, generation);
+        this.source.connect(this.workletNode);
+        this.workletNode.connect(this.sink);
+        this.sink.connect(this.context.destination);
+        this._attachPort(this.workletNode.port, this.workletNode, generation);
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('INPUT_AUDIO_GRAPH_FAILED', 'Failed to connect capture audio graph');
+      }
 
-      await this.context.resume?.();
+      try {
+        await this.context.resume?.();
+      } catch (error) {
+        if (isCanonicalError(error)) throw error;
+        throw createAudioError('INPUT_AUDIO_CONTEXT_RESUME_FAILED', 'Failed to resume input AudioContext');
+      }
       this._assertCurrentGeneration(generation);
       this.state = 'running';
       return this.getGraphInfo();
