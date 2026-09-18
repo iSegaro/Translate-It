@@ -34,9 +34,11 @@ playback.
    `RUNNING`.
 3. `stop()`, tab removal, top-level navigation, capture-track end, and
    provider terminal events all funnel into one idempotent terminal path:
-   mark terminal → `DISPOSE` the offscreen session → release the exact
-   lease → clear the descriptor. Duplicate, stale, and wrong-session
-   terminal messages are ignored without side effects.
+   mark terminal → exact `DISPOSE` acknowledgement → release the exact lease
+   → clear the descriptor. When the Coordinator positively proves the
+   offscreen runtime absent, it uses the dedicated exact-release path without
+   `DISPOSE`. Duplicate, stale, and wrong-session terminal messages are
+   ignored without side effects.
 4. Operation timeouts: start 30 s, stop 10 s, status 5 s, setup stages
    10 s. Service-worker restarts reconcile via descriptor + lease snapshot
    (`reconcile()`), never trusting a stale session.
@@ -47,6 +49,61 @@ playback.
    `RUNNING`. If cleanup cannot finish, the Coordinator retains the authoritative
    descriptor and exact lease ownership as `cleanupPending`; a later STOP retries
    disposal before release and descriptor clearing.
+
+### START preflight and side-effect boundary
+
+The Coordinator's serialized START transaction performs its checks in this
+order:
+
+1. Validate the provider id and normalize the provider-specific target language.
+2. Read and validate the persisted descriptor, reject unreadable/invalid storage,
+   and reject an existing descriptor as busy.
+3. Await pending terminal-outcome mutations, read the descriptor again, and
+   repeat the storage and busy checks. This barrier keeps an old outcome write
+   ahead of a later lifecycle.
+4. Await `hasConfiguredCredentials(providerId)` for the selected provider. The
+   production implementation dynamically uses the exported Gemini or OpenAI
+   bootstrap-service singleton. The service method is read-only: it reuses the
+   service's `_eligibleKeys()` policy, performs no network request, does not mint
+   a token/secret, log, or provider/key-state mutation, and does not expose a
+   key. Gemini retains its primary-list then legacy-key fallback; both services
+   trim and deduplicate eligible keys.
+   `false`, rejection, or any result other than literal `true` returns
+   `LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE`.
+5. Recheck pending START cancellation. If the configured offscreen lease manager
+   exposes synchronous `supportsOffscreenDocument()`, call it next; `false` or
+   an exception returns `LIVE_DUBBING_UNSUPPORTED`. If the method is absent, the
+   prior behavior is preserved.
+6. Resolve the authoritative tab, recheck pending cancellation, and verify tab
+   capture support. Only then create and persist the descriptor, acquire the
+   exact lease, send `PREPARE`, obtain the one-time stream id, send `CONSUME`,
+   wait for capture/audio-path readiness, persist `CONNECTING_PROVIDER`, and
+   send `CONNECT_PROVIDER` for provider bootstrap and setup before the final
+   `RUNNING` commit.
+
+The early rejection paths through provider, language, storage, busy,
+outcome-barrier, credential, cancellation, and offscreen-capability checks
+occur before the descriptor write, lease acquisition, tab stream id, offscreen
+stage message, or media resource creation. Cancellation is also rechecked after
+descriptor persistence and between setup stages. A cancellation after
+resources are acquired enters the fenced terminal cleanup path and clears only
+after exact cleanup/lease settlement (or the proven-absence release path);
+before resource acquisition, it uses the fenced descriptor-clear path.
+Credential preflight only proves that a configured key is present; a later
+mint-time failure remains
+`LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE` and does not introduce automatic
+cross-provider fallback or reconnect.
+
+### Status availability
+
+`LiveDubbingCoordinator.getStatus()` computes `available` synchronously as
+successful tab-capture support **and**, when the lease manager exposes
+`supportsOffscreenDocument()`, successful offscreen-document support. A false
+result or thrown capability check makes `available` false. When that offscreen
+capability method is absent, offscreen support defaults to true to preserve the
+previous behavior. The method then reads the StateStore snapshot only: it does
+not acquire/create a lease, create/reconcile an offscreen document, or join the
+START/STOP mutation queue.
 
 ## Provider Setting
 
@@ -65,14 +122,51 @@ playback.
 
 ## Runtime Ownership
 
-- `LiveDubbingCoordinator` (background) owns session identity, descriptor
-  persistence, lease acquisition/release, and terminal fencing.
+- `LiveDubbingCoordinator` (background) owns lifecycle policy: provider and
+  language validation, busy/preflight ordering, descriptor transitions, stage
+  sequencing, terminal decisions, identity fences, stop races, and recovery
+  policy. It delegates persistence mechanics, physical cleanup, raw platform
+  calls, and identity collections to the components below.
+- `LiveDubbingStateStore` owns `storage.session` mechanics for the active
+  descriptor and the separate terminal-outcome record. It sanitizes records,
+  tracks read/write state, serializes outcome mutations, and applies persistence
+  fences for expected session/provider/descriptor identity and stale
+  `eventSequence`. The Coordinator decides lifecycle policy such as when
+  `STOPPING` is allowed and when a successful `RUNNING` commit may clear an
+  outcome; the Store performs the atomic descriptor plus null-outcome write in
+  one `storage.set` after the Coordinator's outcome barrier and final fence
+  re-read.
+- `LiveDubbingCleanupManager` owns physical cleanup facts and exact resource
+  settlement. `disposeAndRelease()` is single-flight per session/state/provider,
+  requires the exact session/provider `DISPOSED` acknowledgement, settles a
+  pending lease before deciding release, and releases only the exact
+  `{ owner: 'live-dubbing', leaseId }`. Its stale-state fence prevents an old
+  cleanup generation from releasing or completing a replacement. The separate
+  `releaseAfterProvenAbsence()` path skips `DISPOSE` only after the Coordinator
+  has positively proved that the offscreen runtime is absent.
+- `LiveDubbingRuntimeGateway` is a thin platform boundary that normalizes
+  browser/runtime/tab/capture probes. It exposes tab resolution, tab-capture
+  support and stream-id calls, captured-tab/current capture probes, runtime
+  messaging, sender-origin mechanics, and tab presence probes. It does not
+  choose lifecycle error codes, create descriptors, decide cleanup, or
+  reconcile sessions.
+- `LiveDubbingSessionRegistry` is a synchronous identity/reference collection,
+  not a policy owner. It stores session-state references, pending-start records
+  and tab-event markers, terminal-operation records, and one-time bootstrap
+  reservations. Expected-object deletion plus the Coordinator's exact
+  session/provider checks keep old records from deleting or joining a
+  replacement; lifecycle decisions stay in the Coordinator.
+- `OffscreenRuntimeLeaseManager` owns shared offscreen-document capability and
+  existence detection, document creation/close, lease metadata, supported
+  reasons, and named lease transitions. The Coordinator supplies the provider's
+  exact required reasons and decides when a lease is appropriate.
 - `LiveDubbingController` (offscreen document) owns the only media,
   provider-socket, and audio-graph resources for the current session.
   A terminal callback re-fences the session first, so late worklet and
   socket events cannot affect a subsequent session.
-- The offscreen document exists only while the lease is held; disposal
-  always precedes lease release.
+- Live Dubbing acquires its named lease before using the offscreen capture and
+  provider resources; ordinary disposal precedes release. The offscreen
+  document is shared infrastructure and may also serve other lease owners.
 - Background handlers are the offscreen control boundary for terminal and
   provider-bootstrap requests. Terminal notifications require the authorized
   offscreen sender and an exact authoritative `sessionId` + `providerId` match.
@@ -80,6 +174,27 @@ playback.
   discard a legitimate terminal signal; target language and event sequence are
   not terminal-authorization requirements. Stale or wrong-session/provider
   terminal notifications still fail closed and are ignored.
+
+### Controller terminal delivery
+
+Provider failures and capture-track loss mark the current Controller session
+terminal and start local physical cleanup independently of terminal-message
+delivery. `_notifyTerminal()` creates one immutable sanitized payload for that
+session: scalar session/provider identity and event-sequence/status/error fields
+plus optional freshly sanitized, frozen provider and cleanup diagnostic objects.
+`terminalSent` and the
+`terminalDelivery` record permit one notification workflow per session.
+
+The first send is immediate. A rejected or synchronously thrown send is retried
+after 25 ms and then 50 ms, for at most three sends total. A successful send
+stops retry scheduling; exhaustion only records debug delivery detail and is a
+lifecycle no-op because local cleanup does not wait for notification success.
+`DISPOSE` cancels pending notification timers before cleanup and clears the
+active-session fence; `currentSession`, delivery identity, and replacement
+checks prevent a late send from an old session reaching a new one. Background
+still authorizes each terminal message by the exact authoritative session and
+provider identity; event-sequence drift alone is intentionally not a terminal
+authorization failure.
 
 ## Capture
 
@@ -95,6 +210,48 @@ returned, stored, or logged.
 - The source graph terminates in a **zero-gain sink**, so captured tab
   audio stays inaudible while capture runs.
 - The pipeline never connects the raw stream to the destination.
+
+### Capture and runtime loss
+
+`handleCaptureStatusChanged()` accepts only `stopped` or `error` capture
+statuses. It first requires a persisted `RUNNING` descriptor for the reported
+tab, then re-reads the descriptor and checks the current session state and
+terminal-operation record. It probes tab presence, re-reads the descriptor
+again, queries current tab-capture state, and repeats the descriptor/session
+fence before terminal work. A missing tab selects `TAB_REMOVED`; an active
+capture is ignored. A stopped/error event whose revalidated capture state is
+not active enters the capture-loss terminal path.
+
+A capture-loss event is terminal proof of capture loss, **not proof that the
+offscreen document is absent**. Runtime absence is probed separately through
+lease-manager reconciliation/snapshot state or an exact offscreen `STATUS`
+response. The Coordinator queues the sanitized terminal outcome
+`LIVE_DUBBING_OFFSCREEN_LOST` for persistence before cleanup on this terminal
+path; a storage failure leaves the outcome write unsuccessful but does not
+block the cleanup decision. A positively absent runtime can use exact lease
+release without `DISPOSE`; otherwise normal exact `DISPOSE` cleanup is used.
+Even when the absence probe is unavailable, capture loss is not silently
+ignored.
+
+These sources do not share one initial fence:
+
+- Capture status has no session identity, so it uses the persisted `RUNNING`
+  descriptor/tab, repeated descriptor and session-state reads, tab presence,
+  and current capture-state probes before terminalization.
+- Tab removal/navigation matches the current descriptor's `tabId` and marks
+  matching pending starts through the registry's tab-event markers.
+- Explicit STOP requires the requested `sessionId` to match the current
+  descriptor; a pending START is cancelled separately, and terminal ownership
+  is then established from the current session state.
+- Authorized offscreen terminal messages require the authorized offscreen
+  sender and exact current `sessionId` + `providerId`; event-sequence drift is
+  tolerated, then the authorized descriptor and current session state are passed
+  into terminal handling.
+
+After their respective checks, all converge on the Coordinator's terminal
+operation and the CleanupManager's per-session single-flight record, so
+concurrent races join one cleanup workflow rather than duplicate disposal or
+lease release.
 
 ## Provider Identity and Bootstrap
 
@@ -277,6 +434,100 @@ offscreen-internal state and is never exposed as public `RUNNING`.
 `STOPPING` blocks descriptor writes from any path except the owning
 terminal operation.
 
+## Terminal Outcomes and UI Reopening
+
+The active descriptor and latest terminal outcome are separate records:
+`LIVE_DUBBING_STORAGE_KEY` stores the sanitized lifecycle descriptor, while
+`LIVE_DUBBING_OUTCOME_STORAGE_KEY` stores a sanitized internal outcome with its
+`sourceSessionId`, provider, safe error, timestamp, and optional sanitized
+provider diagnostic. The public DTO removes `sourceSessionId`; the Popup uses
+the Coordinator's authoritative `GET_LIVE_DUBBING_STATUS` response rather than
+trusting a terminal notification's data.
+`LiveDubbingControl.vue` keeps an authoritative retained session available for
+cleanup after structured START/STOP failures, disables START while unavailable
+or cleanup is pending, and treats a terminal-outcome notification only as a
+reason to refresh status; it does not render notification payloads directly.
+
+Terminal handling queues outcome mutations through the StateStore's serialized
+outcome chain. A candidate terminal notification is chained after that write
+attempt settles, never sent while the outcome write is still pending. A failed
+write does not make the candidate authoritative in `GET_LIVE_DUBBING_STATUS`;
+the read sees the last valid compatible persisted outcome or a safe null, while
+cleanup remains independent. The notification may trigger a Popup status
+refresh, but its payload is not rendered directly, and a reopened Popup can
+reconstruct the active descriptor or retained cleanup state from storage.
+
+The final successful `RUNNING` descriptor commit is special: the Coordinator
+awaits earlier outcome mutations, re-reads the descriptor, and rechecks the
+session/state fences before asking the StateStore to write the descriptor and
+`LIVE_DUBBING_OUTCOME_STORAGE_KEY: null` atomically. StateStore identity,
+event-sequence, and `STOPPING` fencing reject stale writes, so a late terminal
+outcome cannot overwrite a newer session or race the atomic outcome clear.
+
+## Stop and Cleanup Reliability
+
+Explicit STOP, tab removal/navigation, capture loss, and authorized offscreen
+terminal events converge on one Coordinator terminal operation for the exact
+session/provider/state. Concurrent requests join that operation; the
+CleanupManager separately single-flights the physical cleanup facts. Ordinary
+cleanup sends `LIVE_DUBBING_DISPOSE` and accepts completion only for the exact
+`DISPOSED` acknowledgement, then settles and releases the exact lease. A
+pending lease acquisition is awaited before release; failed or timed-out
+disposal retains the descriptor as `STOPPING` or `ERROR` with `cleanupPending`,
+blocks a new START as busy, and is retried by a later STOP.
+Before cleanup begins, a session, state, or expected-descriptor fence mismatch
+is an ignored no-op; explicit STOP with a different session id is likewise
+ignored. Once terminalization has begun, a readable persistence-fence rejection
+of the `STOPPING` write returns `LIVE_DUBBING_STORAGE_UNWRITABLE`; it is not
+treated as a pre-terminal cleanup rejection. A descriptor-clear failure returns
+`LIVE_DUBBING_STORAGE_CLEAR_FAILED` and retains cleanup as retryable.
+The offscreen Controller reports an unsettled physical teardown as
+`LIVE_DUBBING_CLEANUP_PENDING`; a Coordinator wait can likewise return
+`LIVE_DUBBING_STOP_TIMEOUT` while the canonical cleanup continues in the
+background.
+
+The Coordinator continues exact cleanup when a real `STOPPING` storage write
+failure makes storage unreadable; descriptor clearing remains a retryable
+operation until storage confirms it. Conversely, a readable expected-descriptor
+or session fence mismatch rejects stale cleanup before `DISPOSE` or lease
+release (`LIVE_DUBBING_STORAGE_UNWRITABLE`); a failed descriptor clear is
+reported as `LIVE_DUBBING_STORAGE_CLEAR_FAILED`. This preserves exact ownership
+across delayed sends, duplicate STOPs, late terminal callbacks, and
+service-worker timing races.
+
+## Reconciliation
+
+`reconcile()` reads and sanitizes the descriptor, asks the lease manager to
+reconcile shared offscreen presence/metadata without creating a document, then
+reads the lease snapshot first. It uses exact offscreen `STATUS` probes where
+the snapshot and descriptor require proof of session ownership, absence, or
+recovery. Session/provider mismatches fail closed: no `DISPOSE`, lease release,
+or descriptor adoption is performed for an uncertain owner.
+
+- A `RUNNING` descriptor whose offscreen runtime/session is provably absent is
+  terminalized through the `LIVE_DUBBING_OFFSCREEN_LOST` outcome path, not
+  silently cleared. An uncertain `RUNNING` descriptor remains retained and
+  retryable rather than being guessed away. If a running descriptor has an
+  exact active offscreen status but no matching lease, reconciliation reacquires
+  the provider-specific lease; failure records
+  `LIVE_DUBBING_LEASE_ACQUIRE_FAILED` and retains an error descriptor for retry.
+- A non-running descriptor is directly cleared only when an exact status/snapshot
+  proof shows the session absent and no matching lease exists. Otherwise normal
+  cleanup sends `DISPOSE`, requires the exact `DISPOSED` acknowledgement, settles
+  and releases the exact lease, and clears the descriptor only after cleanup
+  succeeds. A descriptor that is not exact or cannot be proven absent remains
+  retained and retryable rather than being guessed away.
+- Descriptor-less live leases are resolved by exact status probes for the
+  supported providers. They are cleaned only when ownership is unambiguous;
+  otherwise reconciliation returns a provider-identity-required failure and
+  leaves the lease isolated. Unmatched stale leases are similarly resolved and
+  cleaned after a valid active descriptor is recovered.
+- Running recovery adopts exact status only when it reports `active === true`,
+  `captureReady === true`, `audioPathReady === true`, and
+  `setupComplete === true`; it then persists `RUNNING` under the descriptor
+  identity/event-sequence fence. Cleanup failures remain
+  `cleanupPending`/retryable and do not release an uncertain lease.
+
 ## Security
 
 - **Background-only keys, ephemeral offscreen bootstrap.** Long-lived Gemini
@@ -331,7 +582,7 @@ terminal operation.
 
 - **Canonical codes.** `LIVE_DUBBING_*`, `GEMINI_LIVE_*`, and
   `OPENAI_REALTIME_*` codes are the internal failure identity across
-  background, offscreen, and the adapter. Phase E capture, readiness,
+  background, offscreen, and the adapter. Capture, readiness,
   terminal, cleanup, and provider-diagnostic categories remain unchanged.
 - **ErrorTypes classification-only.** Shared `ErrorTypes` are reused only
   inside Gemini and OpenAI provider-bootstrap HTTP classification where an
@@ -343,9 +594,8 @@ terminal operation.
   key failover; transport/proxy failures stop directly without shared-type
   normalization; unsupported language/configuration validation stays
   feature-local and stops before minting. Surfaced diagnostics keep the
-  canonical codes. `ErrorHandler` and UI presentation (policies, adapters,
-  display strategies, localization) are deferred: live dubbing reports
-  failures through its own DTOs and never presents provider errors to UI.
+  canonical codes. Live dubbing reports failures through its own DTOs and does
+  not present raw provider errors to the UI.
 - **Explicit async ownership.** Session timers (start timeout, setup
   timeout), track listeners, sockets, pipelines, and the provider client are
   created and cleared on the fenced session paths that own them
@@ -355,11 +605,3 @@ terminal operation.
   clear or detach a live fenced resource and change ordering, so explicit
   ownership remains correct. `ResourceTracker` stays limited to simple
   synchronous local resources, of which this feature owns none.
-
-## Stage 3 Note (Historical)
-
-A time-boxed Stage 3 spike compared fixed 100 ms framing against a 40 ms
-build variant. The 100 ms production framing was retained: the 40 ms
-variant added WS buffering pressure without a latency gain. See
-ADR-018. This section is history, not a benchmark report: no benchmark
-persistence, export, or routine measurement logging exists in production.
