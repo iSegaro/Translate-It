@@ -41,6 +41,7 @@ import {
 import { LiveDubbingStateStore, LIVE_DUBBING_CLEAR_OUTCOMES } from './LiveDubbingStateStore.js';
 import { LiveDubbingCleanupManager } from './LiveDubbingCleanupManager.js';
 import { LiveDubbingRuntimeGateway } from './LiveDubbingRuntimeGateway.js';
+import { LiveDubbingSessionRegistry } from './LiveDubbingSessionRegistry.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 
@@ -122,18 +123,15 @@ export class LiveDubbingCoordinator {
     this.now = options.now || (() => Date.now());
     this.uuid = options.uuid || defaultUuid;
     this.log = options.logger || logger;
+    this.sessionRegistry = options.sessionRegistry || new LiveDubbingSessionRegistry();
     this.stateStore = options.stateStore
       || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
     this.transition = Promise.resolve();
-    this.sessionStates = new Map();
-    this.terminalOperations = new Map();
-    this.pendingStarts = new Set();
-    this.bootstrapRequestSessions = new Set();
     this.cleanupManager = options.cleanupManager
       || new LiveDubbingCleanupManager({
         leaseManager: this.leaseManager,
         sendOffscreen: this._sendOffscreen.bind(this),
-        getSessionState: (sessionId) => this.sessionStates.get(sessionId) || null,
+        getSessionState: (sessionId) => this.sessionRegistry.getSessionState(sessionId),
         logger: this.log,
       });
   }
@@ -157,11 +155,11 @@ export class LiveDubbingCoordinator {
       terminalRequested: false,
       startedAt: this.now(),
     };
-    this.pendingStarts.add(pendingStart);
+    this.sessionRegistry.addPendingStart(pendingStart);
     const operation = this._enqueue(() => this._start(message, sender, pendingStart));
     void operation.then(
-      () => this.pendingStarts.delete(pendingStart),
-      () => this.pendingStarts.delete(pendingStart),
+      () => this.sessionRegistry.deletePendingStart(pendingStart),
+      () => this.sessionRegistry.deletePendingStart(pendingStart),
     );
     return operation;
   }
@@ -219,7 +217,7 @@ export class LiveDubbingCoordinator {
     // re-read it before any terminal work so a reused tab cannot stop a newer
     // session.
     const expectedDescriptor = cloneDescriptor(descriptor);
-    const expectedState = this.sessionStates.get(descriptor.sessionId) || null;
+    const expectedState = this.sessionRegistry.getSessionState(descriptor.sessionId);
     const current = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -227,8 +225,8 @@ export class LiveDubbingCoordinator {
       return { success: true, stopped: false, ignored: true };
     }
 
-    const fencedState = this.sessionStates.get(expectedDescriptor.sessionId) || null;
-    const terminalOperation = this.terminalOperations.get(expectedDescriptor.sessionId);
+    const fencedState = this.sessionRegistry.getSessionState(expectedDescriptor.sessionId);
+    const terminalOperation = this.sessionRegistry.getTerminalOperation(expectedDescriptor.sessionId);
     if (fencedState?.terminalRequested
       || (terminalOperation?.providerId === expectedDescriptor.providerId
         && terminalOperation.state === fencedState)) {
@@ -253,8 +251,8 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const revalidatedState = this.sessionStates.get(expectedDescriptor.sessionId) || null;
-    const revalidatedTerminalOperation = this.terminalOperations.get(expectedDescriptor.sessionId);
+    const revalidatedState = this.sessionRegistry.getSessionState(expectedDescriptor.sessionId);
+    const revalidatedTerminalOperation = this.sessionRegistry.getTerminalOperation(expectedDescriptor.sessionId);
     if (revalidatedState?.terminalRequested
       || (revalidatedTerminalOperation?.providerId === expectedDescriptor.providerId
         && revalidatedTerminalOperation.state === revalidatedState)) {
@@ -290,8 +288,8 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const captureState = this.sessionStates.get(expectedDescriptor.sessionId) || null;
-    const captureTerminalOperation = this.terminalOperations.get(expectedDescriptor.sessionId);
+    const captureState = this.sessionRegistry.getSessionState(expectedDescriptor.sessionId);
+    const captureTerminalOperation = this.sessionRegistry.getTerminalOperation(expectedDescriptor.sessionId);
     if (captureState?.terminalRequested
       || (captureTerminalOperation?.providerId === expectedDescriptor.providerId
         && captureTerminalOperation.state === captureState)) {
@@ -353,7 +351,7 @@ export class LiveDubbingCoordinator {
       const providerDiagnostic = sanitizeLiveDubbingProviderDiagnostic(
         message?.data?.providerDiagnostic || message?.providerDiagnostic,
       );
-      const state = this.sessionStates.get(sessionId);
+      const state = this.sessionRegistry.getSessionState(sessionId);
       const latchedProviderDiagnostic = this._latchProviderDiagnostic(state, providerDiagnostic);
       if (providerDiagnostic) this.log.warn('Live dubbing provider terminal', providerDiagnostic);
 
@@ -390,7 +388,7 @@ export class LiveDubbingCoordinator {
         sessionId,
         message?.data?.event || 'OFFSCREEN_TERMINAL',
         authorized,
-        this.sessionStates.get(sessionId),
+        this.sessionRegistry.getSessionState(sessionId),
         { cleanupFailureError: startupFailureCode },
       ).then(result => {
         if (result?.success === true && result.stopped === true
@@ -449,11 +447,11 @@ export class LiveDubbingCoordinator {
       || !descriptor
       || data.sessionId !== descriptor.sessionId
       || data.providerId !== descriptor.providerId
-      || this.terminalOperations.has(descriptor.sessionId)) {
+      || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)) {
       return null;
     }
 
-    let state = this.sessionStates.get(descriptor.sessionId);
+    let state = this.sessionRegistry.getSessionState(descriptor.sessionId);
     if (state?.terminalRequested) return null;
     if (!state) {
       state = {
@@ -465,7 +463,7 @@ export class LiveDubbingCoordinator {
         cleanupCompleted: false,
         providerDiagnostic: null,
       };
-      this.sessionStates.set(descriptor.sessionId, state);
+      this.sessionRegistry.setSessionState(descriptor.sessionId, state);
     }
 
     this._markTerminalState(state);
@@ -481,7 +479,7 @@ export class LiveDubbingCoordinator {
     const descriptor = this.descriptor;
     const data = message?.data || message;
     const state = descriptor?.sessionId
-      ? this.sessionStates.get(descriptor.sessionId)
+      ? this.sessionRegistry.getSessionState(descriptor.sessionId)
       : null;
 
     if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT
@@ -490,16 +488,16 @@ export class LiveDubbingCoordinator {
       || descriptor.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
       || !state
       || state.terminalRequested
-      || this.terminalOperations.has(descriptor.sessionId)
+      || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
       || !this._isSameDescriptorFence(state.descriptor, descriptor)
       || !hasExactSessionEvent(message, descriptor)
       || data.providerId !== descriptor.providerId
       || data.targetLanguage !== descriptor.targetLanguage
-      || this.bootstrapRequestSessions.has(descriptor.sessionId)) {
+      || this.sessionRegistry.hasBootstrapSession(descriptor.sessionId)) {
       return null;
     }
 
-    this.bootstrapRequestSessions.add(descriptor.sessionId);
+    this.sessionRegistry.reserveBootstrapSession(descriptor.sessionId);
     return cloneDescriptor(descriptor);
   }
 
@@ -512,15 +510,15 @@ export class LiveDubbingCoordinator {
     if (!descriptor?.sessionId) return false;
 
     const current = this.descriptor;
-    const state = this.sessionStates.get(descriptor.sessionId);
+    const state = this.sessionRegistry.getSessionState(descriptor.sessionId);
     return this.storageState === LIVE_DUBBING_STORAGE_STATE.PRESENT
       && current?.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
       && this._isSameDescriptorFence(current, descriptor)
       && this._isSameDescriptorFence(state?.descriptor, descriptor)
       && !state?.terminalRequested
-      && !this.terminalOperations.has(descriptor.sessionId)
+      && !this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
       && isLiveDubbingProviderId(descriptor.providerId)
-      && this.bootstrapRequestSessions.has(descriptor.sessionId);
+      && this.sessionRegistry.hasBootstrapSession(descriptor.sessionId);
   }
 
   /**
@@ -543,7 +541,7 @@ export class LiveDubbingCoordinator {
     const timeout = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
         pendingStart.terminalRequested = true;
-        const state = this.sessionStates.get(pendingStart.sessionId);
+        const state = this.sessionRegistry.getSessionState(pendingStart.sessionId);
         if (state) this._markTerminalState(state);
         reject(new Error('LIVE_DUBBING_START_TIMEOUT'));
       }, LIVE_DUBBING_START_TIMEOUT);
@@ -553,7 +551,7 @@ export class LiveDubbingCoordinator {
       return await Promise.race([transaction, timeout]);
     } catch (error) {
       if (error?.message !== 'LIVE_DUBBING_START_TIMEOUT') throw error;
-      const state = this.sessionStates.get(pendingStart.sessionId);
+      const state = this.sessionRegistry.getSessionState(pendingStart.sessionId);
       if (!state) return { success: false, error: 'LIVE_DUBBING_START_TIMEOUT' };
 
       const cleanup = await this._awaitCleanup(
@@ -662,7 +660,7 @@ export class LiveDubbingCoordinator {
       cleanupCompleted: false,
       providerDiagnostic: null,
     };
-    this.sessionStates.set(descriptor.sessionId, sessionState);
+    this.sessionRegistry.setSessionState(descriptor.sessionId, sessionState);
     if (!await this._writeDescriptor(descriptor)) {
       this._forgetSessionState(descriptor.sessionId, sessionState);
       return this._storageWriteFailure();
@@ -912,7 +910,7 @@ export class LiveDubbingCoordinator {
         ...(providerDiagnostic ? { providerDiagnostic } : {}),
       };
     } finally {
-      if (this.sessionStates.get(descriptor.sessionId) === sessionState) {
+      if (this.sessionRegistry.isSessionState(descriptor.sessionId, sessionState)) {
         sessionState.leasePromise = null;
       }
     }
@@ -959,7 +957,7 @@ export class LiveDubbingCoordinator {
       return { success: true, stopped: false, ignored: true, status: cloneDescriptor(current) };
     }
 
-    if ((expectedState && this.sessionStates.get(sessionId) !== expectedState)
+    if ((expectedState && !this.sessionRegistry.isSessionState(sessionId, expectedState))
       || (expectedDescriptor && !this._isSameDescriptorFence(current, expectedDescriptor))) {
       return { success: true, stopped: false, ignored: true, status: cloneDescriptor(current), reason };
     }
@@ -979,7 +977,7 @@ export class LiveDubbingCoordinator {
         if (pending) {
           pending.terminalRequested = true;
         }
-        const unresolved = [...this.pendingStarts].filter(item => item.tabId === null);
+        const unresolved = this.sessionRegistry.listUnresolvedPendingStarts();
         for (const pendingStart of unresolved) {
           pendingStart.tabEventIds.add(tabId);
         }
@@ -1002,8 +1000,8 @@ export class LiveDubbingCoordinator {
       'LIVE_DUBBING_START_FAILED',
     ]);
     const retainedStartupError = allowedStartupCodes.has(cleanupFailureError) ? cleanupFailureError : null;
-    const currentState = this.sessionStates.get(descriptor.sessionId) || null;
-    const existingTerminal = this.terminalOperations.get(descriptor.sessionId);
+    const currentState = this.sessionRegistry.getSessionState(descriptor.sessionId);
+    const existingTerminal = this.sessionRegistry.getTerminalOperation(descriptor.sessionId);
     if (existingTerminal?.providerId === descriptor.providerId
       && existingTerminal.state === currentState) {
       return this._awaitStop(existingTerminal, descriptor, reason);
@@ -1020,7 +1018,7 @@ export class LiveDubbingCoordinator {
         cleanupCompleted: false,
         providerDiagnostic: null,
       };
-      this.sessionStates.set(descriptor.sessionId, state);
+      this.sessionRegistry.setSessionState(descriptor.sessionId, state);
     }
     this._markTerminalState(state);
 
@@ -1081,7 +1079,7 @@ export class LiveDubbingCoordinator {
       };
 
       if (state.cleanupCompleted) {
-        if (this.sessionStates.get(descriptor.sessionId) !== state) {
+        if (!this.sessionRegistry.isSessionState(descriptor.sessionId, state)) {
           return {
             success: true,
             stopped: false,
@@ -1115,7 +1113,7 @@ export class LiveDubbingCoordinator {
         });
       terminalRecord.cleanupAttempt = this.cleanupManager.getAttempt(descriptor.sessionId) || null;
       const cleanup = await cleanupPromise;
-      if (this.sessionStates.get(descriptor.sessionId) !== state) {
+      if (!this.sessionRegistry.isSessionState(descriptor.sessionId, state)) {
         return {
           success: true,
           stopped: false,
@@ -1143,17 +1141,13 @@ export class LiveDubbingCoordinator {
     })();
 
     terminalRecord.promise = terminalOperation;
-    this.terminalOperations.set(descriptor.sessionId, terminalRecord);
+    this.sessionRegistry.setTerminalOperation(descriptor.sessionId, terminalRecord);
     terminalOperation.then(
       () => {
-        if (this.terminalOperations.get(descriptor.sessionId) === terminalRecord) {
-          this.terminalOperations.delete(descriptor.sessionId);
-        }
+        this.sessionRegistry.deleteTerminalOperation(descriptor.sessionId, terminalRecord);
       },
       () => {
-        if (this.terminalOperations.get(descriptor.sessionId) === terminalRecord) {
-          this.terminalOperations.delete(descriptor.sessionId);
-        }
+        this.sessionRegistry.deleteTerminalOperation(descriptor.sessionId, terminalRecord);
       },
     );
     return this._awaitStop(terminalRecord, descriptor, reason);
@@ -1164,9 +1158,7 @@ export class LiveDubbingCoordinator {
     let timeoutId;
     const timeout = new Promise(resolve => {
       timeoutId = setTimeout(() => {
-        if (this.terminalOperations.get(descriptor.sessionId) === record) {
-          this.terminalOperations.delete(descriptor.sessionId);
-        }
+        this.sessionRegistry.deleteTerminalOperation(descriptor.sessionId, record);
         const cleanup = record.cleanupAttempt;
         if (cleanup) {
           this.cleanupManager.abandonAttempt(descriptor.sessionId, cleanup);
@@ -1244,7 +1236,7 @@ export class LiveDubbingCoordinator {
     const descriptor = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
-    const terminalState = descriptor && this.sessionStates.get(descriptor.sessionId);
+    const terminalState = descriptor && this.sessionRegistry.getSessionState(descriptor.sessionId);
     if (terminalState?.terminalRequested && terminalState.cleanupCompleted) {
       const cleanupRetry = await this._stopDescriptor(descriptor, 'RECONCILE_CLEANUP');
       return {
@@ -1598,7 +1590,7 @@ export class LiveDubbingCoordinator {
   }
 
   _rememberReconciledSession(descriptor, leaseAcquired) {
-    const current = this.sessionStates.get(descriptor.sessionId);
+    const current = this.sessionRegistry.getSessionState(descriptor.sessionId);
     if (current) {
       current.descriptor = descriptor;
       current.leaseAcquired = leaseAcquired;
@@ -1617,13 +1609,13 @@ export class LiveDubbingCoordinator {
       cleanupCompleted: false,
       providerDiagnostic: null,
     };
-    this.sessionStates.set(descriptor.sessionId, newState);
+    this.sessionRegistry.setSessionState(descriptor.sessionId, newState);
   }
 
   _markTerminalState(state) {
     if (!state?.descriptor?.sessionId) return;
     state.terminalRequested = true;
-    this.bootstrapRequestSessions.delete(state.descriptor.sessionId);
+    this.sessionRegistry.releaseBootstrapSession(state.descriptor.sessionId);
   }
 
   _latchProviderDiagnostic(state, diagnostic) {
@@ -1634,8 +1626,8 @@ export class LiveDubbingCoordinator {
   }
 
   _forgetSessionState(sessionId, expectedState = null) {
-    if (expectedState && this.sessionStates.get(sessionId) !== expectedState) return;
-    const state = this.sessionStates.get(sessionId);
+    if (expectedState && !this.sessionRegistry.isSessionState(sessionId, expectedState)) return;
+    const state = this.sessionRegistry.getSessionState(sessionId);
     // Delegate physical facts ownership; manager fences exact generation only.
     if (expectedState) {
       this.cleanupManager.forgetSession(sessionId, expectedState);
@@ -1644,8 +1636,8 @@ export class LiveDubbingCoordinator {
     } else {
       this.cleanupManager.forgetSession(sessionId, null);
     }
-    this.sessionStates.delete(sessionId);
-    this.bootstrapRequestSessions.delete(sessionId);
+    this.sessionRegistry.deleteSessionState(sessionId, state);
+    this.sessionRegistry.releaseBootstrapSession(sessionId);
   }
 
   _classifyStartFailure({ error, providerDiagnostic, providerStartAttempted }) {
@@ -1792,10 +1784,7 @@ export class LiveDubbingCoordinator {
   }
 
   _findPendingStart(sessionId, tabId = null) {
-    return [...this.pendingStarts].find(pending => (
-      (!sessionId || pending.sessionId === sessionId)
-      && (tabId === null || pending.tabId === tabId)
-    ));
+    return this.sessionRegistry.findPendingStart(sessionId, tabId);
   }
 
   async _sendOffscreen(message) {
@@ -1898,7 +1887,7 @@ export class LiveDubbingCoordinator {
     const current = await this.stateStore.readDescriptor();
     if (this._storageReadFailed()) return false;
 
-    const state = expectedSessionId ? this.sessionStates.get(expectedSessionId) : null;
+    const state = expectedSessionId ? this.sessionRegistry.getSessionState(expectedSessionId) : null;
     if (state?.terminalRequested
       && ![LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR].includes(descriptor.status)) {
       return false;
@@ -1940,7 +1929,7 @@ export class LiveDubbingCoordinator {
     const currentAfter = await this.stateStore.readDescriptor();
     if (this._storageReadFailed()) return false;
 
-    const stateAfter = this.sessionStates.get(expectedSessionId) || state;
+    const stateAfter = this.sessionRegistry.getSessionState(expectedSessionId) || state;
     if (stateAfter?.terminalRequested
       && ![LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR].includes(descriptor.status)) {
       return false;
