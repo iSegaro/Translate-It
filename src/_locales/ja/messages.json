@@ -260,6 +260,9 @@
   "live_dubbing_provider_bootstrap_openai_error": {
     "message": "OpenAIライブ吹き替えを初期化できません。OpenAI APIキーと接続を確認して、もう一度お試しください。"
   },
+  "live_dubbing_provider_setup_failed_error": {
+    "message": "選択したプロバイダーに接続できません。接続と設定を確認して、もう一度お試しください。"
+  },
   "configure_service_button": {
     "message": "サービスを設定 ⚙️"
   },

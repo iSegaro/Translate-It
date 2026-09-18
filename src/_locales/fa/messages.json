@@ -260,6 +260,9 @@
   "live_dubbing_provider_bootstrap_openai_error": {
     "message": "امکان راه‌اندازی دوبله زنده OpenAI وجود ندارد. کلید API OpenAI و اتصال خود را بررسی کنید و دوباره تلاش کنید."
   },
+  "live_dubbing_provider_setup_failed_error": {
+    "message": "امکان اتصال به ارائه‌دهنده انتخاب شده وجود ندارد. اتصال و پیکربندی خود را بررسی کنید و دوباره تلاش کنید."
+  },
   "configure_service_button": {
     "message": "تنظیم سرویس ⚙️"
   },

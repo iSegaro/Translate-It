@@ -128,6 +128,9 @@ const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = 
       ? t('live_dubbing_provider_bootstrap_openai_error')
       : t('live_dubbing_provider_bootstrap_gemini_error')
   }
+  if (error === 'LIVE_DUBBING_PROVIDER_SETUP_FAILED') {
+    return t('live_dubbing_provider_setup_failed_error')
+  }
   const hardcoded = {
     LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
     INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.'

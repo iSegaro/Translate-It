@@ -260,6 +260,9 @@
   "live_dubbing_provider_bootstrap_openai_error": {
     "message": "Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again."
   },
+  "live_dubbing_provider_setup_failed_error": {
+    "message": "Unable to connect to the selected provider. Check your connection and configuration, then try again."
+  },
   "configure_service_button": {
     "message": "Configure Service ⚙️"
   },

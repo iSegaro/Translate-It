@@ -43,6 +43,16 @@ import { LiveDubbingCleanupManager } from './LiveDubbingCleanupManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 
+// Explicit Coordinator-owned allowlist: Controller-local pipeline/audio failures
+// must never be misclassified as provider setup, even during CONNECTING_PROVIDER.
+const NON_PROVIDER_SETUP_TERMINAL_CATEGORIES = new Set([
+  'INPUT_PIPELINE_ERROR',
+  'INPUT_SEND_ERROR',
+  'INVALID_OUTPUT_AUDIO',
+  'OUTPUT_AUDIO_ERROR',
+  'OUTPUT_PIPELINE_ERROR',
+]);
+
 export { LIVE_DUBBING_CLEAR_OUTCOMES };
 
 function createCaptureStageFailure(stage, error, diagnostic = null) {
@@ -211,6 +221,19 @@ export class LiveDubbingCoordinator {
       if (providerDiagnostic) this.log.warn('Live dubbing provider terminal', providerDiagnostic);
 
       const data = message?.data || message;
+      let startupFailureCode = null;
+      if (authorized.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER) {
+        const candidate = this._classifyStartFailure({
+          error: data,
+          providerDiagnostic: latchedProviderDiagnostic,
+          providerStartAttempted: true,
+        });
+        if (candidate === 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE'
+          || candidate === 'LIVE_DUBBING_PROVIDER_SETUP_FAILED'
+          || candidate === 'LIVE_DUBBING_START_FAILED') {
+          startupFailureCode = candidate;
+        }
+      }
       const outcome = data.status === LIVE_DUBBING_STATUS.ERROR
         ? createLiveDubbingTerminalOutcome({
           sourceSessionId: sessionId,
@@ -231,6 +254,7 @@ export class LiveDubbingCoordinator {
         message?.data?.event || 'OFFSCREEN_TERMINAL',
         authorized,
         this.sessionStates.get(sessionId),
+        { cleanupFailureError: startupFailureCode },
       ).then(result => {
         if (result?.success === true && result.stopped === true
           && cleanupDiagnostic?.playbackAccepted === false) {
@@ -676,7 +700,6 @@ export class LiveDubbingCoordinator {
       if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
       return { success: true, status: cloneDescriptor(activeDescriptor) };
     } catch (error) {
-      const failureCode = safeFailureCode('START');
       const diagnostic = error?.captureDiagnostic || null;
       let providerDiagnostic = this._latchProviderDiagnostic(
         sessionState,
@@ -695,6 +718,7 @@ export class LiveDubbingCoordinator {
       if (providerDiagnostic) {
         this.log.warn('Live dubbing provider startup failed', providerDiagnostic);
       }
+      const failureCode = this._classifyStartFailure({ error, providerDiagnostic, providerStartAttempted });
       if (!sessionState.terminalRequested) {
         const failedBase = sessionState.descriptor || descriptor;
         const failedDescriptor = this._advance(failedBase, LIVE_DUBBING_STATUS.ERROR, failureCode);
@@ -777,7 +801,7 @@ export class LiveDubbingCoordinator {
     return this._stopDescriptor(current, 'STOP_REQUESTED');
   }
 
-  async _stopForSession(sessionId, reason, expectedDescriptor = null, expectedState = null) {
+  async _stopForSession(sessionId, reason, expectedDescriptor = null, expectedState = null, options = {}) {
     const current = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -802,7 +826,7 @@ export class LiveDubbingCoordinator {
       return { success: true, stopped: false, ignored: true, status: cloneDescriptor(current), reason };
     }
 
-    return this._stopDescriptor(current, reason);
+    return this._stopDescriptor(current, reason, options);
   }
 
   async _stopForTab(tabId, reason) {
@@ -831,7 +855,14 @@ export class LiveDubbingCoordinator {
     return this._stopDescriptor(current, reason);
   }
 
-  async _stopDescriptor(descriptor, reason) {
+  async _stopDescriptor(descriptor, reason, options = {}) {
+    const cleanupFailureError = options?.cleanupFailureError || null;
+    const allowedStartupCodes = new Set([
+      'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+      'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
+      'LIVE_DUBBING_START_FAILED',
+    ]);
+    const retainedStartupError = allowedStartupCodes.has(cleanupFailureError) ? cleanupFailureError : null;
     const currentState = this.sessionStates.get(descriptor.sessionId) || null;
     const existingTerminal = this.terminalOperations.get(descriptor.sessionId);
     if (existingTerminal?.providerId === descriptor.providerId
@@ -909,7 +940,8 @@ export class LiveDubbingCoordinator {
         };
       }
       if (!cleanup.success) {
-        const failed = this._advance(stopping, LIVE_DUBBING_STATUS.ERROR, 'STOP_FAILED');
+        const failedLastError = retainedStartupError || 'STOP_FAILED';
+        const failed = this._advance(stopping, LIVE_DUBBING_STATUS.ERROR, failedLastError);
         await this._writeDescriptor(failed, descriptor.sessionId, stopping).catch(() => {});
         return {
           success: false,
@@ -1380,6 +1412,39 @@ export class LiveDubbingCoordinator {
     }
     this.sessionStates.delete(sessionId);
     this.bootstrapRequestSessions.delete(sessionId);
+  }
+
+  _classifyStartFailure({ error, providerDiagnostic, providerStartAttempted }) {
+    const BOOTSTRAP = 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE';
+    const SETUP = 'LIVE_DUBBING_PROVIDER_SETUP_FAILED';
+    const GENERIC = 'LIVE_DUBBING_START_FAILED';
+
+    const hasBootstrap = (value) => {
+      if (!value) return false;
+      if (typeof value === 'string') return value === BOOTSTRAP;
+      if (value.code === BOOTSTRAP) return true;
+      if (value.error === BOOTSTRAP) return true;
+      if (value.providerDiagnostic?.code === BOOTSTRAP) return true;
+      return false;
+    };
+
+    if (hasBootstrap(error) || hasBootstrap(providerDiagnostic) || hasBootstrap(error?.providerDiagnostic)) {
+      return BOOTSTRAP;
+    }
+
+    const sanitized = sanitizeLiveDubbingProviderDiagnostic(providerDiagnostic);
+    if (
+      providerStartAttempted === true
+      && sanitized
+      && typeof sanitized.code === 'string'
+      && sanitized.code
+      && sanitized.setupComplete !== true
+      && !NON_PROVIDER_SETUP_TERMINAL_CATEGORIES.has(sanitized.terminalCategory)
+    ) {
+      return SETUP;
+    }
+
+    return GENERIC;
   }
 
   _hasLiveLease(sessionId) {

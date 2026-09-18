@@ -13,7 +13,8 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
     t: (key) => ({
       live_dubbing_provider_bootstrap_gemini_error: 'Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again.',
-      live_dubbing_provider_bootstrap_openai_error: 'Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again.'
+      live_dubbing_provider_bootstrap_openai_error: 'Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again.',
+      live_dubbing_provider_setup_failed_error: 'Unable to connect to the selected provider. Check your connection and configuration, then try again.'
     }[key] || key)
   })
 }))
@@ -449,6 +450,101 @@ describe('LiveDubbingControl', () => {
     expect(wrapper.vm.terminalOutcome).toBe(null)
     expect(wrapper.text()).not.toContain('Provider session ended.')
     expect(wrapper.text()).not.toContain('must not render')
+  })
+
+  it('presents direct bootstrap failure as Gemini i18n guidance', async () => {
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE'
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Unable to initialize Gemini Live Dubbing.')
+    expect(wrapper.text()).toContain('Gemini API key')
+  })
+
+  it('presents direct bootstrap failure as OpenAI i18n guidance', async () => {
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE'
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de', providerId: 'openai' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Unable to initialize OpenAI Live Dubbing.')
+    expect(wrapper.text()).toContain('OpenAI API key')
+  })
+
+  it('renders retained ERROR bootstrap as provider-specific guidance after reopen', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({
+          status: { status: 'ERROR', sessionId: 'retained-session', providerId: 'gemini', lastError: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' }
+        })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const first = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await first.vm.$nextTick()
+    expect(first.text()).toContain('Unable to initialize Gemini Live Dubbing.')
+    first.unmount()
+
+    const second = mount(LiveDubbingControl, { props: { targetLanguage: 'de', providerId: 'openai' } })
+    await Promise.resolve()
+    await second.vm.$nextTick()
+
+    // Retained session provider (gemini) wins over the prop (openai).
+    expect(second.text()).toContain('Unable to initialize Gemini Live Dubbing.')
+    expect(second.text()).not.toContain('Unable to initialize OpenAI Live Dubbing.')
+    second.unmount()
+  })
+
+  it('renders SETUP_FAILED as generic i18n guidance', async () => {
+    sendMessage.mockResolvedValue({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED'
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Unable to connect to the selected provider.')
+  })
+
+  it('never renders providerDiagnostic.code in error output', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+      if (action === 'START_LIVE_DUBBING') {
+        return Promise.reject(Object.assign(new Error('LIVE_DUBBING_START_FAILED'), {
+          data: {
+            success: false,
+            error: 'LIVE_DUBBING_START_FAILED',
+            status: { status: 'ERROR', sessionId: 's1', providerId: 'gemini', lastError: 'LIVE_DUBBING_START_FAILED' },
+            providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_REMOTE_ERROR' }
+          }
+        }))
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('GEMINI_LIVE_REMOTE_ERROR')
+    expect(wrapper.text()).not.toContain('CONNECT_PROVIDER')
   })
 
   it('treats an authenticated terminal notification as invalidation and re-reads status', async () => {

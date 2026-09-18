@@ -1466,7 +1466,7 @@ describe('LiveDubbingCoordinator', () => {
 
     expect(result).toMatchObject({
       success: false,
-      error: 'LIVE_DUBBING_START_FAILED',
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
       providerDiagnostic: {
         stage: 'CONNECT_PROVIDER',
         code: 'GEMINI_LIVE_PROVIDER_CLOSED',
@@ -1587,7 +1587,7 @@ describe('LiveDubbingCoordinator', () => {
     });
     await expect(startPromise).resolves.toMatchObject({
       success: false,
-      error: 'LIVE_DUBBING_START_FAILED',
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
       providerDiagnostic: {
         code: 'GEMINI_LIVE_REMOTE_ERROR',
         terminalCategory: 'REMOTE_ERROR',
@@ -4267,5 +4267,870 @@ describe('LiveDubbingCoordinator', () => {
     const running4 = { ...desc4, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 3 };
     const okRunningTerminal = await harness4.coordinator._writeDescriptor(running4, desc4.sessionId, desc4);
     expect(okRunningTerminal).toBe(false);
+  });
+
+  it('START Gemini bootstrap unavailable is classified as BOOTSTRAP_UNAVAILABLE with diagnostic preserved', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+            terminalCategory: 'BOOTSTRAP_UNAVAILABLE',
+            wsOpen: false,
+            setupSent: false,
+            setupComplete: false,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+      providerDiagnostic: expect.objectContaining({ code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' }),
+    });
+    expect(result.providerDiagnostic.code).toBe('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
+    // descriptor cleared after successful cleanup, but no prior outcome to clear; check storage has no descriptor
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    // No credentials leaked
+    expect(JSON.stringify(result)).not.toContain('secret');
+    expect(JSON.stringify(result)).not.toContain('token');
+  });
+
+  it('START OpenAI bootstrap unavailable is classified as BOOTSTRAP_UNAVAILABLE', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+          sessionId: message.data.sessionId,
+          providerId: 'openai',
+          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+            terminalCategory: 'BOOTSTRAP_UNAVAILABLE',
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { providerId: 'openai', targetLanguage: 'en-US' } }, {});
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+      providerDiagnostic: expect.objectContaining({ code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' }),
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+  });
+
+  it('START Gemini setup timeout is classified as PROVIDER_SETUP_FAILED with diagnostic preserved', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'GEMINI_LIVE_SETUP_TIMEOUT',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+            terminalCategory: 'SETUP_TIMEOUT',
+            wsOpen: true,
+            setupSent: true,
+            setupComplete: false,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
+      providerDiagnostic: expect.objectContaining({ code: 'GEMINI_LIVE_SETUP_TIMEOUT' }),
+    });
+    expect(result.providerDiagnostic.code).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(result.error).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+  });
+
+  it('START OpenAI setup failure is classified as PROVIDER_SETUP_FAILED', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED',
+          sessionId: message.data.sessionId,
+          providerId: 'openai',
+          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED',
+            terminalCategory: 'SETUP_FAILED',
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { providerId: 'openai', targetLanguage: 'en-US' } }, {});
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
+      providerDiagnostic: expect.objectContaining({ code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED' }),
+    });
+  });
+
+  it('START capture failure is classified as START_FAILED', async () => {
+    const harness = createHarness();
+    harness.chromeAPI.tabCapture.getMediaStreamId.mockRejectedValueOnce(new Error('capture failed'));
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({ success: false, error: 'LIVE_DUBBING_START_FAILED' });
+    expect(result).not.toHaveProperty('providerDiagnostic');
+    // descriptor should be cleared after successful cleanup, lastError is START_FAILED
+    // Check that providerDiagnostic not present and error is generic
+    expect(result.error).toBe('LIVE_DUBBING_START_FAILED');
+  });
+
+  it('START bootstrap failure with cleanupPending retains classified error in descriptor and response', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+          },
+        };
+      }
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+      retryable: true,
+      cleanupPending: true,
+      providerDiagnostic: expect.objectContaining({ code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' }),
+    });
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored).toMatchObject({ status: LIVE_DUBBING_STATUS.ERROR, lastError: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' });
+    expect(stored.lastError).toBe(result.error);
+  });
+
+  it('START setup failure with cleanupPending retains classified error in descriptor and response', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'GEMINI_LIVE_SETUP_TIMEOUT',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+          },
+        };
+      }
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+      providerDiagnostic: expect.objectContaining({ code: 'GEMINI_LIVE_SETUP_TIMEOUT' }),
+    });
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored.lastError).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(stored.lastError).toBe(result.error);
+  });
+
+  it('successful START clears previous terminal outcome', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    await harness.coordinator.handleOffscreenTerminal({
+      data: { sessionId: 'session-1', providerId: 'gemini', status: LIVE_DUBBING_STATUS.ERROR, error: 'LIVE_DUBBING_PROVIDER_ERROR' },
+    }, { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).not.toBeNull();
+    harness.coordinator.uuid = () => 'session-2';
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result.success).toBe(true);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+  });
+
+  it('failed START does not clear previous terminal outcome', async () => {
+    const harness = createHarness({
+      outcome: {
+        sourceSessionId: 'old-session',
+        providerId: 'gemini',
+        error: 'LIVE_DUBBING_PROVIDER_ERROR',
+        occurredAt: 123,
+        providerDiagnostic: null,
+      },
+    });
+    harness.chromeAPI.tabCapture.getMediaStreamId.mockRejectedValueOnce(new Error('capture failed'));
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({ success: false, error: 'LIVE_DUBBING_START_FAILED' });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'old-session',
+      error: 'LIVE_DUBBING_PROVIDER_ERROR',
+    });
+  });
+
+  // Finding 4 integration: startup terminal race with real controller and DISPOSE failure retains startup classification
+  it('integration: bootstrap unavailable terminal race retains BOOTSTRAP_UNAVAILABLE on cleanup failure (real controller)', async () => {
+    const harness = createHarness();
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      stop: vi.fn(),
+    };
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    const providerClient = { connect: vi.fn(async () => {}), dispose: vi.fn(async () => {}), close: vi.fn() };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getAudioTracks: () => [track], getTracks: () => [track] })) },
+      inputPipelineFactory: vi.fn(async () => inputPipeline),
+      outputPlayerFactory: vi.fn(async () => outputPlayer),
+      providerClient,
+      requestBootstrap: async () => ({ success: false }),
+      notify: (msg) => harness.coordinator.handleOffscreenTerminal(msg, sender),
+    });
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return controller.handle(message);
+    });
+
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+      retryable: true,
+      cleanupPending: true,
+    });
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored).toMatchObject({
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+    });
+    expect(stored.lastError).toBe(result.error);
+    expect(stored.lastError).not.toBe('STOP_FAILED');
+    // Ensure terminal outcome was not lost due to overwrite
+    await harness.coordinator.getStatus(); // ensure descriptor readable
+  });
+
+  it('integration: Gemini setup timeout terminal race retains SETUP_FAILED with detailed diagnostic (real controller)', async () => {
+    const harness = createHarness();
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      stop: vi.fn(),
+    };
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    const setupError = Object.assign(new Error('Gemini setup timeout'), {
+      code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+      providerDiagnostic: {
+        stage: 'CONNECT_PROVIDER',
+        code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+        terminalCategory: 'SETUP_TIMEOUT',
+        wsOpen: true,
+        setupSent: true,
+        setupComplete: false,
+      },
+    });
+    const providerClient = {
+      connect: vi.fn(async () => { throw setupError; }),
+      dispose: vi.fn(async () => {}),
+      close: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getAudioTracks: () => [track], getTracks: () => [track] })) },
+      inputPipelineFactory: vi.fn(async () => inputPipeline),
+      outputPlayerFactory: vi.fn(async () => outputPlayer),
+      providerClient,
+      requestBootstrap: (request) => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' }).then((desc) => (desc ? { success: true, providerId: desc.providerId, targetLanguage: desc.targetLanguage, bootstrap: { accessToken: 'tok' } } : { success: false })),
+      notify: (msg) => harness.coordinator.handleOffscreenTerminal(msg, sender),
+    });
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return controller.handle(message);
+    });
+
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+      providerDiagnostic: expect.objectContaining({ code: 'GEMINI_LIVE_SETUP_TIMEOUT' }),
+    });
+    expect(result.providerDiagnostic.code).toBe('GEMINI_LIVE_SETUP_TIMEOUT');
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored).toMatchObject({
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
+    });
+    expect(stored.lastError).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(stored.lastError).not.toBe('STOP_FAILED');
+  });
+
+  it('integration: RUNNING runtime terminal with cleanup failure does NOT become SETUP_FAILED (real controller)', async () => {
+    const harness = createHarness();
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      stop: vi.fn(),
+    };
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    const providerClient = { connect: vi.fn(async () => {}), dispose: vi.fn(async () => {}), close: vi.fn() };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getAudioTracks: () => [track], getTracks: () => [track] })) },
+      inputPipelineFactory: vi.fn(async () => inputPipeline),
+      outputPlayerFactory: vi.fn(async () => outputPlayer),
+      providerClient,
+      requestBootstrap: (request) => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' }).then((desc) => (desc ? { success: true, providerId: desc.providerId, targetLanguage: desc.targetLanguage, bootstrap: { accessToken: 'tok' } } : { success: false })),
+      notify: vi.fn(),
+    });
+    harness.browserAPI.runtime.sendMessage.mockImplementation((message) => controller.handle(message));
+
+    const started = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(started).toMatchObject({ success: true, status: { status: LIVE_DUBBING_STATUS.RUNNING } });
+
+    // Now make DISPOSE fail for the terminal cleanup
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return controller.handle(message);
+    });
+    // Wire notify to coordinator for this terminal (not needed for this test, we call handleOffscreenTerminal directly)
+    const descriptor = harness.coordinator.descriptor;
+    expect(descriptor.status).toBe(LIVE_DUBBING_STATUS.RUNNING);
+    const terminalResult = await harness.coordinator.handleOffscreenTerminal({
+      data: {
+        sessionId: descriptor.sessionId,
+        providerId: descriptor.providerId,
+        eventSequence: descriptor.eventSequence,
+        status: LIVE_DUBBING_STATUS.ERROR,
+        error: 'GEMINI_LIVE_SETUP_TIMEOUT',
+        event: 'PROVIDER_ERROR',
+        providerDiagnostic: {
+          stage: 'CONNECT_PROVIDER',
+          code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+          terminalCategory: 'SETUP_TIMEOUT',
+          wsOpen: true,
+          setupSent: true,
+          setupComplete: false,
+        },
+      },
+    }, sender);
+
+    expect(terminalResult).toMatchObject({ success: false, error: 'STOP_FAILED', retryable: true, cleanupPending: true });
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored).toMatchObject({ status: LIVE_DUBBING_STATUS.ERROR, lastError: 'STOP_FAILED' });
+    expect(stored.lastError).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(stored.lastError).toBe('STOP_FAILED');
+  });
+
+  it('integration: explicit STOP with cleanup failure keeps STOP semantics (real controller)', async () => {
+    const harness = createHarness();
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      stop: vi.fn(),
+    };
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    const providerClient = { connect: vi.fn(async () => {}), dispose: vi.fn(async () => {}), close: vi.fn() };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getAudioTracks: () => [track], getTracks: () => [track] })) },
+      inputPipelineFactory: vi.fn(async () => inputPipeline),
+      outputPlayerFactory: vi.fn(async () => outputPlayer),
+      providerClient,
+      requestBootstrap: (request) => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' }).then((desc) => (desc ? { success: true, providerId: desc.providerId, targetLanguage: desc.targetLanguage, bootstrap: { accessToken: 'tok' } } : { success: false })),
+      notify: vi.fn(),
+    });
+    harness.browserAPI.runtime.sendMessage.mockImplementation((message) => controller.handle(message));
+
+    const started = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(started).toMatchObject({ success: true, status: { status: LIVE_DUBBING_STATUS.RUNNING } });
+
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return controller.handle(message);
+    });
+
+    const stopResult = await harness.coordinator.stop({ data: { sessionId: started.status.sessionId } });
+    expect(stopResult).toMatchObject({ success: false, error: 'STOP_FAILED', retryable: true, cleanupPending: true });
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored).toMatchObject({ status: LIVE_DUBBING_STATUS.ERROR, lastError: 'STOP_FAILED' });
+    expect(stored.lastError).toBe('STOP_FAILED');
+  });
+
+  // Finding 4: narrow SETUP_FAILED classification – Controller-local pipeline/audio failures must not be SETUP_FAILED
+  it('Finding4: INPUT_PIPELINE_ERROR while CONNECTING_PROVIDER is classified as START_FAILED not SETUP_FAILED (structured diagnostic)', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_INPUT_PIPELINE_ERROR',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+            terminalCategory: 'INPUT_PIPELINE_ERROR',
+            wsOpen: true,
+            setupSent: true,
+            setupComplete: false,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({ success: false, error: 'LIVE_DUBBING_START_FAILED' });
+    expect(result.error).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(result.providerDiagnostic).toMatchObject({ terminalCategory: 'INPUT_PIPELINE_ERROR', setupComplete: false });
+  });
+
+  it('Finding4: OUTPUT_PIPELINE_ERROR while CONNECTING_PROVIDER is classified as START_FAILED', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_OUTPUT_PIPELINE_ERROR',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED',
+            terminalCategory: 'OUTPUT_PIPELINE_ERROR',
+            setupComplete: false,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result).toMatchObject({ success: false, error: 'LIVE_DUBBING_START_FAILED' });
+    expect(result.error).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+  });
+
+  it.each([
+    'INPUT_PIPELINE_ERROR',
+    'INPUT_SEND_ERROR',
+    'INVALID_OUTPUT_AUDIO',
+    'OUTPUT_AUDIO_ERROR',
+    'OUTPUT_PIPELINE_ERROR',
+  ])('Finding4: excluded terminalCategory %s while CONNECTING_PROVIDER → START_FAILED', async (terminalCategory) => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: `LIVE_DUBBING_${terminalCategory}`,
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+            terminalCategory,
+            setupComplete: false,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result.error).toBe('LIVE_DUBBING_START_FAILED');
+    expect(result.providerDiagnostic.terminalCategory).toBe(terminalCategory);
+  });
+
+  it('Finding4: INPUT_PIPELINE_ERROR via real Controller path while CONNECTING_PROVIDER → START_FAILED (genuine pipeline callback)', async () => {
+    const harness = createHarness();
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      stop: vi.fn(),
+    };
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    let providerConnectReject;
+    const providerConnectPromise = new Promise((_, reject) => { providerConnectReject = reject; });
+    const providerClient = {
+      connect: vi.fn(() => providerConnectPromise),
+      dispose: vi.fn(async () => {}),
+      close: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getAudioTracks: () => [track], getTracks: () => [track] })) },
+      inputPipelineFactory: vi.fn(async () => inputPipeline),
+      outputPlayerFactory: vi.fn(async () => outputPlayer),
+      providerClient,
+      requestBootstrap: (request) => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' }).then(desc => desc ? { success: true, providerId: desc.providerId, targetLanguage: desc.targetLanguage, bootstrap: { accessToken: 'tok' } } : { success: false }),
+      notify: (msg) => harness.coordinator.handleOffscreenTerminal(msg, sender),
+    });
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return controller.handle(message);
+    });
+
+    const startPromise = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    for (let i = 0; i < 200 && providerClient.connect.mock.calls.length === 0; i++) {
+      await new Promise(r => setTimeout(r, 0));
+      await Promise.resolve();
+    }
+    expect(providerClient.connect).toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER });
+    expect(typeof inputPipeline.onError).toBe('function');
+
+    inputPipeline.onError(Object.assign(new Error('input pipeline failed'), { code: 'LIVE_DUBBING_INPUT_PIPELINE_ERROR' }));
+
+    await new Promise(r => setTimeout(r, 0));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    providerConnectReject(Object.assign(new Error('provider connect aborted'), { code: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED' }));
+    await new Promise(r => setTimeout(r, 0));
+
+    const result = await startPromise;
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_START_FAILED',
+      retryable: true,
+      cleanupPending: true,
+    });
+    expect(result.error).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(result.error).not.toBe('STOP_FAILED');
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored).toMatchObject({
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: 'LIVE_DUBBING_START_FAILED',
+    });
+    expect(stored.lastError).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(stored.lastError).not.toBe('STOP_FAILED');
+  });
+
+  it('Finding4: setupComplete:true terminal while CONNECTING_PROVIDER with cleanup failure retains START_FAILED', async () => {
+    const harness = createHarness();
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+    const track = {
+      kind: 'audio',
+      readyState: 'live',
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      stop: vi.fn(),
+    };
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}), clear: vi.fn() };
+    let providerConnectReject;
+    const providerConnectPromise = new Promise((_, reject) => { providerConnectReject = reject; });
+    const providerClient = {
+      connect: vi.fn(() => providerConnectPromise),
+      dispose: vi.fn(async () => {}),
+      close: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => ({ getAudioTracks: () => [track], getTracks: () => [track] })) },
+      inputPipelineFactory: vi.fn(async () => inputPipeline),
+      outputPlayerFactory: vi.fn(async () => outputPlayer),
+      providerClient,
+      requestBootstrap: (request) => harness.coordinator.authorizeOffscreenControlMessage(request, sender, { type: 'bootstrap' }).then(desc => desc ? { success: true, providerId: desc.providerId, targetLanguage: desc.targetLanguage, bootstrap: { accessToken: 'tok' } } : { success: false }),
+      notify: (msg) => harness.coordinator.handleOffscreenTerminal(msg, sender),
+    });
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return { success: false, error: 'DISPOSE_FAILED' };
+      }
+      return controller.handle(message);
+    });
+
+    const startPromise = harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    for (let i = 0; i < 200 && providerClient.connect.mock.calls.length === 0; i++) {
+      await new Promise(r => setTimeout(r, 0));
+      await Promise.resolve();
+    }
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER });
+
+    const terminalResult = await harness.coordinator.handleOffscreenTerminal({
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: harness.storage.get(LIVE_DUBBING_STORAGE_KEY).eventSequence,
+        status: LIVE_DUBBING_STATUS.ERROR,
+        error: 'GEMINI_LIVE_SETUP_TIMEOUT',
+        event: 'PROVIDER_ERROR',
+        providerDiagnostic: {
+          stage: 'CONNECT_PROVIDER',
+          code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+          terminalCategory: 'SETUP_TIMEOUT',
+          wsOpen: true,
+          setupSent: true,
+          setupComplete: true,
+        },
+      },
+    }, sender);
+
+    expect(terminalResult).toMatchObject({ success: false, retryable: true, cleanupPending: true });
+    expect(terminalResult.error).toBe('STOP_FAILED');
+    const storedAfterTerminal = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(storedAfterTerminal).toMatchObject({ status: LIVE_DUBBING_STATUS.ERROR, lastError: 'LIVE_DUBBING_START_FAILED' });
+    expect(storedAfterTerminal.lastError).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+    expect(storedAfterTerminal.lastError).not.toBe('STOP_FAILED');
+
+    providerConnectReject(Object.assign(new Error('aborted'), { code: 'LIVE_DUBBING_PROVIDER_SETUP_FAILED' }));
+    await new Promise(r => setTimeout(r, 0));
+    const startResult = await startPromise;
+    expect(startResult).toMatchObject({ success: false, error: 'LIVE_DUBBING_START_FAILED', retryable: true, cleanupPending: true });
+    const stored = harness.storage.get(LIVE_DUBBING_STORAGE_KEY);
+    expect(stored.lastError).toBe('LIVE_DUBBING_START_FAILED');
+    expect(stored.lastError).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+  });
+
+  it('Finding4: setupComplete:true with provider-looking code while CONNECTING_PROVIDER → START_FAILED not SETUP_FAILED', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'GEMINI_LIVE_SETUP_TIMEOUT',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
+            terminalCategory: 'SETUP_TIMEOUT',
+            setupComplete: true,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result.error).toBe('LIVE_DUBBING_START_FAILED');
+    expect(result.providerDiagnostic.setupComplete).toBe(true);
+    expect(result.error).not.toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+  });
+
+  it('Finding4: setupComplete:true with OPENAI code → START_FAILED', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED',
+            terminalCategory: 'SETUP_FAILED',
+            setupComplete: true,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { providerId: 'openai', targetLanguage: 'en-US' } }, {});
+    expect(result.error).toBe('LIVE_DUBBING_START_FAILED');
+  });
+
+  it('Finding4: bootstrap highest priority over pipeline category and setupComplete:true', async () => {
+    const harness = createHarness();
+    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
+            terminalCategory: 'INPUT_PIPELINE_ERROR',
+            setupComplete: true,
+          },
+        };
+      }
+      return original(message);
+    });
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(result.error).toBe('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
+  });
+
+  it('Finding4: direct _classifyStartFailure – excluded categories → START_FAILED, valid setup → SETUP_FAILED', () => {
+    const harness = createHarness();
+    const coordinator = harness.coordinator;
+    // Valid setup: should be SETUP_FAILED
+    expect(coordinator._classifyStartFailure({
+      error: { error: 'GEMINI_LIVE_SETUP_TIMEOUT' },
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_SETUP_TIMEOUT', terminalCategory: 'SETUP_TIMEOUT', setupComplete: false },
+      providerStartAttempted: true,
+    })).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+
+    expect(coordinator._classifyStartFailure({
+      error: {},
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED', terminalCategory: 'SETUP_FAILED', setupComplete: false },
+      providerStartAttempted: true,
+    })).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
+
+    // Excluded categories → START_FAILED even with providerStartAttempted true
+    for (const cat of ['INPUT_PIPELINE_ERROR', 'INPUT_SEND_ERROR', 'INVALID_OUTPUT_AUDIO', 'OUTPUT_AUDIO_ERROR', 'OUTPUT_PIPELINE_ERROR']) {
+      expect(coordinator._classifyStartFailure({
+        error: {},
+        providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_SETUP_TIMEOUT', terminalCategory: cat, setupComplete: false },
+        providerStartAttempted: true,
+      })).toBe('LIVE_DUBBING_START_FAILED');
+    }
+
+    // setupComplete true → START_FAILED
+    expect(coordinator._classifyStartFailure({
+      error: {},
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_SETUP_TIMEOUT', terminalCategory: 'SETUP_TIMEOUT', setupComplete: true },
+      providerStartAttempted: true,
+    })).toBe('LIVE_DUBBING_START_FAILED');
+
+    // providerStartAttempted false → START_FAILED
+    expect(coordinator._classifyStartFailure({
+      error: {},
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_SETUP_TIMEOUT', terminalCategory: 'SETUP_TIMEOUT', setupComplete: false },
+      providerStartAttempted: false,
+    })).toBe('LIVE_DUBBING_START_FAILED');
+
+    // No code → START_FAILED
+    expect(coordinator._classifyStartFailure({
+      error: {},
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: null, terminalCategory: 'SETUP_TIMEOUT', setupComplete: false },
+      providerStartAttempted: true,
+    })).toBe('LIVE_DUBBING_START_FAILED');
+
+    // Bootstrap priority
+    expect(coordinator._classifyStartFailure({
+      error: { code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' },
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE', terminalCategory: 'BOOTSTRAP_UNAVAILABLE', setupComplete: false },
+      providerStartAttempted: true,
+    })).toBe('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
+
+    expect(coordinator._classifyStartFailure({
+      error: {},
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE', terminalCategory: 'INPUT_PIPELINE_ERROR', setupComplete: true },
+      providerStartAttempted: true,
+    })).toBe('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
+  });
+
+  it('Finding4: no message substring matching – error.message containing provider string does not affect classification', async () => {
+    const harness = createHarness();
+    // Simulate error.message containing GEMINI_LIVE_SETUP_TIMEOUT but no structured code; should remain START_FAILED
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
+        // Return no providerDiagnostic code, only message substring
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_START_FAILED',
+          sessionId: message.data.sessionId,
+          providerId: message.data.providerId,
+          // providerDiagnostic has no code, but message-like field would contain substring if we matched it – we don't
+          providerDiagnostic: {
+            stage: 'CONNECT_PROVIDER',
+            code: null,
+            terminalCategory: null,
+            setupComplete: false,
+          },
+          // Also test error object with message substring
+          diagnostic: { stage: 'CONNECT_PROVIDER', error: { message: 'GEMINI_LIVE_SETUP_TIMEOUT occurred', name: 'Error' } },
+        };
+      }
+      if (message.action === 'LIVE_DUBBING_PREPARE' || message.action === 'LIVE_DUBBING_CONSUME' || message.action === 'LIVE_DUBBING_DISPOSE') {
+        // delegate to original behavior for other stages
+        // fallback: return success for prepare/consume
+        if (message.action === 'LIVE_DUBBING_PREPARE') return { success: true, ack: 'READY', sessionId: message.data.sessionId, providerId: message.data.providerId, eventSequence: message.data.eventSequence };
+        if (message.action === 'LIVE_DUBBING_CONSUME') return { success: true, ack: 'MEDIA_ACQUIRED', sessionId: message.data.sessionId, providerId: message.data.providerId, status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, eventSequence: message.data.eventSequence, captureReady: true, audioPathReady: true };
+        if (message.action === 'LIVE_DUBBING_DISPOSE') return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId, providerId: message.data.providerId };
+      }
+      return { success: true };
+    });
+    // For this isolated substring test, use direct classify to prove no substring logic
+    const direct = harness.coordinator._classifyStartFailure({
+      error: { message: 'GEMINI_LIVE_SETUP_TIMEOUT failed badly', error: 'LIVE_DUBBING_START_FAILED' },
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: null, terminalCategory: null, setupComplete: false },
+      providerStartAttempted: true,
+    });
+    expect(direct).toBe('LIVE_DUBBING_START_FAILED');
+    // Also ensure normal provider code still classifies correctly (not via substring)
+    const setup = harness.coordinator._classifyStartFailure({
+      error: {},
+      providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_SETUP_TIMEOUT', terminalCategory: 'SETUP_TIMEOUT', setupComplete: false },
+      providerStartAttempted: true,
+    });
+    expect(setup).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
   });
 });
