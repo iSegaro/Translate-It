@@ -15,7 +15,7 @@ import {
   LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 
-function createHarness({ stored = null, outcome = null, streamId = 'stream-secret', statusResponse, documentExists } = {}) {
+function createHarness({ stored = null, outcome = null, streamId = 'stream-secret', statusResponse, documentExists, runtimeGateway = null } = {}) {
   const storage = new Map(stored
     ? [[LIVE_DUBBING_STORAGE_KEY, { providerId: 'gemini', ...stored }]]
     : []);
@@ -129,6 +129,7 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
     coordinator: new LiveDubbingCoordinator({
       browserAPI,
       chromeAPI,
+      runtimeGateway,
       leaseManager: manager,
       uuid: () => 'session-1',
       now: () => 123,
@@ -140,6 +141,42 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
 
 describe('LiveDubbingCoordinator', () => {
   beforeEach(() => vi.restoreAllMocks());
+
+  it('uses the injected runtime gateway when platform methods are unavailable on API objects', async () => {
+    const harness = createHarness();
+    const platformSendMessage = harness.browserAPI.runtime.sendMessage;
+    const gateway = {
+      supportsTabCapture: vi.fn(() => true),
+      sendMessage: vi.fn(message => platformSendMessage(message)),
+      getMediaStreamId: vi.fn(async tabId => {
+        expect(tabId).toBe(42);
+        return 'gateway-stream-id';
+      }),
+      getTab: vi.fn(async tabId => ({ id: tabId })),
+      getActiveTab: vi.fn(async () => ({ id: 42, url: 'https://example.test' })),
+      getCapturedTabs: vi.fn(async () => []),
+      isExtensionPageSender: vi.fn(() => false),
+      resolveTabFromSender: vi.fn(async sender => gateway.getActiveTab(sender)),
+    };
+    harness.coordinator.runtimeGateway = gateway;
+    delete harness.browserAPI.runtime.sendMessage;
+    delete harness.browserAPI.tabs.get;
+    delete harness.browserAPI.tabs.query;
+    delete harness.chromeAPI.tabCapture.getMediaStreamId;
+    delete harness.chromeAPI.tabCapture.getCapturedTabs;
+
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    expect(result).toMatchObject({ success: true, status: { tabId: 42 } });
+    expect(gateway.supportsTabCapture).toHaveBeenCalledOnce();
+    expect(gateway.getActiveTab).toHaveBeenCalledOnce();
+    expect(gateway.getMediaStreamId).toHaveBeenCalledWith(42);
+    expect(gateway.sendMessage.mock.calls.map(([message]) => message.action)).toEqual([
+      'LIVE_DUBBING_PREPARE',
+      'LIVE_DUBBING_CONSUME',
+      'LIVE_DUBBING_CONNECT_PROVIDER',
+    ]);
+  });
 
   it('acquires lease, prepares offscreen, forwards stream ID only to consume, then reports active', async () => {
     const harness = createHarness();

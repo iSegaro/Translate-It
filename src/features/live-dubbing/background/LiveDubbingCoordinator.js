@@ -40,6 +40,7 @@ import {
 } from '../contracts.js';
 import { LiveDubbingStateStore, LIVE_DUBBING_CLEAR_OUTCOMES } from './LiveDubbingStateStore.js';
 import { LiveDubbingCleanupManager } from './LiveDubbingCleanupManager.js';
+import { LiveDubbingRuntimeGateway } from './LiveDubbingRuntimeGateway.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 
@@ -112,6 +113,11 @@ export class LiveDubbingCoordinator {
   constructor(options = {}) {
     this.browserAPI = options.browserAPI || browser;
     this.chromeAPI = options.chromeAPI || globalThis.chrome || this.browserAPI;
+    this.runtimeGateway = options.runtimeGateway
+      || new LiveDubbingRuntimeGateway({
+        browserAPI: this.browserAPI,
+        chromeAPI: this.chromeAPI,
+      });
     this.leaseManager = options.leaseManager || offscreenRuntimeLeaseManager;
     this.now = options.now || (() => Date.now());
     this.uuid = options.uuid || defaultUuid;
@@ -173,7 +179,7 @@ export class LiveDubbingCoordinator {
    * cleanup, or terminal state, so mutation serialization is unaffected.
    */
   async getStatus() {
-    const available = typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
+    const available = this.runtimeGateway.supportsTabCapture();
     await this._readStatusSnapshot();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -234,7 +240,7 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const tabPresent = await this._isCaptureTabPresent(tabId);
+    const tabPresent = await this.runtimeGateway.probeTabPresence(tabId);
     const revalidated = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -269,7 +275,7 @@ export class LiveDubbingCoordinator {
       );
     }
 
-    const currentCaptureState = await this._getCurrentCaptureState(tabId);
+    const currentCaptureState = await this.runtimeGateway.getCurrentCaptureState(tabId);
     const captureRevalidated = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -624,7 +630,11 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const tab = await this._resolveAuthoritativeTab(sender, pendingStart);
+    const tab = await this.runtimeGateway.resolveTabFromSender(sender);
+    if (pendingStart && Number.isInteger(tab?.id) && tab.id >= 0) {
+      pendingStart.tabId = tab.id;
+      if (pendingStart.tabEventIds.has(tab.id)) pendingStart.terminalRequested = true;
+    }
     if (pendingStart.terminalRequested) {
       return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
     }
@@ -632,8 +642,7 @@ export class LiveDubbingCoordinator {
       return { success: false, error: 'TARGET_TAB_UNAVAILABLE' };
     }
 
-    const getMediaStreamId = this.chromeAPI?.tabCapture?.getMediaStreamId;
-    if (typeof getMediaStreamId !== 'function') {
+    if (!this.runtimeGateway.supportsTabCapture()) {
       return { success: false, error: 'TAB_CAPTURE_UNAVAILABLE' };
     }
 
@@ -728,9 +737,7 @@ export class LiveDubbingCoordinator {
       // Keep stream ID ephemeral. It is forwarded in exactly one targeted message.
       let streamId;
       try {
-        streamId = await getMediaStreamId.call(this.chromeAPI.tabCapture, {
-          targetTabId: captureDescriptor.tabId,
-        });
+        streamId = await this.runtimeGateway.getMediaStreamId(captureDescriptor.tabId);
         if (typeof streamId !== 'string' || !streamId) {
           throw new TypeError('getMediaStreamId returned no stream ID');
         }
@@ -1717,34 +1724,6 @@ export class LiveDubbingCoordinator {
       && left.status === right.status);
   }
 
-  async _isCaptureTabPresent(tabId) {
-    const getTab = this.browserAPI?.tabs?.get;
-    if (typeof getTab !== 'function') return null;
-
-    try {
-      return Boolean(await getTab.call(this.browserAPI.tabs, tabId));
-    } catch {
-      return false;
-    }
-  }
-
-  async _getCurrentCaptureState(tabId) {
-    const getCapturedTabs = this.chromeAPI?.tabCapture?.getCapturedTabs;
-    if (typeof getCapturedTabs !== 'function') return null;
-
-    try {
-      const capturedTabs = await getCapturedTabs.call(this.chromeAPI.tabCapture);
-      if (!Array.isArray(capturedTabs)) return null;
-
-      const matchingTabs = capturedTabs.filter(entry => entry?.tabId === tabId);
-      if (matchingTabs.length === 0) return false;
-      if (matchingTabs.some(entry => typeof entry?.status !== 'string')) return null;
-      return matchingTabs.some(entry => entry.status !== 'stopped' && entry.status !== 'error');
-    } catch {
-      return null;
-    }
-  }
-
   _isRecoverableRunningStatus(response, sessionId, providerId) {
     return this._isExactSessionStatus(response, sessionId, providerId)
       && response.status === LIVE_DUBBING_STATUS.RUNNING
@@ -1800,44 +1779,9 @@ export class LiveDubbingCoordinator {
     };
   }
 
-  async _resolveAuthoritativeTab(sender, pendingStart = null) {
-    const senderTabId = sender?.tab?.id;
-    const senderIsExtensionPage = this._isExtensionPageSender(sender);
-    let tab = null;
-
-    if (!senderIsExtensionPage && Number.isInteger(senderTabId) && senderTabId >= 0) {
-      if (typeof this.browserAPI.tabs?.get === 'function') {
-        try {
-          tab = await this.browserAPI.tabs.get(senderTabId);
-        } catch {
-          tab = null;
-        }
-      } else {
-        tab = sender.tab;
-      }
-    } else {
-      if (typeof this.browserAPI.tabs?.query !== 'function') return null;
-      const tabs = await this.browserAPI.tabs.query({ active: true, currentWindow: true });
-      tab = tabs?.[0] || null;
-    }
-
-    if (pendingStart && Number.isInteger(tab?.id) && tab.id >= 0) {
-      pendingStart.tabId = tab.id;
-      if (pendingStart.tabEventIds.has(tab.id)) pendingStart.terminalRequested = true;
-    }
-    return tab;
-  }
-
-  _isExtensionPageSender(sender) {
-    const extensionUrl = this.browserAPI.runtime?.getURL?.('');
-    return typeof sender?.url === 'string'
-      && typeof extensionUrl === 'string'
-      && sender.url.startsWith(extensionUrl);
-  }
-
   _getPendingStartTabId(sender) {
     const tabId = sender?.tab?.id;
-    return !this._isExtensionPageSender(sender) && Number.isInteger(tabId) && tabId >= 0
+    return !this.runtimeGateway.isExtensionPageSender(sender) && Number.isInteger(tabId) && tabId >= 0
       ? tabId
       : null;
   }
@@ -1855,11 +1799,7 @@ export class LiveDubbingCoordinator {
   }
 
   async _sendOffscreen(message) {
-    if (typeof this.browserAPI.runtime?.sendMessage !== 'function') {
-      throw new Error('offscreen messaging unavailable');
-    }
-
-    return this.browserAPI.runtime.sendMessage(message);
+    return this.runtimeGateway.sendMessage(message);
   }
 
   async _sendCaptureStage(stage, message, sensitiveValues = []) {
@@ -1936,11 +1876,10 @@ export class LiveDubbingCoordinator {
   }
 
   async _notifyTerminalOutcome(terminalOutcome = toPublicLiveDubbingTerminalOutcome(this.terminalOutcome)) {
-    const sendMessage = this.browserAPI.runtime?.sendMessage;
-    if (!terminalOutcome || typeof sendMessage !== 'function') return;
+    if (!terminalOutcome || !this.runtimeGateway?.sendMessage) return;
 
     try {
-      await sendMessage.call(this.browserAPI.runtime, {
+      await this.runtimeGateway.sendMessage({
         action: LIVE_DUBBING_ACTIONS.TERMINAL_OUTCOME,
         data: terminalOutcome,
       });
