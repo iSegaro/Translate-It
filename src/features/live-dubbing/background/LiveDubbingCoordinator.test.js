@@ -679,6 +679,197 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
   });
 
+  it('continues exact cleanup when STOPPING persistence fails', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSet = harness.browserAPI.storage.session.set.getMockImplementation();
+    harness.browserAPI.storage.session.set.mockImplementation(async record => {
+      if (record[LIVE_DUBBING_STORAGE_KEY]?.status === LIVE_DUBBING_STATUS.STOPPING) {
+        throw new Error('STOPPING persistence unavailable');
+      }
+      return originalSet(record);
+    });
+
+    const result = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+
+    expect(result).toMatchObject({ success: true, stopped: true, status: null });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toHaveLength(1);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+  });
+
+  it('joins a cleanup retry after STOPPING persistence failure without duplicate disposal or release', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSet = harness.browserAPI.storage.session.set.getMockImplementation();
+    harness.browserAPI.storage.session.set.mockImplementation(async record => {
+      if (record[LIVE_DUBBING_STORAGE_KEY]?.status === LIVE_DUBBING_STATUS.STOPPING) {
+        throw new Error('STOPPING persistence unavailable');
+      }
+      return originalSet(record);
+    });
+    let resolveDispose;
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return new Promise(resolve => { resolveDispose = resolve; });
+      }
+      return originalSendMessage(message);
+    });
+
+    const firstStop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    while (!resolveDispose) await Promise.resolve();
+    const retry = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    resolveDispose({ success: false });
+
+    await expect(firstStop).resolves.toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+    });
+    await expect(retry).resolves.toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+    });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toHaveLength(1);
+    expect(harness.manager.release).not.toHaveBeenCalled();
+  });
+
+  it('fences fallback ERROR persistence against the original descriptor after STOPPING write failure', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const writes = [];
+    const originalSet = harness.browserAPI.storage.session.set.getMockImplementation();
+    harness.browserAPI.storage.session.set.mockImplementation(async record => {
+      const descriptor = record[LIVE_DUBBING_STORAGE_KEY];
+      if (descriptor) writes.push(descriptor.status);
+      if (descriptor?.status === LIVE_DUBBING_STATUS.STOPPING) {
+        throw new Error('STOPPING persistence unavailable');
+      }
+      return originalSet(record);
+    });
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') return { success: false };
+      return originalSendMessage(message);
+    });
+
+    const result = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+      status: { status: LIVE_DUBBING_STATUS.ERROR },
+    });
+    expect(writes).toEqual([LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR]);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'session-1',
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: 'STOP_FAILED',
+    });
+  });
+
+  it('does not clean up when the STOPPING write loses its readable descriptor fence', async () => {
+    const descriptor = {
+      sessionId: 'session-a',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 3,
+    };
+    const newer = {
+      ...descriptor,
+      sessionId: 'session-b',
+      startedAt: 2,
+      eventSequence: 4,
+    };
+    const harness = createHarness({ stored: descriptor });
+    const originalGet = harness.browserAPI.storage.session.get.getMockImplementation();
+    let descriptorReads = 0;
+    harness.browserAPI.storage.session.get.mockImplementation(async key => {
+      const result = await originalGet(key);
+      if (key === LIVE_DUBBING_STORAGE_KEY && descriptorReads++ === 1) {
+        harness.storage.set(LIVE_DUBBING_STORAGE_KEY, newer);
+        return { [LIVE_DUBBING_STORAGE_KEY]: newer };
+      }
+      return result;
+    });
+
+    const result = await harness.coordinator.stop({ data: { sessionId: 'session-a' } });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_STORAGE_UNWRITABLE',
+      retryable: true,
+      status: newer,
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toEqual(newer);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeUndefined();
+  });
+
+  it('retries a new STOP after failed persistence and cleanup without double release', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSet = harness.browserAPI.storage.session.set.getMockImplementation();
+    let stoppingWriteFailed = true;
+    harness.browserAPI.storage.session.set.mockImplementation(async record => {
+      if (stoppingWriteFailed
+        && record[LIVE_DUBBING_STORAGE_KEY]?.status === LIVE_DUBBING_STATUS.STOPPING) {
+        stoppingWriteFailed = false;
+        throw new Error('STOPPING persistence unavailable');
+      }
+      return originalSet(record);
+    });
+    let disposeAttempts = 0;
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        disposeAttempts += 1;
+        if (disposeAttempts === 1) return { success: false };
+      }
+      return originalSendMessage(message);
+    });
+
+    const firstStop = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+
+    expect(firstStop).toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+    });
+    expect(disposeAttempts).toBe(1);
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'session-1',
+      status: LIVE_DUBBING_STATUS.ERROR,
+    });
+
+    const retry = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+
+    expect(retry).toMatchObject({ success: true, stopped: true, status: null });
+    expect(disposeAttempts).toBe(2);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.manager.release).toHaveBeenCalledWith({
+      owner: LIVE_DUBBING_OWNER,
+      leaseId: 'session-1',
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+  });
+
   it('bounds STOP while canonical disposal is pending and releases only after it settles', async () => {
     vi.useFakeTimers();
     try {

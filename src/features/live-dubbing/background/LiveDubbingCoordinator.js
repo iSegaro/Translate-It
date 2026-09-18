@@ -1097,9 +1097,10 @@ export class LiveDubbingCoordinator {
       }
 
       const stopping = this._advance(descriptor, LIVE_DUBBING_STATUS.STOPPING);
-      if (!await this._writeDescriptor(stopping, descriptor.sessionId, descriptor)) {
-        return this._storageWriteFailure();
-      }
+      // STOPPING is an observability marker; actual storage failure cannot block
+      // exact cleanup, while a readable fence rejection must remain a no-op.
+      const stoppingPersisted = await this._writeDescriptor(stopping, descriptor.sessionId, descriptor);
+      if (!stoppingPersisted && !this._storageReadFailed()) return this._storageWriteFailure();
       const cleanupPromise = provenAbsenceLease
         ? this.cleanupManager.releaseAfterProvenAbsence(descriptor, { releaseLease: true })
         : this.cleanupManager.disposeAndRelease(descriptor, {
@@ -1118,8 +1119,9 @@ export class LiveDubbingCoordinator {
       }
       if (!cleanup.success) {
         const failedLastError = retainedStartupError || 'STOP_FAILED';
-        const failed = this._advance(stopping, LIVE_DUBBING_STATUS.ERROR, failedLastError);
-        await this._writeDescriptor(failed, descriptor.sessionId, stopping).catch(() => {});
+        const cleanupFence = stoppingPersisted ? stopping : descriptor;
+        const failed = this._advance(cleanupFence, LIVE_DUBBING_STATUS.ERROR, failedLastError);
+        await this._writeDescriptor(failed, descriptor.sessionId, cleanupFence).catch(() => {});
         await notifyRuntimeLossOutcome?.();
         return {
           success: false,
