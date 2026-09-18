@@ -2037,8 +2037,8 @@ describe('LiveDubbingCoordinator', () => {
       terminalOutcome: null,
     });
     resolveOutcome();
-    await harness.coordinator.outcomeMutation;
-    // notify is chained via outcomeMutation.then(...); flush that microtask chain.
+    await harness.coordinator.stateStore.awaitOutcomeMutations();
+    // Notification is chained after outcome persistence; flush that microtask chain.
     await Promise.resolve();
     await Promise.resolve();
     expect(outcomeSettled).toBe(true);
@@ -2103,11 +2103,11 @@ describe('LiveDubbingCoordinator', () => {
     // Cleanup success is independent of outcome I/O; notification must still wait.
     expect(harness.browserAPI.runtime.sendMessage.mock.calls
       .map(([message]) => message.action)).not.toContain('LIVE_DUBBING_TERMINAL_OUTCOME');
-    expect(harness.coordinator.outcomeMutation).toBeDefined();
+    expect(harness.coordinator.stateStore.awaitOutcomeMutations).toEqual(expect.any(Function));
 
     rejectOutcome();
-    await harness.coordinator.outcomeMutation;
-    // notify is chained via outcomeMutation.then(...); flush that microtask chain.
+    await harness.coordinator.stateStore.awaitOutcomeMutations();
+    // Notification is chained after outcome persistence; flush that microtask chain.
     await Promise.resolve();
     await Promise.resolve();
     expect(outcomeSettled).toBe(true);
@@ -2172,7 +2172,7 @@ describe('LiveDubbingCoordinator', () => {
       .map(([message]) => message.action)).not.toContain('LIVE_DUBBING_TERMINAL_OUTCOME');
 
     resolveOutcome();
-    await harness.coordinator.outcomeMutation;
+    await harness.coordinator.stateStore.awaitOutcomeMutations();
     await Promise.resolve();
     await Promise.resolve();
     const pendingResult = await terminal;
@@ -3852,5 +3852,420 @@ describe('LiveDubbingCoordinator', () => {
     });
     expect(harness.manager.release).not.toHaveBeenCalled();
     expect(harness.browserAPI.runtime.sendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  // ---- lifecycle policy ownership (Coordinator, not Store) ----
+  it('prevents terminalRequested session from committing non-terminal transition', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    // ensure session state exists for terminalRequested check
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    state.terminalRequested = true;
+
+    const attempt = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: descriptor.eventSequence + 1 };
+    const ok = await harness.coordinator._writeDescriptor(attempt, descriptor.sessionId, descriptor);
+    expect(ok).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).eventSequence).toBe(2);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
+    // terminal states are allowed
+    const stopping = { ...descriptor, status: LIVE_DUBBING_STATUS.STOPPING, eventSequence: descriptor.eventSequence + 1 };
+    const okStopping = await harness.coordinator._writeDescriptor(stopping, descriptor.sessionId, descriptor);
+    expect(okStopping).toBe(true);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.STOPPING);
+  });
+
+  it('prevents STOPPING from regressing to RUNNING without STOPPING expectedDescriptor', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const descriptor = harness.coordinator.descriptor;
+    const stopping = { ...descriptor, status: LIVE_DUBBING_STATUS.STOPPING, eventSequence: descriptor.eventSequence + 1 };
+    expect(await harness.coordinator._writeDescriptor(stopping, descriptor.sessionId, descriptor)).toBe(true);
+    harness.coordinator.sessionStates.get(descriptor.sessionId).descriptor = stopping;
+    // now try to regress to RUNNING with expectedDescriptor not STOPPING
+    const running = { ...stopping, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: stopping.eventSequence + 1 };
+    const regress = await harness.coordinator._writeDescriptor(running, descriptor.sessionId, descriptor);
+    expect(regress).toBe(false);
+    // with STOPPING expectedDescriptor it is allowed (internal ERROR transition)
+    const errorFromStopping = { ...stopping, status: LIVE_DUBBING_STATUS.ERROR, eventSequence: stopping.eventSequence + 1, lastError: 'STOP_FAILED' };
+    const okError = await harness.coordinator._writeDescriptor(errorFromStopping, descriptor.sessionId, stopping);
+    expect(okError).toBe(true);
+  });
+
+  it('successful RUNNING clears previous outcome atomically via Coordinator', async () => {
+    const outcome = {
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'LIVE_DUBBING_PROVIDER_ERROR',
+      occurredAt: 123,
+      providerDiagnostic: null,
+    };
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+      outcome,
+    });
+    // hydrate outcome into store
+    await harness.coordinator._readStatusSnapshot();
+    expect(harness.coordinator.terminalOutcome).toMatchObject({ sourceSessionId: 'session-1' });
+    const state = harness.coordinator.sessionStates.get('session-1') || { descriptor: harness.coordinator.descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    if (!harness.coordinator.sessionStates.has('session-1')) harness.coordinator.sessionStates.set('session-1', state);
+    state.descriptor = harness.coordinator.descriptor;
+    const running = { ...harness.coordinator.descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 3 };
+    const ok = await harness.coordinator._writeDescriptor(running, 'session-1', harness.coordinator.descriptor, { clearOutcome: true });
+    expect(ok).toBe(true);
+    expect(harness.coordinator.terminalOutcome).toBeNull();
+    expect(harness.coordinator.outcomeStorageState).toBe(LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+    expect(harness.browserAPI.storage.session.set).toHaveBeenCalledWith(expect.objectContaining({
+      [LIVE_DUBBING_STORAGE_KEY]: expect.objectContaining({ status: LIVE_DUBBING_STATUS.RUNNING }),
+      [LIVE_DUBBING_OUTCOME_STORAGE_KEY]: null,
+    }));
+  });
+
+  it('terminal racing outcome mutation cannot commit RUNNING', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    // queue a long outcome mutation
+    let resolveMutation;
+    const pending = harness.coordinator._queueOutcomeMutation(() => new Promise(resolve => { resolveMutation = resolve; }));
+    await Promise.resolve();
+    // prepare RUNNING commit that will await the mutation
+    const running = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: descriptor.eventSequence + 1 };
+    const commit = harness.coordinator._writeDescriptor(running, descriptor.sessionId, descriptor, { clearOutcome: true });
+    // before mutation settles, mark terminalRequested (simulates OFFSCREEN_TERMINAL racing)
+    state.terminalRequested = true;
+    resolveMutation(true);
+    await pending;
+    const ok = await commit;
+    expect(ok).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).eventSequence).toBe(2);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
+  });
+
+  it('exposes public storage failure responses with retryable/cleanupPending/status', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    harness.browserAPI.storage.session.get.mockRejectedValueOnce(new Error('unreadable'));
+    const readFail = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    expect(readFail).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_STORAGE_UNREADABLE',
+      retryable: true,
+      status: { sessionId: 'session-1' },
+    });
+    // descriptor invalid
+    harness.browserAPI.storage.session.get.mockResolvedValueOnce({
+      [LIVE_DUBBING_STORAGE_KEY]: { sessionId: 'bad', tabId: 'not-a-number', providerId: 'gemini', targetLanguage: 'en', status: 'RUNNING', startedAt: 1, lastError: null, eventSequence: 0 },
+    });
+    const bad = await harness.coordinator.stop({ data: { sessionId: 'bad' } });
+    expect(bad).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_STORAGE_DESCRIPTOR_INVALID',
+      retryable: true,
+    });
+    // clear failure cleanupPending
+    harness.browserAPI.storage.session.remove.mockRejectedValueOnce(new Error('clear failed'));
+    const clearFail = await harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    expect(clearFail).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_STORAGE_CLEAR_FAILED',
+      retryable: true,
+      cleanupPending: true,
+      status: expect.objectContaining({ sessionId: 'session-1' }),
+    });
+  });
+
+  // ---- race tests for explicit snapshot API (A-E) ----
+
+  it('A: terminalRequested flips during authoritative read rejects non-terminal write', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    harness.browserAPI.storage.session.set.mockClear();
+    let resolveGet;
+    const deferred = new Promise(resolve => { resolveGet = resolve; });
+    harness.browserAPI.storage.session.get.mockImplementation(() => deferred);
+    const attempt = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: descriptor.eventSequence + 1 };
+    const promise = harness.coordinator._writeDescriptor(attempt, descriptor.sessionId, descriptor);
+    // flip while read pending
+    state.terminalRequested = true;
+    resolveGet({ [LIVE_DUBBING_STORAGE_KEY]: { ...descriptor, providerId: 'gemini' } });
+    const ok = await promise;
+    expect(ok).toBe(false);
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).eventSequence).toBe(2);
+  });
+
+  it('B: STOPPING appears during authoritative read rejects RUNNING', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    harness.browserAPI.storage.session.set.mockClear();
+    let resolveGet;
+    const deferred = new Promise(resolve => { resolveGet = resolve; });
+    harness.browserAPI.storage.session.get.mockImplementation(() => deferred);
+    const running = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: descriptor.eventSequence + 1 };
+    const promise = harness.coordinator._writeDescriptor(running, descriptor.sessionId, descriptor);
+    // mutate persisted to STOPPING while read pending
+    const stoppingPersisted = { ...descriptor, providerId: 'gemini', status: LIVE_DUBBING_STATUS.STOPPING, eventSequence: descriptor.eventSequence + 1 };
+    harness.storage.set(LIVE_DUBBING_STORAGE_KEY, stoppingPersisted);
+    resolveGet({ [LIVE_DUBBING_STORAGE_KEY]: stoppingPersisted });
+    const ok = await promise;
+    expect(ok).toBe(false);
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.STOPPING);
+  });
+
+  it('C: normal fenced non-clearOutcome uses exactly one authoritative read before set', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    harness.browserAPI.storage.session.get.mockClear();
+    harness.browserAPI.storage.session.set.mockClear();
+    const attempt = { ...descriptor, status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, eventSequence: 3 };
+    const ok = await harness.coordinator._writeDescriptor(attempt, descriptor.sessionId, descriptor);
+    expect(ok).toBe(true);
+    expect(harness.browserAPI.storage.session.get).toHaveBeenCalledTimes(1);
+    expect(harness.browserAPI.storage.session.get).toHaveBeenCalledWith(LIVE_DUBBING_STORAGE_KEY);
+    expect(harness.browserAPI.storage.session.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('D1: clearOutcome race - terminalRequested flips during awaitOutcomeMutations prevents RUNNING+clear', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    harness.browserAPI.storage.session.set.mockClear();
+    let resolveMutation;
+    const pending = harness.coordinator._queueOutcomeMutation(() => new Promise(resolve => { resolveMutation = resolve; }));
+    await Promise.resolve();
+    let resolveAuthoritativeRead;
+    const authoritativeRead = new Promise(resolve => { resolveAuthoritativeRead = resolve; });
+    harness.browserAPI.storage.session.get.mockImplementationOnce(() => authoritativeRead);
+    let resolveAwaitEntered;
+    const awaitEntered = new Promise(resolve => { resolveAwaitEntered = resolve; });
+    const awaitOutcomeMutations = harness.coordinator.stateStore.awaitOutcomeMutations.bind(
+      harness.coordinator.stateStore,
+    );
+    harness.coordinator.stateStore.awaitOutcomeMutations = vi.fn(async () => {
+      resolveAwaitEntered();
+      await awaitOutcomeMutations();
+    });
+    const running = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: descriptor.eventSequence + 1 };
+    const commit = harness.coordinator._writeDescriptor(running, descriptor.sessionId, descriptor, { clearOutcome: true });
+    resolveAuthoritativeRead({ [LIVE_DUBBING_STORAGE_KEY]: { ...descriptor } });
+    await awaitEntered;
+    // flip after the first read and while awaiting outcome mutations
+    state.terminalRequested = true;
+    resolveMutation(true);
+    await pending;
+    const ok = await commit;
+    expect(ok).toBe(false);
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalledWith(expect.objectContaining({ [LIVE_DUBBING_OUTCOME_STORAGE_KEY]: null }));
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).eventSequence).toBe(2);
+  });
+
+  it('D2: clearOutcome race - STOPPING appears during awaitOutcomeMutations prevents RUNNING+clear', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    const descriptor = harness.coordinator.descriptor;
+    const state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    harness.browserAPI.storage.session.set.mockClear();
+    let resolveMutation;
+    const pending = harness.coordinator._queueOutcomeMutation(() => new Promise(resolve => { resolveMutation = resolve; }));
+    await Promise.resolve();
+    const running = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: descriptor.eventSequence + 1 };
+    const commit = harness.coordinator._writeDescriptor(running, descriptor.sessionId, descriptor, { clearOutcome: true });
+    // mutate persisted to STOPPING while awaiting
+    const stoppingPersisted = { ...descriptor, providerId: 'gemini', status: LIVE_DUBBING_STATUS.STOPPING, eventSequence: 3 };
+    // delay mutation until commit has started awaiting, then set storage before second read
+    // We mutate the map now; second read will see STOPPING
+    harness.storage.set(LIVE_DUBBING_STORAGE_KEY, stoppingPersisted);
+    resolveMutation(true);
+    await pending;
+    const ok = await commit;
+    expect(ok).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.STOPPING);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).not.toBe(LIVE_DUBBING_STATUS.RUNNING);
+  });
+
+  it('E: valid transitions still succeed (CONNECTING_PROVIDER->RUNNING, STOPPING->ERROR, terminal->STOPPING/ERROR)', async () => {
+    // CONNECTING_PROVIDER -> RUNNING with clearOutcome
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness.coordinator._readStatusSnapshot();
+    let descriptor = harness.coordinator.descriptor;
+    let state = { descriptor, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness.coordinator.sessionStates.set(descriptor.sessionId, state);
+    const running = { ...descriptor, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 3 };
+    const okRunning = await harness.coordinator._writeDescriptor(running, descriptor.sessionId, descriptor, { clearOutcome: true });
+    expect(okRunning).toBe(true);
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.RUNNING);
+
+    // STOPPING -> ERROR with matching expectedDescriptor
+    const harness2 = createHarness({
+      stored: {
+        sessionId: 'session-2',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.STOPPING,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 3,
+      },
+    });
+    await harness2.coordinator._readStatusSnapshot();
+    const stopping = harness2.coordinator.descriptor;
+    const state2 = { descriptor: stopping, terminalRequested: false, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness2.coordinator.sessionStates.set(stopping.sessionId, state2);
+    const error = { ...stopping, status: LIVE_DUBBING_STATUS.ERROR, eventSequence: 4, lastError: 'STOP_FAILED' };
+    const okError = await harness2.coordinator._writeDescriptor(error, stopping.sessionId, stopping);
+    expect(okError).toBe(true);
+    expect(harness2.storage.get(LIVE_DUBBING_STORAGE_KEY).status).toBe(LIVE_DUBBING_STATUS.ERROR);
+
+    // terminalRequested may still go to STOPPING/ERROR
+    const harness3 = createHarness({
+      stored: {
+        sessionId: 'session-3',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness3.coordinator._readStatusSnapshot();
+    const desc3 = harness3.coordinator.descriptor;
+    const state3 = { descriptor: desc3, terminalRequested: true, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness3.coordinator.sessionStates.set(desc3.sessionId, state3);
+    const stopping3 = { ...desc3, status: LIVE_DUBBING_STATUS.STOPPING, eventSequence: 3 };
+    const okStoppingTerminal = await harness3.coordinator._writeDescriptor(stopping3, desc3.sessionId, desc3);
+    expect(okStoppingTerminal).toBe(true);
+    // update state to reflect new persisted stopping
+    state3.descriptor = stopping3;
+    const error3 = { ...stopping3, status: LIVE_DUBBING_STATUS.ERROR, eventSequence: 4, lastError: 'STOP_FAILED' };
+    const okErrorTerminal = await harness3.coordinator._writeDescriptor(error3, desc3.sessionId, stopping3);
+    expect(okErrorTerminal).toBe(true);
+    // but RUNNING should still be rejected when terminalRequested
+    const harness4 = createHarness({
+      stored: {
+        sessionId: 'session-4',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+        startedAt: 123,
+        lastError: null,
+        eventSequence: 2,
+      },
+    });
+    await harness4.coordinator._readStatusSnapshot();
+    const desc4 = harness4.coordinator.descriptor;
+    const state4 = { descriptor: desc4, terminalRequested: true, leaseAcquired: true, prepared: true, cleanupCompleted: false, providerDiagnostic: null, cleanupFacts: null };
+    harness4.coordinator.sessionStates.set(desc4.sessionId, state4);
+    const running4 = { ...desc4, status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 3 };
+    const okRunningTerminal = await harness4.coordinator._writeDescriptor(running4, desc4.sessionId, desc4);
+    expect(okRunningTerminal).toBe(false);
   });
 });

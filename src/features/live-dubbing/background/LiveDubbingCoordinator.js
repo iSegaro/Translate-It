@@ -10,11 +10,8 @@ import {
   LIVE_DUBBING_OWNER,
   LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
-  LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_STATUS,
-  LIVE_DUBBING_STORAGE_KEY,
-  LIVE_DUBBING_OUTCOME_STORAGE_KEY,
-  LIVE_DUBBING_OUTCOME_STORAGE_STATE,
+  LIVE_DUBBING_STORAGE_STATE,
   LIVE_DUBBING_START_TIMEOUT,
   LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
@@ -41,8 +38,8 @@ import {
   sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
   toPublicLiveDubbingTerminalOutcome,
-  sanitizeDescriptor,
 } from '../contracts.js';
+import { LiveDubbingStateStore, LIVE_DUBBING_CLEAR_OUTCOMES } from './LiveDubbingStateStore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
 const CLEANUP_LEASE_STATES = Object.freeze({
@@ -51,15 +48,7 @@ const CLEANUP_LEASE_STATES = Object.freeze({
   ABSENT: 'ABSENT',
 });
 
-export const LIVE_DUBBING_CLEAR_OUTCOMES = Object.freeze({
-  CLEARED: 'CLEARED',
-  SESSION_MISMATCH: 'SESSION_MISMATCH',
-  STORAGE_FAILURE: 'STORAGE_FAILURE',
-});
-
-function sanitizeStoredDescriptor(value) {
-  return sanitizeDescriptor(value);
-}
+export { LIVE_DUBBING_CLEAR_OUTCOMES };
 
 function createCaptureStageFailure(stage, error, diagnostic = null) {
   const failure = new Error('Live dubbing capture failed');
@@ -122,11 +111,8 @@ export class LiveDubbingCoordinator {
     this.now = options.now || (() => Date.now());
     this.uuid = options.uuid || defaultUuid;
     this.log = options.logger || logger;
-    this.descriptor = null;
-    this.storageState = LIVE_DUBBING_STORAGE_STATE.ABSENT;
-    this.terminalOutcome = null;
-    this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT;
-    this.outcomeMutation = Promise.resolve();
+    this.stateStore = options.stateStore
+      || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
     this.transition = Promise.resolve();
     this.sessionStates = new Map();
     this.cleanupFacts = new Map();
@@ -135,6 +121,15 @@ export class LiveDubbingCoordinator {
     this.pendingStarts = new Set();
     this.bootstrapRequestSessions = new Set();
   }
+
+  get descriptor() { return this.stateStore.descriptor; }
+  set descriptor(value) { this.stateStore.descriptor = value; }
+  get storageState() { return this.stateStore.storageState; }
+  set storageState(value) { this.stateStore.storageState = value; }
+  get terminalOutcome() { return this.stateStore.terminalOutcome; }
+  set terminalOutcome(value) { this.stateStore.terminalOutcome = value; }
+  get outcomeStorageState() { return this.stateStore.outcomeStorageState; }
+  set outcomeStorageState(value) { this.stateStore.outcomeStorageState = value; }
 
   start(message = {}, sender = {}) {
     const requestedProviderId = getStartProviderId(message);
@@ -462,7 +457,7 @@ export class LiveDubbingCoordinator {
 
     // Complete any terminal outcome write before a new lifecycle can start.
     // This keeps a late old write ahead of the final RUNNING+clear commit.
-    await this.outcomeMutation;
+    await this.stateStore.awaitOutcomeMutations();
     const currentAfterOutcome = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -1708,11 +1703,11 @@ export class LiveDubbingCoordinator {
   }
 
   _storageReadFailed() {
-    return this.storageState === LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
+    return this.stateStore.isStorageReadFailed();
   }
 
   _storageDescriptorInvalid() {
-    return this.storageState === LIVE_DUBBING_STORAGE_STATE.PRESENT && !this.descriptor;
+    return this.stateStore.isStorageDescriptorInvalid();
   }
 
   _storageReadFailure() {
@@ -1753,108 +1748,19 @@ export class LiveDubbingCoordinator {
   }
 
   async _readStatusSnapshot() {
-    const storage = this.browserAPI.storage?.session;
-    if (typeof storage?.get !== 'function') {
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.READ_FAILED;
-      this.terminalOutcome = null;
-      return;
-    }
-
-    try {
-      const result = await storage.get([
-        LIVE_DUBBING_STORAGE_KEY,
-        LIVE_DUBBING_OUTCOME_STORAGE_KEY,
-      ]);
-      const storedDescriptor = result?.[LIVE_DUBBING_STORAGE_KEY];
-      if (storedDescriptor === undefined || storedDescriptor === null) {
-        this.storageState = LIVE_DUBBING_STORAGE_STATE.ABSENT;
-        this.descriptor = null;
-      } else {
-        this.storageState = LIVE_DUBBING_STORAGE_STATE.PRESENT;
-        this.descriptor = sanitizeStoredDescriptor(storedDescriptor);
-      }
-
-      const storedOutcome = result?.[LIVE_DUBBING_OUTCOME_STORAGE_KEY];
-      if (storedOutcome === undefined || storedOutcome === null) {
-        this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT;
-        this.terminalOutcome = null;
-      } else {
-        const outcome = createLiveDubbingTerminalOutcome(storedOutcome);
-        if (!outcome) {
-          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.READ_FAILED;
-          this.terminalOutcome = null;
-        } else {
-          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.PRESENT;
-          this.terminalOutcome = outcome;
-        }
-      }
-    } catch {
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.READ_FAILED;
-      this.terminalOutcome = null;
-    }
+    return this.stateStore.readStatusSnapshot();
   }
 
   _getStatusTerminalOutcome() {
-    if (!this.terminalOutcome || (this.descriptor
-      && (this.terminalOutcome.sourceSessionId !== this.descriptor.sessionId
-        || this.terminalOutcome.providerId !== this.descriptor.providerId))) {
-      return null;
-    }
-    return toPublicLiveDubbingTerminalOutcome(this.terminalOutcome);
+    return this.stateStore.getStatusTerminalOutcome();
   }
 
   _queueOutcomeMutation(operation) {
-    const next = this.outcomeMutation.then(operation, operation).catch(() => false);
-    this.outcomeMutation = next;
-    return next;
+    return this.stateStore.queueOutcomeMutation(operation);
   }
 
   async _writeTerminalOutcome(outcome) {
-    const sanitized = createLiveDubbingTerminalOutcome(outcome);
-    const storage = this.browserAPI.storage?.session;
-    if (!sanitized || typeof storage?.get !== 'function' || typeof storage?.set !== 'function') {
-      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
-      return false;
-    }
-
-    try {
-      // The active descriptor is the lifecycle fence. An old terminal may not
-      // write after a newer session has taken ownership of the descriptor.
-      const descriptorResult = await storage.get(LIVE_DUBBING_STORAGE_KEY);
-      const active = sanitizeStoredDescriptor(descriptorResult?.[LIVE_DUBBING_STORAGE_KEY]);
-      if (active && (active.sessionId !== sanitized.sourceSessionId
-        || active.providerId !== sanitized.providerId)) {
-        this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
-        return false;
-      }
-
-      const outcomeResult = await storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY);
-      const stored = outcomeResult?.[LIVE_DUBBING_OUTCOME_STORAGE_KEY];
-      if (stored !== undefined && stored !== null) {
-        const existing = createLiveDubbingTerminalOutcome(stored);
-        if (!existing) {
-          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
-          return false;
-        }
-        if (existing.sourceSessionId !== sanitized.sourceSessionId) {
-          this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
-          return false;
-        }
-        this.terminalOutcome = existing;
-        this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.PRESENT;
-        return true;
-      }
-
-      await storage.set({ [LIVE_DUBBING_OUTCOME_STORAGE_KEY]: sanitized });
-      this.terminalOutcome = sanitized;
-      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.PRESENT;
-      return true;
-    } catch {
-      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.WRITE_FAILED;
-      return false;
-    }
+    return this.stateStore.writeTerminalOutcome(outcome);
   }
 
   async _notifyTerminalOutcome(terminalOutcome = toPublicLiveDubbingTerminalOutcome(this.terminalOutcome)) {
@@ -1872,146 +1778,76 @@ export class LiveDubbingCoordinator {
   }
 
   async _readDescriptor() {
-    const storage = this.browserAPI.storage?.session;
-    if (typeof storage?.get !== 'function') {
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-      return this.descriptor;
-    }
-
-    try {
-      const result = await storage.get(LIVE_DUBBING_STORAGE_KEY);
-      const stored = result?.[LIVE_DUBBING_STORAGE_KEY];
-      if (stored === undefined || stored === null) {
-        this.storageState = LIVE_DUBBING_STORAGE_STATE.ABSENT;
-        this.descriptor = null;
-      } else {
-        this.storageState = LIVE_DUBBING_STORAGE_STATE.PRESENT;
-        this.descriptor = sanitizeStoredDescriptor(stored);
-      }
-    } catch {
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-    }
-
-    return this.descriptor;
+    return this.stateStore.readDescriptor();
   }
 
   async _writeDescriptor(descriptor, expectedSessionId = null, expectedDescriptor = null, options = {}) {
-    if (expectedSessionId) {
-      const current = await this._readDescriptor();
-      if (this._storageReadFailed()) return false;
-      if (!current || current.sessionId !== expectedSessionId) return false;
-    }
+    const wantsClearOutcome = options.clearOutcome === true;
+    const isRunningCommit = descriptor.status === LIVE_DUBBING_STATUS.RUNNING;
+    const current = await this.stateStore.readDescriptor();
     if (this._storageReadFailed()) return false;
-
-    const sanitized = sanitizeDescriptor(descriptor);
-    if (!sanitized) throw new TypeError('Invalid live dubbing descriptor');
-
-    if (expectedDescriptor && (!this.descriptor
-      || this.descriptor.sessionId !== expectedDescriptor.sessionId
-      || this.descriptor.providerId !== expectedDescriptor.providerId
-      || this.descriptor.eventSequence !== expectedDescriptor.eventSequence
-      || this.descriptor.status !== expectedDescriptor.status)) {
-      return false;
-    }
-
-    if (expectedSessionId && (!this.descriptor
-      || this.descriptor.sessionId !== expectedSessionId
-      || this.descriptor.providerId !== sanitized.providerId
-      || this.descriptor.eventSequence > sanitized.eventSequence
-      || (this.descriptor.eventSequence === sanitized.eventSequence
-        && this.descriptor.status !== sanitized.status)
-      || (this.descriptor.status === LIVE_DUBBING_STATUS.STOPPING
-        && this.descriptor.status !== sanitized.status
-        && expectedDescriptor?.status !== LIVE_DUBBING_STATUS.STOPPING))) {
-      return false;
-    }
 
     const state = expectedSessionId ? this.sessionStates.get(expectedSessionId) : null;
     if (state?.terminalRequested
-      && ![LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR].includes(sanitized.status)) {
+      && ![LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR].includes(descriptor.status)) {
+      return false;
+    }
+    if (current
+      && current.status === LIVE_DUBBING_STATUS.STOPPING
+      && current.status !== descriptor.status
+      && expectedDescriptor?.status !== LIVE_DUBBING_STATUS.STOPPING) {
+      return false;
+    }
+    if (expectedSessionId && (!current || current.sessionId !== expectedSessionId)) return false;
+    if (expectedDescriptor && !this._isSameDescriptorFence(current, expectedDescriptor)) return false;
+
+    if (wantsClearOutcome && !isRunningCommit) {
+      const { clearOutcome, ...writeOptions } = options;
+      void clearOutcome;
+      return this.stateStore.writeDescriptorFromCurrent(
+        descriptor,
+        current,
+        expectedSessionId,
+        expectedDescriptor,
+        writeOptions,
+      );
+    }
+
+    if (!wantsClearOutcome || !isRunningCommit) {
+      return this.stateStore.writeDescriptorFromCurrent(
+        descriptor,
+        current,
+        expectedSessionId,
+        expectedDescriptor,
+        options,
+      );
+    }
+
+    // RUNNING + clearOutcome: await outcome mutations, then re-read authoritative descriptor and re-check
+    await this.stateStore.awaitOutcomeMutations();
+
+    const currentAfter = await this.stateStore.readDescriptor();
+    if (this._storageReadFailed()) return false;
+
+    const stateAfter = this.sessionStates.get(expectedSessionId) || state;
+    if (stateAfter?.terminalRequested
+      && ![LIVE_DUBBING_STATUS.STOPPING, LIVE_DUBBING_STATUS.ERROR].includes(descriptor.status)) {
       return false;
     }
 
-    const storage = this.browserAPI.storage?.session;
-    if (typeof storage?.set !== 'function') {
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
+    if (expectedSessionId && (!currentAfter || currentAfter.sessionId !== expectedSessionId)) return false;
+    if (expectedDescriptor && !this._isSameDescriptorFence(currentAfter, expectedDescriptor)) return false;
+    if (currentAfter?.status === LIVE_DUBBING_STATUS.STOPPING
+      && currentAfter.status !== descriptor.status
+      && expectedDescriptor?.status !== LIVE_DUBBING_STATUS.STOPPING) {
       return false;
     }
 
-    const previousDescriptor = this.descriptor;
-    const clearOutcome = options.clearOutcome === true && sanitized.status === LIVE_DUBBING_STATUS.RUNNING;
-    if (clearOutcome) {
-      await this.outcomeMutation;
-      if (state?.terminalRequested) return false;
-      const current = expectedSessionId ? await this._readDescriptor() : this.descriptor;
-      if (expectedSessionId && (!current || current.sessionId !== expectedSessionId
-        || (expectedDescriptor && !this._isSameDescriptorFence(current, expectedDescriptor)))) {
-        return false;
-      }
-    }
-    try {
-      await storage.set({
-        [LIVE_DUBBING_STORAGE_KEY]: cloneDescriptor(sanitized),
-        ...(clearOutcome ? { [LIVE_DUBBING_OUTCOME_STORAGE_KEY]: null } : {}),
-      });
-    } catch {
-      // Keep last known descriptor; a failed write cannot establish ownership.
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-      this.descriptor = previousDescriptor;
-      return false;
-    }
-
-    this.descriptor = sanitized;
-    this.storageState = LIVE_DUBBING_STORAGE_STATE.PRESENT;
-    if (clearOutcome) {
-      this.terminalOutcome = null;
-      this.outcomeStorageState = LIVE_DUBBING_OUTCOME_STORAGE_STATE.ABSENT;
-    }
-    return true;
+    return this.stateStore.writeDescriptorFromCurrent(descriptor, currentAfter, expectedSessionId, expectedDescriptor, { clearOutcome: true });
   }
 
   async _clearDescriptor(expectedSessionId = null) {
-    if (expectedSessionId) {
-      const current = await this._readDescriptor();
-      if (this._storageReadFailed()) {
-        return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE };
-      }
-      if (this._storageDescriptorInvalid()) {
-        return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE };
-      }
-      if (!current || current.sessionId !== expectedSessionId) {
-        return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.SESSION_MISMATCH };
-      }
-    }
-    if (this._storageReadFailed() || this._storageDescriptorInvalid()) {
-      return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE };
-    }
-
-    if (expectedSessionId && (!this.descriptor || this.descriptor.sessionId !== expectedSessionId)) {
-      return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.SESSION_MISMATCH };
-    }
-
-    const storage = this.browserAPI.storage?.session;
-    if (typeof storage?.remove !== 'function' && typeof storage?.set !== 'function') {
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-      return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE };
-    }
-
-    try {
-      if (typeof storage.remove === 'function') {
-        await storage.remove(LIVE_DUBBING_STORAGE_KEY);
-      } else {
-        await storage.set({ [LIVE_DUBBING_STORAGE_KEY]: null });
-      }
-    } catch {
-      // Retain descriptor until storage confirms terminal cleanup.
-      this.storageState = LIVE_DUBBING_STORAGE_STATE.UNREADABLE;
-      return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE };
-    }
-
-    this.descriptor = null;
-    this.storageState = LIVE_DUBBING_STORAGE_STATE.ABSENT;
-    return { outcome: LIVE_DUBBING_CLEAR_OUTCOMES.CLEARED };
+    return this.stateStore.clearDescriptor(expectedSessionId);
   }
 }
 
