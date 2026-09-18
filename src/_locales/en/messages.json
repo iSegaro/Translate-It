@@ -263,6 +263,9 @@
   "live_dubbing_provider_setup_failed_error": {
     "message": "Unable to connect to the selected provider. Check your connection and configuration, then try again."
   },
+  "live_dubbing_offscreen_lost_error": {
+    "message": "Live Dubbing stopped unexpectedly. Start it again."
+  },
   "configure_service_button": {
     "message": "Configure Service ⚙️"
   },

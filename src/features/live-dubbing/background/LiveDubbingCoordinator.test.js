@@ -116,6 +116,7 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
   const chromeAPI = {
     tabCapture: {
       getMediaStreamId: vi.fn(async () => streamId),
+      getCapturedTabs: vi.fn(async () => []),
     },
   };
 
@@ -1913,6 +1914,531 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
   });
 
+  it.each(['stopped', 'error'])('turns a matching RUNNING capture %s into one OFFSCREEN_LOST outcome', async status => {
+    const harness = createHarness({ documentExists: true });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    harness.chromeAPI.tabCapture.getCapturedTabs.mockResolvedValue([]);
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_STATUS') {
+        return {
+          success: true,
+          active: false,
+          sessionId: 'session-1',
+          providerId: 'gemini',
+          status: 'IDLE',
+        };
+      }
+      return originalSendMessage(message);
+    });
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status });
+
+    expect(result).toMatchObject({ success: true, stopped: true });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toEqual({
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+      occurredAt: 123,
+      providerDiagnostic: null,
+    });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toEqual([[
+        expect.objectContaining({
+          action: 'LIVE_DUBBING_TERMINAL_OUTCOME',
+          data: {
+            providerId: 'gemini',
+            error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+            occurredAt: 123,
+            providerDiagnostic: null,
+          },
+        }),
+      ]]);
+  });
+
+  it.each(['active', 'pending'])('ignores an old capture event while current capture is %s', async captureStatus => {
+    const current = {
+      sessionId: 'session-b',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 2,
+      lastError: null,
+      eventSequence: 4,
+    };
+    const harness = createHarness({ stored: current });
+    harness.chromeAPI.tabCapture.getCapturedTabs.mockResolvedValue([
+      { tabId: 42, status: captureStatus },
+    ]);
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({
+      success: true,
+      stopped: false,
+      ignored: true,
+      status: current,
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toEqual(current);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeUndefined();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toBe(false);
+  });
+
+  it('does not let an active capture on another tab protect the stopped tab', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        providerId: 'gemini',
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+        startedAt: 1,
+        lastError: null,
+        eventSequence: 3,
+      },
+      documentExists: true,
+      statusResponse: {
+        success: true,
+        active: false,
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        status: 'IDLE',
+      },
+    });
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'session-1' }];
+    harness.chromeAPI.tabCapture.getCapturedTabs.mockResolvedValue([
+      { tabId: 99, status: 'active' },
+    ]);
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({ success: true, stopped: true });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'session-1',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+  });
+
+  it.each(['unavailable', 'rejecting'])('falls back to capture-loss handling when getCapturedTabs is %s', async mode => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'session-1',
+        tabId: 42,
+        providerId: 'gemini',
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+        startedAt: 1,
+        lastError: null,
+        eventSequence: 3,
+      },
+      documentExists: true,
+      statusResponse: {
+        success: true,
+        active: false,
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        status: 'IDLE',
+      },
+    });
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'session-1' }];
+    if (mode === 'unavailable') {
+      delete harness.chromeAPI.tabCapture.getCapturedTabs;
+    } else {
+      harness.chromeAPI.tabCapture.getCapturedTabs.mockRejectedValueOnce(new Error('capture API unavailable'));
+    }
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'error' });
+
+    expect(result).toMatchObject({ success: true, stopped: true });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'session-1',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+  });
+
+  it('uses normal tab teardown when capture stops after the owner tab disappears', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    harness.browserAPI.tabs.get.mockRejectedValueOnce(new Error('tab not found'));
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({ success: true, stopped: true, reason: 'TAB_REMOVED' });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(0);
+
+    await expect(harness.coordinator.handleTabRemoved(42)).resolves.toMatchObject({
+      success: true,
+      stopped: false,
+      ignored: true,
+    });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+  });
+
+  it('does not emit OFFSCREEN_LOST when tab removal already owns held DISPOSE cleanup', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    let resolveDispose;
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return new Promise(resolve => { resolveDispose = resolve; });
+      }
+      return originalSendMessage(message);
+    });
+
+    const removal = harness.coordinator.handleTabRemoved(42);
+    while (!resolveDispose) await Promise.resolve();
+    const capture = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(capture).toMatchObject({ success: true, stopped: false, ignored: true });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+    expect(harness.coordinator.terminalOperations.size).toBe(1);
+
+    resolveDispose({
+      success: true,
+      ack: 'DISPOSED',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+    });
+    await expect(removal).resolves.toMatchObject({ success: true, stopped: true, reason: 'TAB_REMOVED' });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toHaveLength(1);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(0);
+  });
+
+  it('releases a matching stale lease after proven document loss without DISPOSE', async () => {
+    const harness = createHarness({ documentExists: false });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({ success: true, stopped: true });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.manager.release).toHaveBeenCalledWith({
+      owner: LIVE_DUBBING_OWNER,
+      leaseId: 'session-1',
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(1);
+  });
+
+  it('retains ERROR and outcome when proven-absence lease release fails', async () => {
+    const harness = createHarness({ documentExists: false });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    harness.manager.release.mockResolvedValueOnce(false);
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'error' });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+      status: { sessionId: 'session-1', status: LIVE_DUBBING_STATUS.ERROR },
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'session-1',
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: 'STOP_FAILED',
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(true);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'session-1',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(1);
+  });
+
+  it('terminalizes capture loss with unknown runtime status and retains ERROR after DISPOSE failure', async () => {
+    const harness = createHarness({ documentExists: true });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_STATUS') return null;
+      if (message.action === 'LIVE_DUBBING_DISPOSE') return { success: false };
+      return originalSendMessage(message);
+    });
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'STOP_FAILED',
+      retryable: true,
+      cleanupPending: true,
+      status: { sessionId: 'session-1', status: LIVE_DUBBING_STATUS.ERROR },
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      status: LIVE_DUBBING_STATUS.ERROR,
+      lastError: 'STOP_FAILED',
+    });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'session-1',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toHaveLength(1);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(1);
+  });
+
+  it('lets an explicit STOP that already owns cleanup win over a concurrent capture event', async () => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    let resolveDispose;
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return new Promise(resolve => { resolveDispose = resolve; });
+      }
+      return originalSendMessage(message);
+    });
+
+    const stop = harness.coordinator.stop({ data: { sessionId: 'session-1' } });
+    while (!resolveDispose) await Promise.resolve();
+    const capture = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(capture).toMatchObject({ success: true, stopped: false, ignored: true });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+    expect(harness.coordinator.terminalOperations.size).toBe(1);
+
+    resolveDispose({
+      success: true,
+      ack: 'DISPOSED',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+    });
+    await expect(stop).resolves.toMatchObject({ success: true, stopped: true });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toHaveLength(1);
+  });
+
+  it('clears proven capture loss after outcome persistence fails without notifying it', async () => {
+    const harness = createHarness({ documentExists: false });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSet = harness.browserAPI.storage.session.set.getMockImplementation();
+    harness.browserAPI.storage.session.set.mockImplementation(async record => {
+      if (record[LIVE_DUBBING_OUTCOME_STORAGE_KEY]) throw new Error('outcome storage unavailable');
+      return originalSet(record);
+    });
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({ success: true, stopped: true });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toBe(false);
+  });
+
+  it('fences a stale capture event before a newer RUNNING session can be stopped', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'old-session',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 3,
+    } });
+    const newer = {
+      sessionId: 'new-session',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 2,
+      lastError: null,
+      eventSequence: 4,
+    };
+    let descriptorRead = 0;
+    const originalGet = harness.browserAPI.storage.session.get.getMockImplementation();
+    harness.browserAPI.storage.session.get.mockImplementation(async key => {
+      const result = await originalGet(key);
+      if (key === LIVE_DUBBING_STORAGE_KEY && descriptorRead++ === 1) {
+        harness.storage.set(LIVE_DUBBING_STORAGE_KEY, newer);
+        return { [LIVE_DUBBING_STORAGE_KEY]: newer };
+      }
+      return result;
+    });
+
+    const result = await harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+
+    expect(result).toMatchObject({ success: true, stopped: false, ignored: true });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toEqual(newer);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeUndefined();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+  });
+
+  it('revalidates the descriptor after the awaited current-capture lookup', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'old-session',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 1,
+      lastError: null,
+      eventSequence: 3,
+    } });
+    const newer = {
+      sessionId: 'new-session',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 2,
+      lastError: null,
+      eventSequence: 4,
+    };
+    let resolveCapturedTabs;
+    harness.chromeAPI.tabCapture.getCapturedTabs.mockImplementation(
+      () => new Promise(resolve => { resolveCapturedTabs = resolve; }),
+    );
+
+    const capture = harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+    while (!resolveCapturedTabs) await Promise.resolve();
+    harness.storage.set(LIVE_DUBBING_STORAGE_KEY, newer);
+    resolveCapturedTabs([]);
+
+    const result = await capture;
+
+    expect(result).toMatchObject({
+      success: true,
+      stopped: false,
+      ignored: true,
+      status: newer,
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toEqual(newer);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeUndefined();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+  });
+
+  it.each(['explicit STOP', 'tab removal'])('does not emit OFFSCREEN_LOST when %s wins during current-capture lookup', async event => {
+    const harness = createHarness();
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    let resolveCapturedTabs;
+    harness.chromeAPI.tabCapture.getCapturedTabs.mockImplementation(
+      () => new Promise(resolve => { resolveCapturedTabs = resolve; }),
+    );
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    let resolveDispose;
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_DISPOSE') {
+        return new Promise(resolve => { resolveDispose = resolve; });
+      }
+      return originalSendMessage(message);
+    });
+
+    const capture = harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' });
+    while (!resolveCapturedTabs) await Promise.resolve();
+    const terminal = event === 'explicit STOP'
+      ? harness.coordinator.stop({ data: { sessionId: 'session-1' } })
+      : harness.coordinator.handleTabRemoved(42);
+    while (!resolveDispose) await Promise.resolve();
+    resolveCapturedTabs([]);
+
+    await expect(capture).resolves.toMatchObject({ success: true, stopped: false, ignored: true });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+
+    resolveDispose({
+      success: true,
+      ack: 'DISPOSED',
+      sessionId: 'session-1',
+      providerId: 'gemini',
+    });
+    await expect(terminal).resolves.toMatchObject({ success: true, stopped: true });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toHaveLength(1);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(0);
+  });
+
+  it('single-flights duplicate capture loss events across cleanup, outcome, and notification', async () => {
+    const harness = createHarness({ documentExists: true });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      if (message.action === 'LIVE_DUBBING_STATUS') {
+        return {
+          success: true,
+          active: false,
+          sessionId: 'session-1',
+          providerId: 'gemini',
+          status: 'DISPOSED',
+          disposed: true,
+        };
+      }
+      return originalSendMessage(message);
+    });
+
+    const results = await Promise.all([
+      harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' }),
+      harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' }),
+      harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'error' }),
+    ]);
+
+    expect(results.filter(result => result.stopped === true)).toHaveLength(3);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(1);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'session-1',
+      providerId: 'gemini',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+  });
+
+  it('lets explicit STOP win over a later capture loss event without an outcome', async () => {
+    const harness = createHarness({ documentExists: true });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+    await expect(harness.coordinator.stop({ data: { sessionId: 'session-1' } }))
+      .resolves.toMatchObject({ success: true, stopped: true });
+
+    await expect(harness.coordinator.handleCaptureStatusChanged({ tabId: 42, status: 'stopped' }))
+      .resolves.toMatchObject({ success: true, stopped: false, ignored: true });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeNull();
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+  });
+
   it('persists a public-safe runtime error outcome before clearing the descriptor', async () => {
     const harness = createHarness();
     await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
@@ -2817,7 +3343,7 @@ describe('LiveDubbingCoordinator', () => {
     )).resolves.toMatchObject({ sessionId: second.status.sessionId });
   });
 
-  it('reconciles stale descriptor through status, dispose, and exact lease release', async () => {
+  it('retains a RUNNING descriptor when matching-lease status is incomplete', async () => {
     const stored = {
       sessionId: 'old-session',
       tabId: 42,
@@ -2837,9 +3363,19 @@ describe('LiveDubbingCoordinator', () => {
     const result = await harness.coordinator.reconcile();
     const actions = harness.browserAPI.runtime.sendMessage.mock.calls.map(([message]) => message.action);
 
-    expect(result).toMatchObject({ success: true, stale: true, status: null });
-    expect(actions).toEqual(['LIVE_DUBBING_STATUS', 'LIVE_DUBBING_DISPOSE']);
-    expect(harness.manager.release).toHaveBeenCalledWith({ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' });
+    expect(result).toMatchObject({
+      success: false,
+      stale: true,
+      recovered: false,
+      retryable: true,
+      status: { sessionId: 'old-session', status: LIVE_DUBBING_STATUS.RUNNING },
+    });
+    expect(actions).toEqual(['LIVE_DUBBING_STATUS']);
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'old-session',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+    });
   });
 
   it('ignores a status response from a different provider identity', async () => {
@@ -3822,6 +4358,211 @@ describe('LiveDubbingCoordinator', () => {
       action: 'LIVE_DUBBING_STATUS',
       data: { sessionId: 'openai-session', providerId: LIVE_DUBBING_OPENAI_PROVIDER_ID },
     });
+  });
+
+  it('persists OFFSCREEN_LOST before clearing a persisted RUNNING descriptor after document loss', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'old-session',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+        startedAt: 1,
+        lastError: null,
+        eventSequence: 2,
+      },
+      documentExists: false,
+    });
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toEqual({
+      success: true,
+      status: null,
+      stale: true,
+      recovered: false,
+      retryable: false,
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toEqual({
+      sourceSessionId: 'old-session',
+      providerId: 'gemini',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+      occurredAt: 123,
+      providerDiagnostic: null,
+    });
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .map(([message]) => message.action)).toEqual(['LIVE_DUBBING_TERMINAL_OUTCOME']);
+  });
+
+  it('releases a matching stale lease during document-loss reconciliation without DISPOSE', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'old-session',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+        startedAt: 1,
+        lastError: null,
+        eventSequence: 2,
+      },
+      documentExists: false,
+    });
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' }];
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toMatchObject({ success: true, status: null, stale: true, recovered: false });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_DISPOSE')).toBe(false);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.manager.release).toHaveBeenCalledWith({
+      owner: LIVE_DUBBING_OWNER,
+      leaseId: 'old-session',
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+      sourceSessionId: 'old-session',
+      providerId: 'gemini',
+      error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+    });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toHaveLength(1);
+  });
+
+  it('ordinarily cleans an exact ERROR status for a persisted RUNNING descriptor', async () => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'old-session',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+        startedAt: 1,
+        lastError: null,
+        eventSequence: 2,
+      },
+      documentExists: true,
+      statusResponse: {
+        success: true,
+        active: false,
+        sessionId: 'old-session',
+        providerId: 'gemini',
+        status: LIVE_DUBBING_STATUS.ERROR,
+      },
+    });
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' }];
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toMatchObject({ success: true, status: null, stale: true, retryable: false });
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .map(([message]) => message.action)).toEqual([
+      'LIVE_DUBBING_STATUS',
+      'LIVE_DUBBING_DISPOSE',
+    ]);
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.manager.release).toHaveBeenCalledWith({
+      owner: LIVE_DUBBING_OWNER,
+      leaseId: 'old-session',
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeUndefined();
+  });
+
+  it.each(['IDLE', 'MISSING', 'DISPOSED'])('persists OFFSCREEN_LOST before clearing a recreated document with exact %s status', async status => {
+      const harness = createHarness({
+        stored: {
+          sessionId: 'old-session',
+          tabId: 42,
+          targetLanguage: 'en',
+          status: LIVE_DUBBING_STATUS.RUNNING,
+          startedAt: 1,
+          lastError: null,
+          eventSequence: 2,
+        },
+        documentExists: true,
+        statusResponse: {
+          success: true,
+          active: false,
+          sessionId: 'old-session',
+          status,
+          ...(status === 'DISPOSED' ? { disposed: true } : {}),
+        },
+      });
+      harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' }];
+
+      const result = await harness.coordinator.reconcile();
+
+      expect(result).toMatchObject({
+        success: true,
+        status: null,
+        stale: true,
+        recovered: false,
+        retryable: false,
+      });
+      expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+      expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toMatchObject({
+        sourceSessionId: 'old-session',
+        providerId: 'gemini',
+        error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+        providerDiagnostic: null,
+      });
+      expect(harness.manager.release).toHaveBeenCalledOnce();
+      expect(harness.manager.release).toHaveBeenCalledWith({
+        owner: LIVE_DUBBING_OWNER,
+        leaseId: 'old-session',
+      });
+      expect(harness.browserAPI.runtime.sendMessage.mock.calls
+        .map(([message]) => message.action)).toEqual([
+        'LIVE_DUBBING_STATUS',
+        'LIVE_DUBBING_TERMINAL_OUTCOME',
+      ]);
+    });
+
+  it.each([
+    ['unknown status', { success: true, active: false, sessionId: 'old-session' }, null],
+    ['null response', null, null],
+    ['unknown status with known document', { success: true, active: false, sessionId: 'old-session' }, true],
+  ])('does not clear or create an outcome for an ambiguous RUNNING reconciliation (%s)', async (_label, statusResponse, documentExists) => {
+    const harness = createHarness({
+      stored: {
+        sessionId: 'old-session',
+        tabId: 42,
+        targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING,
+        startedAt: 1,
+        lastError: null,
+        eventSequence: 2,
+      },
+      documentExists,
+      statusResponse: statusResponse || {},
+    });
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'old-session' }];
+    if (statusResponse === null) {
+      const originalSendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+      harness.browserAPI.runtime.sendMessage.mockImplementation(async message => (
+        message.action === 'LIVE_DUBBING_STATUS' ? null : originalSendMessage(message)
+      ));
+    }
+
+    const result = await harness.coordinator.reconcile();
+
+    expect(result).toMatchObject({
+      success: false,
+      stale: true,
+      recovered: false,
+      retryable: true,
+      status: { sessionId: 'old-session', status: LIVE_DUBBING_STATUS.RUNNING },
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({
+      sessionId: 'old-session',
+      status: LIVE_DUBBING_STATUS.RUNNING,
+    });
+    expect(harness.storage.get(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBeUndefined();
+    expect(harness.manager.release).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage.mock.calls
+      .some(([message]) => message.action === 'LIVE_DUBBING_TERMINAL_OUTCOME')).toBe(false);
   });
 
   it('fails closed when an untrusted lease has ambiguous active provider probes', async () => {

@@ -14,7 +14,8 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
     t: (key) => ({
       live_dubbing_provider_bootstrap_gemini_error: 'Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again.',
       live_dubbing_provider_bootstrap_openai_error: 'Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again.',
-      live_dubbing_provider_setup_failed_error: 'Unable to connect to the selected provider. Check your connection and configuration, then try again.'
+      live_dubbing_provider_setup_failed_error: 'Unable to connect to the selected provider. Check your connection and configuration, then try again.',
+      live_dubbing_offscreen_lost_error: 'Live Dubbing stopped unexpectedly. Start it again.'
     }[key] || key)
   })
 }))
@@ -430,6 +431,30 @@ describe('LiveDubbingControl', () => {
     expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('PROVIDER_SESSION_ENDED')
     expect(wrapper.text()).not.toContain('must not render')
+  })
+
+  it('maps a reopened Offscreen loss outcome without blocking Start', async () => {
+    sendMessage.mockResolvedValue({
+      status: null,
+      terminalOutcome: {
+        providerId: 'gemini',
+        error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+        occurredAt: 123
+      }
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Live Dubbing stopped unexpectedly. Start it again.')
+    expect(wrapper.text()).not.toContain('LIVE_DUBBING_OFFSCREEN_LOST')
+    expect(wrapper.text()).not.toContain('Offscreen')
+    expect(wrapper.text()).not.toContain('tabCapture')
+    expect(wrapper.text()).not.toContain('document')
   })
 
   it('ignores unsafe terminal error prose and provider diagnostics', async () => {

@@ -54,7 +54,7 @@
       class="ti-live-dubbing-control-error"
       role="alert"
     >
-      {{ errorMessage || terminalOutcome.error }}
+      {{ errorMessage || getErrorMessage(terminalOutcome.error, 'Live dubbing failed.', terminalOutcome.providerId) }}
     </p>
   </section>
 </template>
@@ -123,6 +123,9 @@ const statusText = computed(() => ({
 }[authoritativeStatus.value || state.value] || 'Error'))
 
 const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = sessionProviderId.value || props.providerId) => {
+  if (error === 'LIVE_DUBBING_OFFSCREEN_LOST') {
+    return t('live_dubbing_offscreen_lost_error')
+  }
   if (error === 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE') {
     return providerId === 'openai'
       ? t('live_dubbing_provider_bootstrap_openai_error')

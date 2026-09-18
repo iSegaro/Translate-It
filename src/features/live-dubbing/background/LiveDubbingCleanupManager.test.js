@@ -68,6 +68,59 @@ describe('LiveDubbingCleanupManager', () => {
     expect(state).not.toHaveProperty('cleanupFacts');
   });
 
+  it('proven absence releases the exact lease without DISPOSE', async () => {
+    const state = createState('s-1', 'gemini', { leaseAcquired: true });
+    const states = new Map([['s-1', state]]);
+    const sendOffscreen = vi.fn(async () => {
+      throw new Error('DISPOSE must not be sent after runtime loss');
+    });
+    const leaseManager = { release: vi.fn(async () => true) };
+    const manager = new LiveDubbingCleanupManager({
+      leaseManager,
+      sendOffscreen,
+      getSessionState: id => states.get(id) || null,
+      logger: { warn: vi.fn() },
+    });
+
+    const result = await manager.releaseAfterProvenAbsence(state.descriptor, { releaseLease: true });
+
+    expect(result).toEqual({ success: true });
+    expect(sendOffscreen).not.toHaveBeenCalled();
+    expect(leaseManager.release).toHaveBeenCalledOnce();
+    expect(leaseManager.release).toHaveBeenCalledWith({ owner: LIVE_DUBBING_OWNER, leaseId: 's-1' });
+    expect(state.cleanupCompleted).toBe(true);
+  });
+
+  it('proven absence release is single-flight and fences a replaced state', async () => {
+    const state = createState('s-1', 'gemini', { leaseAcquired: true });
+    const states = new Map([['s-1', state]]);
+    let resolveRelease;
+    const leaseManager = {
+      release: vi.fn(() => new Promise(resolve => { resolveRelease = resolve; })),
+    };
+    const sendOffscreen = vi.fn();
+    const manager = new LiveDubbingCleanupManager({
+      leaseManager,
+      sendOffscreen,
+      getSessionState: id => states.get(id) || null,
+      logger: { warn: vi.fn() },
+    });
+
+    const first = manager.releaseAfterProvenAbsence(state.descriptor, { releaseLease: true });
+    const second = manager.releaseAfterProvenAbsence(state.descriptor, { releaseLease: true });
+    expect(first).toBe(second);
+    await Promise.resolve();
+    expect(leaseManager.release).toHaveBeenCalledOnce();
+
+    const replacement = createState('s-1', 'gemini', { leaseAcquired: true });
+    states.set('s-1', replacement);
+    resolveRelease(true);
+
+    expect(await first).toEqual({ success: false });
+    expect(replacement.cleanupCompleted).toBe(false);
+    expect(sendOffscreen).not.toHaveBeenCalled();
+  });
+
   it('ack mismatch: provider mismatch fails', async () => {
     const state = createState('s-1', 'gemini', { leaseAcquired: false });
     const states = new Map([['s-1', state]]);

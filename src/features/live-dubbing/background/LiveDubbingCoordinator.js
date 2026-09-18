@@ -194,6 +194,137 @@ export class LiveDubbingCoordinator {
     return this._stopForTab(tabId, 'TOP_LEVEL_NAVIGATION');
   }
 
+  async handleCaptureStatusChanged({ tabId, status } = {}) {
+    if (!Number.isInteger(tabId) || tabId < 0) {
+      return { success: false, error: 'INVALID_TAB_ID', ignored: true };
+    }
+    if (status !== 'stopped' && status !== 'error') {
+      return { success: false, error: 'INVALID_CAPTURE_STATUS', ignored: true };
+    }
+
+    const descriptor = await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (descriptor?.status !== LIVE_DUBBING_STATUS.RUNNING || descriptor.tabId !== tabId) {
+      return { success: true, stopped: false, ignored: true };
+    }
+
+    // Capture events carry no session identity. Keep an immutable fence and
+    // re-read it before any terminal work so a reused tab cannot stop a newer
+    // session.
+    const expectedDescriptor = cloneDescriptor(descriptor);
+    const expectedState = this.sessionStates.get(descriptor.sessionId) || null;
+    const current = await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (!this._isSameDescriptorFence(current, expectedDescriptor)) {
+      return { success: true, stopped: false, ignored: true };
+    }
+
+    const fencedState = this.sessionStates.get(expectedDescriptor.sessionId) || null;
+    const terminalOperation = this.terminalOperations.get(expectedDescriptor.sessionId);
+    if (fencedState?.terminalRequested
+      || (terminalOperation?.providerId === expectedDescriptor.providerId
+        && terminalOperation.state === fencedState)) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(current),
+      };
+    }
+
+    const tabPresent = await this._isCaptureTabPresent(tabId);
+    const revalidated = await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (!this._isSameDescriptorFence(revalidated, expectedDescriptor)) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(revalidated),
+      };
+    }
+
+    const revalidatedState = this.sessionStates.get(expectedDescriptor.sessionId) || null;
+    const revalidatedTerminalOperation = this.terminalOperations.get(expectedDescriptor.sessionId);
+    if (revalidatedState?.terminalRequested
+      || (revalidatedTerminalOperation?.providerId === expectedDescriptor.providerId
+        && revalidatedTerminalOperation.state === revalidatedState)) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(revalidated),
+      };
+    }
+
+    if (tabPresent === false) {
+      return this._stopForSession(
+        expectedDescriptor.sessionId,
+        'TAB_REMOVED',
+        expectedDescriptor,
+        expectedState,
+      );
+    }
+
+    const currentCaptureState = await this._getCurrentCaptureState(tabId);
+    const captureRevalidated = await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (!this._isSameDescriptorFence(captureRevalidated, expectedDescriptor)
+      || captureRevalidated?.status !== LIVE_DUBBING_STATUS.RUNNING
+      || captureRevalidated?.tabId !== tabId) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(captureRevalidated),
+      };
+    }
+
+    const captureState = this.sessionStates.get(expectedDescriptor.sessionId) || null;
+    const captureTerminalOperation = this.terminalOperations.get(expectedDescriptor.sessionId);
+    if (captureState?.terminalRequested
+      || (captureTerminalOperation?.providerId === expectedDescriptor.providerId
+        && captureTerminalOperation.state === captureState)) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(captureRevalidated),
+      };
+    }
+
+    if (currentCaptureState === true) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(captureRevalidated),
+      };
+    }
+
+    // Capture loss is terminal proof. Runtime absence only selects the safe
+    // lease-release path; it must not gate terminalization itself. An
+    // unavailable tab API leaves this path unchanged instead of guessing that
+    // the tab was removed.
+    const runtimeAbsent = await this._isRuntimeAbsent(expectedDescriptor);
+
+    return this._stopForSession(
+      expectedDescriptor.sessionId,
+      'CAPTURE_STATUS_CHANGED',
+      expectedDescriptor,
+      expectedState,
+      {
+        terminalizeRuntimeLoss: true,
+        runtimeAbsent,
+        skipCleanup: runtimeAbsent && !this._hasLiveLease(expectedDescriptor.sessionId),
+      },
+    );
+  }
+
   async handleOffscreenTerminal(message = {}, sender = null) {
     const sessionId = message?.data?.sessionId || message?.sessionId;
     const providerId = message?.data?.providerId || message?.providerId;
@@ -857,6 +988,7 @@ export class LiveDubbingCoordinator {
 
   async _stopDescriptor(descriptor, reason, options = {}) {
     const cleanupFailureError = options?.cleanupFailureError || null;
+    const terminalizeRuntimeLoss = options?.terminalizeRuntimeLoss === true;
     const allowedStartupCodes = new Set([
       'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
       'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
@@ -893,18 +1025,37 @@ export class LiveDubbingCoordinator {
       promise: null,
     };
     const terminalOperation = (async () => {
-      if (state.cleanupCompleted) {
-        if (this.sessionStates.get(descriptor.sessionId) !== state) {
-          return {
-            success: true,
-            stopped: false,
-            ignored: true,
-            status: cloneDescriptor(this.descriptor),
-            reason,
+      let notifyRuntimeLossOutcome = null;
+      if (terminalizeRuntimeLoss) {
+        if (!state.runtimeLossOutcomePersisted) {
+          const outcome = createLiveDubbingTerminalOutcome({
+            sourceSessionId: descriptor.sessionId,
+            providerId: descriptor.providerId,
+            error: 'LIVE_DUBBING_OFFSCREEN_LOST',
+            occurredAt: this.now(),
+            providerDiagnostic: null,
+          });
+          const persisted = await this._queueOutcomeMutation(
+            () => this._writeTerminalOutcome(outcome),
+          );
+          if (persisted) state.runtimeLossOutcomePersisted = true;
+        }
+
+        if (state.runtimeLossOutcomePersisted) {
+          notifyRuntimeLossOutcome = async () => {
+            if (state.runtimeLossOutcomeNotified) return;
+            state.runtimeLossOutcomeNotified = true;
+            await this._notifyTerminalOutcome(
+              toPublicLiveDubbingTerminalOutcome(this.terminalOutcome),
+            );
           };
         }
+      }
+
+      const clearTerminalDescriptor = async () => {
         const cleared = await this._clearDescriptor(descriptor.sessionId);
         if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.CLEARED) {
+          await notifyRuntimeLossOutcome?.();
           this._forgetSessionState(descriptor.sessionId, state);
           return { success: true, stopped: true, status: null, reason };
         }
@@ -918,16 +1069,42 @@ export class LiveDubbingCoordinator {
             reason,
           };
         }
+        await notifyRuntimeLossOutcome?.();
         return this._storageClearFailure(descriptor);
+      };
+
+      if (state.cleanupCompleted) {
+        if (this.sessionStates.get(descriptor.sessionId) !== state) {
+          return {
+            success: true,
+            stopped: false,
+            ignored: true,
+            status: cloneDescriptor(this.descriptor),
+            reason,
+          };
+        }
+        return clearTerminalDescriptor();
+      }
+
+      const provenAbsenceLease = terminalizeRuntimeLoss
+        && options.runtimeAbsent === true
+        && this._hasLiveLease(descriptor.sessionId);
+      if (terminalizeRuntimeLoss
+        && !provenAbsenceLease
+        && (options.skipCleanup === true || options.runtimeAbsent === true)) {
+        state.cleanupCompleted = true;
+        return clearTerminalDescriptor();
       }
 
       const stopping = this._advance(descriptor, LIVE_DUBBING_STATUS.STOPPING);
       if (!await this._writeDescriptor(stopping, descriptor.sessionId, descriptor)) {
         return this._storageWriteFailure();
       }
-      const cleanupPromise = this.cleanupManager.disposeAndRelease(descriptor, {
-        releaseLease: state ? undefined : this._hasLiveLease(descriptor.sessionId),
-      });
+      const cleanupPromise = provenAbsenceLease
+        ? this.cleanupManager.releaseAfterProvenAbsence(descriptor, { releaseLease: true })
+        : this.cleanupManager.disposeAndRelease(descriptor, {
+          releaseLease: state ? undefined : this._hasLiveLease(descriptor.sessionId),
+        });
       terminalRecord.cleanupAttempt = this.cleanupManager.getAttempt(descriptor.sessionId) || null;
       const cleanup = await cleanupPromise;
       if (this.sessionStates.get(descriptor.sessionId) !== state) {
@@ -943,6 +1120,7 @@ export class LiveDubbingCoordinator {
         const failedLastError = retainedStartupError || 'STOP_FAILED';
         const failed = this._advance(stopping, LIVE_DUBBING_STATUS.ERROR, failedLastError);
         await this._writeDescriptor(failed, descriptor.sessionId, stopping).catch(() => {});
+        await notifyRuntimeLossOutcome?.();
         return {
           success: false,
           error: 'STOP_FAILED',
@@ -952,22 +1130,7 @@ export class LiveDubbingCoordinator {
         };
       }
 
-      const cleared = await this._clearDescriptor(descriptor.sessionId);
-      if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.STORAGE_FAILURE) {
-        return this._storageClearFailure(descriptor);
-      }
-      if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.SESSION_MISMATCH) {
-        this._forgetSessionState(descriptor.sessionId, state);
-        return {
-          success: true,
-          stopped: false,
-          ignored: true,
-          status: cloneDescriptor(this.descriptor),
-          reason,
-        };
-      }
-      this._forgetSessionState(descriptor.sessionId, state);
-      return { success: true, stopped: true, status: null, reason };
+      return clearTerminalDescriptor();
     })();
 
     terminalRecord.promise = terminalOperation;
@@ -1032,6 +1195,42 @@ export class LiveDubbingCoordinator {
     return Promise.race([operation, timeout]).finally(() => clearTimeout(timeoutId));
   }
 
+  async _reconcileRuntimeLoss(descriptor) {
+    const current = await this._readDescriptor();
+    if (this._storageReadFailed()) return this._storageReadFailure();
+    if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (!this._isSameDescriptorFence(current, descriptor)) {
+      return {
+        success: true,
+        stopped: false,
+        ignored: true,
+        status: cloneDescriptor(current),
+        stale: true,
+        recovered: false,
+      };
+    }
+
+    const result = await this._stopDescriptor(current, 'RECONCILE_OFFSCREEN_LOST', {
+      terminalizeRuntimeLoss: true,
+      runtimeAbsent: true,
+      skipCleanup: true,
+    });
+    if (result.success === true && result.stopped === true) {
+      return {
+        success: true,
+        status: null,
+        stale: true,
+        recovered: false,
+        retryable: false,
+      };
+    }
+    return {
+      ...result,
+      stale: true,
+      recovered: false,
+    };
+  }
+
   async _reconcile() {
     const descriptor = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
@@ -1081,6 +1280,9 @@ export class LiveDubbingCoordinator {
     }
 
     let matchingLease = liveLeases.find(item => item.leaseId === descriptor.sessionId);
+    if (snapshot.documentExists === false && descriptor.status === LIVE_DUBBING_STATUS.RUNNING) {
+      return this._reconcileRuntimeLoss(descriptor);
+    }
     if (snapshot.documentExists === false && !matchingLease) {
       const cleared = await this._clearDescriptor(descriptor.sessionId);
       if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.CLEARED) {
@@ -1201,8 +1403,21 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    const documentAndSessionAbsent = !matchingLease
-      && this._isProvablyAbsent(descriptorStatus, descriptor.sessionId, descriptor.providerId);
+    const sessionAbsent = this._isProvablyAbsent(
+      descriptorStatus,
+      descriptor.sessionId,
+      descriptor.providerId,
+    );
+    const exactStatus = this._isExactSessionStatus(
+      descriptorStatus,
+      descriptor.sessionId,
+      descriptor.providerId,
+    );
+    if (descriptor.status === LIVE_DUBBING_STATUS.RUNNING && sessionAbsent) {
+      return this._reconcileRuntimeLoss(descriptor);
+    }
+
+    const documentAndSessionAbsent = !matchingLease && sessionAbsent;
     if (documentAndSessionAbsent) {
       const cleared = await this._clearDescriptor(descriptor.sessionId);
       if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.CLEARED) {
@@ -1233,6 +1448,16 @@ export class LiveDubbingCoordinator {
         recovered: false,
         retryable: true,
         cleanupPending: true,
+      };
+    }
+
+    if (descriptor.status === LIVE_DUBBING_STATUS.RUNNING && !exactStatus) {
+      return {
+        success: false,
+        status: cloneDescriptor(descriptor),
+        stale: true,
+        recovered: false,
+        retryable: true,
       };
     }
 
@@ -1490,6 +1715,34 @@ export class LiveDubbingCoordinator {
       && left.status === right.status);
   }
 
+  async _isCaptureTabPresent(tabId) {
+    const getTab = this.browserAPI?.tabs?.get;
+    if (typeof getTab !== 'function') return null;
+
+    try {
+      return Boolean(await getTab.call(this.browserAPI.tabs, tabId));
+    } catch {
+      return false;
+    }
+  }
+
+  async _getCurrentCaptureState(tabId) {
+    const getCapturedTabs = this.chromeAPI?.tabCapture?.getCapturedTabs;
+    if (typeof getCapturedTabs !== 'function') return null;
+
+    try {
+      const capturedTabs = await getCapturedTabs.call(this.chromeAPI.tabCapture);
+      if (!Array.isArray(capturedTabs)) return null;
+
+      const matchingTabs = capturedTabs.filter(entry => entry?.tabId === tabId);
+      if (matchingTabs.length === 0) return false;
+      if (matchingTabs.some(entry => typeof entry?.status !== 'string')) return null;
+      return matchingTabs.some(entry => entry.status !== 'stopped' && entry.status !== 'error');
+    } catch {
+      return null;
+    }
+  }
+
   _isRecoverableRunningStatus(response, sessionId, providerId) {
     return this._isExactSessionStatus(response, sessionId, providerId)
       && response.status === LIVE_DUBBING_STATUS.RUNNING
@@ -1503,6 +1756,30 @@ export class LiveDubbingCoordinator {
     return this._isExactSessionStatus(response, sessionId, providerId)
       && (['IDLE', 'DISPOSED', 'MISSING'].includes(response.status)
         || response.disposed === true);
+  }
+
+  async _isRuntimeAbsent(descriptor) {
+    try {
+      await this.leaseManager.ensureDocument?.();
+    } catch {
+      // Runtime absence is best effort; capture loss remains terminal proof.
+    }
+
+    let snapshot;
+    try {
+      snapshot = this.leaseManager.getSnapshot?.() || null;
+    } catch {
+      snapshot = null;
+    }
+
+    if (snapshot?.documentExists === false) return true;
+
+    const status = await this._queryStatus(
+      descriptor,
+      descriptor?.sessionId,
+      descriptor?.providerId,
+    );
+    return this._isProvablyAbsent(status, descriptor?.sessionId, descriptor?.providerId);
   }
 
   _isExplicitlyInactive(response, providerId) {

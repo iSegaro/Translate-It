@@ -10,7 +10,8 @@ export const CLEANUP_LEASE_STATES = Object.freeze({
 /**
  * Physical cleanup/resource-release subsystem for Live Dubbing.
  * Owns single-flight, per-session facts, offscreen DISPOSE, ack validation,
- * pending lease settlement, and exactly-once release with stale fencing.
+ * proven-absence lease release, pending lease settlement, and exactly-once
+ * release with stale fencing.
  *
  * Facts are manager-owned and carry exact captured state identity:
  * {sessionId, providerId, state, leaseState, leaseSettlementPromise,
@@ -30,6 +31,27 @@ export class LiveDubbingCleanupManager {
   }
 
   disposeAndRelease(descriptor, options = {}) {
+    return this._startCleanup(
+      descriptor,
+      options,
+      (currentDescriptor, facts) => this._disposeAndReleaseOnce(currentDescriptor, facts),
+    );
+  }
+
+  /**
+   * Release an exact lease after the Coordinator has positively proved that
+   * the offscreen runtime is absent. This path deliberately skips DISPOSE;
+   * ordinary cleanup must continue to receive an exact DISPOSED acknowledgement.
+   */
+  releaseAfterProvenAbsence(descriptor, options = {}) {
+    return this._startCleanup(
+      descriptor,
+      options,
+      (currentDescriptor, facts) => this._releaseAfterProvenAbsenceOnce(currentDescriptor, facts),
+    );
+  }
+
+  _startCleanup(descriptor, options, operation) {
     const { facts } = this._getOrCreateFacts(descriptor, options);
     const existing = this._promises.get(descriptor.sessionId);
     if (
@@ -46,7 +68,7 @@ export class LiveDubbingCleanupManager {
       facts,
       promise: null,
     };
-    const cleanup = this._disposeAndReleaseOnce(descriptor, facts);
+    const cleanup = operation(descriptor, facts);
     record.promise = cleanup;
     this._promises.set(descriptor.sessionId, record);
     cleanup.then(
@@ -100,6 +122,11 @@ export class LiveDubbingCleanupManager {
     if (this.getSessionState(sessionId) !== expectedState) return;
     if (facts.leaseState === CLEANUP_LEASE_STATES.PENDING) return;
     facts.leaseState = leaseAcquired ? CLEANUP_LEASE_STATES.ACQUIRED : CLEANUP_LEASE_STATES.ABSENT;
+  }
+
+  _releaseAfterProvenAbsenceOnce(descriptor, facts) {
+    this._trackLeaseSettlement(facts);
+    return this._finalizeRelease(descriptor, facts);
   }
 
   async _disposeAndReleaseOnce(descriptor, facts) {
@@ -204,10 +231,15 @@ export class LiveDubbingCleanupManager {
     if (!this._isCurrentCleanup(facts) || !facts.disposeAcknowledged) {
       return Promise.resolve({ success: false });
     }
+    return this._finalizeRelease(descriptor, facts);
+  }
+
+  _finalizeRelease(descriptor, facts) {
+    if (!this._isCurrentCleanup(facts)) return Promise.resolve({ success: false });
     if (facts.completed) return Promise.resolve({ success: true });
     if (facts.leaseState === CLEANUP_LEASE_STATES.PENDING) {
       return facts.leaseSettlementPromise
-        ? facts.leaseSettlementPromise.then(() => this._finalizeCleanup(descriptor, facts))
+        ? facts.leaseSettlementPromise.then(() => this._finalizeRelease(descriptor, facts))
         : Promise.resolve({ success: false });
     }
     if (facts.leaseState === CLEANUP_LEASE_STATES.ABSENT) {

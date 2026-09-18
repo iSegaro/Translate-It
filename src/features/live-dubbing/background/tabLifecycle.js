@@ -19,14 +19,22 @@ export function registerLiveDubbingTabLifecycle({
     if (details?.frameId !== 0) return;
     void coordinator.handleTopLevelNavigation(details.tabId).catch(() => {});
   };
+  const captureStatusChangedListener = (details) => {
+    const tabId = details?.tabId;
+    const status = details?.status;
+    if (!Number.isInteger(tabId) || tabId < 0 || (status !== 'stopped' && status !== 'error')) return;
+    void coordinator.handleCaptureStatusChanged({ tabId, status }).catch(() => {});
+  };
 
   browserAPI.tabs?.onRemoved?.addListener(removedListener);
   browserAPI.webNavigation?.onCommitted?.addListener(committedListener);
+  browserAPI.tabCapture?.onStatusChanged?.addListener(captureStatusChangedListener);
   registeredBrowsers.add(browserAPI);
 
   return () => {
     browserAPI.tabs?.onRemoved?.removeListener?.(removedListener);
     browserAPI.webNavigation?.onCommitted?.removeListener?.(committedListener);
+    browserAPI.tabCapture?.onStatusChanged?.removeListener?.(captureStatusChangedListener);
     registeredBrowsers.delete(browserAPI);
   };
 }
