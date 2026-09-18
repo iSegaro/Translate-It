@@ -3446,7 +3446,7 @@ describe('LiveDubbingCoordinator', () => {
 
     const harness = createHarness({ stored });
     harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'session-A' }];
-    const dispose = vi.spyOn(harness.coordinator, '_disposeAndRelease');
+    const dispose = vi.spyOn(harness.coordinator.cleanupManager, 'disposeAndRelease');
     harness.browserAPI.runtime.sendMessage.mockImplementation(message => {
       harness.calls.push(['message', message]);
       return offscreen.handle(message);

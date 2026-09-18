@@ -22,7 +22,6 @@ import {
   createLiveDubbingProviderDiagnostic,
   createConsumeMessage,
   createDescriptor,
-  createDisposeMessage,
   createProviderConnectMessage,
   createPrepareMessage,
   createSessionMessage,
@@ -40,13 +39,9 @@ import {
   toPublicLiveDubbingTerminalOutcome,
 } from '../contracts.js';
 import { LiveDubbingStateStore, LIVE_DUBBING_CLEAR_OUTCOMES } from './LiveDubbingStateStore.js';
+import { LiveDubbingCleanupManager } from './LiveDubbingCleanupManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingCoordinator');
-const CLEANUP_LEASE_STATES = Object.freeze({
-  PENDING: 'PENDING',
-  ACQUIRED: 'ACQUIRED',
-  ABSENT: 'ABSENT',
-});
 
 export { LIVE_DUBBING_CLEAR_OUTCOMES };
 
@@ -115,11 +110,16 @@ export class LiveDubbingCoordinator {
       || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
     this.transition = Promise.resolve();
     this.sessionStates = new Map();
-    this.cleanupFacts = new Map();
-    this.cleanupPromises = new Map();
     this.terminalOperations = new Map();
     this.pendingStarts = new Set();
     this.bootstrapRequestSessions = new Set();
+    this.cleanupManager = options.cleanupManager
+      || new LiveDubbingCleanupManager({
+        leaseManager: this.leaseManager,
+        sendOffscreen: this._sendOffscreen.bind(this),
+        getSessionState: (sessionId) => this.sessionStates.get(sessionId) || null,
+        logger: this.log,
+      });
   }
 
   get descriptor() { return this.stateStore.descriptor; }
@@ -303,7 +303,6 @@ export class LiveDubbingCoordinator {
         terminalRequested: false,
         cleanupCompleted: false,
         providerDiagnostic: null,
-        cleanupFacts: null,
       };
       this.sessionStates.set(descriptor.sessionId, state);
     }
@@ -397,7 +396,7 @@ export class LiveDubbingCoordinator {
       if (!state) return { success: false, error: 'LIVE_DUBBING_START_TIMEOUT' };
 
       const cleanup = await this._awaitCleanup(
-        this._disposeAndRelease(state.descriptor),
+        this.cleanupManager.disposeAndRelease(state.descriptor),
         state.descriptor,
       );
       if (!cleanup.success) {
@@ -498,7 +497,6 @@ export class LiveDubbingCoordinator {
       terminalRequested: false,
       cleanupCompleted: false,
       providerDiagnostic: null,
-      cleanupFacts: null,
     };
     this.sessionStates.set(descriptor.sessionId, sessionState);
     if (!await this._writeDescriptor(descriptor)) {
@@ -712,7 +710,7 @@ export class LiveDubbingCoordinator {
         ? { success: true }
         : leaseAcquired || sessionState.prepared || sessionState.terminalRequested
         ? await this._awaitCleanup(
-          this._disposeAndRelease(cleanupDescriptor),
+          this.cleanupManager.disposeAndRelease(cleanupDescriptor),
           cleanupDescriptor,
         )
         : { success: true };
@@ -851,7 +849,6 @@ export class LiveDubbingCoordinator {
         terminalRequested: false,
         cleanupCompleted: false,
         providerDiagnostic: null,
-        cleanupFacts: null,
       };
       this.sessionStates.set(descriptor.sessionId, state);
     }
@@ -897,10 +894,10 @@ export class LiveDubbingCoordinator {
       if (!await this._writeDescriptor(stopping, descriptor.sessionId, descriptor)) {
         return this._storageWriteFailure();
       }
-      const cleanupPromise = this._disposeAndRelease(descriptor, {
+      const cleanupPromise = this.cleanupManager.disposeAndRelease(descriptor, {
         releaseLease: state ? undefined : this._hasLiveLease(descriptor.sessionId),
       });
-      terminalRecord.cleanupAttempt = this.cleanupPromises.get(descriptor.sessionId) || null;
+      terminalRecord.cleanupAttempt = this.cleanupManager.getAttempt(descriptor.sessionId) || null;
       const cleanup = await cleanupPromise;
       if (this.sessionStates.get(descriptor.sessionId) !== state) {
         return {
@@ -967,8 +964,8 @@ export class LiveDubbingCoordinator {
           this.terminalOperations.delete(descriptor.sessionId);
         }
         const cleanup = record.cleanupAttempt;
-        if (cleanup && this.cleanupPromises.get(descriptor.sessionId) === cleanup) {
-          this.cleanupPromises.delete(descriptor.sessionId);
+        if (cleanup) {
+          this.cleanupManager.abandonAttempt(descriptor.sessionId, cleanup);
         }
         resolve({
           success: false,
@@ -985,13 +982,12 @@ export class LiveDubbingCoordinator {
   }
 
   _awaitCleanup(operation, descriptor) {
-    const attempt = descriptor ? this.cleanupPromises.get(descriptor.sessionId) : null;
+    const attempt = descriptor ? this.cleanupManager.getAttempt(descriptor.sessionId) : null;
     let timeoutId;
     const timeout = new Promise(resolve => {
       timeoutId = setTimeout(() => {
-        if (attempt?.promise === operation
-          && this.cleanupPromises.get(descriptor.sessionId) === attempt) {
-          this.cleanupPromises.delete(descriptor.sessionId);
+        if (attempt?.promise === operation) {
+          this.cleanupManager.abandonAttempt(descriptor.sessionId, attempt);
         }
         resolve({
           success: false,
@@ -1002,174 +998,6 @@ export class LiveDubbingCoordinator {
     });
 
     return Promise.race([operation, timeout]).finally(() => clearTimeout(timeoutId));
-  }
-
-  _disposeAndRelease(descriptor, options = {}) {
-    const { state, facts } = this._getCleanupFacts(descriptor, options);
-    const existing = this.cleanupPromises.get(descriptor.sessionId);
-    if (existing
-      && existing.providerId === descriptor.providerId
-      && existing.facts === facts) {
-      return existing.promise;
-    }
-
-    const record = {
-      sessionId: descriptor.sessionId,
-      providerId: descriptor.providerId,
-      state,
-      facts,
-      promise: null,
-    };
-    const cleanup = this._disposeAndReleaseOnce(descriptor, options, state, facts);
-    record.promise = cleanup;
-    this.cleanupPromises.set(descriptor.sessionId, record);
-    cleanup.then(
-      () => {
-        if (this.cleanupPromises.get(descriptor.sessionId) === record) {
-          this.cleanupPromises.delete(descriptor.sessionId);
-        }
-      },
-      () => {
-        if (this.cleanupPromises.get(descriptor.sessionId) === record) {
-          this.cleanupPromises.delete(descriptor.sessionId);
-        }
-      },
-    );
-    return cleanup;
-  }
-
-  async _disposeAndReleaseOnce(descriptor, options = {}, state = null, facts = null) {
-    const capturedState = state || this.sessionStates.get(descriptor.sessionId) || null;
-    const capturedFacts = facts || this._getCleanupFacts(descriptor, options).facts;
-    this._trackLeaseSettlement(capturedState, capturedFacts);
-
-    try {
-      const response = await this._sendOffscreen(createDisposeMessage(descriptor));
-      if (response?.ack !== 'DISPOSED'
-        || !isAcknowledgedForSession(response, 'DISPOSED', descriptor.sessionId, descriptor.providerId)
-        || response.ignored === true
-        || !this._isCurrentCleanup(capturedState, capturedFacts)) {
-        return { success: false };
-      }
-
-      capturedFacts.disposeAcknowledged = true;
-      return this._finalizeCleanup(descriptor, capturedState, capturedFacts);
-    } catch {
-      this.log.warn('Live dubbing disposal did not complete');
-      return { success: false };
-    }
-  }
-
-  _getCleanupFacts(descriptor, options = {}) {
-    const sessionId = descriptor.sessionId;
-    const providerId = descriptor.providerId;
-    const state = this.sessionStates.get(sessionId) || null;
-    let facts = state?.cleanupFacts || null;
-    if (!facts && !state) facts = this.cleanupFacts.get(sessionId) || null;
-    if (!facts || facts.providerId !== providerId) {
-      facts = {
-        sessionId,
-        providerId,
-        leaseState: CLEANUP_LEASE_STATES.ABSENT,
-        leaseSettlementPromise: null,
-        disposeAcknowledged: false,
-        releasePromise: null,
-        completed: false,
-      };
-      this.cleanupFacts.set(sessionId, facts);
-    }
-    if (state) state.cleanupFacts = facts;
-
-    if (options.releaseLease === true) {
-      facts.leaseState = CLEANUP_LEASE_STATES.ACQUIRED;
-    } else if (options.releaseLease === false
-      && !(state?.leasePromise && !state.leaseAcquired)) {
-      facts.leaseState = CLEANUP_LEASE_STATES.ABSENT;
-    } else if (facts.leaseState === CLEANUP_LEASE_STATES.ABSENT) {
-      facts.leaseState = state?.leasePromise && !state.leaseAcquired
-        ? CLEANUP_LEASE_STATES.PENDING
-        : state?.leaseAcquired
-          ? CLEANUP_LEASE_STATES.ACQUIRED
-          : CLEANUP_LEASE_STATES.ABSENT;
-    }
-
-    return { state, facts };
-  }
-
-  _trackLeaseSettlement(state, facts) {
-    if (facts.leaseState !== CLEANUP_LEASE_STATES.PENDING
-      || facts.leaseSettlementPromise
-      || !state?.leasePromise) return;
-
-    const settlement = Promise.resolve(state.leasePromise).then(
-      acquired => {
-        if (!this._isCurrentCleanup(state, facts)) return false;
-        state.leaseAcquired = acquired === true;
-        facts.leaseState = acquired === true
-          ? CLEANUP_LEASE_STATES.ACQUIRED
-          : CLEANUP_LEASE_STATES.ABSENT;
-        return acquired === true;
-      },
-      () => {
-        if (!this._isCurrentCleanup(state, facts)) return false;
-        facts.leaseState = CLEANUP_LEASE_STATES.ABSENT;
-        return false;
-      },
-    );
-    facts.leaseSettlementPromise = settlement;
-    settlement.then(() => {
-      if (facts.leaseSettlementPromise === settlement) facts.leaseSettlementPromise = null;
-    });
-  }
-
-  _isCurrentCleanup(state, facts) {
-    if (this.cleanupFacts.get(facts.sessionId) !== facts) return false;
-    return state
-      ? this.sessionStates.get(facts.sessionId) === state
-      : !this.sessionStates.has(facts.sessionId);
-  }
-
-  _finalizeCleanup(descriptor, state, facts) {
-    if (!this._isCurrentCleanup(state, facts) || !facts.disposeAcknowledged) {
-      return Promise.resolve({ success: false });
-    }
-    if (facts.completed) return Promise.resolve({ success: true });
-    if (facts.leaseState === CLEANUP_LEASE_STATES.PENDING) {
-      return facts.leaseSettlementPromise
-        ? facts.leaseSettlementPromise.then(() => this._finalizeCleanup(descriptor, state, facts))
-        : Promise.resolve({ success: false });
-    }
-    if (facts.leaseState === CLEANUP_LEASE_STATES.ABSENT) {
-      facts.completed = true;
-      if (state) state.cleanupCompleted = true;
-      return Promise.resolve({ success: true });
-    }
-
-    const release = this._releaseCleanupLease(descriptor, state, facts);
-    return release.then(success => {
-      if (!success || !this._isCurrentCleanup(state, facts)) return { success: false };
-      facts.completed = true;
-      if (state) state.cleanupCompleted = true;
-      return { success: true };
-    });
-  }
-
-  _releaseCleanupLease(descriptor, state, facts) {
-    if (facts.releasePromise) return facts.releasePromise;
-    if (!this._isCurrentCleanup(state, facts)) return Promise.resolve(false);
-
-    const release = Promise.resolve()
-      .then(() => this.leaseManager.release({
-        owner: LIVE_DUBBING_OWNER,
-        leaseId: descriptor.sessionId,
-      }))
-      .then(result => result !== false)
-      .catch(() => false);
-    facts.releasePromise = release;
-    release.then(success => {
-      if (!success && facts.releasePromise === release) facts.releasePromise = null;
-    });
-    return release;
   }
 
   async _reconcile() {
@@ -1378,7 +1206,7 @@ export class LiveDubbingCoordinator {
 
     this._rememberReconciledSession(descriptor, Boolean(matchingLease));
     const cleanup = await this._awaitCleanup(
-      this._disposeAndRelease(descriptor, {
+      this.cleanupManager.disposeAndRelease(descriptor, {
         releaseLease: Boolean(matchingLease),
       }),
       descriptor,
@@ -1450,7 +1278,7 @@ export class LiveDubbingCoordinator {
     if (!stale && !this._isExplicitlyInactive(status, resolvedProviderId)) return { success: true };
 
     return this._awaitCleanup(
-      this._disposeAndRelease(
+      this.cleanupManager.disposeAndRelease(
         { sessionId, providerId: resolvedProviderId },
         { releaseLease: true },
       ),
@@ -1510,16 +1338,11 @@ export class LiveDubbingCoordinator {
       current.leaseAcquired = leaseAcquired;
       current.prepared = true;
       current.cleanupCompleted = false;
-      if (current.cleanupFacts
-        && current.cleanupFacts.leaseState !== CLEANUP_LEASE_STATES.PENDING) {
-        current.cleanupFacts.leaseState = leaseAcquired
-          ? CLEANUP_LEASE_STATES.ACQUIRED
-          : CLEANUP_LEASE_STATES.ABSENT;
-      }
+      this.cleanupManager.syncLeaseOwnership(descriptor.sessionId, current, leaseAcquired);
       return;
     }
 
-    this.sessionStates.set(descriptor.sessionId, {
+    const newState = {
       descriptor,
       leasePromise: null,
       leaseAcquired,
@@ -1527,8 +1350,8 @@ export class LiveDubbingCoordinator {
       terminalRequested: false,
       cleanupCompleted: false,
       providerDiagnostic: null,
-      cleanupFacts: null,
-    });
+    };
+    this.sessionStates.set(descriptor.sessionId, newState);
   }
 
   _markTerminalState(state) {
@@ -1547,11 +1370,16 @@ export class LiveDubbingCoordinator {
   _forgetSessionState(sessionId, expectedState = null) {
     if (expectedState && this.sessionStates.get(sessionId) !== expectedState) return;
     const state = this.sessionStates.get(sessionId);
+    // Delegate physical facts ownership; manager fences exact generation only.
+    if (expectedState) {
+      this.cleanupManager.forgetSession(sessionId, expectedState);
+    } else if (state) {
+      this.cleanupManager.forgetSession(sessionId, state);
+    } else {
+      this.cleanupManager.forgetSession(sessionId, null);
+    }
     this.sessionStates.delete(sessionId);
     this.bootstrapRequestSessions.delete(sessionId);
-    if (state?.cleanupFacts && this.cleanupFacts.get(sessionId) === state.cleanupFacts) {
-      this.cleanupFacts.delete(sessionId);
-    }
   }
 
   _hasLiveLease(sessionId) {
