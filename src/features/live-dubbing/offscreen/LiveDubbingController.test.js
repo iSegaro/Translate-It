@@ -455,6 +455,196 @@ describe('LiveDubbingController', () => {
     expect(notify).toHaveBeenCalledOnce();
   });
 
+  it('delivers a successful terminal notification immediately and only once', async () => {
+    const notify = vi.fn();
+    const controller = new LiveDubbingController({ notify });
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    const session = controller.currentSession;
+    session.status = LIVE_DUBBING_STATUS.ERROR;
+    session.lastError = 'LIVE_DUBBING_INPUT_PIPELINE_ERROR';
+    controller._notifyTerminal(session, 'INPUT_PIPELINE_ERROR');
+    await Promise.resolve();
+
+    expect(notify).toHaveBeenCalledOnce();
+    expect(session.terminalDelivery).toMatchObject({
+      attempts: 1,
+      cancelled: false,
+      delivered: true,
+    });
+    expect(Object.isFrozen(notify.mock.calls[0][0])).toBe(true);
+    expect(Object.isFrozen(notify.mock.calls[0][0].data)).toBe(true);
+  });
+
+  it.each([
+    ['INPUT_PIPELINE_ERROR', 'LIVE_DUBBING_INPUT_PIPELINE_ERROR'],
+    ['OUTPUT_PIPELINE_ERROR', 'LIVE_DUBBING_OUTPUT_PIPELINE_ERROR'],
+    ['INPUT_SEND_ERROR', 'LIVE_DUBBING_INPUT_SEND_ERROR'],
+    ['OUTPUT_AUDIO_ERROR', 'LIVE_DUBBING_OUTPUT_AUDIO_ERROR'],
+    ['TRACK_ENDED', 'LIVE_DUBBING_CAPTURE_TRACK_ENDED'],
+  ])('retries terminal %s with the same sanitized immutable payload', async (event, error) => {
+    vi.useFakeTimers();
+    try {
+      const notify = vi.fn()
+        .mockRejectedValueOnce(new Error('transport-secret'))
+        .mockResolvedValueOnce(undefined);
+      const controller = new LiveDubbingController({ notify });
+
+      controller.prepare('session-1', 'gemini', null, 0);
+      const session = controller.currentSession;
+      session.status = LIVE_DUBBING_STATUS.ERROR;
+      session.lastError = error;
+      session.providerDiagnostic = {
+        stage: 'CONNECT_PROVIDER',
+        code: 'SAFE_PROVIDER_ERROR',
+        closeCode: null,
+        wasClean: null,
+        terminalCategory: 'PROVIDER_ERROR',
+        malformedAt: null,
+        wsOpen: true,
+        setupSent: true,
+        setupComplete: false,
+        message: 'provider-secret',
+      };
+      controller._notifyTerminal(session, event, {
+        cleanupCause: `LIVE_DUBBING_${event}`,
+        capturedFrames: 1,
+        inputSentFrames: 1,
+        inputPendingFrames: 0,
+        providerLastSendReason: null,
+        providerAudioChunks: 1,
+        playbackAccepted: false,
+        outputSafetyDrops: 0,
+        interruptions: 0,
+        providerTerminalCategory: event,
+        secret: 'cleanup-secret',
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      expect(notify).toHaveBeenCalledOnce();
+      const payload = notify.mock.calls[0][0];
+      expect(payload).toMatchObject({
+        action: LIVE_DUBBING_ACTIONS.TERMINAL,
+        data: {
+          event,
+          error,
+        },
+      });
+      expect(JSON.stringify(payload)).not.toContain('provider-secret');
+      expect(JSON.stringify(payload)).not.toContain('cleanup-secret');
+      expect(Object.isFrozen(payload)).toBe(true);
+      expect(Object.isFrozen(payload.data)).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(25);
+      expect(notify).toHaveBeenCalledTimes(2);
+      expect(notify.mock.calls[1][0]).toBe(payload);
+      expect(session.terminalDelivery).toMatchObject({ attempts: 2, delivered: true });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(notify).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops after exactly three failed terminal notification attempts', async () => {
+    vi.useFakeTimers();
+    try {
+      const debug = vi.fn();
+      const notify = vi.fn(() => Promise.reject(new Error('transport-secret')));
+      const controller = new LiveDubbingController({ notify, logger: { debug } });
+
+      controller.prepare('session-1', 'gemini', null, 0);
+      const session = controller.currentSession;
+      session.status = LIVE_DUBBING_STATUS.ERROR;
+      session.lastError = 'LIVE_DUBBING_OUTPUT_AUDIO_ERROR';
+      controller._notifyTerminal(session, 'OUTPUT_AUDIO_ERROR');
+
+      await vi.advanceTimersByTimeAsync(25);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(notify).toHaveBeenCalledTimes(3);
+      expect(session.terminalDelivery).toMatchObject({ attempts: 3, delivered: false });
+      expect(debug).toHaveBeenCalledWith(
+        'Live dubbing terminal notification delivery exhausted',
+        { attempts: 3 },
+      );
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(notify).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts cleanup without waiting for terminal notification retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const notify = vi.fn(() => Promise.reject(new Error('transport-secret')));
+      const controller = new LiveDubbingController({ notify });
+      controller.prepare('session-1', 'gemini', null, 0);
+      const session = controller.currentSession;
+      session.status = LIVE_DUBBING_STATUS.ERROR;
+      session.lastError = 'LIVE_DUBBING_PROVIDER_ERROR';
+
+      controller._providerFailed(session, { code: 'LIVE_DUBBING_PROVIDER_ERROR' }, 'PROVIDER_ERROR');
+      await session.cleanupPromise;
+
+      expect(notify).toHaveBeenCalledOnce();
+      expect(session.telemetry.milestones.cleanupComplete).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(25);
+      expect(notify).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels late terminal delivery when disposing and replacing a session', async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectNotification;
+      const notify = vi.fn(() => new Promise((resolve, reject) => {
+        void resolve;
+        rejectNotification = reject;
+      }));
+      const controller = new LiveDubbingController({ notify });
+
+      controller.prepare('session-1', 'gemini', null, 0);
+      const oldSession = controller.currentSession;
+      oldSession.status = LIVE_DUBBING_STATUS.ERROR;
+      oldSession.lastError = 'LIVE_DUBBING_PROVIDER_ERROR';
+      controller._notifyTerminal(oldSession, 'PROVIDER_ERROR');
+
+      await controller.dispose('session-1', 'gemini');
+      expect(oldSession.terminalDelivery.cancelled).toBe(true);
+      controller.prepare('session-2', 'gemini', null, 0);
+      rejectNotification(new Error('late-transport-secret'));
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(notify).toHaveBeenCalledOnce();
+      expect(controller.currentSession).toMatchObject({
+        sessionId: 'session-2',
+        terminalDelivery: null,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps provider, pipeline, and track terminal paths single-flight', () => {
+    const notify = vi.fn();
+    const controller = new LiveDubbingController({ notify });
+    const track = new FakeTrack();
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    const session = controller.currentSession;
+    session.status = LIVE_DUBBING_STATUS.RUNNING;
+    session.stream = createStream(track);
+    controller._providerFailed(session, { code: 'LIVE_DUBBING_PROVIDER_ERROR' }, 'PROVIDER_ERROR');
+    controller._handlePipelineError(session, { code: 'LIVE_DUBBING_INPUT_PIPELINE_ERROR' }, 'INPUT_PIPELINE_ERROR');
+    controller._handleTrackEnded(session);
+
+    expect(notify).toHaveBeenCalledOnce();
+  });
+
   it('rejects status requests for another session with explicit mismatch proof', async () => {
     const controller = new LiveDubbingController({
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(new FakeTrack())) },

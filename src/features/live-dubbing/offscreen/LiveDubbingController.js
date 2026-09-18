@@ -19,6 +19,7 @@ import {
   isLiveDubbingAudioMode,
   normalizeProviderTargetLanguage,
   parseProviderBootstrapResponse,
+  sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
 import { liveDubbingProviderRegistry } from '../providers/LiveDubbingProviderRegistry.js';
@@ -33,6 +34,8 @@ const PROVIDER_AUDIO_TERMINAL_REASONS = new Set([
   'INVALID_OUTPUT_AUDIO',
   'OUTPUT_AUDIO_ERROR',
 ]);
+const TERMINAL_NOTIFICATION_RETRY_DELAYS_MS = Object.freeze([25, 50]);
+const TERMINAL_NOTIFICATION_MAX_ATTEMPTS = TERMINAL_NOTIFICATION_RETRY_DELAYS_MS.length + 1;
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'LiveDubbingController');
 const TELEMETRY_MILESTONES = Object.freeze([
   'captureReady',
@@ -501,6 +504,7 @@ export class LiveDubbingController {
         connectPromise: null,
         listeners: [],
         terminalSent: false,
+        terminalDelivery: null,
         terminalRequested: false,
         disposing: false,
         bootstrapRequested: false,
@@ -1163,6 +1167,7 @@ export class LiveDubbingController {
     void reason;
 
     session.terminalRequested = true;
+    this._cancelTerminalNotification(session);
     this._removeTrackListeners(session);
     const cleanup = this._cleanupSessionResources(session);
     const tombstone = {
@@ -1967,23 +1972,86 @@ export class LiveDubbingController {
   _notifyTerminal(session, event, cleanupDiagnostic = null) {
     if (session.terminalSent) return;
     session.terminalSent = true;
-    const notification = {
+    const providerDiagnostic = session.providerDiagnostic
+      ? sanitizeLiveDubbingProviderDiagnostic(session.providerDiagnostic)
+      : null;
+    const safeCleanupDiagnostic = cleanupDiagnostic
+      ? sanitizeLiveDubbingCleanupDiagnostic(cleanupDiagnostic)
+      : null;
+    if (providerDiagnostic) Object.freeze(providerDiagnostic);
+    if (safeCleanupDiagnostic) Object.freeze(safeCleanupDiagnostic);
+    const data = Object.freeze({
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      event,
+      error: session.lastError,
+      ...(providerDiagnostic ? { providerDiagnostic } : {}),
+      ...(safeCleanupDiagnostic ? { cleanupDiagnostic: safeCleanupDiagnostic } : {}),
+    });
+    const payload = Object.freeze({
       action: LIVE_DUBBING_ACTIONS.TERMINAL,
-      data: {
-        sessionId: session.sessionId,
-        providerId: session.providerId,
-        eventSequence: session.eventSequence,
-        status: session.status,
-        event,
-        error: session.lastError,
-        ...(session.providerDiagnostic ? { providerDiagnostic: session.providerDiagnostic } : {}),
-        ...(cleanupDiagnostic ? { cleanupDiagnostic } : {}),
-      },
+      data,
+    });
+    const delivery = {
+      payload,
+      attempts: 0,
+      timerId: null,
+      cancelled: false,
+      delivered: false,
     };
+    session.terminalDelivery = delivery;
+    this._attemptTerminalNotification(session, delivery);
+  }
+
+  _attemptTerminalNotification(session, delivery) {
+    if (session.terminalDelivery !== delivery || delivery.cancelled || this.currentSession !== session) return;
+    delivery.attempts += 1;
+    let result;
     try {
-      Promise.resolve(this.notify(notification)).catch(() => {});
+      result = this.notify(delivery.payload);
     } catch {
-      // Terminal notification is best effort; local resources remain fenced.
+      this._scheduleTerminalNotificationRetry(session, delivery);
+      return;
+    }
+    Promise.resolve(result).then(
+      () => {
+        if (session.terminalDelivery !== delivery || delivery.cancelled || this.currentSession !== session) return;
+        delivery.delivered = true;
+      },
+      () => {
+        if (session.terminalDelivery !== delivery || delivery.cancelled || this.currentSession !== session) return;
+        this._scheduleTerminalNotificationRetry(session, delivery);
+      },
+    );
+  }
+
+  _scheduleTerminalNotificationRetry(session, delivery) {
+    if (session.terminalDelivery !== delivery || delivery.cancelled || this.currentSession !== session) return;
+    if (delivery.attempts >= TERMINAL_NOTIFICATION_MAX_ATTEMPTS) {
+      try {
+        this.log?.debug?.('Live dubbing terminal notification delivery exhausted', { attempts: 3 });
+      } catch {
+        // Delivery diagnostics must never affect local cleanup.
+      }
+      return;
+    }
+    const delay = TERMINAL_NOTIFICATION_RETRY_DELAYS_MS[delivery.attempts - 1];
+    delivery.timerId = setTimeout(() => {
+      delivery.timerId = null;
+      if (session.terminalDelivery !== delivery || delivery.cancelled || this.currentSession !== session) return;
+      this._attemptTerminalNotification(session, delivery);
+    }, delay);
+  }
+
+  _cancelTerminalNotification(session) {
+    const delivery = session?.terminalDelivery;
+    if (!delivery) return;
+    delivery.cancelled = true;
+    if (delivery.timerId !== null) {
+      clearTimeout(delivery.timerId);
+      delivery.timerId = null;
     }
   }
 
