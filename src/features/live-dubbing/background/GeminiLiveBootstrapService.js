@@ -205,6 +205,10 @@ export class GeminiLiveBootstrapService {
     }
   }
 
+  async hasConfiguredCredentials() {
+    return (await this._eligibleKeys()).length > 0;
+  }
+
   /**
    * One classified mint attempt. Transport throws, malformed success
    * payloads, and non-key failures resolve to stop; only key/project-plausible

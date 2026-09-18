@@ -4,6 +4,7 @@ import { LiveDubbingController } from '../offscreen/LiveDubbingController.js';
 import {
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_OWNER,
+  LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_STORAGE_KEY,
   LIVE_DUBBING_OUTCOME_STORAGE_KEY,
@@ -15,7 +16,7 @@ import {
   LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
 
-function createHarness({ stored = null, outcome = null, streamId = 'stream-secret', statusResponse, documentExists, runtimeGateway = null } = {}) {
+function createHarness({ stored = null, outcome = null, streamId = 'stream-secret', statusResponse, documentExists, runtimeGateway = null, hasConfiguredCredentials = vi.fn(async () => true), supportsOffscreenDocument } = {}) {
   const storage = new Map(stored
     ? [[LIVE_DUBBING_STORAGE_KEY, { providerId: 'gemini', ...stored }]]
     : []);
@@ -38,6 +39,7 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
     ensureDocument: vi.fn(),
     getSnapshot: vi.fn(() => ({ documentExists: manager.documentExists, activeLeases: manager.activeLeases })),
   };
+  if (supportsOffscreenDocument !== undefined) manager.supportsOffscreenDocument = supportsOffscreenDocument;
   const sendMessage = vi.fn(async message => {
     calls.push(['message', message]);
     if (message.action === 'LIVE_DUBBING_PREPARE') {
@@ -134,8 +136,10 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
       uuid: () => 'session-1',
       now: () => 123,
       logger,
+      hasConfiguredCredentials,
     }),
     logger,
+    hasConfiguredCredentials,
   };
 }
 
@@ -305,7 +309,8 @@ describe('LiveDubbingCoordinator', () => {
     ['gemini', 'de-DE'],
     ['openai', 'en_US'],
   ])('rejects invalid %s target language before descriptor and runtime side effects', async (providerId, targetLanguage) => {
-    const harness = createHarness();
+    const hasConfiguredCredentials = vi.fn(async () => true);
+    const harness = createHarness({ hasConfiguredCredentials });
 
     await expect(harness.coordinator.start({ data: { providerId, targetLanguage } }, {}))
       .resolves.toEqual({ success: false, error: 'INVALID_TARGET_LANGUAGE' });
@@ -316,6 +321,174 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
     expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
     expect(harness.coordinator.descriptor).toBeNull();
+    expect(hasConfiguredCredentials).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [LIVE_DUBBING_PROVIDER_ID, 'false', async () => false],
+    [LIVE_DUBBING_PROVIDER_ID, 'rejected', async () => { throw new Error('credential read failed'); }],
+    [LIVE_DUBBING_PROVIDER_ID, 'non-true', async () => 'configured'],
+    [LIVE_DUBBING_OPENAI_PROVIDER_ID, 'false', async () => false],
+    [LIVE_DUBBING_OPENAI_PROVIDER_ID, 'rejected', async () => { throw new Error('credential read failed'); }],
+    [LIVE_DUBBING_OPENAI_PROVIDER_ID, 'non-true', async () => 'configured'],
+  ])('fails %s start before side effects when credentials are %s', async (providerId, _label, credentialCheck) => {
+    const hasConfiguredCredentials = vi.fn(credentialCheck);
+    const harness = createHarness({ hasConfiguredCredentials });
+
+    await expect(harness.coordinator.start({ data: { providerId, targetLanguage: providerId === 'gemini' ? 'en' : 'en-US' } }, {}))
+      .resolves.toEqual({ success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' });
+
+    expect(hasConfiguredCredentials).toHaveBeenCalledOnce();
+    expect(hasConfiguredCredentials).toHaveBeenCalledWith(providerId);
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('preflights credentials before tab, descriptor, lease, media, and offscreen work', async () => {
+    const order = [];
+    const hasConfiguredCredentials = vi.fn(async () => {
+      order.push('credentials');
+      return true;
+    });
+    const harness = createHarness({ hasConfiguredCredentials });
+    const gateway = harness.coordinator.runtimeGateway;
+    const resolveTabFromSender = gateway.resolveTabFromSender.bind(gateway);
+    vi.spyOn(gateway, 'resolveTabFromSender').mockImplementation(async sender => {
+      order.push('tab');
+      return resolveTabFromSender(sender);
+    });
+    harness.manager.supportsOffscreenDocument = vi.fn(() => {
+      order.push('offscreen-capability');
+      return true;
+    });
+    const acquire = harness.manager.acquire.getMockImplementation();
+    harness.manager.acquire.mockImplementation(async lease => {
+      order.push('lease');
+      return acquire(lease);
+    });
+    const set = harness.browserAPI.storage.session.set.getMockImplementation();
+    harness.browserAPI.storage.session.set.mockImplementation(async record => {
+      order.push('descriptor');
+      return set(record);
+    });
+    const getMediaStreamId = harness.chromeAPI.tabCapture.getMediaStreamId.getMockImplementation();
+    harness.chromeAPI.tabCapture.getMediaStreamId.mockImplementation(async (...args) => {
+      order.push('media');
+      return getMediaStreamId(...args);
+    });
+    const sendMessage = harness.browserAPI.runtime.sendMessage.getMockImplementation();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
+      order.push('offscreen');
+      return sendMessage(message);
+    });
+
+    await expect(harness.coordinator.start({ data: { targetLanguage: 'en' } }, {}))
+      .resolves.toMatchObject({ success: true });
+
+    expect(order.indexOf('credentials')).toBeLessThan(order.indexOf('offscreen-capability'));
+    expect(order.indexOf('credentials')).toBeLessThan(order.indexOf('tab'));
+    expect(order.indexOf('credentials')).toBeLessThan(order.indexOf('descriptor'));
+    expect(order.indexOf('credentials')).toBeLessThan(order.indexOf('lease'));
+    expect(order.indexOf('credentials')).toBeLessThan(order.indexOf('media'));
+    expect(order.indexOf('credentials')).toBeLessThan(order.indexOf('offscreen'));
+  });
+
+  it('allows a configured provider through the existing start flow', async () => {
+    const hasConfiguredCredentials = vi.fn(async () => true);
+    const harness = createHarness({ hasConfiguredCredentials });
+
+    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    expect(result).toMatchObject({ success: true, status: { providerId: 'gemini' } });
+    expect(hasConfiguredCredentials).toHaveBeenCalledOnce();
+    expect(harness.manager.acquire).toHaveBeenCalledOnce();
+  });
+
+  it('does not preflight credentials for a busy start', async () => {
+    const hasConfiguredCredentials = vi.fn(async () => true);
+    const harness = createHarness({ hasConfiguredCredentials });
+    await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
+
+    const duplicate = await harness.coordinator.start({ data: { targetLanguage: 'de' } }, {});
+
+    expect(duplicate).toMatchObject({ success: false, busy: true });
+    expect(hasConfiguredCredentials).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['unsupported', () => false],
+    ['detection throws', () => { throw new Error('offscreen probe failed'); }],
+  ])('rejects %s offscreen runtimes before all start side effects', async (_label, supportsOffscreenDocument) => {
+    const hasConfiguredCredentials = vi.fn(async () => true);
+    const supports = vi.fn(supportsOffscreenDocument);
+    const harness = createHarness({ hasConfiguredCredentials, supportsOffscreenDocument: supports });
+
+    await expect(harness.coordinator.start({ data: { targetLanguage: 'en' } }, {}))
+      .resolves.toEqual({ success: false, error: 'LIVE_DUBBING_UNSUPPORTED' });
+
+    expect(supports).toHaveBeenCalledOnce();
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('preserves start behavior when offscreen support detection is absent', async () => {
+    const harness = createHarness({ hasConfiguredCredentials: vi.fn(async () => true) });
+
+    await expect(harness.coordinator.start({ data: { targetLanguage: 'en' } }, {}))
+      .resolves.toMatchObject({ success: true });
+  });
+
+  it('preserves status availability when offscreen support detection is absent', async () => {
+    const harness = createHarness();
+
+    await expect(harness.coordinator.getStatus()).resolves.toMatchObject({
+      success: true,
+      available: true,
+    });
+    expect(harness.manager.ensureDocument).not.toHaveBeenCalled();
+  });
+
+  it('cancels a pending credential preflight before tab or resource creation', async () => {
+    let resolveCredentials;
+    const hasConfiguredCredentials = vi.fn(() => new Promise(resolve => {
+      resolveCredentials = resolve;
+    }));
+    const harness = createHarness({ hasConfiguredCredentials });
+    const start = harness.coordinator.start({ data: { targetLanguage: 'en' } }, { tab: { id: 42 } });
+    while (!resolveCredentials) await Promise.resolve();
+
+    await expect(harness.coordinator.handleTabRemoved(42)).resolves.toMatchObject({
+      pending: true,
+      stopped: false,
+    });
+    resolveCredentials(true);
+
+    await expect(start).resolves.toEqual({ success: false, error: 'LIVE_DUBBING_START_CANCELLED' });
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['both supported', () => true, () => true, true],
+    ['tab capture unsupported', () => false, () => true, false],
+    ['offscreen unsupported', () => true, () => false, false],
+    ['offscreen detection throws', () => true, () => { throw new Error('offscreen probe failed'); }, false],
+    ['tab capture detection throws', () => { throw new Error('capture probe failed'); }, () => true, false],
+  ])('reports availability only when %s', async (_label, supportsTabCapture, supportsOffscreenDocument, available) => {
+    const runtimeGateway = { supportsTabCapture: vi.fn(supportsTabCapture) };
+    const harness = createHarness({ runtimeGateway, supportsOffscreenDocument: vi.fn(supportsOffscreenDocument) });
+
+    await expect(harness.coordinator.getStatus()).resolves.toMatchObject({
+      success: true,
+      available,
+    });
+    expect(harness.manager.ensureDocument).not.toHaveBeenCalled();
   });
 
   it('returns current status for duplicate start and ignores stale stop', async () => {

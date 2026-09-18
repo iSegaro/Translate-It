@@ -164,6 +164,10 @@ export class OpenAIRealtimeBootstrapService {
     }
   }
 
+  async hasConfiguredCredentials() {
+    return (await this._eligibleKeys()).length > 0;
+  }
+
   /**
    * One classified mint attempt. It never throws or surfaces provider data.
    * @returns {Promise<{ok: boolean, secret?: string, tryNext?: boolean}>}

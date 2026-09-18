@@ -56,6 +56,44 @@ describe('GeminiLiveBootstrapService', () => {
     vi.restoreAllMocks();
   });
 
+  it('reports configured credentials without network use or key exposure', async () => {
+    const fetchImpl = vi.fn();
+    const { service } = createService({
+      keys: [' gemini-key-secret ', 'gemini-key-secret', ' ', 'second-key'],
+      fetchImpl,
+    });
+
+    await expect(service.hasConfiguredCredentials()).resolves.toBe(true);
+    await expect(service._eligibleKeys()).resolves.toEqual(['gemini-key-secret', 'second-key']);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(JSON.stringify(await service.hasConfiguredCredentials())).not.toContain('gemini-key-secret');
+  });
+
+  it('returns false for empty or failed key stores without network use', async () => {
+    const fetchImpl = vi.fn();
+    const { service } = createService({ keys: [], legacyKey: '', fetchImpl });
+    await expect(service.hasConfiguredCredentials()).resolves.toBe(false);
+
+    const whitespaceOnly = createService({ keys: [' ', '\t'], fetchImpl }).service;
+    await expect(whitespaceOnly.hasConfiguredCredentials()).resolves.toBe(false);
+
+    const failedStore = new GeminiLiveBootstrapService({
+      getKeysImpl: async () => { throw new Error('key-store-secret'); },
+      getLegacyKeyImpl: async () => '',
+      fetchImpl,
+    });
+    await expect(failedStore.hasConfiguredCredentials()).resolves.toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('reports a configured legacy key when the primary key list is empty', async () => {
+    const fetchImpl = vi.fn();
+    const { service } = createService({ keys: [], legacyKey: 'legacy-gemini-key', fetchImpl });
+
+    await expect(service.hasConfiguredCredentials()).resolves.toBe(true);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('mints a single-use token with the constrained request shape', async () => {
     const { service, calls } = createService({ keys: ['key-1'] });
 

@@ -105,6 +105,22 @@ function getLeaseReasons(providerId) {
     : [...LIVE_DUBBING_LEASE_REASONS];
 }
 
+async function defaultHasConfiguredCredentials(providerId) {
+  try {
+    if (providerId === LIVE_DUBBING_OPENAI_PROVIDER_ID) {
+      const { openAIRealtimeBootstrapService } = await import('./OpenAIRealtimeBootstrapService.js');
+      return (await openAIRealtimeBootstrapService.hasConfiguredCredentials()) === true;
+    }
+    if (providerId === LIVE_DUBBING_PROVIDER_ID) {
+      const { geminiLiveBootstrapService } = await import('./GeminiLiveBootstrapService.js');
+      return (await geminiLiveBootstrapService.hasConfiguredCredentials()) === true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 /**
  * Owns one Chrome tab-capture control-plane session.
  * No media, provider bootstrap, transcript, WebSocket URL, or stream ID is
@@ -123,6 +139,9 @@ export class LiveDubbingCoordinator {
     this.now = options.now || (() => Date.now());
     this.uuid = options.uuid || defaultUuid;
     this.log = options.logger || logger;
+    this.hasConfiguredCredentials = typeof options.hasConfiguredCredentials === 'function'
+      ? options.hasConfiguredCredentials
+      : defaultHasConfiguredCredentials;
     this.sessionRegistry = options.sessionRegistry || new LiveDubbingSessionRegistry();
     this.stateStore = options.stateStore
       || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
@@ -177,7 +196,21 @@ export class LiveDubbingCoordinator {
    * cleanup, or terminal state, so mutation serialization is unaffected.
    */
   async getStatus() {
-    const available = this.runtimeGateway.supportsTabCapture();
+    let tabCaptureAvailable = false;
+    try {
+      tabCaptureAvailable = this.runtimeGateway.supportsTabCapture() === true;
+    } catch {
+      tabCaptureAvailable = false;
+    }
+    let offscreenAvailable = true;
+    if (typeof this.leaseManager.supportsOffscreenDocument === 'function') {
+      try {
+        offscreenAvailable = this.leaseManager.supportsOffscreenDocument() === true;
+      } catch {
+        offscreenAvailable = false;
+      }
+    }
+    const available = tabCaptureAvailable && offscreenAvailable;
     await this._readStatusSnapshot();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
@@ -626,6 +659,35 @@ export class LiveDubbingCoordinator {
         status: cloneDescriptor(currentAfterOutcome),
         current: cloneDescriptor(currentAfterOutcome),
       };
+    }
+
+    if (pendingStart.terminalRequested) {
+      return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
+    }
+
+    let credentialsConfigured = false;
+    try {
+      credentialsConfigured = await this.hasConfiguredCredentials(providerId);
+    } catch {
+      credentialsConfigured = false;
+    }
+    if (credentialsConfigured !== true) {
+      return { success: false, error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE' };
+    }
+    if (pendingStart.terminalRequested) {
+      return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
+    }
+
+    let offscreenSupported = true;
+    if (typeof this.leaseManager.supportsOffscreenDocument === 'function') {
+      try {
+        offscreenSupported = this.leaseManager.supportsOffscreenDocument() === true;
+      } catch {
+        offscreenSupported = false;
+      }
+    }
+    if (!offscreenSupported) {
+      return { success: false, error: 'LIVE_DUBBING_UNSUPPORTED' };
     }
 
     const tab = await this.runtimeGateway.resolveTabFromSender(sender);

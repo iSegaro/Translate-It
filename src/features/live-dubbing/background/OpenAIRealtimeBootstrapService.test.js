@@ -44,6 +44,35 @@ describe('OpenAIRealtimeBootstrapService', () => {
     vi.restoreAllMocks();
   });
 
+  it('reports configured credentials without network use or key exposure', async () => {
+    const fetchImpl = vi.fn();
+    const { service } = createService({
+      keys: [' openai-key-secret ', 'openai-key-secret', ' ', 'second-key'],
+      fetchImpl,
+    });
+
+    await expect(service.hasConfiguredCredentials()).resolves.toBe(true);
+    await expect(service._eligibleKeys()).resolves.toEqual(['openai-key-secret', 'second-key']);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(JSON.stringify(await service.hasConfiguredCredentials())).not.toContain('openai-key-secret');
+  });
+
+  it('returns false for empty or failed key stores without network use', async () => {
+    const fetchImpl = vi.fn();
+    const { service } = createService({ keys: [], fetchImpl });
+    await expect(service.hasConfiguredCredentials()).resolves.toBe(false);
+
+    const whitespaceOnly = createService({ keys: [' ', '\t'], fetchImpl }).service;
+    await expect(whitespaceOnly.hasConfiguredCredentials()).resolves.toBe(false);
+
+    const failedStore = new OpenAIRealtimeBootstrapService({
+      getKeysImpl: async () => { throw new Error('key-store-secret'); },
+      fetchImpl,
+    });
+    await expect(failedStore.hasConfiguredCredentials()).resolves.toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('mints with the documented endpoint, auth, and body shape', async () => {
     const { service, calls } = createService({ keys: ['key-1'] });
 
