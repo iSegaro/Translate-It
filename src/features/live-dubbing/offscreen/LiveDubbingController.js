@@ -23,8 +23,7 @@ import {
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
 import { liveDubbingProviderRegistry } from '../providers/LiveDubbingProviderRegistry.js';
-import { TabAudioPipeline } from './TabAudioPipeline.js';
-import { PcmOutputPlayer } from './PcmOutputPlayer.js';
+import { LiveDubbingAudioEngine } from './LiveDubbingAudioEngine.js';
 
 const IDLE_STATUS = 'IDLE';
 const INPUT_SAMPLE_RATE = 16_000;
@@ -279,11 +278,9 @@ function hasAudioContext(options) {
 }
 
 /**
- * Owns one offscreen live-dubbing transaction: capture, both local audio
- * graphs, one provider bootstrap request, and one fenced provider generation.
- *
- * The controller is deliberately the only owner of these resources. A
- * terminal callback changes the session fence before cleanup so late worklet
+ * Owns one offscreen live-dubbing transaction: capture, the local audio
+ * engine, one provider bootstrap request, and one fenced provider generation.
+ * A terminal callback changes the session fence before cleanup so late worklet
  * and socket events cannot affect a subsequent session.
  */
 export class LiveDubbingController {
@@ -316,6 +313,15 @@ export class LiveDubbingController {
     this.providerClient = options.providerClient || null;
     this.inputPipelineOptions = options.inputPipelineOptions || options.tabAudioPipelineOptions || {};
     this.outputPlayerOptions = options.outputPlayerOptions || options.pcmOutputPlayerOptions || {};
+    this.audioEngineOptions = {
+      audioContextFactory: options.audioContextFactory,
+      contextFactory: options.contextFactory,
+      AudioContext: options.AudioContext,
+      inputPipeline: this.inputPipeline,
+      outputPlayer: this.outputPlayer,
+      inputPipelineOptions: this.inputPipelineOptions,
+      outputPlayerOptions: this.outputPlayerOptions,
+    };
     this.providerClientOptions = options.providerClientOptions || options.geminiClientOptions || {};
     this.pipelineRequired = options.requirePipelines
       ?? Boolean(
@@ -514,6 +520,7 @@ export class LiveDubbingController {
         providerDiagnostic: null,
         setupComplete: false,
         setupAcknowledged: false,
+        audioEngine: null,
         inputPipeline: null,
         outputPlayer: null,
         pipelinesReady: false,
@@ -683,75 +690,62 @@ export class LiveDubbingController {
   }
 
   async _initializePipelines(session) {
-    const { audioMode } = session;
-    if (audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
-      return this._initializeMediaStreamPath(session);
-    }
-    if (audioMode !== LIVE_DUBBING_AUDIO_MODES.PCM) {
-      throw Object.assign(new Error('Live dubbing provider audio mode is unsupported'), {
-        code: 'LIVE_DUBBING_AUDIO_MODE_UNSUPPORTED',
-      });
-    }
-    if (!this.pipelineRequired) {
-      session.pipelinesReady = true;
-      session.audioPathReady = true;
-      return;
-    }
-
-    const inputPipeline = await this._createInputPipeline(session);
-    session.inputPipeline = inputPipeline;
-    const outputPlayer = await this._createOutputPlayer(session);
-    if (!inputPipeline || !outputPlayer) {
-      throw Object.assign(new Error('Live dubbing audio pipelines are unavailable'), {
-        code: 'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE',
-      });
-    }
     if (!this._isCurrentSession(session)) {
-      await Promise.allSettled([
-        inputPipeline.stop?.(),
-        outputPlayer.stop?.(),
-      ]);
       throw Object.assign(new Error('Live dubbing pipeline setup was cancelled'), {
         code: 'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
       });
     }
 
-    session.outputPlayer = outputPlayer;
-    const inputStart = Promise.resolve(inputPipeline.start?.(session.stream)).then(() => {
-      this._markMilestone(session, 'inputReady');
+    const inputPipelineFactory = this.inputPipelineFactory
+      ? callbacks => this.inputPipelineFactory({ sessionId: session.sessionId, ...callbacks })
+      : null;
+    const outputPlayerFactory = this.outputPlayerFactory
+      ? callbacks => this.outputPlayerFactory({ sessionId: session.sessionId, ...callbacks })
+      : null;
+
+    const audioEngine = new LiveDubbingAudioEngine({
+      ...this.audioEngineOptions,
+      audioMode: session.audioMode,
+      enabled: this.pipelineRequired,
+      inputPipelineFactory,
+      outputPlayerFactory,
+      onFrame: frame => this._handleInputFrame(session, frame),
+      onInputError: error => this._handlePipelineError(session, error, 'INPUT_PIPELINE_ERROR'),
+      onOutputError: error => this._handlePipelineError(session, error, 'OUTPUT_PIPELINE_ERROR'),
+      onInputReady: () => {
+        if (this._isCurrentSession(session)) this._markMilestone(session, 'inputReady');
+      },
+      onOutputReady: () => {
+        if (this._isCurrentSession(session)) this._markMilestone(session, 'outputReady');
+      },
+      onOutputCreated: player => {
+        session.telemetry.outputBaseline = this._readChildMetrics(player);
+      },
+      onMetrics: metrics => {
+        if (!this._isCurrentSession(session)) return;
+        session.outputMetrics = { ...metrics };
+        this._recordOutputMetrics(session, metrics);
+      },
+      onPlaybackAccepted: details => {
+        this._handlePlaybackAccepted(session, details);
+      },
     });
-    const outputStart = Promise.resolve(outputPlayer.start?.()).then(() => {
-      this._markMilestone(session, 'outputReady');
-    });
-    await Promise.all([inputStart, outputStart]);
+    session.audioEngine = audioEngine;
+
+    const readiness = await audioEngine.start(session.stream);
     if (!this._isCurrentSession(session)) {
       throw Object.assign(new Error('Live dubbing pipeline setup was cancelled'), {
         code: 'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
       });
     }
 
-    session.pipelinesReady = true;
-    session.audioPathReady = true;
-    session.status = LIVE_DUBBING_STATUS.CONNECTING_PROVIDER;
-  }
-
-  /**
-   * Media-stream audio path: the retained capture MediaStream is handed to
-   * the provider, which consumes and plays audio itself. No local PCM
-   * graphs are built and no frames are queued; tracks stay
-   * Controller-owned and stop only in Controller cleanup. Ready here means
-   * the provider may connect. `inputReady`/`outputReady` stay unset: they
-   * describe local PCM graph starts, and media-stream readiness is carried
-   * by `audioPathReady` alone.
-   */
-  async _initializeMediaStreamPath(session) {
-    if (!this._isCurrentSession(session)) {
-      throw Object.assign(new Error('Live dubbing pipeline setup was cancelled'), {
-        code: 'LIVE_DUBBING_PIPELINE_SETUP_CANCELLED',
-      });
+    session.inputPipeline = audioEngine.inputPipeline;
+    session.outputPlayer = audioEngine.outputPlayer;
+    session.pipelinesReady = readiness.inputPipelineReady && readiness.outputPipelineReady;
+    session.audioPathReady = readiness.audioPathReady;
+    if (this.pipelineRequired || session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+      session.status = LIVE_DUBBING_STATUS.CONNECTING_PROVIDER;
     }
-    session.audioPathReady = true;
-    session.status = LIVE_DUBBING_STATUS.CONNECTING_PROVIDER;
   }
 
   /**
@@ -766,51 +760,6 @@ export class LiveDubbingController {
     } catch {
       return null;
     }
-  }
-
-  async _createInputPipeline(session) {
-    const callbacks = {
-      onFrame: frame => this._handleInputFrame(session, frame),
-      onError: error => this._handlePipelineError(session, error, 'INPUT_PIPELINE_ERROR'),
-    };
-    let pipeline = this.inputPipeline;
-    if (!pipeline && typeof this.inputPipelineFactory === 'function') {
-      pipeline = await this.inputPipelineFactory({ sessionId: session.sessionId, ...callbacks });
-    }
-    if (!pipeline) {
-      pipeline = new TabAudioPipeline({
-        ...this.inputPipelineOptions,
-        stopStreamOnCleanup: false,
-        ...callbacks,
-      });
-    }
-    pipeline.onFrame = callbacks.onFrame;
-    pipeline.onError = callbacks.onError;
-    return pipeline;
-  }
-
-  async _createOutputPlayer(session) {
-    const callbacks = {
-      onError: error => this._handlePipelineError(session, error, 'OUTPUT_PIPELINE_ERROR'),
-      onMetrics: metrics => {
-        if (!this._isCurrentSession(session)) return;
-        session.outputMetrics = { ...metrics };
-        this._recordOutputMetrics(session, metrics);
-      },
-      onPlaybackAccepted: details => {
-        this._handlePlaybackAccepted(session, details);
-      },
-    };
-    let player = this.outputPlayer;
-    if (!player && typeof this.outputPlayerFactory === 'function') {
-      player = await this.outputPlayerFactory({ sessionId: session.sessionId, ...callbacks });
-    }
-    if (!player) player = new PcmOutputPlayer({ ...this.outputPlayerOptions, ...callbacks });
-    player.onError = callbacks.onError;
-    player.onMetrics = callbacks.onMetrics;
-    player.onPlaybackAccepted = callbacks.onPlaybackAccepted;
-    session.telemetry.outputBaseline = this._readChildMetrics(player);
-    return player;
   }
 
   connectProvider(sessionId, providerId, targetLanguage = null, eventSequence = undefined) {
@@ -1254,10 +1203,12 @@ export class LiveDubbingController {
     session.metrics.inputPendingDurationMs = 0;
 
     const client = session.providerClient;
+    const audioEngine = session.audioEngine;
     const inputPipeline = session.inputPipeline;
     const outputPlayer = session.outputPlayer;
     const stream = session.stream;
     session.providerClient = null;
+    session.audioEngine = null;
     session.inputPipeline = null;
     session.outputPlayer = null;
     session.stream = null;
@@ -1283,7 +1234,8 @@ export class LiveDubbingController {
     session.bootstrapRequested = false;
 
     try {
-      outputPlayer?.clear?.();
+      if (audioEngine) audioEngine.clearOutput?.();
+      else outputPlayer?.clear?.();
     } catch {
       // Queue clearing is best effort before graph teardown.
     }
@@ -1296,10 +1248,12 @@ export class LiveDubbingController {
       }
     };
 
+    const audioShutdown = audioEngine
+      ? stopResource(audioEngine)
+      : Promise.allSettled([stopResource(inputPipeline), stopResource(outputPlayer)]);
     session.cleanupPromise = Promise.allSettled([
       providerShutdown,
-      stopResource(inputPipeline),
-      stopResource(outputPlayer),
+      audioShutdown,
     ]).then(() => {
       session.telemetry.outputQueueCurrentDurationMs = 0;
       this._markMilestone(session, 'cleanupComplete');
@@ -1418,6 +1372,7 @@ export class LiveDubbingController {
    * flags read false while `audioPathReady` carries readiness truthfully.
    */
   _audioReadiness(session) {
+    if (session.audioEngine) return session.audioEngine.getReadiness();
     return {
       audioPathReady: session.audioPathReady === true,
       inputPipelineReady: Boolean(session.inputPipeline && session.pipelinesReady),
@@ -1651,7 +1606,8 @@ export class LiveDubbingController {
   _syncOutputMetricsFromPlayer(session) {
     let playerMetrics = null;
     try {
-      playerMetrics = session.outputPlayer?.getMetrics?.();
+      playerMetrics = session.audioEngine?.getOutputMetrics?.()
+        || session.outputPlayer?.getMetrics?.();
     } catch {
       playerMetrics = null;
     }
@@ -1830,10 +1786,13 @@ export class LiveDubbingController {
     if (!this._isCurrentProvider(session, generation) || !session.setupComplete) return;
     try {
       this._markMilestone(session, 'firstTranslatedAudioReceived');
-      const result = session.outputPlayer?.enqueuePcm16(audioBytes, {
+      const metadata = {
         epoch: session.outputEpoch,
         sequence: ++session.outputSequence,
-      });
+      };
+      const result = session.audioEngine
+        ? session.audioEngine.enqueuePcm16(audioBytes, metadata)
+        : session.outputPlayer?.enqueuePcm16(audioBytes, metadata);
       session.metrics.outputChunks += 1;
       session.metrics.outputBytes += audioBytes?.byteLength || 0;
       session.telemetry.translatedAudioChunks = safeInteger(session.metrics.outputChunks);
@@ -1853,7 +1812,8 @@ export class LiveDubbingController {
     if (!this._isCurrentProvider(session, generation) || !session.setupComplete) return;
     session.telemetry.interruptions += 1;
     session.outputEpoch += 1;
-    session.outputPlayer?.resetEpoch?.(session.outputEpoch);
+    if (session.audioEngine) session.audioEngine.resetEpoch(session.outputEpoch);
+    else session.outputPlayer?.resetEpoch?.(session.outputEpoch);
   }
 
   _handleProviderError(session, generation, error, providerDiagnostic = null) {

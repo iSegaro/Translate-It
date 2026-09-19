@@ -40,6 +40,15 @@ function createStream(track) {
 }
 
 describe('LiveDubbingController', () => {
+  it('does not require pipelines from nested audio options alone', () => {
+    const controller = new LiveDubbingController({
+      inputPipelineOptions: { audioWorkletNodeFactory: vi.fn() },
+      outputPlayerOptions: { audioWorkletNodeFactory: vi.fn() },
+    });
+
+    expect(controller.pipelineRequired).toBe(false);
+  });
+
   it('requires an explicit zero sequence for the initial prepare', () => {
     const controller = new LiveDubbingController();
     const missing = controller.handle({
@@ -835,6 +844,111 @@ describe('LiveDubbingController', () => {
     expect(track.stop).toHaveBeenCalledOnce();
   });
 
+  it('keeps status readiness closed while one local graph start is pending', async () => {
+    const track = new FakeTrack();
+    let resolveOutputStart;
+    const inputPipeline = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+    };
+    const outputPlayer = {
+      start: vi.fn(() => new Promise(resolve => { resolveOutputStart = resolve; })),
+      stop: vi.fn(async () => {}),
+      clear: vi.fn(),
+    };
+    const inputPipelineFactory = vi.fn(options => {
+      expect(options.sessionId).toBe('session-1');
+      expect(options).not.toHaveProperty('factoryContext');
+      return inputPipeline;
+    });
+    const outputPlayerFactory = vi.fn(options => {
+      expect(options.sessionId).toBe('session-1');
+      expect(options).not.toHaveProperty('factoryContext');
+      return outputPlayer;
+    });
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipelineFactory,
+      outputPlayerFactory,
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    const capture = controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await vi.waitFor(() => expect(controller.currentSession.telemetry.milestones.inputReady)
+      .not.toBeNull());
+
+    expect(controller.status()).toMatchObject({
+      active: true,
+      status: LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      audioPathReady: false,
+      inputPipelineReady: false,
+      outputPipelineReady: false,
+    });
+    expect(controller.currentSession.telemetry.milestones.outputReady).toBeNull();
+
+    resolveOutputStart();
+    await expect(capture).resolves.toMatchObject({
+      status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      audioPathReady: true,
+      inputPipelineReady: true,
+      outputPipelineReady: true,
+    });
+    await controller.dispose('session-1', 'gemini');
+  });
+
+  it('captures output metrics baseline before reused player start notifications', async () => {
+    const track = new FakeTrack();
+    let metrics = {
+      queuedSamples: 2_400,
+      peakQueuedSamples: 2_400,
+      underruns: 7,
+      underrunSamples: 70,
+      safetyDrops: 2,
+      epochResets: 1,
+      acceptedChunks: 3,
+    };
+    const inputPipeline = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+    };
+    const outputPlayer = {
+      onMetrics: null,
+      start: vi.fn(() => {
+        metrics = {
+          ...metrics,
+          queuedSamples: 4_800,
+          peakQueuedSamples: 4_800,
+          underruns: 8,
+          underrunSamples: 90,
+          safetyDrops: 3,
+          epochResets: 2,
+          acceptedChunks: 4,
+        };
+        outputPlayer.onMetrics(metrics);
+      }),
+      stop: vi.fn(async () => {}),
+      clear: vi.fn(),
+      getMetrics: vi.fn(() => ({ ...metrics })),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipelineFactory: vi.fn(() => inputPipeline),
+      outputPlayerFactory: vi.fn(() => outputPlayer),
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+
+    expect(controller.getTelemetry()).toMatchObject({
+      outputQueueCurrentDurationMs: 200,
+      outputQueuePeakDurationMs: 200,
+      underruns: 1,
+      underrunSamples: 20,
+      outputSafetyDrops: 1,
+    });
+    await controller.dispose('session-1', 'gemini');
+  });
+
   it('exposes scalar telemetry, playback acceptance, and cleanup milestones', async () => {
     let now = 0;
     const track = new FakeTrack();
@@ -1300,6 +1414,8 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(controller.currentSession.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
     expect(registry.getAudioMode).toHaveBeenCalledOnce();
     const captured = await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const audioEngine = controller.currentSession.audioEngine;
+    expect(audioEngine).toBeTruthy();
     expect(captured).toMatchObject({
       ack: 'MEDIA_ACQUIRED',
       status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
@@ -1313,6 +1429,8 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(controller.currentSession.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
     expect(controller.currentSession.inputPipeline).toBeNull();
     expect(controller.currentSession.outputPlayer).toBeNull();
+    expect(audioEngine.inputPipeline).toBeNull();
+    expect(audioEngine.outputPlayer).toBeNull();
     expect(registry.getAudioMode).toHaveBeenCalledOnce();
     expect(inputPipelineFactory).not.toHaveBeenCalled();
     expect(outputPlayerFactory).not.toHaveBeenCalled();
@@ -1362,8 +1480,10 @@ describe('LiveDubbingController media-stream audio path', () => {
       captureReady: true,
     });
 
+    const engineStop = vi.spyOn(audioEngine, 'stop');
     await controller.dispose('session-1', 'gemini');
     expect(mediaClient.dispose).toHaveBeenCalledOnce();
+    expect(engineStop).toHaveBeenCalledOnce();
     expect(track.stop).toHaveBeenCalledOnce();
 
     await controller.dispose('session-1', 'gemini');
@@ -1738,6 +1858,104 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(inputPipeline.stop).toHaveBeenCalledOnce();
     expect(outputPlayer.stop).toHaveBeenCalledOnce();
     expect(controller.disposedSession.cleanupComplete).toBe(true);
+  });
+
+  it('clears failed engine output once before stopping each local graph', async () => {
+    const track = new FakeTrack();
+    const inputPipeline = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+    };
+    const outputPlayer = {
+      start: vi.fn(async () => { throw new Error('output start failed'); }),
+      stop: vi.fn(async () => {}),
+      clear: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipeline,
+      outputPlayer,
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    const result = await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    const session = controller.currentSession;
+    controller._cleanupSessionResources(session);
+
+    expect(result).toMatchObject({ success: false });
+    expect(outputPlayer.clear).toHaveBeenCalledOnce();
+    expect(inputPipeline.stop).toHaveBeenCalledOnce();
+    expect(outputPlayer.stop).toHaveBeenCalledOnce();
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
+
+  it('orders provider shutdown, track stop, output clear, and graph stops', async () => {
+    const events = [];
+    const track = new FakeTrack();
+    track.stop = vi.fn(() => events.push('tracks'));
+    const inputPipeline = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => events.push('input-stop')),
+    };
+    const outputPlayer = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => events.push('output-stop')),
+      clear: vi.fn(() => events.push('output-clear')),
+    };
+    const provider = {
+      connect: vi.fn(async () => provider.onSetupComplete()),
+      dispose: vi.fn(() => events.push('provider-dispose')),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipeline,
+      outputPlayer,
+      providerClient: provider,
+      requestBootstrap: vi.fn().mockResolvedValue({
+        success: true,
+        providerId: 'gemini',
+        targetLanguage: 'en',
+        bootstrap: { accessToken: 'test-token' },
+      }),
+    });
+
+    controller.prepare('session-1', 'gemini', 'en', 0);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await controller.connectProvider('session-1', 'gemini', 'en', 2);
+    await controller.dispose('session-1', 'gemini');
+
+    expect(events).toEqual([
+      'provider-dispose',
+      'tracks',
+      'output-clear',
+      'input-stop',
+      'output-stop',
+    ]);
+  });
+
+  it('keeps legacy direct cleanup clearing output before stopping resources', async () => {
+    const events = [];
+    const track = new FakeTrack();
+    track.stop = vi.fn(() => events.push('tracks'));
+    const controller = new LiveDubbingController();
+    controller.prepare('legacy-session', 'gemini', null, 0);
+    const activeSession = controller.currentSession;
+    activeSession.stream = createStream(track);
+    activeSession.inputPipeline = { stop: vi.fn(() => events.push('input-stop')) };
+    activeSession.outputPlayer = {
+      clear: vi.fn(() => events.push('output-clear')),
+      stop: vi.fn(() => events.push('output-stop')),
+    };
+
+    await controller._cleanupSessionResources(activeSession);
+
+    expect(events).toEqual([
+      'tracks',
+      'output-clear',
+      'input-stop',
+      'output-stop',
+    ]);
+    expect(activeSession.outputPlayer).toBeNull();
   });
 
   it('ignores late provider callbacks after disposal', async () => {
