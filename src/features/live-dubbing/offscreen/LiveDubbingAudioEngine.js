@@ -306,33 +306,84 @@ export class LiveDubbingAudioEngine {
    * Set the audible original-audio gain. Async because a non-zero volume
    * after an active start lazily creates and starts the monitor. Silence
    * never creates a monitor: without one the value is only stored, with a
-   * live or starting monitor it mutes that same instance at gain 0. Before
-   * any start (or after stop) the value is only stored for a later start.
-   * Rejects with the same RangeError policy as the monitor for invalid
-   * volumes, and with the monitor failure when lazy startup fails.
+   * live monitor it mutes that same instance at gain 0. Before any start
+   * (or after stop) the value is only stored for a later start. A newer
+   * command is newest desire immediately: while another realization is
+   * still starting it returns promptly instead of joining that startup
+   * indefinitely, sharing the single pending graph; an already-starting
+   * instance receives the latest value immediately, and when the monitor
+   * becomes usable only the latest value is applied. Rejects with the same
+   * RangeError policy as the monitor for invalid volumes, and with the
+   * monitor failure when this call's own lazy startup fails.
    */
   async setOriginalVolume(volume) {
     const normalized = normalizeOriginalVolume(volume);
     this.originalVolume = normalized;
     if (normalized === 0) {
-      let monitor = this.originalAudioMonitor;
-      const pending = !monitor ? this._monitorStartPromise : null;
-      if (pending) {
-        try {
-          monitor = await pending;
-        } catch {
-          monitor = null;
-        }
+      const monitor = this.originalAudioMonitor;
+      if (monitor) {
+        // Latest wins: a newer non-zero request may have superseded this
+        // mute while a startup was pending.
+        if (this.originalVolume === 0) monitor?.setVolume?.(0);
+        return normalized;
       }
-      // Latest wins: a newer non-zero request may have superseded this mute
-      // while the startup was pending.
-      if (this.originalVolume === 0) monitor?.setVolume?.(0);
+      // A starting instance already exists: forward silence to it
+      // immediately instead of waiting for startup, so no stale gain can
+      // apply at graph creation. Without setVolume (custom monitor) only
+      // the post-settlement re-assertion below applies.
+      const pendingMonitor = this._pendingOriginalMonitor;
+      if (pendingMonitor && typeof pendingMonitor.setVolume === 'function'
+        && this.originalVolume === 0) {
+        pendingMonitor.setVolume(0);
+      }
+      const pending = this._monitorStartPromise;
+      if (pending) {
+        // Silence is newest desire: do not join a potentially hanging
+        // startup. The shared realization reads the latest desire when it
+        // attaches; re-assert silence then if still latest so a
+        // later-attaching monitor ends at gain 0 with no stale commit.
+        void Promise.resolve(pending).then(
+          attached => {
+            if (this.originalVolume === 0) attached?.setVolume?.(0);
+          },
+          () => {},
+        );
+        return normalized;
+      }
       return normalized;
     }
     const active = (this.state === 'running' || this.state === 'ready')
       && !this._stopping
       && Boolean(this.monitorStream);
     if (!active) return normalized;
+    if (this.originalAudioMonitor) {
+      // Latest wins: skip a stale application when a newer volume (often a
+      // mute) was stored while the startup was pending.
+      if (this.originalVolume === normalized) this.originalAudioMonitor.setVolume?.(normalized);
+      return normalized;
+    }
+    if (this._monitorStartPromise) {
+      // A realization is already in flight: become newest desire without
+      // joining it indefinitely and without starting a duplicate graph.
+      // Forward to the starting instance immediately when possible so a
+      // stale gain cannot apply at graph creation; without setVolume
+      // (custom monitor) only the post-settlement re-assertion applies.
+      // The shared startup reads the latest desire on attach; re-assert
+      // this value then if still latest so an older value cannot win.
+      const pendingMonitor = this._pendingOriginalMonitor;
+      if (pendingMonitor && typeof pendingMonitor.setVolume === 'function'
+        && this.originalVolume === normalized) {
+        pendingMonitor.setVolume(normalized);
+      }
+      const pending = this._monitorStartPromise;
+      void Promise.resolve(pending).then(
+        attached => {
+          if (this.originalVolume === normalized) attached?.setVolume?.(normalized);
+        },
+        () => {},
+      );
+      return normalized;
+    }
     const monitor = await this._ensureOriginalMonitor();
     // Latest wins: skip a stale application when a newer volume (often a
     // mute) was stored while the startup was pending.

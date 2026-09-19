@@ -628,6 +628,58 @@ describe('offscreen live-dubbing control sender authorization', () => {
     expect(track.stop).toHaveBeenCalledOnce();
   });
 
+  it('routes original-volume control only from the background service worker', async () => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const { LIVE_DUBBING_ACTIONS } = await import('../features/live-dubbing/constants.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+    const action = LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN;
+    const data = {
+      sessionId: 'volume-session',
+      providerId: 'gemini',
+      volume: 0.4,
+      eventSequence: 0,
+    };
+
+    await expect(sendMessage({
+      target: 'offscreen',
+      action: 'LIVE_DUBBING_PREPARE',
+      data: { sessionId: data.sessionId, providerId: data.providerId, eventSequence: 0 },
+    }, swSender)).resolves.toMatchObject({ success: true, ack: 'READY' });
+    handle.mockClear();
+
+    await expect(sendMessage({ target: 'offscreen', action, data }, swSender)).resolves.toEqual({
+      success: true,
+      sessionId: data.sessionId,
+      providerId: data.providerId,
+      eventSequence: 0,
+      status: 'PREPARING_CAPTURE',
+      originalVolume: 0.4,
+    });
+    expect(handle).toHaveBeenCalledOnce();
+    expect(liveDubbingController.currentSession.originalVolume).toBe(0.4);
+    handle.mockClear();
+
+    const rejectedSenders = [
+      popupSender,
+      optionsSender,
+      sidepanelSender,
+      contentScriptSender,
+      offscreenSelfSender,
+      arbitraryDocumentSender,
+      { id: 'other-extension', url: 'chrome-extension://other-extension/background.js' },
+    ];
+    for (const sender of rejectedSenders) {
+      await expect(sendMessage({
+        target: 'offscreen',
+        action,
+        data: { ...data, volume: 0.8 },
+      }, sender)).resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    }
+    expect(handle).not.toHaveBeenCalled();
+    expect(liveDubbingController.currentSession.originalVolume).toBe(0.4);
+  });
+
   it.each([
     ['popup', popupSender],
     ['options', optionsSender],

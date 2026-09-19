@@ -201,6 +201,13 @@ function isEventSequence(value) {
   return Number.isInteger(value) && value >= 0;
 }
 
+function isOriginalVolume(value) {
+  return typeof value === 'number'
+    && Number.isFinite(value)
+    && value >= 0
+    && value <= 1;
+}
+
 function getEventSequence(message) {
   const value = getMessageValue(message, 'eventSequence');
   return isEventSequence(value) ? value : undefined;
@@ -342,6 +349,7 @@ export class LiveDubbingController {
     return action === LIVE_DUBBING_ACTIONS.PREPARE
       || action === LIVE_DUBBING_ACTIONS.CONSUME
       || action === LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER
+      || action === LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN
       || action === LIVE_DUBBING_ACTIONS.STATUS
       || action === LIVE_DUBBING_ACTIONS.DISPOSE;
   }
@@ -369,6 +377,13 @@ export class LiveDubbingController {
           getMessageValue(message, 'targetLanguage'),
           getEventSequence(message),
         );
+      case LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN:
+        return this.setOriginalVolume(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
+          getMessageValue(message, 'volume'),
+          getEventSequence(message),
+        );
       case LIVE_DUBBING_ACTIONS.STATUS:
         return this.status(
           getMessageValue(message, 'sessionId'),
@@ -385,6 +400,121 @@ export class LiveDubbingController {
       default:
         return { success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED' };
     }
+  }
+
+  /**
+   * Apply a runtime original-audio gain without changing the lifecycle fence.
+   * The value lives only on the offscreen session and is committed after an
+   * active engine accepts it, so late engine work cannot update a replacement.
+   * The session value stays authoritative: a current-request engine failure
+   * reconciles the engine back to the committed value, while superseded
+   * requests never roll the engine back. While the core path is not ready
+   * (`audioPathReady !== true`) the command is pre-engine: it only stores
+   * the session value and never calls the engine.
+   */
+  setOriginalVolume(sessionId, providerId, volume, eventSequence = undefined) {
+    if (!isOriginalVolume(volume)) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_ORIGINAL_VOLUME_INVALID',
+      };
+    }
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
+    if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
+
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
+      return this._sessionMismatch(sessionId, providerId, session);
+    }
+    if (session.eventSequence !== eventSequence) {
+      return this._sequenceMismatch(sessionId, session, providerId);
+    }
+    const allowedStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!allowedStatuses.includes(session.status)) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_UNAVAILABLE',
+      };
+    }
+
+    const requestToken = ++session.originalVolumeRequestToken;
+    const committedVolume = session.originalVolume;
+    // While the core audio path is not ready, volume is pre-engine state
+    // only: store it and never touch the engine, so a pending startup cannot
+    // observe a mutated engine volume. The active path requires readiness.
+    if (!session.audioEngine || session.audioPathReady !== true) {
+      session.originalVolume = volume;
+      return this._originalVolumeResponse(session);
+    }
+
+    const audioEngine = session.audioEngine;
+    return Promise.resolve()
+      .then(() => audioEngine.setOriginalVolume(volume))
+      .then(() => {
+        if (!this._isCurrentOriginalVolumeRequest(
+          session,
+          sessionId,
+          providerId,
+          eventSequence,
+          requestToken,
+        )) {
+          return this._staleOriginalVolumeResponse(
+            session,
+            sessionId,
+            providerId,
+            eventSequence,
+            requestToken,
+          );
+        }
+        session.originalVolume = volume;
+        return this._originalVolumeResponse(session);
+      })
+      .catch(async () => {
+        if (!this._isCurrentOriginalVolumeRequest(
+          session,
+          sessionId,
+          providerId,
+          eventSequence,
+          requestToken,
+        )) {
+          return this._staleOriginalVolumeResponse(
+            session,
+            sessionId,
+            providerId,
+            eventSequence,
+            requestToken,
+          );
+        }
+        if (committedVolume !== volume) {
+          try {
+            if (this._isCurrentOriginalVolumeRequest(
+              session,
+              sessionId,
+              providerId,
+              eventSequence,
+              requestToken,
+            )) {
+              await audioEngine.setOriginalVolume(committedVolume);
+            }
+          } catch {
+            // Reconciliation is best effort and never terminalizes or cleans up.
+          }
+        }
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE',
+          sessionId,
+          providerId,
+          eventSequence: session.eventSequence,
+          status: session.status,
+        };
+      });
   }
 
   prepare(sessionId, providerId, targetLanguage = null, eventSequence = undefined) {
@@ -525,6 +655,8 @@ export class LiveDubbingController {
         outputPlayer: null,
         pipelinesReady: false,
         audioMode,
+        originalVolume: 0,
+        originalVolumeRequestToken: 0,
         audioPathReady: false,
         pendingInput: [],
         pendingInputMs: 0,
@@ -703,9 +835,14 @@ export class LiveDubbingController {
       ? callbacks => this.outputPlayerFactory({ sessionId: session.sessionId, ...callbacks })
       : null;
 
+    // Start the core audio path silent: optional original-audio monitoring
+    // must never fail core capture. The latest remembered session volume is
+    // applied afterwards through the normal runtime path with latest-wins
+    // fencing (read after readiness, never a pre-startup capture).
     const audioEngine = new LiveDubbingAudioEngine({
       ...this.audioEngineOptions,
       audioMode: session.audioMode,
+      originalVolume: 0,
       enabled: this.pipelineRequired,
       inputPipelineFactory,
       outputPlayerFactory,
@@ -745,6 +882,59 @@ export class LiveDubbingController {
     session.audioPathReady = readiness.audioPathReady;
     if (this.pipelineRequired || session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
       session.status = LIVE_DUBBING_STATUS.CONNECTING_PROVIDER;
+    }
+
+    // Deferred original-audio realization must never block core capture:
+    // launch detached after readiness/status are committed. Fencing inside
+    // keeps dispose/replacement inert and failures local-only.
+    void this._applyDeferredOriginalVolume(session, audioEngine).catch(() => {});
+  }
+
+  /**
+   * Realize the latest remembered pre-engine volume after core readiness.
+   * Reads `session.originalVolume`/`originalVolumeRequestToken` after the
+   * core path is ready (never a pre-startup capture) and applies it through
+   * the normal runtime engine path so monitor logic stays in the engine.
+   * Failure stays local: fall back to the last realizable safe value for a
+   * new engine (silence), keep session/engine consistent, and never
+   * terminalize, clean up, or notify. A newer runtime command arriving
+   * during the deferred apply always wins via the token/session fence.
+   */
+  async _applyDeferredOriginalVolume(session, audioEngine) {
+    if (this.currentSession !== session || session.audioEngine !== audioEngine) return;
+    if (!this._isCurrentSession(session)) return;
+    if (session.audioPathReady !== true) return;
+    const volume = session.originalVolume;
+    const token = session.originalVolumeRequestToken;
+    if (volume === 0) return;
+    let applied = false;
+    try {
+      await audioEngine.setOriginalVolume(volume);
+      applied = true;
+    } catch {
+      applied = false;
+    }
+    if (applied) {
+      if (this.currentSession !== session || session.audioEngine !== audioEngine) return;
+      if (!this._isCurrentSession(session)) return;
+      if (session.originalVolumeRequestToken !== token) return;
+      if (session.originalVolume !== volume) return;
+      return;
+    }
+    if (this.currentSession !== session || session.audioEngine !== audioEngine) return;
+    if (!this._isCurrentSession(session)) return;
+    if (session.originalVolumeRequestToken !== token) return;
+    if (session.originalVolume !== volume) return;
+    session.originalVolume = 0;
+    try {
+      if (this.currentSession === session
+        && session.audioEngine === audioEngine
+        && session.originalVolumeRequestToken === token
+        && session.originalVolume === 0) {
+        await audioEngine.setOriginalVolume(0);
+      }
+    } catch {
+      // Best effort: session already reflects the safe fallback.
     }
   }
 
@@ -1363,6 +1553,43 @@ export class LiveDubbingController {
       ...this._audioReadiness(session),
       setupComplete: session.setupComplete,
     };
+  }
+
+  _originalVolumeResponse(session) {
+    return {
+      success: true,
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      originalVolume: session.originalVolume,
+    };
+  }
+
+  _supersededOriginalVolumeResponse(session) {
+    return {
+      success: true,
+      ignored: true,
+      superseded: true,
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      originalVolume: session.originalVolume,
+    };
+  }
+
+  _staleOriginalVolumeResponse(session, sessionId, providerId, eventSequence, requestToken) {
+    if (this.currentSession && this.currentSession !== session) {
+      return this._sessionMismatch(sessionId, providerId, this.currentSession);
+    }
+    if (this.currentSession === session && session.eventSequence !== eventSequence) {
+      return this._sequenceMismatch(sessionId, session, providerId);
+    }
+    if (this.currentSession === session && session.originalVolumeRequestToken !== requestToken) {
+      return this._supersededOriginalVolumeResponse(session);
+    }
+    return this._disposedProviderResponse(session);
   }
 
   /**
@@ -2031,6 +2258,15 @@ export class LiveDubbingController {
     return this._isCurrentSession(session)
       && !session.disposing
       && session.providerGeneration === generation;
+  }
+
+  _isCurrentOriginalVolumeRequest(session, sessionId, providerId, eventSequence, requestToken) {
+    return this._isCurrentSession(session)
+      && this.currentSession === session
+      && session.sessionId === sessionId
+      && session.providerId === providerId
+      && session.eventSequence === eventSequence
+      && session.originalVolumeRequestToken === requestToken;
   }
 
   _invalidProvider(sessionId) {

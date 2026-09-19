@@ -783,6 +783,27 @@ export function createStatusMessage(descriptor) {
   return baseOffscreenMessage(LIVE_DUBBING_ACTIONS.STATUS, descriptor);
 }
 
+/**
+ * Build the session-fenced original-audio volume command. Volume is already a
+ * normalized gain and is deliberately kept out of the public descriptor.
+ */
+export function createOriginalVolumeMessage(descriptor, volume) {
+  if (typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) {
+    throw new TypeError('volume must be a finite number between 0 and 1');
+  }
+
+  return {
+    target: 'offscreen',
+    action: LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN,
+    data: {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence,
+      volume,
+    },
+  };
+}
+
 export function isSuccessfulResponse(response) {
   return Boolean(response && response.success !== false);
 }

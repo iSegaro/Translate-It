@@ -53,6 +53,15 @@ export function handleLiveDubbingGetStatus(message, sender) {
   return liveDubbingCoordinator.getStatus();
 }
 
+export function handleLiveDubbingSetOriginalVolume(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (message?.action && message.action !== LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME) {
+    return unauthorized();
+  }
+  if (!isTrustedUi(sender)) return unauthorized();
+  return liveDubbingCoordinator.setOriginalVolume(message);
+}
+
 /**
  * Resolve the provider bootstrap request from the authorized offscreen
  * document. The descriptor selects the bootstrap service, while the

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createLiveDubbingCleanupDiagnostic,
   createDescriptor,
+  createOriginalVolumeMessage,
   createLiveDubbingProviderDiagnostic,
   createProviderBootstrapRequest,
   createProviderBootstrapResponse,
@@ -24,6 +25,8 @@ import {
 } from './contracts.js';
 import {
   LIVE_DUBBING_ACTION_TIMEOUTS,
+  LIVE_DUBBING_ACTIONS,
+  LIVE_DUBBING_OFFSCREEN_ACTIONS,
   LIVE_DUBBING_STATUS,
   LIVE_DUBBING_TIMEOUTS,
 } from './constants.js';
@@ -134,6 +137,42 @@ describe('live dubbing Stage 2 contracts', () => {
       eventSequence: 1,
     });
   });
+
+  it.each([0, 1])('builds an exact original-volume message for %s', volume => {
+    const descriptor = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      targetLanguage: 'en',
+    };
+    const snapshot = { ...descriptor };
+
+    expect(createOriginalVolumeMessage(descriptor, volume)).toEqual({
+      target: 'offscreen',
+      action: LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        volume,
+      },
+    });
+    expect(descriptor).toEqual(snapshot);
+    expect(LIVE_DUBBING_OFFSCREEN_ACTIONS).toContain(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN);
+    expect(LIVE_DUBBING_OFFSCREEN_ACTIONS).not.toContain(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME);
+  });
+
+  it.each([null, '0.5', Number.NaN, Number.POSITIVE_INFINITY, -0.01, 1.01, undefined])(
+    'rejects invalid original volume %p',
+    volume => {
+      expect(() => createOriginalVolumeMessage({
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+      }, volume)).toThrow();
+    },
+  );
 
   it('sanitizes an OpenAI descriptor while retaining its immutable identity tuple', () => {
     const descriptor = sanitizeDescriptor({
@@ -679,6 +718,8 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(LIVE_DUBBING_ACTION_TIMEOUTS.START_LIVE_DUBBING).toBe(30_000);
     expect(LIVE_DUBBING_ACTION_TIMEOUTS.STOP_LIVE_DUBBING).toBe(10_000);
     expect(LIVE_DUBBING_ACTION_TIMEOUTS.GET_LIVE_DUBBING_STATUS).toBe(5_000);
+    expect(LIVE_DUBBING_ACTION_TIMEOUTS.SET_LIVE_DUBBING_ORIGINAL_VOLUME)
+      .toBe(LIVE_DUBBING_TIMEOUTS.STATUS);
   });
 
   it('accepts only the declared provider audio modes', () => {

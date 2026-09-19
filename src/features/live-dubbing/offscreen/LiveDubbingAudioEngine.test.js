@@ -665,6 +665,144 @@ describe('LiveDubbingAudioEngine', () => {
     await engine.stop();
   });
 
+  it('forwards mute to a starting real monitor before it resolves', async () => {
+    let resolveCtx;
+    const ctxGate = new Promise(resolve => {
+      resolveCtx = resolve;
+    });
+    const fake = createMonitorContext();
+    const audioContextFactory = vi.fn(() => ctxGate.then(() => fake.context));
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: createDouble(),
+      audioContextFactory,
+    });
+    await engine.start(createStream());
+
+    const pending = engine.setOriginalVolume(0.6);
+    await vi.waitFor(() => expect(engine._pendingOriginalMonitor).not.toBeNull());
+
+    const muting = engine.setOriginalVolume(0);
+    await expect(muting).resolves.toBe(0);
+    expect(engine.getOriginalVolume()).toBe(0);
+    expect(engine._pendingOriginalMonitor.getVolume()).toBe(0);
+
+    resolveCtx();
+    await expect(pending).resolves.toBe(0.6);
+
+    expect(audioContextFactory).toHaveBeenCalledOnce();
+    expect(engine.originalAudioMonitor).not.toBeNull();
+    expect(fake.gain.gain.setValueAtTime).not.toHaveBeenCalledWith(0.6, expect.anything());
+    expect(fake.gain.gain.setValueAtTime).toHaveBeenLastCalledWith(0, expect.anything());
+    expect(engine.getOriginalVolume()).toBe(0);
+    await engine.stop();
+  });
+
+  it('forwards a newer volume to a starting monitor without a second graph', async () => {
+    let resolveStart;
+    const startGate = new Promise(resolve => {
+      resolveStart = resolve;
+    });
+    const monitor = createMonitorDouble({
+      start: vi.fn(() => startGate),
+    });
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: createDouble(),
+      originalAudioMonitor: monitor,
+    });
+    await engine.start(createStream());
+
+    const first = engine.setOriginalVolume(0.4);
+    await vi.waitFor(() => expect(monitor.start).toHaveBeenCalledOnce());
+    expect(engine._pendingOriginalMonitor).toBe(monitor);
+
+    const second = engine.setOriginalVolume(0.8);
+    await expect(second).resolves.toBe(0.8);
+    expect(monitor.setVolume).toHaveBeenCalledWith(0.8);
+    expect(engine.getOriginalVolume()).toBe(0.8);
+
+    resolveStart();
+    await expect(first).resolves.toBe(0.4);
+
+    expect(monitor.start).toHaveBeenCalledOnce();
+    expect(monitor.setVolume).not.toHaveBeenCalledWith(0.4);
+    expect(monitor.setVolume).toHaveBeenLastCalledWith(0.8);
+    expect(engine.originalAudioMonitor).toBe(monitor);
+    expect(engine.getOriginalVolume()).toBe(0.8);
+    await engine.stop();
+  });
+
+  it('lets a newer non-zero supersede a hanging startup without a second graph', async () => {
+    let resolveFactory;
+    const factoryGate = new Promise(resolve => {
+      resolveFactory = resolve;
+    });
+    const monitor = createMonitorDouble();
+    const monitorFactory = vi.fn(() => factoryGate.then(() => monitor));
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: createDouble(),
+      originalAudioMonitorFactory: monitorFactory,
+    });
+    await engine.start(createStream());
+
+    const first = engine.setOriginalVolume(0.4);
+    await vi.waitFor(() => expect(monitorFactory).toHaveBeenCalledOnce());
+
+    const second = engine.setOriginalVolume(0.8);
+    await expect(second).resolves.toBe(0.8);
+    expect(monitorFactory).toHaveBeenCalledOnce();
+
+    resolveFactory();
+    await expect(first).resolves.toBe(0.4);
+
+    expect(monitorFactory).toHaveBeenCalledOnce();
+    expect(monitor.start).toHaveBeenCalledOnce();
+    expect(monitor.start).toHaveBeenCalledWith(expect.anything(), 0.8);
+    expect(monitor.setVolume).not.toHaveBeenCalledWith(0.4);
+    expect(monitor.setVolume).toHaveBeenLastCalledWith(0.8);
+    expect(engine.originalAudioMonitor).toBe(monitor);
+    expect(engine.getOriginalVolume()).toBe(0.8);
+    await engine.stop();
+  });
+
+  it('resolves mute promptly while a monitor startup hangs', async () => {
+    let resolveFactory;
+    const factoryGate = new Promise(resolve => {
+      resolveFactory = resolve;
+    });
+    const monitor = createMonitorDouble();
+    const monitorFactory = vi.fn(() => factoryGate.then(() => monitor));
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: createDouble(),
+      originalAudioMonitorFactory: monitorFactory,
+    });
+    await engine.start(createStream());
+
+    const pending = engine.setOriginalVolume(0.6);
+    await vi.waitFor(() => expect(monitorFactory).toHaveBeenCalledOnce());
+
+    await expect(engine.setOriginalVolume(0)).resolves.toBe(0);
+    expect(engine.getOriginalVolume()).toBe(0);
+
+    resolveFactory();
+    await expect(pending).resolves.toBe(0.6);
+
+    expect(monitorFactory).toHaveBeenCalledOnce();
+    expect(monitor.start).toHaveBeenCalledOnce();
+    expect(monitor.setVolume).not.toHaveBeenCalledWith(0.6);
+    expect(monitor.setVolume).toHaveBeenLastCalledWith(0);
+    expect(engine.originalAudioMonitor).toBe(monitor);
+    expect(engine.getOriginalVolume()).toBe(0);
+    await engine.stop();
+  });
+
   it.each([
     ['originalVolume', { originalVolume: 0.3, originalAudioVolume: 0.7 }, 0.3],
     ['originalAudioVolume', { originalAudioVolume: 0.4 }, 0.4],

@@ -10,6 +10,7 @@ import { openAIRealtimeBootstrapService } from './OpenAIRealtimeBootstrapService
 import {
   handleLiveDubbingGetStatus,
   handleLiveDubbingBootstrapRequest,
+  handleLiveDubbingSetOriginalVolume,
   handleLiveDubbingStart,
   handleLiveDubbingStop,
 } from './handlers.js';
@@ -34,6 +35,10 @@ describe('live dubbing browser gate', () => {
       error: 'LIVE_DUBBING_UNSUPPORTED',
     });
     expect(handleLiveDubbingGetStatus()).toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_UNSUPPORTED',
+    });
+    expect(handleLiveDubbingSetOriginalVolume()).toEqual({
       success: false,
       error: 'LIVE_DUBBING_UNSUPPORTED',
     });
@@ -94,6 +99,49 @@ describe('live dubbing browser gate', () => {
       tab: { id: 42 },
     })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
     expect(start).toHaveBeenCalledTimes(2);
+  });
+
+  it('routes original-volume control only from trusted Popup and Sidepanel UI', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    const setOriginalVolume = vi.spyOn(liveDubbingCoordinator, 'setOriginalVolume')
+      .mockResolvedValue({ success: true });
+    const message = {
+      action: 'SET_LIVE_DUBBING_ORIGINAL_VOLUME',
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 2, volume: 0.5 },
+    };
+
+    await expect(handleLiveDubbingSetOriginalVolume(message, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+    })).resolves.toEqual({ success: true });
+    await expect(handleLiveDubbingSetOriginalVolume(message, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/sidepanel.html',
+    })).resolves.toEqual({ success: true });
+    expect(setOriginalVolume).toHaveBeenCalledTimes(2);
+
+    expect(handleLiveDubbingSetOriginalVolume(message, {
+      id: 'extension-id',
+      url: 'https://example.test/page',
+      tab: { id: 42 },
+    })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
+    await expect(handleLiveDubbingSetOriginalVolume(message, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+      tab: { id: 42 },
+    })).resolves.toEqual({ success: true });
+
+    const internalMessage = {
+      ...message,
+      action: 'LIVE_DUBBING_SET_ORIGINAL_VOLUME',
+    };
+    expect(handleLiveDubbingSetOriginalVolume(internalMessage, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+    })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
+    expect(setOriginalVolume).toHaveBeenCalledTimes(3);
   });
 
   it('rejects bootstrap requests from page/content senders without resolving a key', async () => {

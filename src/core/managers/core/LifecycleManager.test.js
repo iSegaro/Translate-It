@@ -26,6 +26,7 @@ vi.mock('@/core/browserHandlers.js', () => ({ addBrowserSpecificHandlers: vi.fn(
 vi.mock('@/utils/UtilsFactory.js', () => ({ utilsFactory: {} }))
 
 const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js')
+const { LIVE_DUBBING_ACTIONS } = await import('@/features/live-dubbing/constants.js')
 const Handlers = await import('@/core/background/handlers/index.js')
 const { LifecycleManager } = await import('./LifecycleManager.js')
 
@@ -42,6 +43,8 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.get(MessageActions.TRANSLATE_TEXT)).toBe(translateTextHandler)
     expect(registeredHandlers.get('translateText')).toBe(translateTextHandler)
     expect(registeredHandlers.get(MessageActions.SETTINGS_UPDATED)).toBe(settingsUpdatedHandler)
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME)).toEqual(expect.any(Function))
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN)).toBe(false)
     expect(registeredHandlers.get(MessageActions.IFRAME_SELECT_ELEMENT_FINISHED)).toEqual(expect.any(Function))
     expect(registeredHandlers.get(MessageActions.SELECT_ELEMENT_FRAME_READY)).toEqual(expect.any(Function))
     expect(registeredHandlers.has(MessageActions.TRANSLATION_RESULT_UPDATE)).toBe(false)
@@ -68,6 +71,7 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.has(MessageActions.START_LIVE_DUBBING)).toBe(false)
     expect(registeredHandlers.has(MessageActions.STOP_LIVE_DUBBING)).toBe(false)
     expect(registeredHandlers.has(MessageActions.GET_LIVE_DUBBING_STATUS)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME)).toBe(false)
     vi.unstubAllGlobals()
   })
 })

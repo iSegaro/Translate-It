@@ -22,6 +22,15 @@ function isChromeRuntime() {
   return typeof detector === 'function' ? detector() : true;
 }
 
+async function handleLiveDubbingSetOriginalVolumeLazy(message, sender) {
+  try {
+    const { handleLiveDubbingSetOriginalVolume } = await import('@/features/live-dubbing/background/handlers.js');
+    return handleLiveDubbingSetOriginalVolume(message, sender);
+  } catch {
+    return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+  }
+}
+
 class LifecycleManager {
   constructor() {
     this.initialized = false;
@@ -275,6 +284,7 @@ class LifecycleManager {
         [MessageActions.START_LIVE_DUBBING]: Handlers.handleLiveDubbingStartLazy,
         [MessageActions.STOP_LIVE_DUBBING]: Handlers.handleLiveDubbingStopLazy,
         [MessageActions.GET_LIVE_DUBBING_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
+        [LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME]: handleLiveDubbingSetOriginalVolumeLazy,
         [MessageActions.LIVE_DUBBING_START]: Handlers.handleLiveDubbingStartLazy,
         [MessageActions.LIVE_DUBBING_STOP]: Handlers.handleLiveDubbingStopLazy,
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,

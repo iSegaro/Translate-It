@@ -4,6 +4,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { offscreenRuntimeLeaseManager } from '@/shared/runtime/OffscreenRuntimeLeaseManager.js';
 import {
   LIVE_DUBBING_ACTIONS,
+  LIVE_DUBBING_ACTION_TIMEOUTS,
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_LEASE_REASONS,
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
@@ -22,6 +23,7 @@ import {
   createLiveDubbingProviderDiagnostic,
   createConsumeMessage,
   createDescriptor,
+  createOriginalVolumeMessage,
   createProviderConnectMessage,
   createPrepareMessage,
   createSessionMessage,
@@ -220,6 +222,105 @@ export class LiveDubbingCoordinator {
       available,
       status: cloneDescriptor(this.descriptor),
       terminalOutcome,
+    };
+  }
+
+  /**
+   * Apply original-audio gain without entering the lifecycle mutation queue.
+   * The descriptor identity and event sequence are the complete command fence;
+   * no lifecycle or public descriptor state is changed by this control path.
+   */
+  async setOriginalVolume(message = {}) {
+    const data = message?.data && typeof message.data === 'object'
+      ? message.data
+      : message;
+    const volume = data?.volume;
+    const volumeValid = typeof volume === 'number'
+      && Number.isFinite(volume)
+      && volume >= 0
+      && volume <= 1;
+    if (!volumeValid) {
+      return { success: false, error: 'LIVE_DUBBING_ORIGINAL_VOLUME_INVALID' };
+    }
+
+    const descriptor = await this._readDescriptor();
+    const controllableStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!descriptor || this._storageReadFailed() || this._storageDescriptorInvalid()
+      || !controllableStatuses.includes(descriptor.status)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+
+    if (data?.sessionId !== descriptor.sessionId || data?.providerId !== descriptor.providerId) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (!hasExactSessionEvent(message, descriptor)) {
+      return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+    }
+
+    let response;
+    try {
+      response = await this._sendOriginalVolume(
+        createOriginalVolumeMessage(descriptor, volume),
+      );
+    } catch {
+      return { success: false, error: 'LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE' };
+    }
+
+    const responseData = response?.data && typeof response.data === 'object'
+      ? response.data
+      : response;
+    const hasResponseIdentity = responseData
+      && responseData.sessionId !== undefined
+      && responseData.providerId !== undefined;
+    if (hasResponseIdentity
+      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (hasResponseIdentity) {
+      if (responseData.eventSequence !== undefined
+        && responseData.eventSequence !== descriptor.eventSequence) {
+        return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+      }
+    }
+
+    if (!responseData
+      || responseData.success === false
+      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
+      || !hasExactSessionEvent(response, descriptor)
+      || typeof responseData.originalVolume !== 'number'
+      || !Number.isFinite(responseData.originalVolume)
+      || responseData.originalVolume < 0
+      || responseData.originalVolume > 1) {
+      return { success: false, error: 'LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE' };
+    }
+
+    const current = await this._readDescriptor();
+    if (!current || this._storageReadFailed() || this._storageDescriptorInvalid()) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+    if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (!hasExactSessionEvent({ data: responseData }, current)) {
+      return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+    }
+    if (!controllableStatuses.includes(current.status)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+
+    const isSupersededVolume = responseData?.superseded === true;
+    return {
+      success: true,
+      sessionId: current.sessionId,
+      providerId: current.providerId,
+      eventSequence: current.eventSequence,
+      status: current.status,
+      originalVolume: responseData.originalVolume,
+      ...(isSupersededVolume ? { ignored: true, superseded: true } : {}),
     };
   }
 
@@ -1851,6 +1952,20 @@ export class LiveDubbingCoordinator {
 
   async _sendOffscreen(message) {
     return this.runtimeGateway.sendMessage(message);
+  }
+
+  async _sendOriginalVolume(message) {
+    const timeoutMs = LIVE_DUBBING_ACTION_TIMEOUTS[LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME];
+    let timeoutId;
+    const timeout = new Promise(resolve => {
+      timeoutId = setTimeout(() => resolve(null), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([this._sendOffscreen(message), timeout]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   async _sendCaptureStage(stage, message, sensitiveValues = []) {
