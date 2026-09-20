@@ -170,7 +170,7 @@ describe('PopupHeader', () => {
 
   const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
 
-  it('renders a fixed direct toolbar without the action scroller', async () => {
+  it('renders left and actions groups without the action scroller', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
@@ -178,27 +178,54 @@ describe('PopupHeader', () => {
     // The HorizontalActionScroller is gone from the header entirely.
     expect(wrapper.find('.horizontal-action-scroller-stub').exists()).toBe(false)
 
-    const pageTranslationButton = wrapper.find('.ti-header-toolbar > .page-translation-button-stub')
+    // Two visual groups: left (page + switcher slot) and right actions.
+    const toolbar = wrapper.find('.ti-header-toolbar')
+    expect([...toolbar.element.children].map((element) => element.className)).toEqual([
+      'ti-header-left',
+      'ti-header-actions'
+    ])
+
+    const left = wrapper.find('.ti-header-left')
+    const pageTranslationButton = left.find('.page-translation-button-stub')
     expect(pageTranslationButton.exists()).toBe(true)
     expect(pageTranslationButton.attributes('class')).toContain('ti-page-translate-btn')
 
-    // Primary actions render inline, left to right.
-    expect(wrapper.find('.ti-btn-select').exists()).toBe(true)
-    expect(wrapper.find('.ti-btn-revert').exists()).toBe(false)
-    expect(wrapper.find('.ti-btn-mouse-hover').exists()).toBe(true)
-    expect(wrapper.find('.ti-btn-capture').exists()).toBe(true)
-    expect(wrapper.find('.ti-btn-sidepanel').exists()).toBe(true)
-    expect(wrapper.find('.ti-btn-more').exists()).toBe(true)
-    expect(wrapper.find('.ti-btn-settings').exists()).toBe(true)
+    // Direct actions all live inside the actions group.
+    const actions = wrapper.find('.ti-header-actions')
+    for (const selector of ['.ti-btn-more-menu', '.ti-btn-settings', '.ti-btn-mouse-hover', '.ti-btn-capture', '.ti-btn-select', '.ti-btn-sidepanel']) {
+      expect(actions.find(selector).exists()).toBe(true)
+    }
+    expect(actions.find('.ti-btn-revert').exists()).toBe(false)
+  })
 
-    expect([...wrapper.find('.ti-header-toolbar').element.children].map((element) => element.className)).toEqual([
-      'page-translation-button-stub ti-page-translate-btn',
-      'ti-toolbar-button ti-btn-select',
+  it('orders actions More → Settings → Hover → Capture → Select → Sidepanel', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    // Revert is contextual (hidden); the rest keep a stable DOM order.
+    expect([...wrapper.find('.ti-header-actions').element.children].map((element) => element.className)).toEqual([
+      'toolbar-menu-stub ti-btn-more-menu',
+      'ti-toolbar-button ti-btn-settings',
       'ti-toolbar-button ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide',
       'ti-toolbar-button ti-btn-capture ti-header-toolbar-button--narrow-hide',
-      'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide',
+      'ti-toolbar-button ti-btn-select',
+      'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide'
+    ])
+  })
+
+  it('keeps action order stable with Revert between Capture and Select', async () => {
+    mockSelectModeHolder.ref.value = true
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    expect([...wrapper.find('.ti-header-actions').element.children].map((element) => element.className)).toEqual([
       'toolbar-menu-stub ti-btn-more-menu',
-      'ti-toolbar-button ti-btn-settings'
+      'ti-toolbar-button ti-btn-settings',
+      'ti-toolbar-button ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide',
+      'ti-toolbar-button ti-btn-capture ti-header-toolbar-button--narrow-hide',
+      'ti-toolbar-button ti-btn-revert',
+      'ti-toolbar-button ti-btn-select',
+      'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide'
     ])
   })
 
@@ -455,20 +482,24 @@ describe('PopupHeader', () => {
     expect(panel.findAll('.ti-header-menu-item--narrow-only')).toHaveLength(1)
   })
 
-  it('renders slot content (view switcher) between page button and direct actions', async () => {
+  it('renders slot content (view switcher) inside the left group', async () => {
     const wrapper = mount(PopupHeader, {
       slots: { default: '<div class="view-switcher-stub" />' }
     })
     await wrapper.vm.$nextTick()
 
-    const toolbarChildren = wrapper.find('.ti-header-toolbar').element.children
-    const children = [...toolbarChildren]
+    // Slot sits with Page Translation in the left group, before the actions.
+    const leftChildren = [...wrapper.find('.ti-header-left').element.children]
     const switcher = wrapper.find('.view-switcher-stub')
     expect(switcher.exists()).toBe(true)
-    expect(children[0].className).toContain('page-translation-button-stub')
-    expect(children[1]).toBe(switcher.element)
-    expect(children[2].className).toContain('ti-btn-select')
-    expect(children[children.length - 1].className).toContain('ti-btn-settings')
+    expect(leftChildren[0].className).toContain('page-translation-button-stub')
+    expect(leftChildren[1]).toBe(switcher.element)
+
+    const toolbarChildren = [...wrapper.find('.ti-header-toolbar').element.children]
+    expect(toolbarChildren[0].className).toBe('ti-header-left')
+    expect(toolbarChildren[1].className).toBe('ti-header-actions')
+    // Actions group starts with More and keeps its order.
+    expect(wrapper.find('.ti-header-actions').element.children[0].className).toContain('ti-btn-more-menu')
   })
 
   it('starts select-element mode and closes the popup', async () => {

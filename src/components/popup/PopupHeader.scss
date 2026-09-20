@@ -21,6 +21,23 @@
   direction: ltr !important;
   flex-direction: row !important;
 
+  /* Left group: Page Translation + View Switcher slot */
+  .ti-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    min-width: 0 !important;
+  }
+
+  /* Right group: direct actions, pushed to the far right.
+     DOM order inside is the visual left-to-right order. */
+  .ti-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-inline-start: auto;
+  }
+
   /* Toolbar Buttons Base Style */
   .ti-toolbar-button {
     display: flex !important;

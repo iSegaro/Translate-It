@@ -1,192 +1,202 @@
 <template>
   <div class="ti-header-toolbar">
-    <!-- 1. Translate Page (Leftmost, compact icon-only) -->
-    <PageTranslationButton
-      v-if="isWholePageEnabled"
-      :compact="true"
-      :target-language="targetLanguage"
-      :disabled="!isPageTranslationSupported"
-      :show-auto-translate-toggle="true"
-      class="ti-page-translate-btn"
-    />
+    <div class="ti-header-left">
+      <!-- 1. Translate Page (Leftmost, compact icon-only) -->
+      <PageTranslationButton
+        v-if="isWholePageEnabled"
+        :compact="true"
+        :target-language="targetLanguage"
+        :disabled="!isPageTranslationSupported"
+        :show-auto-translate-toggle="true"
+        class="ti-page-translate-btn"
+      />
 
-    <slot />
+      <slot />
+    </div>
 
-    <!-- 2. Select Element -->
-    <IconButton
-      v-if="isSelectElementEnabled"
-      icon="select.png"
-      :alt="t('popup_select_element_alt_icon') || 'Select Element'"
-      :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
-      type="toolbar"
-      :active="isSelectModeActive"
-      :disabled="!isSelectElementSupported"
-      class="ti-btn-select"
-      @click="handleSelectElement"
-    />
+    <div class="ti-header-actions">
+      <!-- DOM order = visual left-to-right order within the right group.
+        The flex container is right-aligned via margin-inline-start: auto,
+        so the FIRST listed item ends up leftmost and the LAST rightmost.
+        Visual right-to-left reading becomes:
+        Sidepanel → Select → Revert? → OCR → Mouse Hover → Settings → More -->
 
-    <!-- 3. Revert (contextual: only while select-element mode is active) -->
-    <IconButton
-      v-if="isSelectElementEnabled && isSelectModeActive"
-      icon="revert.png"
-      :alt="t('popup_revert_alt_icon') || 'Revert'"
-      :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
-      type="toolbar"
-      variant="revert"
-      class="ti-btn-revert"
-      @click="handleRevert"
-    />
-
-    <!-- 4. Mouse Hover (direct action; More duplicate for very-narrow widths) -->
-    <IconButton
-      icon="mouse-hover.png"
-      :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
-      :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
-      type="toolbar"
-      :active="isMouseHoverEnabled"
-      class="ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide"
-      @click="toggleMouseHover"
-    />
-
-    <!-- 5. Screen Capture (direct action; More duplicate for narrow widths) -->
-    <IconButton
-      v-if="isScreenCaptureEnabled"
-      icon="capture.svg"
-      :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
-      :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
-      type="toolbar"
-      class="ti-btn-capture ti-header-toolbar-button--narrow-hide"
-      @click="handleScreenCapture"
-    />
-
-    <!-- 6. Open Sidepanel (direct action, native listener attached on mount; More duplicate for narrow widths) -->
-    <IconButton
-      v-if="!IsMobile"
-      ref="sidePanelButton"
-      icon="side-panel.png"
-      :alt="t('popup_open_side_panel_title') || 'Open in side panel'"
-      :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
-      type="toolbar"
-      class="ti-btn-sidepanel ti-header-toolbar-button--narrow-hide"
-    />
-
-    <!-- 7. More menu: Subtitle, PDF, Exclude always visible; Mouse Hover,
+      <!-- 2. More menu: Subtitle, PDF, Exclude always visible; Mouse Hover,
       Screen Capture, Sidepanel as narrow-only duplicates (see SCSS) -->
-    <ToolbarMenu
-      placement="end"
-      class="ti-btn-more-menu"
-    >
-      <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
-        <button
-          v-bind="triggerAttrs"
-          :ref="(el) => triggerRef(el)"
-          type="button"
-          class="ti-toolbar-button ti-btn-more"
-          aria-label="More actions"
-          :title="t('popup_more_actions_title') || 'More actions'"
-          @click="onToggle"
-        >
-          <span aria-hidden="true">⋯</span>
-        </button>
-      </template>
-      <template #default="{ close }">
-        <button
-          type="button"
-          role="menuitem"
-          class="ti-header-menu-item"
-          @click="close(); handleOpenExtensionApp('subtitle')"
-        >
-          <img
-            :src="menuIcon('subtitle.png')"
-            alt=""
-            aria-hidden="true"
+      <ToolbarMenu
+        placement="end"
+        class="ti-btn-more-menu"
+      >
+        <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
+          <button
+            v-bind="triggerAttrs"
+            :ref="(el) => triggerRef(el)"
+            type="button"
+            class="ti-toolbar-button ti-btn-more"
+            aria-label="More actions"
+            :title="t('popup_more_actions_title') || 'More actions'"
+            @click="onToggle"
           >
-          <span>{{ t('popup_subtitle_title_icon') || 'Subtitle' }}</span>
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          class="ti-header-menu-item"
-          @click="close(); handleOpenExtensionApp('pdf')"
-        >
-          <img
-            :src="menuIcon('pdf_viewer/pdf.png')"
-            alt=""
-            aria-hidden="true"
+            <span aria-hidden="true">⋯</span>
+          </button>
+        </template>
+        <template #default="{ close }">
+          <button
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item"
+            @click="close(); handleOpenExtensionApp('subtitle')"
           >
-          <span>{{ t('pdf_app_title') || 'PDF' }}</span>
-        </button>
-        <button
-          type="button"
-          role="menuitem"
-          class="ti-header-menu-item"
-          @click="close(); handleExcludeToggle()"
-        >
-          <span
-            class="ti-header-menu-check"
-            aria-hidden="true"
-          >{{ isExtensionEnabled ? '☐' : '✓' }}</span>
-          <span>{{ isExtensionEnabled ? (t('popup_exclude_disable_label', 'Disable on this site')) : (t('popup_exclude_enable_label', 'Enable on this site')) }}</span>
-        </button>
-        <!-- Narrow-width duplicates: hidden at normal widths via
+            <img
+              :src="menuIcon('subtitle.png')"
+              alt=""
+              aria-hidden="true"
+            >
+            <span>{{ t('popup_subtitle_title_icon') || 'Subtitle' }}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item"
+            @click="close(); handleOpenExtensionApp('pdf')"
+          >
+            <img
+              :src="menuIcon('pdf_viewer/pdf.png')"
+              alt=""
+              aria-hidden="true"
+            >
+            <span>{{ t('pdf_app_title') || 'PDF' }}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item"
+            @click="close(); handleExcludeToggle()"
+          >
+            <span
+              class="ti-header-menu-check"
+              aria-hidden="true"
+            >{{ isExtensionEnabled ? '☐' : '✓' }}</span>
+            <span>{{ isExtensionEnabled ? (t('popup_exclude_disable_label', 'Disable on this site')) : (t('popup_exclude_enable_label', 'Enable on this site')) }}</span>
+          </button>
+          <!-- Narrow-width duplicates: hidden at normal widths via
           ti-header-menu-item--narrow-only / --very-narrow-only (see
           PopupHeader.scss breakpoint ownership). They keep Mouse Hover,
           Screen Capture and Sidepanel reachable when their direct buttons
           are CSS-hidden at narrow widths. -->
-        <button
-          type="button"
-          role="menuitem"
-          class="ti-header-menu-item ti-header-menu-item--very-narrow-only"
-          :class="{ 'is-active': isMouseHoverEnabled }"
-          @click="close(); toggleMouseHover()"
-        >
-          <img
-            :src="menuIcon('mouse-hover.png')"
-            alt=""
-            aria-hidden="true"
+          <button
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item ti-header-menu-item--very-narrow-only"
+            :class="{ 'is-active': isMouseHoverEnabled }"
+            @click="close(); toggleMouseHover()"
           >
-          <span>{{ isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس') }}</span>
-        </button>
-        <button
-          v-if="isScreenCaptureEnabled"
-          type="button"
-          role="menuitem"
-          class="ti-header-menu-item ti-header-menu-item--narrow-only"
-          @click="close(); handleScreenCapture()"
-        >
-          <img
-            :src="menuIcon('capture.svg')"
-            alt=""
-            aria-hidden="true"
+            <img
+              :src="menuIcon('mouse-hover.png')"
+              alt=""
+              aria-hidden="true"
+            >
+            <span>{{ isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس') }}</span>
+          </button>
+          <button
+            v-if="isScreenCaptureEnabled"
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item ti-header-menu-item--narrow-only"
+            @click="close(); handleScreenCapture()"
           >
-          <span>{{ t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه' }}</span>
-        </button>
-        <button
-          v-if="!IsMobile"
-          type="button"
-          role="menuitem"
-          class="ti-header-menu-item ti-header-menu-item--narrow-only"
-          @click="close(); handleOpenSidePanelNative($event)"
-        >
-          <img
-            :src="menuIcon('side-panel.png')"
-            alt=""
-            aria-hidden="true"
+            <img
+              :src="menuIcon('capture.svg')"
+              alt=""
+              aria-hidden="true"
+            >
+            <span>{{ t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه' }}</span>
+          </button>
+          <button
+            v-if="!IsMobile"
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item ti-header-menu-item--narrow-only"
+            @click="close(); handleOpenSidePanelNative($event)"
           >
-          <span>{{ t('popup_open_side_panel_title') || 'باز کردن در پنل کناری' }}</span>
-        </button>
-      </template>
-    </ToolbarMenu>
+            <img
+              :src="menuIcon('side-panel.png')"
+              alt=""
+              aria-hidden="true"
+            >
+            <span>{{ t('popup_open_side_panel_title') || 'باز کردن در پنل کناری' }}</span>
+          </button>
+        </template>
+      </ToolbarMenu>
 
-    <!-- 8. Settings (Rightmost) -->
-    <IconButton
-      icon="settings.png"
-      :alt="t('popup_settings_alt_icon') || 'Settings'"
-      :title="t('popup_settings_title_icon') || 'تنظیمات'"
-      type="toolbar"
-      class="ti-btn-settings"
-      @click="handleOpenSettings"
-    />
+      <!-- 3. Settings -->
+      <IconButton
+        icon="settings.png"
+        :alt="t('popup_settings_alt_icon') || 'Settings'"
+        :title="t('popup_settings_title_icon') || 'تنظیمات'"
+        type="toolbar"
+        class="ti-btn-settings"
+        @click="handleOpenSettings"
+      />
+
+      <!-- 4. Mouse Hover (direct action; More duplicate for very-narrow widths) -->
+      <IconButton
+        icon="mouse-hover.png"
+        :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        type="toolbar"
+        :active="isMouseHoverEnabled"
+        class="ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide"
+        @click="toggleMouseHover"
+      />
+
+      <!-- 5. Screen Capture / OCR (direct action; More duplicate for narrow widths) -->
+      <IconButton
+        v-if="isScreenCaptureEnabled"
+        icon="capture.svg"
+        :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
+        :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
+        type="toolbar"
+        class="ti-btn-capture ti-header-toolbar-button--narrow-hide"
+        @click="handleScreenCapture"
+      />
+
+      <!-- 6. Revert (contextual: only while select-element mode is active) -->
+      <IconButton
+        v-if="isSelectElementEnabled && isSelectModeActive"
+        icon="revert.png"
+        :alt="t('popup_revert_alt_icon') || 'Revert'"
+        :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
+        type="toolbar"
+        variant="revert"
+        class="ti-btn-revert"
+        @click="handleRevert"
+      />
+
+      <!-- 7. Select Element -->
+      <IconButton
+        v-if="isSelectElementEnabled"
+        icon="select.png"
+        :alt="t('popup_select_element_alt_icon') || 'Select Element'"
+        :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
+        type="toolbar"
+        :active="isSelectModeActive"
+        :disabled="!isSelectElementSupported"
+        class="ti-btn-select"
+        @click="handleSelectElement"
+      />
+
+      <!-- 8. Open Sidepanel (rightmost; native listener attached on mount; More duplicate for narrow widths) -->
+      <IconButton
+        v-if="!IsMobile"
+        ref="sidePanelButton"
+        icon="side-panel.png"
+        :alt="t('popup_open_side_panel_title') || 'Open in side panel'"
+        :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
+        type="toolbar"
+        class="ti-btn-sidepanel ti-header-toolbar-button--narrow-hide"
+      />
+    </div>
   </div>
 </template>
 
