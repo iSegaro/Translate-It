@@ -15,29 +15,14 @@
   width: 100% !important;
   box-sizing: border-box !important;
   min-height: 52px !important;
-  gap: 8px !important;
-  
+  gap: 4px !important;
+
   // Force LTR and Row direction
   direction: ltr !important;
   flex-direction: row !important;
 
-  .ti-horizontal-action-scroller__track {
-    justify-content: flex-end;
-
-    .ti-switch { order: 1 !important; }
-    .ti-btn-subtitle { order: 2 !important; }
-    .ti-btn-pdf { order: 3 !important; }
-    .ti-btn-settings { order: 4 !important; }
-    .ti-btn-mouse-hover { order: 5 !important; }
-    .ti-btn-capture { order: 6 !important; }
-    .ti-btn-revert { order: 7 !important; }
-    .ti-btn-select { order: 8 !important; }
-    .ti-btn-sidepanel { order: 9 !important; }
-  }
-
   /* Toolbar Buttons Base Style */
-  .ti-toolbar-button,
-  .ti-horizontal-action-scroller__control {
+  .ti-toolbar-button {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -82,11 +67,19 @@
     }
   }
 
-  .ti-horizontal-action-scroller__control {
-    color: var(--color-text-secondary) !important;
+  /* More menu trigger: real ellipsis glyph (U+22EF), no icon asset */
+  .ti-btn-more {
+    font-size: 18px !important;
+    line-height: 1 !important;
+    color: var(--color-text, #212529) !important;
+    letter-spacing: 1px !important;
 
-    &:hover {
-      color: var(--color-text) !important;
+    span {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 22px !important;
+      height: 22px !important;
     }
   }
 
@@ -96,8 +89,7 @@
     background-color: #2d2d2d !important;
     border-bottom-color: #404040 !important;
 
-    .ti-toolbar-button:hover,
-    .ti-horizontal-action-scroller__control:hover {
+    .ti-toolbar-button:hover {
       background-color: #424242 !important;
     }
 
@@ -119,6 +111,10 @@
 
     .ti-toolbar-button:hover img {
       opacity: 1 !important;
+    }
+
+    .ti-btn-more {
+      color: var(--color-text, #e9ecef) !important;
     }
 
     /* Keep branded icons colorful */
@@ -172,6 +168,50 @@
   }
 }
 
+/* More menu items */
+.ti-header-menu-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  padding: 8px 12px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  color: var(--color-text) !important;
+  text-align: start !important;
+  white-space: nowrap !important;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #1976d2) !important;
+    outline-offset: -2px !important;
+  }
+
+  &.is-active {
+    color: var(--color-primary, #007bff) !important;
+  }
+
+  img {
+    width: 18px !important;
+    height: 18px !important;
+    object-fit: contain !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+.ti-header-menu-check {
+  width: 18px !important;
+  flex-shrink: 0 !important;
+  text-align: center !important;
+  font-weight: 700 !important;
+}
+
 // PageTranslationButton link
 .ti-header-toolbar .toolbar-link {
   font-size: 13px !important;
@@ -185,4 +225,42 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+}
+
+/* Breakpoint ownership (CSS-only responsive routing, no JS):
+   - Normal width (>380px): Mouse Hover, Screen Capture, Sidepanel render
+     as direct toolbar buttons; their More-menu duplicates
+     (.ti-header-menu-item--narrow-only / --very-narrow-only) stay hidden,
+     so More visually contains only Subtitle, PDF, Exclude.
+   - Narrow (<=380px): direct Capture + Sidepanel hide
+     (.ti-header-toolbar-button--narrow-hide); their More duplicates show.
+   - Very narrow (<=340px): direct Mouse Hover hides too; its More
+     duplicate shows.
+   An action is never visible in both places at the same width.
+   Priority (always visible first): view switcher > page translation
+   > select > settings > mouse hover > capture > sidepanel. */
+.ti-header-menu-item--narrow-only,
+.ti-header-menu-item--very-narrow-only {
+  display: none !important;
+}
+
+@media (max-width: 380px) {
+  .ti-header-toolbar .ti-btn-capture.ti-header-toolbar-button--narrow-hide,
+  .ti-header-toolbar .ti-btn-sidepanel.ti-header-toolbar-button--narrow-hide {
+    display: none !important;
+  }
+
+  .ti-header-menu-item--narrow-only {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 340px) {
+  .ti-header-toolbar .ti-btn-mouse-hover.ti-header-toolbar-button--narrow-hide {
+    display: none !important;
+  }
+
+  .ti-header-menu-item--very-narrow-only {
+    display: flex !important;
+  }
 }

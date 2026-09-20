@@ -11,12 +11,12 @@ vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
-    t: (key) => ({
+    t: (key, fallback) => ({
       live_dubbing_provider_bootstrap_gemini_error: 'Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again.',
       live_dubbing_provider_bootstrap_openai_error: 'Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again.',
       live_dubbing_provider_setup_failed_error: 'Unable to connect to the selected provider. Check your connection and configuration, then try again.',
       live_dubbing_offscreen_lost_error: 'Live Dubbing stopped unexpectedly. Start it again.'
-    }[key] || key)
+    }[key] || fallback || key)
   })
 }))
 
@@ -3034,6 +3034,102 @@ describe('LiveDubbingControl', () => {
     // pre-existing suite (Original Volume included) stays green. Verified by running
     // `vitest --config tests/vitest.config.js src/components/popup/LiveDubbingControl.test.js`
     // after adding this block.
+  })
+
+  describe('Phase 3 layout', () => {
+    it('shows Cleanup required while a retained session awaits cleanup', async () => {
+      // RUNNING with a retained session, then STOP fails at transport level:
+      // the session stays and the status text names the cleanup state
+      // (authoritativeStatus is null on this path, so state owns the label).
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          return Promise.resolve({ status: { status: 'RUNNING', sessionId: 'session-1', providerId: 'gemini' } })
+        }
+        if (action === 'STOP_LIVE_DUBBING') {
+          return Promise.reject(new Error('Background transport failed'))
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Running')
+
+      await wrapper.find('button[aria-label="Stop live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Cleanup required')
+      expect(wrapper.find('button[aria-label="Clean up live dubbing"]').exists()).toBe(true)
+    })
+
+    it('renders an inline explanation when start is unavailable', async () => {
+      sendMessage.mockResolvedValue({ success: false, error: 'LIVE_DUBBING_UNSUPPORTED' })
+
+      const wrapper = await mountAndFlush()
+
+      const explanation = wrapper.find('.ti-live-dubbing-control-unavailable')
+      expect(explanation.exists()).toBe(true)
+      expect(explanation.attributes('role')).toBe('status')
+      expect(explanation.text()).toBe('Live dubbing is not supported in this browser.')
+      // Same text is not duplicated in the error paragraph.
+      expect(wrapper.find('.ti-live-dubbing-control-error').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('prefers the unsupported explanation when the terminal outcome names it', async () => {
+      sendMessage.mockResolvedValue({
+        available: false,
+        terminalOutcome: { providerId: 'gemini', error: 'LIVE_DUBBING_UNSUPPORTED', occurredAt: Date.now() }
+      })
+
+      const wrapper = await mountAndFlush()
+
+      const explanation = wrapper.find('.ti-live-dubbing-control-unavailable')
+      expect(explanation.exists()).toBe(true)
+      expect(explanation.text()).toBe('Live dubbing is not supported in this browser.')
+      // The generic error paragraph (which applyStatus populated with
+      // "Live dubbing is unavailable.") must not also render here — the
+      // unavailable explanation supersedes it for this cause.
+      expect(wrapper.find('.ti-live-dubbing-control-error').exists()).toBe(false)
+    })
+
+    it('explains a generic terminal failure without blaming the browser', async () => {
+      sendMessage.mockResolvedValue({
+        available: false,
+        terminalOutcome: { providerId: 'gemini', error: 'LIVE_DUBBING_STATUS_FAILED', occurredAt: Date.now() }
+      })
+
+      const wrapper = await mountAndFlush()
+
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Unavailable')
+      expect(wrapper.text()).toContain('Live dubbing is unavailable.')
+      expect(wrapper.text()).not.toContain('not supported in this browser')
+      // The generic text renders once via the error paragraph; the
+      // unavailable paragraph stays hidden instead of duplicating it.
+      expect(wrapper.find('.ti-live-dubbing-control-unavailable').exists()).toBe(false)
+      expect(wrapper.find('.ti-live-dubbing-control-error').text()).toBe('Live dubbing is unavailable.')
+    })
+
+    it('does not duplicate the message when errorMessage already shows the cause', async () => {
+      sendMessage.mockRejectedValue(new Error('Status query failed'))
+
+      const wrapper = await mountAndFlush()
+
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Unavailable')
+      expect(wrapper.find('.ti-live-dubbing-control-error').text()).toBe('Status query failed')
+      expect(wrapper.find('.ti-live-dubbing-control-unavailable').exists()).toBe(false)
+      // Single occurrence across the whole control.
+      expect(wrapper.text().split('Status query failed')).toHaveLength(2)
+    })
+
+    it('no longer renders the static Live dubbing label', async () => {
+      const wrapper = await mountAndFlush()
+
+      expect(wrapper.find('#live-dubbing-label').exists()).toBe(false)
+      expect(wrapper.find('.ti-live-dubbing-control-label').exists()).toBe(false)
+      // The live status text still conveys context.
+      expect(wrapper.find('.ti-live-dubbing-control-status').exists()).toBe(true)
+    })
   })
 
 })

@@ -1,19 +1,69 @@
 <template>
   <section
     class="ti-live-dubbing-control"
-    aria-labelledby="live-dubbing-label"
+    aria-label="Live dubbing"
   >
-    <div class="ti-live-dubbing-control-copy">
-      <span
-        id="live-dubbing-label"
-        class="ti-live-dubbing-control-label"
-      >Live dubbing</span>
+    <!-- Section 1: Status + primary action row -->
+    <div class="ti-live-dubbing-control-action-row">
       <span
         class="ti-live-dubbing-control-status"
         aria-live="polite"
       >{{ statusText }}</span>
+
+      <LoadingSpinner
+        v-if="isTransitioning"
+        class="ti-live-dubbing-control-spinner"
+        size="xs"
+        aria-hidden="true"
+      />
+
+      <BaseButton
+        v-if="!isRunning && !isStopping"
+        size="sm"
+        :loading="isStarting"
+        :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
+        text="Start"
+        aria-label="Start live dubbing"
+        @click="start"
+      />
+      <BaseButton
+        v-if="isRunning || isStopping"
+        size="sm"
+        variant="danger"
+        :loading="isStopping"
+        :disabled="isStopping"
+        :text="isCleanupPending ? 'Clean up' : 'Stop'"
+        :aria-label="isCleanupPending ? 'Clean up live dubbing' : 'Stop live dubbing'"
+        @click="stop"
+      />
+      <BaseButton
+        v-if="isCleanupPending"
+        size="sm"
+        variant="danger"
+        text="Clean up"
+        aria-label="Clean up live dubbing"
+        @click="stop"
+      />
     </div>
 
+    <p
+      v-if="showUnavailableExplanation"
+      class="ti-live-dubbing-control-unavailable"
+      role="status"
+    >
+      {{ unavailableExplanation }}
+    </p>
+
+    <!-- Section 2: Status / error messages -->
+    <p
+      v-if="showErrorParagraph"
+      class="ti-live-dubbing-control-error"
+      role="alert"
+    >
+      {{ errorParagraphText }}
+    </p>
+
+    <!-- Section 3: Volume controls -->
     <div
       v-if="showVolumeControl"
       class="ti-live-dubbing-control-volumes"
@@ -62,49 +112,6 @@
         >{{ displayDubbedVolume != null ? displayDubbedVolume + '%' : '—' }}</span>
       </div>
     </div>
-
-    <LoadingSpinner
-      v-if="isTransitioning"
-      class="ti-live-dubbing-control-spinner"
-      size="xs"
-      aria-hidden="true"
-    />
-
-    <BaseButton
-      v-if="!isRunning && !isStopping"
-      size="sm"
-      :loading="isStarting"
-      :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
-      text="Start"
-      aria-label="Start live dubbing"
-      @click="start"
-    />
-    <BaseButton
-      v-if="isRunning || isStopping"
-      size="sm"
-      variant="danger"
-      :loading="isStopping"
-      :disabled="isStopping"
-      :text="isCleanupPending ? 'Clean up' : 'Stop'"
-      :aria-label="isCleanupPending ? 'Clean up live dubbing' : 'Stop live dubbing'"
-      @click="stop"
-    />
-    <BaseButton
-      v-if="isCleanupPending"
-      size="sm"
-      variant="danger"
-      text="Clean up"
-      aria-label="Clean up live dubbing"
-      @click="stop"
-    />
-
-    <p
-      v-if="errorMessage || (isIdle && terminalOutcome)"
-      class="ti-live-dubbing-control-error"
-      role="alert"
-    >
-      {{ errorMessage || getErrorMessage(terminalOutcome.error, 'Live dubbing failed.', terminalOutcome.providerId) }}
-    </p>
 
     <p
       v-if="volumeError"
@@ -217,7 +224,8 @@ const statusText = computed(() => ({
   RUNNING: 'Running',
   STOPPING: 'Stopping…',
   ERROR: 'Error',
-  unavailable: 'Unavailable'
+  unavailable: 'Unavailable',
+  cleanup: 'Cleanup required'
 }[authoritativeStatus.value || state.value] || 'Error'))
 
 const isVolumeControllable = computed(() =>
@@ -281,6 +289,46 @@ const nextOperationGeneration = () => {
   operationGeneration += 1
   return operationGeneration
 }
+
+// ── Unavailable-state explanation ──────────────────────────────────────────
+// `state === 'unavailable'` has two distinct causes: the browser genuinely
+// lacks the required APIs (LIVE_DUBBING_UNSUPPORTED), or a runtime /
+// status-query / transport failure. The explanation reflects the concrete
+// cause instead of always blaming the browser. The unavailable paragraph is
+// suppressed when the error paragraph already shows the identical text, so a
+// single failure never renders the same message twice.
+const isUnsupportedCause = computed(() =>
+  terminalOutcome.value?.error === 'LIVE_DUBBING_UNSUPPORTED'
+  || errorMessage.value === getErrorMessage('LIVE_DUBBING_UNSUPPORTED'))
+
+const unavailableExplanation = computed(() => {
+  if (!isUnavailable.value) return ''
+  if (isUnsupportedCause.value) return getErrorMessage('LIVE_DUBBING_UNSUPPORTED')
+  if (errorMessage.value) return errorMessage.value
+  if (terminalOutcome.value?.error) return getErrorMessage(terminalOutcome.value.error)
+  return t('live_dubbing_unavailable_generic', 'Live dubbing is currently unavailable.')
+})
+
+const errorParagraphText = computed(() => errorMessage.value
+  || (isIdle.value && terminalOutcome.value
+    ? getErrorMessage(terminalOutcome.value.error, 'Live dubbing failed.', terminalOutcome.value.providerId)
+    : ''))
+
+const showUnavailableExplanation = computed(() => isUnavailable.value
+  && !!unavailableExplanation.value
+  && (isUnsupportedCause.value || unavailableExplanation.value !== errorMessage.value))
+
+const showErrorParagraph = computed(() => {
+  if (!errorParagraphText.value) return false
+  // When the cause is genuinely unsupported, the unavailable paragraph carries
+  // the canonical explanation. Suppress the error paragraph entirely so the
+  // generic "Live dubbing is unavailable." (set by applyStatus) never bleeds
+  // through alongside it. Generic unavailable failures still dedupe via the
+  // same-text check below; other states are untouched.
+  if (isUnavailable.value && isUnsupportedCause.value) return false
+  if (showUnavailableExplanation.value && errorParagraphText.value === unavailableExplanation.value) return false
+  return true
+})
 
 const applyStatus = (response, { preserveSession = false, syncTerminalOutcome = false } = {}) => {
   const result = unwrap(response)
