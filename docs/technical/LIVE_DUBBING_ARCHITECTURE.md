@@ -105,6 +105,24 @@ previous behavior. The method then reads the StateStore snapshot only: it does
 not acquire/create a lease, create/reconcile an offscreen document, or join the
 START/STOP mutation queue.
 
+### Volume sliders
+
+The Live Dubbing control (`LiveDubbingControl.vue`) exposes two sliders:
+"Original Volume" with "Dubbed Volume" immediately below it. The UI range
+is `0..100`, mapped to the runtime `0..1` range (`* 100` for display,
+`/ 100` for input). Both sliders query runtime values via
+`GET_LIVE_DUBBING_*_VOLUME` on mount when an active controllable session
+exists, so reopening the Popup during a live session reflects actual
+runtime values rather than stored preferences. Updates are optimistic and
+throttled (~80 ms trailing timer, never reset), latest-input-wins. Each
+slider is independent — its own request-generation counter, throttle
+timer, recovery-in-progress flag, and `MAX_*_RECOVERY_DEPTH = 1` — so a
+pending Original SET never blocks a Dubbed SET and a failure on one lane
+never modifies the other lane's UI. Stale responses cannot overwrite newer
+UI state (generation plus fence snapshot); a lifecycle fence change resets
+both lanes and re-queries both. The component performs no manual
+persistence; preference persistence is backend-owned.
+
 ## Provider Setting
 
 - `LIVE_DUBBING_PROVIDER` is the canonical persisted provider selection and is
@@ -210,6 +228,17 @@ returned, stored, or logged.
 - The source graph terminates in a **zero-gain sink**, so captured tab
   audio stays inaudible while capture runs.
 - The pipeline never connects the raw stream to the destination.
+
+Original-audio monitoring reuses the captured stream without taking
+ownership of it. The monitor graph is captured tab stream →
+`OriginalAudioMonitor` → `GainNode` → `AudioContext.destination`, with a
+default volume of `0` (silence). The monitor is lazily created when the
+volume rises above `0`; an explicit `0` keeps an existing monitor alive
+but muted. Captured tracks stay Controller-owned — provider adapters
+never call `track.stop()` on capture tracks — and the monitor only
+borrows the stream from Controller pipeline state. `setVolume(v)` is
+finite-`0..1` validated and non-terminal; calls arriving before monitor
+creation are stored and applied at lazy start.
 
 ### Capture and runtime loss
 
@@ -426,6 +455,79 @@ dropped and counted as `outputSafetyDrops`), tracks underruns and
 underrun samples, and reports first-chunk acceptance back to the
 controller. Queue clearing on teardown is best effort before graph stop.
 
+## Runtime Volume Control
+
+Original and dubbed output levels are independently controllable at
+runtime without affecting lifecycle state. The offscreen session object is
+the runtime authority: `session.originalVolume` (default `0`) and
+`session.dubbedVolume` (default `1`), each settable from a runtime SET and
+from the PREPARE seed. A runtime SET arriving before its per-mode target
+exists (PCM engine not ready, OpenAI provider client not created) is
+stored on the session only, with no target mutation.
+
+- **Original.** `OriginalAudioMonitor` → `GainNode` → destination, default
+  `0`. See Capture for lazy creation and track ownership.
+- **Dubbed PCM (Gemini).** `PcmOutputPlayer` → `AudioWorkletNode` →
+  `GainNode` → destination, default `1`. The `GainNode` is created inside
+  `PcmOutputPlayer._start()` and `gain.value = volume` is applied before
+  connect/resume/pump, so the initial session value holds from graph
+  creation with no audible `1` window. Runtime `setVolume(v)` only mutates
+  the gain value; it does not rebuild the graph, reset queue/epoch/metrics/
+  backpressure, or touch the worklet. Teardown disconnects the `GainNode`
+  safely.
+- **Dubbed media-stream (OpenAI).** Remote WebRTC `MediaStream` →
+  `HTMLAudioElement`, with a single element reused across replacement
+  remote tracks. The latest `session.dubbedVolume` is seeded via
+  `client.setDubbedVolume(...)` before `client.connect(...)` runs, so
+  persisted startup preferences and pre-connect runtime SETs both reach the
+  first remote audio frame. Every remote-track handler assigns the latest
+  `dubbedVolume` to the existing (or freshly factory-created) element
+  before `element.play()`. Runtime `setDubbedVolume(v)` on an active
+  element propagates assignment failures through the strict-apply path to
+  the Controller without a provider terminal callback, WebRTC reconnect, or
+  `dispose()`. No `createPeerConnection`, `createOffer`, `addTrack`, or
+  `fetch` runs in the `setDubbedVolume` path.
+
+Public actions (UI → Background, Chrome-only, trusted-UI sender):
+
+- `SET_LIVE_DUBBING_ORIGINAL_VOLUME` / `GET_LIVE_DUBBING_ORIGINAL_VOLUME`
+- `SET_LIVE_DUBBING_DUBBED_VOLUME` / `GET_LIVE_DUBBING_DUBBED_VOLUME`
+
+Internal actions (Background → offscreen document):
+
+- `LIVE_DUBBING_SET_ORIGINAL_VOLUME` / `LIVE_DUBBING_GET_ORIGINAL_VOLUME`
+- `LIVE_DUBBING_SET_DUBBED_VOLUME` / `LIVE_DUBBING_GET_DUBBED_VOLUME`
+
+All four are fenced by exact `sessionId` + `providerId` + `eventSequence`.
+Controllable statuses for SET/GET are `PREPARING_CAPTURE` |
+`CONNECTING_PROVIDER` | `RUNNING` (plus internal `CAPTURING` on the
+offscreen Controller). SET and GET do not mutate `eventSequence`, change
+lifecycle state, restart anything, or publish terminal outcomes. SET is
+read-write; GET is read-only and returns
+`session.{original,dubbed}Volume`.
+
+GET is purely read-only and never touches any physical target: it returns
+the committed session value directly from the offscreen Controller's
+runtime state (`session.originalVolume` and `session.dubbedVolume`),
+which is authoritative for the active session. GET does not read from
+`LiveDubbingAudioEngine`, `OriginalAudioMonitor`, `PcmOutputPlayer`, or
+the provider client. Only SET applies volume to a physical target.
+
+Routing is by declared `audioMode`, not provider id, and applies to SET
+only. For Dubbed Volume: in PCM mode the Coordinator routes SET through
+the offscreen Controller to `session.audioEngine.setDubbedVolume(...)`;
+in media-stream mode it routes to
+`session.providerClient.setDubbedVolume(...)` (provider-owned). For
+Original Volume, SET is always routed through the audio engine's
+`OriginalAudioMonitor` path and is independent of the provider's
+declared `audioMode`.
+
+Non-terminal runtime failures are
+`LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE` and
+`LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE`: they reconcile/roll back to the
+last committed runtime value and never terminalize, stop, or restart the
+session.
+
 ## Lifecycle States
 
 Public descriptor states: `PREPARING_CAPTURE` → `CONNECTING_PROVIDER` →
@@ -433,6 +535,28 @@ Public descriptor states: `PREPARING_CAPTURE` → `CONNECTING_PROVIDER` →
 offscreen-internal state and is never exposed as public `RUNNING`.
 `STOPPING` blocks descriptor writes from any path except the owning
 terminal operation.
+
+### Shared Volume Preferences
+
+Volume preferences are two independent shared storage keys, not descriptor
+fields: `LIVE_DUBBING_ORIGINAL_VOLUME` (number `0..1`, default `0`) and
+`LIVE_DUBBING_DUBBED_VOLUME` (number `0..1`, default `1`).
+`sanitizeDescriptor` allowlists only `sessionId, tabId, providerId,
+targetLanguage, status, startedAt, lastError, eventSequence`, so initial
+volumes travel in the PREPARE message rather than the persisted
+descriptor. New sessions are seeded from a fresh `storage.getFresh` read;
+an immediate next START observes the newest accepted value even while
+persistence is still in-flight.
+
+Persistence is backend-owned; component UI never calls `storage.*`. Each
+kind has its own detached, non-blocking persistence queue
+(`_volumePreferenceWrites` / `_latestAcceptedOriginalVolume` and
+`_dubbedVolumePreferenceWrites` / `_latestAcceptedDubbedVolume`). A
+successful current non-superseded SET persists; a failed, stale, or
+superseded SET never persists. Storage failure is swallowed
+(non-terminal). The newest accepted value is the immediate next-START
+fallback (memory override layered over `storage.getFresh`); after
+successful persistence, fresh shared storage is authoritative again.
 
 ## Terminal Outcomes and UI Reopening
 
