@@ -3,6 +3,7 @@ import {
   createLiveDubbingCleanupDiagnostic,
   createDescriptor,
   createOriginalVolumeMessage,
+  createOriginalVolumeQueryMessage,
   createLiveDubbingProviderDiagnostic,
   createProviderBootstrapRequest,
   createProviderBootstrapResponse,
@@ -173,6 +174,30 @@ describe('live dubbing Stage 2 contracts', () => {
       }, volume)).toThrow();
     },
   );
+
+  it('builds an exact original-volume query message without a volume payload', () => {
+    const descriptor = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      targetLanguage: 'en',
+    };
+    const snapshot = { ...descriptor };
+
+    expect(createOriginalVolumeQueryMessage(descriptor)).toEqual({
+      target: 'offscreen',
+      action: LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+      },
+    });
+    expect(descriptor).toEqual(snapshot);
+    expect(LIVE_DUBBING_OFFSCREEN_ACTIONS).toContain(LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN);
+    expect(LIVE_DUBBING_OFFSCREEN_ACTIONS).not.toContain(LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME);
+  });
 
   it('sanitizes an OpenAI descriptor while retaining its immutable identity tuple', () => {
     const descriptor = sanitizeDescriptor({
@@ -719,6 +744,10 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(LIVE_DUBBING_ACTION_TIMEOUTS.STOP_LIVE_DUBBING).toBe(10_000);
     expect(LIVE_DUBBING_ACTION_TIMEOUTS.GET_LIVE_DUBBING_STATUS).toBe(5_000);
     expect(LIVE_DUBBING_ACTION_TIMEOUTS.SET_LIVE_DUBBING_ORIGINAL_VOLUME)
+      .toBe(LIVE_DUBBING_TIMEOUTS.STATUS);
+    expect(LIVE_DUBBING_ACTION_TIMEOUTS.GET_LIVE_DUBBING_ORIGINAL_VOLUME)
+      .toBe(LIVE_DUBBING_TIMEOUTS.STATUS);
+    expect(LIVE_DUBBING_ACTION_TIMEOUTS.LIVE_DUBBING_GET_ORIGINAL_VOLUME)
       .toBe(LIVE_DUBBING_TIMEOUTS.STATUS);
   });
 

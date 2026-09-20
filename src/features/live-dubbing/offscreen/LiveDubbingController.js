@@ -350,6 +350,7 @@ export class LiveDubbingController {
       || action === LIVE_DUBBING_ACTIONS.CONSUME
       || action === LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER
       || action === LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN
+      || action === LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN
       || action === LIVE_DUBBING_ACTIONS.STATUS
       || action === LIVE_DUBBING_ACTIONS.DISPOSE;
   }
@@ -384,6 +385,12 @@ export class LiveDubbingController {
           getMessageValue(message, 'volume'),
           getEventSequence(message),
         );
+      case LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN:
+        return this.getOriginalVolume(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
+          getEventSequence(message),
+        );
       case LIVE_DUBBING_ACTIONS.STATUS:
         return this.status(
           getMessageValue(message, 'sessionId'),
@@ -400,6 +407,47 @@ export class LiveDubbingController {
       default:
         return { success: false, error: 'LIVE_DUBBING_ACTION_UNSUPPORTED' };
     }
+  }
+
+  /**
+   * Read the committed original-audio gain without changing anything. The
+   * fencing matches the write path exactly; the audio engine is never
+   * touched, so no monitor is created, no gain changes, and no lifecycle,
+   * sequence, or terminal state moves.
+   */
+  getOriginalVolume(sessionId, providerId, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
+    if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
+
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
+      return this._sessionMismatch(sessionId, providerId, session);
+    }
+    if (session.eventSequence !== eventSequence) {
+      return this._sequenceMismatch(sessionId, session, providerId);
+    }
+    const allowedStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!allowedStatuses.includes(session.status)) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_UNAVAILABLE',
+      };
+    }
+
+    return {
+      success: true,
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      originalVolume: session.originalVolume,
+    };
   }
 
   /**

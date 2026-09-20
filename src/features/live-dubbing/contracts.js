@@ -804,6 +804,23 @@ export function createOriginalVolumeMessage(descriptor, volume) {
   };
 }
 
+/**
+ * Build the session-fenced original-audio volume query. Read-only: the
+ * descriptor identity and event sequence are the complete request fence,
+ * no volume is carried, and nothing is stored.
+ */
+export function createOriginalVolumeQueryMessage(descriptor) {
+  return {
+    target: 'offscreen',
+    action: LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN,
+    data: {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence,
+    },
+  };
+}
+
 export function isSuccessfulResponse(response) {
   return Boolean(response && response.success !== false);
 }

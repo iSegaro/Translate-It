@@ -14,6 +14,31 @@
       >{{ statusText }}</span>
     </div>
 
+    <div
+      v-if="showVolumeControl"
+      class="ti-live-dubbing-control-volume"
+    >
+      <label
+        class="ti-live-dubbing-control-volume-label"
+        for="ti-live-dubbing-volume"
+      >Original</label>
+      <input
+        id="ti-live-dubbing-volume"
+        type="range"
+        class="ti-live-dubbing-control-volume-slider"
+        min="0"
+        max="100"
+        step="1"
+        :value="displayVolume ?? 0"
+        :disabled="!isVolumeControllable || !volumeResolved"
+        @input="onVolumeInput"
+      >
+      <span
+        class="ti-live-dubbing-control-volume-value"
+        aria-live="polite"
+      >{{ displayVolume != null ? displayVolume + '%' : '—' }}</span>
+    </div>
+
     <LoadingSpinner
       v-if="isTransitioning"
       class="ti-live-dubbing-control-spinner"
@@ -55,6 +80,14 @@
       role="alert"
     >
       {{ errorMessage || getErrorMessage(terminalOutcome.error, 'Live dubbing failed.', terminalOutcome.providerId) }}
+    </p>
+
+    <p
+      v-if="volumeError"
+      class="ti-live-dubbing-control-volume-error"
+      role="status"
+    >
+      {{ volumeError }}
     </p>
   </section>
 </template>
@@ -102,6 +135,25 @@ const terminalOutcome = ref(null)
 let operationGeneration = 0
 let removeRuntimeListener = null
 
+// ── Volume state (local only, no Pinia/storage) ──────────────────────────────
+// desiredVolume: optimistic value the UI reflects, 0..1
+// confirmedVolume: last backend-confirmed value, 0..1 — rollback target
+// volumeResolved: true once the first queryOriginalVolume or sendVolume succeeds
+// pendingVolumeShot: immutable {fence, volume, generation} snapshot captured at user-input
+//   time for fence-scoped sends — prevents stale-session writes when the fence shifts
+//   between scheduling and executing.  generation is bumped at input time so that any
+//   older in-flight query/write is immediately invalidated when the user acts.
+const desiredVolume = ref(null)
+const confirmedVolume = ref(null)
+const volumeResolved = ref(false)
+const volumeError = ref('')
+let volumeRequestGeneration = 0
+let volumeThrottleTimer = null
+const VOLUME_THROTTLE_MS = 80
+let pendingVolumeShot = null
+const volumeRecoveryInProgress = ref(false)
+const MAX_VOLUME_RECOVERY_DEPTH = 1
+
 const isStarting = computed(() => state.value === 'starting')
 const isRunning = computed(() => state.value === 'running')
 const isStopping = computed(() => state.value === 'stopping')
@@ -121,6 +173,21 @@ const statusText = computed(() => ({
   ERROR: 'Error',
   unavailable: 'Unavailable'
 }[authoritativeStatus.value || state.value] || 'Error'))
+
+const isVolumeControllable = computed(() =>
+  ['PREPARING_CAPTURE', 'CONNECTING_PROVIDER', 'RUNNING'].includes(authoritativeStatus.value)
+    && !isStopping.value
+)
+const showVolumeControl = computed(() => isVolumeControllable.value && sessionId.value != null)
+const displayVolume = computed(() => {
+  if (!volumeResolved.value) return null
+  const v = desiredVolume.value ?? confirmedVolume.value
+  return Math.round(v * 100)
+})
+const volumeFence = computed(() => {
+  const d = sessionDescriptor.value
+  return d ? `${d.sessionId}|${d.providerId}|${d.eventSequence ?? ''}` : null
+})
 
 const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = sessionProviderId.value || props.providerId) => {
   if (error === 'LIVE_DUBBING_OFFSCREEN_LOST') {
@@ -203,21 +270,286 @@ const applyStatus = (response, { preserveSession = false, syncTerminalOutcome = 
     : ''
 }
 
+// ── Volume fencing helpers ────────────────────────────────────────────────────
+
+const nextVolumeGeneration = () => {
+  volumeRequestGeneration += 1
+  return volumeRequestGeneration
+}
+
+const resetVolumeState = () => {
+  nextVolumeGeneration()
+  if (volumeThrottleTimer != null) {
+    clearTimeout(volumeThrottleTimer)
+    volumeThrottleTimer = null
+  }
+  pendingVolumeShot = null
+  desiredVolume.value = null
+  confirmedVolume.value = null
+  volumeResolved.value = false
+  volumeError.value = ''
+}
+
+const isSessionMismatchError = (result) => result?.success === false && (
+  result.error === 'LIVE_DUBBING_SESSION_MISMATCH'
+  || result.error === 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH'
+  || result.error === 'LIVE_DUBBING_SESSION_UNAVAILABLE'
+)
+
+/** Snapshot the current session fence so sends scheduled for later can verify
+ *  the fence is still valid at execution time. */
+const captureCurrentFence = () => {
+  const d = sessionDescriptor.value
+  if (!d) return null
+  return { sessionId: d.sessionId, providerId: d.providerId, eventSequence: d.eventSequence }
+}
+
+/**
+ * Refresh lifecycle status for volume recovery without bumping the lifecycle
+ * generation counter.  Snapshots the current generation, sends a STATUS query,
+ * and discards the result if the generation changed during the round-trip.
+ * This prevents volume-mismatch recovery from invalidating in-flight
+ * START/STOP operations.
+ * @returns {boolean} true if the result was accepted (generation unchanged)
+ */
+const refreshLifecycleForVolume = async () => {
+  const generation = operationGeneration
+  try {
+    const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
+    if (generation !== operationGeneration) return false
+    applyStatus(response, { syncTerminalOutcome: true })
+    return true
+  } catch {
+    if (generation !== operationGeneration) return false
+    return false
+  }
+}
+
+/**
+ * Recover the runtime original-audio volume for the active session.
+ * Never assumes 0 — always queries the backend.
+ * @param {number} depth - recursion guard; 0 = first attempt, 1 = one retry
+ */
+const queryOriginalVolume = async (generation = nextVolumeGeneration(), depth = 0) => {
+  const descriptor = sessionDescriptor.value
+  if (!descriptor?.sessionId || !descriptor?.providerId) return
+
+  try {
+    const response = await sendMessage({
+      action: LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME,
+      data: {
+        sessionId: descriptor.sessionId,
+        providerId: descriptor.providerId,
+        eventSequence: descriptor.eventSequence
+      }
+    })
+    if (generation !== volumeRequestGeneration) return
+
+    const result = unwrap(response)
+
+    if (result.success === false) {
+      if (isSessionMismatchError(result)) {
+        if (volumeRecoveryInProgress.value) return
+        if (depth >= MAX_VOLUME_RECOVERY_DEPTH) return
+        volumeRecoveryInProgress.value = true
+        const recoveryGeneration = volumeRequestGeneration
+        const fenceBeforeRefresh = volumeFence.value
+        try {
+          const accepted = await refreshLifecycleForVolume()
+          if (recoveryGeneration !== volumeRequestGeneration) return
+          // If the exact fence changed during refresh, the watcher owns the
+          // new-fence read — do not retry here to avoid duplicate queries.
+          if (volumeFence.value !== fenceBeforeRefresh) return
+          if (accepted && isVolumeControllable.value && sessionId.value) {
+            void queryOriginalVolume(nextVolumeGeneration(), depth + 1)
+          }
+        } finally {
+          volumeRecoveryInProgress.value = false
+        }
+        return
+      }
+      // LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE and other non-mismatch errors:
+      // keep last-confirmed, show inline error — never terminal, never stop/cleanup
+      volumeError.value = 'Original audio unavailable'
+      return
+    }
+
+    if (typeof result.originalVolume === 'number'
+      && Number.isFinite(result.originalVolume)
+      && result.originalVolume >= 0
+      && result.originalVolume <= 1) {
+      confirmedVolume.value = result.originalVolume
+      desiredVolume.value = result.originalVolume
+      volumeError.value = ''
+      volumeResolved.value = true
+    }
+  } catch {
+    if (generation !== volumeRequestGeneration) return
+    // Transport failure: keep last-confirmed, silent — no toast, no terminal
+  }
+}
+
+/**
+ * Send a volume write to the backend with fencing.
+ * Success commits confirmedVolume; failure rolls back desiredVolume;
+ * superseded = non-error, no rollback, no error display.
+ * @param {number} depth - recursion guard; 0 = first attempt, 1 = one retry
+ */
+const sendVolume = async (depth = 0) => {
+  const shot = pendingVolumeShot
+  pendingVolumeShot = null
+  if (!shot?.fence?.sessionId || !shot.fence?.providerId) return
+
+  const { fence, volume, generation } = shot
+
+  // Pre-send fence check: skip if session shifted since input was captured
+  const current = sessionDescriptor.value
+  if (!current
+    || current.sessionId !== fence.sessionId
+    || current.providerId !== fence.providerId
+    || current.eventSequence !== fence.eventSequence) return
+
+  try {
+    const response = await sendMessage({
+      action: LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME,
+      data: {
+        sessionId: fence.sessionId,
+        providerId: fence.providerId,
+        eventSequence: fence.eventSequence,
+        volume
+      }
+    })
+    if (generation !== volumeRequestGeneration) return
+
+    const result = unwrap(response)
+
+    if (result.success === false) {
+      if (isSessionMismatchError(result)) {
+        if (volumeRecoveryInProgress.value) return
+        if (depth >= MAX_VOLUME_RECOVERY_DEPTH) return
+        volumeRecoveryInProgress.value = true
+        const recoveryGeneration = volumeRequestGeneration
+        const fenceBeforeRefresh = volumeFence.value
+        try {
+          const accepted = await refreshLifecycleForVolume()
+          if (recoveryGeneration !== volumeRequestGeneration) return
+          if (volumeFence.value !== fenceBeforeRefresh) return
+          if (accepted && isVolumeControllable.value && sessionId.value) {
+            void queryOriginalVolume(nextVolumeGeneration(), depth + 1)
+          }
+        } finally {
+          volumeRecoveryInProgress.value = false
+        }
+        return
+      }
+      if (result.error === 'LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE') {
+        desiredVolume.value = confirmedVolume.value
+        volumeError.value = 'Original audio unavailable'
+        return
+      }
+      // Unknown failure: rollback to last-confirmed
+      desiredVolume.value = confirmedVolume.value
+      return
+    }
+
+    // Superseded = latest-wins: non-error, no rollback, no commit, no error
+    if (result.ignored && result.superseded) return
+
+    // Success: commit confirmed
+    if (typeof result.originalVolume === 'number'
+      && Number.isFinite(result.originalVolume)
+      && result.originalVolume >= 0
+      && result.originalVolume <= 1) {
+      confirmedVolume.value = result.originalVolume
+      desiredVolume.value = result.originalVolume
+      volumeError.value = ''
+      volumeResolved.value = true
+    }
+  } catch {
+    if (generation !== volumeRequestGeneration) return
+    // Transport failure: rollback to last-confirmed
+    desiredVolume.value = confirmedVolume.value
+  }
+}
+
+/**
+ * Trailing throttle for volume input: fires at most once every VOLUME_THROTTLE_MS.
+ * Unlike debounce, it does NOT reset the timer on subsequent inputs — the first
+ * input starts the cycle, and the next input after the cycle starts a new one.
+ * This provides runtime updates during drag while bounding message frequency.
+ */
+const onVolumeInput = (event) => {
+  const raw = Number(event.target.value)
+  const clamped = Math.max(0, Math.min(100, raw))
+  desiredVolume.value = clamped / 100
+  volumeError.value = ''
+  const generation = nextVolumeGeneration()
+  const fence = captureCurrentFence()
+  if (fence) {
+    pendingVolumeShot = Object.freeze({ fence, volume: desiredVolume.value, generation })
+  }
+
+  // Trailing throttle: skip if a timer is already running
+  if (volumeThrottleTimer != null) return
+  volumeThrottleTimer = setTimeout(() => {
+    volumeThrottleTimer = null
+    void sendVolume()
+  }, VOLUME_THROTTLE_MS)
+}
+
+/**
+ * Flush any pending volume send synchronously (called on unmount).
+ * Only sends if the captured snapshot is still valid (current descriptor matches).
+ */
+const flushPendingVolumeSend = () => {
+  if (volumeThrottleTimer != null) {
+    clearTimeout(volumeThrottleTimer)
+    volumeThrottleTimer = null
+  }
+  if (pendingVolumeShot) {
+    const current = sessionDescriptor.value
+    const { fence } = pendingVolumeShot
+    const stillValid = current
+      && current.sessionId === fence.sessionId
+      && current.providerId === fence.providerId
+      && current.eventSequence === fence.eventSequence
+    if (stillValid && isVolumeControllable.value) {
+      void sendVolume()
+    } else {
+      pendingVolumeShot = null
+    }
+  }
+}
+
+// ── Lifecycle ────────────────────────────────────────────────────────────────
+
 const queryStatus = async (generation = nextOperationGeneration()) => {
+  const prevFence = volumeFence.value
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
     if (generation !== operationGeneration) return
     applyStatus(response, { syncTerminalOutcome: true })
+    // After status recovery, recover volume if controllable — independent round trip.
+    // The volumeFence watcher handles all fence transitions (active→active).
+    // Only the initial mount (null→active) is owned here, since the watcher
+    // skips the null→active transition.
+    if (isVolumeControllable.value && sessionId.value && prevFence === null) {
+      void queryOriginalVolume()
+    } else if (!isVolumeControllable.value || !sessionId.value) {
+      resetVolumeState()
+    }
   } catch (error) {
     if (generation !== operationGeneration) return
     state.value = 'unavailable'
     authoritativeStatus.value = null
     errorMessage.value = getErrorMessage(error?.message, 'Live dubbing is unavailable.')
+    resetVolumeState()
   }
 }
 
 const start = async () => {
   const generation = nextOperationGeneration()
+  const prevFence = volumeFence.value
   state.value = 'starting'
   errorMessage.value = ''
   try {
@@ -230,6 +562,13 @@ const start = async () => {
     if (state.value === 'idle') state.value = 'running'
     if (state.value === 'running' && !normalizeTerminalOutcome(unwrap(response).terminalOutcome)) {
       terminalOutcome.value = null
+    }
+    // Recover volume for the newly established controllable session.
+    // The volumeFence watcher skips the initial null→active transition, so
+    // START must own this recovery path.  For active→active (restart), the
+    // watcher handles it.
+    if (isVolumeControllable.value && sessionId.value && prevFence === null) {
+      void queryOriginalVolume()
     }
   } catch (error) {
     if (generation !== operationGeneration) return
@@ -249,6 +588,9 @@ const start = async () => {
 }
 
 const stop = async () => {
+  // Invalidate in-flight volume work immediately: cancel throttle timer,
+  // clear pending shot, bump generation so no old SET resolves after STOP.
+  resetVolumeState()
   const generation = nextOperationGeneration()
   state.value = 'stopping'
   errorMessage.value = ''
@@ -295,9 +637,25 @@ onMounted(() => {
 onUnmounted(() => {
   removeRuntimeListener?.()
   removeRuntimeListener = null
+  flushPendingVolumeSend()
 })
 
 watch(isBusy, (busy) => emit('busy-change', busy), { immediate: true })
+
+// Cancel pending volume sends and re-query when the session fence shifts
+// externally (e.g. background restart assigns a new sessionId).
+// Skip the initial mount transition (oldFence === null) — the first volume
+// query is owned by queryStatus (mount) or start() (START-from-idle).
+// The watcher always owns new-fence recovery, even when a mismatch recovery
+// is in progress.  resetVolumeState() bumps volumeRequestGeneration which
+// invalidates the old recovery's generation check, so no duplicate reads.
+watch(volumeFence, (newFence, oldFence) => {
+  if (oldFence === null) return
+  resetVolumeState()
+  if (isVolumeControllable.value && sessionId.value) {
+    void queryOriginalVolume()
+  }
+})
 
 // Parent owns target-language control; popup close intentionally sends no dubbing cleanup.
 </script>

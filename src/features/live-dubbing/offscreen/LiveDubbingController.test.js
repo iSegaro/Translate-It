@@ -569,6 +569,101 @@ describe('LiveDubbingController', () => {
     expect(controller.status()).not.toHaveProperty('originalVolume');
   });
 
+  it('reads the committed original volume without touching lifecycle or audio state', () => {
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+    expect(controller.setOriginalVolume('session-1', 'gemini', 0.4, 0)).toMatchObject({
+      success: true,
+      originalVolume: 0.4,
+    });
+    const session = controller.currentSession;
+    const audioEngine = {
+      setOriginalVolume: vi.fn().mockResolvedValue(0.4),
+      getReadiness: () => ({}),
+    };
+    session.audioEngine = audioEngine;
+    session.audioPathReady = true;
+    const before = {
+      eventSequence: session.eventSequence,
+      status: session.status,
+      providerGeneration: session.providerGeneration,
+      originalVolumeRequestToken: session.originalVolumeRequestToken,
+      terminalRequested: session.terminalRequested,
+      originalVolume: session.originalVolume,
+    };
+
+    expect(controller.handle({
+      action: LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0 },
+    })).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      originalVolume: 0.4,
+    });
+
+    expect(session).toMatchObject(before);
+    expect(audioEngine.setOriginalVolume).not.toHaveBeenCalled();
+    expect(controller.status()).not.toHaveProperty('originalVolume');
+  });
+
+  it('reads the default original volume as silence', () => {
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+
+    expect(controller.getOriginalVolume('session-1', 'gemini', 0)).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      originalVolume: 0,
+    });
+  });
+
+  it('rejects volume query fencing exactly like the write path', () => {
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+    const session = controller.currentSession;
+    const before = {
+      eventSequence: session.eventSequence,
+      status: session.status,
+      providerGeneration: session.providerGeneration,
+      originalVolume: session.originalVolume,
+    };
+
+    expect(controller.getOriginalVolume('other-session', 'gemini', 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      ignored: true,
+    });
+    expect(controller.getOriginalVolume('session-1', 'openai', 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      ignored: true,
+    });
+    expect(controller.getOriginalVolume('session-1', 'gemini', 1)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+      ignored: true,
+    });
+    expect(controller.getOriginalVolume('session-1', 'gemini', undefined)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+    });
+    expect(session).toMatchObject(before);
+
+    session.status = LIVE_DUBBING_STATUS.ERROR;
+    expect(controller.getOriginalVolume('session-1', 'gemini', 0)).toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_UNAVAILABLE',
+    });
+    expect(session.eventSequence).toBe(0);
+    expect(session.originalVolume).toBe(0);
+  });
+
   it.each([-1, 1.1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, '0.5', null])(
     'rejects invalid original volume %p without mutation', volume => {
       const controller = new LiveDubbingController();
