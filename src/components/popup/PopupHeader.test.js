@@ -94,7 +94,7 @@ vi.mock('@/components/shared/HorizontalActionScroller.vue', () => ({
 vi.mock('@/components/base/ToolbarMenu/ToolbarMenu.vue', () => ({
   default: {
     name: 'ToolbarMenu',
-    props: ['placement'],
+    props: ['placement', 'forcePopover'],
     setup() {
       const open = ref(false)
       const toggle = () => { open.value = !open.value }
@@ -192,41 +192,65 @@ describe('PopupHeader', () => {
 
     // Direct actions all live inside the actions group.
     const actions = wrapper.find('.ti-header-actions')
-    for (const selector of ['.ti-btn-more-menu', '.ti-btn-settings', '.ti-btn-mouse-hover', '.ti-btn-capture', '.ti-btn-select', '.ti-btn-sidepanel']) {
+    for (const selector of ['.ti-btn-more-menu', '.ti-btn-settings', '.ti-btn-mouse-hover', '.ti-btn-capture', '.ti-select-split', '.ti-btn-sidepanel']) {
       expect(actions.find(selector).exists()).toBe(true)
     }
+    // Revert is now inside the select-split ToolbarMenu, not a sibling in the actions group.
     expect(actions.find('.ti-btn-revert').exists()).toBe(false)
   })
 
-  it('orders actions More → Settings → Hover → Capture → Select → Sidepanel', async () => {
+  it('orders actions More → Settings → Hover → Capture → SelectSplit → Sidepanel', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    // Revert is contextual (hidden); the rest keep a stable DOM order.
+    // Select + Revert are now a single split-control ToolbarMenu in the DOM order.
     expect([...wrapper.find('.ti-header-actions').element.children].map((element) => element.className)).toEqual([
       'toolbar-menu-stub ti-btn-more-menu',
       'ti-toolbar-button ti-btn-settings',
       'ti-toolbar-button ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide',
       'ti-toolbar-button ti-btn-capture ti-header-toolbar-button--narrow-hide',
-      'ti-toolbar-button ti-btn-select',
+      'toolbar-menu-stub ti-btn-select-split-menu',
       'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide'
     ])
   })
 
-  it('keeps action order stable with Revert between Capture and Select', async () => {
+  it('keeps the split-control order stable regardless of select mode state', async () => {
     mockSelectModeHolder.ref.value = true
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
+    // Revert is always inside the menu; not a contextual sibling any more.
     expect([...wrapper.find('.ti-header-actions').element.children].map((element) => element.className)).toEqual([
       'toolbar-menu-stub ti-btn-more-menu',
       'ti-toolbar-button ti-btn-settings',
       'ti-toolbar-button ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide',
       'ti-toolbar-button ti-btn-capture ti-header-toolbar-button--narrow-hide',
-      'ti-toolbar-button ti-btn-revert',
-      'ti-toolbar-button ti-btn-select',
+      'toolbar-menu-stub ti-btn-select-split-menu',
       'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide'
     ])
+  })
+
+  it('passes force-popover to both PopupHeader ToolbarMenus (popup is narrower than 750px)', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const menus = wrapper.findAllComponents({ name: 'ToolbarMenu' })
+    expect(menus).toHaveLength(2)
+    for (const menu of menus) {
+      expect(menu.props('forcePopover')).toBe(true)
+    }
+  })
+
+  it('mirrors select-mode active state to the chevron half', async () => {
+    const idle = mount(PopupHeader)
+    await idle.vm.$nextTick()
+    expect(idle.find('.ti-btn-select-chevron').classes()).not.toContain('ti-active')
+
+    mockSelectModeHolder.ref.value = true
+    const active = mount(PopupHeader)
+    await active.vm.$nextTick()
+    expect(active.find('.ti-btn-select').classes()).toContain('ti-active')
+    expect(active.find('.ti-btn-select-chevron').classes()).toContain('ti-active')
   })
 
   it('renders the More trigger as a normal toolbar button with an ellipsis glyph', async () => {
@@ -252,16 +276,32 @@ describe('PopupHeader', () => {
     expect(pageButton.props('showAutoTranslateToggle')).toBe(true)
   })
 
-  it('shows the revert button only while select mode is active', async () => {
-    const hidden = mount(PopupHeader)
-    await hidden.vm.$nextTick()
-    expect(hidden.find('.ti-btn-revert').exists()).toBe(false)
+  it('makes Revert available in the split menu whenever Select Element is enabled', async () => {
+    // Idle: split is rendered, menu closed, Revert is reachable through the chevron.
+    const idle = mount(PopupHeader)
+    await idle.vm.$nextTick()
+    expect(idle.find('.ti-btn-select').exists()).toBe(true)
+    expect(idle.find('.ti-btn-select-chevron').exists()).toBe(true)
+    expect(idle.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(false)
 
-    mockSelectModeHolder.ref.value = true
-    const shown = mount(PopupHeader)
-    await shown.vm.$nextTick()
-    expect(shown.find('.ti-btn-select').exists()).toBe(true)
-    expect(shown.find('.ti-btn-revert').exists()).toBe(true)
+    await idle.find('.ti-btn-select-chevron').trigger('click')
+    await idle.vm.$nextTick()
+    expect(idle.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(true)
+    const items = idle.findAll('.ti-btn-select-split-menu [role="menuitem"]')
+    expect(items).toHaveLength(1)
+    expect(items[0].text()).toContain('Revert')
+  })
+
+  it('opens the split menu via chevron click without activating Select Element', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.ti-btn-select-chevron').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(true)
+    expect(mockToggleSelectElement).not.toHaveBeenCalled()
+    expect(closePopup).not.toHaveBeenCalled()
   })
 
   it('opens the More menu with Subtitle, PDF, Exclude plus narrow-only duplicates', async () => {
@@ -467,7 +507,9 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
+    expect(wrapper.find('.ti-btn-select-split-menu').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-select').exists()).toBe(false)
+    expect(wrapper.find('.ti-btn-select-chevron').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-revert').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-capture').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-mouse-hover').exists()).toBe(true)
@@ -507,23 +549,31 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader, { props: { targetLanguage: 'fa', provider: 'google' } })
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('.ti-btn-select').trigger('click')
+    await wrapper.find('.ti-select-split .ti-btn-select').trigger('click')
 
     expect(mockToggleSelectElement).toHaveBeenCalledWith({ targetLanguage: 'fa', provider: 'google' })
     expect(closePopup).toHaveBeenCalled()
   })
 
-  it('sends a revert request from the contextual revert button', async () => {
+  it('sends a revert request from the split-menu revert item', async () => {
     mockSendMessage.mockResolvedValue({ success: true })
-    mockSelectModeHolder.ref.value = true
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('.ti-btn-revert').trigger('click')
+    // Open the split menu via chevron, then click Revert.
+    await wrapper.find('.ti-btn-select-chevron').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const splitPanel = wrapper.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub')
+    expect(splitPanel.exists()).toBe(true)
+
+    await splitPanel.find('[role="menuitem"]').trigger('click')
     await flushPromises()
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE
     }))
+    // Menu closes after the action.
+    expect(wrapper.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(false)
   })
 })

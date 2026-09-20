@@ -25,6 +25,7 @@
       Screen Capture, Sidepanel as narrow-only duplicates (see SCSS) -->
       <ToolbarMenu
         placement="end"
+        force-popover
         class="ti-btn-more-menu"
       >
         <template #trigger="{ triggerAttrs, triggerRef, onToggle }">
@@ -161,30 +162,69 @@
         @click="handleScreenCapture"
       />
 
-      <!-- 6. Revert (contextual: only while select-element mode is active) -->
-      <IconButton
-        v-if="isSelectElementEnabled && isSelectModeActive"
-        icon="revert.png"
-        :alt="t('popup_revert_alt_icon') || 'Revert'"
-        :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
-        type="toolbar"
-        variant="revert"
-        class="ti-btn-revert"
-        @click="handleRevert"
-      />
-
-      <!-- 7. Select Element -->
-      <IconButton
+      <!-- 6. Select Element split control: main activates Select Element;
+           chevron opens a menu containing the Revert action. -->
+      <ToolbarMenu
         v-if="isSelectElementEnabled"
-        icon="select.png"
-        :alt="t('popup_select_element_alt_icon') || 'Select Element'"
-        :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
-        type="toolbar"
-        :active="isSelectModeActive"
-        :disabled="!isSelectElementSupported"
-        class="ti-btn-select"
-        @click="handleSelectElement"
-      />
+        placement="end"
+        force-popover
+        class="ti-btn-select-split-menu"
+      >
+        <template #trigger="{ triggerAttrs, triggerRef, toggle }">
+          <div class="ti-select-split">
+            <button
+              type="button"
+              class="ti-toolbar-button ti-btn-select"
+              :class="{ 'ti-active': isSelectModeActive }"
+              :title="!isSelectElementSupported
+                ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند')
+                : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
+              :disabled="!isSelectElementSupported"
+              :aria-pressed="isSelectModeActive"
+              @click="handleSelectElement"
+            >
+              <img
+                :src="menuIcon('select.png')"
+                :alt="t('popup_select_element_alt_icon') || 'Select Element'"
+                class="ti-toolbar-icon"
+              >
+            </button>
+            <button
+              type="button"
+              class="ti-toolbar-button ti-btn-select-chevron"
+              :class="{ 'ti-active': isSelectModeActive }"
+              :title="t('popup_select_element_options_title') || 'Select Element options'"
+              v-bind="triggerAttrs"
+              :ref="(el) => triggerRef(el)"
+              :aria-label="t('popup_select_element_options_title') || 'Select Element options'"
+              @click="toggle"
+            >
+              <img
+                :src="menuIcon('dropdown-arrow.svg')"
+                alt=""
+                class="ti-toolbar-icon ti-chevron-icon"
+                aria-hidden="true"
+              >
+            </button>
+          </div>
+        </template>
+        <template #default="{ close }">
+          <button
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item"
+            :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
+            @click="close(); handleRevert()"
+          >
+            <img
+              :src="menuIcon('revert.png')"
+              alt=""
+              aria-hidden="true"
+            >
+            <span>{{ t('popup_revert_alt_icon') || 'Revert' }}</span>
+          </button>
+        </template>
+      </ToolbarMenu>
 
       <!-- 8. Open Sidepanel (rightmost; native listener attached on mount; More duplicate for narrow widths) -->
       <IconButton

@@ -30,12 +30,15 @@
   overflow: hidden;
 }
 
-/* Header section remains visible during scroll */
+/* Header section remains visible during scroll.
+   `.sticky-header` is the outer stacking-context owner (`position: sticky`
+   forms one), so the dropdown layer token lives here — this lets the
+   anchored ToolbarMenu panel (inside) overlay all Popup content below. */
 .sticky-header {
   flex-shrink: 0;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: var(--ti-z-dropdown);
   background: var(--bg-color);
   border-bottom: 1px solid var(--header-border-color);
 }

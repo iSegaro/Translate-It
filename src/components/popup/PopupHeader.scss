@@ -85,8 +85,53 @@
     }
   }
 
-  /* More menu trigger: real ellipsis glyph (U+22EF), no icon asset */
-  .ti-btn-more {
+/* Select Element split control: main button activates Select Element;
+   chevron button opens a ToolbarMenu with the Revert action. */
+.ti-select-split {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.ti-select-split .ti-btn-select,
+.ti-select-split .ti-btn-select-chevron {
+  margin: 0 !important;
+  border-radius: 0 !important;
+  height: 24px;
+}
+
+.ti-select-split .ti-btn-select {
+  padding-inline-end: 4px !important;
+}
+
+.ti-select-split .ti-btn-select-chevron {
+  padding-inline-start: 2px !important;
+  padding-inline-end: 4px !important;
+  width: 18px;
+  border-inline-start: 1px solid var(--header-border-color, transparent) !important;
+}
+
+.ti-select-split:hover .ti-btn-select,
+.ti-select-split:hover .ti-btn-select-chevron {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+  transform: translateY(-1px) !important;
+}
+
+.ti-select-split .ti-btn-select.ti-active,
+.ti-select-split .ti-btn-select-chevron.ti-active {
+  background-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+.ti-select-split .ti-btn-select-chevron .ti-chevron-icon {
+  width: 12px !important;
+  height: 12px !important;
+  opacity: 0.8;
+}
+
+/* More menu trigger: real ellipsis glyph (U+22EF), no icon asset */
+.ti-btn-more {
     font-size: 18px !important;
     line-height: 1 !important;
     color: var(--color-text, #212529) !important;
@@ -100,6 +145,15 @@
       height: 22px !important;
     }
   }
+
+/* Popup menu panels: opaque surface so stacked content (e.g. the language
+   toolbar) is not visible through them. Scoped to the Popup menus only —
+   ToolbarMenu global defaults remain transparent for other consumers. */
+.ti-btn-more-menu,
+.ti-btn-select-split-menu {
+  --tm-panel-background: var(--bg-color);
+  --tm-panel-border: 1px solid var(--header-border-color);
+}
 
   /* Specific Dark Mode overrides */
   @at-root :global(.ti-dark-mode) &, 
@@ -133,6 +187,22 @@
 
     .ti-btn-more {
       color: var(--color-text, #e9ecef) !important;
+    }
+
+    .ti-select-split .ti-btn-select-chevron {
+      border-inline-start-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .ti-select-split:hover .ti-btn-select,
+    .ti-select-split:hover .ti-btn-select-chevron {
+      background-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    .ti-select-split .ti-btn-select.ti-active,
+    .ti-select-split .ti-btn-select-chevron.ti-active {
+      background-color: rgba(255, 255, 255, 0.12) !important;
+    }
+    .ti-btn-select-chevron img {
+      filter: brightness(0) invert(1) !important;
+      opacity: 0.8 !important;
     }
 
     /* Keep branded icons colorful */

@@ -167,6 +167,55 @@ describe('ToolbarMenu', () => {
     wrapper.unmount()
   })
 
+  it('forcePopover keeps the popover at narrow viewport widths (no drawer, no mobile backdrop)', async () => {
+    stubMatchMedia(true)
+    const wrapper = mount(ToolbarMenu, {
+      attachTo: document.body,
+      props: { forcePopover: true },
+      global: {
+        provide: {
+          [OVERLAY_ROOT_KEY]: ref(null)
+        }
+      },
+      slots: {
+        trigger: `
+          <template #trigger="slotProps">
+            <button
+              class="test-trigger"
+              v-bind="slotProps.triggerAttrs"
+              :ref="(el) => slotProps.triggerRef(el)"
+              @click="slotProps.onToggle"
+            >More</button>
+          </template>
+        `,
+        default: '<button class="menu-item-a">A</button>'
+      }
+    })
+
+    // Root carries the force-popover class so the SCSS can scope out
+    // the mobile drawer + mobile fullscreen backdrop rules.
+    expect(wrapper.classes()).toContain('toolbar-menu--force-popover')
+
+    await wrapper.find('.test-trigger').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // Anchored popover panel exists.
+    expect(wrapper.find('.toolbar-menu__panel').exists()).toBe(true)
+    expect(wrapper.find('.toolbar-menu__panel').attributes('role')).toBe('menu')
+
+    // No mobile drawer branch.
+    expect(wrapper.find('.toolbar-menu__drawer').exists()).toBe(false)
+    expect(document.body.querySelector('.toolbar-menu__drawer')).toBeNull()
+
+    // No mobile fullscreen backdrop on the body — the popover branch
+    // renders the desktop backdrop inline, not teleported.
+    const allBackdrops = document.body.querySelectorAll('.toolbar-menu__backdrop')
+    expect(allBackdrops).toHaveLength(1)
+    expect(wrapper.element.contains(allBackdrops[0])).toBe(true)
+
+    wrapper.unmount()
+  })
+
   it('removes document listeners on unmount without leaking handlers', () => {
     const addSpy = vi.spyOn(document, 'addEventListener')
     const removeSpy = vi.spyOn(document, 'removeEventListener')

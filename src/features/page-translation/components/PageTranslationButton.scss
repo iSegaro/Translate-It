@@ -166,6 +166,15 @@
   opacity: 1 !important;
 }
 
+/* When the compact wrapper is hovered or focused, keep the BaseButton's
+   ghost-hover background active (matches the ti-toolbar-button-minimal
+   mixin token). The Auto-Translate star is positioned absolutely inside
+   the wrapper, so hovering it triggers .compact-wrapper:hover. */
+.compact-wrapper:hover .is-compact-icon:not(.ti-btn--disabled),
+.compact-wrapper:focus-within .is-compact-icon:not(.ti-btn--disabled) {
+  background-color: var(--color-background-hover) !important;
+}
+
 /* Compact Icon Style (Unification) */
 .is-compact-icon {
   @include ti-toolbar-button-minimal;
