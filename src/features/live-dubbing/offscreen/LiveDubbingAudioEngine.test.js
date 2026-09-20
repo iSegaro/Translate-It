@@ -42,15 +42,18 @@ function createInputContext() {
 function createOutputContext() {
   const port = createPort();
   const node = { connect: vi.fn(), disconnect: vi.fn(), port };
+  const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } };
   return {
     context: {
       sampleRate: OUTPUT_SAMPLE_RATE,
       destination: {},
       audioWorklet: { addModule: vi.fn(async () => {}) },
+      createGain: vi.fn(() => gainNode),
       resume: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     },
     node,
+    gainNode,
   };
 }
 
@@ -68,6 +71,8 @@ function createDouble(overrides = {}) {
     clear: vi.fn(),
     enqueuePcm16: vi.fn(() => ({ accepted: true })),
     resetEpoch: vi.fn(),
+    setVolume: vi.fn(),
+    getVolume: vi.fn(() => 1),
     ...overrides,
   };
 }
@@ -127,7 +132,8 @@ describe('LiveDubbingAudioEngine', () => {
     expect(engine.outputPlayer).toBeInstanceOf(PcmOutputPlayer);
     expect(engine.inputPipeline.stopStreamOnCleanup).toBe(false);
     expect(input.source.connect).toHaveBeenCalledWith(input.node);
-    expect(output.node.connect).toHaveBeenCalledWith(output.context.destination);
+    expect(output.node.connect).toHaveBeenCalledWith(output.gainNode);
+    expect(output.gainNode.connect).toHaveBeenCalledWith(output.context.destination);
 
     await engine.stop();
     expect(input.context.close).toHaveBeenCalledOnce();
@@ -1378,5 +1384,117 @@ describe('LiveDubbingAudioEngine', () => {
     expect(callbacks.onError).toHaveBeenCalledTimes(2);
     expect(callbacks.onMetrics).toHaveBeenCalledWith({ queuedSamples: 2 });
     expect(callbacks.onPlaybackAccepted).toHaveBeenCalledWith({ accepted: true, sampleCount: 2 });
+  });
+
+  it('defaults dubbed volume to full gain', () => {
+    const engine = new LiveDubbingAudioEngine({ audioMode: LIVE_DUBBING_AUDIO_MODES.PCM });
+
+    expect(engine.getDubbedVolume()).toBe(1);
+  });
+
+  it('delegates runtime dubbed volume to the active player without recreation', async () => {
+    const output = createDouble();
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: output,
+    });
+    await engine.start(createStream());
+    expect(output.setVolume).toHaveBeenCalledWith(1);
+    expect(output.start).toHaveBeenCalledOnce();
+    output.setVolume.mockClear();
+
+    expect(engine.setDubbedVolume(0.5)).toBe(0.5);
+
+    expect(output.setVolume).toHaveBeenCalledWith(0.5);
+    expect(output.setVolume).toHaveBeenCalledOnce();
+    expect(output.start).toHaveBeenCalledOnce();
+    expect(engine.getDubbedVolume()).toBe(0.5);
+    await engine.stop();
+  });
+
+  it('applies a pre-start dubbed volume to a factory-created player', async () => {
+    const output = createDouble();
+    const outputPlayerFactory = vi.fn(() => output);
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayerFactory,
+    });
+
+    expect(engine.setDubbedVolume(0.3)).toBe(0.3);
+
+    await engine.start(createStream());
+
+    expect(outputPlayerFactory).toHaveBeenCalledOnce();
+    expect(output.setVolume).toHaveBeenCalledWith(0.3);
+    expect(engine.getDubbedVolume()).toBe(0.3);
+    await engine.stop();
+  });
+
+  it('applies a pre-start dubbed volume to real PCM gain before playback', async () => {
+    const fake = createOutputContext();
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: player,
+    });
+
+    engine.setDubbedVolume(0.4);
+    await engine.start(createStream());
+
+    expect(player.getVolume()).toBe(0.4);
+    expect(fake.gainNode.gain.value).toBe(0.4);
+    expect(fake.node.connect).toHaveBeenCalledWith(fake.gainNode);
+    await engine.stop();
+  });
+
+  it('rejects invalid dubbed volumes without touching the player', async () => {
+    const output = createDouble();
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: output,
+    });
+    await engine.start(createStream());
+    output.setVolume.mockClear();
+
+    for (const volume of [-1, 2, Number.NaN, Number.POSITIVE_INFINITY, '0.5', null, {}]) {
+      expect(() => engine.setDubbedVolume(volume)).toThrow(RangeError);
+    }
+    expect(output.setVolume).not.toHaveBeenCalled();
+    expect(engine.getDubbedVolume()).toBe(1);
+    expect(() => new LiveDubbingAudioEngine({ dubbedVolume: 2 }))
+      .toThrow(RangeError);
+    await engine.stop();
+  });
+
+  it('leaves original volume and monitor untouched by dubbed changes', async () => {
+    const monitorFactory = vi.fn(() => createMonitorDouble());
+    const output = createDouble();
+    const engine = new LiveDubbingAudioEngine({
+      audioMode: LIVE_DUBBING_AUDIO_MODES.PCM,
+      inputPipeline: createDouble(),
+      outputPlayer: output,
+      originalAudioMonitorFactory: monitorFactory,
+    });
+    await engine.start(createStream());
+
+    engine.setDubbedVolume(0.5);
+
+    expect(engine.getDubbedVolume()).toBe(0.5);
+    expect(engine.getOriginalVolume()).toBe(0);
+    expect(monitorFactory).not.toHaveBeenCalled();
+    expect(engine.originalAudioMonitor).toBeNull();
+
+    await engine.setOriginalVolume(0.4);
+
+    expect(engine.getOriginalVolume()).toBe(0.4);
+    expect(engine.getDubbedVolume()).toBe(0.5);
+    await engine.stop();
   });
 });

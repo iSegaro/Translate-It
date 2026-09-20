@@ -209,6 +209,13 @@ function isOriginalVolume(value) {
     && value <= 1;
 }
 
+function isDubbedVolume(value) {
+  return typeof value === 'number'
+    && Number.isFinite(value)
+    && value >= 0
+    && value <= 1;
+}
+
 function getEventSequence(message) {
   const value = getMessageValue(message, 'eventSequence');
   return isEventSequence(value) ? value : undefined;
@@ -352,6 +359,8 @@ export class LiveDubbingController {
       || action === LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER
       || action === LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN
       || action === LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN
+      || action === LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN
+      || action === LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN
       || action === LIVE_DUBBING_ACTIONS.STATUS
       || action === LIVE_DUBBING_ACTIONS.DISPOSE;
   }
@@ -392,6 +401,19 @@ export class LiveDubbingController {
         );
       case LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN:
         return this.getOriginalVolume(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
+          getEventSequence(message),
+        );
+      case LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN:
+        return this.setDubbedVolume(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
+          getMessageValue(message, 'volume'),
+          getEventSequence(message),
+        );
+      case LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN:
+        return this.getDubbedVolume(
           getMessageValue(message, 'sessionId'),
           getMessageValue(message, 'providerId'),
           getEventSequence(message),
@@ -570,6 +592,170 @@ export class LiveDubbingController {
       });
   }
 
+  /**
+   * Read the committed dubbed-audio gain without changing anything. The
+   * fencing matches the write path exactly; no audio target is touched, so
+   * no gain changes and no lifecycle, sequence, or terminal state moves.
+   * GET is read-only and returns `session.dubbedVolume`.
+   */
+  getDubbedVolume(sessionId, providerId, eventSequence = undefined) {
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
+    if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
+
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
+      return this._sessionMismatch(sessionId, providerId, session);
+    }
+    if (session.eventSequence !== eventSequence) {
+      return this._sequenceMismatch(sessionId, session, providerId);
+    }
+    const allowedStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!allowedStatuses.includes(session.status)) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_UNAVAILABLE',
+      };
+    }
+
+    return {
+      success: true,
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      dubbedVolume: session.dubbedVolume,
+    };
+  }
+
+  /**
+   * Apply a runtime dubbed-audio gain without changing the lifecycle fence.
+   * The value lives only on the offscreen session and is committed after the
+   * active per-mode target accepts it, so late target work cannot update a
+   * replacement. The session value stays authoritative: a current-request
+   * target failure reconciles the target back to the committed value, while
+   * superseded requests never roll the target back. While the target does not
+   * exist the command is pre-target: it only stores the session value and
+   * never calls the target. Routing is by declared audio mode — PCM targets
+   * the local audio engine, media-stream targets the provider client.
+   */
+  setDubbedVolume(sessionId, providerId, volume, eventSequence = undefined) {
+    if (!isDubbedVolume(volume)) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_DUBBED_VOLUME_INVALID',
+      };
+    }
+    const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
+    if (sequenceError) return sequenceError;
+    if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
+
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId) {
+      return this._sessionMismatch(sessionId, providerId, session);
+    }
+    if (session.eventSequence !== eventSequence) {
+      return this._sequenceMismatch(sessionId, session, providerId);
+    }
+    const allowedStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_INTERNAL_STATUS.CAPTURING,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!allowedStatuses.includes(session.status)) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_SESSION_UNAVAILABLE',
+      };
+    }
+
+    const requestToken = ++session.dubbedVolumeRequestToken;
+    const committedVolume = session.dubbedVolume;
+    const isMediaStream = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM;
+    // While the dubbed target does not exist, volume is pre-target state
+    // only: store it and never touch the target, so a pending startup cannot
+    // observe a mutated target volume. PCM requires the core audio path to be
+    // ready; media-stream requires the provider client to exist.
+    if (isMediaStream) {
+      if (!session.providerClient) {
+        session.dubbedVolume = volume;
+        return this._dubbedVolumeResponse(session);
+      }
+    } else if (!session.audioEngine || session.audioPathReady !== true) {
+      session.dubbedVolume = volume;
+      return this._dubbedVolumeResponse(session);
+    }
+
+    const target = isMediaStream ? session.providerClient : session.audioEngine;
+    return Promise.resolve()
+      .then(() => target.setDubbedVolume(volume))
+      .then(() => {
+        if (!this._isCurrentDubbedVolumeRequest(
+          session,
+          sessionId,
+          providerId,
+          eventSequence,
+          requestToken,
+        )) {
+          return this._staleDubbedVolumeResponse(
+            session,
+            sessionId,
+            providerId,
+            eventSequence,
+            requestToken,
+          );
+        }
+        session.dubbedVolume = volume;
+        return this._dubbedVolumeResponse(session);
+      })
+      .catch(async () => {
+        if (!this._isCurrentDubbedVolumeRequest(
+          session,
+          sessionId,
+          providerId,
+          eventSequence,
+          requestToken,
+        )) {
+          return this._staleDubbedVolumeResponse(
+            session,
+            sessionId,
+            providerId,
+            eventSequence,
+            requestToken,
+          );
+        }
+        if (committedVolume !== volume) {
+          try {
+            if (this._isCurrentDubbedVolumeRequest(
+              session,
+              sessionId,
+              providerId,
+              eventSequence,
+              requestToken,
+            )) {
+              await target.setDubbedVolume(committedVolume);
+            }
+          } catch {
+            // Reconciliation is best effort and never terminalizes or cleans up.
+          }
+        }
+        return {
+          success: false,
+          error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE',
+          sessionId,
+          providerId,
+          eventSequence: session.eventSequence,
+          status: session.status,
+        };
+      });
+  }
+
   prepare(sessionId, providerId, targetLanguage = null, eventSequence = undefined, initialVolumes = {}) {
     // Runtime-only volume authorities seeded from persisted preferences
     // carried by the PREPARE message. Validated here; malformed values fall
@@ -717,6 +903,7 @@ export class LiveDubbingController {
         originalVolume: initialOriginalVolume,
         originalVolumeRequestToken: 0,
         dubbedVolume: initialDubbedVolume,
+        dubbedVolumeRequestToken: 0,
         audioPathReady: false,
         pendingInput: [],
         pendingInputMs: 0,
@@ -903,6 +1090,7 @@ export class LiveDubbingController {
       ...this.audioEngineOptions,
       audioMode: session.audioMode,
       originalVolume: 0,
+      dubbedVolume: session.dubbedVolume,
       enabled: this.pipelineRequired,
       inputPipelineFactory,
       outputPlayerFactory,
@@ -948,6 +1136,9 @@ export class LiveDubbingController {
     // launch detached after readiness/status are committed. Fencing inside
     // keeps dispose/replacement inert and failures local-only.
     void this._applyDeferredOriginalVolume(session, audioEngine).catch(() => {});
+    // Deferred dubbed-audio realization mirrors the original path with the
+    // same detached, fenced, local-failure semantics.
+    void this._applyDeferredDubbedVolume(session, audioEngine).catch(() => {});
   }
 
   /**
@@ -992,6 +1183,59 @@ export class LiveDubbingController {
         && session.originalVolumeRequestToken === token
         && session.originalVolume === 0) {
         await audioEngine.setOriginalVolume(0);
+      }
+    } catch {
+      // Best effort: session already reflects the safe fallback.
+    }
+  }
+
+  /**
+   * Realize the latest remembered pre-target dubbed volume after core
+   * readiness. Reads `session.dubbedVolume`/`dubbedVolumeRequestToken` after
+   * the core path is ready (never a pre-startup capture) and applies it
+   * through the per-mode runtime target so target logic stays in the target.
+   * Media-stream dubbed audio is provider-owned: at pipeline-init time the
+   * provider client does not exist yet, so the deferred step is a no-op and
+   * the stored session value is applied by a later runtime SET once the
+   * client exists. Failure stays local: fall back to the last realizable
+   * safe value for a new target (full gain), keep session/target consistent,
+   * and never terminalize, clean up, or notify. A newer runtime command
+   * arriving during the deferred apply always wins via the token/session
+   * fence.
+   */
+  async _applyDeferredDubbedVolume(session, audioEngine) {
+    if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) return;
+    if (this.currentSession !== session || session.audioEngine !== audioEngine) return;
+    if (!this._isCurrentSession(session)) return;
+    if (session.audioPathReady !== true) return;
+    const volume = session.dubbedVolume;
+    const token = session.dubbedVolumeRequestToken;
+    if (volume === 1) return;
+    let applied = false;
+    try {
+      await audioEngine.setDubbedVolume(volume);
+      applied = true;
+    } catch {
+      applied = false;
+    }
+    if (applied) {
+      if (this.currentSession !== session || session.audioEngine !== audioEngine) return;
+      if (!this._isCurrentSession(session)) return;
+      if (session.dubbedVolumeRequestToken !== token) return;
+      if (session.dubbedVolume !== volume) return;
+      return;
+    }
+    if (this.currentSession !== session || session.audioEngine !== audioEngine) return;
+    if (!this._isCurrentSession(session)) return;
+    if (session.dubbedVolumeRequestToken !== token) return;
+    if (session.dubbedVolume !== volume) return;
+    session.dubbedVolume = 1;
+    try {
+      if (this.currentSession === session
+        && session.audioEngine === audioEngine
+        && session.dubbedVolumeRequestToken === token
+        && session.dubbedVolume === 1) {
+        await audioEngine.setDubbedVolume(1);
       }
     } catch {
       // Best effort: session already reflects the safe fallback.
@@ -1072,6 +1316,26 @@ export class LiveDubbingController {
         });
       }
       session.providerClient = client;
+      // Seed a newly-created media-stream provider with the current session
+      // dubbed volume before connect can produce remote playback. Duck-typed:
+      // providers without setDubbedVolume keep their own default. A seed
+      // failure is non-terminal and never terminalizes or cleans up; the
+      // runtime SET path surfaces failures.
+      if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
+        && typeof client.setDubbedVolume === 'function') {
+        try {
+          await client.setDubbedVolume(session.dubbedVolume);
+        } catch {
+          try {
+            this.log?.warn?.('Live dubbing dubbed volume seed failed');
+          } catch {
+            // Seed-failure diagnostics must never affect provider setup.
+          }
+        }
+        if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
+          return this._disposedProviderResponse(session);
+        }
+      }
       let bootstrapWrapper = await this.requestProviderBootstrapForSession(session);
       if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
         return this._disposedProviderResponse(session);
@@ -1648,6 +1912,43 @@ export class LiveDubbingController {
     }
     if (this.currentSession === session && session.originalVolumeRequestToken !== requestToken) {
       return this._supersededOriginalVolumeResponse(session);
+    }
+    return this._disposedProviderResponse(session);
+  }
+
+  _dubbedVolumeResponse(session) {
+    return {
+      success: true,
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      dubbedVolume: session.dubbedVolume,
+    };
+  }
+
+  _supersededDubbedVolumeResponse(session) {
+    return {
+      success: true,
+      ignored: true,
+      superseded: true,
+      sessionId: session.sessionId,
+      providerId: session.providerId,
+      eventSequence: session.eventSequence,
+      status: session.status,
+      dubbedVolume: session.dubbedVolume,
+    };
+  }
+
+  _staleDubbedVolumeResponse(session, sessionId, providerId, eventSequence, requestToken) {
+    if (this.currentSession && this.currentSession !== session) {
+      return this._sessionMismatch(sessionId, providerId, this.currentSession);
+    }
+    if (this.currentSession === session && session.eventSequence !== eventSequence) {
+      return this._sequenceMismatch(sessionId, session, providerId);
+    }
+    if (this.currentSession === session && session.dubbedVolumeRequestToken !== requestToken) {
+      return this._supersededDubbedVolumeResponse(session);
     }
     return this._disposedProviderResponse(session);
   }
@@ -2327,6 +2628,15 @@ export class LiveDubbingController {
       && session.providerId === providerId
       && session.eventSequence === eventSequence
       && session.originalVolumeRequestToken === requestToken;
+  }
+
+  _isCurrentDubbedVolumeRequest(session, sessionId, providerId, eventSequence, requestToken) {
+    return this._isCurrentSession(session)
+      && this.currentSession === session
+      && session.sessionId === sessionId
+      && session.providerId === providerId
+      && session.eventSequence === eventSequence
+      && session.dubbedVolumeRequestToken === requestToken;
   }
 
   _invalidProvider(sessionId) {

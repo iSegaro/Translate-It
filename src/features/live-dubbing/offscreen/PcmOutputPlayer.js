@@ -10,6 +10,7 @@ export const OUTPUT_SAMPLE_RATE = 24_000;
 export const PLAYBACK_PROCESSOR_NAME = 'live-dubbing-playback-processor';
 export const PLAYBACK_WORKLET_URL = new URL('./liveDubbingPlayback.worklet.js', import.meta.url).href;
 export const DEFAULT_MAX_QUEUED_SAMPLES = OUTPUT_SAMPLE_RATE * 10;
+const DEFAULT_VOLUME = 1;
 
 function isArrayBuffer(value) {
   return value instanceof ArrayBuffer
@@ -151,6 +152,17 @@ function normalizeMaxQueuedSamples(value) {
   return value;
 }
 
+/**
+ * Single volume policy for constructor/start/setVolume. Gain is a normalized
+ * 0-1 ratio, never a percentage: 0 is silence, 1 is the unmodified source.
+ */
+function normalizeVolume(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new RangeError('volume must be a finite number between 0 and 1');
+  }
+  return value;
+}
+
 function isScalar(value) {
   return value === null
     || typeof value === 'string'
@@ -205,10 +217,14 @@ export class PcmOutputPlayer {
     this.onPlaybackAccepted = typeof options.onPlaybackAccepted === 'function'
       ? options.onPlaybackAccepted
       : null;
+    // Only an omitted volume defaults to full gain; explicit null and any
+    // other invalid value throw the same RangeError as the setter.
+    this.volume = normalizeVolume(options.volume === undefined ? DEFAULT_VOLUME : options.volume);
 
     this.state = 'idle';
     this.context = null;
     this.workletNode = null;
+    this.gainNode = null;
     this.queue = new OrderedSampleQueue();
     this.byteAccumulator = new Pcm16ByteAccumulator();
     this.inFlight = null;
@@ -261,10 +277,19 @@ export class PcmOutputPlayer {
       await this.context.audioWorklet.addModule(this.workletUrl);
       this._assertCurrentGeneration(generation);
       this.workletNode = this._createWorkletNode();
-      if (typeof this.workletNode.connect !== 'function' || !this.context.destination) {
+      if (typeof this.workletNode.connect !== 'function'
+        || typeof this.context.createGain !== 'function'
+        || !this.context.destination) {
         throw createAudioError('OUTPUT_AUDIO_GRAPH_UNAVAILABLE', 'Playback audio graph is unavailable');
       }
-      this.workletNode.connect(this.context.destination);
+      // Output gain lives on a GainNode between the worklet and the
+      // destination: PCM samples are never scaled manually. The stored
+      // volume applies here, before resume/pump, so no audio can play
+      // unattenuated first.
+      this.gainNode = this.context.createGain();
+      this.gainNode.gain.value = this.volume;
+      this.workletNode.connect(this.gainNode);
+      this.gainNode.connect(this.context.destination);
       this._attachPort(this.workletNode.port, this.workletNode, generation);
       await this.context.resume?.();
       this._assertCurrentGeneration(generation);
@@ -477,6 +502,22 @@ export class PcmOutputPlayer {
     return this.getMetrics();
   }
 
+  /**
+   * Update the output gain without rebuilding the graph. Before start the
+   * value is stored and applied to the gain node when it is created. Never
+   * touches the queue, epoch, metrics, backpressure, or the worklet.
+   */
+  setVolume(volume) {
+    const normalized = normalizeVolume(volume);
+    this.volume = normalized;
+    if (this.gainNode) this.gainNode.gain.value = normalized;
+    return this.volume;
+  }
+
+  getVolume() {
+    return this.volume;
+  }
+
   _nextEpoch() {
     return typeof this.epoch === 'number' && Number.isSafeInteger(this.epoch)
       ? this.epoch + 1
@@ -566,8 +607,10 @@ export class PcmOutputPlayer {
 
   async _teardown() {
     const node = this.workletNode;
+    const gainNode = this.gainNode;
     const context = this.context;
     this.workletNode = null;
+    this.gainNode = null;
     this.context = null;
     if (node?.port) node.port.onmessage = null;
     try {
@@ -576,6 +619,7 @@ export class PcmOutputPlayer {
       // Teardown continues even if the worklet has already stopped.
     }
     disconnect(node);
+    disconnect(gainNode);
     closePort(node?.port);
     await closeContext(context);
   }

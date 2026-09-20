@@ -19,15 +19,18 @@ function createPort() {
 function createContext(sampleRate = OUTPUT_SAMPLE_RATE) {
   const port = createPort();
   const node = { connect: vi.fn(), disconnect: vi.fn(), port };
+  const gainNode = { connect: vi.fn(), disconnect: vi.fn(), gain: { value: 1 } };
   return {
     context: {
       sampleRate,
       destination: {},
       audioWorklet: { addModule: vi.fn(async () => {}) },
+      createGain: vi.fn(() => gainNode),
       resume: vi.fn(async () => {}),
       close: vi.fn(async () => {}),
     },
     node,
+    gainNode,
     port,
   };
 }
@@ -232,6 +235,121 @@ describe('PCM output primitives', () => {
     expect(fake.port.close).toHaveBeenCalledOnce();
     expect(fake.context.close).toHaveBeenCalledOnce();
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('defaults dubbed volume to full gain', () => {
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => createContext().context),
+      audioWorkletNodeFactory: vi.fn(() => createContext().node),
+    });
+
+    expect(player.getVolume()).toBe(1);
+  });
+
+  it('applies the pre-start volume to the gain node before audible playback', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      volume: 0.25,
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+
+    expect(fake.context.createGain).toHaveBeenCalledOnce();
+    expect(fake.gainNode.gain.value).toBe(0.25);
+    expect(player.getVolume()).toBe(0.25);
+    expect(fake.node.connect).toHaveBeenCalledWith(fake.gainNode);
+    expect(fake.gainNode.connect).toHaveBeenCalledWith(fake.context.destination);
+  });
+
+  it('updates gain at runtime without rebuilding the graph', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+
+    expect(player.setVolume(0.5)).toBe(0.5);
+    expect(player.getVolume()).toBe(0.5);
+    expect(fake.gainNode.gain.value).toBe(0.5);
+    expect(fake.context.createGain).toHaveBeenCalledOnce();
+  });
+
+  it('mutes at 0 without stopping playback', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+    expect(player.enqueuePcm16(pcmBytes(1000)).accepted).toBe(true);
+
+    expect(player.setVolume(0)).toBe(0);
+    expect(fake.gainNode.gain.value).toBe(0);
+    expect(player.getMetrics()).toMatchObject({ state: 'running' });
+    expect(player.enqueuePcm16(pcmBytes(2000)).accepted).toBe(true);
+  });
+
+  it('keeps queue, epoch, metrics, and worklet messages across volume changes', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+    player.enqueuePcm16(pcmBytes(1000, 2000));
+    const enqueueMessage = fake.port.postMessage.mock.calls[0][0];
+    fake.port.onmessage({ data: { type: 'accepted', id: enqueueMessage.id, queuedSamples: 2 } });
+    const before = player.getMetrics();
+    const portMessages = fake.port.postMessage.mock.calls.length;
+
+    player.setVolume(0.3);
+
+    expect(player.epoch).toBe(before.epoch);
+    expect(player.getMetrics()).toMatchObject({
+      acceptedChunks: before.acceptedChunks,
+      acceptedSamples: before.acceptedSamples,
+      sentChunks: before.sentChunks,
+      sentSamples: before.sentSamples,
+      queuedSamples: before.queuedSamples,
+      epochResets: before.epochResets,
+      safetyDrops: before.safetyDrops,
+    });
+    expect(player.getPendingByteCount()).toBe(before.pendingByteCount);
+    expect(fake.port.postMessage.mock.calls.length).toBe(portMessages);
+  });
+
+  it('rejects invalid volumes with RangeError and keeps the current gain', () => {
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => createContext().context),
+      audioWorkletNodeFactory: vi.fn(() => createContext().node),
+    });
+
+    expect(player.setVolume(0)).toBe(0);
+    expect(player.setVolume(1)).toBe(1);
+    for (const volume of [-1, 2, Number.NaN, Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY, '0.5', null, undefined, {}]) {
+      expect(() => player.setVolume(volume)).toThrow(RangeError);
+      expect(() => player.setVolume(volume)).toThrow(/finite number between 0 and 1/);
+    }
+    expect(player.getVolume()).toBe(1);
+    expect(() => new PcmOutputPlayer({ volume: 2 })).toThrow(RangeError);
+  });
+
+  it('disconnects the gain node on teardown', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+
+    await player.stop();
+
+    expect(fake.gainNode.disconnect).toHaveBeenCalledOnce();
+    expect(fake.node.disconnect).toHaveBeenCalledOnce();
+    expect(fake.context.close).toHaveBeenCalledOnce();
   });
 
   it('fails closed for an unexpected output context rate', async () => {

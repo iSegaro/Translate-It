@@ -23,6 +23,8 @@ import {
   createLiveDubbingProviderDiagnostic,
   createConsumeMessage,
   createDescriptor,
+  createDubbedVolumeMessage,
+  createDubbedVolumeQueryMessage,
   createOriginalVolumeMessage,
   createOriginalVolumeQueryMessage,
   normalizeLiveDubbingVolume,
@@ -359,14 +361,120 @@ export class LiveDubbingCoordinator {
   }
 
   /**
+   * Apply dubbed-audio gain without entering the lifecycle mutation queue.
+   * The descriptor identity and event sequence are the complete command fence;
+   * no lifecycle or public descriptor state is changed by this control path.
+   */
+  async setDubbedVolume(message = {}) {
+    const data = message?.data && typeof message.data === 'object'
+      ? message.data
+      : message;
+    const volume = data?.volume;
+    const volumeValid = typeof volume === 'number'
+      && Number.isFinite(volume)
+      && volume >= 0
+      && volume <= 1;
+    if (!volumeValid) {
+      return { success: false, error: 'LIVE_DUBBING_DUBBED_VOLUME_INVALID' };
+    }
+
+    const descriptor = await this._readDescriptor();
+    const controllableStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!descriptor || this._storageReadFailed() || this._storageDescriptorInvalid()
+      || !controllableStatuses.includes(descriptor.status)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+
+    if (data?.sessionId !== descriptor.sessionId || data?.providerId !== descriptor.providerId) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (!hasExactSessionEvent(message, descriptor)) {
+      return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+    }
+
+    let response;
+    try {
+      response = await this._sendDubbedVolume(
+        createDubbedVolumeMessage(descriptor, volume),
+      );
+    } catch {
+      return { success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE' };
+    }
+
+    const responseData = response?.data && typeof response.data === 'object'
+      ? response.data
+      : response;
+    const hasResponseIdentity = responseData
+      && responseData.sessionId !== undefined
+      && responseData.providerId !== undefined;
+    if (hasResponseIdentity
+      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (hasResponseIdentity) {
+      if (responseData.eventSequence !== undefined
+        && responseData.eventSequence !== descriptor.eventSequence) {
+        return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+      }
+    }
+
+    if (!responseData
+      || responseData.success === false
+      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
+      || !hasExactSessionEvent(response, descriptor)
+      || typeof responseData.dubbedVolume !== 'number'
+      || !Number.isFinite(responseData.dubbedVolume)
+      || responseData.dubbedVolume < 0
+      || responseData.dubbedVolume > 1) {
+      return { success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE' };
+    }
+
+    const current = await this._readDescriptor();
+    if (!current || this._storageReadFailed() || this._storageDescriptorInvalid()) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+    if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (!hasExactSessionEvent({ data: responseData }, current)) {
+      return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+    }
+    if (!controllableStatuses.includes(current.status)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+
+    const isSupersededVolume = responseData?.superseded === true;
+    if (!isSupersededVolume) {
+      // Persist only the latest-wins winner. Failed, stale, and superseded
+      // outcomes never persist; persistence itself is best effort, detached
+      // from the runtime SET response so a slow storage write can never block
+      // or delay runtime control.
+      this._persistDubbedVolumePreference(responseData.dubbedVolume);
+    }
+    return {
+      success: true,
+      sessionId: current.sessionId,
+      providerId: current.providerId,
+      eventSequence: current.eventSequence,
+      status: current.status,
+      dubbedVolume: responseData.dubbedVolume,
+      ...(isSupersededVolume ? { ignored: true, superseded: true } : {}),
+    };
+  }
+
+  /**
    * Read persisted volume preferences fresh for session init. Never throws:
    * any reader or storage failure falls back to the persisted defaults.
-   * Layers the coordinator-memory newest accepted Original Volume on top of
-   * the fresh storage read only while that value is not yet safely persisted,
-   * so an immediate subsequent START observes the user's latest accepted
-   * value even while persistence is still in flight, without ever waiting on
-   * storage. Once the newest accepted value has persisted, fresh storage is
-   * authoritative again for cross-context synchronization.
+   * Layers the coordinator-memory newest accepted Original and Dubbed Volumes
+   * on top of the fresh storage read only while each value is not yet safely
+   * persisted, so an immediate subsequent START observes the user's latest
+   * accepted values even while persistence is still in flight, without ever
+   * waiting on storage. Once a newest accepted value has persisted, fresh
+   * storage is authoritative again for cross-context synchronization.
    */
   async _readVolumePreferences() {
     let persisted = { originalVolume: 0, dubbedVolume: 1 };
@@ -381,9 +489,13 @@ export class LiveDubbingCoordinator {
     } catch {
       // Fall through to defaults below.
     }
-    const memoryOverride = this._latestAcceptedOriginalVolume;
-    if (Number.isFinite(memoryOverride) && memoryOverride >= 0 && memoryOverride <= 1) {
-      persisted.originalVolume = memoryOverride;
+    const originalOverride = this._latestAcceptedOriginalVolume;
+    if (Number.isFinite(originalOverride) && originalOverride >= 0 && originalOverride <= 1) {
+      persisted.originalVolume = originalOverride;
+    }
+    const dubbedOverride = this._latestAcceptedDubbedVolume;
+    if (Number.isFinite(dubbedOverride) && dubbedOverride >= 0 && dubbedOverride <= 1) {
+      persisted.dubbedVolume = dubbedOverride;
     }
     return persisted;
   }
@@ -404,8 +516,33 @@ export class LiveDubbingCoordinator {
    * persistence is still in flight.
    */
   _persistOriginalVolumePreference(volume) {
+    return this._persistVolumePreference('original', volume);
+  }
+
+  /**
+   * Best-effort persistence of the accepted dubbed volume. Same latest-wins,
+   * detached, non-terminal semantics as the original-volume path.
+   */
+  _persistDubbedVolumePreference(volume) {
+    return this._persistVolumePreference('dubbed', volume);
+  }
+
+  /**
+   * Single generalized volume-preference writer serving both Original and
+   * Dubbed Volume. `kind` is 'original' or 'dubbed'; each kind owns an
+   * independent coalescing queue, memory override, and storage key so a
+   * dubbed SET can never disturb an original write and vice versa.
+   * @param {'original'|'dubbed'} kind
+   * @param {number} volume normalized 0..1 gain
+   */
+  _persistVolumePreference(kind, volume) {
     if (!Number.isFinite(volume) || volume < 0 || volume > 1) return;
-    const pending = this._volumePreferenceWrites || (this._volumePreferenceWrites = {
+    const isDubbed = kind === 'dubbed';
+    const storageKey = isDubbed ? 'LIVE_DUBBING_DUBBED_VOLUME' : 'LIVE_DUBBING_ORIGINAL_VOLUME';
+    const queueField = isDubbed ? '_dubbedVolumePreferenceWrites' : '_volumePreferenceWrites';
+    const memoryField = isDubbed ? '_latestAcceptedDubbedVolume' : '_latestAcceptedOriginalVolume';
+    const seqField = isDubbed ? '_latestAcceptedDubbedVolumeSeq' : '_latestAcceptedOriginalVolumeSeq';
+    const pending = this[queueField] || (this[queueField] = {
       seq: 0,
       latestSeq: 0,
       latestValue: null,
@@ -413,8 +550,8 @@ export class LiveDubbingCoordinator {
     });
     pending.latestSeq = ++pending.seq;
     pending.latestValue = volume;
-    this._latestAcceptedOriginalVolume = volume;
-    this._latestAcceptedOriginalVolumeSeq = pending.latestSeq;
+    this[memoryField] = volume;
+    this[seqField] = pending.latestSeq;
     if (pending.inflight) return;
     pending.inflight = (async () => {
       try {
@@ -429,17 +566,17 @@ export class LiveDubbingCoordinator {
             continue;
           }
           try {
-            await storageManager.set({ LIVE_DUBBING_ORIGINAL_VOLUME: value });
+            await storageManager.set({ [storageKey]: value });
             // Memory override lives only until the newest accepted value is
             // safely persisted. Clear it only when this completed write still
             // represents the current latest accepted sequence/value; an older
             // write finishing after a newer SET, a failed write, or a stale
             // value must leave the newer memory override intact.
             if (seq === pending.seq
-              && seq === this._latestAcceptedOriginalVolumeSeq
-              && value === this._latestAcceptedOriginalVolume) {
-              this._latestAcceptedOriginalVolume = null;
-              this._latestAcceptedOriginalVolumeSeq = 0;
+              && seq === this[seqField]
+              && value === this[memoryField]) {
+              this[memoryField] = null;
+              this[seqField] = 0;
             }
           } catch {
             // Runtime state stays authoritative when persistence is unavailable.
@@ -542,6 +679,95 @@ export class LiveDubbingCoordinator {
       eventSequence: current.eventSequence,
       status: current.status,
       originalVolume: responseData.originalVolume,
+    };
+  }
+
+  /**
+   * Read the committed dubbed-audio gain without entering the lifecycle
+   * mutation queue and without changing any descriptor state. The descriptor
+   * identity and event sequence are the complete request fence; the offscreen
+   * read never creates or starts audio resources.
+   */
+  async getDubbedVolume(message = {}) {
+    const descriptor = await this._readDescriptor();
+    const controllableStatuses = [
+      LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+      LIVE_DUBBING_STATUS.RUNNING,
+    ];
+    if (!descriptor || this._storageReadFailed() || this._storageDescriptorInvalid()
+      || !controllableStatuses.includes(descriptor.status)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+
+    const data = message?.data && typeof message.data === 'object'
+      ? message.data
+      : message;
+    if (data?.sessionId !== descriptor.sessionId || data?.providerId !== descriptor.providerId) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (!hasExactSessionEvent(message, descriptor)) {
+      return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+    }
+
+    let response;
+    try {
+      response = await this._sendDubbedVolumeQuery(
+        createDubbedVolumeQueryMessage(descriptor),
+      );
+    } catch {
+      return { success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE' };
+    }
+
+    const responseData = response?.data && typeof response.data === 'object'
+      ? response.data
+      : response;
+    const hasResponseIdentity = responseData
+      && responseData.sessionId !== undefined
+      && responseData.providerId !== undefined;
+    if (hasResponseIdentity
+      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (hasResponseIdentity) {
+      if (responseData.eventSequence !== undefined
+        && responseData.eventSequence !== descriptor.eventSequence) {
+        return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+      }
+    }
+
+    if (!responseData
+      || responseData.success === false
+      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
+      || !hasExactSessionEvent(response, descriptor)
+      || typeof responseData.dubbedVolume !== 'number'
+      || !Number.isFinite(responseData.dubbedVolume)
+      || responseData.dubbedVolume < 0
+      || responseData.dubbedVolume > 1) {
+      return { success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE' };
+    }
+
+    const current = await this._readDescriptor();
+    if (!current || this._storageReadFailed() || this._storageDescriptorInvalid()) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+    if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
+    }
+    if (!hasExactSessionEvent({ data: responseData }, current)) {
+      return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
+    }
+    if (!controllableStatuses.includes(current.status)) {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+
+    return {
+      success: true,
+      sessionId: current.sessionId,
+      providerId: current.providerId,
+      eventSequence: current.eventSequence,
+      status: current.status,
+      dubbedVolume: responseData.dubbedVolume,
     };
   }
 
@@ -2196,6 +2422,34 @@ export class LiveDubbingCoordinator {
 
   async _sendOriginalVolume(message) {
     const timeoutMs = LIVE_DUBBING_ACTION_TIMEOUTS[LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME];
+    let timeoutId;
+    const timeout = new Promise(resolve => {
+      timeoutId = setTimeout(() => resolve(null), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([this._sendOffscreen(message), timeout]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async _sendDubbedVolumeQuery(message) {
+    const timeoutMs = LIVE_DUBBING_ACTION_TIMEOUTS[LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME];
+    let timeoutId;
+    const timeout = new Promise(resolve => {
+      timeoutId = setTimeout(() => resolve(null), timeoutMs);
+    });
+
+    try {
+      return await Promise.race([this._sendOffscreen(message), timeout]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async _sendDubbedVolume(message) {
+    const timeoutMs = LIVE_DUBBING_ACTION_TIMEOUTS[LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME];
     let timeoutId;
     const timeout = new Promise(resolve => {
       timeoutId = setTimeout(() => resolve(null), timeoutMs);

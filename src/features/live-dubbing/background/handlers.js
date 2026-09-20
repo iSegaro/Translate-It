@@ -71,6 +71,24 @@ export function handleLiveDubbingGetOriginalVolume(message, sender) {
   return liveDubbingCoordinator.getOriginalVolume(message);
 }
 
+export function handleLiveDubbingSetDubbedVolume(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (message?.action && message.action !== LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME) {
+    return unauthorized();
+  }
+  if (!isTrustedUi(sender)) return unauthorized();
+  return liveDubbingCoordinator.setDubbedVolume(message);
+}
+
+export function handleLiveDubbingGetDubbedVolume(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (message?.action && message.action !== LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME) {
+    return unauthorized();
+  }
+  if (!isTrustedUi(sender)) return unauthorized();
+  return liveDubbingCoordinator.getDubbedVolume(message);
+}
+
 /**
  * Resolve the provider bootstrap request from the authorized offscreen
  * document. The descriptor selects the bootstrap service, while the

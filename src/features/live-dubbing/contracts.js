@@ -838,6 +838,44 @@ export function createOriginalVolumeQueryMessage(descriptor) {
   };
 }
 
+/**
+ * Build the session-fenced dubbed-audio volume command. Volume is already a
+ * normalized gain and is deliberately kept out of the public descriptor.
+ */
+export function createDubbedVolumeMessage(descriptor, volume) {
+  if (typeof volume !== 'number' || !Number.isFinite(volume) || volume < 0 || volume > 1) {
+    throw new TypeError('volume must be a finite number between 0 and 1');
+  }
+
+  return {
+    target: 'offscreen',
+    action: LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN,
+    data: {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence,
+      volume,
+    },
+  };
+}
+
+/**
+ * Build the session-fenced dubbed-audio volume query. Read-only: the
+ * descriptor identity and event sequence are the complete request fence,
+ * no volume is carried, and nothing is stored.
+ */
+export function createDubbedVolumeQueryMessage(descriptor) {
+  return {
+    target: 'offscreen',
+    action: LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN,
+    data: {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence,
+    },
+  };
+}
+
 export function isSuccessfulResponse(response) {
   return Boolean(response && response.success !== false);
 }

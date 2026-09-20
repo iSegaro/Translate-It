@@ -40,6 +40,24 @@ async function handleLiveDubbingGetOriginalVolumeLazy(message, sender) {
   }
 }
 
+async function handleLiveDubbingSetDubbedVolumeLazy(message, sender) {
+  try {
+    const { handleLiveDubbingSetDubbedVolume } = await import('@/features/live-dubbing/background/handlers.js');
+    return handleLiveDubbingSetDubbedVolume(message, sender);
+  } catch {
+    return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+  }
+}
+
+async function handleLiveDubbingGetDubbedVolumeLazy(message, sender) {
+  try {
+    const { handleLiveDubbingGetDubbedVolume } = await import('@/features/live-dubbing/background/handlers.js');
+    return handleLiveDubbingGetDubbedVolume(message, sender);
+  } catch {
+    return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+  }
+}
+
 class LifecycleManager {
   constructor() {
     this.initialized = false;
@@ -295,6 +313,8 @@ class LifecycleManager {
         [MessageActions.GET_LIVE_DUBBING_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
         [LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME]: handleLiveDubbingSetOriginalVolumeLazy,
         [LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME]: handleLiveDubbingGetOriginalVolumeLazy,
+        [LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME]: handleLiveDubbingSetDubbedVolumeLazy,
+        [LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME]: handleLiveDubbingGetDubbedVolumeLazy,
         [MessageActions.LIVE_DUBBING_START]: Handlers.handleLiveDubbingStartLazy,
         [MessageActions.LIVE_DUBBING_STOP]: Handlers.handleLiveDubbingStopLazy,
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,

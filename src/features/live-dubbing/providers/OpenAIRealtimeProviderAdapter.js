@@ -6,6 +6,8 @@ import {
   normalizeProviderTargetLanguage,
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
+import { getScopedLogger } from '../../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../../shared/logging/logConstants.js';
 
 export const OPENAI_REALTIME_TRANSLATIONS_CALLS_ENDPOINT =
   'https://api.openai.com/v1/realtime/translations/calls';
@@ -24,6 +26,8 @@ const TERMINAL_EVENT_TYPES = new Set(['error']);
 const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
 const DISCONNECTED_GRACE_PERIOD = 3000;
 const NOOP = () => {};
+const DEFAULT_DUBBED_VOLUME = 1;
+const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'OpenAIRealtimeProviderAdapter');
 const PROVIDER_ERROR_MESSAGES = Object.freeze({
   OPENAI_REALTIME_PROVIDER_UNAVAILABLE: 'OpenAI Realtime provider is unavailable',
   OPENAI_REALTIME_DATA_CHANNEL_FAILED: 'OpenAI Realtime events channel failed',
@@ -213,6 +217,19 @@ function closePeerConnection(peerConnection) {
 }
 
 /**
+ * Provider-neutral dubbed-volume policy: a normalized 0-1 ratio, never a
+ * percentage. Anything outside a finite 0..1 is rejected with RangeError so
+ * invalid caller input fails fast at this boundary instead of reaching the
+ * playback element.
+ */
+function normalizeDubbedVolume(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new RangeError('dubbed volume must be a finite number between 0 and 1');
+  }
+  return value;
+}
+
+/**
  * Registered production OpenAI Realtime WebRTC provider adapter.
  *
  * The Controller owns the source MediaStream and its tracks. This adapter
@@ -249,10 +266,57 @@ export class OpenAIRealtimeProviderAdapter {
     this.session = null;
     this.pendingStart = null;
     this.lastTelemetry = null;
+    this.dubbedVolume = DEFAULT_DUBBED_VOLUME;
+    this.log = options.logger || logger;
   }
 
   get active() {
     return Boolean(this.session && !this.session.disposed);
+  }
+
+  /**
+   * Provider-neutral dubbed (translated speech) output volume.
+   *
+   * Stores the value immediately; when a remote playback element is already
+   * attached it is updated live, otherwise the value is only remembered and
+   * applied to the element on the next remote-track attachment (before
+   * play()). Invalid values throw RangeError without touching the stored
+   * value. A live-element application failure is rethrown (strict) so the
+   * Controller can reconcile/rollback without terminalizing the provider:
+   * no terminal/error callbacks, reconnect, or dispose happen here. The
+   * stored value is kept on failure so the user's intent is preserved.
+   */
+  setDubbedVolume(volume) {
+    const normalized = normalizeDubbedVolume(volume);
+    this.dubbedVolume = normalized;
+    this._applyDubbedVolume(this.session?.audioElement, { strict: true });
+    return normalized;
+  }
+
+  /**
+   * Latest dubbed output volume, defaulting to full volume before any SET.
+   */
+  getDubbedVolume() {
+    return this.dubbedVolume;
+  }
+
+  /**
+   * Best-effort volume application to a playback element. The attachment path
+   * (default, non-strict) never throws and never reports a provider failure:
+   * volume is cosmetic and must not affect WebRTC transport, ontrack wiring,
+   * or reconnect behavior. The runtime SET path (`strict: true`) rethrows the
+   * assignment error after logging so the Controller can surface
+   * `LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE` and reconcile/rollback without
+   * terminalizing the provider.
+   */
+  _applyDubbedVolume(element, { strict = false } = {}) {
+    if (!element) return;
+    try {
+      element.volume = this.dubbedVolume;
+    } catch (error) {
+      try { this.log?.warn?.('OpenAI Realtime dubbed volume apply failed'); } catch { /* best effort */ }
+      if (strict) throw error;
+    }
   }
 
   /**
@@ -546,6 +610,12 @@ export class OpenAIRealtimeProviderAdapter {
       element.autoplay = true;
       element.playsInline = true;
       element.srcObject = stream;
+      // The stored dubbed volume wins over the element default on every
+      // attachment (including replacement tracks reusing this element), and
+      // is always applied before play() so the first audible frame already
+      // carries the latest level. Best effort: never throws, so transport
+      // and playback-failure semantics below are unchanged.
+      this._applyDubbedVolume(element);
       session.remoteTrackEnded = () => this._reportRuntimeFailure(
         session,
         isAttachmentCurrent,

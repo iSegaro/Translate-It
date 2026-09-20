@@ -955,3 +955,219 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 });
+
+describe('OpenAIRealtimeProviderAdapter dubbed volume', () => {
+  function flushPlayback() {
+    return new Promise(resolve => setTimeout(resolve, 0));
+  }
+
+  it('defaults to full volume and accepts the 0..1 boundaries', () => {
+    const harness = createHarness();
+
+    expect(harness.adapter.getDubbedVolume()).toBe(1);
+    expect(typeof harness.adapter.log?.warn).toBe('function');
+    expect(harness.adapter.setDubbedVolume(0)).toBe(0);
+    expect(harness.adapter.setDubbedVolume(1)).toBe(1);
+    expect(harness.adapter.getDubbedVolume()).toBe(1);
+  });
+
+  it('remembers a pre-track SET without touching any audio element', () => {
+    const audioElementFactory = vi.fn(() => createAudioElement());
+    const adapter = new OpenAIRealtimeProviderAdapter({
+      peerConnectionFactory: vi.fn(async () => new FakePeerConnection()),
+      fetchImpl: vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
+      audioElementFactory,
+      setupTimeout: 100,
+    });
+
+    expect(adapter.setDubbedVolume(0.4)).toBe(0.4);
+    expect(adapter.getDubbedVolume()).toBe(0.4);
+    expect(audioElementFactory).not.toHaveBeenCalled();
+    expect(adapter.active).toBe(false);
+  });
+
+  it('applies the stored volume before play() on the first remote track', async () => {
+    const order = [];
+    const play = vi.fn(() => {
+      order.push('play');
+      return Promise.resolve();
+    });
+    const audioElement = createAudioElement(play);
+    let storedVolume;
+    Object.defineProperty(audioElement, 'volume', {
+      configurable: true,
+      get: () => storedVolume,
+      set: value => {
+        order.push(`volume:${value}`);
+        storedVolume = value;
+      },
+    });
+    const harness = createHarness({ audioElement });
+
+    harness.adapter.setDubbedVolume(0.3);
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+
+    expect(play).toHaveBeenCalledOnce();
+    expect(order).toEqual(['volume:0.3', 'play']);
+    expect(harness.adapter.getDubbedVolume()).toBe(0.3);
+    await harness.adapter.dispose();
+  });
+
+  it('updates the live element on runtime SET without failing the session', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+    await flushPlayback();
+
+    harness.adapter.setDubbedVolume(0.2);
+
+    expect(harness.audioElement.volume).toBe(0.2);
+    expect(harness.adapter.getDubbedVolume()).toBe(0.2);
+    expect(harness.adapter.active).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+    await harness.adapter.dispose();
+  });
+
+  it('surfaces live-element application failures on runtime SET without terminalizing', async () => {
+    const warn = vi.fn();
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    harness.adapter.log = { warn };
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+    await flushPlayback();
+    Object.defineProperty(harness.audioElement, 'volume', {
+      configurable: true,
+      get: () => 1,
+      set: () => { throw new Error('element boom'); },
+    });
+
+    expect(() => harness.adapter.setDubbedVolume(0.5)).toThrow('element boom');
+
+    expect(harness.adapter.getDubbedVolume()).toBe(0.5);
+    expect(harness.adapter.active).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+    await harness.adapter.dispose();
+  });
+
+  it('active SET surfaces assignment failure without terminalizing the provider', async () => {
+    const onError = vi.fn();
+    const onClose = vi.fn();
+    const onGoAway = vi.fn();
+    const harness = createHarness({ callbacks: { onError, onClose, onGoAway } });
+    const disposeSpy = vi.spyOn(harness.adapter, 'dispose');
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+    await flushPlayback();
+    const fetchCallsBefore = harness.fetchImpl.mock.calls.length;
+    const offerCallsBefore = harness.peerConnection.createOffer.mock.calls.length;
+    const addTrackCallsBefore = harness.peerConnection.addTrack.mock.calls.length;
+    Object.defineProperty(harness.audioElement, 'volume', {
+      configurable: true,
+      get: () => 1,
+      set: () => { throw new Error('volume assignment boom'); },
+    });
+
+    expect(() => harness.adapter.setDubbedVolume(0.7)).toThrow('volume assignment boom');
+
+    expect(harness.adapter.active).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onGoAway).not.toHaveBeenCalled();
+    expect(harness.fetchImpl.mock.calls.length).toBe(fetchCallsBefore);
+    expect(harness.peerConnection.createOffer.mock.calls.length).toBe(offerCallsBefore);
+    expect(harness.peerConnection.addTrack.mock.calls.length).toBe(addTrackCallsBefore);
+    expect(harness.peerConnection.close).not.toHaveBeenCalled();
+    expect(disposeSpy).not.toHaveBeenCalled();
+    expect(harness.adapter.getDubbedVolume()).toBe(0.7);
+    disposeSpy.mockRestore();
+    await harness.adapter.dispose();
+  });
+
+  it('attachment path remains non-throwing when volume assignment fails', async () => {
+    const warn = vi.fn();
+    const onError = vi.fn();
+    const onClose = vi.fn();
+    const audioElement = createAudioElement();
+    Object.defineProperty(audioElement, 'volume', {
+      configurable: true,
+      get: () => 1,
+      set: () => { throw new Error('attach volume boom'); },
+    });
+    const harness = createHarness({ audioElement, callbacks: { onError, onClose } });
+    harness.adapter.log = { warn };
+    await harness.connect();
+
+    expect(() => harness.peerConnection.ontrack({
+      track: createTrack(),
+      streams: [{ id: 'remote' }],
+    })).not.toThrow();
+
+    await flushPlayback();
+    expect(harness.adapter.active).toBe(true);
+    expect(onError).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    await harness.adapter.dispose();
+  });
+
+  it('re-applies the latest volume on a replacement remote track', async () => {
+    const onPlaybackAccepted = vi.fn();
+    const harness = createHarness({ callbacks: { onPlaybackAccepted } });
+    await harness.connect();
+
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'first' }] });
+    await flushPlayback();
+    harness.adapter.setDubbedVolume(0.6);
+    expect(harness.audioElement.volume).toBe(0.6);
+
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'second' }] });
+    await flushPlayback();
+
+    expect(harness.adapter.session.audioElement).toBe(harness.audioElement);
+    expect(harness.audioElement.srcObject).toEqual({ id: 'second' });
+    expect(harness.audioElement.volume).toBe(0.6);
+    expect(harness.audioElement.play).toHaveBeenCalledTimes(2);
+    expect(onPlaybackAccepted).toHaveBeenCalledTimes(1);
+    await harness.adapter.dispose();
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, '0.5', null, undefined, {}, [0.5]])(
+    'rejects invalid dubbed volume %p with RangeError',
+    async invalid => {
+      const onError = vi.fn();
+      const harness = createHarness({ callbacks: { onError } });
+      harness.adapter.setDubbedVolume(0.4);
+
+      expect(() => harness.adapter.setDubbedVolume(invalid)).toThrow(RangeError);
+      expect(harness.adapter.getDubbedVolume()).toBe(0.4);
+      expect(onError).not.toHaveBeenCalled();
+
+      await harness.connect();
+      expect(() => harness.adapter.setDubbedVolume(invalid)).toThrow(RangeError);
+      expect(harness.adapter.getDubbedVolume()).toBe(0.4);
+      expect(harness.adapter.active).toBe(true);
+      expect(onError).not.toHaveBeenCalled();
+      await harness.adapter.dispose();
+    },
+  );
+
+  it('changes volume without any WebRTC reconnect', async () => {
+    const harness = createHarness();
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+    await flushPlayback();
+
+    harness.adapter.setDubbedVolume(0.1);
+    harness.adapter.setDubbedVolume(0.9);
+
+    expect(harness.fetchImpl).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.createOffer).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.addTrack).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.close).not.toHaveBeenCalled();
+    expect(harness.adapter.active).toBe(true);
+    await harness.adapter.dispose();
+  });
+});

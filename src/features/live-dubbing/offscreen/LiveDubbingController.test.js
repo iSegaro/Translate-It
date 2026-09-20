@@ -99,6 +99,122 @@ describe('LiveDubbingController', () => {
     },
   );
 
+  it('seeds the PCM audio engine with the PREPARE dubbed volume', async () => {
+    const track = new FakeTrack();
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      providerRegistry: { getAudioMode: vi.fn(() => LIVE_DUBBING_AUDIO_MODES.PCM) },
+      audioContextFactory: vi.fn(async () => createOriginalAudioContext()),
+      inputPipeline: { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) },
+      outputPlayer: {
+        start: vi.fn(async () => {}),
+        stop: vi.fn(async () => {}),
+        clear: vi.fn(),
+      },
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0, { dubbedVolume: 0.3 });
+    expect(controller.currentSession.dubbedVolume).toBe(0.3);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+
+    // Constructor-seeded: the engine graph starts at 0.3, never observes 1.
+    const engine = controller.currentSession.audioEngine;
+    expect(engine).not.toBeNull();
+    expect(engine.getDubbedVolume()).toBe(0.3);
+    await vi.waitFor(() => expect(controller.currentSession.dubbedVolume).toBe(0.3));
+    expect(controller.currentSession.audioEngine).toBe(engine);
+
+    await controller.dispose('session-1', 'gemini');
+  });
+
+  it('applies the latest dubbed volume when a newer SET arrives during startup', async () => {
+    const track = new FakeTrack();
+    let resolveInputStart;
+    const inputStarted = new Promise(resolve => {
+      resolveInputStart = resolve;
+    });
+    const outputPlayer = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+      clear: vi.fn(),
+      setVolume: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      providerRegistry: { getAudioMode: vi.fn(() => LIVE_DUBBING_AUDIO_MODES.PCM) },
+      audioContextFactory: vi.fn(async () => createOriginalAudioContext()),
+      inputPipeline: {
+        start: vi.fn(() => inputStarted),
+        stop: vi.fn(async () => {}),
+      },
+      outputPlayer,
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0, { dubbedVolume: 0.3 });
+    const consumePromise = controller.consume('session-1', 'gemini', 'stream-secret', 1);
+    await vi.waitFor(() => expect(controller.currentSession.audioEngine).not.toBeNull());
+    const pendingEngine = controller.currentSession.audioEngine;
+    // Engine construction captured the PREPARE value.
+    expect(pendingEngine.getDubbedVolume()).toBe(0.3);
+
+    // Newer SET while the core path is not ready: store-only, engine untouched.
+    expect(controller.setDubbedVolume('session-1', 'gemini', 0.6, 1)).toMatchObject({
+      success: true,
+      dubbedVolume: 0.6,
+    });
+    expect(controller.currentSession.dubbedVolume).toBe(0.6);
+    expect(pendingEngine.getDubbedVolume()).toBe(0.3);
+
+    resolveInputStart();
+    await expect(consumePromise).resolves.toMatchObject({
+      success: true,
+      ack: 'MEDIA_ACQUIRED',
+    });
+
+    // Deferred realization applies the latest session value, not the stale
+    // constructor one; the player gain ends at 0.6.
+    await vi.waitFor(() => expect(controller.currentSession.audioEngine.getDubbedVolume()).toBe(0.6));
+    expect(controller.currentSession.dubbedVolume).toBe(0.6);
+    expect(controller.currentSession.audioEngine).toBe(pendingEngine);
+    expect(outputPlayer.setVolume).toHaveBeenCalledWith(0.6);
+    expect(outputPlayer.setVolume.mock.calls.at(-1)[0]).toBe(0.6);
+
+    await controller.dispose('session-1', 'gemini');
+  });
+
+  it('keeps the default full-gain dubbed path unchanged without a configured volume', async () => {
+    const track = new FakeTrack();
+    const outputPlayer = {
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+      clear: vi.fn(),
+      setVolume: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      providerRegistry: { getAudioMode: vi.fn(() => LIVE_DUBBING_AUDIO_MODES.PCM) },
+      audioContextFactory: vi.fn(async () => createOriginalAudioContext()),
+      inputPipeline: { start: vi.fn(async () => {}), stop: vi.fn(async () => {}) },
+      outputPlayer,
+    });
+
+    controller.prepare('session-1', 'gemini', null, 0);
+    expect(controller.currentSession.dubbedVolume).toBe(1);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+
+    const engine = controller.currentSession.audioEngine;
+    expect(engine.getDubbedVolume()).toBe(1);
+    // Deferred apply early-returns at full gain; the only player gain write
+    // is the engine-startup threading of the constructor value.
+    await vi.waitFor(() => expect(controller.currentSession.audioPathReady).toBe(true));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(controller.currentSession.dubbedVolume).toBe(1);
+    expect(engine.getDubbedVolume()).toBe(1);
+    expect(outputPlayer.setVolume).toHaveBeenCalledWith(1);
+
+    await controller.dispose('session-1', 'gemini');
+  });
+
   it('keeps PCM capture ready when deferred original audio fails', async () => {
     const track = new FakeTrack();
     const notify = vi.fn();
@@ -990,6 +1106,314 @@ describe('LiveDubbingController', () => {
     });
     expect(session.originalVolume).toBe(0);
     expect(controller.currentSession).toBeNull();
+  });
+
+  it('routes dubbed-volume offscreen actions and stores pre-target values without lifecycle change', () => {
+    expect(new LiveDubbingController().handles(LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN)).toBe(true);
+    expect(new LiveDubbingController().handles(LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN)).toBe(true);
+
+    // PCM pre-engine: no audio engine yet, stores only.
+    const pcm = new LiveDubbingController();
+    pcm.prepare('session-1', 'gemini', null, 0);
+    const pcmSession = pcm.currentSession;
+    expect(pcmSession.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.PCM);
+    const pcmBefore = { eventSequence: pcmSession.eventSequence, status: pcmSession.status };
+
+    expect(pcm.handle({
+      action: LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN,
+      data: { sessionId: 'session-1', providerId: 'gemini', volume: 0.4, eventSequence: 0 },
+    })).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.4,
+    });
+    expect(pcmSession.dubbedVolume).toBe(0.4);
+    expect(pcmSession.audioEngine).toBeNull();
+    expect(pcmSession).toMatchObject(pcmBefore);
+
+    // Media-stream pre-client: no provider client yet, stores only.
+    const ms = new LiveDubbingController({
+      providerRegistry: { getAudioMode: () => LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM, create: () => null },
+    });
+    ms.prepare('session-9', 'openai', null, 0);
+    const msSession = ms.currentSession;
+    expect(msSession.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
+    expect(ms.setDubbedVolume('session-9', 'openai', 0.3, 0)).toMatchObject({
+      success: true,
+      dubbedVolume: 0.3,
+    });
+    expect(msSession.dubbedVolume).toBe(0.3);
+    expect(msSession.providerClient).toBeNull();
+  });
+
+  it('reads the committed dubbed volume without touching lifecycle or audio state', () => {
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+    expect(controller.setDubbedVolume('session-1', 'gemini', 0.4, 0)).toMatchObject({
+      success: true,
+      dubbedVolume: 0.4,
+    });
+    const session = controller.currentSession;
+    const audioEngine = {
+      setDubbedVolume: vi.fn().mockResolvedValue(0.4),
+      getReadiness: () => ({}),
+    };
+    session.audioEngine = audioEngine;
+    session.audioPathReady = true;
+    const before = {
+      eventSequence: session.eventSequence,
+      status: session.status,
+      providerGeneration: session.providerGeneration,
+      dubbedVolumeRequestToken: session.dubbedVolumeRequestToken,
+      terminalRequested: session.terminalRequested,
+      dubbedVolume: session.dubbedVolume,
+    };
+
+    expect(controller.handle({
+      action: LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0 },
+    })).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.4,
+    });
+
+    expect(session).toMatchObject(before);
+    expect(audioEngine.setDubbedVolume).not.toHaveBeenCalled();
+    expect(controller.status()).not.toHaveProperty('dubbedVolume');
+  });
+
+  it.each([-1, 1.1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, '0.5', null])(
+    'rejects invalid dubbed volume %p without mutation', volume => {
+      const controller = new LiveDubbingController();
+      controller.prepare('session-1', 'gemini', null, 0);
+      const session = controller.currentSession;
+
+      expect(controller.setDubbedVolume('session-1', 'gemini', volume, 0)).toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_DUBBED_VOLUME_INVALID',
+      });
+      expect(session.dubbedVolume).toBe(1);
+      expect(session.eventSequence).toBe(0);
+      expect(session.status).toBe(LIVE_DUBBING_STATUS.PREPARING_CAPTURE);
+    },
+  );
+
+  it('rejects dubbed identity and sequence without changing the session fence', () => {
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+    const session = controller.currentSession;
+    const before = {
+      eventSequence: session.eventSequence,
+      status: session.status,
+      providerGeneration: session.providerGeneration,
+      dubbedVolume: session.dubbedVolume,
+    };
+
+    expect(controller.setDubbedVolume('other-session', 'gemini', 0.5, 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      ignored: true,
+    });
+    expect(controller.setDubbedVolume('session-1', 'openai', 0.5, 0)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_SESSION_MISMATCH',
+      ignored: true,
+    });
+    expect(controller.setDubbedVolume('session-1', 'gemini', 0.5, 1)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+      ignored: true,
+    });
+    expect(controller.getDubbedVolume('session-1', 'gemini', 1)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+      ignored: true,
+    });
+    expect(session).toMatchObject(before);
+  });
+
+  it('forwards PCM dubbed volume to the audio engine and commits only after success', async () => {
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+    const session = controller.currentSession;
+    const audioEngine = { setDubbedVolume: vi.fn().mockResolvedValue(0.6) };
+    session.audioEngine = audioEngine;
+    session.audioPathReady = true;
+    const before = {
+      eventSequence: session.eventSequence,
+      status: session.status,
+      providerGeneration: session.providerGeneration,
+      terminalRequested: session.terminalRequested,
+    };
+
+    await expect(controller.setDubbedVolume('session-1', 'gemini', 0.6, 0)).resolves.toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.6,
+    });
+    expect(audioEngine.setDubbedVolume).toHaveBeenCalledWith(0.6);
+    expect(session.dubbedVolume).toBe(0.6);
+    expect(session).toMatchObject(before);
+  });
+
+  it('forwards media-stream dubbed volume to the provider client', async () => {
+    const controller = new LiveDubbingController({
+      providerRegistry: { getAudioMode: () => LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM, create: () => null },
+    });
+    controller.prepare('session-9', 'openai', null, 0);
+    const session = controller.currentSession;
+    expect(session.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
+    const providerClient = { setDubbedVolume: vi.fn().mockResolvedValue(0.5) };
+    const audioEngine = { setDubbedVolume: vi.fn().mockResolvedValue(0.5) };
+    session.providerClient = providerClient;
+    session.audioEngine = audioEngine;
+    session.audioPathReady = true;
+
+    await expect(controller.setDubbedVolume('session-9', 'openai', 0.5, 0)).resolves.toEqual({
+      success: true,
+      sessionId: 'session-9',
+      providerId: 'openai',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.5,
+    });
+    expect(providerClient.setDubbedVolume).toHaveBeenCalledWith(0.5);
+    expect(audioEngine.setDubbedVolume).not.toHaveBeenCalled();
+    expect(session.dubbedVolume).toBe(0.5);
+  });
+
+  it('media-stream active SET failure rolls back to previous committed value with LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE', async () => {
+    const notify = vi.fn();
+    const controller = new LiveDubbingController({
+      providerRegistry: { getAudioMode: () => LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM, create: () => null },
+      notify,
+    });
+    controller.prepare('session-9', 'openai', null, 0);
+    const session = controller.currentSession;
+    expect(session.audioMode).toBe(LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM);
+    const providerClient = { setDubbedVolume: vi.fn().mockResolvedValue(undefined) };
+    const audioEngine = { setDubbedVolume: vi.fn().mockResolvedValue(undefined) };
+    session.providerClient = providerClient;
+    session.audioEngine = audioEngine;
+    session.audioPathReady = true;
+    const beforeGeneration = controller.providerGeneration;
+    const beforeSequence = session.eventSequence;
+    const beforeStatus = session.status;
+
+    await expect(controller.setDubbedVolume('session-9', 'openai', 0.7, 0)).resolves.toEqual({
+      success: true,
+      sessionId: 'session-9',
+      providerId: 'openai',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.7,
+    });
+    expect(session.dubbedVolume).toBe(0.7);
+
+    // Models the provider-client contract where an active-target assignment
+    // failure propagates instead of being swallowed pre-commit.
+    providerClient.setDubbedVolume.mockRejectedValueOnce(new Error('active dubbed target unavailable'));
+
+    await expect(controller.setDubbedVolume('session-9', 'openai', 0.2, 0)).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE',
+      sessionId: 'session-9',
+      providerId: 'openai',
+      eventSequence: beforeSequence,
+      status: beforeStatus,
+    });
+    // Rolled back: the committed 0.7 survives, the failed 0.2 never commits.
+    expect(session.dubbedVolume).toBe(0.7);
+    expect(providerClient.setDubbedVolume).toHaveBeenCalledWith(0.2);
+    // Best-effort reconciliation targets the committed value, never the PCM engine.
+    expect(providerClient.setDubbedVolume).toHaveBeenLastCalledWith(0.7);
+    expect(audioEngine.setDubbedVolume).not.toHaveBeenCalled();
+    // No lifecycle movement and no terminal/cleanup state.
+    expect(session.eventSequence).toBe(beforeSequence);
+    expect(session.status).toBe(beforeStatus);
+    expect(session.terminalRequested).toBe(false);
+    expect(session.disposing).toBe(false);
+    expect(session.providerClient).toBe(providerClient);
+    expect(controller.currentSession).toBe(session);
+    expect(controller.providerGeneration).toBe(beforeGeneration);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('returns superseded dubbed latest-wins success and reconciles failures without terminalizing', async () => {
+    const deferred = [];
+    const controller = new LiveDubbingController();
+    controller.prepare('session-1', 'gemini', null, 0);
+    const session = controller.currentSession;
+    const audioEngine = {
+      setDubbedVolume: vi.fn(volume => new Promise(resolve => {
+        deferred.push({ volume, resolve });
+      })),
+    };
+    session.audioEngine = audioEngine;
+    session.audioPathReady = true;
+
+    const first = controller.setDubbedVolume('session-1', 'gemini', 0.2, 0);
+    const second = controller.setDubbedVolume('session-1', 'gemini', 0.8, 0);
+    await vi.waitFor(() => expect(audioEngine.setDubbedVolume).toHaveBeenCalledTimes(2));
+
+    deferred[1].resolve(0.8);
+    await expect(second).resolves.toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.8,
+    });
+    expect(session.dubbedVolume).toBe(0.8);
+
+    deferred[0].resolve(0.2);
+    await expect(first).resolves.toEqual({
+      success: true,
+      ignored: true,
+      superseded: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+      dubbedVolume: 0.8,
+    });
+    expect(session.dubbedVolume).toBe(0.8);
+    expect(session.eventSequence).toBe(0);
+
+    // Non-terminal failure reconciles the target back to the committed value.
+    const failing = new LiveDubbingController({ notify: vi.fn() });
+    failing.prepare('session-2', 'gemini', null, 0);
+    const failingSession = failing.currentSession;
+    failingSession.audioEngine = {
+      setDubbedVolume: vi.fn().mockRejectedValue(new Error('dubbed unavailable')),
+    };
+    failingSession.audioPathReady = true;
+    const beforeGeneration = failing.providerGeneration;
+
+    await expect(failing.setDubbedVolume('session-2', 'gemini', 0.6, 0)).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE',
+      sessionId: 'session-2',
+      providerId: 'gemini',
+      eventSequence: 0,
+      status: LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+    });
+    expect(failingSession.dubbedVolume).toBe(1);
+    expect(failingSession.status).toBe(LIVE_DUBBING_STATUS.PREPARING_CAPTURE);
+    expect(failingSession.terminalRequested).toBe(false);
+    expect(failing.providerGeneration).toBe(beforeGeneration);
+    expect(failing.currentSession).toBe(failingSession);
   });
 
   it('requires an explicit zero sequence for the initial prepare', () => {
@@ -2436,6 +2860,65 @@ describe('LiveDubbingController media-stream audio path', () => {
 
     await controller.dispose('session-1', 'gemini');
     expect(mediaClient.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('seeds a newly-created media-stream provider with the PREPARE dubbed volume before connect', async () => {
+    const order = [];
+    const { controller } = createMediaStreamHarness({
+      makeClient: callbacks => ({
+        setDubbedVolume: vi.fn(async volume => {
+          order.push(['setDubbedVolume', volume]);
+        }),
+        connect: vi.fn(async () => {
+          order.push(['connect']);
+          callbacks.onSetupComplete();
+        }),
+        dispose: vi.fn(async () => {}),
+      }),
+    });
+
+    controller.prepare('session-1', 'gemini', 'fr', 0, { dubbedVolume: 0.3 });
+    expect(controller.currentSession.dubbedVolume).toBe(0.3);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+
+    const connected = await controller.connectProvider('session-1', 'gemini', 'fr', 2);
+    expect(connected).toMatchObject({ ack: 'PROVIDER_READY' });
+    expect(order).toEqual([['setDubbedVolume', 0.3], ['connect']]);
+    expect(controller.currentSession.dubbedVolume).toBe(0.3);
+
+    await controller.dispose('session-1', 'gemini');
+  });
+
+  it('seeds a newly-created media-stream provider with a pre-connect runtime SET before connect', async () => {
+    const order = [];
+    const { controller } = createMediaStreamHarness({
+      makeClient: callbacks => ({
+        setDubbedVolume: vi.fn(async volume => {
+          order.push(['setDubbedVolume', volume]);
+        }),
+        connect: vi.fn(async () => {
+          order.push(['connect']);
+          callbacks.onSetupComplete();
+        }),
+        dispose: vi.fn(async () => {}),
+      }),
+    });
+
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    expect(controller.currentSession.dubbedVolume).toBe(1);
+    expect(controller.setDubbedVolume('session-1', 'gemini', 0.4, 0)).toMatchObject({
+      success: true,
+      dubbedVolume: 0.4,
+    });
+    expect(controller.currentSession.dubbedVolume).toBe(0.4);
+    await controller.consume('session-1', 'gemini', 'stream-secret', 1);
+
+    const connected = await controller.connectProvider('session-1', 'gemini', 'fr', 2);
+    expect(connected).toMatchObject({ ack: 'PROVIDER_READY' });
+    expect(order).toEqual([['setDubbedVolume', 0.4], ['connect']]);
+    expect(controller.currentSession.dubbedVolume).toBe(0.4);
+
+    await controller.dispose('session-1', 'gemini');
   });
 
   it('drives the production OpenAI identity through the media-stream path', async () => {

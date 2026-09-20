@@ -859,6 +859,210 @@ describe('LiveDubbingCoordinator', () => {
     await storageManager.remove(['LIVE_DUBBING_ORIGINAL_VOLUME']);
   });
 
+  it.each([
+    LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+    LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+    LIVE_DUBBING_STATUS.RUNNING,
+  ])('sets dubbed volume during %s without changing lifecycle state', async status => {
+    const harness = createVolumeHarness(status);
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => ({
+      success: true,
+      sessionId: message.data.sessionId,
+      providerId: message.data.providerId,
+      eventSequence: message.data.eventSequence,
+      status,
+      dubbedVolume: message.data.volume,
+    }));
+
+    const result = await harness.coordinator.setDubbedVolume({
+      action: LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        volume: 0.7,
+      },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status,
+      dubbedVolume: 0.7,
+    });
+    expect(harness.browserAPI.runtime.sendMessage).toHaveBeenCalledWith({
+      target: 'offscreen',
+      action: LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        volume: 0.7,
+      },
+    });
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.browserAPI.storage.session.remove).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ status, eventSequence: 4 });
+    await storageManager.remove(['LIVE_DUBBING_DUBBED_VOLUME']).catch(() => {});
+  });
+
+  it('rejects invalid dubbed volume before reading a session', async () => {
+    const harness = createVolumeHarness();
+
+    await expect(harness.coordinator.setDubbedVolume({
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4, volume: null },
+    })).resolves.toEqual({ success: false, error: 'LIVE_DUBBING_DUBBED_VOLUME_INVALID' });
+    await expect(harness.coordinator.setDubbedVolume({
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4, volume: 1.5 },
+    })).resolves.toEqual({ success: false, error: 'LIVE_DUBBING_DUBBED_VOLUME_INVALID' });
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['session', { sessionId: 'other' }, 'LIVE_DUBBING_SESSION_MISMATCH'],
+    ['provider', { providerId: 'openai' }, 'LIVE_DUBBING_SESSION_MISMATCH'],
+    ['event sequence', { eventSequence: 3 }, 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH'],
+  ])('rejects a dubbed %s fence mismatch without lifecycle mutation', async (_label, data, error) => {
+    const harness = createVolumeHarness();
+    const messageData = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      volume: 0.5,
+      ...data,
+    };
+
+    await expect(harness.coordinator.setDubbedVolume({ data: messageData }))
+      .resolves.toEqual({ success: false, error });
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+  });
+
+  it('normalizes dubbed offscreen control failures without terminal mutation', async () => {
+    const harness = createVolumeHarness();
+    harness.browserAPI.runtime.sendMessage.mockRejectedValue(new Error('offscreen unavailable'));
+
+    await expect(harness.coordinator.setDubbedVolume({
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4, volume: 0.5 },
+    })).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE',
+    });
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.storage.has(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBe(false);
+  });
+
+  it('preserves superseded dubbed latest-wins responses without persisting', async () => {
+    const harness = createVolumeHarness();
+    harness.browserAPI.runtime.sendMessage.mockResolvedValue({
+      success: true,
+      ignored: true,
+      superseded: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      dubbedVolume: 0.8,
+    });
+
+    await expect(harness.coordinator.setDubbedVolume({
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4, volume: 0.2 },
+    })).resolves.toEqual({
+      success: true,
+      ignored: true,
+      superseded: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      dubbedVolume: 0.8,
+    });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ eventSequence: 4 });
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.browserAPI.storage.session.remove).not.toHaveBeenCalled();
+    expect(harness.coordinator._latestAcceptedDubbedVolume ?? null).toBeNull();
+  });
+
+  it.each([
+    LIVE_DUBBING_STATUS.PREPARING_CAPTURE,
+    LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+    LIVE_DUBBING_STATUS.RUNNING,
+  ])('reads the committed dubbed volume during %s without changing lifecycle state', async status => {
+    const harness = createVolumeHarness(status);
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => ({
+      success: true,
+      sessionId: message.data.sessionId,
+      providerId: message.data.providerId,
+      eventSequence: message.data.eventSequence,
+      status,
+      dubbedVolume: 0.4,
+    }));
+
+    const result = await harness.coordinator.getDubbedVolume({
+      action: LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4 },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status,
+      dubbedVolume: 0.4,
+    });
+    expect(harness.browserAPI.runtime.sendMessage).toHaveBeenCalledWith({
+      target: 'offscreen',
+      action: LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4 },
+    });
+    expect(harness.browserAPI.storage.session.set).not.toHaveBeenCalled();
+    expect(harness.browserAPI.storage.session.remove).not.toHaveBeenCalled();
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ status, eventSequence: 4 });
+    expect(harness.storage.has(LIVE_DUBBING_OUTCOME_STORAGE_KEY)).toBe(false);
+  });
+
+  it('persists the accepted dubbed volume independently without touching original state', async () => {
+    await storageManager.remove(['LIVE_DUBBING_DUBBED_VOLUME']);
+    const harness = createVolumeHarness();
+    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => ({
+      success: true,
+      sessionId: message.data.sessionId,
+      providerId: message.data.providerId,
+      eventSequence: message.data.eventSequence,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      dubbedVolume: message.data.volume,
+    }));
+
+    const result = await harness.coordinator.setDubbedVolume({
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 4, volume: 0.6 },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      status: LIVE_DUBBING_STATUS.RUNNING,
+      dubbedVolume: 0.6,
+    });
+    // Immediate next START observes the newest dubbed value: the detached
+    // writer records it in memory synchronously during SET.
+    expect(harness.coordinator._latestAcceptedDubbedVolume).toBe(0.6);
+    // Persistence is detached — let the coalesced writer fire before reading.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await expect(storageManager.get({ LIVE_DUBBING_DUBBED_VOLUME: null }))
+      .resolves.toEqual({ LIVE_DUBBING_DUBBED_VOLUME: 0.6 });
+    expect(harness.storage.get(LIVE_DUBBING_STORAGE_KEY)).toMatchObject({ eventSequence: 4 });
+    // Original-volume memory and queue stay untouched by a dubbed SET.
+    expect(harness.coordinator._latestAcceptedOriginalVolume ?? null).toBeNull();
+    expect(harness.coordinator._volumePreferenceWrites?.latestValue ?? null).toBeNull();
+    await storageManager.remove(['LIVE_DUBBING_DUBBED_VOLUME']);
+  });
+
   it('uses the injected runtime gateway when platform methods are unavailable on API objects', async () => {
     const harness = createHarness();
     const platformSendMessage = harness.browserAPI.runtime.sendMessage;

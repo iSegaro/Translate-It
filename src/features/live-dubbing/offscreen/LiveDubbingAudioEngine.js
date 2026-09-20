@@ -5,6 +5,7 @@ import { OriginalAudioMonitor } from './OriginalAudioMonitor.js';
 
 const AUDIO_PIPELINES_UNAVAILABLE = 'LIVE_DUBBING_AUDIO_PIPELINES_UNAVAILABLE';
 const DEFAULT_ORIGINAL_VOLUME = 0;
+const DEFAULT_DUBBED_VOLUME = 1;
 
 function getCallback(options, callbacks, name) {
   return options[name] || callbacks?.[name] || null;
@@ -33,6 +34,19 @@ function invokeCallback(callback, ...args) {
  * boundary with the same RangeError.
  */
 function normalizeOriginalVolume(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new RangeError('volume must be a finite number between 0 and 1');
+  }
+  return value;
+}
+
+/**
+ * Dubbed-output gain policy, mirroring the PCM player semantics: a
+ * normalized 0-1 ratio, never a percentage. The player re-validates on
+ * creation and volume updates, so this identical check only fails fast at
+ * the engine boundary with the same RangeError.
+ */
+function normalizeDubbedVolume(value) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
     throw new RangeError('volume must be a finite number between 0 and 1');
   }
@@ -103,6 +117,12 @@ export class LiveDubbingAudioEngine {
         : options.originalAudioVolume !== undefined
           ? options.originalAudioVolume
           : DEFAULT_ORIGINAL_VOLUME,
+    );
+    // Only an omitted dubbed volume defaults to full gain; explicit null
+    // and any other invalid value throw the same RangeError as the
+    // setter/player.
+    this.dubbedVolume = normalizeDubbedVolume(
+      options.dubbedVolume !== undefined ? options.dubbedVolume : DEFAULT_DUBBED_VOLUME,
     );
 
     this.inputPipeline = null;
@@ -290,7 +310,9 @@ export class LiveDubbingAudioEngine {
     if (!player && typeof this.outputPlayerFactory === 'function') {
       player = await this.outputPlayerFactory(callbacks);
     }
-    if (!player) player = new PcmOutputPlayer({ ...this.outputPlayerOptions, ...callbacks });
+    if (!player) {
+      player = new PcmOutputPlayer({ ...this.outputPlayerOptions, ...callbacks, volume: this.dubbedVolume });
+    }
     if (typeof this.callbacks.onOutputError === 'function') {
       player.onError = this.callbacks.onOutputError;
     }
@@ -298,6 +320,11 @@ export class LiveDubbingAudioEngine {
     if (typeof this.callbacks.onPlaybackAccepted === 'function') {
       player.onPlaybackAccepted = this.callbacks.onPlaybackAccepted;
     }
+    // Apply the latest dubbed gain before audible playback: stored-only for
+    // a player that has not started yet, a live gain update for a running
+    // one. Players without setVolume keep their own gain. Never restarts or
+    // recreates the player and never touches the original-audio monitor.
+    player.setVolume?.(this.dubbedVolume);
     invokeCallback(this.callbacks.onOutputCreated, player);
     return player;
   }
@@ -393,6 +420,23 @@ export class LiveDubbingAudioEngine {
 
   getOriginalVolume() {
     return this.originalVolume;
+  }
+
+  /**
+   * Set the dubbed (translated) output gain. Before start the value is only
+   * stored and reaches the player on creation; after start it delegates to
+   * the active player's gain without restart or recreation. Never affects
+   * the original-audio monitor. Rejects invalid volumes with RangeError.
+   */
+  setDubbedVolume(volume) {
+    const normalized = normalizeDubbedVolume(volume);
+    this.dubbedVolume = normalized;
+    this.outputPlayer?.setVolume?.(normalized);
+    return normalized;
+  }
+
+  getDubbedVolume() {
+    return this.dubbedVolume;
   }
 
   async _createOriginalMonitor() {
