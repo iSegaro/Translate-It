@@ -19,6 +19,7 @@
   background: var(--language-controls-bg-color);
   box-sizing: border-box;
   width: 100%;
+  min-height: 40px;
 }
 
 .live-dubbing-view .live-dubbing-language-controls > .ti-language-controls {

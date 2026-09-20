@@ -9,6 +9,31 @@
   border-radius: 8px;
   background-color: var(--color-surface-variant, rgba(0, 0, 0, 0.06));
   flex-shrink: 0;
+
+  /* Dark theme: hover mirrors PopupHeader's dark hover family;
+     active background stays clearly distinguishable and the
+     light-only shadow is replaced with a darker glow.
+     Nested under .ti-popup-view-switcher so `&` has a valid
+     parent selector inside @at-root. */
+  @at-root :global(.ti-dark-mode) &,
+           :global(.theme-dark) & {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+
+    .ti-popup-view-switcher__tab {
+      color: var(--color-text-secondary, #adb5bd);
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: var(--color-text, #e9ecef) !important;
+      }
+
+      &.is-active {
+        background-color: #2d2d2d !important;
+        color: var(--color-primary, #4dabf7) !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+      }
+    }
+  }
 }
 
 .ti-popup-view-switcher__tab {
