@@ -665,6 +665,20 @@ export function isLiveDubbingProviderId(value) {
 }
 
 /**
+ * Shared live-dubbing volume preference validator. A normalized 0-1 gain is
+ * returned as-is; anything else (out of range, NaN, Infinity, strings,
+ * null, malformed) falls back to the caller-supplied default.
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number}
+ */
+export function normalizeLiveDubbingVolume(value, fallback) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+    ? value
+    : fallback;
+}
+
+/**
  * Keep storage records limited to the public control-plane descriptor.
  * @param {unknown} value
  * @returns {object|null}
@@ -749,8 +763,11 @@ function baseOffscreenMessage(action, descriptor) {
   };
 }
 
-export function createPrepareMessage(descriptor) {
-  return baseOffscreenMessage(LIVE_DUBBING_ACTIONS.PREPARE, descriptor);
+export function createPrepareMessage(descriptor, initialVolumes = {}) {
+  const message = baseOffscreenMessage(LIVE_DUBBING_ACTIONS.PREPARE, descriptor);
+  message.data.originalVolume = normalizeLiveDubbingVolume(initialVolumes.originalVolume, 0);
+  message.data.dubbedVolume = normalizeLiveDubbingVolume(initialVolumes.dubbedVolume, 1);
+  return message;
 }
 
 export function createConsumeMessage(descriptor, streamId) {

@@ -82,6 +82,47 @@ describe('Settings Migrations', () => {
     expect(second.updates.LIVE_DUBBING_PROVIDER).toBeUndefined();
   });
 
+  it('should add missing Live Dubbing volume preferences from canonical defaults', async () => {
+    const { updates, logs } = await runSettingsMigrations({});
+
+    expect(updates.LIVE_DUBBING_ORIGINAL_VOLUME).toBe(0);
+    expect(updates.LIVE_DUBBING_DUBBED_VOLUME).toBe(1);
+    expect(logs).toContain('Added missing setting: LIVE_DUBBING_ORIGINAL_VOLUME');
+    expect(logs).toContain('Added missing setting: LIVE_DUBBING_DUBBED_VOLUME');
+  });
+
+  it.each([0, 0.4, 1])('should preserve valid Live Dubbing original volume %p', async (volume) => {
+    const { updates } = await runSettingsMigrations({ LIVE_DUBBING_ORIGINAL_VOLUME: volume });
+
+    expect(updates.LIVE_DUBBING_ORIGINAL_VOLUME).toBeUndefined();
+  });
+
+  it.each([0, 0.4, 1])('should preserve valid Live Dubbing dubbed volume %p', async (volume) => {
+    const { updates } = await runSettingsMigrations({ LIVE_DUBBING_DUBBED_VOLUME: volume });
+
+    expect(updates.LIVE_DUBBING_DUBBED_VOLUME).toBeUndefined();
+  });
+
+  it.each([
+    [-0.5, 0], [1.5, 0], [Number.NaN, 0], [Number.POSITIVE_INFINITY, 0],
+    ['0.5', 0], [null, 0], [{}, 0], [[], 0], [undefined, 0],
+  ])('should normalize invalid Live Dubbing original volume %p to %p', async (stored, expected) => {
+    const { updates, logs } = await runSettingsMigrations({ LIVE_DUBBING_ORIGINAL_VOLUME: stored });
+
+    expect(updates.LIVE_DUBBING_ORIGINAL_VOLUME).toBe(expected);
+    expect(logs).toContain('Normalized LIVE_DUBBING_ORIGINAL_VOLUME to 0');
+  });
+
+  it.each([
+    [-0.5, 1], [1.5, 1], [Number.NaN, 1], [Number.NEGATIVE_INFINITY, 1],
+    ['0.5', 1], [null, 1], [{}, 1], [[], 1], [undefined, 1],
+  ])('should normalize invalid Live Dubbing dubbed volume %p to %p', async (stored, expected) => {
+    const { updates, logs } = await runSettingsMigrations({ LIVE_DUBBING_DUBBED_VOLUME: stored });
+
+    expect(updates.LIVE_DUBBING_DUBBED_VOLUME).toBe(expected);
+    expect(logs).toContain('Normalized LIVE_DUBBING_DUBBED_VOLUME to 1');
+  });
+
   it('should remove obsolete Microsoft Edge endpoint overrides', async () => {
     const { removals, logs } = await runSettingsMigrations({
       MICROSOFT_EDGE_AUTH_URL: 'https://edge.microsoft.com/translate/auth',

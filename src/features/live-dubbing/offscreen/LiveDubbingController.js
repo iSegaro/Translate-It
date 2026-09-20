@@ -15,6 +15,7 @@ import {
   createLiveDubbingCleanupDiagnostic,
   createLiveDubbingProviderDiagnostic,
   createProviderBootstrapRequest,
+  normalizeLiveDubbingVolume,
   isLiveDubbingProviderId,
   isLiveDubbingAudioMode,
   normalizeProviderTargetLanguage,
@@ -363,6 +364,10 @@ export class LiveDubbingController {
           getMessageValue(message, 'providerId'),
           getMessageValue(message, 'targetLanguage'),
           getEventSequence(message),
+          {
+            originalVolume: getMessageValue(message, 'originalVolume'),
+            dubbedVolume: getMessageValue(message, 'dubbedVolume'),
+          },
         );
       case LIVE_DUBBING_ACTIONS.CONSUME:
         return this.consume(
@@ -565,7 +570,13 @@ export class LiveDubbingController {
       });
   }
 
-  prepare(sessionId, providerId, targetLanguage = null, eventSequence = undefined) {
+  prepare(sessionId, providerId, targetLanguage = null, eventSequence = undefined, initialVolumes = {}) {
+    // Runtime-only volume authorities seeded from persisted preferences
+    // carried by the PREPARE message. Validated here; malformed values fall
+    // back to silence for original audio and full gain for dubbed audio.
+    // Repeat PREPARE for the same session never reseeds these fields.
+    const initialOriginalVolume = normalizeLiveDubbingVolume(initialVolumes?.originalVolume, 0);
+    const initialDubbedVolume = normalizeLiveDubbingVolume(initialVolumes?.dubbedVolume, 1);
     const sequenceError = this._requiredEventSequence(sessionId, eventSequence, providerId);
     if (sequenceError) return sequenceError;
     if (!isProviderId(providerId)) return this._invalidProvider(sessionId);
@@ -703,8 +714,9 @@ export class LiveDubbingController {
         outputPlayer: null,
         pipelinesReady: false,
         audioMode,
-        originalVolume: 0,
+        originalVolume: initialOriginalVolume,
         originalVolumeRequestToken: 0,
+        dubbedVolume: initialDubbedVolume,
         audioPathReady: false,
         pendingInput: [],
         pendingInputMs: 0,

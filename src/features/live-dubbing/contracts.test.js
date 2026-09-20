@@ -4,6 +4,8 @@ import {
   createDescriptor,
   createOriginalVolumeMessage,
   createOriginalVolumeQueryMessage,
+  createPrepareMessage,
+  normalizeLiveDubbingVolume,
   createLiveDubbingProviderDiagnostic,
   createProviderBootstrapRequest,
   createProviderBootstrapResponse,
@@ -174,6 +176,44 @@ describe('live dubbing Stage 2 contracts', () => {
       }, volume)).toThrow();
     },
   );
+
+  it.each([
+    [0, 0, 0], [1, 1, 1], [0.4, 0.25, 0.4],
+    [-0.5, 0, 0], [1.5, 0, 0], [Number.NaN, 0, 0],
+    [Number.POSITIVE_INFINITY, 1, 1], [Number.NEGATIVE_INFINITY, 1, 1],
+    ['0.5', 0, 0], ['0.5', 1, 1], [null, 0, 0], [null, 1, 1],
+    [undefined, 0, 0], [undefined, 1, 1], [{}, 0, 0], [[], 1, 1],
+  ])('normalizes live-dubbing volume %p to %p with fallback %p', (value, fallback, expected) => {
+    expect(normalizeLiveDubbingVolume(value, fallback)).toBe(expected);
+  });
+
+  it('carries normalized initial volumes on the prepare message', () => {
+    const descriptor = {
+      sessionId: 'session-1',
+      tabId: 42,
+      providerId: 'gemini',
+      targetLanguage: 'en',
+      eventSequence: 0,
+    };
+
+    expect(createPrepareMessage(descriptor, { originalVolume: 0.4, dubbedVolume: 0.9 })).toMatchObject({
+      target: 'offscreen',
+      action: LIVE_DUBBING_ACTIONS.PREPARE,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 0,
+        originalVolume: 0.4,
+        dubbedVolume: 0.9,
+      },
+    });
+    expect(createPrepareMessage(descriptor)).toMatchObject({
+      data: { originalVolume: 0, dubbedVolume: 1 },
+    });
+    expect(createPrepareMessage(descriptor, { originalVolume: 'loud', dubbedVolume: 7 })).toMatchObject({
+      data: { originalVolume: 0, dubbedVolume: 1 },
+    });
+  });
 
   it('builds an exact original-volume query message without a volume payload', () => {
     const descriptor = {

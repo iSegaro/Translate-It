@@ -23,6 +23,7 @@ import { HISTORICAL_PROMPT_DEFAULTS } from './promptHistoricalDefaults.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { LIVE_DUBBING_PROVIDER_ID, LIVE_DUBBING_PROVIDER_IDS } from '@/features/live-dubbing/constants.js';
+import { normalizeLiveDubbingVolume } from '@/features/live-dubbing/contracts.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONFIG, 'SettingsMigrations');
 
@@ -81,6 +82,27 @@ function normalizeLiveDubbingProvider(currentSettings, updates, migrationLog) {
 
   updates.LIVE_DUBBING_PROVIDER = LIVE_DUBBING_PROVIDER_ID;
   migrationLog.push(`Normalized LIVE_DUBBING_PROVIDER to ${LIVE_DUBBING_PROVIDER_ID}`);
+}
+
+/**
+ * Normalize explicitly stored Live Dubbing volume preferences. Malformed
+ * values fall back to their persisted defaults (Original 0, Dubbed 1)
+ * without affecting unrelated settings. Missing values are filled by the
+ * canonical persisted-default pass below.
+ */
+function normalizeLiveDubbingVolumes(currentSettings, updates, migrationLog) {
+  const volumeKeys = [
+    ['LIVE_DUBBING_ORIGINAL_VOLUME', 0],
+    ['LIVE_DUBBING_DUBBED_VOLUME', 1],
+  ];
+  for (const [key, fallback] of volumeKeys) {
+    if (!Object.prototype.hasOwnProperty.call(currentSettings, key)) continue;
+    const normalized = normalizeLiveDubbingVolume(currentSettings[key], fallback);
+    if (normalized !== currentSettings[key]) {
+      updates[key] = normalized;
+      migrationLog.push(`Normalized ${key} to ${normalized}`);
+    }
+  }
 }
 
 /**
@@ -255,6 +277,10 @@ function runMainMigration(currentSettings) {
   // Normalize only an explicitly stored invalid provider. Missing values are
   // handled by the generic persisted-default migration below.
   normalizeLiveDubbingProvider(currentSettings, updates, migrationLog);
+
+  // Normalize explicitly stored invalid volume preferences; missing values
+  // are filled by the generic persisted-default migration below.
+  normalizeLiveDubbingVolumes(currentSettings, updates, migrationLog);
   
   // Migrate Bilingual Mode keys
   migrateBilingualModeKeys(currentSettings, updates, migrationLog);

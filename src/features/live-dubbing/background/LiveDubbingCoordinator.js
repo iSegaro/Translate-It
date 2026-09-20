@@ -25,6 +25,7 @@ import {
   createDescriptor,
   createOriginalVolumeMessage,
   createOriginalVolumeQueryMessage,
+  normalizeLiveDubbingVolume,
   createProviderConnectMessage,
   createPrepareMessage,
   createSessionMessage,
@@ -125,6 +126,30 @@ async function defaultHasConfiguredCredentials(providerId) {
 }
 
 /**
+ * Read persisted live-dubbing volume preferences through the shared storage
+ * path. Always bypasses cache so START from any context observes the latest
+ * persisted preference; every failure falls back to the persisted defaults.
+ * Dynamic import keeps this module loadable where extension storage is
+ * unavailable.
+ * @returns {Promise<{originalVolume: number, dubbedVolume: number}>}
+ */
+async function readPersistedVolumePreferences() {
+  try {
+    const { storageManager } = await import('@/shared/storage/core/StorageCore.js');
+    const stored = await storageManager.getFresh({
+      LIVE_DUBBING_ORIGINAL_VOLUME: 0,
+      LIVE_DUBBING_DUBBED_VOLUME: 1,
+    });
+    return {
+      originalVolume: normalizeLiveDubbingVolume(stored?.LIVE_DUBBING_ORIGINAL_VOLUME, 0),
+      dubbedVolume: normalizeLiveDubbingVolume(stored?.LIVE_DUBBING_DUBBED_VOLUME, 1),
+    };
+  } catch {
+    return { originalVolume: 0, dubbedVolume: 1 };
+  }
+}
+
+/**
  * Owns one Chrome tab-capture control-plane session.
  * No media, provider bootstrap, transcript, WebSocket URL, or stream ID is
  * placed in descriptor storage or returned to UI callers.
@@ -146,6 +171,7 @@ export class LiveDubbingCoordinator {
       ? options.hasConfiguredCredentials
       : defaultHasConfiguredCredentials;
     this.sessionRegistry = options.sessionRegistry || new LiveDubbingSessionRegistry();
+    this.volumePreferencesReader = options.volumePreferencesReader || readPersistedVolumePreferences;
     this.stateStore = options.stateStore
       || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
     this.transition = Promise.resolve();
@@ -314,6 +340,13 @@ export class LiveDubbingCoordinator {
     }
 
     const isSupersededVolume = responseData?.superseded === true;
+    if (!isSupersededVolume) {
+      // Persist only the latest-wins winner. Failed, stale, and superseded
+      // outcomes never persist; persistence itself is best effort, detached
+      // from the runtime SET response so a slow storage write can never block
+      // or delay runtime control.
+      this._persistOriginalVolumePreference(responseData.originalVolume);
+    }
     return {
       success: true,
       sessionId: current.sessionId,
@@ -323,6 +356,104 @@ export class LiveDubbingCoordinator {
       originalVolume: responseData.originalVolume,
       ...(isSupersededVolume ? { ignored: true, superseded: true } : {}),
     };
+  }
+
+  /**
+   * Read persisted volume preferences fresh for session init. Never throws:
+   * any reader or storage failure falls back to the persisted defaults.
+   * Layers the coordinator-memory newest accepted Original Volume on top of
+   * the fresh storage read only while that value is not yet safely persisted,
+   * so an immediate subsequent START observes the user's latest accepted
+   * value even while persistence is still in flight, without ever waiting on
+   * storage. Once the newest accepted value has persisted, fresh storage is
+   * authoritative again for cross-context synchronization.
+   */
+  async _readVolumePreferences() {
+    let persisted = { originalVolume: 0, dubbedVolume: 1 };
+    try {
+      const preferences = await this.volumePreferencesReader();
+      if (preferences && typeof preferences === 'object') {
+        persisted = {
+          originalVolume: normalizeLiveDubbingVolume(preferences.originalVolume, 0),
+          dubbedVolume: normalizeLiveDubbingVolume(preferences.dubbedVolume, 1),
+        };
+      }
+    } catch {
+      // Fall through to defaults below.
+    }
+    const memoryOverride = this._latestAcceptedOriginalVolume;
+    if (Number.isFinite(memoryOverride) && memoryOverride >= 0 && memoryOverride <= 1) {
+      persisted.originalVolume = memoryOverride;
+    }
+    return persisted;
+  }
+
+  /**
+   * Best-effort persistence of the accepted original volume. Never throws,
+   * never terminalizes, and never changes runtime fencing or results.
+   *
+   * Coalesces accepted SETs: a newer accepted volume supersedes any in-flight
+   * write, so a slow older completion cannot leave storage with an older
+   * value. Each accepted SET bumps a sequence number; before storage is
+   * touched the queue confirms its sequence is still the latest and aborts
+   * the superseded write without writing. Persistence failures are swallowed
+   * and never reach the runtime result. The writer is detached from the
+   * runtime SET path so a slow or hanging storage write can never block or
+   * delay runtime control; the accepted value is also recorded in memory so
+   * an immediate subsequent START observes the latest user choice while
+   * persistence is still in flight.
+   */
+  _persistOriginalVolumePreference(volume) {
+    if (!Number.isFinite(volume) || volume < 0 || volume > 1) return;
+    const pending = this._volumePreferenceWrites || (this._volumePreferenceWrites = {
+      seq: 0,
+      latestSeq: 0,
+      latestValue: null,
+      inflight: null,
+    });
+    pending.latestSeq = ++pending.seq;
+    pending.latestValue = volume;
+    this._latestAcceptedOriginalVolume = volume;
+    this._latestAcceptedOriginalVolumeSeq = pending.latestSeq;
+    if (pending.inflight) return;
+    pending.inflight = (async () => {
+      try {
+        const { storageManager } = await import('@/shared/storage/core/StorageCore.js');
+        while (pending.latestSeq !== 0) {
+          const seq = pending.latestSeq;
+          const value = pending.latestValue;
+          pending.latestSeq = 0;
+          pending.latestValue = null;
+          if (seq !== pending.seq) {
+            // A newer accepted SET superseded this one before its write began.
+            continue;
+          }
+          try {
+            await storageManager.set({ LIVE_DUBBING_ORIGINAL_VOLUME: value });
+            // Memory override lives only until the newest accepted value is
+            // safely persisted. Clear it only when this completed write still
+            // represents the current latest accepted sequence/value; an older
+            // write finishing after a newer SET, a failed write, or a stale
+            // value must leave the newer memory override intact.
+            if (seq === pending.seq
+              && seq === this._latestAcceptedOriginalVolumeSeq
+              && value === this._latestAcceptedOriginalVolume) {
+              this._latestAcceptedOriginalVolume = null;
+              this._latestAcceptedOriginalVolumeSeq = 0;
+            }
+          } catch {
+            // Runtime state stays authoritative when persistence is unavailable.
+            // Keep the memory override so a subsequent START still observes
+            // the newest accepted value.
+          }
+        }
+      } catch {
+        // Defensive: never let the detached writer reject.
+      } finally {
+        pending.inflight = null;
+      }
+    })();
+    pending.inflight.catch(() => {});
   }
 
   /**
@@ -952,9 +1083,14 @@ export class LiveDubbingCoordinator {
       if (!leaseAcquired) throw new Error('offscreen lease unavailable');
 
       if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
+      // Fresh persisted volume preferences seed the offscreen session's
+      // runtime authorities. Read here (never from a UI store) so START from
+      // any context observes the latest values; volumes stay out of the
+      // persisted descriptor and never move the event sequence.
+      const initialVolumes = await this._readVolumePreferences();
       const prepareResponse = await this._sendCaptureStage(
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
-        createPrepareMessage(descriptor),
+        createPrepareMessage(descriptor, initialVolumes),
       );
       if (!isAcknowledgedForSession(prepareResponse, 'READY', descriptor.sessionId, descriptor.providerId)) {
         throw createCaptureStageFailure(

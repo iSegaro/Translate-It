@@ -107,6 +107,8 @@ export const CONFIG = {
 
   // --- Live Dubbing Settings ---
   LIVE_DUBBING_PROVIDER: LIVE_DUBBING_PROVIDER_ID,
+  LIVE_DUBBING_ORIGINAL_VOLUME: 0,
+  LIVE_DUBBING_DUBBED_VOLUME: 1,
 
   // --- Mode Specific Provider Settings (Generated Dynamically) ---
   MODE_PROVIDERS: Object.fromEntries(

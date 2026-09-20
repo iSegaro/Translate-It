@@ -664,6 +664,41 @@ describe('LiveDubbingController', () => {
     expect(session.originalVolume).toBe(0);
   });
 
+  it.each([
+    [{ originalVolume: 0.7, dubbedVolume: 0.3 }, 0.7, 0.3],
+    [{}, 0, 1],
+    [{ originalVolume: 'loud', dubbedVolume: 'loud' }, 0, 1],
+    [{ originalVolume: -1, dubbedVolume: 2 }, 0, 1],
+    [{ originalVolume: Number.NaN, dubbedVolume: null }, 0, 1],
+  ])('seeds a new session from persisted volumes %p', (volumes, originalVolume, dubbedVolume) => {
+    const controller = new LiveDubbingController();
+    const response = controller.handle({
+      action: LIVE_DUBBING_ACTIONS.PREPARE,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0, ...volumes },
+    });
+
+    expect(response).toMatchObject({ success: true });
+    expect(controller.currentSession.originalVolume).toBe(originalVolume);
+    expect(controller.currentSession.dubbedVolume).toBe(dubbedVolume);
+    expect(controller.currentSession.eventSequence).toBe(0);
+  });
+
+  it('never reseeds volumes on repeat prepare for the same session', () => {
+    const controller = new LiveDubbingController();
+    controller.handle({
+      action: LIVE_DUBBING_ACTIONS.PREPARE,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0, originalVolume: 0.7, dubbedVolume: 0.3 },
+    });
+    expect(controller.currentSession.originalVolume).toBe(0.7);
+
+    controller.handle({
+      action: LIVE_DUBBING_ACTIONS.PREPARE,
+      data: { sessionId: 'session-1', providerId: 'gemini', eventSequence: 0, originalVolume: 0.1, dubbedVolume: 0.1 },
+    });
+    expect(controller.currentSession.originalVolume).toBe(0.7);
+    expect(controller.currentSession.dubbedVolume).toBe(0.3);
+  });
+
   it.each([-1, 1.1, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, '0.5', null])(
     'rejects invalid original volume %p without mutation', volume => {
       const controller = new LiveDubbingController();
