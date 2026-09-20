@@ -2191,4 +2191,850 @@ describe('LiveDubbingControl', () => {
     expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('—')
   })
 
+  // Dubbed Volume mirrors the Original Volume runtime contract while keeping
+  // request generations, throttling, recovery, and failure state independent.
+
+  describe('Dubbed Volume', () => {
+    const DUBBED_SLIDER_SELECTOR = '#ti-live-dubbing-dubbed-volume'
+    const getDubbedSlider = (wrapper) => wrapper.find(DUBBED_SLIDER_SELECTOR)
+    // The Dubbed value span is the second `.ti-live-dubbing-control-volume-value`
+    // (the first belongs to the Original lane).
+    const getDubbedValue = (wrapper) => wrapper.findAll('.ti-live-dubbing-control-volume-value')[1]
+    const dubbedValueText = (wrapper) => getDubbedValue(wrapper).text()
+    const runningStatus = (sessionId = 's1', eventSequence = 1) => ({
+      status: { status: 'RUNNING', sessionId, providerId: 'gemini', eventSequence }
+    })
+
+    it.each([
+      'PREPARING_CAPTURE',
+      'CONNECTING_PROVIDER',
+      'RUNNING',
+    ])('dubbed slider renders for a controllable %s session', async (status) => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({
+          status: { status, sessionId: 's1', providerId: 'gemini', eventSequence: 1 }
+        })
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+
+      expect(getDubbedSlider(wrapper).exists()).toBe(true)
+    })
+
+    it('runtime GET initializes the dubbed slider correctly', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+          success: true, dubbedVolume: 0.42
+        })
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(getDubbedSlider(wrapper).element.value).toBe('42')
+      expect(dubbedValueText(wrapper)).toBe('42%')
+      expect(getDubbedSlider(wrapper).attributes('disabled')).toBeUndefined()
+    })
+
+    it('UI 30 maps to backend 0.3', async () => {
+      vi.useFakeTimers()
+      try {
+        let setVolume = null
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.5
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            setVolume = data?.volume
+            return Promise.resolve({
+              success: true, dubbedVolume: setVolume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        await getDubbedSlider(wrapper).setValue(30)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(setVolume).toBe(0.3)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('backend 0.75 maps to UI 75', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+          success: true, dubbedVolume: 0.75
+        })
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(getDubbedSlider(wrapper).element.value).toBe('75')
+      expect(dubbedValueText(wrapper)).toBe('75%')
+    })
+
+    it('default new session displays 100', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+          success: true, dubbedVolume: 1
+        })
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(getDubbedSlider(wrapper).element.value).toBe('100')
+      expect(dubbedValueText(wrapper)).toBe('100%')
+    })
+
+    it('immediately displays optimistic dubbed volume on slider input', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+          success: true, dubbedVolume: 0.5
+        })
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+      expect(dubbedValueText(wrapper)).toBe('50%')
+
+      await getDubbedSlider(wrapper).setValue(75)
+      // No throttle advance: optimistic UI must already reflect the new value.
+      expect(dubbedValueText(wrapper)).toBe('75%')
+    })
+
+    it('coalesces rapid dubbed inputs within a throttle cycle', async () => {
+      vi.useFakeTimers()
+      try {
+        let setCallCount = 0
+        let lastSetVolume = null
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.5
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            setCallCount += 1
+            lastSetVolume = data?.volume
+            return Promise.resolve({
+              success: true, dubbedVolume: lastSetVolume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        // Rapid inputs within one throttle cycle — only the last value is sent.
+        const slider = getDubbedSlider(wrapper)
+        await slider.setValue(10)
+        await slider.setValue(30)
+        await slider.setValue(50)
+        await slider.setValue(70)
+        await slider.setValue(90)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(setCallCount).toBe(1)
+        expect(lastSetVolume).toBe(0.9)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('newest dubbed input wins across throttle cycles', async () => {
+      vi.useFakeTimers()
+      try {
+        const sentVolumes = []
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.5
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            sentVolumes.push(data?.volume)
+            return Promise.resolve({
+              success: true, dubbedVolume: data?.volume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        const slider = getDubbedSlider(wrapper)
+        await slider.setValue(30)
+        vi.advanceTimersByTime(80)
+        await flushPromises(wrapper)
+        await slider.setValue(60)
+        vi.advanceTimersByTime(80)
+        await flushPromises(wrapper)
+        await slider.setValue(90)
+        vi.advanceTimersByTime(80)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(sentVolumes).toEqual([0.3, 0.6, 0.9])
+        expect(dubbedValueText(wrapper)).toBe('90%')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stale dubbed response cannot overwrite newer input', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveSetA
+        let setCallCount = 0
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.5
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            setCallCount += 1
+            if (setCallCount === 1) {
+              // Slow A — in flight.
+              return new Promise(resolve => { resolveSetA = resolve })
+            }
+            // Fast B — resolves with the newer volume.
+            return Promise.resolve({
+              success: true, dubbedVolume: 0.8, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        const slider = getDubbedSlider(wrapper)
+        await slider.setValue(30)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+
+        await slider.setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // B committed first.
+        expect(dubbedValueText(wrapper)).toBe('80%')
+
+        // Late resolution of A (success) — generation stale, discarded.
+        resolveSetA({ success: true, dubbedVolume: 0.3 })
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // A did NOT overwrite B.
+        expect(dubbedValueText(wrapper)).toBe('80%')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dubbed failure rolls back and resyncs to the committed value', async () => {
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.5
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            return Promise.resolve({
+              success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE', dubbedVolume: 0.7
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        await getDubbedSlider(wrapper).setValue(80)
+        expect(dubbedValueText(wrapper)).toBe('80%')
+
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // Failure responses never commit: rollback target is last-confirmed (50%),
+        // even though the failure payload carries a `dubbedVolume` field.
+        expect(dubbedValueText(wrapper)).toBe('50%')
+        expect(wrapper.find('.ti-live-dubbing-control-volume-error').exists()).toBe(true)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dubbed session mismatch performs bounded recovery', async () => {
+      vi.useFakeTimers()
+      try {
+        let getDubbedVolumeCalls = 0
+        let getStatusCalls = 0
+        let setCallCount = 0
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') {
+            getStatusCalls += 1
+            return Promise.resolve(runningStatus())
+          }
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+            getDubbedVolumeCalls += 1
+            // Initial read succeeds; the post-recovery retry mismatches again.
+            return getDubbedVolumeCalls === 1
+              ? Promise.resolve({ success: true, dubbedVolume: 0.5 })
+              : Promise.resolve({ success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' })
+          }
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            setCallCount += 1
+            return Promise.resolve({ success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        const statusCallsAfterMount = getStatusCalls
+        const dubbedCallsAfterMount = getDubbedVolumeCalls
+
+        await getDubbedSlider(wrapper).setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(setCallCount).toBe(1)
+        // Exactly one lifecycle refresh …
+        expect(getStatusCalls).toBe(statusCallsAfterMount + 1)
+        // … and exactly one retry read, which mismatches again and stops (depth 1).
+        expect(getDubbedVolumeCalls).toBe(dubbedCallsAfterMount + 1)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(getDubbedVolumeCalls).toBe(dubbedCallsAfterMount + 1)
+        expect(getStatusCalls).toBe(statusCallsAfterMount + 1)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('lifecycle fence change recovers the dubbed watcher and discards old pending ops', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveGetDubbedVolumeB
+        let setDubbedCalls = 0
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus('sA', 1))
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.4
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            setDubbedCalls += 1
+            return Promise.resolve({
+              success: true, dubbedVolume: 0.8, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(dubbedValueText(wrapper)).toBe('40%')
+
+        // Queue a dubbed input for session A (pending, throttle not yet fired).
+        await getDubbedSlider(wrapper).setValue(80)
+
+        // Fence changes A→B; B's dubbed read is slow.
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus('sB', 2))
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+            return new Promise(resolve => { resolveGetDubbedVolumeB = resolve })
+          }
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            setDubbedCalls += 1
+            return Promise.resolve({
+              success: true, dubbedVolume: 0.8, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+          id: 'extension-id', url: 'chrome-extension://extension-id/'
+        })
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // Session A's pending SET must NOT fire for session B's fence.
+        vi.advanceTimersByTime(200)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(setDubbedCalls).toBe(0)
+
+        // B's dubbed query resolves with a different value.
+        resolveGetDubbedVolumeB({ success: true, dubbedVolume: 0.75 })
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(dubbedValueText(wrapper)).toBe('75%')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('original and dubbed requests use independent generations', async () => {
+      vi.useFakeTimers()
+      try {
+        let getOriginalCalls = 0
+        let getDubbedCalls = 0
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+            getOriginalCalls += 1
+            return Promise.resolve({ success: true, originalVolume: 0.5 })
+          }
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+            getDubbedCalls += 1
+            return Promise.resolve({ success: true, dubbedVolume: 0.6 })
+          }
+          if (action === 'SET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+            return Promise.resolve({
+              success: true, originalVolume: data?.volume, ignored: false, superseded: false
+            })
+          }
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            return Promise.resolve({
+              success: true, dubbedVolume: data?.volume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        const originalCallsAfterMount = getOriginalCalls
+        const dubbedCallsAfterMount = getDubbedCalls
+
+        // Bump the Original generation via an Original SET …
+        await wrapper.find('#ti-live-dubbing-volume').setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // … then bump the Dubbed generation via a Dubbed SET.
+        await getDubbedSlider(wrapper).setValue(90)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // Neither lane re-queried the other: generations are independent.
+        expect(getOriginalCalls).toBe(originalCallsAfterMount)
+        expect(getDubbedCalls).toBe(dubbedCallsAfterMount)
+        expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('80%')
+        expect(dubbedValueText(wrapper)).toBe('90%')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('original pending request does not block dubbed', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveOriginalSet
+        let originalSetCalls = 0
+        let dubbedSetCalls = 0
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.6
+          })
+          if (action === 'SET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+            originalSetCalls += 1
+            return new Promise(resolve => { resolveOriginalSet = resolve })
+          }
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            dubbedSetCalls += 1
+            return Promise.resolve({
+              success: true, dubbedVolume: data?.volume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        // Start an Original SET and leave it pending …
+        await wrapper.find('#ti-live-dubbing-volume').setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        expect(originalSetCalls).toBe(1)
+
+        // … while it is pending, a Dubbed SET must still be sent.
+        await getDubbedSlider(wrapper).setValue(90)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(dubbedSetCalls).toBe(1)
+        expect(dubbedValueText(wrapper)).toBe('90%')
+
+        resolveOriginalSet({ success: true, originalVolume: 0.8, ignored: false, superseded: false })
+        await flushPromises(wrapper)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dubbed pending request does not block original', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveDubbedSet
+        let originalSetCalls = 0
+        let dubbedSetCalls = 0
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.6
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            dubbedSetCalls += 1
+            return new Promise(resolve => { resolveDubbedSet = resolve })
+          }
+          if (action === 'SET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+            originalSetCalls += 1
+            return Promise.resolve({
+              success: true, originalVolume: data?.volume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+
+        // Start a Dubbed SET and leave it pending …
+        await getDubbedSlider(wrapper).setValue(90)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        expect(dubbedSetCalls).toBe(1)
+
+        // … while it is pending, an Original SET must still be sent.
+        await wrapper.find('#ti-live-dubbing-volume').setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(originalSetCalls).toBe(1)
+        expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('80%')
+
+        resolveDubbedSet({ success: true, dubbedVolume: 0.9, ignored: false, superseded: false })
+        await flushPromises(wrapper)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('failure on original does not modify dubbed UI', async () => {
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.6
+          })
+          if (action === 'SET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+            return Promise.resolve({ success: false, error: 'GENERIC_FAIL' })
+          }
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            return Promise.resolve({
+              success: true, dubbedVolume: 0.9, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // Settle Dubbed at 90% first.
+        await getDubbedSlider(wrapper).setValue(90)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(dubbedValueText(wrapper)).toBe('90%')
+
+        // Fail an Original SET — Dubbed UI must be unchanged.
+        await wrapper.find('#ti-live-dubbing-volume').setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('50%')
+        expect(dubbedValueText(wrapper)).toBe('90%')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('failure on dubbed does not modify original UI', async () => {
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.6
+          })
+          if (action === 'SET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+            return Promise.resolve({
+              success: true, originalVolume: 0.8, ignored: false, superseded: false
+            })
+          }
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            return Promise.resolve({ success: false, error: 'GENERIC_FAIL' })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        // Settle Original at 80% first.
+        await wrapper.find('#ti-live-dubbing-volume').setValue(80)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('80%')
+
+        // Fail a Dubbed SET — Original UI must be unchanged.
+        await getDubbedSlider(wrapper).setValue(90)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(dubbedValueText(wrapper)).toBe('60%')
+        expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('80%')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('reopening popup queries actual runtime values for both lanes', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus())
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.42
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+          success: true, dubbedVolume: 0.77
+        })
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const first = await mountAndFlush()
+      await flushPromises(first)
+      await flushPromises(first)
+      expect(first.find('.ti-live-dubbing-control-volume-value').text()).toBe('42%')
+      expect(dubbedValueText(first)).toBe('77%')
+      first.unmount()
+
+      sendMessage.mockClear()
+      const second = await mountAndFlush()
+      await flushPromises(second)
+      await flushPromises(second)
+
+      const actions = sendMessage.mock.calls.map(([m]) => m.action)
+      expect(actions).toContain('GET_LIVE_DUBBING_ORIGINAL_VOLUME')
+      expect(actions).toContain('GET_LIVE_DUBBING_DUBBED_VOLUME')
+      expect(second.find('.ti-live-dubbing-control-volume-value').text()).toBe('42%')
+      expect(dubbedValueText(second)).toBe('77%')
+    })
+
+    it('dubbed SET causes no lifecycle restart or eventSequence mutation', async () => {
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(({ action, data }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus('s1', 3))
+          if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+            success: true, originalVolume: 0.5
+          })
+          if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') return Promise.resolve({
+            success: true, dubbedVolume: 0.5
+          })
+          if (action === 'SET_LIVE_DUBBING_DUBBED_VOLUME') {
+            return Promise.resolve({
+              success: true, dubbedVolume: data?.volume, ignored: false, superseded: false
+            })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+
+        const wrapper = await mountAndFlush()
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        const sequenceBefore = wrapper.vm.sessionDescriptor.eventSequence
+        const lifecycleCallsBefore = sendMessage.mock.calls.filter(([m]) =>
+          ['START_LIVE_DUBBING', 'LIVE_DUBBING_DISPOSE', 'LIVE_DUBBING_STATUS'].includes(m.action)
+        ).length
+
+        await getDubbedSlider(wrapper).setValue(70)
+        vi.advanceTimersByTime(100)
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+
+        expect(dubbedValueText(wrapper)).toBe('70%')
+        expect(wrapper.vm.sessionDescriptor.eventSequence).toBe(sequenceBefore)
+        const lifecycleCallsAfter = sendMessage.mock.calls.filter(([m]) =>
+          ['START_LIVE_DUBBING', 'LIVE_DUBBING_DISPOSE', 'LIVE_DUBBING_STATUS'].includes(m.action)
+        ).length
+        expect(lifecycleCallsAfter).toBe(lifecycleCallsBefore)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('race A→B dubbed query: stale A response cannot overwrite B value', async () => {
+      let resolveGetDubbedA
+      let resolveGetDubbedB
+      let getDubbedCalls = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus('sA', 1))
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+          getDubbedCalls += 1
+          if (getDubbedCalls === 1) {
+            return new Promise(resolve => { resolveGetDubbedA = resolve })
+          }
+          return Promise.resolve({ status: 'idle' })
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+
+      // Lifecycle changes to Session B while A's dubbed GET is still in flight.
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(runningStatus('sB', 2))
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') return Promise.resolve({
+          success: true, originalVolume: 0.5
+        })
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+          return new Promise(resolve => { resolveGetDubbedB = resolve })
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+        id: 'extension-id', url: 'chrome-extension://extension-id/'
+      })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      // Session B's dubbed response arrives first …
+      resolveGetDubbedB({ success: true, dubbedVolume: 0.65 })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(dubbedValueText(wrapper)).toBe('65%')
+
+      // … then Session A's stale response arrives late and must be discarded.
+      resolveGetDubbedA({ success: true, dubbedVolume: 0.2 })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      // UI still reflects Session B's value, not Session A's stale response.
+      expect(dubbedValueText(wrapper)).toBe('65%')
+    })
+
+    // NOTE(spec §20): no test here by design — the contract is that the entire
+    // pre-existing suite (Original Volume included) stays green. Verified by running
+    // `vitest --config tests/vitest.config.js src/components/popup/LiveDubbingControl.test.js`
+    // after adding this block.
+  })
+
 })
+

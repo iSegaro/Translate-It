@@ -16,6 +16,13 @@
   gap: 2px;
 }
 
+.ti-live-dubbing-control-volumes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .ti-live-dubbing-control-label {
   font-weight: 600;
 }

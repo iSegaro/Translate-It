@@ -16,27 +16,51 @@
 
     <div
       v-if="showVolumeControl"
-      class="ti-live-dubbing-control-volume"
+      class="ti-live-dubbing-control-volumes"
     >
-      <label
-        class="ti-live-dubbing-control-volume-label"
-        for="ti-live-dubbing-volume"
-      >Original</label>
-      <input
-        id="ti-live-dubbing-volume"
-        type="range"
-        class="ti-live-dubbing-control-volume-slider"
-        min="0"
-        max="100"
-        step="1"
-        :value="displayVolume ?? 0"
-        :disabled="!isVolumeControllable || !volumeResolved"
-        @input="onVolumeInput"
-      >
-      <span
-        class="ti-live-dubbing-control-volume-value"
-        aria-live="polite"
-      >{{ displayVolume != null ? displayVolume + '%' : '—' }}</span>
+      <div class="ti-live-dubbing-control-volume">
+        <label
+          class="ti-live-dubbing-control-volume-label"
+          for="ti-live-dubbing-volume"
+        >Original</label>
+        <input
+          id="ti-live-dubbing-volume"
+          type="range"
+          class="ti-live-dubbing-control-volume-slider"
+          min="0"
+          max="100"
+          step="1"
+          :value="displayVolume ?? 0"
+          :disabled="!isVolumeControllable || !volumeResolved"
+          @input="onVolumeInput"
+        >
+        <span
+          class="ti-live-dubbing-control-volume-value"
+          aria-live="polite"
+        >{{ displayVolume != null ? displayVolume + '%' : '—' }}</span>
+      </div>
+
+      <div class="ti-live-dubbing-control-volume">
+        <label
+          class="ti-live-dubbing-control-volume-label"
+          for="ti-live-dubbing-dubbed-volume"
+        >Dubbed Volume</label>
+        <input
+          id="ti-live-dubbing-dubbed-volume"
+          type="range"
+          class="ti-live-dubbing-control-volume-slider"
+          min="0"
+          max="100"
+          step="1"
+          :value="displayDubbedVolume ?? 0"
+          :disabled="!isVolumeControllable || !dubbedVolumeResolved"
+          @input="onDubbedVolumeInput"
+        >
+        <span
+          class="ti-live-dubbing-control-volume-value"
+          aria-live="polite"
+        >{{ displayDubbedVolume != null ? displayDubbedVolume + '%' : '—' }}</span>
+      </div>
     </div>
 
     <LoadingSpinner
@@ -88,6 +112,14 @@
       role="status"
     >
       {{ volumeError }}
+    </p>
+
+    <p
+      v-if="dubbedVolumeError"
+      class="ti-live-dubbing-control-volume-error"
+      role="status"
+    >
+      {{ dubbedVolumeError }}
     </p>
   </section>
 </template>
@@ -154,6 +186,20 @@ let pendingVolumeShot = null
 const volumeRecoveryInProgress = ref(false)
 const MAX_VOLUME_RECOVERY_DEPTH = 1
 
+// ── Dubbed volume state (local only, no Pinia/storage) ───────────────────────
+// Mirrors the Original Volume state exactly, with an independent generation
+// counter so a bump in one slider never discards pending ops of the other.
+const desiredDubbedVolume = ref(null)
+const confirmedDubbedVolume = ref(null)
+const dubbedVolumeResolved = ref(false)
+const dubbedVolumeError = ref('')
+let dubbedVolumeRequestGeneration = 0
+let dubbedVolumeThrottleTimer = null
+const DUBBED_VOLUME_THROTTLE_MS = 80
+let pendingDubbedVolumeShot = null
+const dubbedVolumeRecoveryInProgress = ref(false)
+const MAX_DUBBED_VOLUME_RECOVERY_DEPTH = 1
+
 const isStarting = computed(() => state.value === 'starting')
 const isRunning = computed(() => state.value === 'running')
 const isStopping = computed(() => state.value === 'stopping')
@@ -182,6 +228,11 @@ const showVolumeControl = computed(() => isVolumeControllable.value && sessionId
 const displayVolume = computed(() => {
   if (!volumeResolved.value) return null
   const v = desiredVolume.value ?? confirmedVolume.value
+  return Math.round(v * 100)
+})
+const displayDubbedVolume = computed(() => {
+  if (!dubbedVolumeResolved.value) return null
+  const v = desiredDubbedVolume.value ?? confirmedDubbedVolume.value
   return Math.round(v * 100)
 })
 const volumeFence = computed(() => {
@@ -290,6 +341,24 @@ const resetVolumeState = () => {
   volumeError.value = ''
 }
 
+const nextDubbedVolumeGeneration = () => {
+  dubbedVolumeRequestGeneration += 1
+  return dubbedVolumeRequestGeneration
+}
+
+const resetDubbedVolumeState = () => {
+  nextDubbedVolumeGeneration()
+  if (dubbedVolumeThrottleTimer != null) {
+    clearTimeout(dubbedVolumeThrottleTimer)
+    dubbedVolumeThrottleTimer = null
+  }
+  pendingDubbedVolumeShot = null
+  desiredDubbedVolume.value = null
+  confirmedDubbedVolume.value = null
+  dubbedVolumeResolved.value = false
+  dubbedVolumeError.value = ''
+}
+
 const isSessionMismatchError = (result) => result?.success === false && (
   result.error === 'LIVE_DUBBING_SESSION_MISMATCH'
   || result.error === 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH'
@@ -313,6 +382,25 @@ const captureCurrentFence = () => {
  * @returns {boolean} true if the result was accepted (generation unchanged)
  */
 const refreshLifecycleForVolume = async () => {
+  const generation = operationGeneration
+  try {
+    const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
+    if (generation !== operationGeneration) return false
+    applyStatus(response, { syncTerminalOutcome: true })
+    return true
+  } catch {
+    if (generation !== operationGeneration) return false
+    return false
+  }
+}
+
+/**
+ * Refresh lifecycle status for dubbed-volume recovery without bumping the
+ * lifecycle generation counter.  Independent from refreshLifecycleForVolume —
+ * uses the dubbed generation guard so Original Volume work is unaffected.
+ * @returns {boolean} true if the result was accepted (generation unchanged)
+ */
+const refreshLifecycleForDubbedVolume = async () => {
   const generation = operationGeneration
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
@@ -385,6 +473,73 @@ const queryOriginalVolume = async (generation = nextVolumeGeneration(), depth = 
     }
   } catch {
     if (generation !== volumeRequestGeneration) return
+    // Transport failure: keep last-confirmed, silent — no toast, no terminal
+  }
+}
+
+/**
+ * Recover the runtime dubbed-audio volume for the active session.
+ * Mirrors queryOriginalVolume with an independent generation counter.
+ * Never assumes 0 — always queries the backend.
+ * @param {number} generation - request generation snapshot; stale responses are discarded
+ * @param {number} depth - recursion guard; 0 = first attempt, 1 = one retry
+ */
+const queryDubbedVolume = async (generation = nextDubbedVolumeGeneration(), depth = 0) => {
+  const descriptor = sessionDescriptor.value
+  if (!descriptor?.sessionId || !descriptor?.providerId) return
+
+  try {
+    const response = await sendMessage({
+      action: LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME,
+      data: {
+        sessionId: descriptor.sessionId,
+        providerId: descriptor.providerId,
+        eventSequence: descriptor.eventSequence
+      }
+    })
+    if (generation !== dubbedVolumeRequestGeneration) return
+
+    const result = unwrap(response)
+
+    if (result.success === false) {
+      if (isSessionMismatchError(result)) {
+        desiredDubbedVolume.value = confirmedDubbedVolume.value
+        if (dubbedVolumeRecoveryInProgress.value) return
+        if (depth >= MAX_DUBBED_VOLUME_RECOVERY_DEPTH) return
+        dubbedVolumeRecoveryInProgress.value = true
+        const recoveryGeneration = dubbedVolumeRequestGeneration
+        const fenceBeforeRefresh = volumeFence.value
+        try {
+          const accepted = await refreshLifecycleForDubbedVolume()
+          if (recoveryGeneration !== dubbedVolumeRequestGeneration) return
+          // If the exact fence changed during refresh, the watcher owns the
+          // new-fence read — do not retry here to avoid duplicate queries.
+          if (volumeFence.value !== fenceBeforeRefresh) return
+          if (accepted && isVolumeControllable.value && sessionId.value) {
+            void queryDubbedVolume(nextDubbedVolumeGeneration(), depth + 1)
+          }
+        } finally {
+          dubbedVolumeRecoveryInProgress.value = false
+        }
+        return
+      }
+      // LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE and other non-mismatch errors:
+      // keep last-confirmed, show inline error — never terminal, never stop/cleanup
+      dubbedVolumeError.value = 'Dubbed audio unavailable'
+      return
+    }
+
+    if (typeof result.dubbedVolume === 'number'
+      && Number.isFinite(result.dubbedVolume)
+      && result.dubbedVolume >= 0
+      && result.dubbedVolume <= 1) {
+      confirmedDubbedVolume.value = result.dubbedVolume
+      desiredDubbedVolume.value = result.dubbedVolume
+      dubbedVolumeError.value = ''
+      dubbedVolumeResolved.value = true
+    }
+  } catch {
+    if (generation !== dubbedVolumeRequestGeneration) return
     // Transport failure: keep last-confirmed, silent — no toast, no terminal
   }
 }
@@ -498,6 +653,122 @@ const onVolumeInput = (event) => {
 }
 
 /**
+ * Send a dubbed-volume write to the backend with fencing.
+ * Mirrors sendVolume with an independent generation counter.
+ * Success commits confirmedDubbedVolume; session-mismatch rolls back and
+ * recovers; unavailable rolls back with an inline error; invalid keeps the
+ * optimistic value with an inline error; other failures roll back.
+ * Superseded = non-error, no rollback, no error display.
+ * @param {number} depth - recursion guard; 0 = first attempt, 1 = one retry
+ */
+const sendDubbedVolume = async (depth = 0) => {
+  const shot = pendingDubbedVolumeShot
+  pendingDubbedVolumeShot = null
+  if (!shot?.fence?.sessionId || !shot.fence?.providerId) return
+
+  const { fence, volume, generation } = shot
+
+  // Pre-send fence check: skip if session shifted since input was captured
+  const current = sessionDescriptor.value
+  if (!current
+    || current.sessionId !== fence.sessionId
+    || current.providerId !== fence.providerId
+    || current.eventSequence !== fence.eventSequence) return
+
+  try {
+    const response = await sendMessage({
+      action: LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME,
+      data: {
+        sessionId: fence.sessionId,
+        providerId: fence.providerId,
+        eventSequence: fence.eventSequence,
+        volume
+      }
+    })
+    if (generation !== dubbedVolumeRequestGeneration) return
+
+    const result = unwrap(response)
+
+    if (result.success === false) {
+      if (isSessionMismatchError(result)) {
+        desiredDubbedVolume.value = confirmedDubbedVolume.value
+        if (dubbedVolumeRecoveryInProgress.value) return
+        if (depth >= MAX_DUBBED_VOLUME_RECOVERY_DEPTH) return
+        dubbedVolumeRecoveryInProgress.value = true
+        const recoveryGeneration = dubbedVolumeRequestGeneration
+        const fenceBeforeRefresh = volumeFence.value
+        try {
+          const accepted = await refreshLifecycleForDubbedVolume()
+          if (recoveryGeneration !== dubbedVolumeRequestGeneration) return
+          if (volumeFence.value !== fenceBeforeRefresh) return
+          if (accepted && isVolumeControllable.value && sessionId.value) {
+            void queryDubbedVolume(nextDubbedVolumeGeneration(), depth + 1)
+          }
+        } finally {
+          dubbedVolumeRecoveryInProgress.value = false
+        }
+        return
+      }
+      if (result.error === 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE') {
+        desiredDubbedVolume.value = confirmedDubbedVolume.value
+        dubbedVolumeError.value = 'Dubbed audio unavailable'
+        return
+      }
+      if (result.error === 'LIVE_DUBBING_DUBBED_VOLUME_INVALID') {
+        dubbedVolumeError.value = 'Invalid dubbed volume'
+        return
+      }
+      // Unknown failure: rollback to last-confirmed
+      desiredDubbedVolume.value = confirmedDubbedVolume.value
+      return
+    }
+
+    // Superseded = latest-wins: non-error, no rollback, no commit, no error
+    if (result.ignored && result.superseded) return
+
+    // Success: commit confirmed
+    if (typeof result.dubbedVolume === 'number'
+      && Number.isFinite(result.dubbedVolume)
+      && result.dubbedVolume >= 0
+      && result.dubbedVolume <= 1) {
+      confirmedDubbedVolume.value = result.dubbedVolume
+      desiredDubbedVolume.value = result.dubbedVolume
+      dubbedVolumeError.value = ''
+      dubbedVolumeResolved.value = true
+    }
+  } catch {
+    if (generation !== dubbedVolumeRequestGeneration) return
+    // Transport failure: rollback to last-confirmed
+    desiredDubbedVolume.value = confirmedDubbedVolume.value
+  }
+}
+
+/**
+ * Trailing throttle for dubbed-volume input: fires at most once every
+ * DUBBED_VOLUME_THROTTLE_MS.  Unlike debounce, it does NOT reset the timer
+ * on subsequent inputs — the first input starts the cycle, and the next
+ * input after the cycle starts a new one.  Independent timer from Original.
+ */
+const onDubbedVolumeInput = (event) => {
+  const raw = Number(event.target.value)
+  const clamped = Math.max(0, Math.min(100, raw))
+  desiredDubbedVolume.value = clamped / 100
+  dubbedVolumeError.value = ''
+  const generation = nextDubbedVolumeGeneration()
+  const fence = captureCurrentFence()
+  if (fence) {
+    pendingDubbedVolumeShot = Object.freeze({ fence, volume: desiredDubbedVolume.value, generation })
+  }
+
+  // Trailing throttle: skip if a timer is already running
+  if (dubbedVolumeThrottleTimer != null) return
+  dubbedVolumeThrottleTimer = setTimeout(() => {
+    dubbedVolumeThrottleTimer = null
+    void sendDubbedVolume()
+  }, DUBBED_VOLUME_THROTTLE_MS)
+}
+
+/**
  * Flush any pending volume send synchronously (called on unmount).
  * Only sends if the captured snapshot is still valid (current descriptor matches).
  */
@@ -521,6 +792,30 @@ const flushPendingVolumeSend = () => {
   }
 }
 
+/**
+ * Flush any pending dubbed-volume send synchronously (called on unmount).
+ * Only sends if the captured snapshot is still valid (current descriptor matches).
+ */
+const flushPendingDubbedVolumeSend = () => {
+  if (dubbedVolumeThrottleTimer != null) {
+    clearTimeout(dubbedVolumeThrottleTimer)
+    dubbedVolumeThrottleTimer = null
+  }
+  if (pendingDubbedVolumeShot) {
+    const current = sessionDescriptor.value
+    const { fence } = pendingDubbedVolumeShot
+    const stillValid = current
+      && current.sessionId === fence.sessionId
+      && current.providerId === fence.providerId
+      && current.eventSequence === fence.eventSequence
+    if (stillValid && isVolumeControllable.value) {
+      void sendDubbedVolume()
+    } else {
+      pendingDubbedVolumeShot = null
+    }
+  }
+}
+
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
 const queryStatus = async (generation = nextOperationGeneration()) => {
@@ -535,8 +830,10 @@ const queryStatus = async (generation = nextOperationGeneration()) => {
     // skips the null→active transition.
     if (isVolumeControllable.value && sessionId.value && prevFence === null) {
       void queryOriginalVolume()
+      void queryDubbedVolume()
     } else if (!isVolumeControllable.value || !sessionId.value) {
       resetVolumeState()
+      resetDubbedVolumeState()
     }
   } catch (error) {
     if (generation !== operationGeneration) return
@@ -544,6 +841,7 @@ const queryStatus = async (generation = nextOperationGeneration()) => {
     authoritativeStatus.value = null
     errorMessage.value = getErrorMessage(error?.message, 'Live dubbing is unavailable.')
     resetVolumeState()
+    resetDubbedVolumeState()
   }
 }
 
@@ -569,6 +867,7 @@ const start = async () => {
     // watcher handles it.
     if (isVolumeControllable.value && sessionId.value && prevFence === null) {
       void queryOriginalVolume()
+      void queryDubbedVolume()
     }
   } catch (error) {
     if (generation !== operationGeneration) return
@@ -588,9 +887,10 @@ const start = async () => {
 }
 
 const stop = async () => {
-  // Invalidate in-flight volume work immediately: cancel throttle timer,
-  // clear pending shot, bump generation so no old SET resolves after STOP.
+  // Invalidate in-flight volume work immediately: cancel throttle timers,
+  // clear pending shots, bump generations so no old SET resolves after STOP.
   resetVolumeState()
+  resetDubbedVolumeState()
   const generation = nextOperationGeneration()
   state.value = 'stopping'
   errorMessage.value = ''
@@ -638,6 +938,7 @@ onUnmounted(() => {
   removeRuntimeListener?.()
   removeRuntimeListener = null
   flushPendingVolumeSend()
+  flushPendingDubbedVolumeSend()
 })
 
 watch(isBusy, (busy) => emit('busy-change', busy), { immediate: true })
@@ -652,8 +953,10 @@ watch(isBusy, (busy) => emit('busy-change', busy), { immediate: true })
 watch(volumeFence, (newFence, oldFence) => {
   if (oldFence === null) return
   resetVolumeState()
+  resetDubbedVolumeState()
   if (isVolumeControllable.value && sessionId.value) {
     void queryOriginalVolume()
+    void queryDubbedVolume()
   }
 })
 
