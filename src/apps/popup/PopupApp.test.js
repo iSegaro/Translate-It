@@ -7,6 +7,7 @@ let mockSettingsStore
 let mockUnifiedTranslation
 let mockLanguageDefaults
 const useUnifiedTranslationMock = vi.hoisted(() => vi.fn())
+const liveDubbingViewLifecycle = vi.hoisted(() => ({ mounts: 0, unmounts: 0, stopCalls: 0 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => mockSettingsStore
@@ -84,56 +85,72 @@ vi.mock('@/components/popup/PopupHeader.vue', () => ({
   default: {
     name: 'PopupHeader',
     props: ['targetLanguage', 'provider'],
-    template: '<div class="popup-header-stub" />'
+    template: '<div class="popup-header-stub"><slot /></div>'
   }
 }))
 
-vi.mock('@/components/shared/LanguageSelector.vue', () => ({
+vi.mock('@/components/popup/PopupViewSwitcher.vue', () => ({
   default: {
-    name: 'LanguageSelector',
+    name: 'PopupViewSwitcher',
+    props: ['modelValue', 'showLiveDubbing'],
+    emits: ['update:modelValue'],
+    template: `
+      <div class="view-switcher-stub">
+        <button class="switch-to-translate" role="tab" @click="$emit('update:modelValue', 'translate')">Translate</button>
+        <button v-if="showLiveDubbing" class="switch-to-live-dubbing" role="tab" @click="$emit('update:modelValue', 'live-dubbing')">Live Dubbing</button>
+      </div>
+    `
+  }
+}))
+
+vi.mock('@/components/popup/TranslationView.vue', () => ({
+  default: {
+    name: 'TranslationView',
     props: [
       'sourceLanguage',
       'targetLanguage',
-      'provider',
-      'lastKeyword',
-      'beta',
-      'showDefaultActions',
-      'defaultActionsEnabled',
+      'currentProvider',
+      'translation',
+      'liveDubbingBusy',
+      'isReady',
       'sourceIsSavedDefault',
       'targetIsSavedDefault',
       'sourceDefaultTitle',
       'targetDefaultTitle',
-      'sourceTitle',
-      'targetTitle',
-      'swapTitle',
-      'swapAlt',
-      'autoDetectLabel'
+      'lastKeyword'
     ],
-    emits: ['set-default-source', 'set-default-target', 'update:sourceLanguage', 'update:targetLanguage'],
-    template: '<div class="language-selector-stub" />'
+    emits: [
+      'translate',
+      'cancel',
+      'clear',
+      'set-default-source',
+      'set-default-target',
+      'can-translate-change',
+      'update:sourceLanguage',
+      'update:targetLanguage',
+      'update:currentProvider'
+    ],
+    template: '<div class="translation-view-stub" />'
   }
 }))
 
-vi.mock('@/components/shared/ProviderSelector.vue', () => ({
+vi.mock('@/components/popup/LiveDubbingView.vue', () => ({
   default: {
-    name: 'ProviderSelector',
-    template: '<div class="provider-selector-stub" />'
-  }
-}))
-
-vi.mock('@/components/popup/TranslationForm.vue', () => ({
-  default: {
-    name: 'TranslationForm',
-    props: ['sourceLanguage', 'targetLanguage', 'provider', 'translation'],
-    template: '<div class="translation-form-stub" />'
-  }
-}))
-
-vi.mock('@/components/popup/LiveDubbingControl.vue', () => ({
-  default: {
-    name: 'LiveDubbingControl',
+    name: 'LiveDubbingView',
     props: ['targetLanguage', 'providerId'],
-    template: '<div class="live-dubbing-control-stub" />'
+    emits: ['busy-change', 'update:targetLanguage'],
+    mounted() {
+      liveDubbingViewLifecycle.mounts += 1
+    },
+    unmounted() {
+      liveDubbingViewLifecycle.unmounts += 1
+    },
+    methods: {
+      stop() {
+        liveDubbingViewLifecycle.stopCalls += 1
+      }
+    },
+    template: '<div class="live-dubbing-view-stub" />'
   }
 }))
 
@@ -159,6 +176,9 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
 describe('PopupApp', () => {
   beforeEach(() => {
     vi.stubGlobal('__BROWSER__', 'chrome')
+    liveDubbingViewLifecycle.mounts = 0
+    liveDubbingViewLifecycle.unmounts = 0
+    liveDubbingViewLifecycle.stopCalls = 0
     mockUnifiedTranslation = {
       sourceLanguage: ref('fr'),
       targetLanguage: ref('de'),
@@ -190,27 +210,26 @@ describe('PopupApp', () => {
     }
   })
 
-  it('passes default action props', async () => {
+  it('passes default action props to TranslationView', async () => {
     const wrapper = mount(PopupApp)
     await flushPromises()
     await flushPromises()
 
-    const selector = wrapper.findComponent({ name: 'LanguageSelector' })
+    const view = wrapper.findComponent({ name: 'TranslationView' })
 
-    expect(selector.exists()).toBe(true)
-    expect(selector.props('showDefaultActions')).not.toBe(false)
-    expect(selector.props('defaultActionsEnabled')).toBe(true)
-    expect(selector.props('sourceIsSavedDefault')).toBe(true)
-    expect(selector.props('targetIsSavedDefault')).toBe(false)
+    expect(view.exists()).toBe(true)
+    expect(view.props('isReady')).toBe(true)
+    expect(view.props('sourceIsSavedDefault')).toBe(true)
+    expect(view.props('targetIsSavedDefault')).toBe(false)
   })
 
-  it('creates one popup translation owner and passes it to TranslationForm', async () => {
+  it('creates one popup translation owner and passes it to TranslationView', async () => {
     const wrapper = mount(PopupApp)
     await flushPromises()
     await flushPromises()
 
     expect(useUnifiedTranslationMock).toHaveBeenCalledTimes(1)
-    expect(wrapper.findComponent({ name: 'TranslationForm' }).props('translation')).toBe(mockUnifiedTranslation)
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('translation')).toBe(mockUnifiedTranslation)
   })
 
   it('persists current source and target when stars are clicked', async () => {
@@ -218,10 +237,10 @@ describe('PopupApp', () => {
     await flushPromises()
     await flushPromises()
 
-    const selector = wrapper.findComponent({ name: 'LanguageSelector' })
+    const view = wrapper.findComponent({ name: 'TranslationView' })
 
-    selector.vm.$emit('set-default-source')
-    selector.vm.$emit('set-default-target')
+    view.vm.$emit('set-default-source')
+    view.vm.$emit('set-default-target')
     await flushPromises()
 
     expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('fr')
@@ -233,8 +252,8 @@ describe('PopupApp', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('openai')
-    expect(wrapper.findComponent({ name: 'TranslationForm' }).props('provider')).toBe('google')
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).props('providerId')).toBe('openai')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('currentProvider')).toBe('google')
   })
 
   it('falls back to Gemini for an unknown live dubbing provider', async () => {
@@ -243,6 +262,112 @@ describe('PopupApp', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('gemini')
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).props('providerId')).toBe('gemini')
+  })
+
+  it('shows the translate view by default and hides live dubbing', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(false)
+    expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(true)
+  })
+
+  it('passes the last translation keyword to TranslationView', async () => {
+    mockUnifiedTranslation.lastTranslation = ref({ source: 'hello-world' })
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('lastKeyword')).toBe('hello-world')
+  })
+
+  it('passes an empty keyword when there is no last translation', async () => {
+    mockUnifiedTranslation.lastTranslation = ref(null)
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('lastKeyword')).toBe('')
+  })
+
+  it('switching to live dubbing hides the translation view', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+  })
+
+  it('switching back restores the translation view', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(false)
+  })
+
+  it('hides live dubbing entirely when unsupported', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox')
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.find('.switch-to-live-dubbing').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+  })
+
+  it('keeps header actions independent from the active view', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    const header = wrapper.findComponent({ name: 'PopupHeader' })
+    expect(header.exists()).toBe(true)
+    expect(header.props('targetLanguage')).toBe('de')
+    expect(header.props('provider')).toBe('google')
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+
+    const headerAfterSwitch = wrapper.findComponent({ name: 'PopupHeader' })
+    expect(headerAfterSwitch.exists()).toBe(true)
+    expect(headerAfterSwitch.props('targetLanguage')).toBe('de')
+    expect(headerAfterSwitch.props('provider')).toBe('google')
+  })
+
+  it('does not stop live dubbing when switching views', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+
+    expect(liveDubbingViewLifecycle.stopCalls).toBe(0)
+  })
+
+  it('keeps the live dubbing view mounted across view switches', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(liveDubbingViewLifecycle.mounts).toBe(1)
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+
+    expect(liveDubbingViewLifecycle.mounts).toBe(1)
+    expect(liveDubbingViewLifecycle.unmounts).toBe(0)
   })
 })

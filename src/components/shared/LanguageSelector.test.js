@@ -185,4 +185,30 @@ describe('LanguageSelector', () => {
       expect(mockUseSelectElementTranslation).not.toHaveBeenCalled()
     })
   })
+
+  describe('targetOnly prop', () => {
+    it('renders all controls by default', () => {
+      const wrapper = mountSelector()
+
+      expect(wrapper.find('.ti-language-control-group--source').exists()).toBe(true)
+      expect(wrapper.find('.ti-swap-button').exists()).toBe(true)
+      expect(wrapper.find('.ti-language-control-group--target').exists()).toBe(true)
+    })
+
+    it('hides source and swap controls but keeps the target when true', () => {
+      const wrapper = mountSelector({ targetOnly: true })
+
+      expect(wrapper.find('.ti-language-control-group--source').exists()).toBe(false)
+      expect(wrapper.find('.ti-swap-button').exists()).toBe(false)
+      expect(wrapper.find('.ti-language-control-group--target').exists()).toBe(true)
+    })
+
+    it('emits update:targetLanguage when the target changes in target-only mode', async () => {
+      const wrapper = mountSelector({ targetOnly: true })
+
+      await wrapper.find('.ti-language-control-group--target select').setValue('en')
+
+      expect(wrapper.emitted('update:targetLanguage')).toEqual([['en']])
+    })
+  })
 })

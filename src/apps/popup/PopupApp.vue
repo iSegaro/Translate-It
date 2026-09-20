@@ -36,80 +36,52 @@
       <div class="popup-content-container">
         <!-- Sticky Header: Contains Toolbar and Language/Provider Selectors -->
         <div class="sticky-header">
-          <PopupHeader 
-            :target-language="targetLanguage" 
+          <PopupHeader
+            :target-language="targetLanguage"
             :provider="currentProvider"
-          />
-          <div class="language-controls">
-            <!-- Provider Selector: Manages temporary session-based provider overrides -->
-            <ProviderSelector
-              v-model="currentProvider"
-              mode="split"
-              :is-global="false"
-              :show-sync="true"
-              allow-set-default
-              only-configured
-              :loading="translationFormRef?.isTranslating"
-              @translate="handleTranslate"
-              @cancel="handleCancel"
+          >
+            <PopupViewSwitcher
+              v-if="isLiveDubbingSupported"
+              v-model="activeView"
+              :show-live-dubbing="isLiveDubbingSupported"
             />
-
-            <!-- Language Selector: Handles source and target language selection -->
-            <LanguageSelector
-              v-model:source-language="sourceLanguage"
-              v-model:target-language="targetLanguage"
-              :provider="currentProvider"
-              :disabled="isLiveDubbingBusy"
-              :last-keyword="lastTranslation?.source"
-              :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
-              show-default-actions
-              :default-actions-enabled="isReady"
-              :source-is-saved-default="sourceIsSavedDefault"
-              :target-is-saved-default="targetIsSavedDefault"
-              :source-default-title="sourceDefaultTitle"
-              :target-default-title="targetDefaultTitle"
-              :source-title="t('popup_source_language_title') || 'زبان مبدا'"
-              :target-title="t('popup_target_language_title') || 'زبان مقصد'"
-              :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
-              :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
-              :auto-detect-label="'Auto-Detect'"
-              @set-default-source="handleSetDefaultSource"
-              @set-default-target="handleSetDefaultTarget"
-            />
-
-            <!-- Clear Button: Minimized clear fields button -->
-            <button
-              class="ti-btn-min-clear"
-              :title="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
-              @click="handleClearFields"
-            >
-              <img
-                :src="browser.runtime.getURL('icons/ui/clear.png')"
-                class="ti-toolbar-icon"
-                alt="Clear"
-              >
-            </button>
-          </div>
+          </PopupHeader>
         </div>
 
-        <LiveDubbingControl
+        <!-- Active view (v-show keeps both mounted so LiveDubbingControl preserves
+             its local UI runtime state and TranslationView keeps its listeners) -->
+        <TranslationView
+          v-show="activeView === 'translate'"
+          ref="translationFormRef"
+          :source-language="sourceLanguage"
+          :target-language="targetLanguage"
+          :current-provider="currentProvider"
+          :translation="translation"
+          :live-dubbing-busy="isLiveDubbingBusy"
+          :is-ready="isReady"
+          :source-is-saved-default="sourceIsSavedDefault"
+          :target-is-saved-default="targetIsSavedDefault"
+          :source-default-title="sourceDefaultTitle"
+          :target-default-title="targetDefaultTitle"
+          :last-keyword="lastKeyword"
+          @translate="handleTranslate"
+          @cancel="handleCancel"
+          @clear="handleClearFields"
+          @set-default-source="handleSetDefaultSource"
+          @set-default-target="handleSetDefaultTarget"
+          @can-translate-change="canTranslateFromForm = $event"
+          @update:source-language="sourceLanguage = $event"
+          @update:target-language="targetLanguage = $event"
+          @update:current-provider="currentProvider = $event"
+        />
+        <LiveDubbingView
+          v-show="activeView === 'live-dubbing'"
           v-if="isLiveDubbingSupported"
           :target-language="targetLanguage"
           :provider-id="liveDubbingProvider"
           @busy-change="isLiveDubbingBusy = $event"
+          @update:target-language="targetLanguage = $event"
         />
-        
-        <!-- Scrollable Translation Area: Contains the main translation form -->
-        <div class="translation-container">
-          <TranslationForm
-            ref="translationFormRef"
-            :translation="translation"
-            :source-language="sourceLanguage"
-            :target-language="targetLanguage"
-            :provider="currentProvider"
-            @can-translate-change="canTranslateFromForm = $event" 
-          />
-        </div>
       </div>
     </template>
   </div>
@@ -123,10 +95,9 @@ import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
-import LanguageSelector from '@/components/shared/LanguageSelector.vue'
-import ProviderSelector from '@/components/shared/ProviderSelector.vue'
-import TranslationForm from '@/components/popup/TranslationForm.vue'
-import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
+import PopupViewSwitcher from '@/components/popup/PopupViewSwitcher.vue'
+import TranslationView from '@/components/popup/TranslationView.vue'
+import LiveDubbingView from '@/components/popup/LiveDubbingView.vue'
 import browser from 'webextension-polyfill'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -166,12 +137,13 @@ const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
 const currentProvider = ref('')
 const translation = useUnifiedTranslation('popup', { provider: currentProvider });
-const { 
+const {
   sourceLanguage,
   targetLanguage,
   clearTranslation,
   lastTranslation
 } = translation;
+const lastKeyword = computed(() => lastTranslation.value?.source ?? '');
 const {
   savedSourceLanguage,
   savedTargetLanguage,
@@ -198,6 +170,8 @@ const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
 const isLiveDubbingBusy = ref(false)
+// Active popup view: 'translate' (default) or 'live-dubbing'. Local UI state only.
+const activeView = ref('translate')
 const isLiveDubbingSupported = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'chrome'
 const liveDubbingProvider = computed(() => (
   ['gemini', 'openai'].includes(settingsStore.settings?.LIVE_DUBBING_PROVIDER)

@@ -10,6 +10,8 @@
       class="ti-page-translate-btn"
     />
 
+    <slot />
+
     <HorizontalActionScroller
       ref="scrollerRef"
       :aria-label="t('popup_action_scroller_label')"
