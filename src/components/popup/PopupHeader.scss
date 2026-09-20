@@ -87,8 +87,15 @@
 
 /* Select Element split control: main button activates Select Element;
    chevron button opens a ToolbarMenu with the Revert action. */
+.ti-header-actions > .ti-btn-select-split-menu {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  line-height: 0;
+}
+
 .ti-select-split {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   border-radius: 6px;
   overflow: hidden;
@@ -128,6 +135,15 @@
   width: 12px !important;
   height: 12px !important;
   opacity: 0.8;
+}
+
+/* Optical icon centering: Settings, Mouse Hover, and Capture already align with
+   each other, but sit slightly lower than Select Element and Sidepanel. Apply
+   one shared post-layout shift to their images only. */
+.ti-header-actions .ti-btn-settings .ti-toolbar-icon,
+.ti-header-actions .ti-btn-mouse-hover .ti-toolbar-icon,
+.ti-header-actions .ti-btn-capture .ti-toolbar-icon {
+  translate: 0 -1px;
 }
 
 /* More menu trigger: real ellipsis glyph (U+22EF), no icon asset */
