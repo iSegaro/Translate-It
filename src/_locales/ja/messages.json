@@ -1526,6 +1526,12 @@
   "popup_view_live_dubbing": {
     "message": "ライブ吹き替え"
   },
+  "popup_view_switcher_translate_label": {
+    "message": "テキスト"
+  },
+  "popup_view_switcher_dubbing_label": {
+    "message": "吹き替え"
+  },
   "popup_revert_alt_icon": {
     "message": "元に戻す"
   },

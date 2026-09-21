@@ -34,7 +34,7 @@ describe('PopupViewSwitcher', () => {
     expect(mockT).not.toHaveBeenCalledWith('popup_view_live-dubbing', expect.anything())
   })
 
-  it('renders icon-only tabs with accessible labels', () => {
+  it('renders icon-plus-label tabs with accessible labels', () => {
     const wrapper = mount(PopupViewSwitcher, {
       props: { modelValue: 'translate', showLiveDubbing: true }
     })
@@ -43,7 +43,8 @@ describe('PopupViewSwitcher', () => {
     expect(tabs).toHaveLength(2)
 
     const translateTab = tabs[0]
-    expect(translateTab.attributes('aria-label')).toBe('Translate')
+    // Accessible name matches the visible label; tooltip keeps the detailed text.
+    expect(translateTab.attributes('aria-label')).toBe('Text')
     expect(translateTab.attributes('title')).toBe('Translate')
     // Decorative mask icon: no <img>, parent tab owns the accessible label.
     expect(translateTab.find('img').exists()).toBe(false)
@@ -51,15 +52,27 @@ describe('PopupViewSwitcher', () => {
     expect(translateIcon.exists()).toBe(true)
     expect(translateIcon.props('src')).toContain('icons/ui/translate-view.png')
     expect(translateIcon.attributes('aria-hidden')).toBe('true')
+    // Visible label uses its own i18n key (echo-mock returns the fallback).
+    expect(mockT).toHaveBeenCalledWith('popup_view_switcher_translate_label', 'Text')
+    const translateLabel = translateTab.find('.ti-popup-view-switcher__label')
+    expect(translateLabel.exists()).toBe(true)
+    expect(translateLabel.text()).toBe('Text')
+    expect(translateLabel.attributes('aria-hidden')).toBe('true')
 
     const dubbingTab = tabs[1]
-    expect(dubbingTab.attributes('aria-label')).toBe('Live Dubbing')
+    // Accessible name matches the visible label; tooltip keeps the detailed text.
+    expect(dubbingTab.attributes('aria-label')).toBe('Dubbing')
     expect(dubbingTab.attributes('title')).toBe('Live Dubbing')
     expect(dubbingTab.find('img').exists()).toBe(false)
     const dubbingIcon = dubbingTab.findComponent(MaskIcon)
     expect(dubbingIcon.exists()).toBe(true)
     expect(dubbingIcon.props('src')).toContain('icons/ui/dubbing.png')
     expect(dubbingIcon.attributes('aria-hidden')).toBe('true')
+    expect(mockT).toHaveBeenCalledWith('popup_view_switcher_dubbing_label', 'Dubbing')
+    const dubbingLabel = dubbingTab.find('.ti-popup-view-switcher__label')
+    expect(dubbingLabel.exists()).toBe(true)
+    expect(dubbingLabel.text()).toBe('Dubbing')
+    expect(dubbingLabel.attributes('aria-hidden')).toBe('true')
   })
 
   it('marks the active tab with aria-selected', () => {
@@ -94,7 +107,7 @@ describe('PopupViewSwitcher', () => {
 
     const tabs = wrapper.findAll('[role="tab"]')
     expect(tabs).toHaveLength(1)
-    expect(tabs[0].attributes('aria-label')).toBe('Translate')
+    expect(tabs[0].attributes('aria-label')).toBe('Text')
   })
 
   it('tabs are natively keyboard-focusable buttons', () => {

@@ -1526,6 +1526,12 @@
   "popup_view_live_dubbing": {
     "message": "دوبله زنده"
   },
+  "popup_view_switcher_translate_label": {
+    "message": "متن"
+  },
+  "popup_view_switcher_dubbing_label": {
+    "message": "دوبله"
+  },
   "popup_revert_alt_icon": {
     "message": "بازگرداندن"
   },

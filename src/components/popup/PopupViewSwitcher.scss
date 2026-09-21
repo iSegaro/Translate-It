@@ -37,17 +37,18 @@
 }
 
 .ti-popup-view-switcher__tab {
-  width: 28px;
+  width: auto;
   height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 0;
+  padding: 0 8px;
   transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 
   &:hover {
@@ -72,4 +73,24 @@
   height: 18px;
   display: block;
   flex-shrink: 0;
+}
+
+.ti-popup-view-switcher__label {
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  color: currentColor;
+}
+
+/* Narrow widths: fall back to icon-only tabs so the switcher stays compact.
+   Icons keep their size; other Header controls are untouched. */
+@media (max-width: 380px) {
+  .ti-popup-view-switcher__tab {
+    width: 28px;
+    padding: 0;
+  }
+
+  .ti-popup-view-switcher__label {
+    display: none;
+  }
 }

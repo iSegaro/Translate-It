@@ -56,4 +56,15 @@ describe('PopupHeader.scss dark contract', () => {
     expect(tokens).toContain('--color-action-hover-accent: #ff9800;')
     expect(tokens).toContain('--color-action-hover-accent: #ffb74d;')
   })
+
+  it('pins the header actions spacing contract in source', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Ordinary action gap + logical end inset on the actions boundary.
+    expect(source).toContain('gap: 6px !important;')
+    expect(source).toContain('padding-inline-end: 4px !important;')
+    // Select split wrapper keeps a LARGER explicit separation (gap + margin).
+    expect(source).toContain('.ti-header-actions > .ti-btn-select-split-menu')
+    expect(source).toContain('margin-inline-start: 6px;')
+  })
 })

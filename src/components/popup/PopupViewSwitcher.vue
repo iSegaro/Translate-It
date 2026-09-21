@@ -10,7 +10,7 @@
       class="ti-popup-view-switcher__tab"
       :class="{ 'is-active': modelValue === 'translate' }"
       :aria-selected="modelValue === 'translate'"
-      :aria-label="translateLabel"
+      :aria-label="translateTabLabel"
       :title="translateLabel"
       @click="emit('update:modelValue', 'translate')"
     >
@@ -19,6 +19,10 @@
         :size="18"
         class="ti-popup-view-switcher__icon"
       />
+      <span
+        class="ti-popup-view-switcher__label"
+        aria-hidden="true"
+      >{{ translateTabLabel }}</span>
     </button>
     <button
       v-if="showLiveDubbing"
@@ -27,7 +31,7 @@
       class="ti-popup-view-switcher__tab"
       :class="{ 'is-active': modelValue === 'live-dubbing' }"
       :aria-selected="modelValue === 'live-dubbing'"
-      :aria-label="liveDubbingLabel"
+      :aria-label="liveDubbingTabLabel"
       :title="liveDubbingLabel"
       @click="emit('update:modelValue', 'live-dubbing')"
     >
@@ -36,6 +40,10 @@
         :size="18"
         class="ti-popup-view-switcher__icon"
       />
+      <span
+        class="ti-popup-view-switcher__label"
+        aria-hidden="true"
+      >{{ liveDubbingTabLabel }}</span>
     </button>
   </div>
 </template>
@@ -67,6 +75,8 @@ const emit = defineEmits(['update:modelValue'])
 
 const translateLabel = computed(() => t('popup_view_translate', 'Translate'))
 const liveDubbingLabel = computed(() => t('popup_view_live_dubbing', 'Live Dubbing'))
+const translateTabLabel = computed(() => t('popup_view_switcher_translate_label', 'Text'))
+const liveDubbingTabLabel = computed(() => t('popup_view_switcher_dubbing_label', 'Dubbing'))
 const translateIcon = computed(() => ExtensionContextManager.safeGetURL('icons/ui/translate-view.png'))
 const liveDubbingIcon = computed(() => ExtensionContextManager.safeGetURL('icons/ui/dubbing.png'))
 </script>

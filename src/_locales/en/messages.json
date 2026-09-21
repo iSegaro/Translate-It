@@ -1526,6 +1526,12 @@
   "popup_view_live_dubbing": {
     "message": "Live Dubbing"
   },
+  "popup_view_switcher_translate_label": {
+    "message": "Text"
+  },
+  "popup_view_switcher_dubbing_label": {
+    "message": "Dubbing"
+  },
   "popup_revert_alt_icon": {
     "message": "Revert"
   },

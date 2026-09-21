@@ -34,9 +34,10 @@
   .ti-header-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
+    gap: 6px !important;
     flex: 0 0 auto;
     margin-inline-start: auto;
+    padding-inline-end: 4px !important;
 
     /* Action contract ownership boundary: every ordinary toolbar action
        (More, Settings, Mouse Hover, Capture, Sidepanel, both Select split
@@ -126,7 +127,7 @@
   align-items: center;
   align-self: center;
   line-height: 0;
-  margin-inline-start: 4px;
+  margin-inline-start: 6px;
 }
 
 .ti-select-split {
