@@ -199,10 +199,10 @@
               type="button"
               class="ti-toolbar-button ti-btn-select-chevron"
               :class="{ 'ti-active': isSelectModeActive }"
-              :title="t('popup_select_element_options_title') || 'Select Element options'"
+              :title="t('popup_select_element_options_title', 'Select Element options')"
               v-bind="triggerAttrs"
               :ref="(el) => triggerRef(el)"
-              :aria-label="t('popup_select_element_options_title') || 'Select Element options'"
+              :aria-label="t('popup_select_element_options_title', 'Select Element options')"
               @click="toggle"
             >
               <img
@@ -230,7 +230,7 @@
               alt=""
               aria-hidden="true"
             >
-            <span>{{ t('popup_revert_alt_icon') || 'Revert' }}</span>
+            <span>{{ t('popup_revert_alt_icon', 'Revert') }}</span>
           </button>
         </template>
       </ToolbarMenu>

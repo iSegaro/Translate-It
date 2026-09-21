@@ -276,13 +276,13 @@
     "message": "Clean up"
   },
   "live_dubbing_action_start_aria_label": {
-    "message": "Start Live Dubbing"
+    "message": "Start live dubbing"
   },
   "live_dubbing_action_stop_aria_label": {
-    "message": "Stop Live Dubbing"
+    "message": "Stop live dubbing"
   },
   "live_dubbing_action_cleanup_aria_label": {
-    "message": "Clean up Live Dubbing"
+    "message": "Clean up live dubbing"
   },
   "live_dubbing_status_loading": {
     "message": "Checking availability…"

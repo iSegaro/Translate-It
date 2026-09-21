@@ -23,7 +23,7 @@
         :loading="isStarting"
         :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
         :text="t('live_dubbing_action_start', 'Start')"
-        :aria-label="t('live_dubbing_action_start_aria_label', 'Start Live Dubbing')"
+        :aria-label="t('live_dubbing_action_start_aria_label', 'Start live dubbing')"
         @click="start"
       />
       <BaseButton
@@ -33,7 +33,7 @@
         :loading="isStopping"
         :disabled="isStopping"
         :text="isCleanupPending ? t('live_dubbing_action_cleanup', 'Clean up') : t('live_dubbing_action_stop', 'Stop')"
-        :aria-label="isCleanupPending ? t('live_dubbing_action_cleanup_aria_label', 'Clean up Live Dubbing') : t('live_dubbing_action_stop_aria_label', 'Stop Live Dubbing')"
+        :aria-label="isCleanupPending ? t('live_dubbing_action_cleanup_aria_label', 'Clean up live dubbing') : t('live_dubbing_action_stop_aria_label', 'Stop live dubbing')"
         @click="stop"
       />
       <BaseButton
@@ -41,7 +41,7 @@
         size="sm"
         variant="danger"
         :text="t('live_dubbing_action_cleanup', 'Clean up')"
-        :aria-label="t('live_dubbing_action_cleanup_aria_label', 'Clean up Live Dubbing')"
+        :aria-label="t('live_dubbing_action_cleanup_aria_label', 'Clean up live dubbing')"
         @click="stop"
       />
     </div>
@@ -94,7 +94,7 @@
         <label
           class="ti-live-dubbing-control-volume-label"
           for="ti-live-dubbing-dubbed-volume"
-        >{{ t('live_dubbing_volume_dubbed_label', 'Dubbed') }}</label>
+        >{{ t('live_dubbing_volume_dubbed_label', 'Dubbed Volume') }}</label>
         <input
           id="ti-live-dubbing-dubbed-volume"
           type="range"
@@ -216,6 +216,9 @@ const isUnavailable = computed(() => state.value === 'unavailable')
 const isLoading = computed(() => state.value === 'loading')
 const isIdle = computed(() => state.value === 'idle')
 const isBusy = computed(() => isTransitioning.value || isRunning.value || isCleanupPending.value)
+// Presentation-only: UI state is authoritative for the status line. State
+// transitions, session retention and cleanup behavior are untouched.
+const displayStatus = computed(() => state.value === 'cleanup' ? 'cleanup' : authoritativeStatus.value || state.value)
 const statusText = computed(() => ({
   loading: t('live_dubbing_status_loading', 'Checking availability…'),
   idle: t('live_dubbing_status_idle', 'Ready'),
@@ -226,7 +229,7 @@ const statusText = computed(() => ({
   ERROR: t('live_dubbing_status_error', 'Error'),
   unavailable: t('live_dubbing_status_unavailable', 'Unavailable'),
   cleanup: t('live_dubbing_status_cleanup', 'Cleanup required')
-}[authoritativeStatus.value || state.value] || t('live_dubbing_status_error', 'Error')))
+}[displayStatus.value] || t('live_dubbing_status_error', 'Error')))
 
 const isVolumeControllable = computed(() =>
   ['PREPARING_CAPTURE', 'CONNECTING_PROVIDER', 'RUNNING'].includes(authoritativeStatus.value)

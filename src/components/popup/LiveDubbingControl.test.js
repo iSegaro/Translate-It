@@ -288,8 +288,7 @@ describe('LiveDubbingControl', () => {
     ['PREPARING_CAPTURE', 'Preparing capture…'],
     ['CONNECTING_PROVIDER', 'Connecting to provider…'],
     ['RUNNING', 'Running'],
-    ['STOPPING', 'Stopping…'],
-    ['ERROR', 'Error']
+    ['STOPPING', 'Stopping…']
   ])('presents the authoritative %s status', async (status, label) => {
     sendMessage.mockImplementation(({ action }) => (
       action === 'GET_LIVE_DUBBING_STATUS'
@@ -302,6 +301,21 @@ describe('LiveDubbingControl', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+  })
+
+  it('names the cleanup action for an ERROR status with a retained session', async () => {
+    // UI state is authoritative for presentation: ERROR + retained session and
+    // no error detail still names the required cleanup action.
+    mockI18nMap.live_dubbing_status_cleanup = 'Bereinigung erforderlich'
+    sendMessage.mockImplementation(({ action }) => (
+      action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve({ status: { status: 'ERROR', sessionId: 'session-1' } })
+        : Promise.resolve({ status: 'idle' })
+    ))
+
+    const wrapper = await mountAndFlush()
+
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Bereinigung erforderlich')
   })
 
   it('resolves the Start label and accessible name through i18n', async () => {
@@ -354,7 +368,7 @@ describe('LiveDubbingControl', () => {
     ['CONNECTING_PROVIDER', { status: { status: 'CONNECTING_PROVIDER', sessionId: 's1' } }, 'live_dubbing_status_connecting_provider', 'Wird verbunden'],
     ['RUNNING', { status: { status: 'RUNNING', sessionId: 's1' } }, 'live_dubbing_status_running', 'Läuft'],
     ['STOPPING', { status: { status: 'STOPPING', sessionId: 's1' } }, 'live_dubbing_status_stopping', 'Wird gestoppt'],
-    ['ERROR', { status: { status: 'ERROR', sessionId: 's1' } }, 'live_dubbing_status_error', 'Fehler'],
+    ['ERROR', { status: { status: 'ERROR' } }, 'live_dubbing_status_error', 'Fehler'],
     ['unavailable', { available: false }, 'live_dubbing_status_unavailable', 'Nicht verfügbar'],
     ['cleanup', { status: 'ERROR', sessionId: 'retained', lastError: 'x' }, 'live_dubbing_status_cleanup', 'Bereinigung erforderlich']
   ])('resolves the %s status text through i18n', async (state, response, key, label) => {

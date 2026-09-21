@@ -9,11 +9,12 @@ let settings
 let closePopup
 let sidebarToggle
 
-const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, mockSendMessage } = vi.hoisted(() => ({
+const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, mockSendMessage, mockFindProviderById } = vi.hoisted(() => ({
   mockSelectModeHolder: { ref: null },
   mockToggleSelectElement: vi.fn(),
   mockToggleMouseHover: vi.fn(),
-  mockSendMessage: vi.fn()
+  mockSendMessage: vi.fn(),
+  mockFindProviderById: vi.fn(() => ({ features: ['bulk'] }))
 }))
 const mockT = vi.hoisted(() => vi.fn((key, fallback) => fallback || key))
 
@@ -55,7 +56,7 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 }))
 
 vi.mock('@/features/translation/providers/ProviderManifest.js', () => ({
-  findProviderById: () => ({ features: ['bulk'] })
+  findProviderById: (...args) => mockFindProviderById(...args)
 }))
 
 vi.mock('@/utils/browser/compatibility.js', () => ({
@@ -95,7 +96,16 @@ vi.mock('@/components/shared/HorizontalActionScroller.vue', () => ({
 vi.mock('@/components/base/ToolbarMenu/ToolbarMenu.vue', () => ({
   default: {
     name: 'ToolbarMenu',
-    props: ['placement', 'forcePopover'],
+    props: {
+      placement: {
+        type: String,
+        default: 'end'
+      },
+      forcePopover: {
+        type: Boolean,
+        default: false
+      }
+    },
     setup() {
       const open = ref(false)
       const toggle = () => { open.value = !open.value }
@@ -144,6 +154,8 @@ describe('PopupHeader', () => {
     mockToggleMouseHover.mockClear()
     mockSendMessage.mockClear()
     mockSendMessage.mockResolvedValue({})
+    mockFindProviderById.mockReset()
+    mockFindProviderById.mockImplementation(() => ({ features: ['bulk'] }))
     vi.mocked(openExtensionApp).mockClear()
     vi.mocked(openExtensionApp).mockResolvedValue({ success: true })
     closePopup = vi.spyOn(window, 'close').mockImplementation(() => {})
@@ -291,13 +303,23 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    expect(mockT).toHaveBeenCalledWith('provider_does_not_support_bulk', 'This provider does not support page/element translation')
     expect(mockT).toHaveBeenCalledWith('popup_select_element_title_icon', 'Select Element mode')
 
     // The Revert title lives inside the split menu; open it first.
     await wrapper.find('.ti-btn-select-chevron').trigger('click')
     await wrapper.vm.$nextTick()
     expect(mockT).toHaveBeenCalledWith('popup_revert_title_icon', 'Revert')
+  })
+
+  it('uses the unsupported-provider fallback when the provider lacks bulk support', async () => {
+    mockFindProviderById.mockReturnValue({ features: [] })
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    expect(mockT).toHaveBeenCalledWith('provider_does_not_support_bulk', 'This provider does not support page/element translation')
+    // Unsupported: the Select button explains itself and stays disabled.
+    expect(wrapper.find('.ti-btn-select').attributes('title')).toBe('This provider does not support page/element translation')
+    expect(wrapper.find('.ti-btn-select').attributes('disabled')).toBeDefined()
   })
 
   it('passes compact mode to the page translation button', async () => {
