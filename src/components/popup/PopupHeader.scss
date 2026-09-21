@@ -216,15 +216,20 @@
   --tm-panel-border: 1px solid var(--header-border-color);
 }
 
-  /* Specific Dark Mode overrides */
-  @at-root :global(.ti-dark-mode) &, 
-           :global(.theme-dark) & {
+  /* Specific Dark Mode overrides.
+     Plain selectors: this file is a standard SCSS import (not a Vue
+     scoped block and not CSS-Modules), so a :global wrapper would be
+     emitted literally and invalidate the selector. .theme-dark lands on
+     the document root via applyTheme; .ti-dark-mode is a retained hook. */
+  @at-root .theme-dark &, .ti-dark-mode & {
     background-color: #2d2d2d !important;
     border-bottom-color: #404040 !important;
 
     /* Dark side of the action contract: the shared button rules above
        pick these up, so no duplicate button-state literals are needed. */
     .ti-header-actions {
+      --ti-action-icon: #fff;
+      --ti-action-icon-hover: color-mix(in srgb, #fff 82%, var(--color-warning) 18%);
       --ti-action-hover-bg: #424242;
       --ti-action-active-bg: #555555;
     }

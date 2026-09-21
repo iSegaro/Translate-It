@@ -58,11 +58,15 @@ body.popup-context .ti-toolbar-icon {
 
   @include ti-transition-fast(opacity, filter, background-color);
 
-  filter: var(--icon-filter);
-
   &:hover {
     opacity: var(--icon-hover-opacity);
   }
+}
+
+// Legacy image filter is images-only: every element needing --icon-filter
+// is an <img>; mask icons are currentColor-driven and must not be inverted.
+body.popup-context img.ti-toolbar-icon {
+  filter: var(--icon-filter);
 }
 
 // Revert icon animation

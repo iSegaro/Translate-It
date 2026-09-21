@@ -166,15 +166,23 @@
   }
 }
 
-.ti-toolbar-icon {
+// Scoped under the Sidepanel body context (parallel to the popup's
+// body.popup-context): with cssCodeSplit:false this file ships in shared
+// CSS, so a standalone global rule would leak onto Popup Header icons.
+body.sidepanel-context .ti-toolbar-icon {
   width: 16px !important;
   height: 16px !important;
   opacity: 0.7 !important;
-  filter: var(--icon-filter, none);
   transition: opacity 0.2s ease-in-out, filter 0.2s ease;
 }
 
-.ti-icon-button:hover .ti-toolbar-icon {
+// Legacy image filter is images-only: every element needing --icon-filter
+// here is an <img>; mask icons are currentColor-driven and must not be inverted.
+body.sidepanel-context img.ti-toolbar-icon {
+  filter: var(--icon-filter, none);
+}
+
+body.sidepanel-context .ti-icon-button:hover .ti-toolbar-icon {
   opacity: 1 !important;
 }
 
