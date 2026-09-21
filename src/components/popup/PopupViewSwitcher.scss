@@ -10,21 +10,23 @@
   background-color: var(--color-surface-variant, rgba(0, 0, 0, 0.06));
   flex-shrink: 0;
 
-  /* Dark theme: hover mirrors PopupHeader's dark hover family;
-     active background stays clearly distinguishable and the
-     light-only shadow is replaced with a darker glow.
-     Nested under .ti-popup-view-switcher so `&` has a valid
-     parent selector inside @at-root. */
-  @at-root :global(.ti-dark-mode) &,
-           :global(.theme-dark) & {
+  /* Dark theme: inactive tabs use the normal text color (readable but not
+     "disabled-looking"); hover shifts to the action-hover accent; active keeps
+     the primary color and a clearly distinguishable background.
+     Plain selectors: this file is a standard SCSS import (not a Vue scoped
+     block and not CSS-Modules), so a :global wrapper would be emitted
+     literally and invalidate the selector. .theme-dark lands on the document
+     root via applyTheme; .ti-dark-mode is a retained hook. */
+  @at-root .theme-dark &,
+           .ti-dark-mode & {
     background-color: rgba(255, 255, 255, 0.06) !important;
 
     .ti-popup-view-switcher__tab {
-      color: var(--color-text-secondary, #adb5bd);
+      color: var(--color-text);
 
       &:hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
-        color: var(--color-text, #e9ecef) !important;
+        color: var(--color-action-hover-accent) !important;
       }
 
       &.is-active {
