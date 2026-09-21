@@ -38,6 +38,8 @@ describe('PopupHeader.scss dark contract', () => {
     const { css } = sass.compile(scssPath, { importers: scssImporters })
 
     expect(css).not.toContain(':global(')
+    // Dark contract vars are declared on the toolbar root so both
+    // .ti-header-left and .ti-header-actions inherit them.
     expect(css).toContain('.theme-dark .ti-header-toolbar')
     expect(css).toContain('--ti-action-icon: #fff')
     expect(css).toContain('--ti-action-icon-hover: var(--color-action-hover-accent)')
@@ -55,6 +57,21 @@ describe('PopupHeader.scss dark contract', () => {
 
     expect(tokens).toContain('--color-action-hover-accent: #ff9800;')
     expect(tokens).toContain('--color-action-hover-accent: #ffb74d;')
+  })
+
+  it('exposes the action contract at .ti-header-toolbar scope (not only .ti-header-actions)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // Light contract: the four vars appear at .ti-header-toolbar level.
+    // The toolbar root block must declare --ti-action-hover-bg directly.
+    const toolbarBlock = source.match(/\.ti-header-toolbar\s*\{([\s\S]*?)\/\*\s*Left group/)
+    expect(toolbarBlock).toBeTruthy()
+    expect(toolbarBlock[1]).toContain('--ti-action-hover-bg: rgba(0, 0, 0, 0.08)')
+
+    // Compiled: dark contract lands on .theme-dark .ti-header-toolbar,
+    // inherited by both .ti-header-left and .ti-header-actions.
+    expect(css).toContain('.theme-dark .ti-header-toolbar')
   })
 
   it('pins the header actions spacing contract in source', () => {

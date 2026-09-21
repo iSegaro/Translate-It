@@ -200,6 +200,12 @@
   padding-right: 22px !important;
 }
 
+/* Popup Header Page Translate: match the Header action hover surface.
+   The colored <img> icon is intentionally NOT recolored (no `color` here). */
+.ti-page-translate-btn.compact-wrapper .is-compact-icon:hover:not(.ti-btn--disabled) {
+  background-color: var(--ti-action-hover-bg) !important;
+}
+
 .page-translate-star-btn {
   position: absolute !important;
   bottom: -6px !important;

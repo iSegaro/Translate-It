@@ -94,3 +94,37 @@ describe('PageTranslationButton.scss dark-mode selectors', () => {
     expect(source).not.toMatch(/:global\(/)
   })
 })
+
+describe('PageTranslationButton.scss popup header hover contract', () => {
+  const source = readFileSync(scssPath, 'utf8')
+
+  it('popup Page Translate hover uses the Header action contract var', () => {
+    expect(source).toContain('.ti-page-translate-btn.compact-wrapper .is-compact-icon:hover:not(.ti-btn--disabled)')
+    expect(source).toContain('background-color: var(--ti-action-hover-bg) !important;')
+  })
+
+  it('hover rule does NOT set color (colored image icon stays unchanged)', () => {
+    const hoverRule = source.match(
+      /\.ti-page-translate-btn\.compact-wrapper\s+\.is-compact-icon:hover:not\(\.ti-btn--disabled\)\s*\{[^}]*\}/
+    )
+    expect(hoverRule).toBeTruthy()
+    // background-color is fine; reject standalone `color:` property
+    const lines = hoverRule[0].split('\n').map(l => l.trim())
+    const hasStandaloneColor = lines.some(l => /^color:/.test(l))
+    expect(hasStandaloneColor).toBe(false)
+    expect(hoverRule[0]).not.toContain('--ti-action-icon-hover')
+  })
+
+  it('star hover remains independent (no wrapper coupling)', () => {
+    expect(source).not.toContain('.compact-wrapper:hover .is-compact-icon')
+    expect(source).not.toContain('.compact-wrapper:focus-within .is-compact-icon')
+  })
+
+  it('compact geometry values unchanged', () => {
+    expect(source).toContain('padding-left: 2px !important;')
+    expect(source).toContain('padding-right: 22px !important;')
+    const starSection = source.slice(source.indexOf('.page-translate-star-btn'))
+    expect(starSection).toContain('padding: 5px !important;')
+    expect(starSection).toContain('bottom: -6px !important;')
+  })
+})

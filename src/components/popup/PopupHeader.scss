@@ -17,6 +17,16 @@
   min-height: 52px !important;
   gap: 4px !important;
 
+  /* Action contract ownership boundary: every ordinary toolbar action
+     (More, Settings, Mouse Hover, Capture, Sidepanel, both Select split
+     halves) consumes these shared values. Declared on the toolbar root
+     so BOTH .ti-header-left (Page Translate) and .ti-header-actions
+     inherit them. Header-local only — no new component/global tokens. */
+  --ti-action-icon: var(--tab-button-color);
+  --ti-action-icon-hover: var(--color-action-hover-accent);
+  --ti-action-hover-bg: rgba(0, 0, 0, 0.08);
+  --ti-action-active-bg: rgba(0, 0, 0, 0.12);
+
   // Force LTR and Row direction
   direction: ltr !important;
   flex-direction: row !important;
@@ -38,15 +48,6 @@
     flex: 0 0 auto;
     margin-inline-start: auto;
     padding-inline-end: 4px !important;
-
-    /* Action contract ownership boundary: every ordinary toolbar action
-       (More, Settings, Mouse Hover, Capture, Sidepanel, both Select split
-       halves) consumes these shared values. Header-local only — no new
-       component/global tokens. */
-    --ti-action-icon: var(--tab-button-color);
-    --ti-action-icon-hover: var(--color-action-hover-accent);
-    --ti-action-hover-bg: rgba(0, 0, 0, 0.08);
-    --ti-action-active-bg: rgba(0, 0, 0, 0.12);
   }
 
   /* Toolbar Buttons Base Style: consumes the .ti-header-actions contract.
@@ -237,13 +238,13 @@
     background-color: #2d2d2d !important;
     border-bottom-color: #404040 !important;
 
-    /* Dark side of the action contract: the shared button rules above
-       pick these up, so no duplicate button-state literals are needed. */
-    .ti-header-actions {
-      --ti-action-icon: #fff;
-      --ti-action-hover-bg: #424242;
-      --ti-action-active-bg: #555555;
-    }
+    /* Dark side of the action contract: declared on the toolbar root so
+       both .ti-header-left (Page Translate) and .ti-header-actions
+       inherit the dark values. The shared button rules above pick these
+       up, so no duplicate button-state literals are needed. */
+    --ti-action-icon: #fff;
+    --ti-action-hover-bg: #424242;
+    --ti-action-active-bg: #555555;
 
     .ti-select-split .ti-btn-select-chevron {
       border-inline-start-color: rgba(255, 255, 255, 0.1) !important;
