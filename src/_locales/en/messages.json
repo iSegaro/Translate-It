@@ -323,6 +323,12 @@
   "popup_select_element_options_title": {
     "message": "Select Element options"
   },
+  "popup_exclude_enable_label": {
+    "message": "Enable on this site"
+  },
+  "popup_exclude_disable_label": {
+    "message": "Disable on this site"
+  },
   "page_translation_auto_translate_enable_label": {
     "message": "Enable automatic page translation"
   },
