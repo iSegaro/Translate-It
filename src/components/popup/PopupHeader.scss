@@ -66,18 +66,31 @@
       transform: translateY(0) scale(0.95) !important;
     }
 
-    /* Target the icon inside and KILL any background/hover on it */
+    /* Hover opacity for the inner icon — img and MaskIcon alike.
+       Button-level hover restores the pre-mask .ti-icon-button:hover
+       behavior that mask icons lost with that class. Filter-free, so
+       MaskIcon color still comes only from currentColor. */
+    &:hover .ti-toolbar-icon {
+      opacity: var(--icon-hover-opacity, 1) !important;
+    }
+
+    /* Target the icon inside and KILL any background/hover on it.
+       Sizing covers mask icons too; the background/object-fit resets are
+       img-only so MaskIcon keeps its currentColor fill. */
     img, .ti-toolbar-icon, .ti-icon-button {
       width: 22px !important;
       height: 22px !important;
+      display: block !important;
+      margin: 0 !important;
+    }
+
+    img.ti-toolbar-icon, img.ti-icon-button {
       background: transparent !important;
       background-color: transparent !important;
       border: none !important;
       box-shadow: none !important;
-      display: block !important;
-      margin: 0 !important;
       object-fit: contain !important;
-      
+
       &:hover {
         background: transparent !important;
         background-color: transparent !important;
@@ -194,14 +207,11 @@
       background-color: #555555 !important;
     }
 
-    /* Whiten utility icons in dark mode */
-    .ti-btn-settings img,
+    /* Whiten remaining image utility icons in dark mode.
+       Mask icons are excluded: their color comes only from currentColor. */
     .ti-btn-capture img,
-    .ti-btn-revert img,
     .ti-btn-select img,
-    .ti-btn-mouse-hover img,
-    .ti-btn-sidepanel img,
-    .ti-toolbar-icon {
+    img.ti-toolbar-icon {
       filter: brightness(0) invert(1) !important;
       opacity: 0.8 !important;
     }
@@ -224,10 +234,6 @@
     .ti-select-split .ti-btn-select.ti-active,
     .ti-select-split .ti-btn-select-chevron.ti-active {
       background-color: rgba(255, 255, 255, 0.12) !important;
-    }
-    .ti-btn-select-chevron img {
-      filter: brightness(0) invert(1) !important;
-      opacity: 0.8 !important;
     }
 
     /* Keep branded icons colorful */
@@ -310,11 +316,15 @@
     color: var(--color-primary, #007bff) !important;
   }
 
-  img {
+  img,
+  .mask-icon {
     width: 18px !important;
     height: 18px !important;
-    object-fit: contain !important;
     flex-shrink: 0 !important;
+  }
+
+  img {
+    object-fit: contain !important;
   }
 }
 

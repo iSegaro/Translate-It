@@ -16,7 +16,7 @@
             :title="TOOLTIP_OUTLINE"
             @click="$emit('toggle-outline')"
           >
-            <SvgIcon
+            <MaskIcon
               :src="outlineIcon"
               :size="16"
             />
@@ -31,7 +31,7 @@
           title="PDF Information"
           @click="$emit('request-document-info')"
         >
-          <SvgIcon
+          <MaskIcon
             :src="infoIcon"
             :size="16"
           />
@@ -95,7 +95,7 @@
             :aria-pressed="isSideBySide"
             @click="handleLayoutModeToggle"
           >
-            <SvgIcon
+            <MaskIcon
               :src="splitScreenIcon"
               :size="14"
             />
@@ -158,12 +158,12 @@
           :title="fitToggleTooltip"
           @click="handleFitToggle"
         >
-          <SvgIcon
+          <MaskIcon
             v-if="fitToggleIcon === 'fit-page'"
             :src="fitPageIcon"
             :size="18"
           />
-          <SvgIcon
+          <MaskIcon
             v-else
             :src="fitWidthIcon"
             :size="18"
@@ -180,7 +180,7 @@
           :title="TOOLTIP_PREVIOUS_PAGE"
           @click="$emit('previous-page')"
         >
-          <SvgIcon
+          <MaskIcon
             class="pdf-toolbar__icon--rotated"
             :src="dropdownArrowIcon"
             :size="14"
@@ -194,7 +194,7 @@
           :title="TOOLTIP_NEXT_PAGE"
           @click="$emit('next-page')"
         >
-          <SvgIcon
+          <MaskIcon
             :src="dropdownArrowIcon"
             :size="14"
           />
@@ -342,7 +342,7 @@
               role="menuitem"
               @click="handleManageLanguages"
             >
-              <SvgIcon
+              <MaskIcon
                 :src="settingsIcon"
                 :size="16"
               />
@@ -433,7 +433,7 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import SvgIcon from '@/components/shared/SvgIcon.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import PdfTranslationSettingsPopover from './PdfTranslationSettingsPopover.vue'
 import ToolbarActionDock from './ToolbarActionDock.vue'

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref, onMounted, onUnmounted } from 'vue'
 import PopupHeader from './PopupHeader.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import { openExtensionApp } from '@/core/ExtensionAppLauncher.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 
@@ -378,9 +379,12 @@ describe('PopupHeader', () => {
     const icons = panel.findAll('.ti-header-menu-item img').map((img) => img.attributes('src'))
     expect(icons.some((src) => src.includes('subtitle.png'))).toBe(true)
     expect(icons.some((src) => src.includes('pdf.png'))).toBe(true)
-    expect(icons.some((src) => src.includes('mouse-hover.png'))).toBe(true)
     expect(icons.some((src) => src.includes('capture.svg'))).toBe(true)
-    expect(icons.some((src) => src.includes('side-panel.png'))).toBe(true)
+    // Monochrome menu icons render via MaskIcon (currentColor), not <img>.
+    const maskSrcs = panel.findAllComponents(MaskIcon).map((icon) => icon.props('src'))
+    const maskOrImgSrcs = [...icons, ...maskSrcs]
+    expect(maskOrImgSrcs.some((src) => src.includes('mouse-hover.png'))).toBe(true)
+    expect(maskOrImgSrcs.some((src) => src.includes('side-panel.png'))).toBe(true)
     expect(panel.text()).toContain('Disable on this site')
 
     // Breakpoint contract classes: direct buttons hide at narrow widths,

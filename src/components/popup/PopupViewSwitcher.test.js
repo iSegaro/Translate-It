@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PopupViewSwitcher from './PopupViewSwitcher.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 
 const { mockT } = vi.hoisted(() => ({
   mockT: vi.fn((key, fallback) => fallback || key)
@@ -44,14 +45,21 @@ describe('PopupViewSwitcher', () => {
     const translateTab = tabs[0]
     expect(translateTab.attributes('aria-label')).toBe('Translate')
     expect(translateTab.attributes('title')).toBe('Translate')
-    expect(translateTab.find('img').attributes('src')).toContain('icons/ui/translate-view.png')
-    expect(translateTab.find('img').attributes('alt')).toBe('Translate')
+    // Decorative mask icon: no <img>, parent tab owns the accessible label.
+    expect(translateTab.find('img').exists()).toBe(false)
+    const translateIcon = translateTab.findComponent(MaskIcon)
+    expect(translateIcon.exists()).toBe(true)
+    expect(translateIcon.props('src')).toContain('icons/ui/translate-view.png')
+    expect(translateIcon.attributes('aria-hidden')).toBe('true')
 
     const dubbingTab = tabs[1]
     expect(dubbingTab.attributes('aria-label')).toBe('Live Dubbing')
     expect(dubbingTab.attributes('title')).toBe('Live Dubbing')
-    expect(dubbingTab.find('img').attributes('src')).toContain('icons/ui/dubbing.png')
-    expect(dubbingTab.find('img').attributes('alt')).toBe('Live Dubbing')
+    expect(dubbingTab.find('img').exists()).toBe(false)
+    const dubbingIcon = dubbingTab.findComponent(MaskIcon)
+    expect(dubbingIcon.exists()).toBe(true)
+    expect(dubbingIcon.props('src')).toContain('icons/ui/dubbing.png')
+    expect(dubbingIcon.attributes('aria-hidden')).toBe('true')
   })
 
   it('marks the active tab with aria-selected', () => {

@@ -1202,7 +1202,7 @@ describe('PdfToolbar', () => {
       const manageButtons = wrapper.findAll('.pdf-toolbar__ocr-menu-item')
       const manageButton = manageButtons.find(b => b.text().includes('Manage Languages'))
 
-      expect(manageButton.find('.svg-icon').exists()).toBe(true)
+      expect(manageButton.find('.mask-icon').exists()).toBe(true)
       expect(manageButton.text()).toBe('Manage Languages...')
 
       await manageButton.trigger('click')
@@ -1737,7 +1737,7 @@ describe('PdfToolbar', () => {
     it('emits go-to-page on Enter', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1755,7 +1755,7 @@ describe('PdfToolbar', () => {
     it('emits go-to-page on blur', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1772,7 +1772,7 @@ describe('PdfToolbar', () => {
     it('does not emit go-to-page on invalid input blur and restores value', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1789,7 +1789,7 @@ describe('PdfToolbar', () => {
     it('restores current page immediately on invalid non-numeric blur', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1806,7 +1806,7 @@ describe('PdfToolbar', () => {
     it('Enter emits go-to-page only once', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1825,7 +1825,7 @@ describe('PdfToolbar', () => {
     it('cancels edit on Escape and restores value', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1842,7 +1842,7 @@ describe('PdfToolbar', () => {
     it('syncs value when currentPageNumber prop changes while not editing', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1857,7 +1857,7 @@ describe('PdfToolbar', () => {
     it('does not overwrite input while editing when prop changes', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1873,7 +1873,7 @@ describe('PdfToolbar', () => {
     it('strips non-numeric characters from input', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1890,7 +1890,7 @@ describe('PdfToolbar', () => {
     it('does not emit go-to-page on blur when value is unchanged', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')
@@ -1906,7 +1906,7 @@ describe('PdfToolbar', () => {
     it('does not emit go-to-page on Enter when value is unchanged', async () => {
       const wrapper = mount(PdfToolbar, {
         props: baseProps(),
-        global: { stubs: { SvgIcon: true } },
+        global: { stubs: { MaskIcon: true } },
         attachTo: document.body
       })
       const input = wrapper.find('.pdf-toolbar__page-input')

@@ -34,7 +34,7 @@
             @click="handleClose"
           >
             <template #icon>
-              <SvgIcon
+              <MaskIcon
                 :src="closeIcon"
                 :size="18"
               />
@@ -60,7 +60,7 @@
 <script setup>
 import { onMounted, onUnmounted, watch } from 'vue'
 import BaseButton from './BaseButton.vue'
-import SvgIcon from '@/components/shared/SvgIcon.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import closeIcon from '@/icons/ui/close.svg?url'
 import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
 

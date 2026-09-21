@@ -70,6 +70,6 @@
 .ti-popup-view-switcher__icon {
   width: 18px;
   height: 18px;
-  object-fit: contain;
   display: block;
+  flex-shrink: 0;
 }

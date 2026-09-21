@@ -92,11 +92,10 @@
             :class="{ 'is-active': isMouseHoverEnabled }"
             @click="close(); toggleMouseHover()"
           >
-            <img
+            <MaskIcon
               :src="menuIcon('mouse-hover.png')"
-              alt=""
-              aria-hidden="true"
-            >
+              :size="18"
+            />
             <span>{{ isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس') }}</span>
           </button>
           <button
@@ -120,22 +119,22 @@
             class="ti-header-menu-item ti-header-menu-item--narrow-only"
             @click="close(); handleOpenSidePanelNative($event)"
           >
-            <img
+            <MaskIcon
               :src="menuIcon('side-panel.png')"
-              alt=""
-              aria-hidden="true"
-            >
+              :size="18"
+            />
             <span>{{ t('popup_open_side_panel_title') || 'باز کردن در پنل کناری' }}</span>
           </button>
         </template>
       </ToolbarMenu>
 
-      <!-- 3. Settings -->
+      <!-- 3. Settings (pure-black glyph → mask) -->
       <IconButton
         icon="settings.png"
         :alt="t('popup_settings_alt_icon') || 'Settings'"
         :title="t('popup_settings_title_icon') || 'تنظیمات'"
         type="toolbar"
+        :mask="true"
         class="ti-btn-settings"
         @click="handleOpenSettings"
       />
@@ -146,6 +145,7 @@
         :alt="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
         :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
         type="toolbar"
+        :mask="true"
         :active="isMouseHoverEnabled"
         class="ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide"
         @click="toggleMouseHover"
@@ -205,12 +205,11 @@
               :aria-label="t('popup_select_element_options_title', 'Select Element options')"
               @click="toggle"
             >
-              <img
+              <MaskIcon
                 :src="menuIcon('dropdown-arrow.svg')"
-                alt=""
+                :size="12"
                 class="ti-toolbar-icon ti-chevron-icon"
-                aria-hidden="true"
-              >
+              />
             </button>
           </div>
         </template>
@@ -225,11 +224,10 @@
             )"
             @click="close(); handleRevert()"
           >
-            <img
+            <MaskIcon
               :src="menuIcon('revert.png')"
-              alt=""
-              aria-hidden="true"
-            >
+              :size="18"
+            />
             <span>{{ t('popup_revert_alt_icon', 'Revert') }}</span>
           </button>
         </template>
@@ -243,6 +241,7 @@
         :alt="t('popup_open_side_panel_title') || 'Open in side panel'"
         :title="t('popup_open_side_panel_title') || 'باز کردن در پنل کناری'"
         type="toolbar"
+        :mask="true"
         class="ti-btn-sidepanel ti-header-toolbar-button--narrow-hide"
       />
     </div>
@@ -262,6 +261,7 @@ import { TranslationMode } from '@/shared/config/config.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import browser from 'webextension-polyfill'
 import IconButton from '@/components/shared/IconButton.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import ToolbarMenu from '@/components/base/ToolbarMenu/ToolbarMenu.vue'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue'

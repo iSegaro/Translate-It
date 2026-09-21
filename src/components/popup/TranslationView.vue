@@ -41,13 +41,13 @@
       <button
         class="ti-btn-min-clear"
         :title="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
+        :aria-label="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
         @click="emit('clear')"
       >
-        <img
-          :src="browser.runtime.getURL('icons/ui/clear.png')"
-          class="ti-toolbar-icon"
-          alt="Clear"
-        >
+        <MaskIcon
+          :src="clearIcon"
+          :size="14"
+        />
       </button>
     </div>
 
@@ -72,7 +72,8 @@ import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationForm from '@/components/popup/TranslationForm.vue'
-import browser from 'webextension-polyfill'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
+import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Import adjacent SCSS
 import './TranslationView.scss'
@@ -140,6 +141,9 @@ const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 
 const isDeeplBetaEnabled = computed(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? false)
+
+/** Monochrome clear icon rendered via CSS mask; inherits button color. */
+const clearIcon = computed(() => ExtensionContextManager.safeGetURL('icons/ui/clear.png'))
 
 // Two-way proxies so inner selectors can write back to PopupApp-owned state
 const sourceLanguageModel = computed({

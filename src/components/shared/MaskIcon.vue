@@ -1,6 +1,6 @@
 <template>
   <span
-    class="svg-icon"
+    class="mask-icon"
     :style="maskStyle"
     :role="ariaLabel ? 'img' : undefined"
     :aria-label="ariaLabel || undefined"
@@ -10,7 +10,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import './SvgIcon.scss'
+import './MaskIcon.scss'
 
 const props = defineProps({
   src: {

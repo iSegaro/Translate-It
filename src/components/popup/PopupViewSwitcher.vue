@@ -14,11 +14,11 @@
       :title="translateLabel"
       @click="emit('update:modelValue', 'translate')"
     >
-      <img
+      <MaskIcon
         :src="translateIcon"
-        :alt="translateLabel"
+        :size="18"
         class="ti-popup-view-switcher__icon"
-      >
+      />
     </button>
     <button
       v-if="showLiveDubbing"
@@ -31,17 +31,18 @@
       :title="liveDubbingLabel"
       @click="emit('update:modelValue', 'live-dubbing')"
     >
-      <img
+      <MaskIcon
         :src="liveDubbingIcon"
-        :alt="liveDubbingLabel"
+        :size="18"
         class="ti-popup-view-switcher__icon"
-      >
+      />
     </button>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 

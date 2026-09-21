@@ -4,9 +4,22 @@
     class="ti-toolbar-button"
     :class="{ 'ti-active': active }"
     :title="title"
+    :aria-label="maskAriaLabel"
     @click="$emit('click')"
   >
+    <MaskIcon
+      v-if="useMaskIcon"
+      :src="iconSrc"
+      :size="20"
+      :class="[
+        'ti-toolbar-icon',
+        {
+          'ti-revert-icon': isRevertIcon,
+        }
+      ]"
+    />
     <img
+      v-else
       :src="iconSrc"
       :alt="alt"
       :class="[
@@ -40,6 +53,7 @@
 <script setup>
 import { computed } from 'vue'
 import './IconButton.scss'
+import MaskIcon from './MaskIcon.vue'
 import ExtensionContextManager from '@/core/extensionContext.js'
 
 // Props
@@ -73,6 +87,10 @@ const props = defineProps({
   active: {
     type: Boolean,
     default: false
+  },
+  mask: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -103,6 +121,17 @@ const iconSrc = computed(() => {
 
 const isRevertIcon = computed(() => props.variant === 'revert')
 const isToolbarIcon = computed(() => props.type === 'toolbar')
+// Mask opt-in: toolbar buttons only. The native <button> root is preserved
+// (no nested buttons, $el/click/active/title unchanged); the inner <img> is
+// replaced by a decorative MaskIcon and the button owns the accessible name
+// from the existing alt value (title fallback). MaskIcon deliberately omits
+// the `ti-icon-button` class so image-only filters (e.g. --icon-filter
+// inversion) never apply to it — its color comes only from currentColor.
+const useMaskIcon = computed(() => props.mask === true && props.type === 'toolbar')
+const maskAriaLabel = computed(() => {
+  if (!useMaskIcon.value) return undefined
+  return props.alt || props.title || undefined
+})
 const isInlineIcon = computed(() => props.type === 'inline')
 const isPasteIconSeparate = computed(() => props.type === 'paste-separate')
 const isVoiceTargetIcon = computed(() => props.type === 'voice-target')
