@@ -571,6 +571,9 @@ trusting a terminal notification's data.
 cleanup after structured START/STOP failures, disables START while unavailable
 or cleanup is pending, and treats a terminal-outcome notification only as a
 reason to refresh status; it does not render notification payloads directly.
+When a retained session requires cleanup, the Popup displays "Cleanup required"
+based on its cleanup UI state, while authoritative runtime status remains
+unchanged for lifecycle logic.
 
 Terminal handling queues outcome mutations through the StateStore's serialized
 outcome chain. A candidate terminal notification is chained after that write
