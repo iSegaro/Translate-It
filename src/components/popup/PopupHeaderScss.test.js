@@ -28,6 +28,10 @@ describe('PopupHeader.scss dark contract', () => {
 
     expect(source).not.toContain(':global(')
     expect(source).toContain('.theme-dark &')
+    // The hover token lives only in the base contract; the dark block
+    // must not override it (theme value comes from the token itself).
+    const hoverDeclarations = source.match(/--ti-action-icon-hover\s*:/g) || []
+    expect(hoverDeclarations).toHaveLength(1)
   })
 
   it('compiles to reachable dark selectors carrying the contract', () => {
@@ -36,9 +40,20 @@ describe('PopupHeader.scss dark contract', () => {
     expect(css).not.toContain(':global(')
     expect(css).toContain('.theme-dark .ti-header-toolbar')
     expect(css).toContain('--ti-action-icon: #fff')
-    expect(css).toContain('--ti-action-icon-hover: color-mix(in srgb, #fff 82%, var(--color-warning) 18%)')
+    expect(css).toContain('--ti-action-icon-hover: var(--color-action-hover-accent)')
+    expect(css).not.toContain('--ti-action-icon-hover: var(--color-warning)')
     expect(css).toContain('--ti-action-hover-bg: #424242')
     expect(css).toContain('--ti-action-active-bg: #555555')
     expect(css).toContain('border-inline-start-color: rgba(255, 255, 255, 0.1)')
+  })
+
+  it('defines the action hover accent token per theme', () => {
+    const tokens = readFileSync(
+      resolve(srcDir, 'assets/styles/base/_variables.scss'),
+      'utf8'
+    )
+
+    expect(tokens).toContain('--color-action-hover-accent: #ff9800;')
+    expect(tokens).toContain('--color-action-hover-accent: #ffb74d;')
   })
 })
