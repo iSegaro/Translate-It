@@ -171,6 +171,8 @@
       }"
       :disabled="isAutoTranslateToggleDisabled"
       :title="autoTranslateToggleTitle"
+      :aria-pressed="isAutoTranslateToggleActive"
+      :aria-label="autoTranslateToggleLabel"
       @click.stop="toggleAutoTranslateForCurrentPage()"
     >
       <svg 
@@ -238,6 +240,14 @@ const {
   autoTranslateToggleTitle,
   toggleAutoTranslateForCurrentPage
 } = useAutoTranslateRules({ currentUrl: activeTabUrl });
+
+/**
+ * Localized accessible label describing the star toggle ACTION
+ * (not its current state): enabling when off, disabling when on.
+ */
+const autoTranslateToggleLabel = computed(() => isAutoTranslateToggleActive.value
+  ? t('page_translation_auto_translate_disable_label', 'Disable automatic page translation')
+  : t('page_translation_auto_translate_enable_label', 'Enable automatic page translation'));
 
 const {
   isTranslating,

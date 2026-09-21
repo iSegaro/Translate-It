@@ -266,6 +266,69 @@
   "live_dubbing_offscreen_lost_error": {
     "message": "Live Dubbing stopped unexpectedly. Start it again."
   },
+  "live_dubbing_action_start": {
+    "message": "Start"
+  },
+  "live_dubbing_action_stop": {
+    "message": "Stop"
+  },
+  "live_dubbing_action_cleanup": {
+    "message": "Clean up"
+  },
+  "live_dubbing_action_start_aria_label": {
+    "message": "Start Live Dubbing"
+  },
+  "live_dubbing_action_stop_aria_label": {
+    "message": "Stop Live Dubbing"
+  },
+  "live_dubbing_action_cleanup_aria_label": {
+    "message": "Clean up Live Dubbing"
+  },
+  "live_dubbing_status_loading": {
+    "message": "Checking availability…"
+  },
+  "live_dubbing_status_idle": {
+    "message": "Ready"
+  },
+  "live_dubbing_status_preparing_capture": {
+    "message": "Preparing capture…"
+  },
+  "live_dubbing_status_connecting_provider": {
+    "message": "Connecting to provider…"
+  },
+  "live_dubbing_status_running": {
+    "message": "Running"
+  },
+  "live_dubbing_status_stopping": {
+    "message": "Stopping…"
+  },
+  "live_dubbing_status_error": {
+    "message": "Error"
+  },
+  "live_dubbing_status_unavailable": {
+    "message": "Unavailable"
+  },
+  "live_dubbing_status_cleanup": {
+    "message": "Cleanup required"
+  },
+  "live_dubbing_volume_original_label": {
+    "message": "Original"
+  },
+  "live_dubbing_volume_dubbed_label": {
+    "message": "Dubbed Volume"
+  },
+  "popup_more_actions_title": {
+    "message": "More actions"
+  },
+  "popup_select_element_options_title": {
+    "message": "Select Element options"
+  },
+  "page_translation_auto_translate_enable_label": {
+    "message": "Enable automatic page translation"
+  },
+  "page_translation_auto_translate_disable_label": {
+    "message": "Disable automatic page translation"
+  },
   "configure_service_button": {
     "message": "Configure Service ⚙️"
   },
@@ -1447,6 +1510,15 @@
   },
   "popup_select_element_title_icon": {
     "message": "Select Element Mode"
+  },
+  "popup_view_switcher_label": {
+    "message": "Popup views"
+  },
+  "popup_view_translate": {
+    "message": "Translate"
+  },
+  "popup_view_live_dubbing": {
+    "message": "Live Dubbing"
   },
   "popup_revert_alt_icon": {
     "message": "Revert"

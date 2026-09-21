@@ -15,6 +15,7 @@ const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, moc
   mockToggleMouseHover: vi.fn(),
   mockSendMessage: vi.fn()
 }))
+const mockT = vi.hoisted(() => vi.fn((key, fallback) => fallback || key))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({ settings })
@@ -50,7 +51,7 @@ vi.mock('@/composables/shared/useErrorHandler.js', () => ({
 }))
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
-  useUnifiedI18n: () => ({ t: (key, fallback) => fallback || key })
+  useUnifiedI18n: () => ({ t: (...args) => mockT(...args) })
 }))
 
 vi.mock('@/features/translation/providers/ProviderManifest.js', () => ({
@@ -138,6 +139,7 @@ vi.mock('@/features/page-translation/components/PageTranslationButton.vue', () =
 describe('PopupHeader', () => {
   beforeEach(() => {
     if (mockSelectModeHolder.ref) mockSelectModeHolder.ref.value = false
+    mockT.mockClear()
     mockToggleSelectElement.mockClear()
     mockToggleMouseHover.mockClear()
     mockSendMessage.mockClear()
@@ -263,6 +265,39 @@ describe('PopupHeader', () => {
     expect(more.text()).toContain('⋯')
     // No rotated chevron workaround: no icon image inside the trigger.
     expect(more.find('img').exists()).toBe(false)
+  })
+
+  it('uses the popup_more_actions_title key for the More button name', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    expect(mockT).toHaveBeenCalledWith('popup_more_actions_title', 'More actions')
+    const more = wrapper.find('.ti-btn-more')
+    expect(more.attributes('aria-label')).toBe('More actions')
+    expect(more.attributes('title')).toBe('More actions')
+  })
+
+  it('uses the popup_select_element_options_title key for the Select chevron', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    expect(mockT).toHaveBeenCalledWith('popup_select_element_options_title', 'Select Element options')
+    const chevron = wrapper.find('.ti-btn-select-chevron')
+    expect(chevron.attributes('aria-label')).toBe('Select Element options')
+    expect(chevron.attributes('title')).toBe('Select Element options')
+  })
+
+  it('passes English fallbacks as the second t() argument for select and revert titles', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    expect(mockT).toHaveBeenCalledWith('provider_does_not_support_bulk', 'This provider does not support page/element translation')
+    expect(mockT).toHaveBeenCalledWith('popup_select_element_title_icon', 'Select Element mode')
+
+    // The Revert title lives inside the split menu; open it first.
+    await wrapper.find('.ti-btn-select-chevron').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(mockT).toHaveBeenCalledWith('popup_revert_title_icon', 'Revert')
   })
 
   it('passes compact mode to the page translation button', async () => {

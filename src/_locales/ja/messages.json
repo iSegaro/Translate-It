@@ -266,6 +266,69 @@
   "live_dubbing_offscreen_lost_error": {
     "message": "ライブ吹き替えが予期せず停止しました。もう一度開始してください。"
   },
+  "live_dubbing_action_start": {
+    "message": "開始"
+  },
+  "live_dubbing_action_stop": {
+    "message": "停止"
+  },
+  "live_dubbing_action_cleanup": {
+    "message": "クリーンアップ"
+  },
+  "live_dubbing_action_start_aria_label": {
+    "message": "ライブ吹き替えを開始"
+  },
+  "live_dubbing_action_stop_aria_label": {
+    "message": "ライブ吹き替えを停止"
+  },
+  "live_dubbing_action_cleanup_aria_label": {
+    "message": "ライブ吹き替えをクリーンアップ"
+  },
+  "live_dubbing_status_loading": {
+    "message": "利用可能性を確認中…"
+  },
+  "live_dubbing_status_idle": {
+    "message": "準備完了"
+  },
+  "live_dubbing_status_preparing_capture": {
+    "message": "キャプチャを準備中…"
+  },
+  "live_dubbing_status_connecting_provider": {
+    "message": "プロバイダーに接続中…"
+  },
+  "live_dubbing_status_running": {
+    "message": "実行中"
+  },
+  "live_dubbing_status_stopping": {
+    "message": "停止中…"
+  },
+  "live_dubbing_status_error": {
+    "message": "エラー"
+  },
+  "live_dubbing_status_unavailable": {
+    "message": "利用不可"
+  },
+  "live_dubbing_status_cleanup": {
+    "message": "クリーンアップが必要です"
+  },
+  "live_dubbing_volume_original_label": {
+    "message": "オリジナル"
+  },
+  "live_dubbing_volume_dubbed_label": {
+    "message": "吹き替え音量"
+  },
+  "popup_more_actions_title": {
+    "message": "その他のアクション"
+  },
+  "popup_select_element_options_title": {
+    "message": "要素選択オプション"
+  },
+  "page_translation_auto_translate_enable_label": {
+    "message": "ページの自動翻訳を有効にする"
+  },
+  "page_translation_auto_translate_disable_label": {
+    "message": "ページの自動翻訳を無効にする"
+  },
   "configure_service_button": {
     "message": "サービスを設定 ⚙️"
   },
@@ -1447,6 +1510,15 @@
   },
   "popup_select_element_title_icon": {
     "message": "要素選択モード"
+  },
+  "popup_view_switcher_label": {
+    "message": "ポップアップ表示"
+  },
+  "popup_view_translate": {
+    "message": "翻訳"
+  },
+  "popup_view_live_dubbing": {
+    "message": "ライブ吹き替え"
   },
   "popup_revert_alt_icon": {
     "message": "元に戻す"

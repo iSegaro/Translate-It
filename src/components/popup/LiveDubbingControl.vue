@@ -1,7 +1,7 @@
 <template>
   <section
     class="ti-live-dubbing-control"
-    aria-label="Live dubbing"
+    :aria-label="t('popup_view_live_dubbing', 'Live Dubbing')"
   >
     <!-- Section 1: Status + primary action row -->
     <div class="ti-live-dubbing-control-action-row">
@@ -22,8 +22,8 @@
         size="sm"
         :loading="isStarting"
         :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
-        text="Start"
-        aria-label="Start live dubbing"
+        :text="t('live_dubbing_action_start', 'Start')"
+        :aria-label="t('live_dubbing_action_start_aria_label', 'Start Live Dubbing')"
         @click="start"
       />
       <BaseButton
@@ -32,16 +32,16 @@
         variant="danger"
         :loading="isStopping"
         :disabled="isStopping"
-        :text="isCleanupPending ? 'Clean up' : 'Stop'"
-        :aria-label="isCleanupPending ? 'Clean up live dubbing' : 'Stop live dubbing'"
+        :text="isCleanupPending ? t('live_dubbing_action_cleanup', 'Clean up') : t('live_dubbing_action_stop', 'Stop')"
+        :aria-label="isCleanupPending ? t('live_dubbing_action_cleanup_aria_label', 'Clean up Live Dubbing') : t('live_dubbing_action_stop_aria_label', 'Stop Live Dubbing')"
         @click="stop"
       />
       <BaseButton
         v-if="isCleanupPending"
         size="sm"
         variant="danger"
-        text="Clean up"
-        aria-label="Clean up live dubbing"
+        :text="t('live_dubbing_action_cleanup', 'Clean up')"
+        :aria-label="t('live_dubbing_action_cleanup_aria_label', 'Clean up Live Dubbing')"
         @click="stop"
       />
     </div>
@@ -72,7 +72,7 @@
         <label
           class="ti-live-dubbing-control-volume-label"
           for="ti-live-dubbing-volume"
-        >Original</label>
+        >{{ t('live_dubbing_volume_original_label', 'Original') }}</label>
         <input
           id="ti-live-dubbing-volume"
           type="range"
@@ -94,7 +94,7 @@
         <label
           class="ti-live-dubbing-control-volume-label"
           for="ti-live-dubbing-dubbed-volume"
-        >Dubbed Volume</label>
+        >{{ t('live_dubbing_volume_dubbed_label', 'Dubbed') }}</label>
         <input
           id="ti-live-dubbing-dubbed-volume"
           type="range"
@@ -217,16 +217,16 @@ const isLoading = computed(() => state.value === 'loading')
 const isIdle = computed(() => state.value === 'idle')
 const isBusy = computed(() => isTransitioning.value || isRunning.value || isCleanupPending.value)
 const statusText = computed(() => ({
-  loading: 'Checking availability…',
-  idle: 'Ready',
-  PREPARING_CAPTURE: 'Preparing capture…',
-  CONNECTING_PROVIDER: 'Connecting to provider…',
-  RUNNING: 'Running',
-  STOPPING: 'Stopping…',
-  ERROR: 'Error',
-  unavailable: 'Unavailable',
-  cleanup: 'Cleanup required'
-}[authoritativeStatus.value || state.value] || 'Error'))
+  loading: t('live_dubbing_status_loading', 'Checking availability…'),
+  idle: t('live_dubbing_status_idle', 'Ready'),
+  PREPARING_CAPTURE: t('live_dubbing_status_preparing_capture', 'Preparing capture…'),
+  CONNECTING_PROVIDER: t('live_dubbing_status_connecting_provider', 'Connecting to provider…'),
+  RUNNING: t('live_dubbing_status_running', 'Running'),
+  STOPPING: t('live_dubbing_status_stopping', 'Stopping…'),
+  ERROR: t('live_dubbing_status_error', 'Error'),
+  unavailable: t('live_dubbing_status_unavailable', 'Unavailable'),
+  cleanup: t('live_dubbing_status_cleanup', 'Cleanup required')
+}[authoritativeStatus.value || state.value] || t('live_dubbing_status_error', 'Error')))
 
 const isVolumeControllable = computed(() =>
   ['PREPARING_CAPTURE', 'CONNECTING_PROVIDER', 'RUNNING'].includes(authoritativeStatus.value)

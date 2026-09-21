@@ -34,8 +34,8 @@
             :ref="(el) => triggerRef(el)"
             type="button"
             class="ti-toolbar-button ti-btn-more"
-            aria-label="More actions"
-            :title="t('popup_more_actions_title') || 'More actions'"
+            :aria-label="t('popup_more_actions_title', 'More actions')"
+            :title="t('popup_more_actions_title', 'More actions')"
             @click="onToggle"
           >
             <span aria-hidden="true">⋯</span>
@@ -176,9 +176,15 @@
               type="button"
               class="ti-toolbar-button ti-btn-select"
               :class="{ 'ti-active': isSelectModeActive }"
-              :title="!isSelectElementSupported
-                ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند')
-                : (t('popup_select_element_title_icon') || 'حالت انتخاب با موس')"
+                :title="!isSelectElementSupported
+                  ? t(
+                    'provider_does_not_support_bulk',
+                    'This provider does not support page/element translation'
+                  )
+                  : t(
+                    'popup_select_element_title_icon',
+                    'Select Element mode'
+                  )"
               :disabled="!isSelectElementSupported"
               :aria-pressed="isSelectModeActive"
               @click="handleSelectElement"
@@ -213,7 +219,10 @@
             type="button"
             role="menuitem"
             class="ti-header-menu-item"
-            :title="t('popup_revert_title_icon') || 'بازگرداندن به حالت قبلی'"
+            :title="t(
+              'popup_revert_title_icon',
+              'Revert'
+            )"
             @click="close(); handleRevert()"
           >
             <img

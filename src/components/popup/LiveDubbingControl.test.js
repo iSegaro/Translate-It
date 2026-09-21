@@ -5,18 +5,23 @@ import LiveDubbingControl from './LiveDubbingControl.vue'
 const sendMessage = vi.hoisted(() => vi.fn())
 let runtimeListener
 
+// Mutable i18n lookup so tests can override individual keys to prove that
+// rendered strings resolve through t() rather than being hardcoded.
+const mockI18nMap = vi.hoisted(() => ({
+  live_dubbing_provider_bootstrap_gemini_error: 'Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again.',
+  live_dubbing_provider_bootstrap_openai_error: 'Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again.',
+  live_dubbing_provider_setup_failed_error: 'Unable to connect to the selected provider. Check your connection and configuration, then try again.',
+  live_dubbing_offscreen_lost_error: 'Live Dubbing stopped unexpectedly. Start it again.'
+}))
+const mockI18nSnapshot = vi.hoisted(() => ({ ...mockI18nMap }))
+
 vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
   useMessaging: () => ({ sendMessage })
 }))
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
-    t: (key, fallback) => ({
-      live_dubbing_provider_bootstrap_gemini_error: 'Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again.',
-      live_dubbing_provider_bootstrap_openai_error: 'Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again.',
-      live_dubbing_provider_setup_failed_error: 'Unable to connect to the selected provider. Check your connection and configuration, then try again.',
-      live_dubbing_offscreen_lost_error: 'Live Dubbing stopped unexpectedly. Start it again.'
-    }[key] || fallback || key)
+    t: (key, fallback) => mockI18nMap[key] || fallback || key
   })
 }))
 
@@ -59,6 +64,11 @@ describe('LiveDubbingControl', () => {
       if (action === 'START_LIVE_DUBBING') return Promise.resolve({ status: 'running', sessionId: 'session-1' })
       return Promise.resolve({ status: 'idle' })
     })
+    // Restore any per-test i18n overrides so map mutations never leak.
+    for (const key of Object.keys(mockI18nMap)) {
+      if (!(key in mockI18nSnapshot)) delete mockI18nMap[key]
+    }
+    Object.assign(mockI18nMap, mockI18nSnapshot)
   })
 
   it('queries status and sends target language and resolved session on start/stop', async () => {
@@ -292,6 +302,104 @@ describe('LiveDubbingControl', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+  })
+
+  it('resolves the Start label and accessible name through i18n', async () => {
+    mockI18nMap.live_dubbing_action_start = 'Démarrer'
+    mockI18nMap.live_dubbing_action_start_aria_label = 'Démarrer la traduction vocale'
+    const wrapper = await mountAndFlush()
+
+    const start = wrapper.find('button[aria-label="Démarrer la traduction vocale"]')
+    expect(start.exists()).toBe(true)
+    expect(start.text()).toContain('Démarrer')
+  })
+
+  it('resolves the Stop label and accessible name through i18n in the running state', async () => {
+    mockI18nMap.live_dubbing_action_stop = 'Arrêter'
+    mockI18nMap.live_dubbing_action_stop_aria_label = 'Arrêter la traduction vocale'
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({ status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini' } })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+    const wrapper = await mountAndFlush()
+
+    const stop = wrapper.find('button[aria-label="Arrêter la traduction vocale"]')
+    expect(stop.exists()).toBe(true)
+    expect(stop.text()).toContain('Arrêter')
+  })
+
+  it('resolves the Clean up label and accessible name through i18n for a retained session', async () => {
+    mockI18nMap.live_dubbing_action_cleanup = 'Nettoyer'
+    mockI18nMap.live_dubbing_action_cleanup_aria_label = 'Nettoyer la traduction vocale'
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({ status: 'ERROR', sessionId: 'retained-session', lastError: 'Capture failed' })
+      }
+      if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+      return Promise.resolve({ status: 'idle' })
+    })
+    const wrapper = await mountAndFlush()
+
+    const cleanupButtons = wrapper.findAll('button[aria-label="Nettoyer la traduction vocale"]')
+    expect(cleanupButtons.length).toBeGreaterThan(0)
+    expect(cleanupButtons[0].text()).toContain('Nettoyer')
+  })
+
+  it.each([
+    ['idle', { status: 'idle' }, 'live_dubbing_status_idle', 'Bereit'],
+    ['loading', 'PENDING', 'live_dubbing_status_loading', 'Wird geprüft'],
+    ['PREPARING_CAPTURE', { status: { status: 'PREPARING_CAPTURE', sessionId: 's1' } }, 'live_dubbing_status_preparing_capture', 'Wird vorbereitet'],
+    ['CONNECTING_PROVIDER', { status: { status: 'CONNECTING_PROVIDER', sessionId: 's1' } }, 'live_dubbing_status_connecting_provider', 'Wird verbunden'],
+    ['RUNNING', { status: { status: 'RUNNING', sessionId: 's1' } }, 'live_dubbing_status_running', 'Läuft'],
+    ['STOPPING', { status: { status: 'STOPPING', sessionId: 's1' } }, 'live_dubbing_status_stopping', 'Wird gestoppt'],
+    ['ERROR', { status: { status: 'ERROR', sessionId: 's1' } }, 'live_dubbing_status_error', 'Fehler'],
+    ['unavailable', { available: false }, 'live_dubbing_status_unavailable', 'Nicht verfügbar'],
+    ['cleanup', { status: 'ERROR', sessionId: 'retained', lastError: 'x' }, 'live_dubbing_status_cleanup', 'Bereinigung erforderlich']
+  ])('resolves the %s status text through i18n', async (state, response, key, label) => {
+    mockI18nMap[key] = label
+    if (response === 'PENDING') {
+      // Status query never resolves: the control stays in its initial loading state.
+      sendMessage.mockImplementation(() => new Promise(() => {}))
+      const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+      return
+    }
+    sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+      ? Promise.resolve(response)
+      : Promise.resolve({ status: 'idle' }))
+    const wrapper = await mountAndFlush()
+
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+  })
+
+  it('resolves volume labels through i18n', async () => {
+    mockI18nMap.live_dubbing_volume_original_label = 'Original (i18n)'
+    mockI18nMap.live_dubbing_volume_dubbed_label = 'Dubbed (i18n)'
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+      if (action === 'START_LIVE_DUBBING') {
+        return Promise.resolve({ status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 } })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+    const wrapper = await mountAndFlush()
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await flushPromises(wrapper)
+    await flushPromises(wrapper)
+
+    const labels = wrapper.findAll('.ti-live-dubbing-control-volume-label')
+    expect(labels.map((label) => label.text())).toEqual(['Original (i18n)', 'Dubbed (i18n)'])
+  })
+
+  it('gives the Live Dubbing section a localized accessible name', async () => {
+    mockI18nMap.popup_view_live_dubbing = 'Dubbing (i18n)'
+    const wrapper = await mountAndFlush()
+
+    expect(wrapper.find('section.ti-live-dubbing-control').attributes('aria-label')).toBe('Dubbing (i18n)')
   })
 
   it('presents safe background errors without remapping status', async () => {

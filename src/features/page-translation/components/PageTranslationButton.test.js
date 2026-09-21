@@ -264,5 +264,35 @@ describe("PageTranslationButton.vue", () => {
       await wrapper.find(".page-translate-star-btn").trigger("click");
       expect(mockUsePageTranslation.translatePage).not.toHaveBeenCalled();
     });
+
+    it("should expose the enable action via aria-pressed and label when inactive", () => {
+      mockUseAutoTranslateRules.isAutoTranslateToggleVisible.value = true;
+      mockUseAutoTranslateRules.isAutoTranslateToggleActive.value = false;
+
+      const wrapper = mount(PageTranslationButton, {
+        props: { showAutoTranslateToggle: true },
+      });
+
+      const btn = wrapper.find(".page-translate-star-btn");
+      expect(btn.attributes("aria-pressed")).toBe("false");
+      expect(btn.attributes("aria-label")).toBe(
+        "page_translation_auto_translate_enable_label",
+      );
+    });
+
+    it("should expose the disable action via aria-pressed and label when active", () => {
+      mockUseAutoTranslateRules.isAutoTranslateToggleVisible.value = true;
+      mockUseAutoTranslateRules.isAutoTranslateToggleActive.value = true;
+
+      const wrapper = mount(PageTranslationButton, {
+        props: { showAutoTranslateToggle: true },
+      });
+
+      const btn = wrapper.find(".page-translate-star-btn");
+      expect(btn.attributes("aria-pressed")).toBe("true");
+      expect(btn.attributes("aria-label")).toBe(
+        "page_translation_auto_translate_disable_label",
+      );
+    });
   });
 });
