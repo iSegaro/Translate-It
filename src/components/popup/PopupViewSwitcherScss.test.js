@@ -107,12 +107,12 @@ describe('PopupViewSwitcher.scss dark contract', () => {
 
     expect(source).toContain('cubic-bezier(0.65, 0, 0.35, 1)')
     expect(source).toMatch(
-      /\.ti-popup-view-switcher__pill\s*\{[^}]*transition:\s*left\s+0\.4s\s+cubic-bezier\(0\.65,\s*0,\s*0\.35,\s*1\),\s*width\s+0\.4s\s+cubic-bezier\(0\.65,\s*0,\s*0\.35,\s*1\)/s
+      /\.ti-popup-view-switcher__pill\s*\{[^}]*transition:\s*left\s+0\.2s\s+cubic-bezier\(0\.65,\s*0,\s*0\.35,\s*1\),\s*width\s+0\.2s\s+cubic-bezier\(0\.65,\s*0,\s*0\.35,\s*1\)/s
     )
     // No scale/bounce/spring or animated glow/shadow on the pill.
     expect(source).not.toMatch(/\.ti-popup-view-switcher__pill[^}]*scale\(/s)
-    // Tab content crossfades color over ~0.2-0.3s.
-    expect(source).toMatch(/\.ti-popup-view-switcher__tab\s*\{[\s\S]*?transition:[^;]*color\s+0\.2\d?s/s)
+    // Tab content crossfades color quickly (0.15s).
+    expect(source).toMatch(/\.ti-popup-view-switcher__tab\s*\{[\s\S]*?transition:[^;]*color\s+0\.15s/s)
   })
 
   it('keeps the responsive contract (icon-only tabs at <=380px)', () => {

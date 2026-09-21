@@ -53,7 +53,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   z-index: 0;
-  transition: left 0.4s cubic-bezier(0.65, 0, 0.35, 1), width 0.4s cubic-bezier(0.65, 0, 0.35, 1);
+  transition: left 0.2s cubic-bezier(0.65, 0, 0.35, 1), width 0.2s cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 .ti-popup-view-switcher__tab {
@@ -71,7 +71,7 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0 8px;
-  transition: background-color 0.15s ease, color 0.25s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 
   /* Hover background applies to INACTIVE tabs only: the active surface is
      owned by the sliding pill, so the active tab must not paint over it. */
