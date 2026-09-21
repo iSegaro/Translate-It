@@ -192,12 +192,23 @@
   translate: 0 -1px;
 }
 
+/* Per-action optical sizing: keep the shared 22×22 layout box, shrink only
+   the rendered mask glyph. Capture, Select, Mouse Hover keep the shared 22px. */
+.ti-header-actions .ti-btn-settings .ti-toolbar-icon,
+.ti-header-actions .ti-btn-sidepanel .ti-toolbar-icon {
+  mask-size: 20px 20px;
+  -webkit-mask-size: 20px 20px;
+}
+
 /* More menu trigger: real ellipsis glyph (U+22EF), no icon asset.
-   No color exception: it consumes the action contract like every button. */
+   No color exception: it consumes the action contract like every button.
+   Bump font-size and letter-spacing slightly so the glyph reads at the
+   same visual weight as neighbouring 22px mask icons. The span box
+   stays 22×22 — only the rendered text footprint grows. */
 .ti-btn-more {
-    font-size: 18px !important;
+    font-size: 20px !important;
     line-height: 1 !important;
-    letter-spacing: 1px !important;
+    letter-spacing: 1.5px !important;
 
     span {
       display: flex !important;

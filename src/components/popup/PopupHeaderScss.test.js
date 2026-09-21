@@ -109,3 +109,110 @@ describe('PopupHeader.scss dark contract', () => {
     expect(css).toContain('outline: 2px solid var(--color-primary, #1976d2) !important;')
   })
 })
+
+describe('PopupHeader.scss optical sizing contract', () => {
+  it('global toolbar icon box remains 22×22 (shared rule intact)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // The shared rule inside .ti-toolbar-button that covers all icon types.
+    const sharedRule = source.match(
+      /img,\s*\.ti-toolbar-icon,\s*\.ti-icon-button\s*\{[^}]*width:\s*22px\s*![i!]+mportant;[^}]*height:\s*22px\s*![i!]+mportant;[^}]*\}/
+    )
+    expect(sharedRule).toBeTruthy()
+    expect(sharedRule[0]).toContain('width: 22px !important')
+    expect(sharedRule[0]).toContain('height: 22px !important')
+  })
+
+  it('Settings has per-action optical mask-size override to 20px (box stays 22×22)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Match the combined selector block (settings + sidepanel) that carries mask-size.
+    // The mask-size block is the only rule with .ti-btn-settings + .ti-btn-sidepanel together.
+    const maskBlock = source.match(
+      /\.ti-header-actions\s+\.ti-btn-settings[\s\S]*?\.ti-header-actions\s+\.ti-btn-sidepanel\s+\.ti-toolbar-icon\s*\{([^}]*)\}/
+    )
+    expect(maskBlock).toBeTruthy()
+    // Glyph shrinks to 20×20 via mask-size only
+    expect(maskBlock[1]).toContain('mask-size: 20px 20px')
+    expect(maskBlock[1]).toContain('-webkit-mask-size: 20px 20px')
+    // Layout box must NOT be overridden — shared 22×22 rule governs width/height
+    expect(maskBlock[1]).not.toMatch(/width:\s*20px/)
+    expect(maskBlock[1]).not.toMatch(/height:\s*20px/)
+  })
+
+  it('Sidepanel has per-action optical mask-size override to 20px (box stays 22×22)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Same combined block covers sidepanel; verify its properties too.
+    const maskBlock = source.match(
+      /\.ti-header-actions\s+\.ti-btn-settings[\s\S]*?\.ti-header-actions\s+\.ti-btn-sidepanel\s+\.ti-toolbar-icon\s*\{([^}]*)\}/
+    )
+    expect(maskBlock).toBeTruthy()
+    // Glyph shrinks to 20×20 via mask-size only
+    expect(maskBlock[1]).toContain('mask-size: 20px 20px')
+    expect(maskBlock[1]).toContain('-webkit-mask-size: 20px 20px')
+    // Layout box must NOT be overridden
+    expect(maskBlock[1]).not.toMatch(/width:\s*20px/)
+    expect(maskBlock[1]).not.toMatch(/height:\s*20px/)
+  })
+
+  it('Capture and Mouse Hover have NO per-action size or mask-size override (shared 22px)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Capture must not have a width override — it relies on the shared 22px.
+    const captureOverride = source.match(
+      /\.ti-header-actions\s+\.ti-btn-capture\s+\.ti-toolbar-icon\s*\{[^}]*width:/
+    )
+    expect(captureOverride).toBeFalsy()
+
+    // Capture must not have a mask-size override.
+    const captureMaskOverride = source.match(
+      /\.ti-header-actions\s+\.ti-btn-capture\s+\.ti-toolbar-icon\s*\{[^}]*mask-size:/
+    )
+    expect(captureMaskOverride).toBeFalsy()
+
+    // Mouse Hover must not have a width override either.
+    const mouseHoverOverride = source.match(
+      /\.ti-header-actions\s+\.ti-btn-mouse-hover\s+\.ti-toolbar-icon\s*\{[^}]*width:/
+    )
+    expect(mouseHoverOverride).toBeFalsy()
+
+    // Mouse Hover must not have a mask-size override either.
+    const mouseHoverMaskOverride = source.match(
+      /\.ti-header-actions\s+\.ti-btn-mouse-hover\s+\.ti-toolbar-icon\s*\{[^}]*mask-size:/
+    )
+    expect(mouseHoverMaskOverride).toBeFalsy()
+  })
+
+  it('optical translateY correction for Settings/MouseHover/Capture is preserved', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    const translateRule = source.match(
+      /\.ti-header-actions\s+\.ti-btn-settings\s+\.ti-toolbar-icon,\s*\n\s*\.ti-header-actions\s+\.ti-btn-mouse-hover\s+\.ti-toolbar-icon,\s*\n\s*\.ti-header-actions\s+\.ti-btn-capture\s+\.ti-toolbar-icon\s*\{[^}]*translate:\s*0\s+-1px[^}]*\}/
+    )
+    expect(translateRule).toBeTruthy()
+    expect(translateRule[0]).toContain('translate: 0 -1px')
+  })
+
+  it('More keeps text ellipsis (⋯), final font-size 20px, letter-spacing 1.5px, line-height 1', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // The .ti-btn-more block must declare the expected typography values.
+    const moreBlock = source.match(/\.ti-btn-more\s*\{([\s\S]*?)\n\s*\}/)
+    expect(moreBlock).toBeTruthy()
+    expect(moreBlock[1]).toContain('font-size: 20px !important')
+    expect(moreBlock[1]).toContain('letter-spacing: 1.5px !important')
+    expect(moreBlock[1]).toContain('line-height: 1 !important')
+
+    // The span inside must keep the 22×22 box.
+    expect(moreBlock[1]).toContain('width: 22px !important')
+    expect(moreBlock[1]).toContain('height: 22px !important')
+
+    // The Vue template uses the real ⋯ character (U+22EF), not an SVG/img.
+    const vuePath = resolve(here, 'PopupHeader.vue')
+    const vueSource = readFileSync(vuePath, 'utf8')
+    expect(vueSource).toContain('⋯')
+    // More specifically: inside the .ti-btn-more button's span.
+    expect(vueSource).toContain('<span aria-hidden="true">⋯</span>')
+  })
+})
