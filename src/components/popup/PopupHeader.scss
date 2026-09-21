@@ -42,7 +42,7 @@
        (More, Settings, Mouse Hover, Capture, Sidepanel, both Select split
        halves) consumes these shared values. Header-local only — no new
        component/global tokens. */
-    --ti-action-icon: var(--color-text-secondary);
+    --ti-action-icon: var(--tab-button-color);
     --ti-action-icon-hover: var(--color-text);
     --ti-action-hover-bg: rgba(0, 0, 0, 0.08);
     --ti-action-active-bg: rgba(0, 0, 0, 0.12);
