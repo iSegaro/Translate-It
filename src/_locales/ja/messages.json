@@ -335,6 +335,9 @@
   "page_translation_auto_translate_disable_label": {
     "message": "ページの自動翻訳を無効にする"
   },
+  "page_translation_auto_translate_inherited_label": {
+    "message": "自動翻訳はより広いルールで管理されています"
+  },
   "configure_service_button": {
     "message": "サービスを設定 ⚙️"
   },

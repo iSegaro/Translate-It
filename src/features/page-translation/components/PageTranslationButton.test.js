@@ -363,5 +363,63 @@ describe("PageTranslationButton.vue", () => {
         "page_translation_auto_translate_disable_label",
       );
     });
+
+    it("should expose the inherited state via aria-label when disabled by a broader rule", () => {
+      mockUseAutoTranslateRules.isAutoTranslateToggleVisible.value = true;
+      mockUseAutoTranslateRules.isAutoTranslateToggleDisabled.value = true;
+      mockUseAutoTranslateRules.isAutoTranslateToggleActive.value = true;
+
+      const wrapper = mount(PageTranslationButton, {
+        props: { showAutoTranslateToggle: true },
+      });
+
+      const btn = wrapper.find(".page-translate-star-btn");
+      expect(btn.attributes("aria-label")).toBe(
+        "page_translation_auto_translate_inherited_label",
+      );
+      expect(btn.attributes("aria-pressed")).toBe("true");
+      expect(btn.attributes("disabled")).toBeDefined();
+    });
+
+    it("should expose the disable action when active via an exact (enabled) rule", () => {
+      mockUseAutoTranslateRules.isAutoTranslateToggleVisible.value = true;
+      mockUseAutoTranslateRules.isAutoTranslateToggleDisabled.value = false;
+      mockUseAutoTranslateRules.isAutoTranslateToggleActive.value = true;
+
+      const wrapper = mount(PageTranslationButton, {
+        props: { showAutoTranslateToggle: true },
+      });
+
+      const btn = wrapper.find(".page-translate-star-btn");
+      expect(btn.attributes("aria-label")).toBe(
+        "page_translation_auto_translate_disable_label",
+      );
+      expect(btn.attributes("aria-pressed")).toBe("true");
+      expect(btn.attributes("disabled")).toBeUndefined();
+    });
+
+    it("should expose the enable action when inactive", () => {
+      mockUseAutoTranslateRules.isAutoTranslateToggleVisible.value = true;
+      mockUseAutoTranslateRules.isAutoTranslateToggleDisabled.value = false;
+      mockUseAutoTranslateRules.isAutoTranslateToggleActive.value = false;
+
+      const wrapper = mount(PageTranslationButton, {
+        props: { showAutoTranslateToggle: true },
+      });
+
+      const btn = wrapper.find(".page-translate-star-btn");
+      expect(btn.attributes("aria-label")).toBe(
+        "page_translation_auto_translate_enable_label",
+      );
+      expect(btn.attributes("aria-pressed")).toBe("false");
+      expect(btn.attributes("disabled")).toBeUndefined();
+    });
+
+    it("should define the inherited aria-label key in en/fa/ja locales", () => {
+      const key = "page_translation_auto_translate_inherited_label";
+      for (const messages of [enMessages, faMessages, jaMessages]) {
+        expect(messages[key]?.message, key).toBeTruthy();
+      }
+    });
   });
 });

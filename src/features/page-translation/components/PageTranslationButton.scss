@@ -166,15 +166,6 @@
   opacity: 1 !important;
 }
 
-/* When the compact wrapper is hovered or focused, keep the BaseButton's
-   ghost-hover background active (matches the ti-toolbar-button-minimal
-   mixin token). The Auto-Translate star is positioned absolutely inside
-   the wrapper, so hovering it triggers .compact-wrapper:hover. */
-.compact-wrapper:hover .is-compact-icon:not(.ti-btn--disabled),
-.compact-wrapper:focus-within .is-compact-icon:not(.ti-btn--disabled) {
-  background-color: var(--color-background-hover) !important;
-}
-
 /* Compact Icon Style (Unification) */
 .is-compact-icon {
   @include ti-toolbar-button-minimal;
@@ -198,27 +189,27 @@
 
 /* Tighter horizontal padding for compact mode to reclaim header width.
    Overrides the BaseButton ti-btn--md 16px effective padding with
-   asymmetric values (left: 2px, right: 20px) to reclaim width while
+   asymmetric values (left: 2px, right: 22px) to reclaim width while
    keeping ~3px glyph clearance from the absolutely-positioned
-   Auto-Translate star (22×22 box, right-aligned). Scoped to
+   Auto-Translate star (24×24 box, right-aligned). Scoped to
    .ti-page-translate-btn so ONLY the Popup Header instance receives
    it — the bare .compact-wrapper path is not used. Sidepanel compact
    instances keep the BaseButton ti-btn--md 16px effective padding-inline. */
 .ti-page-translate-btn.compact-wrapper .is-compact-icon {
   padding-left: 2px !important;
-  padding-right: 20px !important;
+  padding-right: 22px !important;
 }
 
 .page-translate-star-btn {
   position: absolute !important;
-  bottom: -4px !important;
+  bottom: -6px !important;
   right: 0 !important;
   z-index: 100 !important;
   
   background: none !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 4px !important;
+  padding: 5px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -258,8 +249,8 @@
   }
 
   /* Specific Dark Mode overrides */
-  @at-root :global(.ti-dark-mode) &, 
-           :global(.theme-dark) & {
+  @at-root .theme-dark &,
+           .ti-dark-mode & {
     color: rgba(255, 255, 255, 0.45) !important;
 
     &:hover {

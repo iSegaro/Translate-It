@@ -335,6 +335,9 @@
   "page_translation_auto_translate_disable_label": {
     "message": "غیرفعال‌سازی ترجمه خودکار صفحه"
   },
+  "page_translation_auto_translate_inherited_label": {
+    "message": "ترجمه خودکار توسط یک قاعدهٔ گسترده‌تر مدیریت می‌شود"
+  },
   "configure_service_button": {
     "message": "تنظیم سرویس ⚙️"
   },

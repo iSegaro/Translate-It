@@ -242,12 +242,19 @@ const {
 } = useAutoTranslateRules({ currentUrl: activeTabUrl });
 
 /**
- * Localized accessible label describing the star toggle ACTION
- * (not its current state): enabling when off, disabling when on.
+ * Localized accessible label for the star toggle:
+ * - inherited/disabled (managed by a broader rule): describes the managed state,
+ * - active (exact rule): describes the disabling action,
+ * - inactive: describes the enabling action.
  */
-const autoTranslateToggleLabel = computed(() => isAutoTranslateToggleActive.value
-  ? t('page_translation_auto_translate_disable_label', 'Disable automatic page translation')
-  : t('page_translation_auto_translate_enable_label', 'Enable automatic page translation'));
+const autoTranslateToggleLabel = computed(() => {
+  if (isAutoTranslateToggleDisabled.value) {
+    return t('page_translation_auto_translate_inherited_label', 'Automatic translation is managed by a broader rule');
+  }
+  return isAutoTranslateToggleActive.value
+    ? t('page_translation_auto_translate_disable_label', 'Disable automatic page translation')
+    : t('page_translation_auto_translate_enable_label', 'Enable automatic page translation');
+});
 
 const {
   isTranslating,
