@@ -178,17 +178,9 @@
 
 ---
 
-## مشارکت‌کنندگان
-- [**Mohammad**](https://x.com/M_Khani65/)
-- [**iSegar0**](https://x.com/iSegar0/)
-
----
-
 ## مجوز
 
-این پروژه تحت مجوز **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)** منتشر شده است.
-
-Copyright (c) 2025-2026 Mohammad Khani and iSegar0.
+این پروژه تحت مجوز **Apache License 2.0** منتشر شده است.
 
 برای اطلاعات بیشتر، فایل [LICENSE](../LICENSE) را مشاهده کنید.
 
