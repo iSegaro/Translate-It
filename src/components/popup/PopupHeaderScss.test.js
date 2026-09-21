@@ -61,11 +61,35 @@ describe('PopupHeader.scss dark contract', () => {
     const source = readFileSync(scssPath, 'utf8')
 
     // Ordinary action gap + logical end inset on the actions boundary.
-    expect(source).toContain('gap: 6px !important;')
+    expect(source).toContain('gap: 7px !important;')
     expect(source).toContain('padding-inline-end: 4px !important;')
     // Select split wrapper keeps a LARGER explicit separation (gap + margin).
     expect(source).toContain('.ti-header-actions > .ti-btn-select-split-menu')
-    expect(source).toContain('margin-inline-start: 6px;')
+    expect(source).toContain('margin-inline-start: 7px;')
+  })
+
+  it('Select separation is larger than ordinary gap (hierarchy preserved)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Ordinary gap inside .ti-header-actions: 7px.
+    // Select split margin-inline-start: 7px.
+    // Total Select separation = 7 + 7 = 14px > ordinary 7px. Ratio = 2×.
+    const actionsBlock = source.match(/\.ti-header-actions\s*\{[\s\S]*?\}/)
+    expect(actionsBlock).toBeTruthy()
+    const gapMatch = actionsBlock[0].match(/gap:\s*(\d+)px/)
+    expect(gapMatch).toBeTruthy()
+    const ordinaryGap = parseInt(gapMatch[1], 10)
+    expect(ordinaryGap).toBe(7)
+
+    const marginMatch = source.match(/margin-inline-start:\s*(\d+)px/)
+    expect(marginMatch).toBeTruthy()
+    const selectMargin = parseInt(marginMatch[1], 10)
+    expect(selectMargin).toBe(7)
+
+    const selectSeparation = ordinaryGap + selectMargin
+    expect(selectSeparation).toBeGreaterThan(ordinaryGap)
+    // Ratio ≥ 1.8× to keep hierarchy visible
+    expect(selectSeparation / ordinaryGap).toBeGreaterThanOrEqual(1.8)
   })
 
   it('pins the More-menu hover contract per theme', () => {

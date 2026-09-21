@@ -196,6 +196,19 @@
   }
 }
 
+/* Tighter horizontal padding for compact mode to reclaim header width.
+   Overrides the BaseButton ti-btn--md 16px effective padding with
+   asymmetric values (left: 2px, right: 20px) to reclaim width while
+   keeping ~3px glyph clearance from the absolutely-positioned
+   Auto-Translate star (22×22 box, right-aligned). Scoped to
+   .ti-page-translate-btn so ONLY the Popup Header instance receives
+   it — the bare .compact-wrapper path is not used. Sidepanel compact
+   instances keep the BaseButton ti-btn--md 16px effective padding-inline. */
+.ti-page-translate-btn.compact-wrapper .is-compact-icon {
+  padding-left: 2px !important;
+  padding-right: 20px !important;
+}
+
 .page-translate-star-btn {
   position: absolute !important;
   bottom: -4px !important;
