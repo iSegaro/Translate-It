@@ -1,10 +1,17 @@
 <template>
   <div
+    ref="switcherRef"
     class="ti-popup-view-switcher"
     role="tablist"
     :aria-label="t('popup_view_switcher_label', 'Popup views')"
   >
+    <span
+      ref="pillRef"
+      class="ti-popup-view-switcher__pill"
+      aria-hidden="true"
+    />
     <button
+      ref="translateTabRef"
       type="button"
       role="tab"
       class="ti-popup-view-switcher__tab"
@@ -26,6 +33,7 @@
     </button>
     <button
       v-if="showLiveDubbing"
+      ref="dubbingTabRef"
       type="button"
       role="tab"
       class="ti-popup-view-switcher__tab"
@@ -49,7 +57,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import MaskIcon from '@/components/shared/MaskIcon.vue'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
@@ -59,7 +67,7 @@ import './PopupViewSwitcher.scss'
 
 const { t } = useUnifiedI18n()
 
-defineProps({
+const props = defineProps({
   modelValue: {
     type: String,
     default: 'translate',
@@ -79,4 +87,63 @@ const translateTabLabel = computed(() => t('popup_view_switcher_translate_label'
 const liveDubbingTabLabel = computed(() => t('popup_view_switcher_dubbing_label', 'Dubbing'))
 const translateIcon = computed(() => ExtensionContextManager.safeGetURL('icons/ui/translate-view.png'))
 const liveDubbingIcon = computed(() => ExtensionContextManager.safeGetURL('icons/ui/dubbing.png'))
+
+// Decorative sliding pill: positioned under the active tab via measured
+// offsetLeft/offsetWidth. modelValue stays the single source of truth.
+const switcherRef = ref(null)
+const pillRef = ref(null)
+const translateTabRef = ref(null)
+const dubbingTabRef = ref(null)
+
+let resizeObserver = null
+let resizeFallback = null
+
+function activeTabEl() {
+  if (props.modelValue === 'live-dubbing' && props.showLiveDubbing) {
+    return dubbingTabRef.value ?? null
+  }
+  return translateTabRef.value ?? null
+}
+
+function syncPill() {
+  const pill = pillRef.value
+  const tab = activeTabEl()
+  if (!pill || !tab) return
+  const left = tab.offsetLeft
+  const width = tab.offsetWidth
+  if (typeof left !== 'number' || typeof width !== 'number') return
+  pill.style.left = `${left}px`
+  pill.style.width = `${width}px`
+}
+
+function scheduleSyncPill() {
+  nextTick().then(syncPill).catch(() => {})
+}
+
+watch(() => props.modelValue, scheduleSyncPill)
+watch(() => props.showLiveDubbing, scheduleSyncPill)
+
+onMounted(() => {
+  scheduleSyncPill()
+  const container = switcherRef.value
+  if (!container) return
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(scheduleSyncPill)
+    resizeObserver.observe(container)
+  } else if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    resizeFallback = scheduleSyncPill
+    window.addEventListener('resize', resizeFallback)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+  if (resizeFallback && typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+    window.removeEventListener('resize', resizeFallback)
+    resizeFallback = null
+  }
+})
 </script>

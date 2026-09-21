@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import PopupViewSwitcher from './PopupViewSwitcher.vue'
 import MaskIcon from '@/components/shared/MaskIcon.vue'
 
@@ -20,10 +21,39 @@ vi.mock('@/core/extensionContext.js', () => ({
 }))
 
 describe('PopupViewSwitcher', () => {
+  const RealResizeObserver = globalThis.ResizeObserver
+  let observeSpy
+  let disconnectSpy
+  let observerCallback
+
   beforeEach(() => {
     vi.stubGlobal('__BROWSER__', 'chrome')
     mockT.mockClear()
+    observeSpy = vi.fn()
+    disconnectSpy = vi.fn()
+    observerCallback = null
+    vi.stubGlobal('ResizeObserver', vi.fn(function (cb) {
+      observerCallback = cb
+      this.observe = observeSpy
+      this.disconnect = disconnectSpy
+    }))
   })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    if (RealResizeObserver !== undefined) {
+      globalThis.ResizeObserver = RealResizeObserver
+    }
+  })
+
+  function mockTabLayout(el, left, width) {
+    Object.defineProperty(el, 'offsetLeft', { value: left, configurable: true })
+    Object.defineProperty(el, 'offsetWidth', { value: width, configurable: true })
+  }
+
+  function pillEl(wrapper) {
+    return wrapper.find('.ti-popup-view-switcher__pill')
+  }
 
   it('uses the underscore i18n key for the live dubbing label', () => {
     mount(PopupViewSwitcher, {
@@ -124,5 +154,96 @@ describe('PopupViewSwitcher', () => {
       expect(tab.attributes('tabindex')).toBeUndefined()
       expect(tab.attributes('disabled')).toBeUndefined()
     }
+  })
+
+  it('renders a single decorative pill as the first child of the tablist', () => {
+    const wrapper = mount(PopupViewSwitcher, {
+      props: { modelValue: 'translate', showLiveDubbing: true }
+    })
+
+    const container = wrapper.find('[role="tablist"]')
+    expect(container.exists()).toBe(true)
+    const pill = pillEl(wrapper)
+    expect(pill.exists()).toBe(true)
+    expect(pill.element.tagName).toBe('SPAN')
+    expect(pill.attributes('aria-hidden')).toBe('true')
+    // Decorative only: no role, not focusable.
+    expect(pill.attributes('role')).toBeUndefined()
+    expect(pill.attributes('tabindex')).toBeUndefined()
+    expect(container.element.firstElementChild).toBe(pill.element)
+  })
+
+  it('positions the pill from the active tab measurements', async () => {
+    const wrapper = mount(PopupViewSwitcher, {
+      props: { modelValue: 'live-dubbing', showLiveDubbing: true }
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    mockTabLayout(tabs[0].element, 2, 80)
+    mockTabLayout(tabs[1].element, 86, 100)
+    await nextTick()
+    await nextTick()
+
+    const pill = pillEl(wrapper)
+    expect(pill.element.style.left).toBe('86px')
+    expect(pill.element.style.width).toBe('100px')
+  })
+
+  it('resyncs the pill when modelValue changes', async () => {
+    const wrapper = mount(PopupViewSwitcher, {
+      props: { modelValue: 'translate', showLiveDubbing: true }
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    mockTabLayout(tabs[0].element, 2, 80)
+    mockTabLayout(tabs[1].element, 86, 100)
+    await nextTick()
+    await nextTick()
+    expect(pillEl(wrapper).element.style.left).toBe('2px')
+
+    await wrapper.setProps({ modelValue: 'live-dubbing' })
+    await nextTick()
+    await nextTick()
+    const pill = pillEl(wrapper)
+    expect(pill.element.style.left).toBe('86px')
+    expect(pill.element.style.width).toBe('100px')
+  })
+
+  it('keeps the pill on the Text tab without error when dubbing is hidden', async () => {
+    const wrapper = mount(PopupViewSwitcher, {
+      props: { modelValue: 'translate', showLiveDubbing: false }
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs).toHaveLength(1)
+    mockTabLayout(tabs[0].element, 2, 90)
+    await nextTick()
+    await nextTick()
+
+    const pill = pillEl(wrapper)
+    expect(pill.exists()).toBe(true)
+    expect(pill.element.style.left).toBe('2px')
+    expect(pill.element.style.width).toBe('90px')
+  })
+
+  it('observes container layout with ResizeObserver and disconnects on unmount', async () => {
+    const wrapper = mount(PopupViewSwitcher, {
+      props: { modelValue: 'translate', showLiveDubbing: true }
+    })
+
+    expect(vi.mocked(globalThis.ResizeObserver)).toHaveBeenCalledTimes(1)
+    expect(observeSpy).toHaveBeenCalledTimes(1)
+    expect(observeSpy).toHaveBeenCalledWith(wrapper.find('[role="tablist"]').element)
+
+    // Layout change resyncs without throwing, even with zeroed JSDOM layout.
+    const tabs = wrapper.findAll('[role="tab"]')
+    mockTabLayout(tabs[0].element, 2, 80)
+    observerCallback?.()
+    await nextTick()
+    await nextTick()
+    expect(pillEl(wrapper).element.style.width).toBe('80px')
+
+    wrapper.unmount()
+    expect(disconnectSpy).toHaveBeenCalledTimes(1)
   })
 })

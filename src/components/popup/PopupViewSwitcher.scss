@@ -2,6 +2,7 @@
 @use "@/assets/styles/base/variables" as *;
 
 .ti-popup-view-switcher {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
@@ -21,24 +22,43 @@
            .ti-dark-mode & {
     background-color: rgba(255, 255, 255, 0.06) !important;
 
+    .ti-popup-view-switcher__pill {
+      background-color: #2d2d2d !important;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+    }
+
     .ti-popup-view-switcher__tab {
       color: var(--color-text);
 
-      &:hover {
+      &:not(.is-active):hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
         color: var(--color-action-hover-accent) !important;
       }
 
       &.is-active {
-        background-color: #2d2d2d !important;
         color: var(--color-primary, #4dabf7) !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
       }
     }
   }
 }
 
+.ti-popup-view-switcher__pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: 6px;
+  background-color: var(--color-surface, #ffffff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  z-index: 0;
+  transition: left 0.4s cubic-bezier(0.65, 0, 0.35, 1), width 0.4s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
 .ti-popup-view-switcher__tab {
+  position: relative;
+  z-index: 1;
   width: auto;
   height: 28px;
   display: flex;
@@ -51,9 +71,11 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   padding: 0 8px;
-  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease, color 0.25s ease, box-shadow 0.15s ease;
 
-  &:hover {
+  /* Hover background applies to INACTIVE tabs only: the active surface is
+     owned by the sliding pill, so the active tab must not paint over it. */
+  &:not(.is-active):hover {
     background-color: rgba(0, 0, 0, 0.08);
     color: var(--color-text);
   }
@@ -64,9 +86,7 @@
   }
 
   &.is-active {
-    background-color: var(--color-surface, #ffffff);
     color: var(--color-primary);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   }
 }
 
@@ -94,5 +114,15 @@
 
   .ti-popup-view-switcher__label {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-popup-view-switcher__pill {
+    transition: none;
+  }
+
+  .ti-popup-view-switcher__tab {
+    transition-duration: 0s;
   }
 }

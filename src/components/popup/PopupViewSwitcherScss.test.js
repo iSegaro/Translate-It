@@ -40,17 +40,93 @@ describe('PopupViewSwitcher.scss dark contract', () => {
     expect(css).toContain('color: var(--color-text);')
     // Hover shifts to the shared action-hover accent.
     expect(css).toContain('color: var(--color-action-hover-accent) !important;')
-    // Active keeps the existing primary color + dark active background.
+    // Active keeps the existing primary color (now on the tab) while the
+    // active background + shadow moved to the sliding pill.
     expect(css).toContain('color: var(--color-primary, #4dabf7) !important;')
     expect(css).toContain('background-color: #2d2d2d !important;')
+    expect(css).toMatch(/\.theme-dark[^{]*\.ti-popup-view-switcher__pill[^}]*background-color:\s*#2d2d2d/s)
   })
 
   it('keeps the light theme tab colors unchanged', () => {
     const source = readFileSync(scssPath, 'utf8')
 
-    // Base (light) rule: muted inactive, normal-text hover, primary active.
+    // Base (light) rule: muted inactive, normal-text hover (inactive-only),
+    // primary active.
     expect(source).toContain('color: var(--color-text-secondary);')
-    expect(source).toMatch(/&:hover\s*\{[^}]*color:\s*var\(--color-text\);/s)
+    expect(source).toMatch(/&:not\(\.is-active\):hover\s*\{[^}]*color:\s*var\(--color-text\);/s)
     expect(source).toMatch(/&\.is-active\s*\{[^}]*color:\s*var\(--color-primary\);/s)
+  })
+
+  it('applies tab hover background only to inactive tabs (pill owns active surface)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // Inactive-only hover in both the base (light) and dark contracts.
+    expect(source).toMatch(/&:not\(\.is-active\):hover\s*\{[^}]*background-color:\s*rgba\(0,\s*0,\s*0,\s*0\.08\)/s)
+    expect(source).toMatch(/&:not\(\.is-active\):hover\s*\{[^}]*background-color:\s*rgba\(255,\s*255,\s*255,\s*0\.08\)\s*!important/s)
+
+    // Reachable compiled selectors for light + dark.
+    expect(css).toContain('.ti-popup-view-switcher__tab:not(.is-active):hover')
+    expect(css).toContain('.theme-dark .ti-popup-view-switcher .ti-popup-view-switcher__tab:not(.is-active):hover')
+
+    // No unqualified tab :hover rule paints a background over the pill.
+    const tabBlock = source.match(/\.ti-popup-view-switcher__tab\s*\{[\s\S]*?^\}/m)?.[0] ?? ''
+    expect(tabBlock).toBeTruthy()
+    expect(tabBlock).not.toMatch(/(^|\s)&:hover\s*\{/)
+
+    // The pill remains the sole owner of the active background/shadow.
+    const isActiveBlocks = [...source.matchAll(/&\.is-active\s*\{([^}]*)\}/g)].map((m) => m[1])
+    expect(isActiveBlocks.length).toBeGreaterThan(0)
+    for (const block of isActiveBlocks) {
+      expect(block).not.toMatch(/background-color/)
+      expect(block).not.toMatch(/box-shadow/)
+    }
+  })
+
+  it('moves the active background to the sliding pill (tabs keep only color)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // Pill carries the light + dark active surfaces with the static shadow.
+    expect(source).toMatch(/\.ti-popup-view-switcher__pill\s*\{[^}]*background-color:\s*var\(--color-surface,\s*#ffffff\)/s)
+    expect(css).toContain('background-color: var(--color-surface, #ffffff);')
+    // The tab .is-active rule no longer sets its own background or shadow;
+    // the pill provides the surface so it can slide between tabs.
+    const tabBlock = source.match(/\.ti-popup-view-switcher__tab\s*\{[\s\S]*?^\}/m)?.[0] ?? source
+    expect(tabBlock).toBeTruthy()
+    const isActiveBlocks = [...source.matchAll(/&\.is-active\s*\{([^}]*)\}/g)].map((m) => m[1])
+    expect(isActiveBlocks.length).toBeGreaterThan(0)
+    for (const block of isActiveBlocks) {
+      expect(block).not.toMatch(/background-color/)
+      expect(block).not.toMatch(/box-shadow/)
+    }
+  })
+
+  it('animates the pill with the requested easing and crossfades tab color', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    expect(source).toContain('cubic-bezier(0.65, 0, 0.35, 1)')
+    expect(source).toMatch(
+      /\.ti-popup-view-switcher__pill\s*\{[^}]*transition:\s*left\s+0\.4s\s+cubic-bezier\(0\.65,\s*0,\s*0\.35,\s*1\),\s*width\s+0\.4s\s+cubic-bezier\(0\.65,\s*0,\s*0\.35,\s*1\)/s
+    )
+    // No scale/bounce/spring or animated glow/shadow on the pill.
+    expect(source).not.toMatch(/\.ti-popup-view-switcher__pill[^}]*scale\(/s)
+    // Tab content crossfades color over ~0.2-0.3s.
+    expect(source).toMatch(/\.ti-popup-view-switcher__tab\s*\{[\s\S]*?transition:[^;]*color\s+0\.2\d?s/s)
+  })
+
+  it('keeps the responsive contract (icon-only tabs at <=380px)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    expect(source).toMatch(/@media\s*\(max-width:\s*380px\)\s*\{[^}]*\.ti-popup-view-switcher__tab\s*\{[^}]*width:\s*28px;[^}]*padding:\s*0;/s)
+    expect(source).toMatch(/@media\s*\(max-width:\s*380px\)[\s\S]*?\.ti-popup-view-switcher__label\s*\{[^}]*display:\s*none;/s)
+  })
+
+  it('disables pill motion and tab transitions under reduced motion', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    expect(source).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\.ti-popup-view-switcher__pill\s*\{[^}]*transition:\s*none;[\s\S]*?\.ti-popup-view-switcher__tab\s*\{[^}]*transition-duration:\s*0s;/s
+    )
   })
 })
