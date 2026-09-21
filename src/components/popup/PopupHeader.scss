@@ -244,6 +244,16 @@
       filter: none !important;
       opacity: 1 !important;
     }
+
+    /* More menu items: on the dark panel surface the light-only black
+       overlay is imperceptible, so hover uses the neutral dark action
+       background. Text and currentColor MaskIcons shift to the shared
+       accent; brand/multicolor <img> assets ignore `color` and stay as-is.
+       focus-visible keeps its separate blue ring. */
+    .ti-header-menu-item:hover {
+      background-color: var(--ti-action-hover-bg, #424242) !important;
+      color: var(--color-action-hover-accent) !important;
+    }
   }
 }
 

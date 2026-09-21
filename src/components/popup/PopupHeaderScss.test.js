@@ -67,4 +67,21 @@ describe('PopupHeader.scss dark contract', () => {
     expect(source).toContain('.ti-header-actions > .ti-btn-select-split-menu')
     expect(source).toContain('margin-inline-start: 6px;')
   })
+
+  it('pins the More-menu hover contract per theme', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // Light hover unchanged: neutral black overlay only (no color shift).
+    expect(source).toContain('background-color: rgba(0, 0, 0, 0.06) !important;')
+
+    // Dark hover: reachable selector, distinguishable neutral background,
+    // accent for text + currentColor icons.
+    expect(css).toContain('.theme-dark .ti-header-toolbar .ti-header-menu-item:hover')
+    expect(css).toContain('background-color: var(--ti-action-hover-bg, #424242) !important;')
+    expect(css).toContain('color: var(--color-action-hover-accent) !important;')
+
+    // focus-visible remains a separate state (blue ring preserved).
+    expect(css).toContain('outline: 2px solid var(--color-primary, #1976d2) !important;')
+  })
 })
