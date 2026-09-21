@@ -37,9 +37,19 @@
     gap: 4px !important;
     flex: 0 0 auto;
     margin-inline-start: auto;
+
+    /* Action contract ownership boundary: every ordinary toolbar action
+       (More, Settings, Mouse Hover, Capture, Sidepanel, both Select split
+       halves) consumes these shared values. Header-local only — no new
+       component/global tokens. */
+    --ti-action-icon: var(--color-text-secondary);
+    --ti-action-icon-hover: var(--color-text);
+    --ti-action-hover-bg: rgba(0, 0, 0, 0.08);
+    --ti-action-active-bg: rgba(0, 0, 0, 0.12);
   }
 
-  /* Toolbar Buttons Base Style */
+  /* Toolbar Buttons Base Style: consumes the .ti-header-actions contract.
+     Mask icons are driven by color only (currentColor); legacy imgs ignore it. */
   .ti-toolbar-button {
     display: flex !important;
     align-items: center !important;
@@ -49,29 +59,32 @@
     flex-shrink: 0 !important;
     background-color: transparent !important;
     border: none !important;
+    color: var(--ti-action-icon) !important;
     cursor: pointer !important;
     padding: 0 !important;
     margin: 0 !important;
 
     &:hover {
-      background-color: rgba(0, 0, 0, 0.08) !important;
+      background-color: var(--ti-action-hover-bg) !important;
+      color: var(--ti-action-icon-hover) !important;
       transform: translateY(-1px) !important;
     }
 
     &.ti-active {
-      background-color: rgba(0, 0, 0, 0.12) !important;
+      background-color: var(--ti-action-active-bg) !important;
     }
 
     &:active {
       transform: translateY(0) scale(0.95) !important;
     }
 
-    /* Hover opacity for the inner icon — img and MaskIcon alike.
-       Button-level hover restores the pre-mask .ti-icon-button:hover
-       behavior that mask icons lost with that class. Filter-free, so
-       MaskIcon color still comes only from currentColor. */
-    &:hover .ti-toolbar-icon {
-      opacity: var(--icon-hover-opacity, 1) !important;
+    /* Toolbar MaskIcon appearance is driven by color only: fully opaque
+       here, with base/hover distinction coming from the action contract
+       colors above (no opacity tricks, no filters). All header toolbar
+       buttons live inside .ti-header-actions; global --icon-opacity and
+       IconButton outside the header are untouched. */
+    & .mask-icon {
+      opacity: 1 !important;
     }
 
     /* Target the icon inside and KILL any background/hover on it.
@@ -142,37 +155,47 @@
   border-inline-start: 1px solid var(--header-border-color, transparent) !important;
 }
 
+/* Split halves hover/activate through the ordinary action contract above —
+   no competing split-level :hover. Layout (joined pill, divider,
+   dimensions) is preserved; only the duplicate state rules are gone. */
+
+/* Joined hover: hovering anywhere on the split control (either half)
+   highlights both halves through the shared action contract. Plain parent
+   hover — no :has() needed. Values match the ordinary button hover, so the
+   two rules agree rather than compete. */
 .ti-select-split:hover .ti-btn-select,
 .ti-select-split:hover .ti-btn-select-chevron {
-  background-color: rgba(0, 0, 0, 0.08) !important;
+  background-color: var(--ti-action-hover-bg) !important;
+  color: var(--ti-action-icon-hover) !important;
   transform: translateY(-1px) !important;
 }
 
-.ti-select-split .ti-btn-select.ti-active,
-.ti-select-split .ti-btn-select-chevron.ti-active {
-  background-color: rgba(0, 0, 0, 0.12) !important;
+/* Active wins over hover: higher specificity than the joined hover rule
+   above, so an active Select control keeps its active background while
+   hovered. Background only — the hover icon color still applies. */
+.ti-select-split:hover .ti-toolbar-button.ti-active {
+  background-color: var(--ti-action-active-bg) !important;
 }
 
 .ti-select-split .ti-btn-select-chevron .ti-chevron-icon {
   width: 12px !important;
   height: 12px !important;
-  opacity: 0.8;
 }
 
 /* Optical icon centering: Settings, Mouse Hover, and Capture already align with
    each other, but sit slightly lower than Select Element and Sidepanel. Apply
-   one shared post-layout shift to their images only. */
+   one shared post-layout shift to their icons. */
 .ti-header-actions .ti-btn-settings .ti-toolbar-icon,
 .ti-header-actions .ti-btn-mouse-hover .ti-toolbar-icon,
 .ti-header-actions .ti-btn-capture .ti-toolbar-icon {
   translate: 0 -1px;
 }
 
-/* More menu trigger: real ellipsis glyph (U+22EF), no icon asset */
+/* More menu trigger: real ellipsis glyph (U+22EF), no icon asset.
+   No color exception: it consumes the action contract like every button. */
 .ti-btn-more {
     font-size: 18px !important;
     line-height: 1 !important;
-    color: var(--color-text, #212529) !important;
     letter-spacing: 1px !important;
 
     span {
@@ -199,41 +222,15 @@
     background-color: #2d2d2d !important;
     border-bottom-color: #404040 !important;
 
-    .ti-toolbar-button:hover {
-      background-color: #424242 !important;
-    }
-
-    .ti-toolbar-button.ti-active {
-      background-color: #555555 !important;
-    }
-
-    /* Whiten remaining image utility icons in dark mode.
-       Mask icons are excluded: their color comes only from currentColor. */
-    .ti-btn-capture img,
-    .ti-btn-select img,
-    img.ti-toolbar-icon {
-      filter: brightness(0) invert(1) !important;
-      opacity: 0.8 !important;
-    }
-
-    .ti-toolbar-button:hover img {
-      opacity: 1 !important;
-    }
-
-    .ti-btn-more {
-      color: var(--color-text, #e9ecef) !important;
+    /* Dark side of the action contract: the shared button rules above
+       pick these up, so no duplicate button-state literals are needed. */
+    .ti-header-actions {
+      --ti-action-hover-bg: #424242;
+      --ti-action-active-bg: #555555;
     }
 
     .ti-select-split .ti-btn-select-chevron {
       border-inline-start-color: rgba(255, 255, 255, 0.1) !important;
-    }
-    .ti-select-split:hover .ti-btn-select,
-    .ti-select-split:hover .ti-btn-select-chevron {
-      background-color: rgba(255, 255, 255, 0.08) !important;
-    }
-    .ti-select-split .ti-btn-select.ti-active,
-    .ti-select-split .ti-btn-select-chevron.ti-active {
-      background-color: rgba(255, 255, 255, 0.12) !important;
     }
 
     /* Keep branded icons colorful */

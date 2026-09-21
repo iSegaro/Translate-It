@@ -199,7 +199,6 @@ Do not use `transform` on the root `<svg>` element. Browsers may not apply it re
 | 29 inline SVGs across 14 components | High |
 | TTS icons duplicated in 3 components | High |
 | 4 identical back chevrons | High |
-| `capture.svg` lacks `viewBox` (26.8KB) | High |
 | `?url` imports used with `<img>` tags (eye-open, eye-hide) | Medium |
 | 14 provider `.svg` files unused (PNG is standard) | Medium |
 | `IconButton` component overlap with MaskIcon | Medium |

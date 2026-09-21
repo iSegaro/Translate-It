@@ -105,11 +105,10 @@
             class="ti-header-menu-item ti-header-menu-item--narrow-only"
             @click="close(); handleScreenCapture()"
           >
-            <img
+            <MaskIcon
               :src="menuIcon('capture.svg')"
-              alt=""
-              aria-hidden="true"
-            >
+              :size="18"
+            />
             <span>{{ t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه' }}</span>
           </button>
           <button
@@ -158,6 +157,7 @@
         :alt="t('popup_screen_capture_alt_icon') || 'Screen Capture'"
         :title="t('popup_screen_capture_title_icon') || 'تصویربرداری از صفحه'"
         type="toolbar"
+        :mask="true"
         class="ti-btn-capture ti-header-toolbar-button--narrow-hide"
         @click="handleScreenCapture"
       />
@@ -176,24 +176,17 @@
               type="button"
               class="ti-toolbar-button ti-btn-select"
               :class="{ 'ti-active': isSelectModeActive }"
-                :title="!isSelectElementSupported
-                  ? t(
-                    'provider_does_not_support_bulk',
-                    'This provider does not support page/element translation'
-                  )
-                  : t(
-                    'popup_select_element_title_icon',
-                    'Select Element mode'
-                  )"
+              :title="selectElementTitle"
+              :aria-label="t('popup_select_element_alt_icon') || 'Select Element'"
               :disabled="!isSelectElementSupported"
               :aria-pressed="isSelectModeActive"
               @click="handleSelectElement"
             >
-              <img
+              <MaskIcon
                 :src="menuIcon('select.png')"
-                :alt="t('popup_select_element_alt_icon') || 'Select Element'"
+                :size="22"
                 class="ti-toolbar-icon"
-              >
+              />
             </button>
             <button
               type="button"
@@ -355,6 +348,21 @@ const supportsBulk = (mode) => {
 
 const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element))
 const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page))
+
+/**
+ * Support-aware tooltip for the Select Element main button (title only).
+ * The accessible name is always the stable action label (see template),
+ * independent of support state.
+ */
+const selectElementTitle = computed(() => !isSelectElementSupported.value
+  ? t(
+    'provider_does_not_support_bulk',
+    'This provider does not support page/element translation'
+  )
+  : t(
+    'popup_select_element_title_icon',
+    'Select Element mode'
+  ))
 
 const isSelectElementEnabled = computed(() => {
   return isExtensionEnabledGlobal.value && (settingsStore.settings?.TRANSLATE_WITH_SELECT_ELEMENT ?? true)

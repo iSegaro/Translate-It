@@ -268,6 +268,25 @@ describe('PopupHeader', () => {
     expect(active.find('.ti-btn-select-chevron').classes()).toContain('ti-active')
   })
 
+  it('keeps both split halves active while hovered', async () => {
+    mockSelectModeHolder.ref.value = true
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const select = wrapper.find('.ti-btn-select')
+    const chevron = wrapper.find('.ti-btn-select-chevron')
+    expect(select.classes()).toContain('ti-active')
+    expect(chevron.classes()).toContain('ti-active')
+
+    // JSDOM does not apply :hover styles; assert the active state itself
+    // survives hover interaction. The visual (active bg over hover bg) is
+    // guaranteed by the higher-specificity split-active rule in SCSS.
+    await select.trigger('mouseenter')
+    await chevron.trigger('mouseenter')
+    expect(select.classes()).toContain('ti-active')
+    expect(chevron.classes()).toContain('ti-active')
+  })
+
   it('renders the More trigger as a normal toolbar button with an ellipsis glyph', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
@@ -379,12 +398,14 @@ describe('PopupHeader', () => {
     const icons = panel.findAll('.ti-header-menu-item img').map((img) => img.attributes('src'))
     expect(icons.some((src) => src.includes('subtitle.png'))).toBe(true)
     expect(icons.some((src) => src.includes('pdf.png'))).toBe(true)
-    expect(icons.some((src) => src.includes('capture.svg'))).toBe(true)
     // Monochrome menu icons render via MaskIcon (currentColor), not <img>.
     const maskSrcs = panel.findAllComponents(MaskIcon).map((icon) => icon.props('src'))
     const maskOrImgSrcs = [...icons, ...maskSrcs]
     expect(maskOrImgSrcs.some((src) => src.includes('mouse-hover.png'))).toBe(true)
+    expect(maskOrImgSrcs.some((src) => src.includes('capture.svg'))).toBe(true)
     expect(maskOrImgSrcs.some((src) => src.includes('side-panel.png'))).toBe(true)
+    // Capture is fully off the image path: no <img> anywhere in the menu.
+    expect(icons.some((src) => src.includes('capture'))).toBe(false)
     expect(panel.text()).toContain('Disable on this site')
 
     // Breakpoint contract classes: direct buttons hide at narrow widths,
@@ -394,6 +415,57 @@ describe('PopupHeader', () => {
     for (const selector of ['.ti-btn-mouse-hover', '.ti-btn-capture', '.ti-btn-sidepanel']) {
       expect(wrapper.find(selector).classes()).toContain('ti-header-toolbar-button--narrow-hide')
     }
+  })
+
+  it('renders direct toolbar actions in IconButton mask mode', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const buttons = wrapper.findAllComponents({ name: 'IconButton' })
+    // The IconButton mock declares no props, so icon/mask/type arrive as
+    // fallthrough attrs; read them via $attrs instead of props().
+    const byIcon = Object.fromEntries(buttons.map((button) => [button.vm.$attrs.icon, button]))
+    for (const icon of ['settings.png', 'mouse-hover.png', 'capture.svg', 'side-panel.png']) {
+      expect(byIcon[icon].vm.$attrs.type).toBe('toolbar')
+      expect(byIcon[icon].vm.$attrs.mask).toBe(true)
+    }
+    // Capture is fully off the image path in the header.
+    expect(wrapper.find('.ti-btn-capture img').exists()).toBe(false)
+  })
+
+  it('renders the Select main action as a decorative MaskIcon', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const select = wrapper.find('.ti-btn-select')
+    expect(select.find('img').exists()).toBe(false)
+    // Decorative mask icon: the button owns a stable accessible name,
+    // independent of the support-aware tooltip (echo-mock returns the key).
+    expect(mockT).toHaveBeenCalledWith('popup_select_element_alt_icon')
+    expect(select.attributes('aria-label')).toBe('popup_select_element_alt_icon')
+    expect(select.attributes('title')).toBe('Select Element mode')
+    expect(select.attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps the Select accessible name when the provider lacks bulk support', async () => {
+    mockFindProviderById.mockReturnValue({ features: [] })
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const select = wrapper.find('.ti-btn-select')
+    // Disabled branch: tooltip explains itself, but the accessible name
+    // stays the stable action label.
+    expect(select.attributes('disabled')).toBeDefined()
+    expect(select.attributes('title')).toBe('This provider does not support page/element translation')
+    expect(select.attributes('aria-label')).toBe('popup_select_element_alt_icon')
+    const icon = select.findComponent(MaskIcon)
+    expect(icon.exists()).toBe(true)
+    expect(icon.props('src')).toContain('select.png')
+    expect(icon.attributes('aria-hidden')).toBe('true')
+    // Chevron stays MaskIcon.
+    const chevronIcon = wrapper.find('.ti-btn-select-chevron').findComponent(MaskIcon)
+    expect(chevronIcon.exists()).toBe(true)
+    expect(chevronIcon.props('src')).toContain('dropdown-arrow.svg')
   })
 
   it('launches Subtitle and PDF translators from the menu before closing Popup', async () => {
