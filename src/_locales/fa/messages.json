@@ -1661,6 +1661,27 @@
   "page_translation_btn_restore": {
     "message": "بازگشت به اصلی"
   },
+  "page_translation_tooltip_translate": {
+    "message": "ترجمه کل صفحه"
+  },
+  "page_translation_tooltip_in_progress": {
+    "message": "ترجمه در حال انجام است..."
+  },
+  "page_translation_tooltip_stop_auto": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "page_translation_tooltip_cancel": {
+    "message": "لغو ترجمه"
+  },
+  "page_translation_tooltip_restore_blocked": {
+    "message": "بازیابی در حین ترجمه امکانپذیر نیست"
+  },
+  "page_translation_tooltip_nothing_to_restore": {
+    "message": "ترجمه‌ای برای بازیابی وجود ندارد"
+  },
+  "page_translation_tooltip_restore": {
+    "message": "بازیابی محتوای اصلی صفحه"
+  },
   "sync_page_label": {
     "message": "همگام صفحه"
   },

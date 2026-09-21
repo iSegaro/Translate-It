@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { ref } from "vue";
 import PageTranslationButton from "./PageTranslationButton.vue";
+import enMessages from "../../../_locales/en/messages.json";
+import faMessages from "../../../_locales/fa/messages.json";
+import jaMessages from "../../../_locales/ja/messages.json";
 
 // Mock components
 vi.mock("@/components/base/BaseButton.vue", () => ({
   default: {
     name: "BaseButton",
-    template: "<button><slot /></button>",
+    template: '<button :title="title"><slot /></button>',
     props: ["variant", "disabled", "title"],
   },
 }));
@@ -171,6 +174,72 @@ describe("PageTranslationButton.vue", () => {
 
     expect(wrapper.find(".error-message").text()).toBe("Localized model error");
     expect(wrapper.text()).not.toContain("raw provider response body");
+  });
+
+  describe("Tooltips (i18n keys)", () => {
+    const getBaseButtonTitle = (wrapper) =>
+      wrapper.findComponent({ name: "BaseButton" }).props("title");
+
+    it("should use translate tooltip key when idle", () => {
+      const wrapper = mount(PageTranslationButton);
+      expect(getBaseButtonTitle(wrapper)).toBe(
+        "page_translation_tooltip_translate",
+      );
+      expect(wrapper.find("button").attributes("title")).toBe(
+        "page_translation_tooltip_translate",
+      );
+    });
+
+    it("should use cancel tooltip key during translation", () => {
+      mockUsePageTranslation.isTranslating.value = true;
+      const wrapper = mount(PageTranslationButton);
+      expect(getBaseButtonTitle(wrapper)).toBe(
+        "page_translation_tooltip_cancel",
+      );
+    });
+
+    it("should use stop auto-translation tooltip key during auto-translation", () => {
+      mockUsePageTranslation.isAutoTranslating.value = true;
+      const wrapper = mount(PageTranslationButton);
+      expect(getBaseButtonTitle(wrapper)).toBe(
+        "page_translation_tooltip_stop_auto",
+      );
+    });
+
+    it("should use restore tooltip key when restore is available", () => {
+      mockUsePageTranslation.isTranslated.value = true;
+      mockUsePageTranslation.canRestore.value = true;
+      const wrapper = mount(PageTranslationButton);
+      expect(getBaseButtonTitle(wrapper)).toBe(
+        "page_translation_tooltip_restore",
+      );
+    });
+
+    it("should use nothing-to-restore tooltip key when restore is unavailable", () => {
+      mockUsePageTranslation.isTranslated.value = true;
+      mockUsePageTranslation.canRestore.value = false;
+      const wrapper = mount(PageTranslationButton);
+      expect(getBaseButtonTitle(wrapper)).toBe(
+        "page_translation_tooltip_nothing_to_restore",
+      );
+    });
+
+    it("should define all tooltip keys in en/fa/ja locales", () => {
+      const keys = [
+        "page_translation_tooltip_translate",
+        "page_translation_tooltip_in_progress",
+        "page_translation_tooltip_stop_auto",
+        "page_translation_tooltip_cancel",
+        "page_translation_tooltip_restore_blocked",
+        "page_translation_tooltip_nothing_to_restore",
+        "page_translation_tooltip_restore",
+      ];
+      for (const key of keys) {
+        for (const messages of [enMessages, faMessages, jaMessages]) {
+          expect(messages[key]?.message, key).toBeTruthy();
+        }
+      }
+    });
   });
 
   describe("Auto-Translate Star Toggle", () => {

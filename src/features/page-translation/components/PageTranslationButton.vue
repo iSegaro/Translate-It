@@ -298,21 +298,21 @@ const translateButtonTitle = computed(() => {
     return t('provider_does_not_support_bulk') || 'This provider does not support page/element translation';
   }
   if (!canTranslate.value) {
-    return isTranslating.value || isAutoTranslating.value ? 'Translation in progress...' : 'Translate entire page';
+    return isTranslating.value || isAutoTranslating.value ? t('page_translation_tooltip_in_progress', 'Translation in progress...') : t('page_translation_tooltip_translate', 'Translate entire page');
   }
-  return 'Translate entire page';
+  return t('page_translation_tooltip_translate', 'Translate entire page');
 });
 
 const cancelButtonTitle = computed(() => {
-  if (isAutoTranslating.value) return 'Stop auto-translation';
-  return 'Cancel translation';
+  if (isAutoTranslating.value) return t('page_translation_tooltip_stop_auto', 'Stop auto-translation');
+  return t('page_translation_tooltip_cancel', 'Cancel translation');
 });
 
 const restoreButtonTitle = computed(() => {
   if (!canRestore.value) {
-    return isTranslating.value || isAutoTranslating.value ? 'Cannot restore during translation' : 'No translation to restore';
+    return isTranslating.value || isAutoTranslating.value ? t('page_translation_tooltip_restore_blocked', 'Cannot restore during translation') : t('page_translation_tooltip_nothing_to_restore', 'No translation to restore');
   }
-  return 'Restore original page content';
+  return t('page_translation_tooltip_restore', 'Restore original page content');
 });
 
 // Actions
