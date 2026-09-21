@@ -180,17 +180,9 @@ Vue 3、Pinia、Vite を使用した **フィーチャーベース・アーキ�
 
 ---
 
-## 貢献者
-- [**Mohammad**](https://x.com/M_Khani65/)
-- [**iSegar0**](https://x.com/iSegar0/)
-
----
-
 ## ライセンス
 
-このプロジェクトは **Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)** の下でライセンスされています。
-
-Copyright (c) 2025-2026 Mohammad Khani and iSegar0.
+このプロジェクトは **Apache License 2.0** の下でライセンスされています。
 
 詳細は [LICENSE](../LICENSE) ファイルをご覧ください。
 

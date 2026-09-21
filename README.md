@@ -178,17 +178,9 @@ We follow a **Feature-Based Architecture** using Vue 3, Pinia, and Vite.
 
 ---
 
-## Contributors
-- [**Mohammad**](https://x.com/M_Khani65/)
-- [**iSegar0**](https://x.com/iSegar0/)
-
----
-
 ## License
 
-This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)**.
-
-Copyright (c) 2025-2026 Mohammad Khani and iSegar0.
+This project is licensed under the **Apache License 2.0**.
 
 For more details, please see the [LICENSE](LICENSE) file.
 
