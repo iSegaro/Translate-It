@@ -78,7 +78,7 @@ describe('PopupHeader.scss dark contract', () => {
     const source = readFileSync(scssPath, 'utf8')
 
     // Ordinary action gap + logical end inset on the actions boundary.
-    expect(source).toContain('gap: 7px !important;')
+    expect(source).toContain('gap: 5px !important;')
     expect(source).toContain('padding-inline-end: 4px !important;')
     // Select split wrapper keeps a LARGER explicit separation (gap + margin).
     expect(source).toContain('.ti-header-actions > .ti-btn-select-split-menu')
@@ -88,15 +88,15 @@ describe('PopupHeader.scss dark contract', () => {
   it('Select separation is larger than ordinary gap (hierarchy preserved)', () => {
     const source = readFileSync(scssPath, 'utf8')
 
-    // Ordinary gap inside .ti-header-actions: 7px.
+    // Ordinary gap inside .ti-header-actions: 5px.
     // Select split margin-inline-start: 7px.
-    // Total Select separation = 7 + 7 = 14px > ordinary 7px. Ratio = 2×.
+    // Total Select separation = 5 + 7 = 12px > ordinary 5px. Ratio = 2.4×.
     const actionsBlock = source.match(/\.ti-header-actions\s*\{[\s\S]*?\}/)
     expect(actionsBlock).toBeTruthy()
     const gapMatch = actionsBlock[0].match(/gap:\s*(\d+)px/)
     expect(gapMatch).toBeTruthy()
     const ordinaryGap = parseInt(gapMatch[1], 10)
-    expect(ordinaryGap).toBe(7)
+    expect(ordinaryGap).toBe(5)
 
     const marginMatch = source.match(/margin-inline-start:\s*(\d+)px/)
     expect(marginMatch).toBeTruthy()
@@ -209,6 +209,126 @@ describe('PopupHeader.scss optical sizing contract', () => {
     )
     expect(translateRule).toBeTruthy()
     expect(translateRule[0]).toContain('translate: 0 -1px')
+  })
+
+  it('ordinary header buttons are 24×24 hit targets (width/height/min-width/min-height)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // The hit-target rule must exist scoped to .ti-header-actions so
+    // Page Translate compact geometry is untouched.
+    const hitTargetBlock = source.match(
+      /\.ti-header-actions\s+\.ti-toolbar-button\s*\{([^}]*)\}/
+    )
+    expect(hitTargetBlock).toBeTruthy()
+    expect(hitTargetBlock[1]).toContain('width: 24px')
+    expect(hitTargetBlock[1]).toContain('height: 24px')
+    expect(hitTargetBlock[1]).toContain('min-width: 24px')
+    expect(hitTargetBlock[1]).toContain('min-height: 24px')
+  })
+
+  it('shared icon glyph remains 22px (not changed by hit-target)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    const sharedRule = source.match(
+      /img,\s*\.ti-toolbar-icon,\s*\.ti-icon-button\s*\{[^}]*width:\s*22px\s*![i!]+mportant;[^}]*height:\s*22px\s*![i!]+mportant;[^}]*\}/
+    )
+    expect(sharedRule).toBeTruthy()
+    expect(sharedRule[0]).toContain('width: 22px !important')
+    expect(sharedRule[0]).toContain('height: 22px !important')
+  })
+
+  it('Settings and Sidepanel optical mask-size remains 20px', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    const maskBlock = source.match(
+      /\.ti-header-actions\s+\.ti-btn-settings[\s\S]*?\.ti-header-actions\s+\.ti-btn-sidepanel\s+\.ti-toolbar-icon\s*\{([^}]*)\}/
+    )
+    expect(maskBlock).toBeTruthy()
+    expect(maskBlock[1]).toContain('mask-size: 20px 20px')
+    expect(maskBlock[1]).toContain('-webkit-mask-size: 20px 20px')
+    expect(maskBlock[1]).not.toMatch(/width:\s*20px/)
+    expect(maskBlock[1]).not.toMatch(/height:\s*20px/)
+  })
+
+  it('More inner span remains 22×22 while button is 24×24', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    const moreBlock = source.match(/\.ti-btn-more\s*\{([\s\S]*?)\n\s*\}/)
+    expect(moreBlock).toBeTruthy()
+    // Button hit target
+    expect(moreBlock[1]).toContain('width: 24px !important')
+    expect(moreBlock[1]).toContain('height: 24px !important')
+    // Inner span unchanged
+    expect(moreBlock[1]).toContain('width: 22px !important')
+    expect(moreBlock[1]).toContain('height: 22px !important')
+    // Typography unchanged
+    expect(moreBlock[1]).toContain('font-size: 20px !important')
+    expect(moreBlock[1]).toContain('letter-spacing: 1.5px !important')
+    expect(moreBlock[1]).toContain('line-height: 1 !important')
+  })
+
+  it('Select main button is 24×24 with box-sizing border-box', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Combined rule covers both halves; verify shared sizing.
+    const splitRule = source.match(
+      /\.ti-select-split\s+\.ti-btn-select,\s*\n\.ti-select-split\s+\.ti-btn-select-chevron\s*\{([^}]*)\}/
+    )
+    expect(splitRule).toBeTruthy()
+    expect(splitRule[1]).toContain('width: 24px')
+    expect(splitRule[1]).toContain('height: 24px')
+    expect(splitRule[1]).toContain('box-sizing: border-box')
+    // Old padding must be gone
+    expect(splitRule[1]).not.toContain('padding-inline-end')
+  })
+
+  it('Select chevron button is 24×24 with border-inline-start divider', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Chevron-specific block has ONLY the divider — no leftover width/padding.
+    // Match the standalone chevron block (not the combined rule) by anchoring
+    // on the border-inline-start property that starts the block body.
+    const chevronBlock = source.match(
+      /\.ti-select-split\s+\.ti-btn-select-chevron\s*\{\s*\n\s*border-inline-start[^}]*\}/
+    )
+    expect(chevronBlock).toBeTruthy()
+    expect(chevronBlock[0]).toContain('border-inline-start: 1px solid')
+    // Old padding/width must be absent from this standalone block
+    expect(chevronBlock[0]).not.toContain('padding-inline-start')
+    expect(chevronBlock[0]).not.toContain('padding-inline-end')
+    expect(chevronBlock[0]).not.toMatch(/width:\s*18px/)
+  })
+
+  it('Select glyph remains 22px and chevron glyph remains 12px', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Shared icon rule inside .ti-toolbar-button governs the Select glyph.
+    const sharedRule = source.match(
+      /img,\s*\.ti-toolbar-icon,\s*\.ti-icon-button\s*\{[^}]*width:\s*22px[^}]*\}/
+    )
+    expect(sharedRule).toBeTruthy()
+
+    // Chevron glyph is sized separately.
+    const chevronGlyph = source.match(
+      /\.ti-select-split\s+\.ti-btn-select-chevron\s+\.ti-chevron-icon\s*\{([^}]*)\}/
+    )
+    expect(chevronGlyph).toBeTruthy()
+    expect(chevronGlyph[1]).toContain('width: 12px !important')
+    expect(chevronGlyph[1]).toContain('height: 12px !important')
+  })
+
+  it('Select split group margin-inline-start remains 7px', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    expect(source).toContain('margin-inline-start: 7px;')
+  })
+
+  it('focus-visible outline contract is intact', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    expect(source).toContain('.ti-toolbar-button:focus-visible')
+    expect(source).toContain('outline: 2px solid var(--color-primary, #1976d2)')
+    expect(source).toContain('outline-offset: 1px')
   })
 
   it('More keeps text ellipsis (⋯), final font-size 20px, letter-spacing 1.5px, line-height 1', () => {

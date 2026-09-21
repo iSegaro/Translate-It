@@ -44,7 +44,7 @@
   .ti-header-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 7px !important;
+    gap: 5px !important;
     flex: 0 0 auto;
     margin-inline-start: auto;
     padding-inline-end: 4px !important;
@@ -113,6 +113,19 @@
     }
   }
 
+  /* Header action hit-target contract: 24×24 boxes for all direct header
+   actions. Glyphs stay 22px; the extra 2px total per axis adds 1px of
+   internal space on each side. The reduced gap preserves approximately
+   the same perceived glyph spacing.
+   Scoped to .ti-header-actions so Page Translate compact geometry is
+   untouched. */
+  .ti-header-actions .ti-toolbar-button {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
 /* Visible keyboard focus for Popup Header toolbar buttons only.
    Scoped here so IconButton/BaseButton global focus behavior is untouched.
    Outline (not border) avoids layout shift. */
@@ -143,17 +156,12 @@
 .ti-select-split .ti-btn-select-chevron {
   margin: 0 !important;
   border-radius: 0 !important;
+  width: 24px;
   height: 24px;
-}
-
-.ti-select-split .ti-btn-select {
-  padding-inline-end: 4px !important;
+  box-sizing: border-box;
 }
 
 .ti-select-split .ti-btn-select-chevron {
-  padding-inline-start: 2px !important;
-  padding-inline-end: 4px !important;
-  width: 18px;
   border-inline-start: 1px solid var(--header-border-color, transparent) !important;
 }
 
@@ -207,6 +215,8 @@
    same visual weight as neighbouring 22px mask icons. The span box
    stays 22×22 — only the rendered text footprint grows. */
 .ti-btn-more {
+    width: 24px !important;
+    height: 24px !important;
     font-size: 20px !important;
     line-height: 1 !important;
     letter-spacing: 1.5px !important;
