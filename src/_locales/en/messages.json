@@ -248,9 +248,6 @@
   "providers_tab_title": {
     "message": "Providers"
   },
-  "live_dubbing_provider_label": {
-    "message": "Live Dubbing Provider"
-  },
   "live_dubbing_provider_description": {
     "message": "Used for new live dubbing sessions."
   },

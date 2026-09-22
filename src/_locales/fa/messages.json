@@ -248,9 +248,6 @@
   "providers_tab_title": {
     "message": "سرویس‌ها"
   },
-  "live_dubbing_provider_label": {
-    "message": "ارائه‌دهنده دوبله زنده"
-  },
   "live_dubbing_provider_description": {
     "message": "برای جلسه‌های جدید دوبله زنده استفاده می‌شود."
   },

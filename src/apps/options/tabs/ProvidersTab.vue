@@ -16,32 +16,6 @@
         </div>
       </div>
 
-      <div
-        id="LIVE_DUBBING_PROVIDER_SECTION"
-        class="setting-group live-dubbing-provider-group"
-      >
-        <div class="setting-row">
-          <div class="setting-info">
-            <label
-              class="setting-label"
-              for="LIVE_DUBBING_PROVIDER"
-            >
-              {{ t('live_dubbing_provider_label') || 'Live Dubbing Provider' }}
-            </label>
-            <p class="setting-description">
-              {{ t('live_dubbing_provider_description') || 'Used for new live dubbing sessions.' }}
-            </p>
-          </div>
-          <div class="setting-control">
-            <BaseSelect
-              id="LIVE_DUBBING_PROVIDER"
-              v-model="liveDubbingProvider"
-              :options="liveDubbingProviderOptions"
-            />
-          </div>
-        </div>
-      </div>
-
       <div class="api-settings-section">
         <div class="provider-settings-container">
           <Transition 
@@ -149,7 +123,6 @@ import { useProviderVisibility } from '../composables/useProviderVisibility.js'
 // Components
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
-import BaseSelect from '@/components/base/BaseSelect.vue'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProvidersTab')
 const settingsStore = useSettingsStore()
@@ -164,18 +137,6 @@ const selectedProvider = computed({
   get: () => settingsStore.activeConfigProvider,
   set: (val) => { settingsStore.activeConfigProvider = val }
 })
-
-const liveDubbingProvider = computed({
-  get: () => ['gemini', 'openai'].includes(settingsStore.settings?.LIVE_DUBBING_PROVIDER)
-    ? settingsStore.settings.LIVE_DUBBING_PROVIDER
-    : 'gemini',
-  set: (value) => settingsStore.updateSettingAndPersist('LIVE_DUBBING_PROVIDER', value)
-})
-
-const liveDubbingProviderOptions = computed(() => [
-  { value: 'gemini', label: t('provider_gemini_title') || 'Google Gemini' },
-  { value: 'openai', label: t('provider_openai_title') || 'OpenAI GPT' }
-])
 
 // Auto-highlight missing settings when provider is changed manually
 watch(selectedProvider, (newProvider) => {

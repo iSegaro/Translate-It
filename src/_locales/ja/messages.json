@@ -248,9 +248,6 @@
   "providers_tab_title": {
     "message": "サービス"
   },
-  "live_dubbing_provider_label": {
-    "message": "ライブ吹き替えプロバイダー"
-  },
   "live_dubbing_provider_description": {
     "message": "新しいライブ吹き替えセッションで使用されます。"
   },
