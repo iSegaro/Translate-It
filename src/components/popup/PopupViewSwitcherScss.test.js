@@ -36,15 +36,74 @@ describe('PopupViewSwitcher.scss dark contract', () => {
 
     expect(css).not.toContain(':global(')
     expect(css).toContain('.theme-dark .ti-popup-view-switcher')
-    // Inactive tabs are readable (normal text color, not muted secondary).
-    expect(css).toContain('color: var(--color-text);')
+    // Both theme hooks reach the dark tab-color block.
+    expect(css).toContain('.theme-dark .ti-popup-view-switcher .ti-popup-view-switcher__tab')
+    expect(css).toContain('.ti-dark-mode .ti-popup-view-switcher .ti-popup-view-switcher__tab')
+    // Inactive tabs are muted (secondary), weaker than the active tab.
+    expect(css).toContain('color: var(--color-text-secondary);')
     // Hover shifts to the shared action-hover accent.
     expect(css).toContain('color: var(--color-action-hover-accent) !important;')
-    // Active keeps the existing primary color (now on the tab) while the
-    // active background + shadow moved to the sliding pill.
-    expect(css).toContain('color: var(--color-primary, #4dabf7) !important;')
+    // Active uses the LIGHT primary token (dark's --color-primary lost hierarchy).
+    expect(css).toContain('color: var(--color-primary-light) !important;')
     expect(css).toContain('background-color: #2d2d2d !important;')
     expect(css).toMatch(/\.theme-dark[^{]*\.ti-popup-view-switcher__pill[^}]*background-color:\s*#2d2d2d/s)
+  })
+
+  it('dark theme: inactive secondary, active light-primary, hover/pill unchanged', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // Extract the @at-root dark block (both hooks, never :global()).
+    const darkBlock = source.match(
+      /@at-root\s+\.theme-dark\s+&,\s*\n\s*\.ti-dark-mode\s+&\s*\{([\s\S]*?)\n\s*\}\s*\n\}/
+    )
+    expect(darkBlock).toBeTruthy()
+    const dark = darkBlock[1]
+
+    // 1. Dark inactive tab uses the muted secondary text token.
+    const inactive = dark.match(/\.ti-popup-view-switcher__tab\s*\{([^}]*)\}/)
+    expect(inactive).toBeTruthy()
+    expect(inactive[1]).toContain('color: var(--color-text-secondary);')
+    expect(inactive[1]).not.toContain('var(--color-text)')
+
+    // 2. Dark active tab uses the light primary token.
+    const active = dark.match(/&\.is-active\s*\{([^}]*)\}/)
+    expect(active).toBeTruthy()
+    expect(active[1]).toContain('color: var(--color-primary-light) !important;')
+    // Not the darker default primary (bare or with fallback).
+    expect(active[1]).not.toContain('var(--color-primary)')
+    expect(active[1]).not.toContain('--color-primary,')
+
+    // 3. Dark inactive hover keeps the exact white overlay + accent color.
+    const hover = dark.match(/&:not\(\.is-active\):hover\s*\{([^}]*)\}/)
+    expect(hover).toBeTruthy()
+    expect(hover[1]).toContain('background-color: rgba(255, 255, 255, 0.08) !important;')
+    expect(hover[1]).toContain('color: var(--color-action-hover-accent) !important;')
+
+    // 4. Dark pill keeps bg + shadow exactly.
+    const pill = dark.match(/\.ti-popup-view-switcher__pill\s*\{([^}]*)\}/)
+    expect(pill).toBeTruthy()
+    expect(pill[1]).toContain('background-color: #2d2d2d !important;')
+    expect(pill[1]).toContain('box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;')
+
+    // 5. Both theme hooks reachable in compiled CSS for inactive + active.
+    for (const hook of ['.theme-dark', '.ti-dark-mode']) {
+      expect(css).toContain(`${hook} .ti-popup-view-switcher .ti-popup-view-switcher__tab`)
+      expect(css).toMatch(new RegExp(`${hook}[^{]*\\.ti-popup-view-switcher__tab\\.is-active[^}]*color:\\s*var\\(--color-primary-light\\)`))
+    }
+    expect(css).not.toContain(':global(')
+
+    // 6. Light theme contract unchanged: inactive secondary, inactive hover
+    //    normal-text, active primary (base rules outside the dark block).
+    const sourceWithoutDark = source.replace(darkBlock[0], '')
+    expect(sourceWithoutDark).toMatch(/\.ti-popup-view-switcher__tab\s*\{[^}]*color:\s*var\(--color-text-secondary\);/s)
+    expect(sourceWithoutDark).toMatch(/&:not\(\.is-active\):hover\s*\{[^}]*color:\s*var\(--color-text\);/s)
+    expect(sourceWithoutDark).toMatch(/&\.is-active\s*\{[^}]*color:\s*var\(--color-primary\);/s)
+
+    // Tokens resolve in both themes (_variables.scss).
+    const variables = readFileSync(resolve(srcDir, 'assets/styles/base/_variables.scss'), 'utf8')
+    expect(variables).toContain('--color-text-secondary:')
+    expect(variables).toContain('--color-primary-light: #42a5f5;')
   })
 
   it('keeps the light theme tab colors unchanged', () => {

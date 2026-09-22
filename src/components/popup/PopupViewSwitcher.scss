@@ -11,13 +11,14 @@
   background-color: var(--color-surface-variant, rgba(0, 0, 0, 0.06));
   flex-shrink: 0;
 
-  /* Dark theme: inactive tabs use the normal text color (readable but not
-     "disabled-looking"); hover shifts to the action-hover accent; active keeps
-     the primary color and a clearly distinguishable background.
-     Plain selectors: this file is a standard SCSS import (not a Vue scoped
-     block and not CSS-Modules), so a :global wrapper would be emitted
-     literally and invalidate the selector. .theme-dark lands on the document
-     root via applyTheme; .ti-dark-mode is a retained hook. */
+  /* Dark theme: inactive tabs use the muted secondary text color so they
+     read weaker than the active tab; active uses the LIGHT primary token
+     (dark's --color-primary is a darker blue that lost the hierarchy);
+     hover shifts to the action-hover accent. Plain selectors: this file is
+     a standard SCSS import (not a Vue scoped block and not CSS-Modules), so
+     a :global wrapper would be emitted literally and invalidate the
+     selector. .theme-dark lands on the document root via applyTheme;
+     .ti-dark-mode is a retained hook. */
   @at-root .theme-dark &,
            .ti-dark-mode & {
     background-color: rgba(255, 255, 255, 0.06) !important;
@@ -28,7 +29,7 @@
     }
 
     .ti-popup-view-switcher__tab {
-      color: var(--color-text);
+      color: var(--color-text-secondary);
 
       &:not(.is-active):hover {
         background-color: rgba(255, 255, 255, 0.08) !important;
@@ -36,7 +37,7 @@
       }
 
       &.is-active {
-        color: var(--color-primary, #4dabf7) !important;
+        color: var(--color-primary-light) !important;
       }
     }
   }
