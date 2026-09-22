@@ -166,18 +166,82 @@
 }
 
 .live-dubbing-setup-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 6px;
+  display: block;
   margin-block-start: 8px;
 }
 
-.live-dubbing-setup-input {
-  flex: 1 1 160px;
+.live-dubbing-setup-input-field {
+  position: relative;
+  direction: ltr;
   min-width: 0;
 }
 
+.live-dubbing-setup-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.live-dubbing-setup-input .ti-input {
+  width: 100% !important;
+  min-height: 36px !important;
+  padding-inline: 10px 42px !important;
+  direction: ltr !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__label,
+.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__help {
+  direction: rtl !important;
+  text-align: start !important;
+}
+
+.live-dubbing-setup-toggle {
+  position: absolute;
+  inset-inline-end: 4px;
+  inset-block-start: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-color);
+  background: transparent;
+  cursor: pointer;
+}
+
+.live-dubbing-setup-toggle:hover:not(:disabled),
+.live-dubbing-setup-toggle:focus-visible {
+  background: var(--language-controls-bg-color);
+}
+
+.live-dubbing-setup-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.live-dubbing-setup-toggle img {
+  width: 16px;
+  height: 16px;
+}
+
+:root.theme-dark .live-dubbing-setup-toggle img,
+.theme-dark .live-dubbing-setup-toggle img {
+  filter: invert(1);
+}
+
+.live-dubbing-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 8px;
+}
+
+.live-dubbing-view--rtl .live-dubbing-setup-actions {
+  direction: rtl;
+  justify-content: flex-end;
+}
+
 .live-dubbing-setup-save {
-  margin-inline-start: auto;
+  min-inline-size: 72px;
 }

@@ -49,7 +49,9 @@ const typeKey = async (wrapper, value) => {
 }
 
 const clickButton = async (wrapper, label) => {
-  const button = wrapper.findAll('button').find((candidate) => candidate.text() === label)
+  const button = wrapper.findAll('button').find((candidate) => (
+    candidate.text() === label || candidate.attributes('aria-label') === label
+  ))
   expect(button, `button "${label}"`).toBeTruthy()
   await button.trigger('click')
 }
@@ -95,12 +97,16 @@ describe('LiveDubbingProviderSetup', () => {
     expect(input.attributes('type')).toBe('password')
     expect(input.attributes('dir')).toBe('ltr')
     expect(input.attributes('placeholder')).toBe('Paste your Gemini API key here')
+    expect(wrapper.find('.ti-input__label').text()).toBe('API Key')
 
     await clickButton(wrapper, 'Show')
     expect(wrapper.find('input').attributes('type')).toBe('text')
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('aria-label')).toBe('Hide')
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('aria-pressed')).toBe('true')
 
     await clickButton(wrapper, 'Hide')
     expect(wrapper.find('input').attributes('type')).toBe('password')
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('aria-pressed')).toBe('false')
   })
 
   it('saves a Gemini key under GEMINI_API_KEY', async () => {
@@ -186,5 +192,24 @@ describe('LiveDubbingProviderSetup', () => {
 
     expect(wrapper.find('input').element.value).toBe('sk-hidden-from-text')
     expect(wrapper.text()).not.toContain('sk-hidden-from-text')
+  })
+
+  it('disables the input, visibility toggle, and save action while saving', async () => {
+    let resolveSave
+    harness.store.updateSettingAndPersist = vi.fn(() => new Promise((resolve) => {
+      resolveSave = resolve
+    }))
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-saving-secret')
+
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-save').attributes('disabled')).toBeDefined()
+
+    resolveSave(true)
+    await nextTick()
   })
 })

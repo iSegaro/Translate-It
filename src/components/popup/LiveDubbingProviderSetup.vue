@@ -23,29 +23,46 @@
     </p>
 
     <div class="live-dubbing-setup-row">
-      <BaseInput
-        v-model="draft"
-        class="live-dubbing-setup-input"
-        :type="revealed ? 'text' : 'password'"
-        dir="ltr"
-        :label="t('custom_api_settings_api_key_label', 'API Key')"
-        :placeholder="t(placeholderKey, 'Paste your API key here')"
-        :error="errorMessage"
-        :disabled="saving"
-      />
-      <BaseButton
-        size="xs"
-        variant="ghost"
-        :text="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
-        @click="revealed = !revealed"
-      />
-      <BaseButton
-        class="live-dubbing-setup-save"
-        size="sm"
-        :loading="saving"
-        :text="t('live_dubbing_setup_save', 'Save')"
-        @click="save"
-      />
+      <div class="live-dubbing-setup-input-field">
+        <BaseInput
+          v-model="draft"
+          class="live-dubbing-setup-input"
+          :type="revealed ? 'text' : 'password'"
+          dir="ltr"
+          :label="t('custom_api_settings_api_key_label', 'API Key')"
+          :placeholder="t(placeholderKey, 'Paste your API key here')"
+          :error="errorMessage"
+          :disabled="saving"
+        />
+        <button
+          type="button"
+          class="live-dubbing-setup-toggle"
+          :title="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
+          :aria-label="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
+          :aria-pressed="revealed"
+          :disabled="saving"
+          @click="revealed = !revealed"
+        >
+          <img
+            :src="revealed ? eyeHideIcon : eyeIcon"
+            alt=""
+            aria-hidden="true"
+            width="16"
+            height="16"
+          >
+        </button>
+      </div>
+      <div class="live-dubbing-setup-actions">
+        <BaseButton
+          class="live-dubbing-setup-save"
+          size="sm"
+          variant="primary"
+          :loading="saving"
+          :disabled="saving"
+          :text="t('live_dubbing_setup_save', 'Save')"
+          @click="save"
+        />
+      </div>
     </div>
   </section>
 </template>
@@ -54,6 +71,8 @@
 import { computed, ref } from 'vue'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
+import eyeIcon from '@/icons/ui/eye-open.svg?url'
+import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import {

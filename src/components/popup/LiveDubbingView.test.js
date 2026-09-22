@@ -299,6 +299,26 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
     expect(scss).not.toMatch(/^\.ti-language-select/m)
     expect(scss).not.toMatch(/^\.ti-select/m)
+    expect(scss).not.toMatch(/\.live-dubbing-view--rtl\s*\{[\s\S]*?direction:\s*rtl/)
+
+    const setupInputField = scss.match(
+      /\.live-dubbing-setup-input-field\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(setupInputField).toMatch(/direction:\s*ltr/)
+    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-input[\s\S]*?padding-inline:\s*10px 42px\s*!important/)
+    expect(scss).toMatch(/:root\.theme-dark \.live-dubbing-setup-toggle img[\s\S]*?filter:\s*invert\(1\)/)
+
+    const rtlInputText = scss.match(
+      /\.live-dubbing-view--rtl \.live-dubbing-setup-input \.ti-input__label,[\s\S]*?\.ti-input__help\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(rtlInputText).toMatch(/direction:\s*rtl\s*!important/)
+    expect(rtlInputText).toMatch(/text-align:\s*start\s*!important/)
+
+    const rtlActions = scss.match(
+      /\.live-dubbing-view--rtl \.live-dubbing-setup-actions\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(rtlActions).toMatch(/direction:\s*rtl/)
+    expect(rtlActions).toMatch(/justify-content:\s*flex-end/)
 
     const languageWrapper = scss.match(
       /\.live-dubbing-config-card \.live-dubbing-config-field--language > \.ti-language-controls\s*\{[\s\S]*?\n\}/m
