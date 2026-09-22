@@ -25,16 +25,27 @@
 
 /* ── Configuration card ───────────────────────────────────────────────────── */
 
-/* auto-fit collapses to a single stacked column on narrow popups. */
 .live-dubbing-config-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  align-items: end;
+  align-items: stretch;
 }
 
 .live-dubbing-config-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   min-width: 0;
+}
+
+.live-dubbing-config-label {
+  display: block;
+  margin-block-end: 4px;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.25;
+  opacity: 0.7;
 }
 
 /* The selector ships its own bar styling (margin/padding/background);
@@ -47,12 +58,76 @@
   background: transparent !important;
 }
 
-.live-dubbing-config-provider-label {
-  display: block;
-  margin-block-end: 4px;
-  color: var(--text-color);
-  font-size: 12px;
-  opacity: 0.7;
+.live-dubbing-config-field--language .ti-language-control-group,
+.live-dubbing-config-field--language .ti-language-control-shell,
+.live-dubbing-config-field--language .ti-language-select,
+.live-dubbing-config-field--provider .ti-select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  border: 1px solid var(--header-border-color) !important;
+  border-radius: 6px !important;
+  vertical-align: baseline !important;
+}
+
+.live-dubbing-config-field--language .ti-language-select,
+.live-dubbing-config-field--provider .ti-select {
+  padding-block: 0 !important;
+  padding-inline: 10px 34px !important;
+  background-position: right 10px center !important;
+}
+
+/* The popup's responsive rule is more specific than the shared selector.
+   Keep this correction scoped to the configuration card. */
+.live-dubbing-config-card .live-dubbing-config-field--language
+  .ti-language-controls:not(.ti-compact-mode) .ti-language-select {
+  height: 36px !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  padding-block: 0 !important;
+  padding-inline: 10px 34px !important;
+  background-position: right 10px center !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-config-card
+  .live-dubbing-config-field--language
+  .ti-language-controls:not(.ti-compact-mode) .ti-language-select {
+  padding-inline: 10px 34px !important;
+  background-position: left 10px center !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-config-card
+  .live-dubbing-config-field--provider .ti-select {
+  padding-inline: 10px 34px !important;
+  background-position: left 10px center !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-group,
+.live-dubbing-config-field--language .ti-language-control-shell {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-group {
+  align-items: stretch !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-shell {
+  flex: 1 1 auto !important;
+}
+
+/* Stack only when the popup cannot give each field a usable width. */
+@media (max-width: 420px) {
+  .live-dubbing-config-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Session card ─────────────────────────────────────────────────────────── */

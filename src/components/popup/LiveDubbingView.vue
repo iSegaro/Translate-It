@@ -1,5 +1,8 @@
 <template>
-  <div class="live-dubbing-view">
+  <div
+    class="live-dubbing-view"
+    :class="{ 'live-dubbing-view--rtl': isRtlLocale }"
+  >
     <!-- Configuration: target language + provider for upcoming sessions -->
     <section
       class="live-dubbing-card live-dubbing-config-card"
@@ -7,6 +10,7 @@
     >
       <div class="live-dubbing-config-grid">
         <div class="live-dubbing-config-field live-dubbing-config-field--language">
+          <span class="live-dubbing-config-label">{{ t('target_language_label', 'Target Language') }}</span>
           <LanguageSelector
             v-model:target-language="targetLanguageModel"
             :provider="providerModel"
@@ -17,9 +21,11 @@
         </div>
         <div class="live-dubbing-config-field live-dubbing-config-field--provider">
           <label
-            class="live-dubbing-config-provider-label"
+            class="live-dubbing-config-label"
             for="live-dubbing-provider-select"
-          >{{ t('live_dubbing_provider_label', 'Live Dubbing Provider') }}</label>
+          >
+            {{ t('provider_label', 'Provider') }}
+          </label>
           <BaseSelect
             id="live-dubbing-provider-select"
             v-model="providerModel"
@@ -84,8 +90,10 @@ const props = defineProps({
 
 const emit = defineEmits(['busy-change', 'update:targetLanguage'])
 
-const { t } = useUnifiedI18n()
+const { t, locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
+
+const isRtlLocale = computed(() => /^fa(?:-|$)/i.test(locale.value || ''))
 
 /** Mirrors LiveDubbingControl's busy state so the config card can lock while a session is active. */
 const isControlBusy = ref(false)

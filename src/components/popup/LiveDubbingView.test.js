@@ -12,7 +12,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 // reach per-test store/i18n state.
 const harness = vi.hoisted(() => ({
   store: null,
-  i18n: {}
+  i18n: {},
+  locale: { value: 'en' }
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -23,6 +24,7 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 // untranslated; (key, { params }) interpolates; bare key falls back to key.
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
+    locale: harness.locale,
     t: (key, options) => {
       const message = harness.i18n[key]
       if (typeof options === 'string') return message ?? options
@@ -109,6 +111,7 @@ const providerSelect = (wrapper) => wrapper.find('#live-dubbing-provider-select'
 describe('LiveDubbingView', () => {
   beforeEach(() => {
     setupLifecycle.mounts = 0
+    harness.locale.value = 'en'
     harness.store = makeStore({
       GEMINI_API_KEY: 'gemini-configured-key',
       OPENAI_API_KEY: 'openai-configured-key'
@@ -116,7 +119,8 @@ describe('LiveDubbingView', () => {
     harness.i18n = {
       provider_gemini_title: 'Google Gemini',
       provider_openai_title: 'OpenAI GPT',
-      live_dubbing_provider_label: 'Live Dubbing Provider',
+      provider_label: 'Provider',
+      target_language_label: 'Target Language',
       live_dubbing_provider_description: 'Used for new live dubbing sessions.',
       live_dubbing_config_label: 'Configuration'
     }
@@ -130,6 +134,25 @@ describe('LiveDubbingView', () => {
     expect(selector.props('targetOnly')).toBe(true)
     expect(selector.props('enableSelectElementIntegration')).toBe(false)
     expect(selector.props('provider')).toBe('openai')
+  })
+
+  it('renders localized labels with the shared label treatment', () => {
+    const wrapper = mountView()
+
+    expect(wrapper.findAll('.live-dubbing-config-label').map((label) => label.text())).toEqual([
+      'Target Language',
+      'Provider'
+    ])
+    expect(wrapper.find('label[for="live-dubbing-provider-select"]').classes())
+      .toContain('live-dubbing-config-label')
+  })
+
+  it('marks the view locally for Persian RTL styling', async () => {
+    harness.locale.value = 'fa'
+    const wrapper = mountView()
+
+    await nextTick()
+    expect(wrapper.find('.live-dubbing-view').classes()).toContain('live-dubbing-view--rtl')
   })
 
   it('forwards the selected target language to LiveDubbingControl', async () => {
@@ -271,6 +294,36 @@ describe('LiveDubbingView', () => {
     // Theme-aware tokens only — no hardcoded light/dark surfaces.
     expect(scss).toMatch(/var\(--header-border-color\)/)
     expect(scss).toMatch(/var\(--language-controls-bg-color\)/)
+    // Control alignment is owned by this card, not shared control styles.
+    expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
+    expect(scss).not.toMatch(/^\.ti-language-select/m)
+    expect(scss).not.toMatch(/^\.ti-select/m)
+
+    const responsiveSelector = '.ti-language-controls:not(.ti-compact-mode) .ti-language-select'
+    const languageOverride = scss.match(
+      /\.live-dubbing-config-card \.live-dubbing-config-field--language\s+\.ti-language-controls:not\(\.ti-compact-mode\) \.ti-language-select\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(languageOverride).toBeTruthy()
+    const languageOverrideSelector = languageOverride.split('{')[0]
+    expect((languageOverrideSelector.match(/\./g) || []).length)
+      .toBeGreaterThan((responsiveSelector.match(/\./g) || []).length)
+    expect(languageOverride).toMatch(/height:\s*36px\s*!important/)
+    expect(languageOverride).toMatch(/min-height:\s*36px\s*!important/)
+    expect(languageOverride).toMatch(/font-size:\s*13px\s*!important/)
+    expect(languageOverride).toMatch(/border-radius:\s*6px\s*!important/)
+    expect(languageOverride).toMatch(/padding-inline:\s*10px 34px\s*!important/)
+    expect(languageOverride).toMatch(/background-position:\s*right 10px center\s*!important/)
+    const languageRtlBlock = scss.match(
+      /\.live-dubbing-view--rtl \.live-dubbing-config-card\s+\.live-dubbing-config-field--language[\s\S]*?\{[\s\S]*?\n\}/m
+    )?.[0]
+    const providerRtlBlock = scss.match(
+      /\.live-dubbing-view--rtl \.live-dubbing-config-card\s+\.live-dubbing-config-field--provider \.ti-select\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(languageRtlBlock).toMatch(/padding-inline:\s*10px 34px\s*!important/)
+    expect(providerRtlBlock).toMatch(/padding-inline:\s*10px 34px\s*!important/)
+    expect(languageRtlBlock).toMatch(/background-position:\s*left 10px center\s*!important/)
+    expect(providerRtlBlock).toMatch(/background-position:\s*left 10px center\s*!important/)
   })
 
   it('keeps the setup card mounted while a save is pending despite optimistic store mutation', async () => {
