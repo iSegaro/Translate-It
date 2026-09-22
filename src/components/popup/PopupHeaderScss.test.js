@@ -694,3 +694,111 @@ describe('PopupHeader.scss legacy popup audit regression', () => {
     expect(source).not.toContain('.ti-spinner-center')
   })
 })
+
+/**
+ * Dark-theme icon exemption for Page Translate: the branded Translate icon
+ * must stay colorful (filter: none) while the monochrome Restore icon under
+ * the SAME .ti-page-translate-btn root inherits the shared base rule and its
+ * dark --icon-filter token. Real DOM chain (PageTranslationButton.vue):
+ *   .ti-page-translate-btn (root) > .is-translate-btn / .is-restore-btn
+ *   (BaseButton) > .ti-btn-status-container > img.toolbar-icon
+ */
+describe('PopupHeader.scss dark Page Translate icon exemption', () => {
+  const variables = readFileSync(
+    resolve(srcDir, 'assets/styles/base/_variables.scss'),
+    'utf8'
+  )
+  const ptbScss = readFileSync(
+    resolve(srcDir, 'features/page-translation/components/PageTranslationButton.scss'),
+    'utf8'
+  )
+  const source = readFileSync(scssPath, 'utf8')
+  // Strip /* ... */ before selector assertions: comment prose must never
+  // leak into selector captures (documented regression pattern).
+  const bare = source.replace(/\/\*[\s\S]*?\*\//g, '')
+  const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+  it('narrows the exemption to .is-translate-btn (source + compiled, both theme hooks)', () => {
+    expect(bare).toMatch(
+      /\.ti-page-translate-btn\s+\.is-translate-btn\s+\.toolbar-icon\s*\{[^}]*filter:\s*none\s*!important/
+    )
+    // Compiled under both plain theme hooks — never :global().
+    expect(css).not.toContain(':global(')
+    expect(css).toMatch(
+      /[^{}]*\.theme-dark[^{}]*\.ti-page-translate-btn\s+\.is-translate-btn\s+\.toolbar-icon[^{}]*\{[^{}]*filter:\s*none\s*!important/
+    )
+    expect(css).toMatch(
+      /[^{}]*\.ti-dark-mode[^{}]*\.ti-page-translate-btn\s+\.is-translate-btn\s+\.toolbar-icon[^{}]*\{[^{}]*filter:\s*none\s*!important/
+    )
+  })
+
+  it('removes the old broad exemptions (.ti-page-translate-btn img / .ti-toolbar-icon)', () => {
+    expect(bare).not.toContain('.ti-page-translate-btn img')
+    expect(bare).not.toContain('.ti-page-translate-btn .ti-toolbar-icon')
+    expect(css).not.toMatch(/\.ti-page-translate-btn\s+img[^{}]*\{[^{}]*filter:\s*none/)
+    expect(css).not.toMatch(/\.ti-page-translate-btn\s+\.ti-toolbar-icon[^{}]*\{[^{}]*filter:\s*none/)
+  })
+
+  it('Restore (.is-restore-btn) is not covered by any filter: none rule in PopupHeader', () => {
+    const filterNoneRules = [...bare.matchAll(/([^{}]+)\{[^{}]*filter:\s*none/g)]
+    expect(filterNoneRules.length).toBeGreaterThan(0)
+    for (const m of filterNoneRules) {
+      // Every filter: none rule must REQUIRE the Translate state class.
+      expect(m[1]).toContain('.is-translate-btn')
+      expect(m[1]).not.toContain('.is-restore-btn')
+    }
+    // Compiled side: no filter: none rule may mention the Restore class.
+    for (const m of css.matchAll(/([^{}]+)\{[^{}]*filter:\s*none/g)) {
+      expect(m[1]).not.toContain('is-restore-btn')
+    }
+  })
+
+  it('Translate icon still receives filter: none (colorful brand icon preserved)', () => {
+    expect(css).toContain(
+      '.theme-dark .ti-header-toolbar .ti-page-translate-btn .is-translate-btn .toolbar-icon'
+    )
+    expect(css).toContain(
+      '.ti-dark-mode .ti-header-toolbar .ti-page-translate-btn .is-translate-btn .toolbar-icon'
+    )
+    const rule = css.match(
+      /[^{}]*\.ti-page-translate-btn\s+\.is-translate-btn\s+\.toolbar-icon[^{}]*\{[^{}]*\}/
+    )
+    expect(rule).toBeTruthy()
+    expect(rule[0]).toMatch(/filter:\s*none\s*!important/)
+    expect(rule[0]).toMatch(/opacity:\s*1\s*!important/)
+  })
+
+  it('shared PTB toolbar-icon base rule still uses filter: var(--icon-filter) !important', () => {
+    expect(ptbScss).toMatch(
+      /:where\(\.page-translation-controls\)\s+\.toolbar-icon[^{]*\{[^}]*filter:\s*var\(--icon-filter\)\s*!important/
+    )
+  })
+
+  it('dark --icon-filter token still defined (invert outline for Restore)', () => {
+    const darkIdx = variables.indexOf(':root.theme-dark')
+    const filterIdx = variables.indexOf('--icon-filter: invert(92%) hue-rotate(180deg) brightness(150%) contrast(150%);')
+    expect(darkIdx).toBeGreaterThan(-1)
+    expect(filterIdx).toBeGreaterThan(darkIdx)
+  })
+
+  it('light-theme behavior unchanged (filter: none lives only inside the dark @at-root block)', () => {
+    const atRootIdx = source.indexOf('@at-root .theme-dark')
+    expect(atRootIdx).toBeGreaterThan(-1)
+    const occurrences = [...source.matchAll(/filter:\s*none/g)]
+    expect(occurrences).toHaveLength(1)
+    expect(occurrences[0].index).toBeGreaterThan(atRootIdx)
+    // Light token untouched: base rule resolves to filter: none anyway.
+    expect(variables).toMatch(/--icon-filter:\s*none;/)
+  })
+
+  it('no Sidepanel selector modified (exemption requires the Popup-only marker)', () => {
+    const filterNoneRules = [...bare.matchAll(/([^{}]+)\{[^{}]*filter:\s*none/g)]
+    expect(filterNoneRules).toHaveLength(1)
+    expect(filterNoneRules[0][1]).toContain('.ti-page-translate-btn')
+    expect(filterNoneRules[0][1]).not.toMatch(/side-toolbar|sidepanel|ti-btn-sidepanel/i)
+    // The shared PTB rule Sidepanel also consumes stays token-driven.
+    expect(ptbScss).toMatch(
+      /:where\(\.page-translation-controls\)\s+\.toolbar-icon[^{]*\{[^}]*filter:\s*var\(--icon-filter\)/
+    )
+  })
+})

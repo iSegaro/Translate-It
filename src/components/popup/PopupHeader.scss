@@ -292,9 +292,13 @@
     --ti-action-hover-bg: #424242;
     --ti-action-active-bg: #555555;
 
-    /* Keep branded icons colorful */
-    .ti-page-translate-btn img,
-    .ti-page-translate-btn .ti-toolbar-icon {
+    /* Keep the branded Translate icon colorful. Scoped to the Translate
+       state only (.is-translate-btn on the BaseButton): the Restore icon
+       (monochrome) sits under the same .ti-page-translate-btn root but
+       carries .is-restore-btn, so it falls through to the shared base rule
+       (PageTranslationButton.scss .toolbar-icon) and keeps the dark
+       --icon-filter for a readable light outline. */
+    .ti-page-translate-btn .is-translate-btn .toolbar-icon {
       filter: none !important;
       opacity: 1 !important;
     }
