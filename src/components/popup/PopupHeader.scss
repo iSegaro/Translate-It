@@ -348,48 +348,6 @@
   }
 }
 
-/* Toggle Switch Styles */
-.ti-switch {
-  position: relative !important;
-  display: inline-block !important;
-  width: 36px !important;
-  height: 20px !important;
-  vertical-align: middle !important;
-  flex-shrink: 0 !important;
-  margin: 0 4px !important;
-
-  input {
-    opacity: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
-
-    &:checked + .ti-slider {
-      background-color: #4caf50 !important;
-      &:before { transform: translateX(16px) !important; }
-    }
-  }
-
-  .ti-slider {
-    position: absolute !important;
-    cursor: pointer !important;
-    inset: 0 !important;
-    background-color: #ccc !important;
-    transition: 0.3s !important;
-    border-radius: 30px !important;
-    &:before {
-      position: absolute !important;
-      content: "" !important;
-      height: 14px !important;
-      width: 14px !important;
-      left: 3px !important;
-      bottom: 3px !important;
-      background-color: white !important;
-      transition: 0.3s !important;
-      border-radius: 50% !important;
-    }
-  }
-}
-
 /* More menu items: compact action rows — 36px min-height band, 10px
    horizontal padding/gap, 8px pill radius. Subtle bg/color transition on
    hover; focus-visible keeps its separate blue ring; nowrap survives
@@ -482,21 +440,6 @@
       transform: rotate(45deg) !important;
     }
   }
-}
-
-// PageTranslationButton link
-.ti-header-toolbar .toolbar-link {
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  padding: 4px 10px !important;
-  border-radius: 4px !important;
-  white-space: nowrap !important;
-  background-color: rgba(0, 0, 0, 0.05) !important;
-  color: var(--color-primary, #007bff) !important;
-  text-decoration: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
 
 /* Breakpoint ownership (CSS-only responsive routing, no JS):

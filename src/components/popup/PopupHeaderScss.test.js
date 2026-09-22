@@ -598,7 +598,7 @@ describe('PopupHeader.scss optical sizing contract', () => {
     expect(css).toContain('--ti-action-active-bg: #555555')
   })
 
-  it('Select split group margin-inline-start remains 7px', () => {
+  it('Select action margin-inline-start remains 7px', () => {
     const source = readFileSync(scssPath, 'utf8')
 
     expect(source).toContain('margin-inline-start: 7px;')

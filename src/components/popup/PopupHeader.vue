@@ -221,7 +221,7 @@
         </button>
       </div>
 
-      <!-- 8. Open Sidepanel (rightmost; native listener attached on mount; More duplicate for narrow widths) -->
+      <!-- 7. Open Sidepanel (rightmost; native listener attached on mount; More duplicate for narrow widths) -->
       <IconButton
         v-if="!IsMobile"
         ref="sidePanelButton"
