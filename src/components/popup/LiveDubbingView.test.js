@@ -360,6 +360,23 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-input[\s\S]*?padding-inline:\s*10px 42px\s*!important/)
     expect(scss).toMatch(/:root\.theme-dark \.live-dubbing-setup-toggle img[\s\S]*?filter:\s*invert\(1\)/)
 
+    const saveButton = scss.match(
+      /\.live-dubbing-setup-actions > \.ti-btn\.live-dubbing-setup-save\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(saveButton).toBeTruthy()
+    const saveButtonSelector = saveButton.split('{')[0]
+    expect((saveButtonSelector.match(/\./g) || []).length)
+      .toBeGreaterThan(('.ti-btn'.match(/\./g) || []).length)
+    expect(saveButton).toMatch(/width:\s*auto\s*!important/)
+    expect(saveButton).toMatch(/height:\s*36px\s*!important/)
+    expect(saveButton).toMatch(/min-height:\s*36px\s*!important/)
+    expect(saveButton).toMatch(/min-inline-size:\s*72px/)
+    expect(saveButton).toMatch(/padding-inline:\s*14px\s*!important/)
+    expect(saveButton).toMatch(/border-radius:\s*6px\s*!important/)
+    expect(saveButton).toMatch(/font-size:\s*13px\s*!important/)
+    expect(saveButton).toMatch(/font-weight:\s*500\s*!important/)
+    expect(scss).not.toMatch(/^\.ti-btn\s*\{/m)
+
     const rtlInputText = scss.match(
       /\.live-dubbing-view--rtl \.live-dubbing-setup-input \.ti-input__label,[\s\S]*?\.ti-input__help\s*\{[\s\S]*?\n\}/m
     )?.[0]

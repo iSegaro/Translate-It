@@ -39,6 +39,27 @@ describe('LiveDubbingControl.scss feedback alignment', () => {
   })
 })
 
+describe('LiveDubbingControl.scss action sizing', () => {
+  const source = readFileSync(scssPath, 'utf8')
+  const block = source.match(
+    /\.ti-live-dubbing-control-action-row > \.ti-btn\s*\{[\s\S]*?\n\}/m
+  )?.[0]
+
+  it('keeps session actions compact with a scoped override', () => {
+    expect(block).toBeTruthy()
+    const selector = block.split('{')[0]
+    expect((selector.match(/\./g) || []).length).toBeGreaterThan(1)
+    expect(block).toMatch(/width:\s*auto\s*!important/)
+    expect(block).toMatch(/height:\s*36px\s*!important/)
+    expect(block).toMatch(/min-height:\s*36px\s*!important/)
+    expect(block).toMatch(/padding-inline:\s*14px\s*!important/)
+    expect(block).toMatch(/border-radius:\s*6px\s*!important/)
+    expect(block).toMatch(/font-size:\s*13px\s*!important/)
+    expect(block).toMatch(/font-weight:\s*500\s*!important/)
+    expect(source).not.toMatch(/^\.ti-btn\s*\{/m)
+  })
+})
+
 function compile() {
   return sass.compile(scssPath)
 }
