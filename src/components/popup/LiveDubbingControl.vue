@@ -303,21 +303,35 @@ const nextOperationGeneration = () => {
 // cause instead of always blaming the browser. The unavailable paragraph is
 // suppressed when the error paragraph already shows the identical text, so a
 // single failure never renders the same message twice.
+/**
+ * Presentation-only terminal outcome. With an active session/descriptor the
+ * authoritative outcome is respected exactly as stored; with NO active
+ * session, a persisted outcome from a previous provider (e.g. a Gemini error
+ * seen after an idle switch to OpenAI) is ignored so it cannot bleed into
+ * another provider's UI. Storage/background ownership is untouched.
+ */
+const displayTerminalOutcome = computed(() => {
+  const outcome = terminalOutcome.value
+  if (!outcome) return null
+  if (sessionId.value != null || sessionDescriptor.value != null) return outcome
+  return outcome.providerId === props.providerId ? outcome : null
+})
+
 const isUnsupportedCause = computed(() =>
-  terminalOutcome.value?.error === 'LIVE_DUBBING_UNSUPPORTED'
+  displayTerminalOutcome.value?.error === 'LIVE_DUBBING_UNSUPPORTED'
   || errorMessage.value === getErrorMessage('LIVE_DUBBING_UNSUPPORTED'))
 
 const unavailableExplanation = computed(() => {
   if (!isUnavailable.value) return ''
   if (isUnsupportedCause.value) return getErrorMessage('LIVE_DUBBING_UNSUPPORTED')
   if (errorMessage.value) return errorMessage.value
-  if (terminalOutcome.value?.error) return getErrorMessage(terminalOutcome.value.error)
+  if (displayTerminalOutcome.value?.error) return getErrorMessage(displayTerminalOutcome.value.error)
   return t('live_dubbing_unavailable_generic', 'Live dubbing is currently unavailable.')
 })
 
 const errorParagraphText = computed(() => errorMessage.value
-  || (isIdle.value && terminalOutcome.value
-    ? getErrorMessage(terminalOutcome.value.error, 'Live dubbing failed.', terminalOutcome.value.providerId)
+  || (isIdle.value && displayTerminalOutcome.value
+    ? getErrorMessage(displayTerminalOutcome.value.error, 'Live dubbing failed.', displayTerminalOutcome.value.providerId)
     : ''))
 
 const showUnavailableExplanation = computed(() => isUnavailable.value

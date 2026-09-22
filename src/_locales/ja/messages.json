@@ -254,6 +254,15 @@
   "live_dubbing_provider_description": {
     "message": "新しいライブ吹き替えセッションで使用されます。"
   },
+  "live_dubbing_config_label": {
+    "message": "設定"
+  },
+  "live_dubbing_setup_save": {
+    "message": "保存"
+  },
+  "live_dubbing_setup_save_error": {
+    "message": "APIキーを保存できませんでした。もう一度お試しください。"
+  },
   "live_dubbing_provider_bootstrap_gemini_error": {
     "message": "Geminiライブ吹き替えを初期化できません。Gemini APIキーと接続を確認して、もう一度お試しください。"
   },

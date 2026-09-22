@@ -1,25 +1,72 @@
 <template>
   <div class="live-dubbing-view">
-    <div class="live-dubbing-language-controls">
-      <LanguageSelector
-        v-model:target-language="targetLanguageModel"
-        :provider="providerId"
-        :enable-select-element-integration="false"
-        :target-only="true"
-      />
-    </div>
-    <LiveDubbingControl
-      :target-language="targetLanguage"
-      :provider-id="providerId"
-      @busy-change="emit('busy-change', $event)"
+    <!-- Configuration: target language + provider for upcoming sessions -->
+    <section
+      class="live-dubbing-card live-dubbing-config-card"
+      :aria-label="t('live_dubbing_config_label', 'Configuration')"
+    >
+      <div class="live-dubbing-config-grid">
+        <div class="live-dubbing-config-field live-dubbing-config-field--language">
+          <LanguageSelector
+            v-model:target-language="targetLanguageModel"
+            :provider="providerModel"
+            :enable-select-element-integration="false"
+            :target-only="true"
+            :disabled="isControlBusy"
+          />
+        </div>
+        <div class="live-dubbing-config-field live-dubbing-config-field--provider">
+          <label
+            class="live-dubbing-config-provider-label"
+            for="live-dubbing-provider-select"
+          >{{ t('live_dubbing_provider_label', 'Live Dubbing Provider') }}</label>
+          <BaseSelect
+            id="live-dubbing-provider-select"
+            v-model="providerModel"
+            :options="providerOptions"
+            :disabled="isControlBusy || isSetupSaving"
+            :title="t('live_dubbing_provider_description', 'Used for new live dubbing sessions.')"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- Credential setup: rendered only while the selected provider has no key -->
+    <!-- :key remount clears stale draft/errors on provider switch; the select is
+         disabled while the control is busy, so remounts only happen while idle. -->
+    <LiveDubbingProviderSetup
+      v-if="needsSetup"
+      :key="providerModel"
+      :provider-id="providerModel"
+      @save-pending="isSetupSaving = $event"
+      @saved="handleSetupSaved"
     />
+
+    <!-- Session: start/stop, status feedback and volumes (owned by the control) -->
+    <section class="live-dubbing-card live-dubbing-session-card">
+      <LiveDubbingControl
+        :key="controlKey"
+        :target-language="targetLanguage"
+        :provider-id="providerModel"
+        @busy-change="handleBusyChange"
+      />
+    </section>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
+import LiveDubbingProviderSetup from '@/components/popup/LiveDubbingProviderSetup.vue'
+import BaseSelect from '@/components/base/BaseSelect.vue'
+import { useSettingsStore } from '@/features/settings/stores/settings.js'
+import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import {
+  LIVE_DUBBING_PROVIDER_ID,
+  LIVE_DUBBING_OPENAI_PROVIDER_ID,
+  LIVE_DUBBING_PROVIDER_IDS
+} from '@/features/live-dubbing/constants.js'
 
 // Import adjacent SCSS
 import './LiveDubbingView.scss'
@@ -31,14 +78,93 @@ const props = defineProps({
   },
   providerId: {
     type: String,
-    default: 'gemini'
+    default: LIVE_DUBBING_PROVIDER_ID
   }
 })
 
 const emit = defineEmits(['busy-change', 'update:targetLanguage'])
 
+const { t } = useUnifiedI18n()
+const settingsStore = useSettingsStore()
+
+/** Mirrors LiveDubbingControl's busy state so the config card can lock while a session is active. */
+const isControlBusy = ref(false)
+
 const targetLanguageModel = computed({
   get: () => props.targetLanguage,
   set: (value) => emit('update:targetLanguage', value)
 })
+
+/**
+ * Normalized provider selection. Reads the parent-owned prop and persists
+ * changes immediately under LIVE_DUBBING_PROVIDER only — TRANSLATION_API is
+ * a separate concern and is never touched here.
+ */
+const providerModel = computed({
+  get: () => (LIVE_DUBBING_PROVIDER_IDS.includes(props.providerId)
+    ? props.providerId
+    : LIVE_DUBBING_PROVIDER_ID),
+  set: (value) => {
+    if (!LIVE_DUBBING_PROVIDER_IDS.includes(value)) return
+    // Local store state is applied synchronously; if the storage write fails
+    // the selection still sticks for this session and retries on next save.
+    settingsStore.updateSettingAndPersist('LIVE_DUBBING_PROVIDER', value)
+      .catch(() => { /* selection already applied locally */ })
+  }
+})
+
+const providerOptions = computed(() => [
+  { value: LIVE_DUBBING_PROVIDER_ID, label: t('provider_gemini_title', 'Google Gemini') },
+  { value: LIVE_DUBBING_OPENAI_PROVIDER_ID, label: t('provider_openai_title', 'OpenAI GPT') }
+])
+
+/**
+ * "Configured" = at least one non-empty trimmed line, matching
+ * ApiKeyManager.parseKeys semantics. Gemini also honors the legacy single-key
+ * API_KEY store as configured (the bootstrap service falls back to it).
+ * @param {unknown} value - raw stored credential value
+ * @returns {boolean} true when the value holds usable key material
+ */
+const hasKeyMaterial = (value) => typeof value === 'string'
+  && value.split('\n').some((line) => line.trim().length > 0)
+
+/** True while the credential setup card has an in-flight save. */
+const isSetupSaving = ref(false)
+
+/**
+ * Identity key for LiveDubbingControl. It follows the provider ONLY while
+ * idle, so an idle Gemini↔OpenAI switch remounts to fresh presentation state
+ * while a busy control is never remounted mid-session. setupEpoch forces a
+ * fresh control after successful credential setup (also idle-guarded).
+ */
+const setupEpoch = ref(0)
+const controlKey = ref(`${providerModel.value}:${setupEpoch.value}`)
+watch([providerModel, setupEpoch, isControlBusy], ([provider, epoch, busy]) => {
+  if (!busy) controlKey.value = `${provider}:${epoch}`
+})
+
+const needsSetup = computed(() => {
+  // A pending save keeps the card mounted even though the store mutates first.
+  if (isSetupSaving.value) return true
+  const settings = settingsStore.settings || {}
+  if (providerModel.value === LIVE_DUBBING_OPENAI_PROVIDER_ID) {
+    return !hasKeyMaterial(settings.OPENAI_API_KEY)
+  }
+  return !hasKeyMaterial(settings.GEMINI_API_KEY) && !hasKeyMaterial(settings.API_KEY)
+})
+
+/** Track control busy state locally, then keep the parent in sync unchanged. */
+const handleBusyChange = (busy) => {
+  isControlBusy.value = busy
+  emit('busy-change', busy)
+}
+
+/**
+ * A successful first-time credential setup leaves a fresh control behind so
+ * stale bootstrap/setup error presentation cannot block the session. Never
+ * remounts while busy — the epoch only takes effect through controlKey.
+ */
+const handleSetupSaved = () => {
+  if (!isControlBusy.value) setupEpoch.value += 1
+}
 </script>

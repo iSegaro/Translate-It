@@ -1,21 +1,57 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { nextTick, reactive } from 'vue'
+import { readFileSync, readdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import LiveDubbingView from './LiveDubbingView.vue'
 
+const here = dirname(fileURLToPath(import.meta.url))
+
+// Shared mutable harness so vi.mock factories (hoisted above imports) can
+// reach per-test store/i18n state.
+const harness = vi.hoisted(() => ({
+  store: null,
+  i18n: {}
+}))
+
+vi.mock('@/features/settings/stores/settings.js', () => ({
+  useSettingsStore: () => harness.store
+}))
+
+// Mirrors useUnifiedI18n semantics: (key, 'fallback') uses the fallback when
+// untranslated; (key, { params }) interpolates; bare key falls back to key.
+vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
+  useUnifiedI18n: () => ({
+    t: (key, options) => {
+      const message = harness.i18n[key]
+      if (typeof options === 'string') return message ?? options
+      if (message == null) return key
+      if (options && typeof options === 'object') {
+        return message.replace(/\{(\w+)\}/g, (match, name) => options[name] ?? match)
+      }
+      return message
+    }
+  })
+}))
+
 // Stubbed children: this suite covers ONLY the view-level wiring contract
-// (target-only selector mode + prop forwarding). LiveDubbingControl behavior
-// itself is covered by LiveDubbingControl.test.js and must not be duplicated.
+// (configuration card, credential visibility, prop forwarding). LiveDubbingControl
+// behavior itself is covered by LiveDubbingControl.test.js and must not be duplicated.
 const LanguageSelectorStub = {
   name: 'LanguageSelector',
   props: {
     targetLanguage: { type: String, default: 'en' },
     provider: { type: String, default: '' },
     enableSelectElementIntegration: { type: Boolean, default: true },
-    targetOnly: { type: Boolean, default: false }
+    targetOnly: { type: Boolean, default: false },
+    disabled: { type: Boolean, default: false }
   },
   emits: ['update:targetLanguage'],
   template: '<div class="language-selector-stub" />'
 }
+
+const setupLifecycle = { mounts: 0 }
 
 const LiveDubbingControlStub = {
   name: 'LiveDubbingControl',
@@ -27,17 +63,65 @@ const LiveDubbingControlStub = {
   template: '<div class="live-dubbing-control-stub" />'
 }
 
+const LiveDubbingProviderSetupStub = {
+  name: 'LiveDubbingProviderSetup',
+  props: {
+    providerId: { type: String, default: '' }
+  },
+  emits: ['save-pending', 'saved'],
+  mounted() {
+    setupLifecycle.mounts += 1
+  },
+  template: '<div class="live-dubbing-provider-setup-stub" />'
+}
+
+/** In-memory settings store: persists one key immediately into reactive state. */
+const makeStore = (settings = {}) => {
+  const store = {
+    settings: reactive({
+      GEMINI_API_KEY: '',
+      OPENAI_API_KEY: '',
+      API_KEY: '',
+      TRANSLATION_API: 'google',
+      ...settings
+    }),
+    updateSettingAndPersist: vi.fn(async (key, value) => {
+      store.settings[key] = value
+      return true
+    })
+  }
+  return store
+}
+
 const mountView = (props = {}) => mount(LiveDubbingView, {
   props: { targetLanguage: 'en', providerId: 'gemini', ...props },
   global: {
     stubs: {
       LanguageSelector: LanguageSelectorStub,
-      LiveDubbingControl: LiveDubbingControlStub
+      LiveDubbingControl: LiveDubbingControlStub,
+      LiveDubbingProviderSetup: LiveDubbingProviderSetupStub
     }
   }
 })
 
+const providerSelect = (wrapper) => wrapper.find('#live-dubbing-provider-select')
+
 describe('LiveDubbingView', () => {
+  beforeEach(() => {
+    setupLifecycle.mounts = 0
+    harness.store = makeStore({
+      GEMINI_API_KEY: 'gemini-configured-key',
+      OPENAI_API_KEY: 'openai-configured-key'
+    })
+    harness.i18n = {
+      provider_gemini_title: 'Google Gemini',
+      provider_openai_title: 'OpenAI GPT',
+      live_dubbing_provider_label: 'Live Dubbing Provider',
+      live_dubbing_provider_description: 'Used for new live dubbing sessions.',
+      live_dubbing_config_label: 'Configuration'
+    }
+  })
+
   it('renders the LanguageSelector in target-only mode', () => {
     const wrapper = mountView({ providerId: 'openai' })
 
@@ -67,5 +151,239 @@ describe('LiveDubbingView', () => {
     await wrapper.setProps({ providerId: 'openai' })
     expect(wrapper.findComponent({ name: 'LanguageSelector' }).props('provider')).toBe('openai')
     expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('openai')
+  })
+
+  it('offers exactly the Gemini and OpenAI provider options', async () => {
+    const wrapper = mountView()
+
+    const options = providerSelect(wrapper).findAll('option')
+    expect(options.map((option) => option.attributes('value'))).toEqual(['gemini', 'openai'])
+    expect(options.map((option) => option.text())).toEqual(['Google Gemini', 'OpenAI GPT'])
+  })
+
+  it('persists provider changes under LIVE_DUBBING_PROVIDER without touching TRANSLATION_API', async () => {
+    const wrapper = mountView()
+
+    await providerSelect(wrapper).setValue('openai')
+
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledWith('LIVE_DUBBING_PROVIDER', 'openai')
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalledWith(
+      'TRANSLATION_API',
+      expect.anything()
+    )
+    expect(harness.store.settings.TRANSLATION_API).toBe('google')
+
+    // Parent applies the persisted value back down; the control follows it.
+    await wrapper.setProps({ providerId: 'openai' })
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('providerId')).toBe('openai')
+  })
+
+  it('disables the configuration card while the control reports busy', async () => {
+    const wrapper = mountView()
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    expect(providerSelect(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.findComponent({ name: 'LanguageSelector' }).props('disabled')).toBe(true)
+    // Busy still propagates to the parent unchanged (TranslationView lock).
+    expect(wrapper.emitted('busy-change')).toEqual([[true]])
+
+    control.vm.$emit('busy-change', false)
+    await nextTick()
+
+    expect(providerSelect(wrapper).attributes('disabled')).toBeUndefined()
+    expect(wrapper.findComponent({ name: 'LanguageSelector' }).props('disabled')).toBe(false)
+    expect(wrapper.emitted('busy-change')).toEqual([[true], [false]])
+  })
+
+  it('shows credential setup only for a provider that lacks credentials', async () => {
+    harness.store = makeStore({ OPENAI_API_KEY: 'openai-configured-key' })
+    const wrapper = mountView({ providerId: 'gemini' })
+
+    const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+    expect(setup().exists()).toBe(true)
+    expect(setup().props('providerId')).toBe('gemini')
+
+    await wrapper.setProps({ providerId: 'openai' })
+    expect(setup().exists()).toBe(false)
+
+    await wrapper.setProps({ providerId: 'gemini' })
+    expect(setup().exists()).toBe(true)
+  })
+
+  it('treats the legacy API_KEY store as configured for Gemini', async () => {
+    harness.store = makeStore({ API_KEY: 'legacy-gemini-key' })
+    const wrapper = mountView({ providerId: 'gemini' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(false)
+
+    // OpenAI has its own key store — an empty one still requires setup.
+    await wrapper.setProps({ providerId: 'openai' })
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(true)
+  })
+
+  it('ignores blank-only credential values when deciding setup visibility', async () => {
+    harness.store = makeStore({ GEMINI_API_KEY: '  \n\t ' })
+    const wrapper = mountView({ providerId: 'gemini' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(true)
+  })
+
+  it('switching provider remounts the setup card so stale state is cleared', async () => {
+    // Neither provider configured → card visible across the switch.
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    expect(setupLifecycle.mounts).toBe(1)
+
+    await wrapper.setProps({ providerId: 'openai' })
+
+    const setup = wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+    expect(setup.props('providerId')).toBe('openai')
+    // :key="providerModel" forces a fresh instance (fresh draft/error state).
+    expect(setupLifecycle.mounts).toBe(2)
+  })
+
+  it('keeps the redesign out of TranslationView and the sidepanel', () => {
+    const translationView = readFileSync(resolve(here, 'TranslationView.vue'), 'utf8')
+    expect(translationView).not.toMatch(/LiveDubbingProviderSetup|LIVE_DUBBING_PROVIDER/)
+
+    const sidepanelDir = resolve(here, '../../apps/sidepanel')
+    const sidepanelFiles = readdirSync(sidepanelDir, { recursive: true })
+      .map(String)
+      .filter((file) => file.endsWith('.vue'))
+    expect(sidepanelFiles.length).toBeGreaterThan(0)
+    for (const file of sidepanelFiles) {
+      const source = readFileSync(resolve(sidepanelDir, file), 'utf8')
+      expect(source, file).not.toMatch(/LiveDubbingProviderSetup|LiveDubbingControl|LIVE_DUBBING_PROVIDER/)
+    }
+  })
+
+  it('uses logical CSS properties so the layout survives RTL locales', () => {
+    const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+
+    expect(scss).not.toMatch(/(?:padding|margin|inset)-(?:left|right)\s*:/)
+    expect(scss).not.toMatch(/(?:text-align|border(?:-left|-right)?):\s*(?:left|right)/)
+    expect(scss).not.toMatch(/\b(?:left|right)\s*:\s*\d/)
+    // Feedback/source text aligns to the logical start edge.
+    expect(scss).toMatch(/text-align:\s*start/)
+    // Theme-aware tokens only — no hardcoded light/dark surfaces.
+    expect(scss).toMatch(/var\(--header-border-color\)/)
+    expect(scss).toMatch(/var\(--language-controls-bg-color\)/)
+  })
+
+  it('keeps the setup card mounted while a save is pending despite optimistic store mutation', async () => {
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+    expect(setup().exists()).toBe(true)
+
+    // The setup signals pending BEFORE the store mutates; the card must stay.
+    await setup().vm.$emit('save-pending', true)
+    harness.store.settings.GEMINI_API_KEY = 'optimistic-draft-key'
+    await nextTick()
+    expect(setup().exists()).toBe(true)
+
+    // Success path: pending clears and credentials are present → card hides.
+    await setup().vm.$emit('save-pending', false)
+    await nextTick()
+    expect(setup().exists()).toBe(false)
+  })
+
+  it('keeps the setup card visible when a failed save restores the previous value', async () => {
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+
+    await setup().vm.$emit('save-pending', true)
+    harness.store.settings.GEMINI_API_KEY = 'optimistic-draft-key'
+    await nextTick()
+    expect(setup().exists()).toBe(true)
+
+    // Failure path restores the previous (empty) value → card stays mounted.
+    harness.store.settings.GEMINI_API_KEY = ''
+    await setup().vm.$emit('save-pending', false)
+    await nextTick()
+    expect(setup().exists()).toBe(true)
+  })
+
+  it('locks the provider select while a credential save is pending', async () => {
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+
+    await setup().vm.$emit('save-pending', true)
+    await nextTick()
+    expect(providerSelect(wrapper).attributes('disabled')).toBeDefined()
+
+    harness.store.settings.GEMINI_API_KEY = 'saved-key'
+    await setup().vm.$emit('save-pending', false)
+    await nextTick()
+    expect(providerSelect(wrapper).attributes('disabled')).toBeUndefined()
+  })
+
+  it('remounts the control on an idle provider switch so stale state cannot survive', async () => {
+    const wrapper = mountView({ providerId: 'gemini' })
+    const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const before = control().vm
+
+    await wrapper.setProps({ providerId: 'openai' })
+
+    expect(control().props('providerId')).toBe('openai')
+    // :key follows the provider while idle → fresh instance, fresh state.
+    expect(control().vm).not.toBe(before)
+  })
+
+  it('does not remount the control while busy, then remounts once idle', async () => {
+    const wrapper = mountView({ providerId: 'gemini' })
+    const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    control().vm.$emit('busy-change', true)
+    await nextTick()
+    const busyInstance = control().vm
+
+    await wrapper.setProps({ providerId: 'openai' })
+    expect(control().props('providerId')).toBe('openai')
+    // Key frozen while busy: same instance, no mid-session remount.
+    expect(control().vm).toBe(busyInstance)
+
+    control().vm.$emit('busy-change', false)
+    await nextTick()
+    // Unlocking with a changed provider remounts to the fresh provider state.
+    expect(control().vm).not.toBe(busyInstance)
+    expect(control().props('providerId')).toBe('openai')
+  })
+
+  it('leaves a fresh control behind after successful credential setup', async () => {
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+    const before = control().vm
+
+    // Save success while idle freshens the control; the persisted credential
+    // then hides the setup card — no popup reopen required.
+    await setup().vm.$emit('saved')
+    harness.store.settings.GEMINI_API_KEY = 'freshly-saved-key'
+    await nextTick()
+
+    expect(control().vm).not.toBe(before)
+    expect(setup().exists()).toBe(false)
+  })
+
+  it('does not remount the control for a save that completes while busy', async () => {
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    control().vm.$emit('busy-change', true)
+    await nextTick()
+    const busyInstance = control().vm
+
+    await wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).vm.$emit('saved')
+    await nextTick()
+
+    expect(control().vm).toBe(busyInstance)
   })
 })

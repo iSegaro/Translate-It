@@ -753,6 +753,66 @@ describe('LiveDubbingControl', () => {
     expect(sendMessage.mock.calls.filter(([message]) => message.action === 'GET_LIVE_DUBBING_STATUS')).toHaveLength(initialReads)
   })
 
+  it('ignores a stale terminal outcome from another provider when no session is active', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({
+          status: 'idle',
+          terminalOutcome: { providerId: 'gemini', error: 'STALE_GEMINI_FAILURE', occurredAt: 1 }
+        })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de', providerId: 'openai' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // Ownership untouched: the outcome is still stored exactly as received.
+    expect(wrapper.vm.terminalOutcome?.error).toBe('STALE_GEMINI_FAILURE')
+    // Presentation only: another provider's stale outcome never renders.
+    expect(wrapper.find('.ti-live-dubbing-control-error').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('STALE_GEMINI_FAILURE')
+  })
+
+  it('keeps rendering a terminal outcome from the current provider with no session', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({
+          status: 'idle',
+          terminalOutcome: { providerId: 'gemini', error: 'STALE_GEMINI_FAILURE', occurredAt: 1 }
+        })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de', providerId: 'gemini' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.ti-live-dubbing-control-error').text()).toContain('STALE_GEMINI_FAILURE')
+  })
+
+  it('still respects the authoritative outcome while a session is active', async () => {
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({
+          status: { status: 'RUNNING', sessionId: 'session-1', providerId: 'gemini' },
+          terminalOutcome: { providerId: 'openai', error: 'ACTIVE_SESSION_OUTCOME', occurredAt: 2 }
+        })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de', providerId: 'gemini' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // Active session: authoritative outcome adopted regardless of provider match.
+    expect(wrapper.vm.terminalOutcome?.error).toBe('ACTIVE_SESSION_OUTCOME')
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+  })
+
   it('removes the exact runtime listener on unmount', async () => {
     const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
     await Promise.resolve()

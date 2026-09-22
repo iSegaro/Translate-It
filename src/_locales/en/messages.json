@@ -254,6 +254,15 @@
   "live_dubbing_provider_description": {
     "message": "Used for new live dubbing sessions."
   },
+  "live_dubbing_config_label": {
+    "message": "Configuration"
+  },
+  "live_dubbing_setup_save": {
+    "message": "Save"
+  },
+  "live_dubbing_setup_save_error": {
+    "message": "Your API key couldn't be saved. Please try again."
+  },
   "live_dubbing_provider_bootstrap_gemini_error": {
     "message": "Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again."
   },
