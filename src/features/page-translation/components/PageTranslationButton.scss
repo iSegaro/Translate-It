@@ -211,9 +211,43 @@
   height: 22px !important;
 }
 
+/* Generic compact status badge — shared by every compact consumer that
+   keeps the INNER presentation (Sidepanel passes no statusBadgePosition,
+   so it always lands here). Historical bottom-right offsets unchanged. */
 :where(.page-translation-controls).compact-wrapper .ti-btn-status-badge {
   bottom: -1px !important;
   right: -1px !important;
+}
+
+/* ── Root-level corner status badge (opt-in) ─────────────────────────
+   Rendered only when compact + statusBadgePosition="corner"
+   (PopupHeader opts in; Sidepanel never does — no marker-class coupling).
+   Anchored to .page-translation-controls itself (position: relative on
+   the root), NOT translated from the 22×22 .ti-btn-status-container —
+   the dot sits in the control's empty top-right area as the upper half
+   of a vertical indicator pair:
+
+           ● status
+   [ Page Translate ]
+           ☆ auto
+
+   Star geometry: right: 0, padding: 5px, 14px glyph → glyph center at
+   12px from the root's right edge. The badge is 5px wide → right: 9px
+   puts its center at 11.5px, within 0.5px of the star column.
+   top: -4px clears the control's top edge; star stays bottom: -6px —
+   opposite vertical halves, no overlap. The theme-aware 2px ring is
+   paint-only (non-layout) separation from the header surface in both
+   themes; it scales with the pulse transform, which is fine — the ring
+   IS the separation. pointer-events: none keeps the dot decorative:
+   it blocks neither the Page Translate button nor the star, and it
+   carries no tabindex/role/ARIA of its own. */
+:where(.page-translation-controls).compact-wrapper .ti-compact-corner-status-badge {
+  position: absolute !important;
+  top: -4px !important;
+  right: 9px !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+  box-shadow: 0 0 0 2px var(--header-bg-color);
 }
 
 /* ── Auto-Translate star toggle ───────────────────────────────────── */

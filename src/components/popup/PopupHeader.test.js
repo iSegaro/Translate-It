@@ -142,7 +142,7 @@ vi.mock('@/components/base/ToolbarMenu/ToolbarMenu.vue', () => ({
 vi.mock('@/features/page-translation/components/PageTranslationButton.vue', () => ({
   default: {
     name: 'PageTranslationButton',
-    props: ['compact', 'textOnly', 'targetLanguage', 'disabled', 'showAutoTranslateToggle'],
+    props: ['compact', 'textOnly', 'targetLanguage', 'disabled', 'showAutoTranslateToggle', 'statusBadgePosition'],
     template: '<div class="page-translation-button-stub" />'
   }
 }))
@@ -384,6 +384,15 @@ describe('PopupHeader', () => {
     expect(pageButton.props('compact')).toBe(true)
     expect(pageButton.props('targetLanguage')).toBe('fa')
     expect(pageButton.props('showAutoTranslateToggle')).toBe(true)
+  })
+
+  it('opts the page translation button into the corner status badge', async () => {
+    const wrapper = mount(PopupHeader, { props: { targetLanguage: 'fa' } })
+    await wrapper.vm.$nextTick()
+
+    const pageButton = wrapper.findComponent({ name: 'PageTranslationButton' })
+    expect(pageButton.exists()).toBe(true)
+    expect(pageButton.props('statusBadgePosition')).toBe('corner')
   })
 
   it('renders the Revert badge beside Select whenever Select Element is enabled', async () => {

@@ -8,6 +8,7 @@
         :target-language="targetLanguage"
         :disabled="!isPageTranslationSupported"
         :show-auto-translate-toggle="true"
+        status-badge-position="corner"
         class="ti-page-translate-btn"
       />
 

@@ -176,12 +176,273 @@ describe('PageTranslationButton.scss compact-mode status rules', () => {
     expect(match).toBeTruthy()
   })
 
-  it('compiled status badge has -1px offsets', () => {
+  it('generic compact rule remains for Sidepanel (previous bottom-right offsets)', () => {
     const { css } = compile()
+    // Generic rule: EXACTLY the historical offsets — no top/right reset, no ring.
     const match = css.match(
-      /:where\(\.page-translation-controls\)\.compact-wrapper\s+\.ti-btn-status-badge\s*\{[^}]*bottom:\s*-1px[^}]*right:\s*-1px/
+      /:where\(\.page-translation-controls\)\.compact-wrapper\s+\.ti-btn-status-badge\s*\{([^}]*)\}/
     )
     expect(match).toBeTruthy()
+    const block = match[1]
+    expect(block).toContain('bottom: -1px !important;')
+    expect(block).toContain('right: -1px !important;')
+    expect(block).not.toContain('top:')
+    expect(block).not.toContain('box-shadow')
+    expect(block).not.toContain('bottom: auto')
+    // Source keeps the generic rule verbatim.
+    expect(source).toMatch(
+      /:where\(\.page-translation-controls\)\.compact-wrapper\s+\.ti-btn-status-badge\s*\{\s*bottom: -1px !important;\s*right: -1px !important;/
+    )
+  })
+
+  it('corner badge is anchored to the control root, not the 22×22 container', () => {
+    const { css } = compile()
+    // Strip comments so prose (which may mention the container) never
+    // leaks into selector capture.
+    const cssNoComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    const match = cssNoComments.match(
+      /(?<=\}|^)\s*([^{}]+\.ti-compact-corner-status-badge[^{}]*)\{([^}]*)\}/
+    )
+    expect(match).toBeTruthy()
+    const selector = match[1]
+    const block = match[2]
+    // Positioning context: the root (.page-translation-controls owns
+    // position: relative) — never scoped to or translated from the
+    // internal status container.
+    expect(selector).toContain(':where(.page-translation-controls)')
+    expect(selector).toContain('.compact-wrapper')
+    expect(selector).not.toContain('.ti-btn-status-container')
+    expect(block).toContain('position: absolute !important;')
+    // Decorative: never intercepts pointer input from button/star.
+    expect(block).toContain('pointer-events: none !important;')
+  })
+
+  it('corner badge uses top-right anchoring (top: -4px; right: 9px)', () => {
+    const { css } = compile()
+    const match = css.match(
+      /(?<=\}|^)\s*([^{}]+\.ti-compact-corner-status-badge[^{}]*)\{([^}]*)\}/
+    )
+    expect(match).toBeTruthy()
+    const block = match[2]
+    expect(block).toContain('top: -4px !important;')
+    expect(block).toContain('right: 9px !important;')
+    // No bottom anchor: top+bottom would stretch the 5px dot.
+    expect(block).not.toContain('bottom:')
+    expect(block).toContain('z-index: 10 !important;')
+  })
+
+  it('corner badge carries the theme-aware 2px ring (verified token)', () => {
+    const { css } = compile()
+    const match = css.match(
+      /(?<=\}|^)\s*([^{}]+\.ti-compact-corner-status-badge[^{}]*)\{([^}]*)\}/
+    )
+    expect(match).toBeTruthy()
+    expect(match[2]).toContain('box-shadow: 0 0 0 2px var(--header-bg-color);')
+    expect(match[2]).not.toMatch(/box-shadow:[^;]*#[0-9a-fA-F]{3,8}/)
+    // Token verified: exists for BOTH light and dark theme roots.
+    const variables = readFileSync(
+      resolve(srcDir, 'assets/styles/base/_variables.scss'),
+      'utf8'
+    )
+    expect(variables).toMatch(/--header-bg-color:\s*#e9ecef;/)
+    expect(variables).toMatch(/--header-bg-color:\s*#303741;/)
+    // The INTERNAL badge rules carry no ring anymore — only the corner badge does.
+    const internalRings = [...css.matchAll(
+      /(?<=\}|^)\s*([^{}]+\.ti-btn-status-badge[^{}]*)\{([^}]*)\}/g
+    )].filter((m) => m[2].includes('box-shadow'))
+    expect(internalRings).toHaveLength(0)
+  })
+
+  it('old Popup internal top-right override is gone; internal badges stay bottom-right', () => {
+    // The former marker-coupled rule no longer exists anywhere.
+    expect(source).not.toContain(
+      ':where(.page-translation-controls).ti-page-translate-btn.compact-wrapper .ti-btn-status-badge',
+    )
+    // No internal .ti-btn-status-badge rule was moved to top-right / ringed.
+    const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '')
+    const internalRules = [...withoutComments.matchAll(
+      /([^{}]+\.ti-btn-status-badge[^{}]*)\{([^}]*)\}/g
+    )]
+    expect(internalRules.length).toBeGreaterThanOrEqual(2)
+    for (const rule of internalRules) {
+      expect(rule[1]).not.toContain('ti-compact-corner-status-badge')
+      expect(rule[2]).not.toContain('top:')
+      expect(rule[2]).not.toContain('bottom: auto')
+      expect(rule[2]).not.toContain('box-shadow')
+    }
+  })
+
+  it('corner ownership: compound :where() rule, no bare standalone, not marker-coupled', () => {
+    const { css } = compile()
+    const match = css.match(
+      /:where\(\.page-translation-controls\)\.compact-wrapper\s+\.ti-compact-corner-status-badge\s*\{/
+    )
+    expect(match).toBeTruthy()
+    // Zero-specificity root boundary + (0,2,0) compound ownership.
+    expect(specificity(match[0])).toEqual([0, 2, 0])
+    expect(source).toContain(
+      ':where(.page-translation-controls).compact-wrapper .ti-compact-corner-status-badge',
+    )
+    const withoutCompound = source.replaceAll(
+      ':where(.page-translation-controls).compact-wrapper .ti-compact-corner-status-badge',
+      '',
+    )
+    expect(withoutCompound).not.toMatch(
+      /(^|[},])\s*\.ti-compact-corner-status-badge\s*\{/,
+    )
+    // Explicit-prop design: the rule must NOT couple to the Popup marker class.
+    const rule = source.match(
+      /:where\(\.page-translation-controls\)\.compact-wrapper \.ti-compact-corner-status-badge\s*\{[^}]*\}/,
+    )
+    expect(rule).toBeTruthy()
+    expect(rule[0]).not.toContain('ti-page-translate-btn')
+  })
+
+  it('corner status ↔ Star alignment: horizontal pair pinned from Star geometry', () => {
+    const { css } = compile()
+    const corner = css.match(
+      /(?<=\}|^)\s*([^{}]+\.ti-compact-corner-status-badge[^{}]*)\{([^}]*)\}/,
+    )
+    expect(corner).toBeTruthy()
+    const star = css.match(
+      /:where\(\.page-translation-controls\)\s+\.page-translate-star-btn\s*\{([^}]*)\}/,
+    )
+    expect(star).toBeTruthy()
+
+    // Star geometry (unchanged): right: 0, padding: 5px, 14px glyph →
+    // glyph center = 0 + 5 + 7 = 12px from the root's right edge.
+    expect(star[1]).toContain('right: 0 !important;')
+    expect(star[1]).toContain('padding: 5px !important;')
+    const starGlyphCenter = 0 + 5 + 14 / 2
+
+    // Corner badge: 5px wide (mode-compact), right: 9px → center at 11.5px.
+    const cornerRight = parseInt(corner[2].match(/right:\s*(-?\d+)px/)[1], 10)
+    const badgeWidth = 5
+    const badgeCenter = cornerRight + badgeWidth / 2
+    expect(Math.abs(starGlyphCenter - badgeCenter)).toBeLessThanOrEqual(0.5)
+    // right pinned in the derived 9–10px band.
+    expect(cornerRight).toBeGreaterThanOrEqual(9)
+    expect(cornerRight).toBeLessThanOrEqual(10)
+
+    // Vertical pair: status above the control's top edge, star below its
+    // bottom edge — opposite halves, no overlap.
+    expect(corner[2]).toContain('top: -4px !important;')
+    expect(star[1]).toContain('bottom: -6px !important;')
+  })
+
+  it('corner badge uses no transform / large-translation hack', () => {
+    const { css } = compile()
+    const corner = css.match(
+      /(?<=\}|^)\s*([^{}]+\.ti-compact-corner-status-badge[^{}]*)\{([^}]*)\}/,
+    )
+    expect(corner).toBeTruthy()
+    const block = corner[2]
+    expect(block).not.toMatch(/transform/)
+    expect(block).not.toMatch(/translate\(/)
+    expect(block).not.toMatch(/margin-/)
+    // All pixel offsets are small anchoring values, not layout shifts.
+    const pixels = [...block.matchAll(/(-?\d+(?:\.\d+)?)px/g)].map(
+      (m) => Math.abs(parseFloat(m[1])),
+    )
+    expect(pixels.length).toBeGreaterThanOrEqual(2)
+    for (const px of pixels) {
+      expect(px).toBeLessThanOrEqual(12)
+    }
+  })
+
+  it('presentation prop wiring: Popup opts in, Sidepanel never does', () => {
+    // Source-level discrimination (SidepanelToolbar.test.js does not exist):
+    // PopupHeader passes the explicit prop; SidepanelToolbar passes nothing.
+    const popupHeader = readFileSync(
+      resolve(srcDir, 'components/popup/PopupHeader.vue'),
+      'utf8',
+    )
+    const popupUsage = popupHeader.match(/<PageTranslationButton[\s\S]*?\/>/)
+    expect(popupUsage).toBeTruthy()
+    expect(popupUsage[0]).toContain('status-badge-position="corner"')
+    expect(popupUsage[0]).toContain(':compact="true"')
+
+    const sidepanelToolbar = readFileSync(
+      resolve(srcDir, 'apps/sidepanel/components/SidepanelToolbar.vue'),
+      'utf8',
+    )
+    const sidepanelUsage = sidepanelToolbar.match(/<PageTranslationButton[\s\S]*?\/>/)
+    expect(sidepanelUsage).toBeTruthy()
+    expect(sidepanelUsage[0]).toContain('compact')
+    expect(sidepanelUsage[0]).not.toContain('status-badge-position')
+    expect(sidepanelUsage[0]).not.toContain('corner')
+    expect(sidepanelUsage[0]).not.toContain('class=')
+  })
+
+  it('badge z-index remains above the LoadingSpinner; spinner centering unchanged', () => {
+    const sourceLocal = readFileSync(scssPath, 'utf8')
+    // Base badge rule: position absolute + z-index 10.
+    const badgeBase = sourceLocal.match(
+      /:where\(\.page-translation-controls\)\s+\.ti-btn-status-badge\s*\{([^}]*)\}/
+    )
+    expect(badgeBase).toBeTruthy()
+    expect(badgeBase[1]).toContain('position: absolute !important;')
+    expect(badgeBase[1]).toContain('z-index: 10 !important;')
+    // Spinner: centered in the container at z-index 5 (< 10).
+    const spinner = sourceLocal.match(
+      /\.ti-base-loading-spinner\s*\{([^}]*)\}/
+    )
+    expect(spinner).toBeTruthy()
+    expect(spinner[1]).toContain('top: 50% !important;')
+    expect(spinner[1]).toContain('left: 50% !important;')
+    expect(spinner[1]).toContain('transform: translate(-50%, -50%) !important;')
+    expect(spinner[1]).toContain('z-index: 5 !important;')
+    expect(spinner[1]).toContain('pointer-events: none !important;')
+    const badgeZ = parseInt(badgeBase[1].match(/z-index:\s*(\d+)/)[1], 10)
+    const spinnerZ = parseInt(spinner[1].match(/z-index:\s*(\d+)/)[1], 10)
+    expect(badgeZ).toBeGreaterThan(spinnerZ)
+  })
+
+  it('text-only status rules unchanged (top-left inside the toolbar link)', () => {
+    const sourceLocal = readFileSync(scssPath, 'utf8')
+    const textStatus = sourceLocal.match(
+      /\.ti-text-status-badge\s*\{([^}]*)\}/
+    )
+    expect(textStatus).toBeTruthy()
+    expect(textStatus[1]).toContain('top: 0px !important;')
+    expect(textStatus[1]).toContain('left: 2px !important;')
+    expect(textStatus[1]).toContain('z-index: 1 !important;')
+    // Not touched by the compact top-right override (different class).
+    expect(textStatus[1]).not.toContain('top: -4px')
+    expect(textStatus[1]).not.toContain('right: -4px')
+  })
+
+  it('non-compact base status rule unchanged (bottom-right, z-index 10)', () => {
+    const sourceLocal = readFileSync(scssPath, 'utf8')
+    const badgeBase = sourceLocal.match(
+      /:where\(\.page-translation-controls\)\s+\.ti-btn-status-badge\s*\{([^}]*)\}/
+    )
+    expect(badgeBase).toBeTruthy()
+    expect(badgeBase[1]).toContain('bottom: -2px !important;')
+    expect(badgeBase[1]).toContain('right: -2px !important;')
+    expect(badgeBase[1]).toContain('z-index: 10 !important;')
+    expect(badgeBase[1]).not.toContain('top:')
+    expect(badgeBase[1]).not.toContain('box-shadow')
+  })
+
+  it('zero-specificity / ownership contracts intact for the compact badge rule', () => {
+    const { css } = compile()
+    const match = css.match(
+      /:where\(\.page-translation-controls\)\.compact-wrapper\s+\.ti-btn-status-badge\s*\{/
+    )
+    expect(match).toBeTruthy()
+    // :where() contributes 0 → (0,2,0), same as the old top-level form.
+    expect(specificity(match[0])).toEqual([0, 2, 0])
+    // Still compound-owned; no bare rewrite. Corner badge rule also owned.
+    expect(source).toContain(':where(.page-translation-controls).compact-wrapper .ti-btn-status-badge')
+    expect(source).toContain(':where(.page-translation-controls).compact-wrapper .ti-compact-corner-status-badge')
+    // Old marker-coupled badge rule must not resurface.
+    expect(source).not.toContain(':where(.page-translation-controls).ti-page-translate-btn.compact-wrapper .ti-btn-status-badge')
+    // Base badge rule still flows through the :where() boundary.
+    expect(css).toContain(':where(.page-translation-controls) .ti-btn-status-badge')
+    // 22 uses of the zero-specificity boundary remain.
+    const whereUses = (source.match(/:where\(\.page-translation-controls\)/g) || []).length
+    expect(whereUses).toBeGreaterThanOrEqual(22)
   })
 
   it('no bare .compact-wrapper .ti-btn-status-* in compiled output', () => {
