@@ -66,7 +66,7 @@ describe('SidepanelMainContent.scss selector ownership', () => {
       .replace(/body\.sidepanel-context\s+\.ti-icon-button/g, 'SCOPE')
       .replace(/\.theme-dark[^{]*\.ti-icon-button/g, 'SCOPE')
       .replace(/:root\.theme-dark[^{]*\.ti-icon-button/g, 'SCOPE')
-    expect(stripped).not.toMatch(/(^|[}\n])\s*\.ti-icon-button\s*[\{,]/m)
+    expect(stripped).not.toMatch(/(^|[}\n])\s*\.ti-icon-button\s*[{,]/m)
   })
 
   /* ---------------------------------------------------------------
