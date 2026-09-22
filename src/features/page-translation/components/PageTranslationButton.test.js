@@ -10,7 +10,8 @@ import jaMessages from "../../../_locales/ja/messages.json";
 vi.mock("@/components/base/BaseButton.vue", () => ({
   default: {
     name: "BaseButton",
-    template: '<button :title="title"><slot /></button>',
+    template:
+      '<button :title="title" :disabled="disabled" :class="{ \'ti-btn--disabled\': disabled }"><slot /></button>',
     props: ["variant", "disabled", "title"],
   },
 }));
@@ -690,6 +691,27 @@ describe("PageTranslationButton.vue", () => {
         wrapper.findAllComponents({ name: "PageTranslationStatus" }),
       ).toHaveLength(1);
       expect(wrapper.find(".ti-text-status-badge").exists()).toBe(true);
+    });
+  });
+
+  describe("compact disabled rendering contract", () => {
+    it("compact + disabled renders native disabled and .ti-btn--disabled", () => {
+      const wrapper = mount(PageTranslationButton, {
+        props: { compact: true, disabled: true },
+      });
+      const btn = wrapper.find(".is-compact-icon");
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
+      expect(btn.classes()).toContain("ti-btn--disabled");
+    });
+
+    it("compact + enabled does NOT render disabled / .ti-btn--disabled", () => {
+      const wrapper = mount(PageTranslationButton, {
+        props: { compact: true },
+      });
+      const btn = wrapper.find(".is-compact-icon");
+      expect(btn.attributes("disabled")).toBeUndefined();
+      expect(btn.classes()).not.toContain("ti-btn--disabled");
     });
   });
 });

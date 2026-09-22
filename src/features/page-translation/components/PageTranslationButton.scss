@@ -180,8 +180,13 @@
   }
 
   &:disabled {
+      /* Required override: BaseButton's `.ti-btn--disabled` sets
+    `opacity: 0.6 !important`, so this must stay `!important` to win.
+    No background reset is needed — `.ti-btn--ghost` (and the Sidepanel
+    `.side-toolbar .ti-btn` rule) already keep the background transparent;
+    any unguarded mixin hover background is non-important and cannot override
+    those rules. */
     opacity: 0.5 !important;
-    background: none !important;
   }
 }
 

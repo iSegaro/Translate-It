@@ -597,3 +597,43 @@ describe('PageTranslationButton.scss root element rules', () => {
     expect(source).toContain('&.text-only {')
   })
 })
+
+/* ── Compact disabled override contract ────────────────────────────── */
+
+describe('PageTranslationButton.scss compact disabled override', () => {
+  const source = readFileSync(scssPath, 'utf8')
+
+  // The local `&:disabled` override inside the `.is-compact-icon` block.
+  const localDisabledBlock = source.match(/&:disabled\s*\{[\s\S]*?\}/)?.[0]
+
+  it('keeps the intentional `opacity: 0.5 !important` override', () => {
+    expect(localDisabledBlock).toBeTruthy()
+    expect(localDisabledBlock).toContain('opacity: 0.5 !important;')
+  })
+
+  it('does NOT re-declare a redundant `background: none` reset', () => {
+    expect(localDisabledBlock).toBeTruthy()
+    expect(localDisabledBlock).not.toContain('background: none')
+    // No background declaration at all — `.ti-btn--ghost` (and the Sidepanel
+    // `.side-toolbar .ti-btn` rule) already keep the background transparent.
+    expect(localDisabledBlock).not.toMatch(/background\s*:/)
+  })
+
+  it('local disabled selector specificity is (0,2,0)', () => {
+    const { css } = compile()
+    const match = css.match(
+      /:where\(\.page-translation-controls\)\s+\.is-compact-icon:disabled\s*\{/
+    )
+    expect(match).toBeTruthy()
+    // :where()=0, .is-compact-icon=1, :disabled=1
+    expect(specificity(match[0])).toEqual([0, 2, 0])
+  })
+
+  it('opacity override outranks BaseButton `.ti-btn--disabled` (0,1,0)', () => {
+    const overrideSpec = specificity(':where(.page-translation-controls) .is-compact-icon:disabled')
+    const baseSpec = specificity('.ti-btn--disabled')
+    expect(overrideSpec).toEqual([0, 2, 0])
+    expect(baseSpec).toEqual([0, 1, 0])
+    expect(overrideSpec[1]).toBeGreaterThan(baseSpec[1])
+  })
+})
