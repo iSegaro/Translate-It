@@ -8,10 +8,8 @@
 
 // Layout styles - Page and context layouts
 @use "./layout/options";
-@use "./layout/sidepanel"; 
 
 // Component styles - Reusable components
-@use "./components/popup";
 @use "./components/ti-window";
 @use "./components/ti-field-icon";
 @use "./components/markdown";

@@ -104,6 +104,22 @@
     height: 22px !important;
     object-fit: contain !important;
   }
+
+  /* ---- Icon opacity / filter behavior ----
+     Migrated from legacy _sidepanel.scss (body.sidepanel-context .toolbar-icon).
+     Provides base icon theming: opacity, CSS-variable filter, smooth
+     transitions, and hover brighten. Dark-theme block below overrides
+     specific utility icons (filter: invert, opacity: 0.8) and protects
+     provider/page-translation colored icons. */
+  .toolbar-icon {
+    opacity: var(--icon-opacity);
+    filter: var(--icon-filter);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+
+    &:hover {
+      opacity: var(--icon-hover-opacity);
+    }
+  }
 }
 
 /*

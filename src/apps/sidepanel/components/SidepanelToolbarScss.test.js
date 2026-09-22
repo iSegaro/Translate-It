@@ -103,3 +103,74 @@ describe('SidepanelToolbar.scss selector ownership', () => {
     expect(css).toContain(':root.theme-dark .side-toolbar')
   })
 })
+
+/**
+ * Migrated from legacy _sidepanel.scss (body.sidepanel-context .toolbar-icon).
+ * Provides base icon theming: opacity, CSS-variable filter, smooth
+ * transitions, and hover brighten. Dark-theme block overrides specific
+ * utility icons (filter: invert, opacity: 0.8) and protects
+ * provider/page-translation colored icons.
+ */
+describe('SidepanelToolbar.scss icon behavior (migrated from _sidepanel.scss)', () => {
+  it('scopes icon opacity under .side-toolbar', () => {
+    const { css } = compile()
+    expect(css).toContain('.side-toolbar .toolbar-icon')
+    expect(css).toMatch(/\.side-toolbar\s+\.toolbar-icon\s*\{[^}]*opacity:\s*var\(--icon-opacity\)/)
+  })
+
+  it('scopes icon filter under .side-toolbar', () => {
+    const { css } = compile()
+    expect(css).toMatch(/\.side-toolbar\s+\.toolbar-icon\s*\{[^}]*filter:\s*var\(--icon-filter\)/)
+  })
+
+  it('scopes icon transition under .side-toolbar', () => {
+    const { css } = compile()
+    expect(css).toMatch(/\.side-toolbar\s+\.toolbar-icon\s*\{[^}]*transition:\s*opacity 0\.2s ease, filter 0\.2s ease/)
+  })
+
+  it('scopes icon hover opacity under .side-toolbar', () => {
+    const { css } = compile()
+    expect(css).toContain('.side-toolbar .toolbar-icon:hover')
+    expect(css).toMatch(/\.side-toolbar\s+\.toolbar-icon:hover\s*\{[^}]*opacity:\s*var\(--icon-hover-opacity\)/)
+  })
+
+  it('emits no standalone global .toolbar-icon opacity rule', () => {
+    const { css } = compile()
+    const stripped = css.replaceAll('.side-toolbar .toolbar-icon', '')
+    expect(stripped).not.toMatch(/(^|[},])\s*\.toolbar-icon\s*\{/)
+  })
+
+  it('preserves dark theme icon inversion for utility buttons', () => {
+    const { css } = compile()
+    expect(css).toContain('brightness(0) invert(1)')
+    expect(css).toContain('#selectElementBtn img')
+    expect(css).toContain('#revertActionBtn img')
+    expect(css).toContain('#historyBtn img')
+    expect(css).toContain('#settingsBtn img')
+  })
+
+  it('preserves provider icon protection (no filter in dark theme)', () => {
+    const { css } = compile()
+    expect(css).toContain('.ti-provider-icon-only')
+    // Provider icons should not get the invert filter
+    const providerRule = css.match(
+      /\.ti-provider-icon-only\s*\{[^}]*\}/
+    )
+    expect(providerRule).not.toBeNull()
+    expect(providerRule[0]).toContain('filter: none')
+  })
+
+  it('preserves translate button colored icon protection', () => {
+    const { css } = compile()
+    expect(css).toContain('.is-translate-btn .ti-btn-status-container img')
+    expect(css).toContain('filter: none !important')
+  })
+
+  it('does not contain body.sidepanel-context selectors', () => {
+    const { css } = compile()
+    // Strip CSS comments before checking — the legacy migration comment
+    // legitimately mentions the old selector as provenance.
+    const withoutComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(withoutComments).not.toMatch(/body\.sidepanel-context\s/)
+  })
+})

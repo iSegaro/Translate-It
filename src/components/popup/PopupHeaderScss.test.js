@@ -353,3 +353,63 @@ describe('PopupHeader.scss optical sizing contract', () => {
     expect(vueSource).toContain('<span aria-hidden="true">⋯</span>')
   })
 })
+
+/**
+ * Regression tests after deleting legacy _popup.scss.
+ * PopupHeader.scss is the sole owner of popup header appearance.
+ * These pin the contracts that the legacy rules used to cover.
+ */
+describe('PopupHeader.scss legacy popup audit regression', () => {
+  it('owns .ti-header-toolbar with row direction (legacy row-reverse is gone)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // PopupHeader.scss must declare flex-direction: row on .ti-header-toolbar.
+    const toolbarBlock = source.match(/\.ti-header-toolbar\s*\{([\s\S]*?)\/\*\s*Left group/)
+    expect(toolbarBlock).toBeTruthy()
+    expect(toolbarBlock[1]).toContain('flex-direction: row !important')
+    // Legacy row-reverse must not exist anywhere in this file.
+    expect(source).not.toContain('row-reverse')
+  })
+
+  it('does not contain any body.popup-context selector', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    expect(source).not.toContain('body.popup-context')
+  })
+
+  it('does not contain a body.popup-context img.ti-toolbar-icon filter rule', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    // The legacy _popup.scss had: body.popup-context img.ti-toolbar-icon { filter: var(--icon-filter) }
+    // This was dead (no <img> in the popup carries ti-toolbar-icon).
+    expect(source).not.toMatch(/body\.popup-context\s+img\.ti-toolbar-icon/)
+    expect(source).not.toMatch(/img\.ti-toolbar-icon\s*\{[^}]*filter/)
+  })
+
+  it('MaskIcon stays currentColor-driven (no filter or invert applied to .mask-icon)', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // The .mask-icon rule inside .ti-header-toolbar must NOT apply filter or invert.
+    const maskIconMatch = source.match(/&\s*\.mask-icon\s*\{([^}]*)\}/)
+    expect(maskIconMatch).toBeTruthy()
+    expect(maskIconMatch[1]).not.toMatch(/filter\s*:/)
+    expect(maskIconMatch[1]).not.toContain('invert')
+    // It must set opacity: 1 (fully opaque, currentColor fill).
+    expect(maskIconMatch[1]).toContain('opacity: 1 !important')
+  })
+
+  it('does not contain the legacy _popup.scss ti-revert-icon rule', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    // IconButton.scss owns .ti-revert-icon; PopupHeader.scss must not redefine it.
+    expect(source).not.toMatch(/^\.ti-revert-icon\s*\{/m)
+  })
+
+  it('does not contain dead legacy selectors from _popup.scss', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    // All of these were dead or redundant; none should appear in PopupHeader.scss.
+    expect(source).not.toContain('.ti-popup-container')
+    expect(source).not.toContain('.ti-toolbar-right-group')
+    expect(source).not.toContain('.ti-toolbar-left-group')
+    expect(source).not.toContain('.ti-result')
+    expect(source).not.toContain('.ti-spinner-overlay')
+    expect(source).not.toContain('.ti-spinner-center')
+  })
+})
