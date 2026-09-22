@@ -98,6 +98,14 @@
   background-position: right 10px center !important;
 }
 
+.live-dubbing-config-card .live-dubbing-config-field--language
+  .ti-language-select:disabled {
+  background-color: var(--color-background-muted) !important;
+  color: var(--color-text-muted) !important;
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
 .live-dubbing-view--rtl .live-dubbing-config-card
   .live-dubbing-config-field--language
   .ti-language-controls:not(.ti-compact-mode) .ti-language-select {

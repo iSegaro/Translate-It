@@ -377,6 +377,16 @@ describe('LiveDubbingView', () => {
     expect(saveButton).toMatch(/font-weight:\s*500\s*!important/)
     expect(scss).not.toMatch(/^\.ti-btn\s*\{/m)
 
+    const disabledLanguage = scss.match(
+      /\.live-dubbing-config-card \.live-dubbing-config-field--language\s+\.ti-language-select:disabled\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    expect(disabledLanguage).toBeTruthy()
+    expect(disabledLanguage).toMatch(/background-color:\s*var\(--color-background-muted\)\s*!important/)
+    expect(disabledLanguage).toMatch(/color:\s*var\(--color-text-muted\)\s*!important/)
+    expect(disabledLanguage).toMatch(/opacity:\s*0\.6\s*!important/)
+    expect(disabledLanguage).toMatch(/cursor:\s*not-allowed\s*!important/)
+    expect(scss).not.toMatch(/^\.ti-language-select:disabled\s*\{/m)
+
     const rtlInputText = scss.match(
       /\.live-dubbing-view--rtl \.live-dubbing-setup-input \.ti-input__label,[\s\S]*?\.ti-input__help\s*\{[\s\S]*?\n\}/m
     )?.[0]
