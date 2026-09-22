@@ -12,67 +12,66 @@
   font-size: var(--translation-font-size, 14px);
   color: var(--text-color);
   overflow: hidden;
-}
 
-.popup-container,
-.popup-content-container {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-color);
-  box-shadow: none;
-  position: relative;
-  box-sizing: border-box;
-  margin: 0;
-  border-radius: 0;
-  overflow: hidden;
-}
+  .popup-container,
+  .popup-content-container {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-color);
+    box-shadow: none;
+    position: relative;
+    box-sizing: border-box;
+    margin: 0;
+    border-radius: 0;
+    overflow: hidden;
+  }
 
-/* Header section remains visible during scroll.
-   `.sticky-header` is the outer stacking-context owner (`position: sticky`
-   forms one), so the dropdown layer token lives here — this lets the
-   anchored ToolbarMenu panel (inside) overlay all Popup content below. */
-.sticky-header {
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: var(--ti-z-dropdown);
-  background: var(--bg-color);
-  border-bottom: 1px solid var(--header-border-color);
-}
+  /* Header section remains visible during scroll.
+     `.sticky-header` is the outer stacking-context owner (`position: sticky`
+     forms one), so the dropdown layer token lives here — this lets the
+     anchored ToolbarMenu panel (inside) overlay all Popup content below. */
+  .sticky-header {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: var(--ti-z-dropdown);
+    background: var(--bg-color);
+    border-bottom: 1px solid var(--header-border-color);
+  }
 
-.loading-container, .error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  gap: 1rem;
-  flex: 1;
-}
+  .loading-container, .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 1rem;
+    flex: 1;
+  }
 
-.loading-text {
-  font-size: 14px;
-  opacity: 0.7;
-}
+  .loading-text {
+    font-size: 14px;
+    opacity: 0.7;
+  }
 
-.error-message {
-  color: var(--text-color);
-  opacity: 0.8;
-  margin: 0;
-  text-align: center;
-}
+  .error-message {
+    color: var(--text-color);
+    opacity: 0.8;
+    margin: 0;
+    text-align: center;
+  }
 
-.retry-button {
-  padding: 0.5rem 1rem;
-  background-color: var(--toolbar-link-color);
-  color: var(--bg-color);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
+  .retry-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--toolbar-link-color);
+    color: var(--bg-color);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
 }
-
 
