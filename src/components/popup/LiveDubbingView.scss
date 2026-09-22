@@ -50,9 +50,11 @@
 
 /* The selector ships its own bar styling (margin/padding/background);
    inside the card it must stretch edge-to-edge without a nested bar. */
-.live-dubbing-config-field--language > .ti-language-controls {
+.live-dubbing-config-card .live-dubbing-config-field--language > .ti-language-controls {
   width: 100%;
   min-width: 0;
+  height: 36px !important;
+  min-height: 36px !important;
   margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;

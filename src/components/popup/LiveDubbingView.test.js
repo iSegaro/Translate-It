@@ -300,6 +300,20 @@ describe('LiveDubbingView', () => {
     expect(scss).not.toMatch(/^\.ti-language-select/m)
     expect(scss).not.toMatch(/^\.ti-select/m)
 
+    const languageWrapper = scss.match(
+      /\.live-dubbing-config-card \.live-dubbing-config-field--language > \.ti-language-controls\s*\{[\s\S]*?\n\}/m
+    )?.[0]
+    const languageWrapperSelector = languageWrapper.split('{')[0]
+    expect((languageWrapperSelector.match(/\./g) || []).length)
+      .toBeGreaterThan(('.popup-wrapper .ti-language-controls'.match(/\./g) || []).length)
+    expect(languageWrapper).toMatch(/width:\s*100%/)
+    expect(languageWrapper).toMatch(/min-width:\s*0/)
+    expect(languageWrapper).toMatch(/height:\s*36px\s*!important/)
+    expect(languageWrapper).toMatch(/min-height:\s*36px\s*!important/)
+    expect(languageWrapper).toMatch(/margin:\s*0\s*!important/)
+    expect(languageWrapper).toMatch(/padding:\s*0\s*!important/)
+    expect(languageWrapper).toMatch(/background:\s*transparent\s*!important/)
+
     const responsiveSelector = '.ti-language-controls:not(.ti-compact-mode) .ti-language-select'
     const languageOverride = scss.match(
       /\.live-dubbing-config-card \.live-dubbing-config-field--language\s+\.ti-language-controls:not\(\.ti-compact-mode\) \.ti-language-select\s*\{[\s\S]*?\n\}/m
