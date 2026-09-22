@@ -46,7 +46,9 @@ describe('PopupHeader.scss dark contract', () => {
     expect(css).not.toContain('--ti-action-icon-hover: var(--color-warning)')
     expect(css).toContain('--ti-action-hover-bg: #424242')
     expect(css).toContain('--ti-action-active-bg: #555555')
-    expect(css).toContain('border-inline-start-color: rgba(255, 255, 255, 0.1)')
+    // The dead dark-theme chevron-divider override is gone with the chevron.
+    expect(css).not.toContain('ti-btn-select-chevron')
+    expect(css).not.toContain('border-inline-start-color: rgba(255, 255, 255, 0.1)')
   })
 
   it('defines the action hover accent token per theme', () => {
@@ -80,8 +82,8 @@ describe('PopupHeader.scss dark contract', () => {
     // Ordinary action gap + logical end inset on the actions boundary.
     expect(source).toContain('gap: 5px !important;')
     expect(source).toContain('padding-inline-end: 4px !important;')
-    // Select split wrapper keeps a LARGER explicit separation (gap + margin).
-    expect(source).toContain('.ti-header-actions > .ti-btn-select-split-menu')
+    // Select+badge container keeps a LARGER explicit separation (gap + margin).
+    expect(source).toContain('.ti-header-actions > .ti-select-action')
     expect(source).toContain('margin-inline-start: 7px;')
   })
 
@@ -89,7 +91,7 @@ describe('PopupHeader.scss dark contract', () => {
     const source = readFileSync(scssPath, 'utf8')
 
     // Ordinary gap inside .ti-header-actions: 5px.
-    // Select split margin-inline-start: 7px.
+    // Select-action container margin-inline-start: 7px.
     // Total Select separation = 5 + 7 = 12px > ordinary 5px. Ratio = 2.4×.
     const actionsBlock = source.match(/\.ti-header-actions\s*\{[\s\S]*?\}/)
     expect(actionsBlock).toBeTruthy()
@@ -267,40 +269,168 @@ describe('PopupHeader.scss optical sizing contract', () => {
     expect(moreBlock[1]).toContain('line-height: 1 !important')
   })
 
-  it('Select main button is 24×24 with box-sizing border-box', () => {
+  it('Select is an ordinary button (no joined-pill geometry)', () => {
     const source = readFileSync(scssPath, 'utf8')
 
-    // Combined rule covers both halves; verify shared sizing.
-    const splitRule = source.match(
-      /\.ti-select-split\s+\.ti-btn-select,\s*\n\.ti-select-split\s+\.ti-btn-select-chevron\s*\{([^}]*)\}/
-    )
-    expect(splitRule).toBeTruthy()
-    expect(splitRule[1]).toContain('width: 24px')
-    expect(splitRule[1]).toContain('height: 24px')
-    expect(splitRule[1]).toContain('box-sizing: border-box')
-    // Old padding must be gone
-    expect(splitRule[1]).not.toContain('padding-inline-end')
+    // Select has no dedicated sizing/radius block — it consumes the shared
+    // hit-target (24×24) and base border-radius (6px) rules like every
+    // other header toolbar button.
+    expect(source).not.toMatch(/\.ti-btn-select\s*\{/)
+    expect(source).not.toContain('6px 0 0 6px')
+    expect(source).not.toContain('border-inline-start')
   })
 
-  it('Select chevron button is 24×24 with border-inline-start divider', () => {
+  it('Revert badge geometry: hit target top-left coincides with the visible surface; slack never steals Select clicks', () => {
     const source = readFileSync(scssPath, 'utf8')
 
-    // Chevron-specific block has ONLY the divider — no leftover width/padding.
-    // Match the standalone chevron block (not the combined rule) by anchoring
-    // on the border-inline-start property that starts the block body.
-    const chevronBlock = source.match(
-      /\.ti-select-split\s+\.ti-btn-select-chevron\s*\{\s*\n\s*border-inline-start[^}]*\}/
+    const badgeBlock = source.match(
+      /\.ti-header-actions\s+\.ti-select-action\s+\.ti-btn-revert-badge\s*\{([^}]*)\}/
     )
-    expect(chevronBlock).toBeTruthy()
-    expect(chevronBlock[0]).toContain('border-inline-start: 1px solid')
-    // Old padding/width must be absent from this standalone block
-    expect(chevronBlock[0]).not.toContain('padding-inline-start')
-    expect(chevronBlock[0]).not.toContain('padding-inline-end')
-    expect(chevronBlock[0]).not.toMatch(/width:\s*18px/)
+    expect(badgeBlock).toBeTruthy()
+    // Full 24×24 transparent hit target.
+    expect(badgeBlock[1]).toContain('width: 24px')
+    expect(badgeBlock[1]).toContain('min-width: 24px')
+    expect(badgeBlock[1]).toContain('height: 24px')
+    expect(badgeBlock[1]).toContain('min-height: 24px')
+    expect(badgeBlock[1]).toContain('box-sizing: border-box')
+    expect(badgeBlock[1]).toContain('position: absolute')
+    // Surface flush at the button's TOP-LEFT (8px slack becomes the
+    // inline-end/bottom tail, not an overlay on Select).
+    expect(badgeBlock[1]).toContain('justify-content: flex-start')
+    expect(badgeBlock[1]).toContain('align-items: flex-start')
+    // Opt out of the shared .ti-toolbar-button rules entirely — no
+    // transform declaration (native press only, badge never shifts).
+    expect(badgeBlock[1]).not.toMatch(/transform\s*:/)
+    // Old18px button sizing and shared class must be gone.
+    expect(badgeBlock[1]).not.toMatch(/width:\s*18px/)
+    expect(source).not.toContain('ti-toolbar-button ti-btn-revert')
+
+    // Container: 24×24 relative anchor box, 7px start separation, 8px
+    // inline-end reservation so the hit target clears Sidepanel.
+    const containerBlock = source.match(
+      /\.ti-header-actions\s+>\s+\.ti-select-action\s*\{([^}]*)\}/
+    )
+    expect(containerBlock).toBeTruthy()
+    expect(containerBlock[1]).toContain('position: relative')
+    expect(containerBlock[1]).toContain('width: 24px')
+    expect(containerBlock[1]).toContain('height: 24px')
+    expect(containerBlock[1]).toContain('margin-inline-start: 7px')
+    expect(containerBlock[1]).toContain('margin-inline-end: 8px')
+    expect(containerBlock[1]).toContain('flex-shrink: 0')
+
+    const badgeWidth = parseInt(badgeBlock[1].match(/width:\s*(\d+)px/)[1], 10)
+    const badgeHeight = parseInt(badgeBlock[1].match(/height:\s*(\d+)px/)[1], 10)
+    const bottomOffset = parseInt(badgeBlock[1].match(/bottom:\s*-(\d+)px/)[1], 10)
+    const rightOffset = parseInt(badgeBlock[1].match(/right:\s*-(\d+)px/)[1], 10)
+    const containerWidth = parseInt(containerBlock[1].match(/width:\s*(\d+)px/)[1], 10)
+    const containerHeight = parseInt(containerBlock[1].match(/height:\s*(\d+)px/)[1], 10)
+    const reserve = parseInt(containerBlock[1].match(/margin-inline-end:\s*(\d+)px/)[1], 10)
+
+    // Boxes relative to the container origin (Select occupies 0..24 × 0..24).
+    const badgeLeft = containerWidth + rightOffset - badgeWidth  // 24 + 13 − 24 = 13
+    const badgeTop = containerHeight + bottomOffset - badgeHeight // 24 + 13 − 24 = 13
+    const badgeRight = badgeLeft + badgeWidth   // 37
+    const badgeBottom = badgeTop + badgeHeight  // 37
+    const surfaceSize = 16
+    // Surface is flush at the button's top-left (flex-start/flex-start).
+    const surfaceLeft = badgeLeft
+    const surfaceTop = badgeTop
+    const surfaceRight = surfaceLeft + surfaceSize   // 29
+    const surfaceBottom = surfaceTop + surfaceSize   // 29
+
+    // --- Contract 4: visible badge coordinates unchanged pre-fix ---
+    expect([surfaceLeft, surfaceTop, surfaceRight, surfaceBottom]).toEqual([13, 13, 29, 29])
+
+    // --- Contract 1: transparent hit slack does NOT overlap Select ---
+    // Slack = button box minus the 16×16 top-left surface:
+    //   right strip (x29..37 × y13..37) and bottom strip (x13..29 × y29..37).
+    // Select box = x0..24 × y0..24. Both strips start past x24 or y24.
+    const slackRegions = [
+      { left: surfaceRight, top: badgeTop, right: badgeRight, bottom: badgeBottom },
+      { left: badgeLeft, top: surfaceBottom, right: badgeRight, bottom: badgeBottom }
+    ]
+    for (const slack of slackRegions) {
+      const overlapsSelect =
+        slack.left < 24 && slack.right > 0 && slack.top < 24 && slack.bottom > 0
+      expect(overlapsSelect).toBe(false)
+    }
+
+    // --- Contract 2: Revert ∩ Select is limited to the visible badge ---
+    // Badge box ∩ Select = x13..24 × y13..24, fully inside the surface,
+    // so the overlap area equals surface ∩ Select and never exceeds 16×16.
+    const badgeSelectOverlap = {
+      left: Math.max(badgeLeft, 0),
+      top: Math.max(badgeTop, 0),
+      right: Math.min(badgeRight, 24),
+      bottom: Math.min(badgeBottom, 24)
+    }
+    const surfaceSelectOverlap = {
+      left: Math.max(surfaceLeft, 0),
+      top: Math.max(surfaceTop, 0),
+      right: Math.min(surfaceRight, 24),
+      bottom: Math.min(surfaceBottom, 24)
+    }
+    expect(badgeSelectOverlap).toEqual(surfaceSelectOverlap)
+    const overlapArea =
+      (badgeSelectOverlap.right - badgeSelectOverlap.left) *
+      (badgeSelectOverlap.bottom - badgeSelectOverlap.top)
+    expect(overlapArea).toBeLessThanOrEqual(surfaceSize * surfaceSize)
+    expect(overlapArea).toBeGreaterThan(0) // visible badge does overlap, intentionally
+
+    // --- Contract 3: hit target does not overlap the Sidepanel button ---
+    // Sidepanel starts after container + inline-end reservation + 5px gap.
+    const actionsBlock = source.match(/\.ti-header-actions\s*\{[\s\S]*?\}/)
+    expect(actionsBlock).toBeTruthy()
+    const gapMatch = actionsBlock[0].match(/gap:\s*(\d+)px/)
+    expect(gapMatch).toBeTruthy()
+    const actionsGap = parseInt(gapMatch[1], 10)
+    const sidepanelLeft = containerWidth + reserve + actionsGap // 24 + 8 + 5 = 37
+    expect(badgeRight).toBeLessThanOrEqual(sidepanelLeft) // 37 ≤ 37
+
+    // Bottom drop still fits the header's ≥14px slack (no popup-body overflow).
+    expect(bottomOffset).toBeLessThanOrEqual(14)
   })
 
-  it('Select glyph remains 22px and chevron glyph remains 12px', () => {
+  it('Revert native target remains a 24×24 min-size hit box', () => {
     const source = readFileSync(scssPath, 'utf8')
+
+    const badgeBlock = source.match(
+      /\.ti-header-actions\s+\.ti-select-action\s+\.ti-btn-revert-badge\s*\{([^}]*)\}/
+    )
+    expect(badgeBlock).toBeTruthy()
+    expect(badgeBlock[1]).toContain('width: 24px')
+    expect(badgeBlock[1]).toContain('min-width: 24px')
+    expect(badgeBlock[1]).toContain('height: 24px')
+    expect(badgeBlock[1]).toContain('min-height: 24px')
+    expect(badgeBlock[1]).toContain('box-sizing: border-box')
+  })
+
+  it('Revert badge surface is a small opaque circle on Select’s corner', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    const surfaceBlock = source.match(
+      /\.ti-select-action\s+\.ti-btn-revert-badge\s+\.ti-revert-badge-surface\s*\{([^}]*)\}/
+    )
+    expect(surfaceBlock).toBeTruthy()
+    // Visible circle lives in the 14–16px band.
+    const surfaceWidth = parseInt(surfaceBlock[1].match(/width:\s*(\d+)px/)[1], 10)
+    expect(surfaceWidth).toBeGreaterThanOrEqual(14)
+    expect(surfaceWidth).toBeLessThanOrEqual(16)
+    expect(surfaceBlock[1]).toContain(`height: ${surfaceWidth}px`)
+    expect(surfaceBlock[1]).toContain('box-sizing: border-box')
+    expect(surfaceBlock[1]).toContain('border-radius: 50%')
+    // Quiet default: 1px theme-aware border + opaque header background
+    // (opaque so Select's hover paint underneath never tints it).
+    expect(surfaceBlock[1]).toContain('border: 1px solid var(--header-border-color')
+    expect(surfaceBlock[1]).toContain('background-color: var(--header-bg-color')
+    // No divider / joined-pill radius leftovers.
+    expect(surfaceBlock[1]).not.toContain('border-inline-start')
+    expect(surfaceBlock[1]).not.toContain('0 6px 6px 0')
+  })
+
+  it('Revert glyph is a small mask icon outside the shared 22px toolbar rule', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const vueSource = readFileSync(resolve(here, 'PopupHeader.vue'), 'utf8')
 
     // Shared icon rule inside .ti-toolbar-button governs the Select glyph.
     const sharedRule = source.match(
@@ -308,13 +438,164 @@ describe('PopupHeader.scss optical sizing contract', () => {
     )
     expect(sharedRule).toBeTruthy()
 
-    // Chevron glyph is sized separately.
-    const chevronGlyph = source.match(
-      /\.ti-select-split\s+\.ti-btn-select-chevron\s+\.ti-chevron-icon\s*\{([^}]*)\}/
+    // Badge glyph carries NO ti-toolbar-icon class (opts out of the shared
+    // 22px rule) and is sized via the MaskIcon size prop in the 11–13 band.
+    const badgeGlyph = vueSource.match(
+      /class="ti-btn-revert-badge"[\s\S]*?class="ti-revert-badge-surface"[\s\S]*?:size="(\d+)"[\s\S]*?<\/button>/
     )
-    expect(chevronGlyph).toBeTruthy()
-    expect(chevronGlyph[1]).toContain('width: 12px !important')
-    expect(chevronGlyph[1]).toContain('height: 12px !important')
+    expect(badgeGlyph).toBeTruthy()
+    const glyphSize = parseInt(badgeGlyph[1], 10)
+    expect(glyphSize).toBeGreaterThanOrEqual(11)
+    expect(glyphSize).toBeLessThanOrEqual(13)
+    expect(vueSource).not.toMatch(/ti-revert-badge-surface[\s\S]*?ti-toolbar-icon/)
+    // SCSS must not force a different badge-glyph size either.
+    expect(source).not.toMatch(/ti-btn-revert-badge[^{]*\.ti-toolbar-icon/)
+  })
+
+  it('badge quiet/hover contract: glyph-only opacity, no shared hover, no filter', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // Quiet default is glyph-only opacity on the badge mask (NOT surface
+    // opacity — the opaque circle must not couple to Select hover underlay).
+    const glyphQuiet = source.match(
+      /\.ti-select-action\s+\.ti-btn-revert-badge\s+\.mask-icon\s*\{([^}]*)\}/
+    )
+    expect(glyphQuiet).toBeTruthy()
+    expect(glyphQuiet[1]).toMatch(/opacity:\s*0\.\d+/)
+    const surfaceBlock = source.match(
+      /\.ti-select-action\s+\.ti-btn-revert-badge\s+\.ti-revert-badge-surface\s*\{([^}]*)\}/
+    )
+    expect(surfaceBlock[1]).not.toMatch(/opacity:/)
+    // currentColor-driven: no filter/invert anywhere near the badge.
+    expect(css).not.toMatch(/ti-btn-revert-badge[^{]*\{[^}]*filter:/)
+
+    // No parent-level joined hover (controls stay independent).
+    expect(source).not.toMatch(/\.ti-select-action\s*:hover/)
+    expect(css).not.toMatch(/\.ti-select-action:hover\s/)
+
+    // Badge owns explicit hover + focus rules targeting its surface + glyph.
+    expect(source).toMatch(/\.ti-btn-revert-badge\s*:\s*hover\s+\.ti-revert-badge-surface/)
+    expect(source).toMatch(/\.ti-btn-revert-badge\s*:\s*focus-visible\s+\.ti-revert-badge-surface/)
+    expect(css).toContain('.ti-btn-revert-badge:hover .ti-revert-badge-surface')
+    expect(css).toContain('.ti-btn-revert-badge:focus-visible .ti-revert-badge-surface')
+    expect(source).toMatch(/\.ti-btn-revert-badge\s*:\s*hover\s+\.mask-icon/)
+    expect(source).toMatch(/\.ti-btn-revert-badge\s*:\s*focus-visible\s+\.mask-icon/)
+
+    // Hover emphasis paints the surface (opaque light-neutral hover bg +
+    // accent border + dark readable glyph — see contrast test below).
+    const hoverRule = source.match(
+      /\.ti-header-actions\s+\.ti-select-action\s+\.ti-btn-revert-badge\s*:\s*hover\s+\.ti-revert-badge-surface[^{]*\{([^}]*)\}/
+    )
+    expect(hoverRule).toBeTruthy()
+    expect(hoverRule[1]).toContain('var(--toolbar-link-hover-bg-color)')
+    expect(hoverRule[1]).toContain('var(--ti-action-icon-hover)')
+    expect(hoverRule[1]).toContain('var(--ti-action-icon)')
+
+    // Badge has its own focus-visible outline (shared .ti-toolbar-button
+    // rule never matches — badge is not a .ti-toolbar-button).
+    expect(source).toMatch(/\.ti-btn-revert-badge\s*:\s*focus-visible\s*\{[^}]*outline:/)
+
+    // Select (and every header action) keeps the ordinary per-button hover.
+    expect(css).toContain('.ti-header-toolbar .ti-toolbar-button:hover')
+    // Select active bg stays per-button; Revert never gets it in the template.
+    expect(css).toContain('.ti-header-toolbar .ti-toolbar-button.ti-active')
+    const vueSource = readFileSync(resolve(here, 'PopupHeader.vue'), 'utf8')
+    const badgeButton = vueSource.match(/class="ti-btn-revert-badge"[\s\S]*?<\/button>/)
+    expect(badgeButton).toBeTruthy()
+    expect(badgeButton[0]).not.toContain('ti-active')
+    expect(badgeButton[0]).not.toContain('menuitem')
+    expect(badgeButton[0]).not.toContain('ti-toolbar-button')
+  })
+
+  it('Revert hover/focus contrast: light opaque surface + dark glyph; dark keeps accent appearance', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    // --- Light/default theme (the top-level rule, before the @at-root block) ---
+    const lightRule = source.match(
+      /\.ti-header-actions\s+\.ti-select-action\s+\.ti-btn-revert-badge\s*:\s*hover\s+\.ti-revert-badge-surface[^{]*\{([^}]*)\}/
+    )
+    expect(lightRule).toBeTruthy()
+    // 1. Opaque light-neutral hover surface (verified token, not the
+    //    translucent dark overlay that killed glyph contrast).
+    expect(lightRule[1]).toContain('background-color: var(--toolbar-link-hover-bg-color) !important')
+    expect(lightRule[1]).not.toContain('var(--ti-action-hover-bg)')
+    // 2. Glyph color stays the dark action icon (readable on the light surface).
+    expect(lightRule[1]).toContain('color: var(--ti-action-icon) !important')
+    // 3. Accent border signals interaction.
+    expect(lightRule[1]).toContain('border-color: var(--ti-action-icon-hover) !important')
+    // Focus-visible shares the exact same declaration block as hover.
+    const lightFocusRule = source.match(
+      /\.ti-header-actions\s+\.ti-select-action\s+\.ti-btn-revert-badge\s*:\s*focus-visible\s+\.ti-revert-badge-surface[^{]*\{([^}]*)\}/
+    )
+    expect(lightFocusRule).toBeTruthy()
+    expect(lightFocusRule[1]).toEqual(lightRule[1])
+
+    // The verified token resolves to an OPAQUE light neutral in light theme
+    // and a dark neutral in dark theme (_variables.scss theme roots).
+    const variables = readFileSync(
+      resolve(srcDir, 'assets/styles/base/_variables.scss'),
+      'utf8'
+    )
+    expect(variables).toMatch(/--toolbar-link-hover-bg-color:\s*#e2e6ea;/)
+    expect(variables).toMatch(/--toolbar-link-hover-bg-color:\s*#404040;/)
+
+    // --- Dark theme (inside the existing reachable @at-root block) ---
+    // Reachable compiled selector covers BOTH .theme-dark and .ti-dark-mode
+    // hooks (never :global()).
+    expect(css).toContain('.theme-dark .ti-header-toolbar .ti-select-action .ti-btn-revert-badge:hover .ti-revert-badge-surface')
+    expect(css).toContain('.ti-dark-mode .ti-header-toolbar .ti-select-action .ti-btn-revert-badge:hover .ti-revert-badge-surface')
+    expect(css).toContain('.theme-dark .ti-header-toolbar .ti-select-action .ti-btn-revert-badge:focus-visible .ti-revert-badge-surface')
+    expect(css).not.toContain(':global(')
+
+    // 4. Dark hover background reasserts the dark action hover token.
+    const darkBlock = source.match(
+      /@at-root\s+\.theme-dark\s+&,\s*\.ti-dark-mode\s+&\s*\{([\s\S]*?)\n\s*\}\s*\n\}/
+    )
+    expect(darkBlock).toBeTruthy()
+    const darkBadgeRule = darkBlock[1].match(
+      /\.ti-select-action\s+\.ti-btn-revert-badge\s*:\s*hover\s+\.ti-revert-badge-surface[^{]*\{([^}]*)\}/
+    )
+    expect(darkBadgeRule).toBeTruthy()
+    expect(darkBadgeRule[1]).toContain('background-color: var(--ti-action-hover-bg) !important')
+    // 5. Dark icon/border keep the accent appearance (visually unchanged).
+    expect(darkBadgeRule[1]).toContain('border-color: var(--ti-action-icon-hover) !important')
+    expect(darkBadgeRule[1]).toContain('color: var(--ti-action-icon-hover) !important')
+    // Dark focus shares the same block as dark hover.
+    const darkFocusRule = darkBlock[1].match(
+      /\.ti-select-action\s+\.ti-btn-revert-badge\s*:\s*focus-visible\s+\.ti-revert-badge-surface[^{]*\{([^}]*)\}/
+    )
+    expect(darkFocusRule).toBeTruthy()
+    expect(darkFocusRule[1]).toEqual(darkBadgeRule[1])
+  })
+
+  it('removes dead split-menu/chevron styling while keeping More-menu panel ownership', () => {
+    const source = readFileSync(scssPath, 'utf8')
+
+    // Dead Select-menu selectors are gone entirely.
+    expect(source).not.toContain('.ti-btn-select-split-menu')
+    expect(source).not.toContain('.ti-btn-select-chevron')
+    expect(source).not.toContain('.ti-chevron-icon')
+    // Old joined split-control selectors are gone with the badge redesign.
+    expect(source).not.toContain('.ti-select-split')
+    expect(source).not.toContain('.ti-revert-surface')
+    expect(source).not.toContain('.ti-btn-revert ')
+    // More-menu panel variable ownership and item styles survive.
+    expect(source).toContain('.ti-btn-more-menu')
+    expect(source).toMatch(/\.ti-btn-more-menu\s*\{/)
+    expect(source).toContain('--tm-panel-background')
+    expect(source).toContain('.ti-header-menu-item')
+  })
+
+  it('dark-theme rules remain reachable after the split redesign', () => {
+    const source = readFileSync(scssPath, 'utf8')
+    const { css } = sass.compile(scssPath, { importers: scssImporters })
+
+    expect(source).toContain('.theme-dark &')
+    expect(css).toContain('.theme-dark .ti-header-toolbar')
+    expect(css).toContain('--ti-action-hover-bg: #424242')
+    expect(css).toContain('--ti-action-active-bg: #555555')
   })
 
   it('Select split group margin-inline-start remains 7px', () => {

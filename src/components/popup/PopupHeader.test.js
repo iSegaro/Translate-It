@@ -207,84 +207,109 @@ describe('PopupHeader', () => {
 
     // Direct actions all live inside the actions group.
     const actions = wrapper.find('.ti-header-actions')
-    for (const selector of ['.ti-btn-more-menu', '.ti-btn-settings', '.ti-btn-mouse-hover', '.ti-btn-capture', '.ti-select-split', '.ti-btn-sidepanel']) {
+    for (const selector of ['.ti-btn-more-menu', '.ti-btn-settings', '.ti-btn-mouse-hover', '.ti-btn-capture', '.ti-select-action', '.ti-btn-sidepanel']) {
       expect(actions.find(selector).exists()).toBe(true)
     }
-    // Revert is now inside the select-split ToolbarMenu, not a sibling in the actions group.
-    expect(actions.find('.ti-btn-revert').exists()).toBe(false)
+    // Revert badge lives INSIDE the select-action wrapper (anchored on
+    // Select), not as a top-level action of its own.
+    expect([...actions.element.children].some((element) => element.classList.contains('ti-btn-revert-badge'))).toBe(false)
+    expect(actions.find('.ti-select-action .ti-btn-revert-badge').exists()).toBe(true)
   })
 
-  it('orders actions More → Settings → Hover → Capture → SelectSplit → Sidepanel', async () => {
+  it('orders actions More → Settings → Hover → Capture → SelectAction → Sidepanel', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    // Select + Revert are now a single split-control ToolbarMenu in the DOM order.
+    // Select + Revert badge are a single plain wrapper in the DOM order.
     expect([...wrapper.find('.ti-header-actions').element.children].map((element) => element.className)).toEqual([
       'toolbar-menu-stub ti-btn-more-menu',
       'ti-toolbar-button ti-btn-settings',
       'ti-toolbar-button ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide',
       'ti-toolbar-button ti-btn-capture ti-header-toolbar-button--narrow-hide',
-      'toolbar-menu-stub ti-btn-select-split-menu',
+      'ti-select-action',
       'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide'
     ])
   })
 
-  it('keeps the split-control order stable regardless of select mode state', async () => {
+  it('keeps the select-action order stable regardless of select mode state', async () => {
     mockSelectModeHolder.ref.value = true
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    // Revert is always inside the menu; not a contextual sibling any more.
+    // Revert is always a child of the Select wrapper; order never shifts.
     expect([...wrapper.find('.ti-header-actions').element.children].map((element) => element.className)).toEqual([
       'toolbar-menu-stub ti-btn-more-menu',
       'ti-toolbar-button ti-btn-settings',
       'ti-toolbar-button ti-btn-mouse-hover ti-header-toolbar-button--narrow-hide',
       'ti-toolbar-button ti-btn-capture ti-header-toolbar-button--narrow-hide',
-      'toolbar-menu-stub ti-btn-select-split-menu',
+      'ti-select-action',
       'ti-toolbar-button ti-btn-sidepanel ti-header-toolbar-button--narrow-hide'
     ])
   })
 
-  it('passes force-popover to both PopupHeader ToolbarMenus (popup is narrower than 750px)', async () => {
+  it('renders Select plus a Revert badge inside the select-action wrapper (no menu, no chevron)', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    // Only the More menu still uses ToolbarMenu.
+    expect(wrapper.findAllComponents({ name: 'ToolbarMenu' })).toHaveLength(1)
+
+    const action = wrapper.find('.ti-select-action')
+    expect(action.exists()).toBe(true)
+    // Ordinary Select button + Revert badge button inside .ti-select-action.
+    expect([...action.element.children].map((element) => element.className)).toEqual([
+      'ti-toolbar-button ti-btn-select',
+      'ti-btn-revert-badge'
+    ])
+    // No chevron button anywhere in the header.
+    expect(wrapper.find('.ti-btn-select-chevron').exists()).toBe(false)
+    expect(wrapper.find('.ti-chevron-icon').exists()).toBe(false)
+
+    // Non-interactive visual surface inside the native Revert badge: it
+    // owns geometry + glyph, is hidden from AT, and is never focusable.
+    const surface = wrapper.find('.ti-btn-revert-badge .ti-revert-badge-surface')
+    expect(surface.exists()).toBe(true)
+    expect(surface.attributes('aria-hidden')).toBe('true')
+    expect(surface.element.tagName).toBe('SPAN')
+    expect(surface.attributes('tabindex')).toBeUndefined()
+    // Glyph lives inside the surface; the native button still owns a11y.
+    expect(surface.findComponent(MaskIcon).exists()).toBe(true)
+    expect(wrapper.find('.ti-btn-revert-badge > .ti-revert-badge-surface').exists()).toBe(true)
+  })
+
+  it('passes force-popover to the single remaining PopupHeader ToolbarMenu (More menu)', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
     const menus = wrapper.findAllComponents({ name: 'ToolbarMenu' })
-    expect(menus).toHaveLength(2)
-    for (const menu of menus) {
-      expect(menu.props('forcePopover')).toBe(true)
-    }
+    expect(menus).toHaveLength(1)
+    expect(menus[0].props('forcePopover')).toBe(true)
   })
 
-  it('mirrors select-mode active state to the chevron half', async () => {
+  it('applies ti-active to Select only; Revert badge never carries it', async () => {
     const idle = mount(PopupHeader)
     await idle.vm.$nextTick()
-    expect(idle.find('.ti-btn-select-chevron').classes()).not.toContain('ti-active')
+    expect(idle.find('.ti-btn-select').classes()).not.toContain('ti-active')
+    expect(idle.find('.ti-btn-revert-badge').classes()).not.toContain('ti-active')
 
     mockSelectModeHolder.ref.value = true
     const active = mount(PopupHeader)
     await active.vm.$nextTick()
-    expect(active.find('.ti-btn-select').classes()).toContain('ti-active')
-    expect(active.find('.ti-btn-select-chevron').classes()).toContain('ti-active')
-  })
 
-  it('keeps both split halves active while hovered', async () => {
-    mockSelectModeHolder.ref.value = true
-    const wrapper = mount(PopupHeader)
-    await wrapper.vm.$nextTick()
-
-    const select = wrapper.find('.ti-btn-select')
-    const chevron = wrapper.find('.ti-btn-select-chevron')
+    const select = active.find('.ti-btn-select')
+    const revert = active.find('.ti-btn-revert-badge')
     expect(select.classes()).toContain('ti-active')
-    expect(chevron.classes()).toContain('ti-active')
+    expect(revert.classes()).not.toContain('ti-active')
 
-    // JSDOM does not apply :hover styles; assert the active state itself
-    // survives hover interaction. The visual (active bg over hover bg) is
-    // guaranteed by the higher-specificity split-active rule in SCSS.
+    // Hover interaction must not leak active state onto the Revert badge.
     await select.trigger('mouseenter')
-    await chevron.trigger('mouseenter')
+    await revert.trigger('mouseenter')
     expect(select.classes()).toContain('ti-active')
-    expect(chevron.classes()).toContain('ti-active')
+    expect(revert.classes()).not.toContain('ti-active')
+
+    // Select keeps pressed-toggle semantics; Revert is a plain action button.
+    expect(select.attributes('aria-pressed')).toBe('true')
+    expect(revert.attributes('aria-pressed')).toBeUndefined()
   })
 
   it('renders the More trigger as a normal toolbar button with an ellipsis glyph', async () => {
@@ -309,14 +334,23 @@ describe('PopupHeader', () => {
     expect(more.attributes('title')).toBe('More actions')
   })
 
-  it('uses the popup_select_element_options_title key for the Select chevron', async () => {
+  it('gives the Revert badge its own localized title and aria-label (no chevron options key)', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    expect(mockT).toHaveBeenCalledWith('popup_select_element_options_title', 'Select Element options')
-    const chevron = wrapper.find('.ti-btn-select-chevron')
-    expect(chevron.attributes('aria-label')).toBe('Select Element options')
-    expect(chevron.attributes('title')).toBe('Select Element options')
+    expect(wrapper.find('.ti-btn-select-chevron').exists()).toBe(false)
+    const revert = wrapper.find('.ti-btn-revert-badge')
+    expect(revert.exists()).toBe(true)
+    expect(mockT).toHaveBeenCalledWith('popup_revert_title_icon', 'Revert')
+    expect(mockT).toHaveBeenCalledWith('popup_revert_alt_icon', 'Revert')
+    expect(revert.attributes('title')).toBe('Revert')
+    expect(revert.attributes('aria-label')).toBe('Revert')
+    // Plain native button — never a menu item; surface is decorative only.
+    expect(revert.element.tagName).toBe('BUTTON')
+    expect(revert.attributes('type')).toBe('button')
+    expect(revert.attributes('role')).toBeUndefined()
+    expect(revert.attributes('tabindex')).toBeUndefined()
+    expect(revert.find('.ti-revert-badge-surface').attributes('aria-hidden')).toBe('true')
   })
 
   it('passes English fallbacks as the second t() argument for select and revert titles', async () => {
@@ -325,10 +359,9 @@ describe('PopupHeader', () => {
 
     expect(mockT).toHaveBeenCalledWith('popup_select_element_title_icon', 'Select Element mode')
 
-    // The Revert title lives inside the split menu; open it first.
-    await wrapper.find('.ti-btn-select-chevron').trigger('click')
-    await wrapper.vm.$nextTick()
+    // The Revert name is on the always-rendered Revert segment — no menu to open.
     expect(mockT).toHaveBeenCalledWith('popup_revert_title_icon', 'Revert')
+    expect(mockT).toHaveBeenCalledWith('popup_revert_alt_icon', 'Revert')
   })
 
   it('uses the unsupported-provider fallback when the provider lacks bulk support', async () => {
@@ -353,32 +386,26 @@ describe('PopupHeader', () => {
     expect(pageButton.props('showAutoTranslateToggle')).toBe(true)
   })
 
-  it('makes Revert available in the split menu whenever Select Element is enabled', async () => {
-    // Idle: split is rendered, menu closed, Revert is reachable through the chevron.
-    const idle = mount(PopupHeader)
-    await idle.vm.$nextTick()
-    expect(idle.find('.ti-btn-select').exists()).toBe(true)
-    expect(idle.find('.ti-btn-select-chevron').exists()).toBe(true)
-    expect(idle.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(false)
-
-    await idle.find('.ti-btn-select-chevron').trigger('click')
-    await idle.vm.$nextTick()
-    expect(idle.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(true)
-    const items = idle.findAll('.ti-btn-select-split-menu [role="menuitem"]')
-    expect(items).toHaveLength(1)
-    expect(items[0].text()).toContain('Revert')
-  })
-
-  it('opens the split menu via chevron click without activating Select Element', async () => {
+  it('renders the Revert badge beside Select whenever Select Element is enabled', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('.ti-btn-select-chevron').trigger('click')
+    expect(wrapper.find('.ti-select-action .ti-btn-select').exists()).toBe(true)
+    expect(wrapper.find('.ti-select-action .ti-btn-revert-badge').exists()).toBe(true)
+    expect(wrapper.find('.ti-btn-select-chevron').exists()).toBe(false)
+    expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
+  })
+
+  it('clicking the Revert badge never activates Select Element and opens no menu', async () => {
+    const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(true)
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+
     expect(mockToggleSelectElement).not.toHaveBeenCalled()
     expect(closePopup).not.toHaveBeenCalled()
+    expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
   })
 
   it('opens the More menu with Subtitle, PDF, Exclude plus narrow-only duplicates', async () => {
@@ -458,14 +485,20 @@ describe('PopupHeader', () => {
     expect(select.attributes('disabled')).toBeDefined()
     expect(select.attributes('title')).toBe('This provider does not support page/element translation')
     expect(select.attributes('aria-label')).toBe('popup_select_element_alt_icon')
+    const revert = wrapper.find('.ti-btn-revert-badge')
     const icon = select.findComponent(MaskIcon)
     expect(icon.exists()).toBe(true)
     expect(icon.props('src')).toContain('select.png')
+    expect(icon.props('size')).toBe(22)
     expect(icon.attributes('aria-hidden')).toBe('true')
-    // Chevron stays MaskIcon.
-    const chevronIcon = wrapper.find('.ti-btn-select-chevron').findComponent(MaskIcon)
-    expect(chevronIcon.exists()).toBe(true)
-    expect(chevronIcon.props('src')).toContain('dropdown-arrow.svg')
+    // Revert badge stays independent of the disabled Select state and
+    // keeps its own smaller decorative MaskIcon.
+    expect(revert.attributes('disabled')).toBeUndefined()
+    const revertIcon = revert.findComponent(MaskIcon)
+    expect(revertIcon.exists()).toBe(true)
+    expect(revertIcon.props('src')).toContain('revert.png')
+    expect(revertIcon.props('size')).toBe(12)
+    expect(revertIcon.attributes('aria-hidden')).toBe('true')
   })
 
   it('launches Subtitle and PDF translators from the menu before closing Popup', async () => {
@@ -640,10 +673,9 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('.ti-btn-select-split-menu').exists()).toBe(false)
+    expect(wrapper.find('.ti-select-action').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-select').exists()).toBe(false)
-    expect(wrapper.find('.ti-btn-select-chevron').exists()).toBe(false)
-    expect(wrapper.find('.ti-btn-revert').exists()).toBe(false)
+    expect(wrapper.find('.ti-btn-revert-badge').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-capture').exists()).toBe(false)
     expect(wrapper.find('.ti-btn-mouse-hover').exists()).toBe(true)
     expect(wrapper.find('.ti-btn-sidepanel').exists()).toBe(true)
@@ -682,31 +714,24 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader, { props: { targetLanguage: 'fa', provider: 'google' } })
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('.ti-select-split .ti-btn-select').trigger('click')
+    await wrapper.find('.ti-select-action .ti-btn-select').trigger('click')
 
     expect(mockToggleSelectElement).toHaveBeenCalledWith({ targetLanguage: 'fa', provider: 'google' })
     expect(closePopup).toHaveBeenCalled()
   })
 
-  it('sends a revert request from the split-menu revert item', async () => {
+  it('sends a revert request from the Revert badge', async () => {
     mockSendMessage.mockResolvedValue({ success: true })
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
-    // Open the split menu via chevron, then click Revert.
-    await wrapper.find('.ti-btn-select-chevron').trigger('click')
-    await wrapper.vm.$nextTick()
-
-    const splitPanel = wrapper.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub')
-    expect(splitPanel.exists()).toBe(true)
-
-    await splitPanel.find('[role="menuitem"]').trigger('click')
+    // Revert is a direct badge button — click it, no menu involved.
+    await wrapper.find('.ti-select-action .ti-btn-revert-badge').trigger('click')
     await flushPromises()
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE
     }))
-    // Menu closes after the action.
-    expect(wrapper.find('.ti-btn-select-split-menu .toolbar-menu-panel-stub').exists()).toBe(false)
+    expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
   })
 })

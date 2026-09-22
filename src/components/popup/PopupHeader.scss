@@ -18,9 +18,9 @@
   gap: 4px !important;
 
   /* Action contract ownership boundary: every ordinary toolbar action
-     (More, Settings, Mouse Hover, Capture, Sidepanel, both Select split
-     halves) consumes these shared values. Declared on the toolbar root
-     so BOTH .ti-header-left (Page Translate) and .ti-header-actions
+     (More, Settings, Mouse Hover, Capture, Sidepanel, Select, and the
+     Revert badge) consumes these shared values. Declared on the toolbar
+     root so BOTH .ti-header-left (Page Translate) and .ti-header-actions
      inherit them. Header-local only — no new component/global tokens. */
   --ti-action-icon: var(--tab-button-color);
   --ti-action-icon-hover: var(--color-action-hover-accent);
@@ -134,62 +134,99 @@
   outline-offset: 1px;
 }
 
-/* Select Element split control: main button activates Select Element;
-   chevron button opens a ToolbarMenu with the Revert action. */
-.ti-header-actions > .ti-btn-select-split-menu {
-  display: flex;
-  align-items: center;
-  align-self: center;
-  line-height: 0;
-  margin-inline-start: 7px;
-}
-
-.ti-select-split {
-  display: flex;
-  align-items: center;
-  border-radius: 6px;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.ti-select-split .ti-btn-select,
-.ti-select-split .ti-btn-select-chevron {
-  margin: 0 !important;
-  border-radius: 0 !important;
+/* Select + Revert badge: Select is an ordinary 24×24 header button (shared
+   hit-target + hover rules above). The Revert badge's 24×24 native hit
+   target is absolutely anchored so its TOP-LEFT coincides with the visible
+   16×16 surface — hit box x13..37 × y13..37, surface x13..29 × y13..29
+   (relative to the container). The only Select overlap is the visible
+   badge itself; transparent slack (x29..37 × y13..37 plus x13..29 ×
+   y29..37) sits entirely outside Select's 0..24 × 0..24 box, so it never
+   steals clicks that visually belong to Select. The 13px overflow past
+   the container is absorbed by an 8px inline-end reservation + the 5px
+   actions gap, keeping the hit target clear of Sidepanel. Bottom sits
+   13px below the container, inside the header's ≥14px slack so it never
+   overflows into the popup body. Controls stay independent: no
+   parent-level :hover. */
+.ti-header-actions > .ti-select-action {
+  position: relative;
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
+  margin-inline-start: 7px;
+  /* Reserve the Revert hit target's overflow (13px) minus the 5px actions
+     gap so the 24×24 native target never overlaps the Sidepanel button. */
+  margin-inline-end: 8px;
+}
+
+/* Revert badge hit target: 24×24 transparent button anchored top-left on
+   the visible surface (right/bottom -13px each). No .ti-toolbar-button
+   class — it opts out of the shared sizing/hover/focus rules entirely. */
+.ti-header-actions .ti-select-action .ti-btn-revert-badge {
+  position: absolute;
+  right: -13px;
+  bottom: -13px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
   box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  color: var(--ti-action-icon);
+  cursor: pointer;
+  /* Native press only — no transform, so the badge never shifts under the cursor. */
 }
 
-.ti-select-split .ti-btn-select-chevron {
-  border-inline-start: 1px solid var(--header-border-color, transparent) !important;
+/* Own keyboard focus (the shared .ti-toolbar-button:focus-visible rule does
+   not apply — badge is not a .ti-toolbar-button). Outline, not border. */
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:focus-visible {
+  outline: 2px solid var(--color-primary, #1976d2);
+  outline-offset: 1px;
 }
 
-/* Split halves hover/activate through the ordinary action contract above —
-   no competing split-level :hover. Layout (joined pill, divider,
-   dimensions) is preserved; only the duplicate state rules are gone. */
-
-/* Joined hover: hovering anywhere on the split control (either half)
-   highlights both halves through the shared action contract. Plain parent
-   hover — no :has() needed. Values match the ordinary button hover, so the
-   two rules agree rather than compete. */
-.ti-select-split:hover .ti-btn-select,
-.ti-select-split:hover .ti-btn-select-chevron {
-  background-color: var(--ti-action-hover-bg) !important;
-  color: var(--ti-action-icon-hover) !important;
-  transform: translateY(-1px) !important;
+/* Visible badge surface: 16×16 opaque circle centered on Select's
+   lower-right corner (x13..29 × y13..29). Opaque background so Select's
+   hover paint underneath never tints it; border uses the theme-aware header
+   border token. Quiet default: glyph-only opacity (surface stays fully
+   opaque, independent of Select hover). */
+.ti-select-action .ti-btn-revert-badge .ti-revert-badge-surface {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--header-border-color, transparent);
+  border-radius: 50%;
+  background-color: var(--header-bg-color, #f8f9fa);
 }
 
-/* Active wins over hover: higher specificity than the joined hover rule
-   above, so an active Select control keeps its active background while
-   hovered. Background only — the hover icon color still applies. */
-.ti-select-split:hover .ti-toolbar-button.ti-active {
-  background-color: var(--ti-action-active-bg) !important;
+.ti-select-action .ti-btn-revert-badge .mask-icon {
+  opacity: 0.65;
 }
 
-.ti-select-split .ti-btn-select-chevron .ti-chevron-icon {
-  width: 12px !important;
-  height: 12px !important;
+/* Revert hover/focus (light/default): emphasis ONLY on this badge's surface
+   (and its glyph opacity). Opaque light-neutral hover surface keeps the 12px
+   glyph readable; accent border signals interaction; glyph color stays the
+   dark action-icon (badge stays secondary — no orange glyph on translucent
+   overlay). Select relies on the ordinary per-button hover — the two never
+   light up together. Badge button itself stays transparent.
+   Dark theme reasserts the current appearance in the @at-root block below. */
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:hover .ti-revert-badge-surface,
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:focus-visible .ti-revert-badge-surface {
+  background-color: var(--toolbar-link-hover-bg-color) !important;
+  border-color: var(--ti-action-icon-hover) !important;
+  color: var(--ti-action-icon) !important;
+}
+
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:hover .mask-icon,
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:focus-visible .mask-icon {
+  opacity: 1;
 }
 
 /* Optical icon centering: Settings, Mouse Hover, and Capture already align with
@@ -231,10 +268,9 @@
   }
 
 /* Popup menu panels: opaque surface so stacked content (e.g. the language
-   toolbar) is not visible through them. Scoped to the Popup menus only —
+   toolbar) is not visible through them. Scoped to the Popup More menu only —
    ToolbarMenu global defaults remain transparent for other consumers. */
-.ti-btn-more-menu,
-.ti-btn-select-split-menu {
+.ti-btn-more-menu {
   --tm-panel-background: var(--bg-color);
   --tm-panel-border: 1px solid var(--header-border-color);
 }
@@ -256,15 +292,21 @@
     --ti-action-hover-bg: #424242;
     --ti-action-active-bg: #555555;
 
-    .ti-select-split .ti-btn-select-chevron {
-      border-inline-start-color: rgba(255, 255, 255, 0.1) !important;
-    }
-
     /* Keep branded icons colorful */
     .ti-page-translate-btn img,
     .ti-page-translate-btn .ti-toolbar-icon {
       filter: none !important;
       opacity: 1 !important;
+    }
+
+    /* Revert badge hover/focus in dark: preserve the pre-contrast-fix
+       appearance (dark neutral hover surface + accent border/glyph). The
+       light rule above would otherwise paint the opaque light token here. */
+    .ti-select-action .ti-btn-revert-badge:hover .ti-revert-badge-surface,
+    .ti-select-action .ti-btn-revert-badge:focus-visible .ti-revert-badge-surface {
+      background-color: var(--ti-action-hover-bg) !important;
+      border-color: var(--ti-action-icon-hover) !important;
+      color: var(--ti-action-icon-hover) !important;
     }
 
     /* More menu items: on the dark panel surface the light-only black

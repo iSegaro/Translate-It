@@ -162,69 +162,48 @@
         @click="handleScreenCapture"
       />
 
-      <!-- 6. Select Element split control: main activates Select Element;
-           chevron opens a menu containing the Revert action. -->
-      <ToolbarMenu
+      <!-- 6. Select Element action + Revert badge: Select is an ordinary
+           header button; a small circular Revert badge is absolutely
+           anchored over its lower-right corner (no shared hover — each
+           control keeps its own emphasis). -->
+      <div
         v-if="isSelectElementEnabled"
-        placement="end"
-        force-popover
-        class="ti-btn-select-split-menu"
+        class="ti-select-action"
       >
-        <template #trigger="{ triggerAttrs, triggerRef, toggle }">
-          <div class="ti-select-split">
-            <button
-              type="button"
-              class="ti-toolbar-button ti-btn-select"
-              :class="{ 'ti-active': isSelectModeActive }"
-              :title="selectElementTitle"
-              :aria-label="t('popup_select_element_alt_icon') || 'Select Element'"
-              :disabled="!isSelectElementSupported"
-              :aria-pressed="isSelectModeActive"
-              @click="handleSelectElement"
-            >
-              <MaskIcon
-                :src="menuIcon('select.png')"
-                :size="22"
-                class="ti-toolbar-icon"
-              />
-            </button>
-            <button
-              type="button"
-              class="ti-toolbar-button ti-btn-select-chevron"
-              :class="{ 'ti-active': isSelectModeActive }"
-              :title="t('popup_select_element_options_title', 'Select Element options')"
-              v-bind="triggerAttrs"
-              :ref="(el) => triggerRef(el)"
-              :aria-label="t('popup_select_element_options_title', 'Select Element options')"
-              @click="toggle"
-            >
-              <MaskIcon
-                :src="menuIcon('dropdown-arrow.svg')"
-                :size="12"
-                class="ti-toolbar-icon ti-chevron-icon"
-              />
-            </button>
-          </div>
-        </template>
-        <template #default="{ close }">
-          <button
-            type="button"
-            role="menuitem"
-            class="ti-header-menu-item"
-            :title="t(
-              'popup_revert_title_icon',
-              'Revert'
-            )"
-            @click="close(); handleRevert()"
+        <button
+          type="button"
+          class="ti-toolbar-button ti-btn-select"
+          :class="{ 'ti-active': isSelectModeActive }"
+          :title="selectElementTitle"
+          :aria-label="t('popup_select_element_alt_icon') || 'Select Element'"
+          :disabled="!isSelectElementSupported"
+          :aria-pressed="isSelectModeActive"
+          @click="handleSelectElement"
+        >
+          <MaskIcon
+            :src="menuIcon('select.png')"
+            :size="22"
+            class="ti-toolbar-icon"
+          />
+        </button>
+        <button
+          type="button"
+          class="ti-btn-revert-badge"
+          :title="t('popup_revert_title_icon', 'Revert')"
+          :aria-label="t('popup_revert_alt_icon', 'Revert')"
+          @click="handleRevert"
+        >
+          <span
+            class="ti-revert-badge-surface"
+            aria-hidden="true"
           >
             <MaskIcon
               :src="menuIcon('revert.png')"
-              :size="18"
+              :size="12"
             />
-            <span>{{ t('popup_revert_alt_icon', 'Revert') }}</span>
-          </button>
-        </template>
-      </ToolbarMenu>
+          </span>
+        </button>
+      </div>
 
       <!-- 8. Open Sidepanel (rightmost; native listener attached on mount; More duplicate for narrow widths) -->
       <IconButton
