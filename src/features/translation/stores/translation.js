@@ -122,8 +122,8 @@ export const useTranslationStore = defineStore('translation', () => {
 
   const setProvider = async (provider) => {
     // This store is currently not directly setting providers.
-    // Provider selection is handled by useApiProvider composable.
-    logger.warn("TranslationStore: setProvider is a placeholder. Use useApiProvider for provider selection.");
+    // Provider selection is handled outside this store.
+    logger.warn("TranslationStore: setProvider is a placeholder; provider selection is handled outside this store.");
     selectedProvider.value = provider; // Still update local state
   }
 
