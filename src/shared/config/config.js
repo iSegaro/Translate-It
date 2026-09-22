@@ -106,6 +106,7 @@ export const CONFIG = {
   TRANSLATION_API: isFirefox ? ProviderRegistryIds.YANDEX : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
 
   // --- Live Dubbing Settings ---
+  POPUP_ACTIVE_VIEW: 'translate',
   LIVE_DUBBING_PROVIDER: LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_ORIGINAL_VOLUME: 0,
   LIVE_DUBBING_DUBBED_VOLUME: 1,

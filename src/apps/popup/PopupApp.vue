@@ -42,8 +42,9 @@
           >
             <PopupViewSwitcher
               v-if="isLiveDubbingSupported"
-              v-model="activeView"
+              :model-value="activeView"
               :show-live-dubbing="isLiveDubbingSupported"
+              @update:model-value="handleActiveViewChange"
             />
           </PopupHeader>
         </div>
@@ -170,14 +171,37 @@ const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
 const isLiveDubbingBusy = ref(false)
-// Active popup view: 'translate' (default) or 'live-dubbing'. Local UI state only.
+// Active popup view: 'translate' (default) or 'live-dubbing'.
 const activeView = ref('translate')
+let activeViewPersistenceTail = Promise.resolve()
 const isLiveDubbingSupported = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'chrome'
 const liveDubbingProvider = computed(() => (
   ['gemini', 'openai'].includes(settingsStore.settings?.LIVE_DUBBING_PROVIDER)
     ? settingsStore.settings.LIVE_DUBBING_PROVIDER
     : 'gemini'
 ))
+
+const isValidActiveView = (value) => value === 'translate'
+  || (value === 'live-dubbing' && isLiveDubbingSupported)
+
+const restoreActiveView = () => {
+  const persistedView = settingsStore.settings?.POPUP_ACTIVE_VIEW
+  activeView.value = isValidActiveView(persistedView) ? persistedView : 'translate'
+}
+
+const persistActiveView = (value) => {
+  activeViewPersistenceTail = activeViewPersistenceTail
+    .then(() => settingsStore.updateSettingAndPersist('POPUP_ACTIVE_VIEW', value))
+    .catch((error) => logger.warn('[PopupApp] Failed to persist active view:', error))
+}
+
+/** Apply supported switcher changes immediately and persist them opportunistically. */
+const handleActiveViewChange = (value) => {
+  if (!isValidActiveView(value) || activeView.value === value) return
+
+  activeView.value = value
+  persistActiveView(value)
+}
 
 // Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {
@@ -269,6 +293,9 @@ const initialize = async () => {
         tracker.trackTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
+
+    // Restore only after settings have loaded so the initial rendered view never flickers.
+    restoreActiveView()
 
     // Step 3: Apply global font variables
     applyGlobalCSSVariables()

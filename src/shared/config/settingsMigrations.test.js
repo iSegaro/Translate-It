@@ -82,6 +82,40 @@ describe('Settings Migrations', () => {
     expect(second.updates.LIVE_DUBBING_PROVIDER).toBeUndefined();
   });
 
+  it('should add the missing popup active view through canonical defaults', async () => {
+    const { updates, logs } = await runSettingsMigrations({});
+
+    expect(updates.POPUP_ACTIVE_VIEW).toBe('translate');
+    expect(logs).toContain('Added missing setting: POPUP_ACTIVE_VIEW');
+    expect(logs).not.toContain('Normalized POPUP_ACTIVE_VIEW to translate');
+  });
+
+  it.each(['translate', 'live-dubbing'])('should preserve valid popup active view %s', async (view) => {
+    const { updates } = await runSettingsMigrations({ POPUP_ACTIVE_VIEW: view });
+
+    expect(updates.POPUP_ACTIVE_VIEW).toBeUndefined();
+  });
+
+  it.each(['', 'unknown-view', null, undefined, {}, 42])(
+    'should normalize invalid popup active view %o to translate',
+    async (view) => {
+      const { updates, logs } = await runSettingsMigrations({ POPUP_ACTIVE_VIEW: view });
+
+      expect(updates.POPUP_ACTIVE_VIEW).toBe('translate');
+      expect(logs).toContain('Normalized POPUP_ACTIVE_VIEW to translate');
+    }
+  );
+
+  it('should make popup active view normalization idempotent', async () => {
+    const first = await runSettingsMigrations({ POPUP_ACTIVE_VIEW: 'unknown-view' });
+    const second = await runSettingsMigrations({
+      POPUP_ACTIVE_VIEW: first.updates.POPUP_ACTIVE_VIEW
+    });
+
+    expect(first.updates.POPUP_ACTIVE_VIEW).toBe('translate');
+    expect(second.updates.POPUP_ACTIVE_VIEW).toBeUndefined();
+  });
+
   it('should add missing Live Dubbing volume preferences from canonical defaults', async () => {
     const { updates, logs } = await runSettingsMigrations({});
 

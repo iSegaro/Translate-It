@@ -85,6 +85,18 @@ function normalizeLiveDubbingProvider(currentSettings, updates, migrationLog) {
 }
 
 /**
+ * Normalize the persisted popup view to one of the supported views.
+ * Missing values are filled by the canonical persisted-default pass below.
+ */
+function normalizePopupActiveView(currentSettings, updates, migrationLog) {
+  if (!Object.prototype.hasOwnProperty.call(currentSettings, 'POPUP_ACTIVE_VIEW')) return;
+  if (['translate', 'live-dubbing'].includes(currentSettings.POPUP_ACTIVE_VIEW)) return;
+
+  updates.POPUP_ACTIVE_VIEW = 'translate';
+  migrationLog.push('Normalized POPUP_ACTIVE_VIEW to translate');
+}
+
+/**
  * Normalize explicitly stored Live Dubbing volume preferences. Malformed
  * values fall back to their persisted defaults (Original 0, Dubbed 1)
  * without affecting unrelated settings. Missing values are filled by the
@@ -277,6 +289,10 @@ function runMainMigration(currentSettings) {
   // Normalize only an explicitly stored invalid provider. Missing values are
   // handled by the generic persisted-default migration below.
   normalizeLiveDubbingProvider(currentSettings, updates, migrationLog);
+
+  // Normalize explicitly stored invalid popup views; missing values are filled
+  // by the generic persisted-default migration below.
+  normalizePopupActiveView(currentSettings, updates, migrationLog);
 
   // Normalize explicitly stored invalid volume preferences; missing values
   // are filled by the generic persisted-default migration below.

@@ -8,6 +8,12 @@ let mockUnifiedTranslation
 let mockLanguageDefaults
 const useUnifiedTranslationMock = vi.hoisted(() => vi.fn())
 const liveDubbingViewLifecycle = vi.hoisted(() => ({ mounts: 0, unmounts: 0, stopCalls: 0 }))
+const popupLogger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn()
+}))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => mockSettingsStore
@@ -163,15 +169,19 @@ vi.mock('webextension-polyfill', () => ({
 }))
 
 vi.mock('@/shared/logging/logger.js', () => ({
-  getScopedLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn()
-  })
+  getScopedLogger: () => popupLogger
 }))
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
+const deferred = () => {
+  let resolve
+  let reject
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve
+    reject = promiseReject
+  })
+  return { promise, resolve, reject }
+}
 
 describe('PopupApp', () => {
   beforeEach(() => {
@@ -189,6 +199,10 @@ describe('PopupApp', () => {
       lastTranslation: ref({ source: 'hello' })
     }
     useUnifiedTranslationMock.mockClear()
+    popupLogger.debug.mockClear()
+    popupLogger.info.mockClear()
+    popupLogger.warn.mockClear()
+    popupLogger.error.mockClear()
 
     mockLanguageDefaults = {
       savedSourceLanguage: ref('fr'),
@@ -206,6 +220,7 @@ describe('PopupApp', () => {
         THEME: 'auto'
       },
       loadSettings: vi.fn().mockResolvedValue(undefined),
+      updateSettingAndPersist: vi.fn().mockResolvedValue(undefined),
       isInitialized: true
     }
   })
@@ -273,6 +288,176 @@ describe('PopupApp', () => {
     expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
     expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(false)
     expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(true)
+  })
+
+  it('restores a persisted live dubbing view after settings load', async () => {
+    mockSettingsStore.settings.POPUP_ACTIVE_VIEW = 'live-dubbing'
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).props('modelValue'))
+      .toBe('live-dubbing')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+  })
+
+  it('normalizes an invalid persisted view to translate', async () => {
+    mockSettingsStore.settings.POPUP_ACTIVE_VIEW = 'invalid-view'
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).props('modelValue'))
+      .toBe('translate')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+  })
+
+  it('falls back to translate when persisted live dubbing is unsupported', async () => {
+    vi.stubGlobal('__BROWSER__', 'firefox')
+    mockSettingsStore.settings.POPUP_ACTIVE_VIEW = 'live-dubbing'
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+  })
+
+  it('renders only after settings resolve so restoring the view does not flicker', async () => {
+    let resolveSettings
+    mockSettingsStore.settings.POPUP_ACTIVE_VIEW = 'live-dubbing'
+    mockSettingsStore.loadSettings = vi.fn(() => new Promise((resolve) => {
+      resolveSettings = resolve
+    }))
+    const wrapper = mount(PopupApp)
+
+    await flushPromises()
+    expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(false)
+    expect(wrapper.find('.loading-container').exists()).toBe(true)
+
+    resolveSettings()
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+  })
+
+  it('updates the active view immediately and persists the supported switch', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    await flushPromises()
+    expect(mockSettingsStore.updateSettingAndPersist)
+      .toHaveBeenCalledWith('POPUP_ACTIVE_VIEW', 'live-dubbing')
+  })
+
+  it('skips duplicate and invalid active-view updates', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+    const switcher = wrapper.findComponent({ name: 'PopupViewSwitcher' })
+
+    switcher.vm.$emit('update:modelValue', 'translate')
+    switcher.vm.$emit('update:modelValue', 'invalid-view')
+    switcher.vm.$emit('update:modelValue', 'live-dubbing')
+    switcher.vm.$emit('update:modelValue', 'live-dubbing')
+    await flushPromises()
+
+    expect(mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledTimes(1)
+    expect(mockSettingsStore.updateSettingAndPersist)
+      .toHaveBeenCalledWith('POPUP_ACTIVE_VIEW', 'live-dubbing')
+  })
+
+  it('keeps the immediate view when active-view persistence fails', async () => {
+    mockSettingsStore.updateSettingAndPersist = vi.fn().mockRejectedValue(new Error('storage failed'))
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+
+    await flushPromises()
+    expect(popupLogger.warn).toHaveBeenCalledWith(
+      '[PopupApp] Failed to persist active view:',
+      expect.any(Error)
+    )
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+  })
+
+  it('serializes rapid active-view writes in selection order', async () => {
+    const writes = []
+    mockSettingsStore.updateSettingAndPersist = vi.fn((key, value) => {
+      const pending = deferred()
+      writes.push({ key, value, ...pending })
+      return pending.promise
+    })
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await flushPromises()
+    expect(writes.map(({ value }) => value)).toEqual(['live-dubbing'])
+
+    await wrapper.find('.switch-to-translate').trigger('click')
+    await flushPromises()
+    expect(writes.map(({ value }) => value)).toEqual(['live-dubbing'])
+
+    writes[0].resolve()
+    await flushPromises()
+    expect(writes.map(({ value }) => value)).toEqual(['live-dubbing', 'translate'])
+
+    writes[1].resolve()
+    await flushPromises()
+    expect(mockSettingsStore.updateSettingAndPersist).toHaveBeenNthCalledWith(
+      1,
+      'POPUP_ACTIVE_VIEW',
+      'live-dubbing'
+    )
+    expect(mockSettingsStore.updateSettingAndPersist).toHaveBeenLastCalledWith(
+      'POPUP_ACTIVE_VIEW',
+      'translate'
+    )
+  })
+
+  it('logs an earlier write failure and continues with later active-view writes', async () => {
+    const writes = []
+    mockSettingsStore.updateSettingAndPersist = vi.fn((key, value) => {
+      const pending = deferred()
+      writes.push({ key, value, ...pending })
+      return pending.promise
+    })
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await flushPromises()
+    await wrapper.find('.switch-to-translate').trigger('click')
+    await flushPromises()
+    expect(writes).toHaveLength(1)
+
+    writes[0].reject(new Error('storage failed'))
+    await flushPromises()
+    expect(writes.map(({ value }) => value)).toEqual(['live-dubbing', 'translate'])
+
+    writes[1].resolve()
+    await flushPromises()
+    expect(popupLogger.warn).toHaveBeenCalledWith(
+      '[PopupApp] Failed to persist active view:',
+      expect.any(Error)
+    )
+    expect(mockSettingsStore.updateSettingAndPersist).toHaveBeenLastCalledWith(
+      'POPUP_ACTIVE_VIEW',
+      'translate'
+    )
   })
 
   it('passes the last translation keyword to TranslationView', async () => {
