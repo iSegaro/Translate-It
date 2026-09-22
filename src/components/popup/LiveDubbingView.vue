@@ -49,7 +49,10 @@
     />
 
     <!-- Session: start/stop, status feedback and volumes (owned by the control) -->
-    <section class="live-dubbing-card live-dubbing-session-card">
+    <section
+      v-show="showSessionControl"
+      class="live-dubbing-card live-dubbing-session-card"
+    >
       <LiveDubbingControl
         :key="controlKey"
         :target-language="targetLanguage"
@@ -160,6 +163,9 @@ const needsSetup = computed(() => {
   }
   return !hasKeyMaterial(settings.GEMINI_API_KEY) && !hasKeyMaterial(settings.API_KEY)
 })
+
+/** Keep an active session visible even if its credentials disappear externally. */
+const showSessionControl = computed(() => isControlBusy.value || !needsSetup.value)
 
 /** Track control busy state locally, then keep the parent in sync unchanged. */
 const handleBusyChange = (busy) => {

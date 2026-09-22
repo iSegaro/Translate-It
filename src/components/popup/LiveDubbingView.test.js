@@ -236,6 +236,58 @@ describe('LiveDubbingView', () => {
     expect(setup().exists()).toBe(true)
   })
 
+  it('hides the session card while keeping the control mounted when setup is needed', () => {
+    harness.store = makeStore({ OPENAI_API_KEY: 'openai-configured-key' })
+    const wrapper = mountView({ providerId: 'gemini' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style')).toContain('display: none')
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+  })
+
+  it('shows the session card when the hidden control becomes busy', async () => {
+    harness.store = makeStore({ OPENAI_API_KEY: 'openai-configured-key' })
+    const wrapper = mountView({ providerId: 'gemini' })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style')).toContain('display: none')
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style') || '')
+      .not.toContain('display: none')
+  })
+
+  it('keeps the session control visible for a configured provider', () => {
+    const wrapper = mountView({ providerId: 'openai' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(false)
+    expect(wrapper.find('.live-dubbing-session-card').exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style') || '')
+      .not.toContain('display: none')
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+  })
+
+  it('shows the session control immediately after successful setup', async () => {
+    harness.store = makeStore()
+    const wrapper = mountView({ providerId: 'gemini' })
+    const setup = wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style')).toContain('display: none')
+
+    await setup.vm.$emit('saved')
+    harness.store.settings.GEMINI_API_KEY = 'freshly-saved-key'
+    await nextTick()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style') || '')
+      .not.toContain('display: none')
+  })
+
   it('treats the legacy API_KEY store as configured for Gemini', async () => {
     harness.store = makeStore({ API_KEY: 'legacy-gemini-key' })
     const wrapper = mountView({ providerId: 'gemini' })
@@ -376,6 +428,7 @@ describe('LiveDubbingView', () => {
     await setup().vm.$emit('save-pending', false)
     await nextTick()
     expect(setup().exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
   })
 
   it('keeps the setup card visible when a failed save restores the previous value', async () => {
@@ -443,11 +496,18 @@ describe('LiveDubbingView', () => {
   })
 
   it('leaves a fresh control behind after successful credential setup', async () => {
-    harness.store = makeStore()
+    harness.store = makeStore({ GEMINI_API_KEY: 'existing-key' })
     const wrapper = mountView({ providerId: 'gemini' })
     const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
     const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
     const before = control().vm
+
+    // Re-enter setup while idle, then complete it successfully.
+    harness.store.settings.GEMINI_API_KEY = ''
+    await nextTick()
+    expect(setup().exists()).toBe(true)
+    expect(control().exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style')).toContain('display: none')
 
     // Save success while idle freshens the control; the persisted credential
     // then hides the setup card — no popup reopen required.
@@ -460,13 +520,17 @@ describe('LiveDubbingView', () => {
   })
 
   it('does not remount the control for a save that completes while busy', async () => {
-    harness.store = makeStore()
+    harness.store = makeStore({ GEMINI_API_KEY: 'existing-key' })
     const wrapper = mountView({ providerId: 'gemini' })
     const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
 
     control().vm.$emit('busy-change', true)
     await nextTick()
     const busyInstance = control().vm
+
+    harness.store.settings.GEMINI_API_KEY = ''
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(true)
 
     await wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).vm.$emit('saved')
     await nextTick()
