@@ -132,7 +132,7 @@ vi.mock('@/components/base/ToolbarMenu/ToolbarMenu.vue', () => ({
     },
     template: `
       <div class="toolbar-menu-stub">
-        <slot name="trigger" :trigger-attrs="{}" :trigger-ref="noopRef" :on-toggle="toggle" :toggle="toggle" :close="close" :open="open" />
+        <slot name="trigger" :trigger-attrs="{ 'aria-expanded': open, 'aria-haspopup': 'menu' }" :trigger-ref="noopRef" :on-toggle="toggle" :toggle="toggle" :close="close" :open="open" />
         <div v-if="open" class="toolbar-menu-panel-stub"><slot :close="close" :is-open="open" /></div>
       </div>
     `
@@ -551,10 +551,16 @@ describe('PopupHeader', () => {
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
+    // The site action is the FINAL menu item (after the responsive duplicates).
     let panel = await openMoreMenu(wrapper)
-    expect(panel.findAll('[role="menuitem"]')[2].text()).toContain('Disable on this site')
+    let items = panel.findAll('[role="menuitem"]')
+    const siteItem = () => items[items.length - 1]
+    expect(siteItem().text()).toContain('Disable on this site')
+    // Enabled: decorative indicator present but not in the excluded state.
+    expect(siteItem().find('.ti-header-menu-site-indicator').exists()).toBe(true)
+    expect(siteItem().find('.ti-header-menu-site-indicator.is-excluded').exists()).toBe(false)
 
-    await panel.findAll('[role="menuitem"]')[2].trigger('click')
+    await siteItem().trigger('click')
     await flushPromises()
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({
       action: MessageActions.Set_Exclude_Current_Page,
@@ -562,10 +568,13 @@ describe('PopupHeader', () => {
     }))
     expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
 
-    // Server confirmed excluded: label flips to Enable with a checkmark.
+    // Server confirmed excluded: label flips to Enable; the CSS indicator
+    // (not a unicode glyph) reflects the excluded state.
     panel = await openMoreMenu(wrapper)
-    expect(panel.findAll('[role="menuitem"]')[2].text()).toContain('Enable on this site')
-    expect(panel.findAll('[role="menuitem"]')[2].text()).toContain('✓')
+    items = panel.findAll('[role="menuitem"]')
+    expect(siteItem().text()).toContain('Enable on this site')
+    expect(siteItem().text()).not.toContain('✓')
+    expect(siteItem().find('.ti-header-menu-site-indicator.is-excluded').exists()).toBe(true)
   })
 
   it('keeps the site toggle unchanged when the server reports failure', async () => {
@@ -579,12 +588,14 @@ describe('PopupHeader', () => {
     await wrapper.vm.$nextTick()
 
     const panel = await openMoreMenu(wrapper)
-    await panel.findAll('[role="menuitem"]')[2].trigger('click')
+    const items = panel.findAll('[role="menuitem"]')
+    await items[items.length - 1].trigger('click')
     await flushPromises()
 
     const reopened = await openMoreMenu(wrapper)
     // No optimistic flip: still enabled, still offering Disable.
-    expect(reopened.findAll('[role="menuitem"]')[2].text()).toContain('Disable on this site')
+    const reopenedItems = reopened.findAll('[role="menuitem"]')
+    expect(reopenedItems[reopenedItems.length - 1].text()).toContain('Disable on this site')
   })
 
   it('routes narrow-duplicate menu actions to the same handlers and closes the menu', async () => {
@@ -742,5 +753,88 @@ describe('PopupHeader', () => {
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE
     }))
     expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
+  })
+
+  // ── More menu modernization ─────────────────────────────────────────
+
+  it('orders the menu: Subtitle, PDF, responsive duplicates, then the site action last', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const panel = await openMoreMenu(wrapper)
+    const items = panel.findAll('[role="menuitem"]')
+    expect(items).toHaveLength(6)
+
+    // 1-2: branded launchers unchanged (first two positions, same assets).
+    expect(items[0].find('img').attributes('src')).toContain('subtitle.png')
+    expect(items[1].find('img').attributes('src')).toContain('pdf.png')
+
+    // 3-5: responsive-only duplicates keep their existing classes
+    // (conditions themselves covered by the dedicated tests above).
+    expect(items[2].classes()).toContain('ti-header-menu-item--very-narrow-only')
+    expect(items[3].classes()).toContain('ti-header-menu-item--narrow-only')
+    expect(items[4].classes()).toContain('ti-header-menu-item--narrow-only')
+    expect(items[4].findComponent(MaskIcon).props('src')).toContain('side-panel.png')
+
+    // 6: site action is the FINAL menu action and never breakpoint-gated —
+    // final at every viewport width.
+    expect(items[5].text()).toContain('Disable on this site')
+    expect(items[5].classes()).not.toContain('ti-header-menu-item--narrow-only')
+    expect(items[5].classes()).not.toContain('ti-header-menu-item--very-narrow-only')
+  })
+
+  it('renders a separator immediately before the final site action', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const panel = await openMoreMenu(wrapper)
+    const separator = panel.find('.ti-header-menu-separator')
+    expect(separator.exists()).toBe(true)
+    expect(separator.attributes('role')).toBe('separator')
+
+    const items = panel.findAll('[role="menuitem"]')
+    // Immediately after the last responsive duplicate (sidepanel)…
+    expect(separator.element.previousElementSibling).toBe(items[4].element)
+    // …and immediately before the site action.
+    expect(separator.element.nextElementSibling).toBe(items[5].element)
+    expect(items[5].text()).toContain('Disable on this site')
+  })
+
+  it('replaces the Unicode checkbox with a decorative, non-interactive CSS indicator', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const panel = await openMoreMenu(wrapper)
+
+    // Old Unicode checkbox/checkmark is gone from the rendered menu.
+    expect(panel.text()).not.toContain('☐')
+    expect(panel.text()).not.toContain('✓')
+
+    const indicator = panel.find('.ti-header-menu-site-indicator')
+    expect(indicator.exists()).toBe(true)
+    // Decorative only: hidden from AT, a bare span, never focusable —
+    // no interaction lives on the indicator itself.
+    expect(indicator.attributes('aria-hidden')).toBe('true')
+    expect(indicator.element.tagName).toBe('SPAN')
+    expect(indicator.attributes('tabindex')).toBeUndefined()
+    expect(['BUTTON', 'INPUT', 'A']).not.toContain(indicator.element.tagName)
+    // Enabled (default): indicator is NOT in the excluded state.
+    expect(indicator.classes()).not.toContain('is-excluded')
+    // State class is bound to !isExtensionEnabled (covered flipping to
+    // .is-excluded in the server-confirmed toggle test above).
+    expect(indicator.classes()).toContain('ti-header-menu-site-indicator')
+  })
+
+  it('binds the open state onto the More trigger via aria-expanded (no component state)', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    const more = wrapper.find('.ti-btn-more')
+    expect(more.attributes('aria-expanded')).toBe('false')
+    expect(more.attributes('aria-haspopup')).toBe('menu')
+
+    await more.trigger('click')
+    expect(more.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(true)
   })
 })

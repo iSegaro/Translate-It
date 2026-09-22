@@ -22,8 +22,10 @@
         Visual right-to-left reading becomes:
         Sidepanel → Select → Revert? → OCR → Mouse Hover → Settings → More -->
 
-      <!-- 2. More menu: Subtitle, PDF, Exclude always visible; Mouse Hover,
-      Screen Capture, Sidepanel as narrow-only duplicates (see SCSS) -->
+      <!-- 2. More menu: Subtitle, PDF always visible; Mouse Hover,
+      Screen Capture, Sidepanel as narrow-only duplicates (see SCSS);
+      then a separator and the site-scope action as the FINAL item at
+      every viewport width. -->
       <ToolbarMenu
         placement="end"
         force-popover
@@ -69,18 +71,6 @@
             >
             <span>{{ t('pdf_app_title') || 'PDF' }}</span>
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            class="ti-header-menu-item"
-            @click="close(); handleExcludeToggle()"
-          >
-            <span
-              class="ti-header-menu-check"
-              aria-hidden="true"
-            >{{ isExtensionEnabled ? '☐' : '✓' }}</span>
-            <span>{{ isExtensionEnabled ? (t('popup_exclude_disable_label', 'Disable on this site')) : (t('popup_exclude_enable_label', 'Enable on this site')) }}</span>
-          </button>
           <!-- Narrow-width duplicates: hidden at normal widths via
           ti-header-menu-item--narrow-only / --very-narrow-only (see
           PopupHeader.scss breakpoint ownership). They keep Mouse Hover,
@@ -124,6 +114,31 @@
               :size="18"
             />
             <span>{{ t('popup_open_side_panel_title') || 'باز کردن در پنل کناری' }}</span>
+          </button>
+          <!-- Grouping: feature actions above, site-scope action below.
+          Sits AFTER the responsive duplicates so the site action is the
+          final menu action (and this divider its immediate predecessor)
+          at every viewport width. -->
+          <div
+            class="ti-header-menu-separator"
+            role="separator"
+          />
+          <button
+            type="button"
+            role="menuitem"
+            class="ti-header-menu-item"
+            @click="close(); handleExcludeToggle()"
+          >
+            <!-- Decorative exclusion-state indicator (CSS-driven, no
+            glyph/asset, non-interactive). Reads CURRENT state: neutral
+            outline while the site is enabled, accent fill + CSS check
+            while excluded. The label below always describes the ACTION. -->
+            <span
+              class="ti-header-menu-site-indicator"
+              :class="{ 'is-excluded': !isExtensionEnabled }"
+              aria-hidden="true"
+            />
+            <span>{{ isExtensionEnabled ? (t('popup_exclude_disable_label', 'Disable on this site')) : (t('popup_exclude_enable_label', 'Enable on this site')) }}</span>
           </button>
         </template>
       </ToolbarMenu>

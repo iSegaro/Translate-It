@@ -267,12 +267,35 @@
     }
   }
 
+/* More trigger open state: driven purely by the aria-expanded attribute
+   ToolbarMenu already binds on the trigger — no component state, no extra
+   class. Active surface + accent glyph mirror the header's pressed action
+   contract; !important beats the shared hover/base background rules. */
+.ti-btn-more[aria-expanded="true"] {
+    background-color: var(--ti-action-active-bg) !important;
+    color: var(--ti-action-icon-hover) !important;
+  }
+
 /* Popup menu panels: opaque surface so stacked content (e.g. the language
-   toolbar) is not visible through them. Scoped to the Popup More menu only —
-   ToolbarMenu global defaults remain transparent for other consumers. */
-.ti-btn-more-menu {
+   toolbar) is not visible through them, plus compact action-menu polish
+   (radius, soft two-layer shadow, 6px internal padding). Scoped to the
+   Popup More menu only — ToolbarMenu global defaults stay transparent and
+   unpadded for other consumers (PDF toolbar etc.). The .ti-header-actions
+   prefix lifts specificity to (0,3,0) so these custom properties beat
+   ToolbarMenu's scoped .toolbar-menu[data-v] (0,2,0) declared on the same
+   root element regardless of style-block order. NO width here: viewport /
+   max-inline-size stays owned by ToolbarMenu so translated labels never
+   overflow. */
+.ti-header-actions .ti-btn-more-menu {
   --tm-panel-background: var(--bg-color);
   --tm-panel-border: 1px solid var(--header-border-color);
+  --tm-panel-radius: 11px;
+  --tm-panel-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+
+  /* Compact internal padding for this panel only. */
+  .toolbar-menu__panel {
+    padding: 6px;
+  }
 }
 
   /* Specific Dark Mode overrides.
@@ -367,21 +390,27 @@
   }
 }
 
-/* More menu items */
+/* More menu items: compact action rows — 36px min-height band, 10px
+   horizontal padding/gap, 8px pill radius. Subtle bg/color transition on
+   hover; focus-visible keeps its separate blue ring; nowrap survives
+   translated labels (panel max-inline-size handles overflow, not wrapping). */
 .ti-header-menu-item {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+  gap: 10px !important;
   width: 100% !important;
-  padding: 8px 12px !important;
+  min-height: 36px !important;
+  box-sizing: border-box !important;
+  padding: 0 10px !important;
   background: transparent !important;
   border: none !important;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   cursor: pointer !important;
   font-size: 13px !important;
   color: var(--color-text) !important;
   text-align: start !important;
   white-space: nowrap !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
 
   &:hover {
     background-color: rgba(0, 0, 0, 0.06) !important;
@@ -408,11 +437,51 @@
   }
 }
 
-.ti-header-menu-check {
+/* Grouping divider between the feature actions and the final site-scope
+   action. Always rendered immediately before the site action (responsive
+   duplicates sit ABOVE it in the DOM, so it stays adjacent at every
+   viewport width). Subtle theme-border token, no hardcoded gray. */
+.ti-header-menu-separator {
+  height: 1px !important;
+  margin: 4px 2px !important;
+  background-color: var(--header-border-color, #ced4da) !important;
+  border: none !important;
+}
+
+/* Site-exclusion status control: decorative, CSS-only — no unicode
+   checkbox/checkmark, no image asset, no interaction (plain span,
+   aria-hidden). Reads the CURRENT state: neutral outline while the site
+   is enabled (unchecked); accent fill + border-drawn check while excluded
+   (checked). The button label keeps describing the ACTION. */
+.ti-header-menu-site-indicator {
+  position: relative !important;
+  display: inline-block !important;
   width: 18px !important;
+  height: 18px !important;
   flex-shrink: 0 !important;
-  text-align: center !important;
-  font-weight: 700 !important;
+  box-sizing: border-box !important;
+  border: 1.5px solid var(--color-text-secondary) !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+
+  &.is-excluded {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+
+    /* Check mark: two CSS borders rotated 45° — glyph drawn, not typed. */
+    &::after {
+      content: '' !important;
+      position: absolute !important;
+      left: 5.5px !important;
+      top: 2px !important;
+      width: 4px !important;
+      height: 9px !important;
+      border: solid #fff !important;
+      border-width: 0 2px 2px 0 !important;
+      transform: rotate(45deg) !important;
+    }
+  }
 }
 
 // PageTranslationButton link

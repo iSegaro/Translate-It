@@ -802,3 +802,170 @@ describe('PopupHeader.scss dark Page Translate icon exemption', () => {
     )
   })
 })
+
+/**
+ * More menu modernization: compact action menu owned entirely by
+ * PopupHeader.scss. ToolbarMenu shared defaults must stay untouched so
+ * other consumers (PDF toolbar, etc.) regress nowhere.
+ */
+describe('PopupHeader.scss More menu modernization', () => {
+  const source = readFileSync(scssPath, 'utf8')
+  // Strip /* ... */ before structural assertions: comment prose must
+  // never leak into captures (documented regression pattern).
+  const bare = source.replace(/\/\*[\s\S]*?\*\//g, '')
+  const { css } = sass.compile(scssPath, { importers: scssImporters })
+  const toolbarMenuScss = readFileSync(
+    resolve(srcDir, 'components/base/ToolbarMenu/ToolbarMenu.scss'),
+    'utf8'
+  )
+
+  it('scopes the panel polish to the Popup More menu boundary', () => {
+    // PopupHeader-owned override lives under the .ti-btn-more-menu boundary
+    // (with .ti-header-actions so custom properties beat ToolbarMenu's
+    // scoped defaults on the same root element — see the SCSS comment).
+    const panelBlock = bare.match(/\.ti-header-actions\s+\.ti-btn-more-menu\s*\{([^}]*)/)
+    expect(panelBlock).toBeTruthy()
+    expect(panelBlock[1]).toContain('--tm-panel-background')
+    expect(panelBlock[1]).toContain('--tm-panel-border')
+    // Panel padding declared only under that boundary…
+    expect(panelBlock[1]).toMatch(/\.toolbar-menu__panel\s*\{[^}]*padding:\s*6px/)
+    // …the shared panel stays unpadded for every other consumer…
+    expect(toolbarMenuScss).not.toMatch(/\.toolbar-menu__panel\s*\{[^}]*padding/)
+    // …and the compiled padding rule carries the Popup boundary.
+    expect(css).toMatch(/\.ti-btn-more-menu\s+\.toolbar-menu__panel\s*\{[^}]*padding:\s*6px/)
+  })
+
+  it('pins panel radius, padding, and soft shadow with no hardcoded width', () => {
+    const panelBlock = bare.match(/\.ti-header-actions\s+\.ti-btn-more-menu\s*\{([^}]*)/)
+    expect(panelBlock).toBeTruthy()
+
+    const radius = panelBlock[1].match(/--tm-panel-radius:\s*(\d+)px/)
+    expect(radius).toBeTruthy()
+    const radiusPx = parseInt(radius[1], 10)
+    expect(radiusPx).toBeGreaterThanOrEqual(10)
+    expect(radiusPx).toBeLessThanOrEqual(12)
+
+    expect(panelBlock[1]).toMatch(/padding:\s*6px/)
+
+    const shadow = panelBlock[1].match(/--tm-panel-shadow:\s*([^;]+);/)
+    expect(shadow).toBeTruthy()
+    // Soft professional shadow: two layers with light alphas.
+    expect(shadow[1]).toMatch(/rgba\(0, 0, 0, 0\.12\)/)
+    expect(shadow[1]).toMatch(/rgba\(0, 0, 0, 0\.08\)/)
+
+    // No width that could break translated labels — viewport/max-inline-size
+    // stays owned by ToolbarMenu.
+    expect(panelBlock[1]).not.toMatch(/\bwidth\s*:/)
+    expect(panelBlock[1]).not.toContain('inline-size')
+  })
+
+  it('pins menu item geometry (min-height, padding, gap, radius, 13px, nowrap)', () => {
+    const itemBlock = bare.match(/\.ti-header-menu-item\s*\{([^}]*)/)
+    expect(itemBlock).toBeTruthy()
+    expect(itemBlock[1]).toContain('min-height: 36px')
+    expect(itemBlock[1]).toContain('padding: 0 10px')
+    expect(itemBlock[1]).toContain('gap: 10px')
+    expect(itemBlock[1]).toContain('border-radius: 8px')
+    expect(itemBlock[1]).toContain('width: 100%')
+    expect(itemBlock[1]).toContain('font-size: 13px')
+    expect(itemBlock[1]).toContain('white-space: nowrap')
+    // Subtle background/color transition (not a blanket `all`).
+    expect(itemBlock[1]).toMatch(/transition:\s*background-color 0\.15s ease, color 0\.15s ease/)
+  })
+
+  it('keeps branded menu images unfiltered in an 18×18 visual box', () => {
+    const iconBlock = bare.match(/img,\s*\.mask-icon\s*\{([^}]*)\}/)
+    expect(iconBlock).toBeTruthy()
+    expect(iconBlock[1]).toContain('width: 18px')
+    expect(iconBlock[1]).toContain('height: 18px')
+
+    // No filter on ANY rule mentioning a menu item: branded multicolor
+    // Subtitle/PDF <img> stay as-is; MaskIcons stay currentColor-driven.
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (m[1].includes('ti-header-menu-item')) {
+        expect(m[2]).not.toMatch(/filter/)
+      }
+    }
+    expect(bare).not.toMatch(/ti-header-menu-item[^{}]*filter/)
+  })
+
+  it('keeps the hover contracts reachable (light neutral, dark action tokens)', () => {
+    // Light: subtle neutral overlay.
+    expect(bare).toContain('rgba(0, 0, 0, 0.06) !important;')
+    // Dark: reachable compiled selector + neutral bg + accent text.
+    expect(css).toContain('.theme-dark .ti-header-toolbar .ti-header-menu-item:hover')
+    expect(css).toContain('background-color: var(--ti-action-hover-bg, #424242) !important;')
+    expect(css).toContain('color: var(--color-action-hover-accent) !important;')
+  })
+
+  it('preserves visible focus-visible on menu items', () => {
+    expect(css).toMatch(
+      /\.ti-header-menu-item:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--color-primary/
+    )
+    expect(css).toMatch(
+      /\.ti-header-menu-item:focus-visible\s*\{[^}]*outline-offset:\s*-2px/
+    )
+  })
+
+  it('styles the More trigger open state from [aria-expanded="true"] only', () => {
+    const openRule = bare.match(/\.ti-btn-more\[aria-expanded="true"\]\s*\{([^}]*)/)
+    expect(openRule).toBeTruthy()
+    expect(openRule[1]).toContain('background-color: var(--ti-action-active-bg) !important;')
+    expect(openRule[1]).toContain('color: var(--ti-action-icon-hover) !important;')
+    // Reachable compiled selector (nested under the toolbar root).
+    // Sass normalizes attribute quotes, so accept both `[x=true]` forms.
+    expect(css).toMatch(/\.ti-header-toolbar \.ti-btn-more\[aria-expanded="?true"?\]/)
+    // No invented component state on the trigger.
+    expect(source).not.toMatch(/\.ti-btn-more\.(is-open|is-expanded|ti-active-open)/)
+  })
+
+  it('styles the separator and the CSS site indicator (legacy check class gone)', () => {
+    const separator = bare.match(/\.ti-header-menu-separator\s*\{([^}]*)/)
+    expect(separator).toBeTruthy()
+    expect(separator[1]).toContain('height: 1px')
+    expect(separator[1]).toContain('background-color: var(--header-border-color')
+
+    const indicator = bare.match(/\.ti-header-menu-site-indicator\s*\{([^}]*)/)
+    expect(indicator).toBeTruthy()
+    expect(indicator[1]).toContain('width: 18px')
+    expect(indicator[1]).toContain('height: 18px')
+    expect(indicator[1]).toContain('border-radius: 5px')
+    // Excluded state: accent fill + border-drawn CSS check (no glyph/asset).
+    expect(source).toMatch(
+      /\.ti-header-menu-site-indicator\s*\{[\s\S]*?&\.is-excluded\s*\{[\s\S]*?--color-primary[\s\S]*?&::after\s*\{[\s\S]*?border-width:\s*0 2px 2px 0/
+    )
+    // Legacy unicode checkbox class is gone entirely.
+    expect(source).not.toContain('ti-header-menu-check')
+  })
+
+  it('preserves the CSS-only responsive routing breakpoints exactly', () => {
+    // Base: both duplicate classes hidden by default (no duplicate
+    // visible actions at any width).
+    expect(bare).toMatch(
+      /\.ti-header-menu-item--narrow-only,\s*\.ti-header-menu-item--very-narrow-only\s*\{[^}]*display:\s*none/
+    )
+
+    const m380 = source.match(/@media \(max-width: 380px\)\s*\{([\s\S]*?)\n\}/)
+    expect(m380).toBeTruthy()
+    expect(m380[1]).toContain('.ti-btn-capture.ti-header-toolbar-button--narrow-hide')
+    expect(m380[1]).toContain('.ti-btn-sidepanel.ti-header-toolbar-button--narrow-hide')
+    expect(m380[1]).toMatch(/\.ti-header-menu-item--narrow-only\s*\{[^}]*display:\s*flex/)
+
+    const m340 = source.match(/@media \(max-width: 340px\)\s*\{([\s\S]*?)\n\}/)
+    expect(m340).toBeTruthy()
+    expect(m340[1]).toContain('.ti-btn-mouse-hover.ti-header-toolbar-button--narrow-hide')
+    expect(m340[1]).toMatch(/\.ti-header-menu-item--very-narrow-only\s*\{[^}]*display:\s*flex/)
+  })
+
+  it('leaves shared ToolbarMenu defaults untouched (no other-consumer regression)', () => {
+    expect(toolbarMenuScss).toContain('--tm-panel-background: transparent;')
+    expect(toolbarMenuScss).toContain('--tm-panel-border: none;')
+    expect(toolbarMenuScss).toContain('--tm-panel-radius: 14px;')
+    expect(toolbarMenuScss).toContain('--tm-panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);')
+    expect(toolbarMenuScss).not.toMatch(/\.toolbar-menu__panel\s*\{[^}]*padding/)
+    // PopupHeader owns exactly one panel rule, always behind the
+    // More-menu boundary — never an unscoped top-level panel selector.
+    expect(source.match(/toolbar-menu__panel/g)).toHaveLength(1)
+    expect(source).not.toMatch(/^\.toolbar-menu__panel/m)
+  })
+})
