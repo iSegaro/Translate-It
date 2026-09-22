@@ -3254,5 +3254,29 @@ describe('LiveDubbingControl', () => {
     })
   })
 
+  describe('feedback text direction (RTL)', () => {
+    it('renders status text with dir="auto"', async () => {
+      const wrapper = await mountAndFlush()
+
+      expect(wrapper.find('.ti-live-dubbing-control-status').attributes('dir')).toBe('auto')
+    })
+
+    it('renders unavailable explanation with dir="auto"', async () => {
+      sendMessage.mockResolvedValue({ success: false, error: 'LIVE_DUBBING_UNSUPPORTED' })
+
+      const wrapper = await mountAndFlush()
+
+      expect(wrapper.find('.ti-live-dubbing-control-unavailable').attributes('dir')).toBe('auto')
+    })
+
+    it('renders error paragraph with dir="auto"', async () => {
+      sendMessage.mockRejectedValue(new Error('Status query failed'))
+
+      const wrapper = await mountAndFlush()
+
+      expect(wrapper.find('.ti-live-dubbing-control-error').attributes('dir')).toBe('auto')
+    })
+  })
+
 })
 

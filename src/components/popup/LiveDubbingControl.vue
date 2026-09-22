@@ -7,6 +7,7 @@
     <div class="ti-live-dubbing-control-action-row">
       <span
         class="ti-live-dubbing-control-status"
+        dir="auto"
         aria-live="polite"
       >{{ statusText }}</span>
 
@@ -49,6 +50,7 @@
     <p
       v-if="showUnavailableExplanation"
       class="ti-live-dubbing-control-unavailable"
+      dir="auto"
       role="status"
     >
       {{ unavailableExplanation }}
@@ -58,6 +60,7 @@
     <p
       v-if="showErrorParagraph"
       class="ti-live-dubbing-control-error"
+      dir="auto"
       role="alert"
     >
       {{ errorParagraphText }}

@@ -32,6 +32,7 @@
   opacity: 0.7;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: start;
 }
 
 .ti-live-dubbing-control-spinner {
@@ -45,6 +46,7 @@
   font-size: 12px;
   opacity: 0.75;
   overflow-wrap: anywhere;
+  text-align: start;
 }
 
 .ti-live-dubbing-control-error {
@@ -53,6 +55,7 @@
   color: var(--error-color, #b42318);
   font-size: 12px;
   overflow-wrap: anywhere;
+  text-align: start;
 }
 
 // ── Volume slider ────────────────────────────────────────────────────────────
