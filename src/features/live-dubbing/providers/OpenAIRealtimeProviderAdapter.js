@@ -22,9 +22,10 @@ const TELEMETRY_MILESTONES = Object.freeze([
   'firstTranslatedAudioAcceptedByPlayback',
   'cleanupComplete',
 ]);
-// Only oai-events types that terminally fail the session. Progress,
-// transcript, audio, session, and rate-limit events are never terminal.
-const TERMINAL_EVENT_TYPES = new Set(['error']);
+// Only lifecycle closure events terminalize the translation session. Generic
+// server data-channel error events are recoverable and must not expose remote
+// error details to the adapter boundary.
+const TERMINAL_EVENT_TYPES = new Set(['session.closed']);
 const SAFE_ERROR_CODE = /^[A-Za-z0-9_.-]{1,80}$/;
 const DISCONNECTED_GRACE_PERIOD = 3000;
 const NOOP = () => {};
@@ -486,15 +487,11 @@ export class OpenAIRealtimeProviderAdapter {
       dataChannel.onopen = () => this._handleChannelViable(session, isCurrent);
       dataChannel.onmessage = event => {
         if (!isCurrent()) return;
-        // Only terminal/error event types fail the session. Supported transcript
-        // events are normalized before reaching the Controller; all other
-        // transcript-shaped events are ignored.
+        // Only terminal lifecycle closure ends the session. Supported transcript
+        // events are normalized before reaching the Controller; generic server
+        // error events and all other transcript-shaped events are ignored.
         if (isTerminalEvent(event?.data)) {
-          this._reportRuntimeFailure(
-            session,
-            isCurrent,
-            createProviderError('OPENAI_REALTIME_PROVIDER_UNAVAILABLE'),
-          );
+          this._reportRuntimeClose(session, isCurrent);
           return;
         }
         const transcript = readOutputTranscriptDelta(event?.data);
@@ -750,6 +747,13 @@ export class OpenAIRealtimeProviderAdapter {
     const safeError = normalizeProviderError(error, 'OPENAI_REALTIME_PROVIDER_UNAVAILABLE');
     this._notifyError(safeError);
     void this._cleanupSession(session);
+  }
+
+  _reportRuntimeClose(session, isCurrent) {
+    if (!isCurrent() || session.terminalReported) return;
+    session.terminalReported = true;
+    void this._cleanupSession(session);
+    this._emit(this.onClose, { code: 1000, wasClean: true });
   }
 
   _notifyError(error) {

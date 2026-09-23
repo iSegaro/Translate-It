@@ -269,26 +269,88 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     await harness.adapter.dispose();
   });
 
-  it('terminalizes a server error event once with sanitized diagnostics', async () => {
+  it('recovers from generic server error events without exposing remote details', async () => {
     const onError = vi.fn();
-    const harness = createHarness({ callbacks: { onError } });
+    const onTranslatedTranscript = vi.fn();
+    const onOriginalTranscript = vi.fn();
+    const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
+    const harness = createHarness({
+      logger,
+      callbacks: { onError, onTranslatedTranscript, onOriginalTranscript },
+    });
     await harness.connect();
 
     harness.peerConnection.channel.onmessage({
       data: JSON.stringify({
         type: 'error',
-        error: { message: 'super secret failure transcript', code: 'server_blowup_42', sdp: 'private-sdp' },
+        error: {
+          message: 'super secret failure transcript',
+          code: 'server_blowup_42',
+          event_id: 'evt-private',
+          payload: 'private-payload',
+        },
       }),
     });
 
-    expect(onError).toHaveBeenCalledOnce();
-    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
-      code: 'OPENAI_REALTIME_PROVIDER_UNAVAILABLE',
-    }));
-    const serialized = JSON.stringify(onError.mock.calls);
+    harness.peerConnection.channel.onmessage({
+      data: JSON.stringify({ type: 'session.output_transcript.delta', delta: 'after error' }),
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(onTranslatedTranscript).toHaveBeenCalledWith({ kind: 'translated', text: 'after error' });
+    expect(onOriginalTranscript).not.toHaveBeenCalled();
+    expect(harness.adapter.active).toBe(true);
+    expect(harness.peerConnection.channel.readyState).toBe('open');
+    expect(harness.peerConnection.close).not.toHaveBeenCalled();
+    expect(harness.peerConnection.channel.close).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.info).not.toHaveBeenCalled();
+    const serialized = JSON.stringify({
+      errors: onError.mock.calls,
+      transcripts: onTranslatedTranscript.mock.calls,
+      originals: onOriginalTranscript.mock.calls,
+      telemetry: harness.adapter.getTelemetry(),
+      logs: logger,
+    });
     expect(serialized).not.toContain('super secret');
     expect(serialized).not.toContain('server_blowup_42');
-    expect(serialized).not.toContain('private-sdp');
+    expect(serialized).not.toContain('evt-private');
+    expect(serialized).not.toContain('private-payload');
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
+  it('closes once on session.closed with fixed local close details', async () => {
+    const onError = vi.fn();
+    const onClose = vi.fn();
+    const harness = createHarness({ callbacks: { onError, onClose } });
+    const cleanup = vi.spyOn(harness.adapter, '_cleanupSession');
+    await harness.connect();
+    const onMessage = harness.peerConnection.channel.onmessage;
+
+    onMessage({
+      data: JSON.stringify({
+        type: 'session.closed',
+        reason: 'remote reason',
+        message: 'remote detail',
+        code: 'remote_code',
+        event_id: 'evt-private',
+        session: { id: 'remote-session', payload: 'private-payload' },
+      }),
+    });
+    onMessage({ data: JSON.stringify({ type: 'session.closed' }) });
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledWith({ code: 1000, wasClean: true });
+    expect(onError).not.toHaveBeenCalled();
+    expect(cleanup).toHaveBeenCalledOnce();
+    const callbacks = JSON.stringify({ onClose: onClose.mock.calls, onError: onError.mock.calls });
+    expect(callbacks).not.toContain('remote reason');
+    expect(callbacks).not.toContain('remote detail');
+    expect(callbacks).not.toContain('remote_code');
+    expect(callbacks).not.toContain('evt-private');
+    expect(callbacks).not.toContain('remote-session');
+    expect(callbacks).not.toContain('private-payload');
     expect(harness.peerConnection.close).toHaveBeenCalledOnce();
     expect(harness.peerConnection.channel.close).toHaveBeenCalledOnce();
     expect(harness.audioTrack.stop).not.toHaveBeenCalled();
@@ -341,18 +403,21 @@ describe('OpenAIRealtimeProviderAdapter', () => {
 
   it('emits a single terminal on raced failure signals', async () => {
     const onError = vi.fn();
-    const harness = createHarness({ callbacks: { onError } });
+    const onClose = vi.fn();
+    const harness = createHarness({ callbacks: { onError, onClose } });
     await harness.connect();
     const iceHandler = harness.peerConnection.oniceconnectionstatechange;
     const messageHandler = harness.peerConnection.channel.onmessage;
 
-    harness.peerConnection.channel.onmessage({ data: JSON.stringify({ type: 'error', error: {} }) });
+    harness.peerConnection.channel.onmessage({ data: JSON.stringify({ type: 'session.closed' }) });
     harness.peerConnection.iceConnectionState = 'failed';
     iceHandler?.();
-    messageHandler?.({ data: JSON.stringify({ type: 'error', error: {} }) });
+    messageHandler?.({ data: JSON.stringify({ type: 'session.closed' }) });
 
-    expect(onError).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onError).not.toHaveBeenCalled();
     expect(harness.peerConnection.close).toHaveBeenCalledOnce();
+    expect(harness.peerConnection.channel.close).toHaveBeenCalledOnce();
   });
 
   it('ignores a stale viability watchdog after dispose', async () => {
@@ -374,6 +439,7 @@ describe('OpenAIRealtimeProviderAdapter', () => {
 
   it('ignores old-generation channel and peer events after a new session starts', async () => {
     const onError = vi.fn();
+    const onClose = vi.fn();
     const firstPeer = new FakePeerConnection();
     const secondPeer = new FakePeerConnection();
     firstPeer.channel.readyState = 'connecting';
@@ -385,7 +451,7 @@ describe('OpenAIRealtimeProviderAdapter', () => {
       fetchImpl: vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
       audioElementFactory: vi.fn(() => createAudioElement()),
       setupTimeout: 50,
-      callbacks: { onError },
+      callbacks: { onError, onClose },
     });
     const audioTrack = createTrack();
     const sourceStream = { getAudioTracks: () => [audioTrack] };
@@ -410,10 +476,11 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     oldOnOpen?.();
     firstPeer.connectionState = 'failed';
     oldPeerState?.();
-    oldOnMessage?.({ data: JSON.stringify({ type: 'error', error: {} }) });
+    oldOnMessage?.({ data: JSON.stringify({ type: 'session.closed' }) });
     await Promise.resolve();
 
     expect(onError).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
     expect(adapter.active).toBe(true);
     expect(secondPeer.close).not.toHaveBeenCalled();
     expect(audioTrack.stop).not.toHaveBeenCalled();

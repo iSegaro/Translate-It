@@ -2717,6 +2717,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     registryMode = LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM,
     controllerOptions = {},
     targetLanguage = 'fr',
+    providerId: expectedProviderId = 'gemini',
   } = {}) {
     const track = new FakeTrack();
     const stream = createStream(track);
@@ -2727,7 +2728,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     const registry = {
       // Mirrors the real registry signature: create(providerId, options).
       create: vi.fn((providerId, options) => {
-        expect(providerId).toBe('gemini');
+        expect(providerId).toBe(expectedProviderId);
         providerCallbacks = options.callbacks;
         const client = makeClient
           ? makeClient(providerCallbacks)
@@ -2745,7 +2746,7 @@ describe('LiveDubbingController media-stream audio path', () => {
       providerRegistry: registry,
       requestBootstrap: vi.fn().mockResolvedValue({
         success: true,
-        providerId: 'gemini',
+        providerId: expectedProviderId,
         targetLanguage,
         bootstrap: { accessToken: 'test-token' },
       }),
@@ -3003,6 +3004,43 @@ describe('LiveDubbingController media-stream audio path', () => {
 
     await controller.dispose('session-openai', 'openai');
     expect(client.dispose).toHaveBeenCalledOnce();
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
+
+  it('maps the OpenAI fixed close callback to one Controller PROVIDER_CLOSED terminal', async () => {
+    const { controller, track, clients, notify, callbacks } = createMediaStreamHarness({
+      providerId: 'openai',
+      targetLanguage: 'en-US',
+    });
+
+    controller.prepare('session-openai-close', 'openai', 'en-US', 0);
+    await controller.consume('session-openai-close', 'openai', 'stream-secret', 1);
+    await controller.connectProvider('session-openai-close', 'openai', 'en-US', 2);
+
+    const activeSession = controller.currentSession;
+    expect(activeSession.status).toBe(LIVE_DUBBING_STATUS.RUNNING);
+
+    callbacks().onClose({ code: 1000, wasClean: true });
+    await activeSession.cleanupPromise;
+
+    expect(controller.currentSession).toBe(activeSession);
+    expect(activeSession.status).toBe(LIVE_DUBBING_STATUS.ERROR);
+    expect(activeSession.lastError).toBe('LIVE_DUBBING_PROVIDER_CLOSED');
+    expect(activeSession.telemetry.providerTerminalCategory).toBe('PROVIDER_CLOSED');
+    expect(notify).toHaveBeenCalledOnce();
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        event: 'PROVIDER_CLOSED',
+        error: 'LIVE_DUBBING_PROVIDER_CLOSED',
+      }),
+    }));
+    expect(clients[0].dispose).toHaveBeenCalledOnce();
+    expect(track.stop).toHaveBeenCalledOnce();
+
+    callbacks().onClose({ code: 1000, wasClean: true });
+
+    expect(notify).toHaveBeenCalledOnce();
+    expect(clients[0].dispose).toHaveBeenCalledOnce();
     expect(track.stop).toHaveBeenCalledOnce();
   });
 
