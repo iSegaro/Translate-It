@@ -109,6 +109,8 @@ function classifyMintFailure(status, metadata) {
 }
 
 function buildMintBody(targetLanguage) {
+  // AuthToken constrained setup and WebSocket setup intentionally use
+  // compatible model-specific configuration.
   return {
     uses: 1,
     bidiGenerateContentSetup: {

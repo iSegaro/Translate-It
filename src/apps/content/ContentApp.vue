@@ -143,7 +143,7 @@ const TranslationWindow = defineAsyncComponent(() => import('@/features/windows/
 const TranslationIcon = defineAsyncComponent(() => import('@/features/windows/components/TranslationIcon.vue'));
 const PageTranslationTooltip = defineAsyncComponent(() => import('./components/PageTranslationTooltip.vue'));
 const MouseHoverTooltip = defineAsyncComponent(() => import('./components/MouseHoverTooltip.vue'));
-const LiveDubbingTranscript = defineAsyncComponent(() => import('@/features/live-dubbing/content/LiveDubbingTranscript.vue'));
+const LiveDubbingTranscript = defineAsyncComponent(() => import('@/features/live-dubbing/components/LiveDubbingTranscript.vue'));
 
 // Device-Specific Lazy Components
 const MobileSheet = defineAsyncComponent(() => import('./components/mobile/MobileSheet.vue'));

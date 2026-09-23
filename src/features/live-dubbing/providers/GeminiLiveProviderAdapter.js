@@ -286,7 +286,7 @@ function callbackFrom(options, callbacks, name, aliases = []) {
  * Small native-WebSocket adapter for the Gemini Live translation protocol.
  *
  * It owns Gemini framing, transport encoding/decoding, protocol validation,
- * diagnostics, socket backpressure, and provider-neutral output transcript
+ * socket backpressure, and provider-neutral output transcript
  * extraction. Audio capture, playback, and retries stay outside this class.
  */
 export class GeminiLiveProviderAdapter {

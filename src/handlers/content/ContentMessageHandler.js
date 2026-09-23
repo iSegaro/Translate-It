@@ -17,6 +17,7 @@ import { LIVE_DUBBING_ACTIONS } from '@/features/live-dubbing/constants.js';
 import {
   acceptLiveDubbingTranscript,
   clearLiveDubbingTranscript,
+  sanitizeLiveDubbingTranscriptEnvelope,
 } from '@/features/live-dubbing/content/liveDubbingTranscriptStore.js';
 
 // Singleton instance for ContentMessageHandler
@@ -1131,9 +1132,10 @@ export class ContentMessageHandler extends ResourceTracker {
   }
 
   handleLiveDubbingStatus(message) {
-    const envelope = acceptLiveDubbingTranscript(message?.data);
-    if (!envelope) return { success: true, accepted: false };
-    return { success: true, accepted: true };
+    const envelope = sanitizeLiveDubbingTranscriptEnvelope(message?.data);
+    const acceptedEnvelope = envelope ? acceptLiveDubbingTranscript(envelope) : null;
+    const accepted = acceptedEnvelope !== null;
+    return { success: true, accepted };
   }
 
   handleLiveDubbingClear(message) {

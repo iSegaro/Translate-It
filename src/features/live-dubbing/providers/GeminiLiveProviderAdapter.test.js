@@ -96,6 +96,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const setup = JSON.parse(socket.sent[0]).setup;
     expect(setup.outputAudioTranscription).toEqual({});
     expect(setup.generationConfig).not.toHaveProperty('outputAudioTranscription');
+    expect(setup).not.toHaveProperty('inputAudioTranscription');
     expect(onSetupComplete).not.toHaveBeenCalled();
 
     socket.receive({ setupComplete: {}, usageMetadata: { promptTokenCount: 1 } });

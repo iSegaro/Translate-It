@@ -16,8 +16,8 @@ import { computed, onUnmounted, ref } from 'vue';
 import {
   getLiveDubbingTranscriptSnapshot,
   subscribeLiveDubbingTranscript,
-} from './liveDubbingTranscriptStore.js';
-import { getVisibleLiveDubbingTranscript } from './liveDubbingTranscriptPresentation.js';
+} from '../content/liveDubbingTranscriptStore.js';
+import { getVisibleLiveDubbingTranscript } from '../content/liveDubbingTranscriptPresentation.js';
 
 const transcript = ref(getLiveDubbingTranscriptSnapshot());
 const visibleText = computed(() => getVisibleLiveDubbingTranscript(transcript.value));
