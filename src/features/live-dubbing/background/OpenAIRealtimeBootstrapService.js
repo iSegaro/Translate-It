@@ -12,6 +12,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'OpenAIRealtimeBoots
 export const OPENAI_REALTIME_TRANSLATIONS_CLIENT_SECRETS_ENDPOINT =
   'https://api.openai.com/v1/realtime/translations/client_secrets';
 export const OPENAI_REALTIME_TRANSLATE_MODEL = 'gpt-realtime-translate';
+export const OPENAI_REALTIME_WHISPER_MODEL = 'gpt-realtime-whisper';
 export const OPENAI_REALTIME_KEYS_SETTING = 'OPENAI_API_KEY';
 
 const KEY_INVALID_CODE_PATTERN = /invalid[_ -]?api[_ -]?key|authentication/i;
@@ -96,6 +97,7 @@ function buildMintBody(targetLanguage) {
     session: {
       model: OPENAI_REALTIME_TRANSLATE_MODEL,
       audio: {
+        input: { transcription: { model: OPENAI_REALTIME_WHISPER_MODEL } },
         output: { language: targetLanguage },
       },
     },

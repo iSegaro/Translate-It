@@ -74,6 +74,7 @@ function createHarness({
   peerConnection = new FakePeerConnection(),
   fetchImpl = vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
   audioElement = createAudioElement(),
+  logger = { warn: vi.fn() },
   callbacks = {},
   setupTimeout = 100,
 } = {}) {
@@ -87,6 +88,7 @@ function createHarness({
     peerConnectionFactory: vi.fn(async () => peerConnection),
     fetchImpl,
     audioElementFactory: vi.fn(() => audioElement),
+    logger,
     setupTimeout,
     ...callbacks,
   });

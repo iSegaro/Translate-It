@@ -6,6 +6,7 @@ import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import {
   OPENAI_REALTIME_TRANSLATE_MODEL,
   OPENAI_REALTIME_TRANSLATIONS_CLIENT_SECRETS_ENDPOINT,
+  OPENAI_REALTIME_WHISPER_MODEL,
   OpenAIRealtimeBootstrapService,
 } from './OpenAIRealtimeBootstrapService.js';
 
@@ -87,7 +88,10 @@ describe('OpenAIRealtimeBootstrapService', () => {
     expect(JSON.parse(calls[0].options.body)).toEqual({
       session: {
         model: OPENAI_REALTIME_TRANSLATE_MODEL,
-        audio: { output: { language: 'en-US' } },
+        audio: {
+          input: { transcription: { model: OPENAI_REALTIME_WHISPER_MODEL } },
+          output: { language: 'en-US' },
+        },
       },
     });
   });

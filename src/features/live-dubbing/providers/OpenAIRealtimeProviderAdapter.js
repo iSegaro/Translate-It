@@ -267,7 +267,7 @@ function normalizeDubbedVolume(value) {
  * only adds the live audio tracks to a peer connection, exchanges raw SDP,
  * and owns the remote playback element. Bootstrap remains opaque outside the
  * short-lived Authorization header; secrets, SDP, media, and raw provider
- * transcript payloads never enter diagnostics or lifecycle callbacks.
+ * transcript payloads never enter lifecycle callbacks.
  */
 export class OpenAIRealtimeProviderAdapter {
   constructor(options = {}) {
