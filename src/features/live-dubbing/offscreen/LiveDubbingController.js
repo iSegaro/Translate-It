@@ -1372,15 +1372,14 @@ export class LiveDubbingController {
         });
       }
 
-      // The client promise resolves only after setupComplete. The callback is
-      // retained as an early fence for input and for callback-driven clients.
-      session.setupAcknowledged = true;
-      session.setupComplete = true;
-      this._markMilestone(session, 'setupComplete');
-      session.status = LIVE_DUBBING_STATUS.RUNNING;
-      session.eventSequence += 1;
-      this._drainPendingInput(session);
-      return this._providerReadyResponse(session);
+       // The client promise resolves only after setupComplete. The callback is
+       // retained as an early fence for input and callback-driven clients;
+       // CONNECTING_PROVIDER remains on its canonical sequence until the
+       // provider-ready lifecycle commit below.
+       this._markProviderSetupComplete(session, providerGeneration);
+       session.status = LIVE_DUBBING_STATUS.RUNNING;
+       session.eventSequence += 1;
+       return this._providerReadyResponse(session);
     }).catch(error => {
       if (this._isCurrentProviderGeneration(session, providerGeneration)) {
         this._providerFailed(session, error, 'PROVIDER_ERROR', error?.providerDiagnostic);
@@ -1395,10 +1394,7 @@ export class LiveDubbingController {
     const callbacks = {
       onSetupComplete: () => {
         if (!this._isCurrentProvider(session, generation)) return;
-        session.setupAcknowledged = true;
-        session.setupComplete = true;
-        this._markMilestone(session, 'setupComplete');
-        this._drainPendingInput(session);
+        this._markProviderSetupComplete(session, generation);
       },
       onAudio: audio => this._handleProviderAudio(session, generation, audio),
       onTranslatedTranscript: transcript => this._handleProviderTranslatedTranscript(
@@ -1456,6 +1452,19 @@ export class LiveDubbingController {
     for (const [name, callback] of Object.entries(callbacks)) client[name] = callback;
     session.telemetry.providerBaseline = this._readChildTelemetry(client);
     return client;
+  }
+
+  _markProviderSetupComplete(session, generation) {
+    if (!this._isCurrentProvider(session, generation)) return false;
+
+    const wasSetupComplete = session.setupComplete === true;
+    session.setupAcknowledged = true;
+    session.setupComplete = true;
+    if (!wasSetupComplete) {
+      this._markMilestone(session, 'setupComplete');
+    }
+    this._drainPendingInput(session);
+    return true;
   }
 
   requestProviderBootstrapForSession(session) {
@@ -2419,8 +2428,11 @@ export class LiveDubbingController {
         ? session.transcriptSequence + 1
         : 1;
       session.transcriptSequence = transcriptSequence;
+      const transcriptDescriptor = session.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+        ? { ...session, eventSequence: session.eventSequence + 1 }
+        : session;
       message = createLiveDubbingTranslatedTranscriptMessage(
-        session,
+        transcriptDescriptor,
         normalized,
         transcriptSequence,
       );

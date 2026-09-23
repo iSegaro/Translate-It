@@ -1006,13 +1006,19 @@ export class LiveDubbingCoordinator {
     const transcript = sanitizeLiveDubbingTranslatedTranscript(data?.transcript);
     const relayRecord = this._syncTranscriptRelayRecord(descriptor);
     const transcriptSequence = data?.transcriptSequence;
+    const hasCurrentEvent = hasExactSessionEvent(message, descriptor);
+    const hasReservedRunningEvent = descriptor?.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      && data?.sessionId === descriptor.sessionId
+      && data?.providerId === descriptor.providerId
+      && Number.isSafeInteger(data?.eventSequence)
+      && data.eventSequence === descriptor.eventSequence + 1;
     if (this._storageReadFailed()
       || this._storageDescriptorInvalid()
       || !descriptor
       || ![LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, LIVE_DUBBING_STATUS.RUNNING]
         .includes(descriptor.status)
       || !transcript
-      || !hasExactSessionEvent(message, descriptor)
+      || (!hasCurrentEvent && !hasReservedRunningEvent)
       || !isValidLiveDubbingTranscriptSequence(transcriptSequence)
       || (Number.isSafeInteger(relayRecord?.lastTranscriptSequence)
         && transcriptSequence <= relayRecord.lastTranscriptSequence)) {
@@ -1183,9 +1189,13 @@ export class LiveDubbingCoordinator {
       const state = this.sessionRegistry.getSessionState(pendingStart.sessionId);
       if (!state) return { success: false, error: 'LIVE_DUBBING_START_TIMEOUT' };
 
+      const cleanupDescriptor = state.descriptor;
+      if (this.descriptor?.sessionId === cleanupDescriptor.sessionId) {
+        this._relayTranscriptClear(cleanupDescriptor);
+      }
       const cleanup = await this._awaitCleanup(
-        this.cleanupManager.disposeAndRelease(state.descriptor),
-        state.descriptor,
+        this.cleanupManager.disposeAndRelease(cleanupDescriptor),
+        cleanupDescriptor,
       );
       if (!cleanup.success) {
         return {
@@ -1529,6 +1539,9 @@ export class LiveDubbingCoordinator {
       }
 
       const cleanupDescriptor = sessionState.descriptor || descriptor;
+      if (this.descriptor?.sessionId === cleanupDescriptor.sessionId) {
+        this._relayTranscriptClear(cleanupDescriptor);
+      }
       const cleanup = sessionState.cleanupCompleted
         ? { success: true }
         : leaseAcquired || sessionState.prepared || sessionState.terminalRequested

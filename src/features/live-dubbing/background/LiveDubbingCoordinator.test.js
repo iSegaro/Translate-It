@@ -1420,8 +1420,10 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.manager.release).not.toHaveBeenCalled();
   });
 
-  it('disposes before releasing exact lease when capture start fails', async () => {
+  it('clears transcript after capture START fails before releasing the exact lease', async () => {
     const harness = createHarness();
+    const sendTabMessage = vi.fn().mockRejectedValue(new Error('tab closed'));
+    harness.browserAPI.tabs.sendMessage = sendTabMessage;
     harness.chromeAPI.tabCapture.getMediaStreamId.mockRejectedValueOnce(new Error('capture failed'));
 
     const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
@@ -1433,6 +1435,10 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.calls[2][1].action).toBe('LIVE_DUBBING_DISPOSE');
     expect(harness.manager.release).toHaveBeenCalledWith({ owner: LIVE_DUBBING_OWNER, leaseId: 'session-1' });
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(sendTabMessage).toHaveBeenCalledWith(42, {
+      action: LIVE_DUBBING_ACTIONS.CLEAR_TRANSCRIPT,
+      data: { sessionId: 'session-1' },
+    }, { frameId: 0 });
   });
 
   it('logs sanitized media-stream diagnostics with preserved stage', async () => {
@@ -1548,9 +1554,11 @@ describe('LiveDubbingCoordinator', () => {
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
   });
 
-  it('times out during pre-provider pipeline setup without stranding the lease', async () => {
+  it('clears transcript after START times out during pre-provider pipeline setup', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
+    const sendTabMessage = vi.fn().mockResolvedValue(undefined);
+    harness.browserAPI.tabs.sendMessage = sendTabMessage;
     const track = {
       kind: 'audio',
       readyState: 'live',
@@ -1596,6 +1604,10 @@ describe('LiveDubbingCoordinator', () => {
       leaseId: 'session-1',
     });
     expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(sendTabMessage).toHaveBeenCalledWith(42, {
+      action: LIVE_DUBBING_ACTIONS.CLEAR_TRANSCRIPT,
+      data: { sessionId: 'session-1' },
+    }, { frameId: 0 });
 
     resolveInputStart();
     await Promise.resolve();
@@ -7232,6 +7244,47 @@ describe('LiveDubbingCoordinator', () => {
     })).resolves.toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
+  });
+
+  it('accepts the reserved running event sequence before the RUNNING commit', async () => {
+    const harness = createVolumeHarness(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, {
+      eventSequence: 4,
+    });
+    const sendTabMessage = vi.fn(async () => undefined);
+    harness.browserAPI.tabs.sendMessage = sendTabMessage;
+    const sender = {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    };
+    const message = {
+      action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 5,
+        transcriptSequence: 1,
+        transcript: { kind: 'translated', text: 'bonjour' },
+      },
+    };
+
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript(message, sender))
+      .resolves.toEqual({ success: true });
+    expect(sendTabMessage).toHaveBeenCalledWith(42, {
+      action: LIVE_DUBBING_ACTIONS.TRANSCRIPT,
+      data: {
+        ...message.data,
+        eventSequence: 4,
+      },
+    }, { frameId: 0 });
+
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript({
+      ...message,
+      data: { ...message.data, eventSequence: 3, transcriptSequence: 2 },
+    }, sender)).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+      ignored: true,
     });
   });
 

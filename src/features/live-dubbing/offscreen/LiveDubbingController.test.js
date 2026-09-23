@@ -3724,6 +3724,80 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(notifyTranscript).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the connecting sequence stable before an early setup transcript', async () => {
+    const track = new FakeTrack();
+    const notifyTranscript = vi.fn();
+    let providerCallbacks;
+    let resolveSetup;
+    const setupPromise = new Promise(resolve => { resolveSetup = resolve; });
+    const provider = {
+      connect: vi.fn(() => {
+        providerCallbacks.onSetupComplete();
+        providerCallbacks.onTranslatedTranscript({ kind: 'translated', text: 'bonjour' });
+        return setupPromise;
+      }),
+      sendAudio: vi.fn(() => true),
+      close: vi.fn(),
+    };
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+       inputPipelineFactory: vi.fn(() => ({ start: vi.fn(async () => {}), stop: vi.fn(async () => {}) })),
+       outputPlayerFactory: vi.fn(() => ({
+         start: vi.fn(async () => {}),
+         stop: vi.fn(async () => {}),
+         clear: vi.fn(),
+       })),
+       audioContextFactory: vi.fn(async () => createOriginalAudioContext()),
+      providerClientFactory: vi.fn(options => {
+        providerCallbacks = options.callbacks;
+        return provider;
+      }),
+      requestBootstrap: vi.fn().mockResolvedValue({
+        success: true,
+        providerId: 'gemini',
+        targetLanguage: 'fr',
+        bootstrap: { accessToken: 'token' },
+      }),
+      notify: vi.fn(),
+      notifyTranscript,
+    });
+
+    controller.prepare('session-1', 'gemini', 'fr', 0);
+    await controller.consume('session-1', 'gemini', 'stream-id', 1);
+    const connectPromise = controller.connectProvider('session-1', 'gemini', 'fr', 2);
+
+    await vi.waitFor(() => expect(notifyTranscript).toHaveBeenCalledOnce());
+     expect(notifyTranscript).toHaveBeenCalledWith(expect.objectContaining({
+       data: expect.objectContaining({ eventSequence: 3, transcriptSequence: 1 }),
+     }));
+     expect(controller.currentSession.status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
+     expect(controller.currentSession.eventSequence).toBe(2);
+
+     await expect(controller.setOriginalVolume('session-1', 'gemini', 0.25, 2))
+       .resolves.toMatchObject({
+         success: true,
+         eventSequence: 2,
+         status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+       });
+     await expect(controller.setDubbedVolume('session-1', 'gemini', 0.75, 2))
+       .resolves.toMatchObject({
+         success: true,
+         eventSequence: 2,
+         status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
+       });
+     expect(controller.currentSession.eventSequence).toBe(2);
+
+     resolveSetup();
+     await expect(connectPromise).resolves.toMatchObject({
+       success: true,
+       ack: 'PROVIDER_READY',
+       eventSequence: 3,
+     });
+     expect(controller.currentSession.status).toBe(LIVE_DUBBING_STATUS.RUNNING);
+     expect(controller.currentSession.eventSequence).toBe(3);
+     await controller.dispose('session-1', 'gemini');
+   });
+
   it('suppresses translated transcript callbacks from stale provider generations and sessions', () => {
     const notifyTranscript = vi.fn();
     const controller = new LiveDubbingController({ notifyTranscript });

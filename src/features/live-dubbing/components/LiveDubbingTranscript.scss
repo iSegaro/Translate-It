@@ -1,27 +1,21 @@
 .live-dubbing-transcript {
-  position: fixed;
-  z-index: 2147483646;
-  left: 50%;
-  bottom: clamp(1.5rem, 8vh, 5rem);
-  width: min(90vw, 52rem);
-  transform: translate3d(-50%, 0, 0);
-  padding: 0.7rem 1rem;
-  color: #fff;
-  background: rgb(12 16 24 / 82%);
-  border: 1px solid rgb(255 255 255 / 15%);
-  border-radius: 0.65rem;
-  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 28%);
-  font: 500 clamp(0.95rem, 1.8vw, 1.2rem) / 1.45 ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: 0.01em;
-  text-align: center;
-  text-wrap: pretty;
-  pointer-events: none;
-  user-select: none;
-  contain: layout paint;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .live-dubbing-transcript {
-    transition: none;
-  }
+  position: fixed !important;
+  z-index: 2147483646 !important;
+  left: 50% !important;
+  bottom: clamp(1.5rem, 8vh, 5rem) !important;
+  width: min(90vw, 52rem) !important;
+  transform: translate3d(-50%, 0, 0) !important;
+  padding: 0.7rem 1rem !important;
+  color: #fff !important;
+  background: rgb(12 16 24 / 82%) !important;
+  border: 1px solid rgb(255 255 255 / 15%) !important;
+  border-radius: 0.65rem !important;
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 28%) !important;
+  font: 500 clamp(0.95rem, 1.8vw, 1.2rem) / 1.45 ui-sans-serif, system-ui, sans-serif !important;
+  letter-spacing: 0.01em !important;
+  text-align: center !important;
+  text-wrap: pretty !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  contain: layout paint !important;
 }
