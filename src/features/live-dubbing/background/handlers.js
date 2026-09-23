@@ -96,6 +96,12 @@ export function handleLiveDubbingTranslatedTranscript(message, sender) {
   return liveDubbingCoordinator.handleOffscreenTranslatedTranscript(message, sender);
 }
 
+export function handleLiveDubbingOriginalTranscript(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (!isAuthorizedOffscreenSender(sender, liveDubbingCoordinator.browserAPI)) return unauthorized();
+  return liveDubbingCoordinator.handleOffscreenOriginalTranscript(message, sender);
+}
+
 /**
  * Resolve the provider bootstrap request from the authorized offscreen
  * document. The descriptor selects the bootstrap service, while the

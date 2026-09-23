@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import {
   normalizeProviderTargetLanguage,
+  createLiveDubbingOriginalTranscript,
   createLiveDubbingTranslatedTranscript,
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
@@ -221,6 +222,23 @@ function readOutputTranscriptDelta(data) {
   }
 }
 
+function readOriginalTranscriptDelta(data) {
+  let event = data;
+  if (typeof data === 'string') {
+    try {
+      event = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  if (!isRecord(event) || event.type !== 'session.input_transcript.delta') return null;
+  try {
+    return createLiveDubbingOriginalTranscript(event.delta);
+  } catch {
+    return null;
+  }
+}
+
 function isTerminalEvent(data) {
   return TERMINAL_EVENT_TYPES.has(readEventType(data));
 }
@@ -274,6 +292,7 @@ export class OpenAIRealtimeProviderAdapter {
     this.onError = callbackFrom(options, callbacks, 'onError');
     this.onClose = callbackFrom(options, callbacks, 'onClose');
     this.onTranslatedTranscript = callbackFrom(options, callbacks, 'onTranslatedTranscript');
+    this.onOriginalTranscript = callbackFrom(options, callbacks, 'onOriginalTranscript');
 
     this.generation = 0;
     this.attachmentToken = 0;
@@ -467,9 +486,9 @@ export class OpenAIRealtimeProviderAdapter {
       dataChannel.onopen = () => this._handleChannelViable(session, isCurrent);
       dataChannel.onmessage = event => {
         if (!isCurrent()) return;
-        // Only terminal/error event types fail the session. The one supported
-        // transcript event is normalized before it reaches the Controller;
-        // input and all other transcript-shaped events are ignored.
+        // Only terminal/error event types fail the session. Supported transcript
+        // events are normalized before reaching the Controller; all other
+        // transcript-shaped events are ignored.
         if (isTerminalEvent(event?.data)) {
           this._reportRuntimeFailure(
             session,
@@ -479,10 +498,12 @@ export class OpenAIRealtimeProviderAdapter {
           return;
         }
         const transcript = readOutputTranscriptDelta(event?.data);
-        if (readEventType(event?.data) === 'session.output_transcript.delta') {
+        const originalTranscript = readOriginalTranscriptDelta(event?.data);
+        if (transcript || originalTranscript) {
           session.telemetry.transcriptEvents += 1;
         }
         if (transcript) this._emit(this.onTranslatedTranscript, transcript);
+        if (originalTranscript) this._emit(this.onOriginalTranscript, originalTranscript);
       };
       dataChannel.onerror = () => this._reportRuntimeFailure(
         session,

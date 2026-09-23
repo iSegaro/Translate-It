@@ -8,6 +8,7 @@ import {
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_LEASE_REASONS,
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
+  LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND,
   LIVE_DUBBING_OWNER,
   LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
@@ -44,7 +45,7 @@ import {
   sanitizeLiveDubbingDiagnostic,
   sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
-  sanitizeLiveDubbingTranslatedTranscript,
+  sanitizeLiveDubbingTranscript,
   toPublicLiveDubbingTerminalOutcome,
 } from '../contracts.js';
 import { LiveDubbingStateStore, LIVE_DUBBING_CLEAR_OUTCOMES } from './LiveDubbingStateStore.js';
@@ -996,14 +997,25 @@ export class LiveDubbingCoordinator {
   }
 
   async handleOffscreenTranslatedTranscript(message = {}, sender = null) {
+    return this.handleOffscreenTranscript(message, sender);
+  }
+
+  async handleOffscreenOriginalTranscript(message = {}, sender = null) {
+    return this.handleOffscreenTranscript(message, sender);
+  }
+
+  async handleOffscreenTranscript(message = {}, sender = null) {
     if (!sender || !isAuthorizedOffscreenSender(sender, this.browserAPI)
-      || message?.action !== LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT) {
+      || ![
+        LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+        LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT,
+      ].includes(message?.action)) {
       return { success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true };
     }
 
     const descriptor = await this._readDescriptor();
     const data = message?.data;
-    const transcript = sanitizeLiveDubbingTranslatedTranscript(data?.transcript);
+    const transcript = sanitizeLiveDubbingTranscript(data?.transcript);
     const relayRecord = this._syncTranscriptRelayRecord(descriptor);
     const transcriptSequence = data?.transcriptSequence;
     const hasCurrentEvent = hasExactSessionEvent(message, descriptor);
@@ -1012,12 +1024,18 @@ export class LiveDubbingCoordinator {
       && data?.providerId === descriptor.providerId
       && Number.isSafeInteger(data?.eventSequence)
       && data.eventSequence === descriptor.eventSequence + 1;
+    const actionMatchesKind = transcript
+      && ((message.action === LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT
+        && transcript.kind === LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND)
+        || (message.action === LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT
+          && transcript.kind !== LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND));
     if (this._storageReadFailed()
       || this._storageDescriptorInvalid()
       || !descriptor
       || ![LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, LIVE_DUBBING_STATUS.RUNNING]
         .includes(descriptor.status)
       || !transcript
+      || !actionMatchesKind
       || (!hasCurrentEvent && !hasReservedRunningEvent)
       || !isValidLiveDubbingTranscriptSequence(transcriptSequence)
       || (Number.isSafeInteger(relayRecord?.lastTranscriptSequence)
@@ -1029,7 +1047,7 @@ export class LiveDubbingCoordinator {
 
     try {
       await this.runtimeGateway.sendTabMessage(descriptor.tabId, {
-        action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+         action: message.action,
         data: {
           sessionId: descriptor.sessionId,
           providerId: descriptor.providerId,

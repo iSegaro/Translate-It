@@ -111,6 +111,7 @@ describe('GeminiLiveBootstrapService', () => {
       bidiGenerateContentSetup: {
         model: GEMINI_LIVE_MODEL,
         outputAudioTranscription: {},
+        inputAudioTranscription: {},
         generationConfig: {
           responseModalities: ['AUDIO'],
           translationConfig: {
@@ -121,7 +122,7 @@ describe('GeminiLiveBootstrapService', () => {
       },
     });
     expect(body).not.toHaveProperty('liveConnectConstraints');
-    expect(body.bidiGenerateContentSetup).not.toHaveProperty('inputAudioTranscription');
+    expect(body.bidiGenerateContentSetup.inputAudioTranscription).toEqual({});
     expect(body.bidiGenerateContentSetup.generationConfig).not.toHaveProperty('inputAudioTranscription');
   });
 

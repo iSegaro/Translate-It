@@ -84,6 +84,7 @@ describe('GeminiLiveProviderAdapter', () => {
       setup: {
         model: GEMINI_LIVE_MODEL,
         outputAudioTranscription: {},
+        inputAudioTranscription: {},
         generationConfig: {
           responseModalities: ['AUDIO'],
           translationConfig: {
@@ -96,7 +97,7 @@ describe('GeminiLiveProviderAdapter', () => {
     const setup = JSON.parse(socket.sent[0]).setup;
     expect(setup.outputAudioTranscription).toEqual({});
     expect(setup.generationConfig).not.toHaveProperty('outputAudioTranscription');
-    expect(setup).not.toHaveProperty('inputAudioTranscription');
+    expect(setup.inputAudioTranscription).toEqual({});
     expect(onSetupComplete).not.toHaveBeenCalled();
 
     socket.receive({ setupComplete: {}, usageMetadata: { promptTokenCount: 1 } });
@@ -472,10 +473,11 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(JSON.stringify(client.getTelemetry())).not.toContain('FUTURE_PROVIDER_STATE');
   });
 
-  it('emits only validated output transcription fragments and ignores malformed/source fields', async () => {
+  it('emits validated source/output transcription fragments and isolates malformed fields', async () => {
     const onTranslatedTranscript = vi.fn();
+    const onOriginalTranscript = vi.fn();
     const onError = vi.fn();
-    const client = createClient({ onTranslatedTranscript, onError });
+    const client = createClient({ onTranslatedTranscript, onOriginalTranscript, onError });
     const socket = await connectReady(client);
 
     socket.receive({ serverContent: {
@@ -490,6 +492,7 @@ describe('GeminiLiveProviderAdapter', () => {
       kind: 'translated',
       text: 'translated fragment',
     });
+    expect(onOriginalTranscript).toHaveBeenCalledWith({ kind: 'source', text: 'source text' });
     expect(onError).not.toHaveBeenCalled();
   });
 

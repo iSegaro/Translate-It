@@ -6,6 +6,8 @@ import {
   LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STATUS,
+  LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND,
+  LIVE_DUBBING_ORIGINAL_TRANSCRIPT_MAX_LENGTH,
   LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND,
   LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH,
 } from './constants.js';
@@ -620,20 +622,36 @@ export function hasExactSessionEvent(message, descriptor) {
 }
 
 /**
- * Keep translated transcript fragments provider-neutral and deliberately small.
+ * Keep transcript fragments provider-neutral and deliberately small.
  * Provider payloads, source transcripts, and timing metadata do not cross a
  * context boundary.
  * @param {unknown} value
- * @returns {{kind: 'translated', text: string}|null}
+ * @returns {{kind: 'translated'|'source', text: string}|null}
  */
-export function createLiveDubbingTranslatedTranscript(value) {
+export function createLiveDubbingTranscript(value, kind = LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND) {
   const text = typeof value === 'string' ? value : null;
+  const maxLength = kind === LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND
+    ? LIVE_DUBBING_ORIGINAL_TRANSCRIPT_MAX_LENGTH
+    : kind === LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND
+      ? LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH
+      : 0;
   return typeof text === 'string'
     && text.length > 0
-    && text.length <= LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH
-    ? { kind: LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND, text }
+    && maxLength > 0
+    && text.length <= maxLength
+    ? { kind, text }
     : null;
 }
+
+export const createLiveDubbingTranslatedTranscript = value => createLiveDubbingTranscript(
+  value,
+  LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND,
+);
+
+export const createLiveDubbingOriginalTranscript = value => createLiveDubbingTranscript(
+  value,
+  LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND,
+);
 
 /**
  * Rebuild a translated transcript DTO from untrusted context-bound input.
@@ -643,27 +661,53 @@ export function createLiveDubbingTranslatedTranscript(value) {
 export function sanitizeLiveDubbingTranslatedTranscript(value) {
   try {
     if (!isPlainRecord(value) || value.kind !== LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND) return null;
-    return createLiveDubbingTranslatedTranscript(value.text);
+    return createLiveDubbingTranscript(value.text, LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND);
   } catch {
     return null;
   }
 }
 
+export function sanitizeLiveDubbingOriginalTranscript(value) {
+  try {
+    if (!isPlainRecord(value) || value.kind !== LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND) return null;
+    return createLiveDubbingTranscript(value.text, LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND);
+  } catch {
+    return null;
+  }
+}
+
+export function sanitizeLiveDubbingTranscript(value) {
+  try {
+    if (!isPlainRecord(value)) return null;
+    if (value.kind === LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND) {
+      return sanitizeLiveDubbingTranslatedTranscript(value);
+    }
+    if (value.kind === LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND) {
+      return sanitizeLiveDubbingOriginalTranscript(value);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /**
  * Build the session-fenced offscreen transcript notification.
  */
-export function createLiveDubbingTranslatedTranscriptMessage(descriptor, value, transcriptSequence) {
-  const transcript = sanitizeLiveDubbingTranslatedTranscript(value);
+export function createLiveDubbingTranscriptMessage(descriptor, value, transcriptSequence) {
+  const transcript = sanitizeLiveDubbingTranscript(value);
   if (!descriptor || !isSessionId(descriptor.sessionId)
     || !isLiveDubbingProviderId(descriptor.providerId)
     || !Number.isInteger(descriptor.eventSequence) || descriptor.eventSequence < 0
     || !Number.isSafeInteger(transcriptSequence) || transcriptSequence < 1
     || !transcript) {
-    throw new TypeError('translated transcript message is invalid');
+    throw new TypeError('transcript message is invalid');
   }
 
   return {
-    action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+    action: transcript.kind === LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND
+      ? LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT
+      : LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
     data: {
       sessionId: descriptor.sessionId,
       providerId: descriptor.providerId,
@@ -673,6 +717,8 @@ export function createLiveDubbingTranslatedTranscriptMessage(descriptor, value, 
     },
   };
 }
+
+export const createLiveDubbingTranslatedTranscriptMessage = createLiveDubbingTranscriptMessage;
 
 export function createLiveDubbingTranscriptClearMessage(sessionId) {
   if (!isSessionId(sessionId)) throw new TypeError('sessionId is required');

@@ -116,6 +116,7 @@ function buildMintBody(targetLanguage) {
     bidiGenerateContentSetup: {
       model: GEMINI_LIVE_MODEL,
       outputAudioTranscription: {},
+      inputAudioTranscription: {},
       generationConfig: {
         responseModalities: ['AUDIO'],
         translationConfig: {

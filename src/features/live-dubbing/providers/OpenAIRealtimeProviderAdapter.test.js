@@ -175,22 +175,24 @@ describe('OpenAIRealtimeProviderAdapter', () => {
 
   it('counts transcript events as scalar telemetry without retaining text', async () => {
     const onTranslatedTranscript = vi.fn();
-    const harness = createHarness({ callbacks: { onTranslatedTranscript } });
+    const onOriginalTranscript = vi.fn();
+    const harness = createHarness({ callbacks: { onTranslatedTranscript, onOriginalTranscript } });
     await harness.connect();
 
     harness.peerConnection.channel.onmessage({
       data: JSON.stringify({ type: 'session.output_transcript.delta', delta: 'private text' }),
     });
     harness.peerConnection.channel.onmessage({
-      data: JSON.stringify({ type: 'input_audio_transcript.delta', delta: 'source text' }),
+      data: JSON.stringify({ type: 'session.input_transcript.delta', delta: 'source text' }),
     });
     harness.peerConnection.channel.onmessage({ data: JSON.stringify({ type: 'audio.delta' }) });
 
     const telemetry = harness.adapter.getTelemetry();
-    expect(telemetry.transcriptEvents).toBe(1);
+    expect(telemetry.transcriptEvents).toBe(2);
     expect(JSON.stringify(telemetry)).not.toContain('private text');
     expect(onTranslatedTranscript).toHaveBeenCalledWith({ kind: 'translated', text: 'private text' });
-    expect(JSON.stringify(onTranslatedTranscript.mock.calls)).not.toContain('source text');
+    expect(onOriginalTranscript).toHaveBeenCalledWith({ kind: 'source', text: 'source text' });
+    expect(JSON.stringify(telemetry)).not.toContain('source text');
   });
 
   it('fails bounded setup when SDP succeeds but the peer stays connecting', async () => {
@@ -314,8 +316,9 @@ describe('OpenAIRealtimeProviderAdapter', () => {
 
   it('ignores malformed output transcript deltas without failing', async () => {
     const onTranslatedTranscript = vi.fn();
+    const onOriginalTranscript = vi.fn();
     const onError = vi.fn();
-    const harness = createHarness({ callbacks: { onTranslatedTranscript, onError } });
+    const harness = createHarness({ callbacks: { onTranslatedTranscript, onOriginalTranscript, onError } });
     await harness.connect();
 
     harness.peerConnection.channel.onmessage({
@@ -324,8 +327,12 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     harness.peerConnection.channel.onmessage({
       data: JSON.stringify({ type: 'response.output_transcript.delta', delta: 'wrong event' }),
     });
+    harness.peerConnection.channel.onmessage({
+      data: JSON.stringify({ type: 'session.input_transcript.delta', delta: 42 }),
+    });
 
     expect(onTranslatedTranscript).not.toHaveBeenCalled();
+    expect(onOriginalTranscript).not.toHaveBeenCalled();
     expect(onError).not.toHaveBeenCalled();
     expect(harness.adapter.active).toBe(true);
   });

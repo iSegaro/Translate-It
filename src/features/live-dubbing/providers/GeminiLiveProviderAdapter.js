@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import {
   createLiveDubbingProviderDiagnostic,
+  createLiveDubbingOriginalTranscript,
   createLiveDubbingTranslatedTranscript,
   normalizeProviderTargetLanguage,
 } from '../contracts.js';
@@ -194,12 +195,20 @@ function isValidServerContentMetadata(field, value) {
   return isRecord(value);
 }
 
-function readOutputTranscript(value) {
+function readTranscript(value, createTranscript) {
   try {
-    return isRecord(value) ? createLiveDubbingTranslatedTranscript(value.text) : null;
+    return isRecord(value) ? createTranscript(value.text) : null;
   } catch {
     return null;
   }
+}
+
+function readOutputTranscript(value) {
+  return readTranscript(value, createLiveDubbingTranslatedTranscript);
+}
+
+function readOriginalTranscript(value) {
+  return readTranscript(value, createLiveDubbingOriginalTranscript);
 }
 
 function sanitizeMessage(value, secret = '') {
@@ -286,8 +295,8 @@ function callbackFrom(options, callbacks, name, aliases = []) {
  * Small native-WebSocket adapter for the Gemini Live translation protocol.
  *
  * It owns Gemini framing, transport encoding/decoding, protocol validation,
- * socket backpressure, and provider-neutral output transcript
- * extraction. Audio capture, playback, and retries stay outside this class.
+ * socket backpressure, and provider-neutral transcript extraction. Audio
+ * capture, playback, and retries stay outside this class.
  */
 export class GeminiLiveProviderAdapter {
   constructor(options = {}) {
@@ -310,6 +319,7 @@ export class GeminiLiveProviderAdapter {
     this.onGenerationComplete = callbackFrom(options, callbacks, 'onGenerationComplete');
     this.onTurnComplete = callbackFrom(options, callbacks, 'onTurnComplete');
     this.onTranslatedTranscript = callbackFrom(options, callbacks, 'onTranslatedTranscript');
+    this.onOriginalTranscript = callbackFrom(options, callbacks, 'onOriginalTranscript');
     this.onGoAway = callbackFrom(options, callbacks, 'onGoAway');
     this.onError = callbackFrom(options, callbacks, 'onError');
     this.onClose = callbackFrom(options, callbacks, 'onClose');
@@ -531,6 +541,7 @@ export class GeminiLiveProviderAdapter {
           setup: {
             model: GEMINI_LIVE_MODEL,
             outputAudioTranscription: {},
+            inputAudioTranscription: {},
             generationConfig: {
               responseModalities: ['AUDIO'],
               translationConfig: {
@@ -774,6 +785,7 @@ export class GeminiLiveProviderAdapter {
     const audioParts = [];
     const lifecycleEvents = [];
     const translatedTranscripts = [];
+    const originalTranscripts = [];
     if (Object.prototype.hasOwnProperty.call(serverContent, 'modelTurn')) {
       const modelTurn = serverContent.modelTurn;
       if (!isRecord(modelTurn) || !Array.isArray(modelTurn.parts)) {
@@ -846,6 +858,11 @@ export class GeminiLiveProviderAdapter {
         if (transcript) translatedTranscripts.push(transcript);
         continue;
       }
+      if (field === 'inputTranscription') {
+        const transcript = readOriginalTranscript(serverContent[field]);
+        if (transcript) originalTranscripts.push(transcript);
+        continue;
+      }
       if (!isValidServerContentMetadata(field, serverContent[field])) {
         this._emitMalformedMessage(socket, generation, 'METADATA_SHAPE');
         return;
@@ -860,6 +877,9 @@ export class GeminiLiveProviderAdapter {
     }
     for (const transcript of translatedTranscripts) {
       this._emit(this.onTranslatedTranscript, transcript);
+    }
+    for (const transcript of originalTranscripts) {
+      this._emit(this.onOriginalTranscript, transcript);
     }
     for (const { callback, type } of lifecycleEvents) {
       if (type === 'interrupted') this.telemetry.interruptions += 1;

@@ -14,7 +14,7 @@ import {
   createLiveDubbingDiagnostic,
   createLiveDubbingCleanupDiagnostic,
   createLiveDubbingProviderDiagnostic,
-  createLiveDubbingTranslatedTranscriptMessage,
+  createLiveDubbingTranscriptMessage,
   createProviderBootstrapRequest,
   normalizeLiveDubbingVolume,
   isLiveDubbingProviderId,
@@ -23,7 +23,7 @@ import {
   parseProviderBootstrapResponse,
   sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
-  sanitizeLiveDubbingTranslatedTranscript,
+  sanitizeLiveDubbingTranscript,
 } from '../contracts.js';
 import { liveDubbingProviderRegistry } from '../providers/LiveDubbingProviderRegistry.js';
 import { LiveDubbingAudioEngine } from './LiveDubbingAudioEngine.js';
@@ -1402,6 +1402,11 @@ export class LiveDubbingController {
         generation,
         transcript,
       ),
+      onOriginalTranscript: transcript => this._handleProviderOriginalTranscript(
+        session,
+        generation,
+        transcript,
+      ),
       onInterrupted: () => this._handleProviderInterrupted(session, generation),
       onGenerationComplete: () => {},
       onTurnComplete: () => {},
@@ -2415,10 +2420,18 @@ export class LiveDubbingController {
   }
 
   _handleProviderTranslatedTranscript(session, generation, transcript) {
+    this._handleProviderTranscript(session, generation, transcript);
+  }
+
+  _handleProviderOriginalTranscript(session, generation, transcript) {
+    this._handleProviderTranscript(session, generation, transcript);
+  }
+
+  _handleProviderTranscript(session, generation, transcript) {
     if (!this._isCurrentProvider(session, generation)
       || !session.setupComplete) return;
 
-    const normalized = sanitizeLiveDubbingTranslatedTranscript(transcript);
+    const normalized = sanitizeLiveDubbingTranscript(transcript);
     if (!normalized) return;
 
     let message;
@@ -2431,7 +2444,7 @@ export class LiveDubbingController {
       const transcriptDescriptor = session.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
         ? { ...session, eventSequence: session.eventSequence + 1 }
         : session;
-      message = createLiveDubbingTranslatedTranscriptMessage(
+      message = createLiveDubbingTranscriptMessage(
         transcriptDescriptor,
         normalized,
         transcriptSequence,

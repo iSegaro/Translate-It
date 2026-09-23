@@ -5,6 +5,9 @@
   bottom: clamp(1.5rem, 8vh, 5rem) !important;
   width: min(90vw, 52rem) !important;
   transform: translate3d(-50%, 0, 0) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  row-gap: 0.15rem !important;
   padding: 0.7rem 1rem !important;
   color: #fff !important;
   background: rgb(12 16 24 / 82%) !important;
@@ -18,4 +21,18 @@
   pointer-events: none !important;
   user-select: none !important;
   contain: layout paint !important;
+}
+
+// Secondary row: original (source) speech, smaller and muted above the
+// primary translated row, which inherits the container's visual unchanged.
+.live-dubbing-transcript__source {
+  color: rgb(255 255 255 / 66%) !important;
+  font-size: 0.78em !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.02em !important;
+  pointer-events: none !important;
+}
+
+.live-dubbing-transcript__translated {
+  pointer-events: none !important;
 }

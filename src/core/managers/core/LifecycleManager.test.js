@@ -60,6 +60,18 @@ describe('LifecycleManager translation text routing', () => {
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === MessageActions.SELECT_ELEMENT_FRAME_READY)).toHaveLength(1)
   })
 
+  it('registers original transcript routing alongside translated transcript routing', () => {
+    const manager = new LifecycleManager()
+    manager.registerMessageHandlers()
+
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT)).toEqual(expect.any(Function))
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT)).toEqual(expect.any(Function))
+    expect(registerHandlerMock.mock.calls.filter(([action]) => action === LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT))
+      .toHaveLength(1)
+    expect(registerHandlerMock.mock.calls.filter(([action]) => action === LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT))
+      .toHaveLength(1)
+  })
+
   it('keeps refresh action registered without an undefined action mapping', () => {
     const manager = new LifecycleManager()
     manager.registerMessageHandlers()

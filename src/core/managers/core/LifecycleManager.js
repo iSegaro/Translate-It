@@ -58,6 +58,15 @@ async function handleLiveDubbingGetDubbedVolumeLazy(message, sender) {
   }
 }
 
+async function handleLiveDubbingOriginalTranscriptLazy(message, sender) {
+  try {
+    const { handleLiveDubbingOriginalTranscript } = await import('@/features/live-dubbing/background/handlers.js');
+    return handleLiveDubbingOriginalTranscript(message, sender);
+  } catch {
+    return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+  }
+}
+
 class LifecycleManager {
   constructor() {
     this.initialized = false;
@@ -320,6 +329,7 @@ class LifecycleManager {
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
         [MessageActions.LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP]: Handlers.handleLiveDubbingBootstrapRequestLazy,
         [LIVE_DUBBING_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
+        [LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT]: handleLiveDubbingOriginalTranscriptLazy,
         [LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT]: Handlers.handleLiveDubbingTranslatedTranscriptLazy,
       });
     }

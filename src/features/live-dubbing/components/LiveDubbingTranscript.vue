@@ -1,12 +1,24 @@
 <template>
   <div
-    v-if="visibleText"
+    v-if="visibleText || visibleSourceText"
     class="live-dubbing-transcript"
-    dir="auto"
     aria-live="polite"
     aria-atomic="false"
   >
-    {{ visibleText }}
+    <div
+      v-if="visibleSourceText"
+      class="live-dubbing-transcript__source"
+      dir="auto"
+    >
+      {{ visibleSourceText }}
+    </div>
+    <div
+      v-if="visibleText"
+      class="live-dubbing-transcript__translated"
+      dir="auto"
+    >
+      {{ visibleText }}
+    </div>
   </div>
 </template>
 
@@ -17,10 +29,14 @@ import {
   getLiveDubbingTranscriptSnapshot,
   subscribeLiveDubbingTranscript,
 } from '../content/liveDubbingTranscriptStore.js';
-import { getVisibleLiveDubbingTranscript } from '../content/liveDubbingTranscriptPresentation.js';
+import {
+  getVisibleLiveDubbingSourceTranscript,
+  getVisibleLiveDubbingTranscript,
+} from '../content/liveDubbingTranscriptPresentation.js';
 
 const transcript = ref(getLiveDubbingTranscriptSnapshot());
 const visibleText = computed(() => getVisibleLiveDubbingTranscript(transcript.value));
+const visibleSourceText = computed(() => getVisibleLiveDubbingSourceTranscript(transcript.value));
 const unsubscribe = subscribeLiveDubbingTranscript((snapshot) => {
   transcript.value = snapshot;
 });

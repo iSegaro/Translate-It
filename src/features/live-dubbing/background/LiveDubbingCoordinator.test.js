@@ -7231,6 +7231,23 @@ describe('LiveDubbingCoordinator', () => {
       data: message.data,
     }, { frameId: 0 });
 
+    await expect(harness.coordinator.handleOffscreenOriginalTranscript({
+      action: LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT,
+      data: {
+        ...message.data,
+        transcriptSequence: 2,
+        transcript: { kind: 'source', text: 'hello' },
+      },
+    }, sender)).resolves.toEqual({ success: true });
+    expect(sendTabMessage).toHaveBeenLastCalledWith(42, {
+      action: LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT,
+      data: {
+        ...message.data,
+        transcriptSequence: 2,
+        transcript: { kind: 'source', text: 'hello' },
+      },
+    }, { frameId: 0 });
+
     await expect(harness.coordinator.handleOffscreenTranslatedTranscript({
       ...message,
       data: { ...message.data, eventSequence: 3 },

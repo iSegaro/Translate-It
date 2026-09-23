@@ -3662,7 +3662,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.dispose('session-1', 'gemini');
   });
 
-  it('forwards only current normalized translated transcript callbacks', async () => {
+  it('forwards current normalized transcript callbacks with one shared sequence', async () => {
     const track = new FakeTrack();
     const notifyTranscript = vi.fn();
     let providerCallbacks;
@@ -3698,7 +3698,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.connectProvider('session-1', 'gemini', 'fr', 2);
     providerCallbacks.onTranslatedTranscript({ kind: 'translated', text: 'bonjour' });
     providerCallbacks.onTranslatedTranscript({ kind: 'translated', text: ' monde' });
-    providerCallbacks.onTranslatedTranscript({ kind: 'source', text: 'ignored' });
+    providerCallbacks.onOriginalTranscript({ kind: 'source', text: 'source' });
 
     expect(notifyTranscript).toHaveBeenNthCalledWith(1, {
       action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
@@ -3717,11 +3717,18 @@ describe('LiveDubbingController media-stream audio path', () => {
         transcript: { kind: 'translated', text: ' monde' },
       }),
     }));
+    expect(notifyTranscript).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      action: LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT,
+      data: expect.objectContaining({
+        transcriptSequence: 3,
+        transcript: { kind: 'source', text: 'source' },
+      }),
+    }));
 
     const staleCallback = providerCallbacks.onTranslatedTranscript;
     await controller.dispose('session-1', 'gemini');
     staleCallback({ kind: 'translated', text: 'late' });
-    expect(notifyTranscript).toHaveBeenCalledTimes(2);
+    expect(notifyTranscript).toHaveBeenCalledTimes(3);
   });
 
   it('keeps the connecting sequence stable before an early setup transcript', async () => {
@@ -3733,6 +3740,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     const provider = {
       connect: vi.fn(() => {
         providerCallbacks.onSetupComplete();
+        providerCallbacks.onOriginalTranscript({ kind: 'source', text: 'hello' });
         providerCallbacks.onTranslatedTranscript({ kind: 'translated', text: 'bonjour' });
         return setupPromise;
       }),
@@ -3766,10 +3774,13 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.consume('session-1', 'gemini', 'stream-id', 1);
     const connectPromise = controller.connectProvider('session-1', 'gemini', 'fr', 2);
 
-    await vi.waitFor(() => expect(notifyTranscript).toHaveBeenCalledOnce());
-     expect(notifyTranscript).toHaveBeenCalledWith(expect.objectContaining({
-       data: expect.objectContaining({ eventSequence: 3, transcriptSequence: 1 }),
-     }));
+     await vi.waitFor(() => expect(notifyTranscript).toHaveBeenCalledTimes(2));
+      expect(notifyTranscript).toHaveBeenCalledWith(expect.objectContaining({
+       data: expect.objectContaining({ eventSequence: 3, transcriptSequence: 1, transcript: { kind: 'source', text: 'hello' } }),
+      }));
+      expect(notifyTranscript).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        data: expect.objectContaining({ eventSequence: 3, transcriptSequence: 2 }),
+      }));
      expect(controller.currentSession.status).toBe(LIVE_DUBBING_STATUS.CONNECTING_PROVIDER);
      expect(controller.currentSession.eventSequence).toBe(2);
 
