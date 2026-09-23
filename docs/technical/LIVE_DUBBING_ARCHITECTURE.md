@@ -240,6 +240,18 @@ borrows the stream from Controller pipeline state. `setVolume(v)` is
 finite-`0..1` validated and non-terminal; calls arriving before monitor
 creation are stored and applied at lazy start.
 
+### Chromium fullscreen limitation
+
+Live Dubbing uses tab audio capture. While Chromium visibly captures the
+active tab, it may suppress normal browser-window fullscreen and keep the
+page in a fullscreen-within-tab presentation, with browser UI such as the
+toolbar still visible. This is Chromium capture behavior, not a transcript
+renderer failure: in that capture-constrained presentation, the normal
+transcript overlay continues to render in the tab viewport. Translate It does
+not override or re-request fullscreen because doing so would be brittle and
+cannot bypass Chromium's capture policy. This behavior has not been verified
+for Firefox.
+
 ### Capture and runtime loss
 
 `handleCaptureStatusChanged()` accepts only `stopped` or `error` capture
