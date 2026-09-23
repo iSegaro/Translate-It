@@ -385,6 +385,15 @@ Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 - **No reconnect or resumption.** Terminal provider states (close, error,
   goAway) end the session. There is no automatic reconnect, session
   resumption, or cross-provider fallback.
+- **Transcript configuration.** Both translated and original (source) audio
+  transcription are enabled. The runtime-verified raw WebSocket setup keeps
+  both fields as siblings of `generationConfig` — moving them inside
+  `generationConfig` causes a WebSocket close (`1007`). The constrained
+  ephemeral-token `bidiGenerateContentSetup` body mirrors that same raw
+  setup shape. The adapter parses only the documented transcript frames and
+  never exposes raw provider events:
+  - translated: `serverContent.outputTranscription.text`
+  - source: `serverContent.inputTranscription.text`
 
 `speechState` is officially documented-but-deprecated and
 `interactionStatus` is officially documented; both are accepted as
@@ -424,6 +433,18 @@ adapter has no `sendAudio` method and never stops or removes Controller-owned
 source tracks. OpenAI setup and playback failures use the existing generic
 provider error lifecycle and generation fencing; transcript events are counted
 as scalar telemetry and transcript text is not retained.
+
+- **Translation model.** `gpt-realtime-translate`.
+- **Transcript configuration.** The translation client-secret mint body
+  enables input audio transcription by including
+  `audio.input.transcription.model = 'gpt-realtime-whisper'` alongside the
+  existing `audio.output.language = targetLanguage`. The `oai-events` data
+  channel delivers both kinds as plain text deltas; the adapter parses
+  only:
+  - translated: `session.output_transcript.delta` (text appended)
+  - source: `session.input_transcript.delta` (text appended)
+
+  Raw provider payloads never cross the adapter boundary.
 
 Ownership split: the controller owns the capture tracks in both modes
 and stops them only in Controller cleanup; providers never own the
@@ -697,6 +718,12 @@ or descriptor adoption is performed for an uncertain owner.
   failures, buffered peaks, safety drops, underruns, interruptions, and
   same-context milestones) is observational only and never affects audio
   or session behavior.
+- **Transcript bounds.** Provider-neutral per-fragment max length and
+  per-kind retained character budgets bound memory; malformed or
+  oversized transcript events are ignored without affecting the session.
+  Transcript text is never persisted to browser storage, descriptor,
+  diagnostic, translation history, telemetry, logs, or error payloads.
+  Scalar transcript counters are allowed.
 - Logging is scoped to `LOG_COMPONENTS.LIVE_DUBBING` (Features category):
   warn for provider terminals, the single background no-playback record, and
   real capture/startup/disposal failures; debug for lifecycle detail and mint
@@ -732,3 +759,89 @@ or descriptor adoption is performed for an uncertain owner.
   clear or detach a live fenced resource and change ordering, so explicit
   ownership remains correct. `ResourceTracker` stays limited to simple
   synchronous local resources, of which this feature owns none.
+
+## Transcript Subsystem
+
+Both translated and original (source) audio transcripts are produced in
+parallel for the active Live Dubbing session and rendered inside the
+existing Shadow DOM UI host in the top frame. The pipeline is strictly
+provider-neutral downstream of the adapter boundary:
+
+```
+Provider Adapter → LiveDubbingController → Background Coordinator
+  → top-frame ContentMessageHandler → plain-JS transcript store
+  → Shadow DOM Vue renderer
+```
+
+- **Provider-neutral DTO.** Adapters emit only `{ kind: 'translated' | 'source', text }`.
+  Raw provider transcript events/payloads never escape provider adapters;
+  only normalized `{ kind, text }` transcript DTOs enter the transcript
+  pipeline. Credentials and bootstrap secrets follow the existing bootstrap
+  transport and never enter transcript DTOs, logs, storage, diagnostics, or
+  UI state. The Coordinator validates a provider-neutral envelope and the
+  store renders only the normalized text.
+- **Shared sequencing.** A single per-session monotonic `transcriptSequence`
+  orders both kinds. Envelopes arriving out of order are rejected.
+- **Side-channel.** Transcript is a side-channel: it never participates in
+  Live Dubbing lifecycle, never mutates `SessionRegistry`, and never
+  influences lease ownership, cleanup, START/STOP, or terminal decisions.
+- **Per-fragment cap.** Provider-neutral per-fragment max length and a
+  per-kind bounded retention budget bound retained memory; oversized or
+  malformed events are ignored without affecting the session.
+
+### Lifecycle Fencing
+
+- Provider callbacks are fenced by current `sessionId`, `providerId`, and
+  the active provider generation. Stale callbacks from a replaced or
+  disposed session are rejected.
+- Provider `setupComplete` may arrive before Background commits the
+  authoritative `RUNNING` descriptor. During that window an early
+  transcript uses the reserved `session.eventSequence + 1` without
+  mutating the canonical `session.eventSequence`. The canonical sequence
+  advances exactly once when the normal `CONNECTING_PROVIDER` →
+  `RUNNING` transition commits, so Original/Dubbed Volume commands issued
+  with the current `CONNECTING_PROVIDER` sequence remain valid throughout
+  the window.
+- The Coordinator accepts transcripts that match the current
+  `CONNECTING_PROVIDER` descriptor event sequence **or** the reserved next
+  sequence during this transition only; older or arbitrary sequences are
+  rejected.
+
+### Background Relay
+
+- Authorized offscreen sender only (exact offscreen URL + runtime id,
+  no tab, no documentId).
+- Per-session identity, provider id, and current `eventSequence` are
+  fenced for every message.
+- `transcriptSequence` is fenced monotonically; stale or duplicate
+  sequences are dropped.
+- Relay bookkeeping state is Coordinator-owned and deliberately kept
+  outside `SessionRegistry` so a service-worker restart with an active
+  descriptor and an empty registry cannot create lifecycle facts.
+- Content delivery uses `frameId: 0`. Tab-message delivery failures are
+  swallowed and never fail Live Dubbing.
+- A single shared Coordinator clear path emits a session-scoped clear
+  action once on authoritative STOP, terminal lifecycle, START failure,
+  and START timeout, covering both `translated` and `source` kinds.
+- Session supersession/replacement is handled independently at the
+  Content/store boundary: when the store accepts a new session envelope
+  for a different `sessionId`, it retires the replaced session and resets
+  both `translated` and `source` buffers as part of its own
+  session-replacement semantics. A separate `CLEAR_TRANSCRIPT` relay from
+  the Coordinator is not required for supersession.
+
+### Store and Renderer
+
+- Plain-JS transcript store (no Vue dependency) retains `translatedFragments`
+  and `sourceFragments` independently. Each buffer has its own character
+  budget; one kind cannot evict the other. Fragment text is preserved
+  byte-for-byte, including whitespace.
+- A retired-session set rejects delayed fragments from sessions that have
+  been replaced. A single clear operation resets both buffers.
+- Renderer mounts in the top frame inside the existing Shadow DOM UI host.
+  The source row is shown above the translated row (secondary, smaller,
+  muted). Translated remains primary. Both rows use `dir="auto"`, are
+  non-interactive (`pointer-events: none`, no click capture), and
+  presentation clipping is bounded independently per kind. Feature-local
+  component SCSS follows the project's Shadow DOM `!important`
+  convention.
