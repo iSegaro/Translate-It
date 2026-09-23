@@ -6,6 +6,8 @@ import {
   LIVE_DUBBING_PROVIDER_IDS,
   LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_STATUS,
+  LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND,
+  LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH,
 } from './constants.js';
 
 const supportedStatuses = new Set(Object.values(LIVE_DUBBING_STATUS));
@@ -615,6 +617,73 @@ export function hasExactSessionEvent(message, descriptor) {
     && data.providerId === descriptor.providerId
     && Number.isInteger(data.eventSequence)
     && data.eventSequence === descriptor.eventSequence);
+}
+
+/**
+ * Keep translated transcript fragments provider-neutral and deliberately small.
+ * Provider payloads, source transcripts, and timing metadata do not cross a
+ * context boundary.
+ * @param {unknown} value
+ * @returns {{kind: 'translated', text: string}|null}
+ */
+export function createLiveDubbingTranslatedTranscript(value) {
+  const text = typeof value === 'string' ? value : null;
+  return typeof text === 'string'
+    && text.length > 0
+    && text.length <= LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH
+    ? { kind: LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND, text }
+    : null;
+}
+
+/**
+ * Rebuild a translated transcript DTO from untrusted context-bound input.
+ * @param {unknown} value
+ * @returns {{kind: 'translated', text: string}|null}
+ */
+export function sanitizeLiveDubbingTranslatedTranscript(value) {
+  try {
+    if (!isPlainRecord(value) || value.kind !== LIVE_DUBBING_TRANSLATED_TRANSCRIPT_KIND) return null;
+    return createLiveDubbingTranslatedTranscript(value.text);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the session-fenced offscreen transcript notification.
+ */
+export function createLiveDubbingTranslatedTranscriptMessage(descriptor, value, transcriptSequence) {
+  const transcript = sanitizeLiveDubbingTranslatedTranscript(value);
+  if (!descriptor || !isSessionId(descriptor.sessionId)
+    || !isLiveDubbingProviderId(descriptor.providerId)
+    || !Number.isInteger(descriptor.eventSequence) || descriptor.eventSequence < 0
+    || !Number.isSafeInteger(transcriptSequence) || transcriptSequence < 1
+    || !transcript) {
+    throw new TypeError('translated transcript message is invalid');
+  }
+
+  return {
+    action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+    data: {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence,
+      transcriptSequence,
+      transcript,
+    },
+  };
+}
+
+export function createLiveDubbingTranscriptClearMessage(sessionId) {
+  if (!isSessionId(sessionId)) throw new TypeError('sessionId is required');
+  return {
+    action: LIVE_DUBBING_ACTIONS.TRANSCRIPT_CLEAR,
+    data: { sessionId },
+  };
+}
+
+export function isValidLiveDubbingTranscriptSequence(value) {
+  return Number.isSafeInteger(value) && value >= 1;
 }
 
 /**

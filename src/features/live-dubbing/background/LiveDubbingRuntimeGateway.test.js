@@ -20,6 +20,19 @@ describe('LiveDubbingRuntimeGateway', () => {
     await expect(gateway.sendMessage(message)).rejects.toBe(failure);
   });
 
+  it('targets translated transcript relays at the top frame of the requested tab', async () => {
+    const tabs = {
+      sendMessage: vi.fn(function sendMessage(...args) {
+        expect(this).toBe(tabs);
+        return Promise.resolve(args);
+      }),
+    };
+    const gateway = new LiveDubbingRuntimeGateway({ browserAPI: { tabs }, chromeAPI: {} });
+    const message = { action: 'LIVE_DUBBING_TRANSLATED_TRANSCRIPT' };
+
+    await expect(gateway.sendTabMessage(42, message)).resolves.toEqual([42, message, { frameId: 0 }]);
+  });
+
   it('returns synchronous runtime message results without wrapping them', () => {
     const result = { success: true };
     const runtime = { sendMessage: vi.fn(() => result) };

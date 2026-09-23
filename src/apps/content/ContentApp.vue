@@ -87,6 +87,9 @@
 
       <!-- Mouse on Hover Translation Tooltip -->
       <MouseHoverTooltip />
+
+      <!-- Live dubbing transcript: top-frame, display-only surface. -->
+      <LiveDubbingTranscript v-if="isTopFrame" />
     </template>
 
     <!-- 
@@ -140,6 +143,7 @@ const TranslationWindow = defineAsyncComponent(() => import('@/features/windows/
 const TranslationIcon = defineAsyncComponent(() => import('@/features/windows/components/TranslationIcon.vue'));
 const PageTranslationTooltip = defineAsyncComponent(() => import('./components/PageTranslationTooltip.vue'));
 const MouseHoverTooltip = defineAsyncComponent(() => import('./components/MouseHoverTooltip.vue'));
+const LiveDubbingTranscript = defineAsyncComponent(() => import('@/features/live-dubbing/content/LiveDubbingTranscript.vue'));
 
 // Device-Specific Lazy Components
 const MobileSheet = defineAsyncComponent(() => import('./components/mobile/MobileSheet.vue'));

@@ -7,6 +7,9 @@ import {
   createPrepareMessage,
   normalizeLiveDubbingVolume,
   createLiveDubbingProviderDiagnostic,
+  createLiveDubbingTranslatedTranscript,
+  createLiveDubbingTranslatedTranscriptMessage,
+  createLiveDubbingTranscriptClearMessage,
   createProviderBootstrapRequest,
   createProviderBootstrapResponse,
   createSessionMessage,
@@ -22,6 +25,8 @@ import {
   normalizeOpenAITargetLanguage,
   sanitizeLiveDubbingTerminalOutcome,
   sanitizeLiveDubbingProviderDiagnostic,
+  sanitizeLiveDubbingTranslatedTranscript,
+  isValidLiveDubbingTranscriptSequence,
   sanitizeDescriptor,
   sanitizeLiveDubbingCleanupDiagnostic,
   toPublicLiveDubbingTerminalOutcome,
@@ -32,6 +37,7 @@ import {
   LIVE_DUBBING_OFFSCREEN_ACTIONS,
   LIVE_DUBBING_STATUS,
   LIVE_DUBBING_TIMEOUTS,
+  LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH,
 } from './constants.js';
 
 const browserAPI = {
@@ -801,5 +807,44 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(isLiveDubbingAudioMode(undefined)).toBe(false);
     expect(isLiveDubbingAudioMode(0)).toBe(false);
     expect(isLiveDubbingAudioMode({})).toBe(false);
+  });
+
+  it('keeps translated transcript DTOs provider-neutral and text-only', () => {
+    expect(createLiveDubbingTranslatedTranscript(' hello ')).toEqual({
+      kind: 'translated',
+      text: ' hello ',
+    });
+    expect(sanitizeLiveDubbingTranslatedTranscript({
+      kind: 'translated',
+      text: 'hello',
+      source: 'must not cross the boundary',
+    })).toEqual({ kind: 'translated', text: 'hello' });
+    expect(sanitizeLiveDubbingTranslatedTranscript({ kind: 'source', text: 'no' })).toBeNull();
+    expect(sanitizeLiveDubbingTranslatedTranscript({ kind: 'translated', text: ' ' })).toEqual({
+      kind: 'translated',
+      text: ' ',
+    });
+    expect(createLiveDubbingTranslatedTranscript('x'.repeat(LIVE_DUBBING_TRANSLATED_TRANSCRIPT_MAX_LENGTH + 1)))
+      .toBeNull();
+    expect(isValidLiveDubbingTranscriptSequence(1)).toBe(true);
+    expect(isValidLiveDubbingTranscriptSequence(0)).toBe(false);
+    expect(createLiveDubbingTranslatedTranscriptMessage({
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+    }, { kind: 'translated', text: 'hello' }, 2)).toEqual({
+      action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        transcriptSequence: 2,
+        transcript: { kind: 'translated', text: 'hello' },
+      },
+    });
+    expect(createLiveDubbingTranscriptClearMessage('session-1')).toEqual({
+      action: LIVE_DUBBING_ACTIONS.CLEAR_TRANSCRIPT,
+      data: { sessionId: 'session-1' },
+    });
   });
 });

@@ -4,6 +4,7 @@ import {
 } from '../constants.js';
 import {
   normalizeProviderTargetLanguage,
+  createLiveDubbingTranslatedTranscript,
   sanitizeLiveDubbingProviderDiagnostic,
 } from '../contracts.js';
 import { getScopedLogger } from '../../../shared/logging/logger.js';
@@ -203,9 +204,21 @@ function readEventType(data) {
   return typeof type === 'string' ? type : null;
 }
 
-function isTranscriptEvent(data) {
-  const type = readEventType(data);
-  return typeof type === 'string' && type.toLowerCase().includes('transcript');
+function readOutputTranscriptDelta(data) {
+  let event = data;
+  if (typeof data === 'string') {
+    try {
+      event = JSON.parse(data);
+    } catch {
+      return null;
+    }
+  }
+  if (!isRecord(event) || event.type !== 'session.output_transcript.delta') return null;
+  try {
+    return createLiveDubbingTranslatedTranscript(event.delta);
+  } catch {
+    return null;
+  }
 }
 
 function isTerminalEvent(data) {
@@ -235,8 +248,8 @@ function normalizeDubbedVolume(value) {
  * The Controller owns the source MediaStream and its tracks. This adapter
  * only adds the live audio tracks to a peer connection, exchanges raw SDP,
  * and owns the remote playback element. Bootstrap remains opaque outside the
- * short-lived Authorization header; secrets, SDP, media, and transcript text
- * never enter diagnostics, telemetry, or callbacks.
+ * short-lived Authorization header; secrets, SDP, media, and raw provider
+ * transcript payloads never enter diagnostics or lifecycle callbacks.
  */
 export class OpenAIRealtimeProviderAdapter {
   constructor(options = {}) {
@@ -260,6 +273,7 @@ export class OpenAIRealtimeProviderAdapter {
     this.onPlaybackAccepted = callbackFrom(options, callbacks, 'onPlaybackAccepted');
     this.onError = callbackFrom(options, callbacks, 'onError');
     this.onClose = callbackFrom(options, callbacks, 'onClose');
+    this.onTranslatedTranscript = callbackFrom(options, callbacks, 'onTranslatedTranscript');
 
     this.generation = 0;
     this.attachmentToken = 0;
@@ -453,9 +467,9 @@ export class OpenAIRealtimeProviderAdapter {
       dataChannel.onopen = () => this._handleChannelViable(session, isCurrent);
       dataChannel.onmessage = event => {
         if (!isCurrent()) return;
-        // Only terminal/error event types fail the session. Progress,
-        // transcript, and audio events are observed (transcript counting) or
-        // ignored; their payloads are never read beyond the type field.
+        // Only terminal/error event types fail the session. The one supported
+        // transcript event is normalized before it reaches the Controller;
+        // input and all other transcript-shaped events are ignored.
         if (isTerminalEvent(event?.data)) {
           this._reportRuntimeFailure(
             session,
@@ -464,7 +478,11 @@ export class OpenAIRealtimeProviderAdapter {
           );
           return;
         }
-        if (isTranscriptEvent(event?.data)) session.telemetry.transcriptEvents += 1;
+        const transcript = readOutputTranscriptDelta(event?.data);
+        if (readEventType(event?.data) === 'session.output_transcript.delta') {
+          session.telemetry.transcriptEvents += 1;
+        }
+        if (transcript) this._emit(this.onTranslatedTranscript, transcript);
       };
       dataChannel.onerror = () => this._reportRuntimeFailure(
         session,
@@ -717,6 +735,14 @@ export class OpenAIRealtimeProviderAdapter {
     try {
       this.onError(normalizeProviderError(error, 'OPENAI_REALTIME_PROVIDER_UNAVAILABLE'));
     } catch { /* lifecycle callback is best effort */ }
+  }
+
+  _emit(callback, ...args) {
+    try {
+      callback(...args);
+    } catch {
+      // Consumer callbacks must not affect the WebRTC session.
+    }
   }
 
   _clearPending(pendingStart) {

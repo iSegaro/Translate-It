@@ -23,6 +23,17 @@ export class LiveDubbingRuntimeGateway {
     return sendMessage.call(this.browserAPI.runtime, message);
   }
 
+  sendTabMessage(tabId, message, options = {}) {
+    const sendMessage = this.browserAPI?.tabs?.sendMessage;
+    if (typeof sendMessage !== 'function') {
+      return Promise.reject(new Error('tab messaging unavailable'));
+    }
+    return sendMessage.call(this.browserAPI.tabs, tabId, message, {
+      ...options,
+      frameId: 0,
+    });
+  }
+
   getMediaStreamId(tabId) {
     const getMediaStreamId = this.chromeAPI?.tabCapture?.getMediaStreamId;
     if (typeof getMediaStreamId !== 'function') return undefined;

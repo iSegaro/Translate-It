@@ -14,6 +14,7 @@ import {
   createLiveDubbingDiagnostic,
   createLiveDubbingCleanupDiagnostic,
   createLiveDubbingProviderDiagnostic,
+  createLiveDubbingTranslatedTranscriptMessage,
   createProviderBootstrapRequest,
   normalizeLiveDubbingVolume,
   isLiveDubbingProviderId,
@@ -22,6 +23,7 @@ import {
   parseProviderBootstrapResponse,
   sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
+  sanitizeLiveDubbingTranslatedTranscript,
 } from '../contracts.js';
 import { liveDubbingProviderRegistry } from '../providers/LiveDubbingProviderRegistry.js';
 import { LiveDubbingAudioEngine } from './LiveDubbingAudioEngine.js';
@@ -302,6 +304,7 @@ export class LiveDubbingController {
   constructor(options = {}) {
     this.mediaDevices = options.mediaDevices || globalThis.navigator?.mediaDevices;
     this.notify = options.notify || ((message) => globalThis.chrome?.runtime?.sendMessage?.(message));
+    this.notifyTranscript = options.notifyTranscript || this.notify;
     this.requestBootstrap = options.requestBootstrap
       || ((message) => globalThis.chrome?.runtime?.sendMessage?.(message));
     this.providerRegistry = options.providerRegistry || liveDubbingProviderRegistry;
@@ -907,9 +910,10 @@ export class LiveDubbingController {
         audioPathReady: false,
         pendingInput: [],
         pendingInputMs: 0,
-        outputEpoch: 0,
-        outputSequence: 0,
-        metrics: {
+         outputEpoch: 0,
+         outputSequence: 0,
+         transcriptSequence: 0,
+         metrics: {
           inputFrames: 0,
           inputBytes: 0,
           inputSentFrames: 0,
@@ -1397,6 +1401,11 @@ export class LiveDubbingController {
         this._drainPendingInput(session);
       },
       onAudio: audio => this._handleProviderAudio(session, generation, audio),
+      onTranslatedTranscript: transcript => this._handleProviderTranslatedTranscript(
+        session,
+        generation,
+        transcript,
+      ),
       onInterrupted: () => this._handleProviderInterrupted(session, generation),
       onGenerationComplete: () => {},
       onTurnComplete: () => {},
@@ -2393,6 +2402,32 @@ export class LiveDubbingController {
       }
     } catch (error) {
       this._providerFailed(session, error, 'OUTPUT_AUDIO_ERROR');
+    }
+  }
+
+  _handleProviderTranslatedTranscript(session, generation, transcript) {
+    if (!this._isCurrentProvider(session, generation)
+      || !session.setupComplete) return;
+
+    const normalized = sanitizeLiveDubbingTranslatedTranscript(transcript);
+    if (!normalized) return;
+
+    let message;
+    try {
+      const transcriptSequence = Number.isSafeInteger(session.transcriptSequence)
+        && session.transcriptSequence >= 0
+        ? session.transcriptSequence + 1
+        : 1;
+      session.transcriptSequence = transcriptSequence;
+      message = createLiveDubbingTranslatedTranscriptMessage(
+        session,
+        normalized,
+        transcriptSequence,
+      );
+      const result = this.notifyTranscript(message);
+      Promise.resolve(result).catch(() => {});
+    } catch {
+      // Transcript delivery is best effort and never changes session lifecycle.
     }
   }
 

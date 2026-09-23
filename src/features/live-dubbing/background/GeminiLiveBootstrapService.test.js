@@ -110,6 +110,7 @@ describe('GeminiLiveBootstrapService', () => {
       uses: 1,
       bidiGenerateContentSetup: {
         model: GEMINI_LIVE_MODEL,
+        outputAudioTranscription: {},
         generationConfig: {
           responseModalities: ['AUDIO'],
           translationConfig: {
@@ -121,6 +122,9 @@ describe('GeminiLiveBootstrapService', () => {
     });
     expect(body).not.toHaveProperty('liveConnectConstraints');
     expect(body.bidiGenerateContentSetup.model).toBe(GEMINI_LIVE_MODEL);
+    expect(body.bidiGenerateContentSetup.outputAudioTranscription).toEqual({});
+    expect(body.bidiGenerateContentSetup.generationConfig)
+      .not.toHaveProperty('outputAudioTranscription');
     expect(body.bidiGenerateContentSetup.generationConfig.translationConfig).toEqual({
       targetLanguageCode: 'zh-Hans',
       echoTargetLanguage: false,

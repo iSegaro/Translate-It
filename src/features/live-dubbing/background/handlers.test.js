@@ -16,6 +16,7 @@ import {
   handleLiveDubbingSetOriginalVolume,
   handleLiveDubbingStart,
   handleLiveDubbingStop,
+  handleLiveDubbingTranslatedTranscript,
 } from './handlers.js';
 import browser from 'webextension-polyfill';
 import { liveDubbingCoordinator } from './LiveDubbingCoordinator.js';
@@ -326,6 +327,35 @@ describe('live dubbing browser gate', () => {
       success: false,
       error: 'LIVE_DUBBING_UNAUTHORIZED',
     });
+  });
+
+  it('routes the dedicated translated transcript action only from Offscreen', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    const relay = vi.spyOn(liveDubbingCoordinator, 'handleOffscreenTranslatedTranscript')
+      .mockResolvedValue({ success: true });
+    const message = {
+      action: 'LIVE_DUBBING_TRANSLATED_TRANSCRIPT',
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 3,
+        transcriptSequence: 1,
+        transcript: { kind: 'translated', text: 'hello' },
+      },
+    };
+
+    await expect(handleLiveDubbingTranslatedTranscript(message, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    })).resolves.toEqual({ success: true });
+    expect(relay).toHaveBeenCalledOnce();
+    expect(handleLiveDubbingTranslatedTranscript(message, {
+      id: 'extension-id',
+      url: 'https://example.test/page',
+      tab: { id: 1 },
+    })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
   });
 
   it('resolves an authorized bootstrap request with an ephemeral access token', async () => {

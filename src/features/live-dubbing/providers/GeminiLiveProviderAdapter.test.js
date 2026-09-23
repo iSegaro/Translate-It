@@ -83,6 +83,7 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(JSON.parse(socket.sent[0])).toEqual({
       setup: {
         model: GEMINI_LIVE_MODEL,
+        outputAudioTranscription: {},
         generationConfig: {
           responseModalities: ['AUDIO'],
           translationConfig: {
@@ -92,6 +93,9 @@ describe('GeminiLiveProviderAdapter', () => {
         },
       },
     });
+    const setup = JSON.parse(socket.sent[0]).setup;
+    expect(setup.outputAudioTranscription).toEqual({});
+    expect(setup.generationConfig).not.toHaveProperty('outputAudioTranscription');
     expect(onSetupComplete).not.toHaveBeenCalled();
 
     socket.receive({ setupComplete: {}, usageMetadata: { promptTokenCount: 1 } });
@@ -465,6 +469,27 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(client.phase).toBe('ready');
     expect(JSON.stringify(client.getTelemetry())).not.toContain('do-not-forward');
     expect(JSON.stringify(client.getTelemetry())).not.toContain('FUTURE_PROVIDER_STATE');
+  });
+
+  it('emits only validated output transcription fragments and ignores malformed/source fields', async () => {
+    const onTranslatedTranscript = vi.fn();
+    const onError = vi.fn();
+    const client = createClient({ onTranslatedTranscript, onError });
+    const socket = await connectReady(client);
+
+    socket.receive({ serverContent: {
+      inputTranscription: { text: 'source text' },
+      outputTranscription: { text: 'translated fragment' },
+    } });
+    socket.receive({ serverContent: { outputTranscription: { text: 42 } } });
+    socket.receive({ serverContent: { outputTranscription: 'malformed' } });
+
+    expect(onTranslatedTranscript).toHaveBeenCalledOnce();
+    expect(onTranslatedTranscript).toHaveBeenCalledWith({
+      kind: 'translated',
+      text: 'translated fragment',
+    });
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it('ignores valid server control frames and usage metadata without forwarding control values', async () => {

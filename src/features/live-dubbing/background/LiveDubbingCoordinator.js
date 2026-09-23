@@ -21,6 +21,7 @@ import {
   createLiveDubbingDiagnostic,
   createLiveDubbingTerminalOutcome,
   createLiveDubbingProviderDiagnostic,
+  createLiveDubbingTranscriptClearMessage,
   createConsumeMessage,
   createDescriptor,
   createDubbedVolumeMessage,
@@ -33,6 +34,7 @@ import {
   createSessionMessage,
   createStatusMessage,
   hasExactSessionEvent,
+  isValidLiveDubbingTranscriptSequence,
   isAuthorizedOffscreenSender,
   isAcknowledgedForSession,
   isExactSessionResponse,
@@ -42,6 +44,7 @@ import {
   sanitizeLiveDubbingDiagnostic,
   sanitizeLiveDubbingCleanupDiagnostic,
   sanitizeLiveDubbingProviderDiagnostic,
+  sanitizeLiveDubbingTranslatedTranscript,
   toPublicLiveDubbingTerminalOutcome,
 } from '../contracts.js';
 import { LiveDubbingStateStore, LIVE_DUBBING_CLEAR_OUTCOMES } from './LiveDubbingStateStore.js';
@@ -177,6 +180,7 @@ export class LiveDubbingCoordinator {
     this.stateStore = options.stateStore
       || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
     this.transition = Promise.resolve();
+    this.transcriptRelayRecord = null;
     this.cleanupManager = options.cleanupManager
       || new LiveDubbingCleanupManager({
         leaseManager: this.leaseManager,
@@ -991,6 +995,50 @@ export class LiveDubbingCoordinator {
     return this._stopForSession(sessionId, message?.data?.event || 'OFFSCREEN_TERMINAL');
   }
 
+  async handleOffscreenTranslatedTranscript(message = {}, sender = null) {
+    if (!sender || !isAuthorizedOffscreenSender(sender, this.browserAPI)
+      || message?.action !== LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT) {
+      return { success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true };
+    }
+
+    const descriptor = await this._readDescriptor();
+    const data = message?.data;
+    const transcript = sanitizeLiveDubbingTranslatedTranscript(data?.transcript);
+    const relayRecord = this._syncTranscriptRelayRecord(descriptor);
+    const transcriptSequence = data?.transcriptSequence;
+    if (this._storageReadFailed()
+      || this._storageDescriptorInvalid()
+      || !descriptor
+      || ![LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, LIVE_DUBBING_STATUS.RUNNING]
+        .includes(descriptor.status)
+      || !transcript
+      || !hasExactSessionEvent(message, descriptor)
+      || !isValidLiveDubbingTranscriptSequence(transcriptSequence)
+      || (Number.isSafeInteger(relayRecord?.lastTranscriptSequence)
+        && transcriptSequence <= relayRecord.lastTranscriptSequence)) {
+      return { success: false, error: 'LIVE_DUBBING_UNAUTHORIZED', ignored: true };
+    }
+
+    relayRecord.lastTranscriptSequence = transcriptSequence;
+
+    try {
+      await this.runtimeGateway.sendTabMessage(descriptor.tabId, {
+        action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+        data: {
+          sessionId: descriptor.sessionId,
+          providerId: descriptor.providerId,
+          eventSequence: descriptor.eventSequence,
+          transcriptSequence,
+          transcript,
+        },
+      }, { frameId: 0 });
+    } catch {
+      // Tab delivery is best effort and cannot affect the session lifecycle.
+    }
+
+    return { success: true };
+  }
+
   /**
    * Authorize messages emitted by the offscreen document before terminal or
    * bootstrap work reaches session coordination. Terminal events use the
@@ -1673,6 +1721,7 @@ export class LiveDubbingCoordinator {
       }
 
       const clearTerminalDescriptor = async () => {
+        this._relayTranscriptClear(descriptor);
         const cleared = await this._clearDescriptor(descriptor.sessionId);
         if (cleared.outcome === LIVE_DUBBING_CLEAR_OUTCOMES.CLEARED) {
           await notifyRuntimeLossOutcome?.();
@@ -2398,6 +2447,24 @@ export class LiveDubbingCoordinator {
       ?? message?.targetLanguage;
   }
 
+  _relayTranscriptClear(descriptor) {
+    const relayRecord = this._syncTranscriptRelayRecord(descriptor);
+    if (!relayRecord || relayRecord.clearSent) return;
+    relayRecord.clearSent = true;
+
+    let result;
+    try {
+      result = this.runtimeGateway.sendTabMessage(
+        descriptor.tabId,
+        createLiveDubbingTranscriptClearMessage(descriptor.sessionId),
+        { frameId: 0 },
+      );
+    } catch {
+      return;
+    }
+    Promise.resolve(result).catch(() => {});
+  }
+
   _findPendingStart(sessionId, tabId = null) {
     return this.sessionRegistry.findPendingStart(sessionId, tabId);
   }
@@ -2548,8 +2615,29 @@ export class LiveDubbingCoordinator {
     }
   }
 
+  _syncTranscriptRelayRecord(descriptor) {
+    const sessionId = typeof descriptor?.sessionId === 'string'
+      && descriptor.sessionId.trim()
+      ? descriptor.sessionId
+      : null;
+    if (!sessionId) {
+      this.transcriptRelayRecord = null;
+      return null;
+    }
+    if (this.transcriptRelayRecord?.sessionId !== sessionId) {
+      this.transcriptRelayRecord = {
+        sessionId,
+        lastTranscriptSequence: 0,
+        clearSent: false,
+      };
+    }
+    return this.transcriptRelayRecord;
+  }
+
   async _readDescriptor() {
-    return this.stateStore.readDescriptor();
+    const descriptor = await this.stateStore.readDescriptor();
+    this._syncTranscriptRelayRecord(descriptor);
+    return descriptor;
   }
 
   async _writeDescriptor(descriptor, expectedSessionId = null, expectedDescriptor = null, options = {}) {

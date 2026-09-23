@@ -7,6 +7,7 @@ import {
 } from '../constants.js';
 import {
   createProviderBootstrapResponse,
+  isAuthorizedOffscreenSender,
   isLiveDubbingProviderId,
   isTrustedLiveDubbingUiSender,
 } from '../contracts.js';
@@ -87,6 +88,12 @@ export function handleLiveDubbingGetDubbedVolume(message, sender) {
   }
   if (!isTrustedUi(sender)) return unauthorized();
   return liveDubbingCoordinator.getDubbedVolume(message);
+}
+
+export function handleLiveDubbingTranslatedTranscript(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (!isAuthorizedOffscreenSender(sender, liveDubbingCoordinator.browserAPI)) return unauthorized();
+  return liveDubbingCoordinator.handleOffscreenTranslatedTranscript(message, sender);
 }
 
 /**

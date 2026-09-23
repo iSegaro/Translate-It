@@ -113,3 +113,13 @@ export async function handleLiveDubbingBootstrapRequestLazy(message, sender) {
         return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
     }
 }
+
+export async function handleLiveDubbingTranslatedTranscriptLazy(message, sender) {
+    try {
+        const { handleLiveDubbingTranslatedTranscript } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingTranslatedTranscript(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing translated transcript handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}

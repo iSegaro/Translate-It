@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { ContentMessageHandler } from './ContentMessageHandler.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
@@ -6,6 +7,10 @@ import { ActionReasons } from '@/shared/messaging/core/MessagingConstants.js';
 import { applyTranslationToTextField } from '../smartTranslationIntegration.js';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import browser from 'webextension-polyfill';
+import {
+  getLiveDubbingTranscriptSnapshot,
+  resetLiveDubbingTranscriptState,
+} from '@/features/live-dubbing/content/liveDubbingTranscriptStore.js';
 
 vi.mock('webextension-polyfill', () => ({
   default: {
@@ -76,6 +81,7 @@ vi.mock('../smartTranslationIntegration.js', () => ({
 vi.mock('@/core/PageEventBus.js', () => ({
   pageEventBus: { emit: vi.fn() },
 }));
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 describe('ContentMessageHandler iframe Select Element activation', () => {
   let handler;
@@ -99,6 +105,7 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
   beforeEach(() => {
     ContentMessageHandler.resetInstance();
     vi.clearAllMocks();
+    resetLiveDubbingTranscriptState();
     browser.runtime.sendMessage.mockResolvedValue({ success: true });
     handler = new ContentMessageHandler();
     handler.handlers.clear();
@@ -109,6 +116,32 @@ describe('ContentMessageHandler iframe Select Element activation', () => {
   it('does not expose legacy iframe Select Element activation route', async () => {
     expect(typeof handler.handleIFrameActivateSelectElement).toBe('undefined');
     expect(handler.handlers.has(MessageActions.IFRAME_ACTIVATE_SELECT_ELEMENT)).toBe(false);
+  });
+
+  it('bridges valid live dubbing transcript envelopes and rejects invalid ones', () => {
+    handler.initialize();
+    const envelope = {
+      sessionId: 'session-1',
+      providerId: 'gemini',
+      eventSequence: 4,
+      transcriptSequence: 4,
+      transcript: { kind: 'translated', text: 'Hello' },
+    };
+
+    expect(handler.handleLiveDubbingStatus({ data: envelope })).toEqual({ success: true, accepted: true });
+    expect(handler.handleLiveDubbingStatus({ data: { ...envelope, transcript: { kind: 'partial', text: 'No' } } }))
+      .toEqual({ success: true, accepted: false });
+    expect(getLiveDubbingTranscriptSnapshot().fragments).toEqual(['Hello']);
+    expect(pageEventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('keeps the transcript bridge on the plain store without a Vue dependency', () => {
+    const handlerSource = readFileSync('src/handlers/content/ContentMessageHandler.js', 'utf8');
+    const storeSource = readFileSync('src/features/live-dubbing/content/liveDubbingTranscriptStore.js', 'utf8');
+
+    expect(handlerSource).toContain('liveDubbingTranscriptStore.js');
+    expect(handlerSource).not.toContain('liveDubbingTranscriptState.js');
+    expect(storeSource).not.toMatch(/from\s+["']vue["']/);
   });
 
   it('does not announce iframe readiness during local initialization', () => {

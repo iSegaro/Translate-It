@@ -7192,4 +7192,158 @@ describe('LiveDubbingCoordinator', () => {
     });
     expect(setup).toBe('LIVE_DUBBING_PROVIDER_SETUP_FAILED');
   });
+
+  it('authorizes and relays only the current translated transcript to the top frame', async () => {
+    const harness = createVolumeHarness(LIVE_DUBBING_STATUS.RUNNING);
+    const sendTabMessage = vi.fn(async () => undefined);
+    harness.browserAPI.tabs.sendMessage = sendTabMessage;
+    const sender = {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    };
+    const message = {
+      action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        transcriptSequence: 1,
+        transcript: { kind: 'translated', text: 'bonjour' },
+      },
+    };
+
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript(message, sender))
+      .resolves.toEqual({ success: true });
+    expect(sendTabMessage).toHaveBeenCalledWith(42, {
+      action: LIVE_DUBBING_ACTIONS.TRANSCRIPT,
+      data: message.data,
+    }, { frameId: 0 });
+
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript({
+      ...message,
+      data: { ...message.data, eventSequence: 3 },
+    }, sender)).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript(message, {
+      ...sender,
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+    })).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+    });
+  });
+
+  it('swallows translated transcript tab delivery failures', async () => {
+    const harness = createVolumeHarness(LIVE_DUBBING_STATUS.RUNNING);
+    harness.browserAPI.tabs.sendMessage = vi.fn().mockRejectedValue(new Error('tab closed'));
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript({
+      action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        transcriptSequence: 1,
+        transcript: { kind: 'translated', text: 'bonjour' },
+      },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    })).resolves.toEqual({ success: true });
+  });
+
+  it('rejects duplicate transcript sequences for the exact active descriptor', async () => {
+    const harness = createVolumeHarness(LIVE_DUBBING_STATUS.RUNNING);
+    const sender = {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    };
+    const message = {
+      action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        transcriptSequence: 1,
+        transcript: { kind: 'translated', text: 'bonjour' },
+      },
+    };
+
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript(message, sender))
+      .resolves.toEqual({ success: true });
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript(message, sender))
+      .resolves.toMatchObject({
+        success: false,
+        error: 'LIVE_DUBBING_UNAUTHORIZED',
+        ignored: true,
+      });
+
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript({
+      ...message,
+      data: { ...message.data, transcriptSequence: 2 },
+    }, sender)).resolves.toEqual({ success: true });
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript({
+      ...message,
+      data: { ...message.data, transcriptSequence: 1 },
+    }, sender)).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_UNAUTHORIZED',
+      ignored: true,
+    });
+  });
+
+  it('keeps transcript relay bookkeeping out of restart lifecycle state and preserves STOP lease recovery', async () => {
+    const harness = createVolumeHarness(LIVE_DUBBING_STATUS.RUNNING);
+    harness.manager.activeLeases = [{ owner: LIVE_DUBBING_OWNER, leaseId: 'session-1' }];
+    harness.browserAPI.tabs.sendMessage = vi.fn(async () => undefined);
+    const sender = {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/offscreen.html',
+    };
+    const transcript = {
+      action: LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT,
+      data: {
+        sessionId: 'session-1',
+        providerId: 'gemini',
+        eventSequence: 4,
+        transcriptSequence: 1,
+        transcript: { kind: 'translated', text: 'after restart' },
+      },
+    };
+
+    expect(harness.coordinator.sessionRegistry.getSessionState('session-1')).toBeNull();
+    await expect(harness.coordinator.handleOffscreenTranslatedTranscript(transcript, sender))
+      .resolves.toEqual({ success: true });
+    expect(harness.coordinator.sessionRegistry.getSessionState('session-1')).toBeNull();
+
+    await expect(harness.coordinator.stop({ data: { sessionId: 'session-1' } }))
+      .resolves.toMatchObject({ success: true, stopped: true });
+    expect(harness.manager.release).toHaveBeenCalledOnce();
+    expect(harness.manager.release).toHaveBeenCalledWith({
+      owner: LIVE_DUBBING_OWNER,
+      leaseId: 'session-1',
+    });
+    expect(harness.calls.some(([, message]) => (
+      message?.action === LIVE_DUBBING_ACTIONS.DISPOSE
+    ))).toBe(true);
+  });
+
+  it('relays one session-scoped clear after stop without making delivery terminal', async () => {
+    const harness = createVolumeHarness(LIVE_DUBBING_STATUS.RUNNING);
+    const sendTabMessage = vi.fn().mockRejectedValue(new Error('tab closed'));
+    harness.browserAPI.tabs.sendMessage = sendTabMessage;
+
+    await expect(harness.coordinator.stop({ data: { sessionId: 'session-1' } }))
+      .resolves.toMatchObject({ success: true, stopped: true });
+    expect(sendTabMessage).toHaveBeenCalledOnce();
+    expect(sendTabMessage).toHaveBeenCalledWith(42, {
+      action: LIVE_DUBBING_ACTIONS.CLEAR_TRANSCRIPT,
+      data: { sessionId: 'session-1' },
+    }, { frameId: 0 });
+
+    await expect(harness.coordinator.stop({ data: { sessionId: 'session-1' } }))
+      .resolves.toMatchObject({ success: true, stopped: false });
+    expect(sendTabMessage).toHaveBeenCalledOnce();
+  });
 });
