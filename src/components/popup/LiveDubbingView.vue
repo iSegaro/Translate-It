@@ -39,25 +39,36 @@
 
     <section
       class="live-dubbing-card live-dubbing-transcript-preferences"
-      :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitle preferences')"
+      :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitles')"
     >
-      <div class="live-dubbing-transcript-preference">
-        <span>{{ t('live_dubbing_show_translated_transcript', 'Translated subtitles') }}</span>
-        <BaseToggle
-          :model-value="showTranslatedTranscript"
-          :disabled="hasTranslatedPreferenceWritePending"
-          :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
-          @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
-        />
-      </div>
-      <div class="live-dubbing-transcript-preference">
-        <span>{{ t('live_dubbing_show_original_transcript', 'Original subtitles') }}</span>
-        <BaseToggle
-          :model-value="showOriginalTranscript"
-          :disabled="hasOriginalPreferenceWritePending || (providerModel === LIVE_DUBBING_OPENAI_PROVIDER_ID && (!isControlStatusResolved || isControlBusy))"
-          :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
-          @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
-        />
+      <h3 class="live-dubbing-card-title">
+        {{ t('live_dubbing_transcript_preferences_label', 'Subtitles') }}
+      </h3>
+      <div class="live-dubbing-transcript-preferences-list">
+        <div class="live-dubbing-transcript-preference">
+          <span class="live-dubbing-transcript-preference-label">
+            {{ t('live_dubbing_show_translated_transcript', 'Translated subtitles') }}
+          </span>
+          <BaseToggle
+            class="live-dubbing-transcript-preference-toggle"
+            :model-value="showTranslatedTranscript"
+            :disabled="hasTranslatedPreferenceWritePending"
+            :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
+            @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
+          />
+        </div>
+        <div class="live-dubbing-transcript-preference">
+          <span class="live-dubbing-transcript-preference-label">
+            {{ t('live_dubbing_show_original_transcript', 'Original subtitles') }}
+          </span>
+          <BaseToggle
+            class="live-dubbing-transcript-preference-toggle"
+            :model-value="showOriginalTranscript"
+            :disabled="hasOriginalPreferenceWritePending || (providerModel === LIVE_DUBBING_OPENAI_PROVIDER_ID && (!isControlStatusResolved || isControlBusy))"
+            :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
+            @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
+          />
+        </div>
       </div>
     </section>
 

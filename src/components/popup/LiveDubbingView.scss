@@ -140,6 +140,48 @@
   }
 }
 
+/* ── Transcript preferences card ───────────────────────────────────────────── */
+
+.live-dubbing-card-title {
+  margin: 0 0 6px;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+  text-align: start;
+  opacity: 0.7;
+}
+
+.live-dubbing-transcript-preferences-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-dubbing-transcript-preference {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.live-dubbing-transcript-preference-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-color);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.live-dubbing-transcript-preference-toggle {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
 /* ── Session card ─────────────────────────────────────────────────────────── */
 
 /* The control keeps its runtime markup; the card supplies the chrome. */
