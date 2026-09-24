@@ -14,6 +14,7 @@ export const OPENAI_REALTIME_TRANSLATIONS_CLIENT_SECRETS_ENDPOINT =
 export const OPENAI_REALTIME_TRANSLATE_MODEL = 'gpt-realtime-translate';
 export const OPENAI_REALTIME_WHISPER_MODEL = 'gpt-realtime-whisper';
 export const OPENAI_REALTIME_KEYS_SETTING = 'OPENAI_API_KEY';
+export const OPENAI_REALTIME_ORIGINAL_TRANSCRIPT_SETTING = 'LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT';
 
 const KEY_INVALID_CODE_PATTERN = /invalid[_ -]?api[_ -]?key|authentication/i;
 const QUOTA_CODE_PATTERN = /insufficient[_ -]?quota|quota|billing[_ -]?hard[_ -]?limit/i;
@@ -92,14 +93,18 @@ function classifyMintFailure(status, metadata) {
   return ErrorTypes.HTTP_ERROR;
 }
 
-function buildMintBody(targetLanguage) {
+function buildMintBody(targetLanguage, showOriginalTranscript) {
+  const audio = showOriginalTranscript
+    ? {
+      input: { transcription: { model: OPENAI_REALTIME_WHISPER_MODEL } },
+      output: { language: targetLanguage },
+    }
+    : { output: { language: targetLanguage } };
+
   return {
     session: {
       model: OPENAI_REALTIME_TRANSLATE_MODEL,
-      audio: {
-        input: { transcription: { model: OPENAI_REALTIME_WHISPER_MODEL } },
-        output: { language: targetLanguage },
-      },
+      audio,
     },
   };
 }
@@ -119,6 +124,15 @@ export class OpenAIRealtimeBootstrapService {
     this.getKeysImpl = typeof options.getKeysImpl === 'function'
       ? options.getKeysImpl
       : () => ApiKeyManager.getKeys(OPENAI_REALTIME_KEYS_SETTING);
+    this.getOriginalTranscriptEnabledImpl = typeof options.getOriginalTranscriptEnabledImpl === 'function'
+      ? options.getOriginalTranscriptEnabledImpl
+      : async () => {
+        const { storageManager } = await import('@/shared/storage/core/StorageCore.js');
+        const stored = await storageManager.getFresh({
+          [OPENAI_REALTIME_ORIGINAL_TRANSCRIPT_SETTING]: false,
+        });
+        return stored?.[OPENAI_REALTIME_ORIGINAL_TRANSCRIPT_SETTING];
+      };
     this.authTokenEndpoint = typeof options.authTokenEndpoint === 'string' && options.authTokenEndpoint
       ? options.authTokenEndpoint
       : OPENAI_REALTIME_TRANSLATIONS_CLIENT_SECRETS_ENDPOINT;
@@ -138,11 +152,12 @@ export class OpenAIRealtimeBootstrapService {
       return null;
     }
 
+    const showOriginalTranscript = await this._readOriginalTranscriptEnabled();
     const keys = await this._eligibleKeys();
     if (keys.length === 0) return null;
 
     for (let index = 0; index < keys.length; index += 1) {
-      const outcome = await this._attemptMint(keys[index], normalized);
+      const outcome = await this._attemptMint(keys[index], normalized, showOriginalTranscript);
       if (outcome.ok) return outcome.secret;
       if (!outcome.tryNext) {
         this.log.debug('[OpenAIRealtimeBootstrapService] Client secret mint failed without failover');
@@ -170,11 +185,19 @@ export class OpenAIRealtimeBootstrapService {
     return (await this._eligibleKeys()).length > 0;
   }
 
+  async _readOriginalTranscriptEnabled() {
+    try {
+      return (await this.getOriginalTranscriptEnabledImpl()) === true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * One classified mint attempt. It never throws or surfaces provider data.
    * @returns {Promise<{ok: boolean, secret?: string, tryNext?: boolean}>}
    */
-  async _attemptMint(apiKey, targetLanguage) {
+  async _attemptMint(apiKey, targetLanguage, showOriginalTranscript) {
     let response;
     try {
       response = await this._fetch(this.authTokenEndpoint, {
@@ -183,7 +206,7 @@ export class OpenAIRealtimeBootstrapService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify(buildMintBody(targetLanguage)),
+        body: JSON.stringify(buildMintBody(targetLanguage, showOriginalTranscript)),
       });
     } catch {
       return { ok: false, tryNext: false };

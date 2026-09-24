@@ -89,7 +89,11 @@
       <MouseHoverTooltip />
 
       <!-- Live dubbing transcript: top-frame, display-only surface. -->
-      <LiveDubbingTranscript v-if="isTopFrame" />
+      <LiveDubbingTranscript
+        v-if="isTopFrame && (showTranslatedTranscript || showOriginalTranscript)"
+        :show-translated-transcript="showTranslatedTranscript"
+        :show-original-transcript="showOriginalTranscript"
+      />
     </template>
 
     <!-- 
@@ -121,7 +125,7 @@
 
 <script setup>
 import './ContentApp.scss'
-import { onUnmounted, defineAsyncComponent } from 'vue';
+import { computed, onUnmounted, defineAsyncComponent } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
@@ -171,6 +175,13 @@ useUnifiedI18n();
 const settingsStore = useSettingsStore();
 const mobileStore = useMobileStore();
 const tracker = useResourceTracker('content-app');
+
+const showTranslatedTranscript = computed(() =>
+  settingsStore.settings?.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT === true
+);
+const showOriginalTranscript = computed(() =>
+  settingsStore.settings?.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT === true
+);
 
 // 2. Localization & RTL Management
 const { toastRTL, updateToastRTL } = useContentAppLocalization(settingsStore);

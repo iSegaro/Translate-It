@@ -22,7 +22,9 @@ describe('LiveDubbingTranscript renderer', () => {
     acceptLiveDubbingTranscript(envelope(1, 'Hello world'));
     acceptLiveDubbingTranscript(envelope(2, 'Bonjour le monde', 'source'));
 
-    const wrapper = mount(LiveDubbingTranscript);
+    const wrapper = mount(LiveDubbingTranscript, {
+      props: { showTranslatedTranscript: true, showOriginalTranscript: true },
+    });
     const container = wrapper.find('.live-dubbing-transcript');
     const source = wrapper.find('.live-dubbing-transcript__source');
     const translated = wrapper.find('.live-dubbing-transcript__translated');
@@ -42,7 +44,7 @@ describe('LiveDubbingTranscript renderer', () => {
   it('renders only the primary translated row when no source is present', () => {
     acceptLiveDubbingTranscript(envelope(1, 'Only translated'));
 
-    const wrapper = mount(LiveDubbingTranscript);
+    const wrapper = mount(LiveDubbingTranscript, { props: { showTranslatedTranscript: true } });
 
     expect(wrapper.find('.live-dubbing-transcript__translated').text()).toBe('Only translated');
     expect(wrapper.find('.live-dubbing-transcript__source').exists()).toBe(false);
@@ -53,7 +55,7 @@ describe('LiveDubbingTranscript renderer', () => {
   it('renders only the source row when no translation is present', () => {
     acceptLiveDubbingTranscript(envelope(1, 'Only source', 'source'));
 
-    const wrapper = mount(LiveDubbingTranscript);
+    const wrapper = mount(LiveDubbingTranscript, { props: { showOriginalTranscript: true } });
 
     expect(wrapper.find('.live-dubbing-transcript__source').text()).toBe('Only source');
     expect(wrapper.find('.live-dubbing-transcript__translated').exists()).toBe(false);
@@ -69,8 +71,35 @@ describe('LiveDubbingTranscript renderer', () => {
     wrapper.unmount();
   });
 
+  it.each([
+    ['translated only', { showTranslatedTranscript: true }, 'translated', 'translated only'],
+    ['original only', { showOriginalTranscript: true }, 'source', 'original only'],
+  ])('renders %s according to its preference', (_name, props, kind, text) => {
+    acceptLiveDubbingTranscript(envelope(1, text, kind));
+    const wrapper = mount(LiveDubbingTranscript, { props });
+
+    expect(wrapper.find(`.live-dubbing-transcript__${kind}`).text()).toBe(text);
+    expect(wrapper.find('.live-dubbing-transcript').exists()).toBe(true);
+    expect(wrapper.find(`.live-dubbing-transcript__${kind === 'source' ? 'translated' : 'source'}`).exists())
+      .toBe(false);
+    wrapper.unmount();
+  });
+
+  it('renders nothing when both transcript displays are disabled', () => {
+    acceptLiveDubbingTranscript(envelope(1, 'Hidden translated'));
+    acceptLiveDubbingTranscript(envelope(2, 'Hidden source', 'source'));
+    const wrapper = mount(LiveDubbingTranscript, {
+      props: { showTranslatedTranscript: false, showOriginalTranscript: false },
+    });
+
+    expect(wrapper.find('.live-dubbing-transcript').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('updates both rows reactively through the store subscription', async () => {
-    const wrapper = mount(LiveDubbingTranscript);
+    const wrapper = mount(LiveDubbingTranscript, {
+      props: { showTranslatedTranscript: true, showOriginalTranscript: true },
+    });
     expect(wrapper.find('.live-dubbing-transcript').exists()).toBe(false);
 
     acceptLiveDubbingTranscript(envelope(1, 'Hi'));

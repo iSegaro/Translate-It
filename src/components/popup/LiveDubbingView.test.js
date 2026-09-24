@@ -37,9 +37,9 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   })
 }))
 
-// Stubbed children: this suite covers ONLY the view-level wiring contract
-// (configuration card, credential visibility, prop forwarding). LiveDubbingControl
-// behavior itself is covered by LiveDubbingControl.test.js and must not be duplicated.
+// Stubbed children: this suite covers the view-level wiring contract and transcript
+// preference write lifecycle. LiveDubbingControl behavior itself is covered by
+// LiveDubbingControl.test.js and must not be duplicated.
 const LanguageSelectorStub = {
   name: 'LanguageSelector',
   props: {
@@ -84,15 +84,50 @@ const makeStore = (settings = {}) => {
       GEMINI_API_KEY: '',
       OPENAI_API_KEY: '',
       API_KEY: '',
-      TRANSLATION_API: 'google',
-      ...settings
+       TRANSLATION_API: 'google',
+       LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: false,
+        LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT: false,
+        ...settings
     }),
-    updateSettingAndPersist: vi.fn(async (key, value) => {
+    updateSettingLocally: vi.fn((key, value) => {
       store.settings[key] = value
+    }),
+    getSetting: vi.fn((key, defaultValue = null) => (
+      store.settings[key] !== undefined ? store.settings[key] : defaultValue
+    )),
+    updateSettingAndPersist: vi.fn(async (key, value) => {
+      store.updateSettingLocally(key, value)
       return true
     })
   }
   return store
+}
+
+const makeDeferredWriteStore = (settings = {}) => {
+  const store = makeStore(settings)
+  const writes = []
+  const persisted = {}
+  store.updateSettingAndPersist = vi.fn((key, value) => {
+    store.updateSettingLocally(key, value)
+    return new Promise((resolve, reject) => {
+      writes.push({
+        key,
+        value,
+        resolve: () => {
+          persisted[key] = value
+          resolve(true)
+        },
+        reject
+      })
+    })
+  })
+  return { store, writes, persisted }
+}
+
+const settle = async () => {
+  await Promise.resolve()
+  await Promise.resolve()
+  await nextTick()
 }
 
 const mountView = (props = {}) => mount(LiveDubbingView, {
@@ -122,7 +157,10 @@ describe('LiveDubbingView', () => {
       provider_label: 'Provider',
       target_language_label: 'Target Language',
       live_dubbing_provider_description: 'Used for new live dubbing sessions.',
-      live_dubbing_config_label: 'Configuration'
+       live_dubbing_config_label: 'Configuration',
+       live_dubbing_transcript_preferences_label: 'Subtitle preferences',
+       live_dubbing_show_translated_transcript: 'Translated subtitles',
+       live_dubbing_show_original_transcript: 'Original subtitles'
     }
   })
 
@@ -219,6 +257,133 @@ describe('LiveDubbingView', () => {
     expect(providerSelect(wrapper).attributes('disabled')).toBeUndefined()
     expect(wrapper.findComponent({ name: 'LanguageSelector' }).props('disabled')).toBe(false)
     expect(wrapper.emitted('busy-change')).toEqual([[true], [false]])
+  })
+
+  it('renders and persists each transcript preference independently', async () => {
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+
+    expect(toggles).toHaveLength(2)
+    expect(toggles.map(toggle => toggle.props('modelValue'))).toEqual([false, false])
+
+    await toggles[0].vm.$emit('update:modelValue', true)
+    await toggles[1].vm.$emit('update:modelValue', true)
+
+    expect(harness.store.updateSettingAndPersist).toHaveBeenNthCalledWith(
+      1, 'LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', true
+    )
+    expect(harness.store.updateSettingAndPersist).toHaveBeenNthCalledWith(
+      2, 'LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', true
+    )
+    expect(harness.store.settings.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(true)
+    expect(harness.store.settings.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(true)
+  })
+
+  it('disables both preference toggles while busy without affecting the stop control', async () => {
+    const wrapper = mountView()
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    expect(wrapper.findAllComponents({ name: 'BaseToggle' }).every(toggle => toggle.props('disabled')))
+      .toBe(true)
+    // The view only locks preferences/configuration; LiveDubbingControl retains
+    // its running-session Stop action unchanged.
+    expect(control.exists()).toBe(true)
+  })
+
+  it('starts one write immediately and disables only that toggle while pending', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+
+    toggles[0].vm.$emit('update:modelValue', true)
+    expect(deferred.writes).toHaveLength(1)
+    expect(deferred.writes[0]).toMatchObject({
+      key: 'LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT',
+      value: true
+    })
+
+    await nextTick()
+    expect(toggles[0].props('disabled')).toBe(true)
+    expect(toggles[1].props('disabled')).toBe(false)
+  })
+
+  it('ignores a second event for the same pending preference', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const translated = wrapper.findAllComponents({ name: 'BaseToggle' })[0]
+
+    translated.vm.$emit('update:modelValue', true)
+    translated.vm.$emit('update:modelValue', false)
+    expect(deferred.writes).toHaveLength(1)
+  })
+
+  it('keeps the other preference enabled and starts its independent write', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+
+    toggles[0].vm.$emit('update:modelValue', true)
+    await nextTick()
+    expect(toggles[1].props('disabled')).toBe(false)
+
+    toggles[1].vm.$emit('update:modelValue', true)
+    expect(deferred.writes).toHaveLength(2)
+    expect(deferred.writes[1]).toMatchObject({
+      key: 'LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT',
+      value: true
+    })
+  })
+
+  it('keeps START unavailable until both independent writes settle', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+
+    toggles[0].vm.$emit('update:modelValue', true)
+    toggles[1].vm.$emit('update:modelValue', true)
+
+    expect(deferred.writes).toHaveLength(2)
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(false)
+
+    deferred.writes[0].resolve()
+    await settle()
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(false)
+
+    deferred.writes[1].resolve()
+    await settle()
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+  })
+
+  it('rolls back a rejected preference write without retrying or an unhandled rejection', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const translated = wrapper.findAllComponents({ name: 'BaseToggle' })[0]
+    const unhandledRejections = []
+    const onUnhandledRejection = (reason) => unhandledRejections.push(reason)
+    process.on('unhandledRejection', onUnhandledRejection)
+
+    translated.vm.$emit('update:modelValue', true)
+    await nextTick()
+    expect(translated.props('disabled')).toBe(true)
+
+    deferred.writes[0].reject(new Error('storage unavailable'))
+    await settle()
+
+    process.off('unhandledRejection', onUnhandledRejection)
+    expect(unhandledRejections).toHaveLength(0)
+    expect(harness.store.settings.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(false)
+    expect(translated.props('disabled')).toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledTimes(1)
   })
 
   it('shows credential setup only for a provider that lacks credentials', async () => {

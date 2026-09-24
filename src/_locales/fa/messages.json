@@ -254,6 +254,15 @@
   "live_dubbing_config_label": {
     "message": "پیکربندی"
   },
+  "live_dubbing_transcript_preferences_label": {
+    "message": "تنظیمات زیرنویس"
+  },
+  "live_dubbing_show_translated_transcript": {
+    "message": "زیرنویس ترجمه‌شده"
+  },
+  "live_dubbing_show_original_transcript": {
+    "message": "زیرنویس اصلی"
+  },
   "live_dubbing_setup_save": {
     "message": "ذخیره"
   },

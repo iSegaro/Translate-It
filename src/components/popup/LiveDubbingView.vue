@@ -37,6 +37,30 @@
       </div>
     </section>
 
+    <section
+      class="live-dubbing-card live-dubbing-transcript-preferences"
+      :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitle preferences')"
+    >
+      <div class="live-dubbing-transcript-preference">
+        <span>{{ t('live_dubbing_show_translated_transcript', 'Translated subtitles') }}</span>
+        <BaseToggle
+          :model-value="showTranslatedTranscript"
+          :disabled="isControlBusy || hasTranslatedPreferenceWritePending"
+          :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
+          @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
+        />
+      </div>
+      <div class="live-dubbing-transcript-preference">
+        <span>{{ t('live_dubbing_show_original_transcript', 'Original subtitles') }}</span>
+        <BaseToggle
+          :model-value="showOriginalTranscript"
+          :disabled="isControlBusy || hasOriginalPreferenceWritePending"
+          :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
+          @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
+        />
+      </div>
+    </section>
+
     <!-- Credential setup: rendered only while the selected provider has no key -->
     <!-- :key remount clears stale draft/errors on provider switch; the select is
          disabled while the control is busy, so remounts only happen while idle. -->
@@ -54,6 +78,7 @@
       class="live-dubbing-card live-dubbing-session-card"
     >
       <LiveDubbingControl
+        v-if="isControlBusy || (!hasTranslatedPreferenceWritePending && !hasOriginalPreferenceWritePending)"
         :key="controlKey"
         :target-language="targetLanguage"
         :provider-id="providerModel"
@@ -69,6 +94,7 @@ import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
 import LiveDubbingProviderSetup from '@/components/popup/LiveDubbingProviderSetup.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import BaseToggle from '@/components/base/BaseToggle.vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import {
@@ -100,6 +126,35 @@ const isRtlLocale = computed(() => /^fa(?:-|$)/i.test(locale.value || ''))
 
 /** Mirrors LiveDubbingControl's busy state so the config card can lock while a session is active. */
 const isControlBusy = ref(false)
+
+const showTranslatedTranscript = computed(() =>
+  settingsStore.settings?.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT === true
+)
+const showOriginalTranscript = computed(() =>
+  settingsStore.settings?.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT === true
+)
+const hasTranslatedPreferenceWritePending = ref(false)
+const hasOriginalPreferenceWritePending = ref(false)
+
+/** Persist one transcript preference and restore its prior value on failure. */
+const updateTranscriptPreference = async (key, value) => {
+  const pending = key === 'LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT'
+    ? hasTranslatedPreferenceWritePending
+    : hasOriginalPreferenceWritePending
+
+  if (pending.value) return
+
+  const previousValue = settingsStore.getSetting(key, false) === true
+  pending.value = true
+  try {
+    await settingsStore.updateSettingAndPersist(key, value)
+  } catch {
+    // Restore local state without starting another persistence write.
+    settingsStore.updateSettingLocally(key, previousValue)
+  } finally {
+    pending.value = false
+  }
+}
 
 const targetLanguageModel = computed({
   get: () => props.targetLanguage,

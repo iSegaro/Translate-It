@@ -31,6 +31,10 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.LIVE_DUBBING_ORIGINAL_VOLUME).toBe(0);
     expect(CONFIG.LIVE_DUBBING_DUBBED_VOLUME).toBe(1);
     expect(defaults.LIVE_DUBBING_DUBBED_VOLUME).toBe(1);
+    expect(CONFIG.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(false);
+    expect(defaults.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(false);
+    expect(CONFIG.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(false);
+    expect(defaults.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(false);
     expect(defaults.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
     expect(defaults.GEMINI_API_URL).toBe(CONFIG.GEMINI_API_URL);
     expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);

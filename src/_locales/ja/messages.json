@@ -254,6 +254,15 @@
   "live_dubbing_config_label": {
     "message": "設定"
   },
+  "live_dubbing_transcript_preferences_label": {
+    "message": "字幕設定"
+  },
+  "live_dubbing_show_translated_transcript": {
+    "message": "翻訳字幕"
+  },
+  "live_dubbing_show_original_transcript": {
+    "message": "元の字幕"
+  },
   "live_dubbing_setup_save": {
     "message": "保存"
   },

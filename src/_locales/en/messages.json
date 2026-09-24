@@ -254,6 +254,15 @@
   "live_dubbing_config_label": {
     "message": "Configuration"
   },
+  "live_dubbing_transcript_preferences_label": {
+    "message": "Subtitle preferences"
+  },
+  "live_dubbing_show_translated_transcript": {
+    "message": "Translated subtitles"
+  },
+  "live_dubbing_show_original_transcript": {
+    "message": "Original subtitles"
+  },
   "live_dubbing_setup_save": {
     "message": "Save"
   },

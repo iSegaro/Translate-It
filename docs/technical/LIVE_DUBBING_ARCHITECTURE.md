@@ -448,7 +448,8 @@ as scalar telemetry and transcript text is not retained.
 
 - **Translation model.** `gpt-realtime-translate`.
 - **Transcript configuration.** The translation client-secret mint body
-  enables input audio transcription by including
+  requests input audio transcription only when the persisted Original subtitles
+  preference is enabled, including
   `audio.input.transcription.model = 'gpt-realtime-whisper'` alongside the
   existing `audio.output.language = targetLanguage`. The `oai-events` data
   channel delivers both kinds as plain text deltas; the adapter parses
@@ -774,9 +775,9 @@ or descriptor adoption is performed for an uncertain owner.
 
 ## Transcript Subsystem
 
-Both translated and original (source) audio transcripts are produced in
-parallel for the active Live Dubbing session and rendered inside the
-existing Shadow DOM UI host in the top frame. The pipeline is strictly
+Translated and original (source) transcript displays are optional, both default
+off, and apply to new Live Dubbing sessions. When enabled, the displays are
+rendered inside the existing Shadow DOM UI host in the top frame. The pipeline is strictly
 provider-neutral downstream of the adapter boundary:
 
 ```
@@ -797,6 +798,8 @@ Provider Adapter → LiveDubbingController → Background Coordinator
 - **Side-channel.** Transcript is a side-channel: it never participates in
   Live Dubbing lifecycle, never mutates `SessionRegistry`, and never
   influences lease ownership, cleanup, START/STOP, or terminal decisions.
+- Display preferences do not change these lifecycle, fencing, sequencing,
+  replacement, clear, or transcript privacy guarantees.
 - **Per-fragment cap.** Provider-neutral per-fragment max length and a
   per-kind bounded retention budget bound retained memory; oversized or
   malformed events are ignored without affecting the session.

@@ -22,7 +22,12 @@ function openAIError({ type = 'invalid_request_error', code = null, message = 'R
   return { error: { type, code, message } };
 }
 
-function createService({ keys = ['key-1'], fetchImpl, logger } = {}) {
+function createService({
+  keys = ['key-1'],
+  fetchImpl,
+  logger,
+  originalTranscriptEnabled = vi.fn().mockResolvedValue(false),
+} = {}) {
   const calls = [];
   const impl = fetchImpl || (async (url, options) => {
     calls.push({ url, options });
@@ -30,6 +35,7 @@ function createService({ keys = ['key-1'], fetchImpl, logger } = {}) {
   });
   const service = new OpenAIRealtimeBootstrapService({
     getKeysImpl: async () => keys,
+    getOriginalTranscriptEnabledImpl: originalTranscriptEnabled,
     fetchImpl: impl,
     logger: logger || { debug: () => {}, warn: () => {}, error: () => {} },
   });
@@ -88,12 +94,30 @@ describe('OpenAIRealtimeBootstrapService', () => {
     expect(JSON.parse(calls[0].options.body)).toEqual({
       session: {
         model: OPENAI_REALTIME_TRANSLATE_MODEL,
-        audio: {
-          input: { transcription: { model: OPENAI_REALTIME_WHISPER_MODEL } },
-          output: { language: 'en-US' },
-        },
+        audio: { output: { language: 'en-US' } },
       },
     });
+  });
+
+  it('retains input transcription when Original subtitles are enabled', async () => {
+    const read = vi.fn().mockResolvedValue(true);
+    const { service, calls } = createService({ originalTranscriptEnabled: read });
+
+    await expect(service.mintClientSecret('en-US')).resolves.toBe('ek_test_secret');
+    expect(read).toHaveBeenCalledOnce();
+    expect(JSON.parse(calls[0].options.body).session.audio.input).toEqual({
+      transcription: { model: OPENAI_REALTIME_WHISPER_MODEL },
+    });
+  });
+
+  it('fails closed when the Original subtitles preference read fails or is not boolean true', async () => {
+    const failed = createService({ originalTranscriptEnabled: vi.fn().mockRejectedValue(new Error('storage')) });
+    await failed.service.mintClientSecret('en');
+    expect(JSON.parse(failed.calls[0].options.body).session.audio.input).toBeUndefined();
+
+    const malformed = createService({ originalTranscriptEnabled: vi.fn().mockResolvedValue('true') });
+    await malformed.service.mintClientSecret('en');
+    expect(JSON.parse(malformed.calls[0].options.body).session.audio.input).toBeUndefined();
   });
 
   it('returns only the documented secret value, never response metadata', async () => {
@@ -117,6 +141,21 @@ describe('OpenAIRealtimeBootstrapService', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe('Bearer bad-key');
     expect(fetchImpl.mock.calls[1][1].headers.Authorization).toBe('Bearer good-key');
+  });
+
+  it('reads the Original subtitles preference once and reuses the snapshot during failover', async () => {
+    const read = vi.fn().mockResolvedValue(true);
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(failMint(401))
+      .mockResolvedValueOnce(okMint('ek_second_secret'));
+    const { service } = createService({ keys: ['bad-key', 'good-key'], fetchImpl, originalTranscriptEnabled: read });
+
+    await expect(service.mintClientSecret('es')).resolves.toBe('ek_second_secret');
+    expect(read).toHaveBeenCalledOnce();
+    for (const [, options] of fetchImpl.mock.calls) {
+      expect(JSON.parse(options.body).session.audio.input.transcription.model)
+        .toBe(OPENAI_REALTIME_WHISPER_MODEL);
+    }
   });
 
   it('tries the next key for quota and rate-limit failures', async () => {
