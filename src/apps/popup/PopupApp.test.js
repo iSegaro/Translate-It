@@ -143,7 +143,7 @@ vi.mock('@/components/popup/TranslationView.vue', () => ({
 vi.mock('@/components/popup/LiveDubbingView.vue', () => ({
   default: {
     name: 'LiveDubbingView',
-    props: ['targetLanguage', 'providerId'],
+    props: ['targetLanguage', 'targetLanguagePending', 'providerId'],
     emits: ['busy-change', 'update:targetLanguage'],
     mounted() {
       liveDubbingViewLifecycle.mounts += 1
@@ -216,10 +216,15 @@ describe('PopupApp', () => {
       settings: {
         DEEPL_BETA_LANGUAGES_ENABLED: false,
         TRANSLATION_API: 'google',
+        TARGET_LANGUAGE: 'de',
         LIVE_DUBBING_PROVIDER: 'openai',
+        LIVE_DUBBING_TARGET_LANGUAGE: 'fr',
         THEME: 'auto'
       },
       loadSettings: vi.fn().mockResolvedValue(undefined),
+      updateSettingLocally: vi.fn((key, value) => {
+        mockSettingsStore.settings[key] = value
+      }),
       updateSettingAndPersist: vi.fn().mockResolvedValue(undefined),
       isInitialized: true
     }
@@ -262,6 +267,28 @@ describe('PopupApp', () => {
     expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('de')
   })
 
+  it('does not persist language defaults when dropdowns change', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    const view = wrapper.findComponent({ name: 'TranslationView' })
+    view.vm.$emit('update:sourceLanguage', 'de')
+    view.vm.$emit('update:targetLanguage', 'fr')
+    await flushPromises()
+
+    expect(view.props('sourceLanguage')).toBe('de')
+    expect(view.props('targetLanguage')).toBe('fr')
+    expect(mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalledWith(
+      'SOURCE_LANGUAGE',
+      expect.anything()
+    )
+    expect(mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalledWith(
+      'TARGET_LANGUAGE',
+      expect.anything()
+    )
+  })
+
   it('passes the normalized live dubbing provider without affecting translation provider', async () => {
     const wrapper = mount(PopupApp)
     await flushPromises()
@@ -269,6 +296,113 @@ describe('PopupApp', () => {
 
     expect(wrapper.findComponent({ name: 'LiveDubbingView' }).props('providerId')).toBe('openai')
     expect(wrapper.findComponent({ name: 'TranslationView' }).props('currentProvider')).toBe('google')
+  })
+
+  it('restores the persisted live dubbing target independently', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).props('targetLanguage')).toBe('fr')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('targetLanguage')).toBe('de')
+  })
+
+  it('uses the independent Live Dubbing default when no value is persisted', async () => {
+    mockSettingsStore.settings.LIVE_DUBBING_TARGET_LANGUAGE = undefined
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).props('targetLanguage')).toBe('en')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('targetLanguage')).toBe('de')
+  })
+
+  it('keeps target-language changes isolated between Translation and Live Dubbing', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    const translationView = wrapper.findComponent({ name: 'TranslationView' })
+    const liveDubbingView = wrapper.findComponent({ name: 'LiveDubbingView' })
+
+    translationView.vm.$emit('update:targetLanguage', 'ja')
+    await flushPromises()
+    expect(translationView.props('targetLanguage')).toBe('ja')
+    expect(liveDubbingView.props('targetLanguage')).toBe('fr')
+    expect(mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalledWith(
+      'LIVE_DUBBING_TARGET_LANGUAGE',
+      expect.anything()
+    )
+
+    liveDubbingView.vm.$emit('update:targetLanguage', 'es')
+    await flushPromises()
+    expect(liveDubbingView.props('targetLanguage')).toBe('es')
+    expect(translationView.props('targetLanguage')).toBe('ja')
+    expect(mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledWith(
+      'LIVE_DUBBING_TARGET_LANGUAGE',
+      'es'
+    )
+    expect(mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalledWith(
+      'TARGET_LANGUAGE',
+      expect.anything()
+    )
+  })
+
+  it('rolls back only the Live Dubbing target when its persistence fails', async () => {
+    mockSettingsStore.updateSettingAndPersist = vi.fn().mockRejectedValue(new Error('storage failed'))
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    const liveDubbingView = wrapper.findComponent({ name: 'LiveDubbingView' })
+    liveDubbingView.vm.$emit('update:targetLanguage', 'es')
+    await flushPromises()
+
+    expect(liveDubbingView.props('targetLanguage')).toBe('fr')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).props('targetLanguage')).toBe('de')
+    expect(liveDubbingView.props('targetLanguagePending')).toBe(false)
+    expect(liveDubbingView.vm).toBe(wrapper.findComponent({ name: 'LiveDubbingView' }).vm)
+    expect(liveDubbingViewLifecycle.mounts).toBe(1)
+    expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('de')
+    expect(mockSettingsStore.updateSettingLocally).toHaveBeenCalledWith(
+      'LIVE_DUBBING_TARGET_LANGUAGE',
+      'fr'
+    )
+  })
+
+  it('ignores a second Live Dubbing target change while the first write is pending', async () => {
+    const writes = []
+    mockSettingsStore.updateSettingAndPersist = vi.fn((key, value) => {
+      const pending = deferred()
+      writes.push({ key, value, ...pending })
+      return pending.promise
+    })
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+    const liveDubbingView = wrapper.findComponent({ name: 'LiveDubbingView' })
+
+    liveDubbingView.vm.$emit('update:targetLanguage', 'es')
+    await flushPromises()
+    expect(liveDubbingView.props('targetLanguagePending')).toBe(true)
+    expect(writes).toHaveLength(1)
+
+    liveDubbingView.vm.$emit('update:targetLanguage', 'ja')
+    await flushPromises()
+    expect(writes).toHaveLength(1)
+    expect(liveDubbingView.props('targetLanguage')).toBe('es')
+
+    writes[0].resolve()
+    await flushPromises()
+    expect(liveDubbingView.props('targetLanguagePending')).toBe(false)
+  })
+
+  it('forwards the independent Live Dubbing target to its start view', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).props('targetLanguage')).toBe('fr')
   })
 
   it('falls back to Gemini for an unknown live dubbing provider', async () => {

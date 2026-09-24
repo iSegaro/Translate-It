@@ -4,6 +4,10 @@ import { ref } from 'vue';
 import TranslationForm from './TranslationForm.vue';
 
 const mockSettingsCallback = vi.fn();
+const resourceTrackerMocks = vi.hoisted(() => ({
+  addEventListener: vi.fn((target, event, handler) => target.addEventListener(event, handler)),
+}));
+let mockSettingsStore;
 const mockTranslation = {
   sourceText: ref('hello'),
   translatedText: ref('bonjour'),
@@ -30,11 +34,7 @@ vi.mock('@/features/translation/composables/useUnifiedTranslation.js', () => ({
 }));
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
-  useSettingsStore: () => ({
-    settings: {
-      AUTO_TRANSLATE_ON_PASTE: false,
-    },
-  }),
+  useSettingsStore: () => mockSettingsStore,
 }));
 
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
@@ -46,7 +46,9 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 }));
 
 vi.mock('@/composables/core/useResourceTracker.js', () => ({
-  useResourceTracker: () => ({ addEventListener: vi.fn() }),
+  useResourceTracker: () => ({
+    addEventListener: vi.fn((target, event, handler) => resourceTrackerMocks.addEventListener(target, event, handler)),
+  }),
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
@@ -85,10 +87,15 @@ vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
 describe('TranslationForm.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSettingsStore = {
+      settings: { AUTO_TRANSLATE_ON_PASTE: false },
+      updateSettingAndPersist: vi.fn(),
+    };
     mockTranslation.canRetry.value = false;
     mockTranslation.canOpenSettings.value = false;
     mockTranslation.getRetryCallback.mockImplementation((retryFunction) => retryFunction);
     mockTranslation.getSettingsCallback.mockReturnValue(mockSettingsCallback);
+    mockTranslation.revertTranslation.mockReturnValue({ sourceLanguage: 'fr', targetLanguage: 'en' });
   });
 
   const mountForm = () => mount(TranslationForm, {
@@ -126,5 +133,17 @@ describe('TranslationForm.vue', () => {
     expect(mockTranslation.getRetryCallback).toHaveBeenCalledWith(expect.any(Function));
     expect(mockTranslation.getSettingsCallback).toHaveBeenCalledTimes(1);
     expect(mockSettingsCallback).toHaveBeenCalledTimes(1);
+  });
+
+  it('reverts UI state without persisting language defaults', () => {
+    const wrapper = mountForm();
+
+    const revertListener = resourceTrackerMocks.addEventListener.mock.calls
+      .find(([, event]) => event === 'revert-translation')[2];
+    revertListener();
+
+    expect(mockTranslation.revertTranslation).toHaveBeenCalledTimes(1);
+    expect(mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 });

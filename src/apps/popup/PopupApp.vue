@@ -78,10 +78,11 @@
         <LiveDubbingView
           v-show="activeView === 'live-dubbing'"
           v-if="isLiveDubbingSupported"
-          :target-language="targetLanguage"
+          :target-language="liveDubbingTargetLanguage"
+          :target-language-pending="isLiveDubbingTargetLanguagePending"
           :provider-id="liveDubbingProvider"
           @busy-change="isLiveDubbingBusy = $event"
-          @update:target-language="targetLanguage = $event"
+          @update:target-language="handleLiveDubbingTargetLanguageChange"
         />
       </div>
     </template>
@@ -112,6 +113,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { useGlobalFont } from '@/composables/shared/useFont.js';
+import { CONFIG } from '@/shared/config/config.js';
 
 // --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
@@ -171,6 +173,8 @@ const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
 const isLiveDubbingBusy = ref(false)
+const liveDubbingTargetLanguage = ref(CONFIG.LIVE_DUBBING_TARGET_LANGUAGE)
+const isLiveDubbingTargetLanguagePending = ref(false)
 // Active popup view: 'translate' (default) or 'live-dubbing'.
 const activeView = ref('translate')
 let activeViewPersistenceTail = Promise.resolve()
@@ -189,6 +193,13 @@ const restoreActiveView = () => {
   activeView.value = isValidActiveView(persistedView) ? persistedView : 'translate'
 }
 
+const restoreLiveDubbingTargetLanguage = () => {
+  const persistedLanguage = settingsStore.settings?.LIVE_DUBBING_TARGET_LANGUAGE
+  liveDubbingTargetLanguage.value = typeof persistedLanguage === 'string' && persistedLanguage
+    ? persistedLanguage
+    : CONFIG.LIVE_DUBBING_TARGET_LANGUAGE
+}
+
 const persistActiveView = (value) => {
   activeViewPersistenceTail = activeViewPersistenceTail
     .then(() => settingsStore.updateSettingAndPersist('POPUP_ACTIVE_VIEW', value))
@@ -201,6 +212,25 @@ const handleActiveViewChange = (value) => {
 
   activeView.value = value
   persistActiveView(value)
+}
+
+/** Persist Live Dubbing's target without changing the Translation target. */
+const handleLiveDubbingTargetLanguageChange = async (value) => {
+  if (isLiveDubbingTargetLanguagePending.value) return
+
+  const previousValue = liveDubbingTargetLanguage.value
+  liveDubbingTargetLanguage.value = value
+  isLiveDubbingTargetLanguagePending.value = true
+
+  try {
+    await settingsStore.updateSettingAndPersist('LIVE_DUBBING_TARGET_LANGUAGE', value)
+  } catch (error) {
+    liveDubbingTargetLanguage.value = previousValue
+    settingsStore.updateSettingLocally('LIVE_DUBBING_TARGET_LANGUAGE', previousValue)
+    logger.warn('[PopupApp] Failed to persist live dubbing target language:', error)
+  } finally {
+    isLiveDubbingTargetLanguagePending.value = false
+  }
 }
 
 // Reactive error message display with i18n support
@@ -296,6 +326,7 @@ const initialize = async () => {
 
     // Restore only after settings have loaded so the initial rendered view never flickers.
     restoreActiveView()
+    restoreLiveDubbingTargetLanguage()
 
     // Step 3: Apply global font variables
     applyGlobalCSSVariables()

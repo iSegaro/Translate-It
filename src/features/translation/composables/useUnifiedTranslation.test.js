@@ -384,8 +384,8 @@ describe("useUnifiedTranslation", () => {
     const provider = ref('default');
     sessionMocks.load.mockResolvedValue({
       draftSource: 'Popup draft',
-      sourceLanguage: 'en',
-      targetLanguage: 'fa',
+      sourceLanguage: 'de',
+      targetLanguage: 'fr',
       provider: 'deepl',
       revision: 4,
       completedTranslation: null,
@@ -396,14 +396,33 @@ describe("useUnifiedTranslation", () => {
 
     expect(composable.sourceText.value).toBe('Popup draft');
     expect(composable.translatedText.value).toBe('');
-    expect(composable.sourceLanguage.value).toBe('en');
-    expect(composable.targetLanguage.value).toBe('fa');
+    expect(composable.sourceLanguage.value).toBe('auto');
+    expect(composable.targetLanguage.value).toBe('en');
     expect(provider.value).toBe('deepl');
+  });
+
+  it('restores sidepanel session languages from its snapshot', async () => {
+    sessionMocks.load.mockResolvedValue({
+      draftSource: 'Sidepanel draft',
+      sourceLanguage: 'de',
+      targetLanguage: 'fr',
+      revision: 4,
+      completedTranslation: null,
+    });
+    const [composable] = withSetup(() => useUnifiedTranslation('sidepanel'));
+
+    await composable.initializeSessionState();
+
+    expect(composable.sourceText.value).toBe('Sidepanel draft');
+    expect(composable.sourceLanguage.value).toBe('de');
+    expect(composable.targetLanguage.value).toBe('fr');
   });
 
   it('restores a completed translation only when it matches saved draft source', async () => {
     sessionMocks.load.mockResolvedValue({
       draftSource: 'Hello',
+      sourceLanguage: 'de',
+      targetLanguage: 'fr',
       revision: 2,
       completedTranslation: {
         source: 'Hello',
@@ -424,6 +443,12 @@ describe("useUnifiedTranslation", () => {
     expect(composable.sourceText.value).toBe('Hello');
     expect(composable.translatedText.value).toBe('سلام');
     expect(composable.lastTranslation.value).toMatchObject({ source: 'Hello', target: 'سلام' });
+    expect(composable.sourceLanguage.value).toBe('auto');
+    expect(composable.targetLanguage.value).toBe('en');
+    expect(composable.lastTranslation.value).toMatchObject({
+      sourceLanguage: 'en',
+      targetLanguage: 'fa',
+    });
   });
 
   it('persists draft-only after source edit following a restored result', async () => {

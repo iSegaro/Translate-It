@@ -22,7 +22,7 @@
         v-if="!isRunning && !isStopping"
         size="sm"
         :loading="isStarting"
-        :disabled="isUnavailable || isLoading || isStopping || isCleanupPending"
+        :disabled="startDisabled || isUnavailable || isLoading || isStopping || isCleanupPending"
         :text="t('live_dubbing_action_start', 'Start')"
         :aria-label="t('live_dubbing_action_start_aria_label', 'Start live dubbing')"
         @click="start"
@@ -160,6 +160,10 @@ const props = defineProps({
     type: String,
     default: LIVE_DUBBING_PROVIDER_ID,
     validator: (value) => LIVE_DUBBING_PROVIDER_IDS.includes(value)
+  },
+  startDisabled: {
+    type: Boolean,
+    default: false
   }
 })
 

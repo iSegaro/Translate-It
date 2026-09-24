@@ -92,6 +92,37 @@ describe('LiveDubbingControl', () => {
     })
   })
 
+  it('applies startDisabled only to START, not STOP or cleanup', async () => {
+    const wrapper = await mountAndFlush({ startDisabled: true })
+    const startButton = () => wrapper.find('button[aria-label="Start live dubbing"]')
+
+    expect(startButton().attributes('disabled')).toBeDefined()
+
+    await wrapper.setProps({ startDisabled: false })
+    expect(startButton().attributes('disabled')).toBeUndefined()
+
+    await startButton().trigger('click')
+    await flushPromises(wrapper)
+    await flushPromises(wrapper)
+    await wrapper.setProps({ startDisabled: true })
+
+    expect(wrapper.find('button[aria-label="Stop live dubbing"]').attributes('disabled'))
+      .toBeUndefined()
+
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        return Promise.resolve({ status: 'ERROR', sessionId: 'retained-session', lastError: 'Capture failed' })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+    const cleanupWrapper = await mountAndFlush({ startDisabled: true })
+
+    expect(cleanupWrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled'))
+      .toBeDefined()
+    expect(cleanupWrapper.find('button[aria-label="Clean up live dubbing"]').attributes('disabled'))
+      .toBeUndefined()
+  })
+
   it('emits status-resolved once after the initial status query succeeds', async () => {
     const wrapper = await mountAndFlush()
 

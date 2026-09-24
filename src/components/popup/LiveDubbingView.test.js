@@ -56,11 +56,12 @@ const LanguageSelectorStub = {
 
 const setupLifecycle = { mounts: 0 }
 
-const LiveDubbingControlStub = {
+  const LiveDubbingControlStub = {
   name: 'LiveDubbingControl',
   props: {
     targetLanguage: { type: String, default: '' },
-    providerId: { type: String, default: '' }
+    providerId: { type: String, default: '' },
+    startDisabled: { type: Boolean, default: false }
   },
   emits: ['busy-change', 'status-resolved'],
   mounted() {
@@ -177,6 +178,35 @@ describe('LiveDubbingView', () => {
     expect(selector.props('targetOnly')).toBe(true)
     expect(selector.props('enableSelectElementIntegration')).toBe(false)
     expect(selector.props('provider')).toBe('openai')
+  })
+
+  it('disables the target selector while a target write or session is busy', async () => {
+    const wrapper = mountView({ targetLanguagePending: true })
+    const selector = wrapper.findComponent({ name: 'LanguageSelector' })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    expect(selector.props('disabled')).toBe(true)
+
+    await wrapper.setProps({ targetLanguagePending: false })
+    expect(selector.props('disabled')).toBe(false)
+
+    await control.vm.$emit('busy-change', true)
+    expect(selector.props('disabled')).toBe(true)
+
+    await control.vm.$emit('busy-change', false)
+    expect(selector.props('disabled')).toBe(false)
+  })
+
+  it('passes the language pending gate to START and clears it after settle', async () => {
+    const wrapper = mountView({ targetLanguagePending: true })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    expect(control.props('startDisabled')).toBe(true)
+
+    await wrapper.setProps({ targetLanguagePending: false })
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).props('startDisabled'))
+      .toBe(false)
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).vm).toBe(control.vm)
   })
 
   it('renders localized labels with the shared label treatment', () => {

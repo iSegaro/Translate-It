@@ -200,8 +200,10 @@ export function useUnifiedTranslation(context = 'popup', { provider = null } = {
 
     sessionRevision = Math.max(sessionRevision, Number(snapshot.revision) || 0);
     sourceText.value = snapshot.draftSource;
-    sourceLanguage.value = snapshot.sourceLanguage || sourceLanguage.value;
-    targetLanguage.value = snapshot.targetLanguage || targetLanguage.value;
+    if (context !== 'popup') {
+      sourceLanguage.value = snapshot.sourceLanguage || sourceLanguage.value;
+      targetLanguage.value = snapshot.targetLanguage || targetLanguage.value;
+    }
     if (provider && snapshot.provider) provider.value = snapshot.provider;
 
     const completed = snapshot.completedTranslation;

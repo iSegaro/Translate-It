@@ -16,7 +16,7 @@
             :provider="providerModel"
             :enable-select-element-integration="false"
             :target-only="true"
-            :disabled="isControlBusy"
+            :disabled="isControlBusy || targetLanguagePending"
           />
         </div>
         <div class="live-dubbing-config-field live-dubbing-config-field--provider">
@@ -93,6 +93,7 @@
         :key="controlKey"
         :target-language="targetLanguage"
         :provider-id="providerModel"
+        :start-disabled="targetLanguagePending"
         @busy-change="handleBusyChange"
         @status-resolved="handleControlStatusResolved"
       />
@@ -122,6 +123,10 @@ const props = defineProps({
   targetLanguage: {
     type: String,
     default: 'en'
+  },
+  targetLanguagePending: {
+    type: Boolean,
+    default: false
   },
   providerId: {
     type: String,

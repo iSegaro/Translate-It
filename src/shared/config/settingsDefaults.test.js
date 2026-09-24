@@ -25,6 +25,8 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.TIMEOUT).toBe(CONFIG.TIMEOUT);
     expect(CONFIG.LIVE_DUBBING_PROVIDER).toBe('gemini');
     expect(defaults.LIVE_DUBBING_PROVIDER).toBe(CONFIG.LIVE_DUBBING_PROVIDER);
+    expect(CONFIG.LIVE_DUBBING_TARGET_LANGUAGE).toBe('en');
+    expect(defaults.LIVE_DUBBING_TARGET_LANGUAGE).toBe(CONFIG.LIVE_DUBBING_TARGET_LANGUAGE);
     expect(CONFIG.POPUP_ACTIVE_VIEW).toBe('translate');
     expect(defaults.POPUP_ACTIVE_VIEW).toBe(CONFIG.POPUP_ACTIVE_VIEW);
     expect(CONFIG.LIVE_DUBBING_ORIGINAL_VOLUME).toBe(0);
