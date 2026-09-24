@@ -811,13 +811,27 @@ Provider Adapter → LiveDubbingController → Background Coordinator
   transcript uses the reserved `session.eventSequence + 1` without
   mutating the canonical `session.eventSequence`. The canonical sequence
   advances exactly once when the normal `CONNECTING_PROVIDER` →
-  `RUNNING` transition commits, so Original/Dubbed Volume commands issued
-  with the current `CONNECTING_PROVIDER` sequence remain valid throughout
-  the window.
+  `RUNNING` transition commits. Background transiently reserves that exact
+  next sequence for the active session/provider bridge, so Original/Dubbed
+  Volume GET/SET commands issued publicly with the authoritative `N` are
+  forwarded internally at only the reserved `N+1` before the `RUNNING` write
+  settles. The public descriptor fence remains `N` throughout the bridge;
+  direct public `N+1` (or later) requests are rejected.
+- If the first internal `N` transport receives the exact ignored sequence
+  mismatch proving `RUNNING/N+1`, the Coordinator may install the same exact
+  reservation and replay that operation once at `N+1`. The replay is bounded
+  by the unchanged public fence and is never repeated for a second mismatch.
+- SET reconciliation uses separate monotonic Coordinator tokens for Original
+  and Dubbed lanes; a newer same-lane SET suppresses an older replay, while
+  the two lanes and replacement sessions remain independent.
 - The Coordinator accepts transcripts that match the current
   `CONNECTING_PROVIDER` descriptor event sequence **or** the reserved next
   sequence during this transition only; older or arbitrary sequences are
   rejected.
+- The volume reservation is transient Coordinator state, not part of the
+  public descriptor. It is background-authorized only, and is cleared when
+  the `RUNNING` write settles or startup/session termination/replacement
+  invalidates the bridge.
 
 ### Background Relay
 

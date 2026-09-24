@@ -261,8 +261,8 @@ export class LiveDubbingCoordinator {
 
   /**
    * Apply original-audio gain without entering the lifecycle mutation queue.
-   * The descriptor identity and event sequence are the complete command fence;
-   * no lifecycle or public descriptor state is changed by this control path.
+   * Public ingress uses the authoritative descriptor fence. The transient
+   * provider-ready bridge changes only the internal offscreen transport fence.
    */
   async setOriginalVolume(message = {}) {
     const data = message?.data && typeof message.data === 'object'
@@ -294,12 +294,23 @@ export class LiveDubbingCoordinator {
     if (!hasExactSessionEvent(message, descriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
+    const setRequestToken = this._advanceVolumeSetRequestToken(descriptor, 'original');
+    let transportDescriptor = this._resolveVolumeTransportDescriptor(descriptor);
 
     let response;
     try {
       response = await this._sendOriginalVolume(
-        createOriginalVolumeMessage(descriptor, volume),
+        createOriginalVolumeMessage(transportDescriptor, volume),
       );
+      ({ response, transportDescriptor } = await this._reconcileVolumeSequenceMismatch({
+        descriptor,
+        response,
+        transportDescriptor,
+        setRequestToken,
+        setRequestLane: 'original',
+        createMessage: transport => createOriginalVolumeMessage(transport, volume),
+        sendMessage: messageToSend => this._sendOriginalVolume(messageToSend),
+      }));
     } catch {
       return { success: false, error: 'LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE' };
     }
@@ -311,20 +322,20 @@ export class LiveDubbingCoordinator {
       && responseData.sessionId !== undefined
       && responseData.providerId !== undefined;
     if (hasResponseIdentity
-      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      && this._isSessionMismatch(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
     if (hasResponseIdentity) {
       if (responseData.eventSequence !== undefined
-        && responseData.eventSequence !== descriptor.eventSequence) {
+        && responseData.eventSequence !== transportDescriptor.eventSequence) {
         return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
       }
     }
 
     if (!responseData
       || responseData.success === false
-      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
-      || !hasExactSessionEvent(response, descriptor)
+      || !isExactSessionResponse(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)
+      || !hasExactSessionEvent(response, transportDescriptor)
       || typeof responseData.originalVolume !== 'number'
       || !Number.isFinite(responseData.originalVolume)
       || responseData.originalVolume < 0
@@ -339,7 +350,8 @@ export class LiveDubbingCoordinator {
     if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
-    if (!hasExactSessionEvent({ data: responseData }, current)) {
+    const currentTransportDescriptor = this._resolveVolumeTransportDescriptor(current);
+    if (!hasExactSessionEvent({ data: responseData }, currentTransportDescriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
     if (!controllableStatuses.includes(current.status)) {
@@ -367,8 +379,8 @@ export class LiveDubbingCoordinator {
 
   /**
    * Apply dubbed-audio gain without entering the lifecycle mutation queue.
-   * The descriptor identity and event sequence are the complete command fence;
-   * no lifecycle or public descriptor state is changed by this control path.
+   * Public ingress uses the authoritative descriptor fence. The transient
+   * provider-ready bridge changes only the internal offscreen transport fence.
    */
   async setDubbedVolume(message = {}) {
     const data = message?.data && typeof message.data === 'object'
@@ -400,12 +412,23 @@ export class LiveDubbingCoordinator {
     if (!hasExactSessionEvent(message, descriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
+    const setRequestToken = this._advanceVolumeSetRequestToken(descriptor, 'dubbed');
+    let transportDescriptor = this._resolveVolumeTransportDescriptor(descriptor);
 
     let response;
     try {
       response = await this._sendDubbedVolume(
-        createDubbedVolumeMessage(descriptor, volume),
+        createDubbedVolumeMessage(transportDescriptor, volume),
       );
+      ({ response, transportDescriptor } = await this._reconcileVolumeSequenceMismatch({
+        descriptor,
+        response,
+        transportDescriptor,
+        setRequestToken,
+        setRequestLane: 'dubbed',
+        createMessage: transport => createDubbedVolumeMessage(transport, volume),
+        sendMessage: messageToSend => this._sendDubbedVolume(messageToSend),
+      }));
     } catch {
       return { success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE' };
     }
@@ -417,20 +440,20 @@ export class LiveDubbingCoordinator {
       && responseData.sessionId !== undefined
       && responseData.providerId !== undefined;
     if (hasResponseIdentity
-      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      && this._isSessionMismatch(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
     if (hasResponseIdentity) {
       if (responseData.eventSequence !== undefined
-        && responseData.eventSequence !== descriptor.eventSequence) {
+        && responseData.eventSequence !== transportDescriptor.eventSequence) {
         return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
       }
     }
 
     if (!responseData
       || responseData.success === false
-      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
-      || !hasExactSessionEvent(response, descriptor)
+      || !isExactSessionResponse(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)
+      || !hasExactSessionEvent(response, transportDescriptor)
       || typeof responseData.dubbedVolume !== 'number'
       || !Number.isFinite(responseData.dubbedVolume)
       || responseData.dubbedVolume < 0
@@ -445,7 +468,8 @@ export class LiveDubbingCoordinator {
     if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
-    if (!hasExactSessionEvent({ data: responseData }, current)) {
+    const currentTransportDescriptor = this._resolveVolumeTransportDescriptor(current);
+    if (!hasExactSessionEvent({ data: responseData }, currentTransportDescriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
     if (!controllableStatuses.includes(current.status)) {
@@ -601,8 +625,9 @@ export class LiveDubbingCoordinator {
   /**
    * Read the committed original-audio gain without entering the lifecycle
    * mutation queue and without changing any descriptor state. The descriptor
-   * identity and event sequence are the complete request fence; the offscreen
-   * read never creates or starts audio resources.
+   * identity and authoritative event sequence are the public request fence;
+   * any bridge sequence is used only for the internal offscreen transport.
+   * The offscreen read never creates or starts audio resources.
    */
   async getOriginalVolume(message = {}) {
     const descriptor = await this._readDescriptor();
@@ -625,12 +650,20 @@ export class LiveDubbingCoordinator {
     if (!hasExactSessionEvent(message, descriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
+    let transportDescriptor = this._resolveVolumeTransportDescriptor(descriptor);
 
     let response;
     try {
       response = await this._sendOriginalVolumeQuery(
-        createOriginalVolumeQueryMessage(descriptor),
+        createOriginalVolumeQueryMessage(transportDescriptor),
       );
+      ({ response, transportDescriptor } = await this._reconcileVolumeSequenceMismatch({
+        descriptor,
+        response,
+        transportDescriptor,
+        createMessage: transport => createOriginalVolumeQueryMessage(transport),
+        sendMessage: messageToSend => this._sendOriginalVolumeQuery(messageToSend),
+      }));
     } catch {
       return { success: false, error: 'LIVE_DUBBING_ORIGINAL_AUDIO_UNAVAILABLE' };
     }
@@ -642,20 +675,20 @@ export class LiveDubbingCoordinator {
       && responseData.sessionId !== undefined
       && responseData.providerId !== undefined;
     if (hasResponseIdentity
-      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      && this._isSessionMismatch(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
     if (hasResponseIdentity) {
       if (responseData.eventSequence !== undefined
-        && responseData.eventSequence !== descriptor.eventSequence) {
+        && responseData.eventSequence !== transportDescriptor.eventSequence) {
         return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
       }
     }
 
     if (!responseData
       || responseData.success === false
-      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
-      || !hasExactSessionEvent(response, descriptor)
+      || !isExactSessionResponse(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)
+      || !hasExactSessionEvent(response, transportDescriptor)
       || typeof responseData.originalVolume !== 'number'
       || !Number.isFinite(responseData.originalVolume)
       || responseData.originalVolume < 0
@@ -670,7 +703,8 @@ export class LiveDubbingCoordinator {
     if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
-    if (!hasExactSessionEvent({ data: responseData }, current)) {
+    const currentTransportDescriptor = this._resolveVolumeTransportDescriptor(current);
+    if (!hasExactSessionEvent({ data: responseData }, currentTransportDescriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
     if (!controllableStatuses.includes(current.status)) {
@@ -690,8 +724,9 @@ export class LiveDubbingCoordinator {
   /**
    * Read the committed dubbed-audio gain without entering the lifecycle
    * mutation queue and without changing any descriptor state. The descriptor
-   * identity and event sequence are the complete request fence; the offscreen
-   * read never creates or starts audio resources.
+   * identity and authoritative event sequence are the public request fence;
+   * any bridge sequence is used only for the internal offscreen transport.
+   * The offscreen read never creates or starts audio resources.
    */
   async getDubbedVolume(message = {}) {
     const descriptor = await this._readDescriptor();
@@ -714,12 +749,20 @@ export class LiveDubbingCoordinator {
     if (!hasExactSessionEvent(message, descriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
+    let transportDescriptor = this._resolveVolumeTransportDescriptor(descriptor);
 
     let response;
     try {
       response = await this._sendDubbedVolumeQuery(
-        createDubbedVolumeQueryMessage(descriptor),
+        createDubbedVolumeQueryMessage(transportDescriptor),
       );
+      ({ response, transportDescriptor } = await this._reconcileVolumeSequenceMismatch({
+        descriptor,
+        response,
+        transportDescriptor,
+        createMessage: transport => createDubbedVolumeQueryMessage(transport),
+        sendMessage: messageToSend => this._sendDubbedVolumeQuery(messageToSend),
+      }));
     } catch {
       return { success: false, error: 'LIVE_DUBBING_DUBBED_AUDIO_UNAVAILABLE' };
     }
@@ -731,20 +774,20 @@ export class LiveDubbingCoordinator {
       && responseData.sessionId !== undefined
       && responseData.providerId !== undefined;
     if (hasResponseIdentity
-      && this._isSessionMismatch(responseData, descriptor.sessionId, descriptor.providerId)) {
+      && this._isSessionMismatch(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
     if (hasResponseIdentity) {
       if (responseData.eventSequence !== undefined
-        && responseData.eventSequence !== descriptor.eventSequence) {
+        && responseData.eventSequence !== transportDescriptor.eventSequence) {
         return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
       }
     }
 
     if (!responseData
       || responseData.success === false
-      || !isExactSessionResponse(responseData, descriptor.sessionId, descriptor.providerId)
-      || !hasExactSessionEvent(response, descriptor)
+      || !isExactSessionResponse(responseData, transportDescriptor.sessionId, transportDescriptor.providerId)
+      || !hasExactSessionEvent(response, transportDescriptor)
       || typeof responseData.dubbedVolume !== 'number'
       || !Number.isFinite(responseData.dubbedVolume)
       || responseData.dubbedVolume < 0
@@ -759,7 +802,8 @@ export class LiveDubbingCoordinator {
     if (current.sessionId !== descriptor.sessionId || current.providerId !== descriptor.providerId) {
       return { success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' };
     }
-    if (!hasExactSessionEvent({ data: responseData }, current)) {
+    const currentTransportDescriptor = this._resolveVolumeTransportDescriptor(current);
+    if (!hasExactSessionEvent({ data: responseData }, currentTransportDescriptor)) {
       return { success: false, error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH' };
     }
     if (!controllableStatuses.includes(current.status)) {
@@ -1512,21 +1556,35 @@ export class LiveDubbingCoordinator {
           null,
           providerResponse.eventSequence,
         );
+        if (!this._reserveVolumeEventSequence(
+          connectingDescriptor,
+          providerResponse.eventSequence,
+        )) {
+          throw new Error('Live dubbing volume sequence reservation failed');
+        }
       } else {
         throw new Error('Live dubbing audio pipelines are not ready');
       }
-      if (!await this._writeDescriptor(
-        activeDescriptor,
-        descriptor.sessionId,
-        sessionState.descriptor,
-        { clearOutcome: true },
-      )) {
-        throw new Error('Live dubbing descriptor persistence failed');
+      try {
+        if (!await this._writeDescriptor(
+          activeDescriptor,
+          descriptor.sessionId,
+          sessionState.descriptor,
+          { clearOutcome: true },
+        )) {
+          throw new Error('Live dubbing descriptor persistence failed');
+        }
+        sessionState.descriptor = activeDescriptor;
+      } finally {
+        this._clearVolumeEventSequenceReservation(
+          descriptor.sessionId,
+          descriptor.providerId,
+        );
       }
-      sessionState.descriptor = activeDescriptor;
       if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
       return { success: true, status: cloneDescriptor(activeDescriptor) };
     } catch (error) {
+      this._clearVolumeEventSequenceReservation(descriptor.sessionId, descriptor.providerId);
       const diagnostic = error?.captureDiagnostic || null;
       let providerDiagnostic = this._latchProviderDiagnostic(
         sessionState,
@@ -2310,7 +2368,57 @@ export class LiveDubbingCoordinator {
   _markTerminalState(state) {
     if (!state?.descriptor?.sessionId) return;
     state.terminalRequested = true;
+    state.volumeEventSequenceReservation = null;
     this.sessionRegistry.releaseBootstrapSession(state.descriptor.sessionId);
+  }
+
+  _reserveVolumeEventSequence(descriptor, eventSequence) {
+    const state = this.sessionRegistry.getSessionState(descriptor?.sessionId);
+    if (!state || state.terminalRequested
+      || state.descriptor?.sessionId !== descriptor?.sessionId
+      || state.descriptor?.providerId !== descriptor?.providerId
+      || state.descriptor?.status !== descriptor?.status
+      || state.descriptor?.eventSequence !== descriptor?.eventSequence
+      || descriptor?.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || !Number.isSafeInteger(eventSequence)
+      || eventSequence !== descriptor.eventSequence + 1) {
+      return false;
+    }
+    state.volumeEventSequenceReservation = {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence,
+    };
+    return true;
+  }
+
+  _advanceVolumeSetRequestToken(descriptor, lane) {
+    if (!['original', 'dubbed'].includes(lane)) return null;
+    const state = this.sessionRegistry.getSessionState(descriptor?.sessionId);
+    if (!state
+      || state.terminalRequested
+      || !this._isSameDescriptorFence(state.descriptor, descriptor)) {
+      return null;
+    }
+
+    const tokens = state.volumeSetRequestTokens || {};
+    const token = (Number.isSafeInteger(tokens[lane]) ? tokens[lane] : 0) + 1;
+    state.volumeSetRequestTokens = { ...tokens, [lane]: token };
+    return token;
+  }
+
+  _isLatestVolumeSetRequestToken(state, lane, token) {
+    return ['original', 'dubbed'].includes(lane)
+      && Number.isSafeInteger(token)
+      && state?.volumeSetRequestTokens?.[lane] === token;
+  }
+
+  _clearVolumeEventSequenceReservation(sessionId, providerId) {
+    const state = this.sessionRegistry.getSessionState(sessionId);
+    const reservation = state?.volumeEventSequenceReservation;
+    if (reservation?.sessionId === sessionId && reservation?.providerId === providerId) {
+      state.volumeEventSequenceReservation = null;
+    }
   }
 
   _latchProviderDiagnostic(state, diagnostic) {
@@ -2323,6 +2431,7 @@ export class LiveDubbingCoordinator {
   _forgetSessionState(sessionId, expectedState = null) {
     if (expectedState && !this.sessionRegistry.isSessionState(sessionId, expectedState)) return;
     const state = this.sessionRegistry.getSessionState(sessionId);
+    if (state) state.volumeEventSequenceReservation = null;
     // Delegate physical facts ownership; manager fences exact generation only.
     if (expectedState) {
       this.cleanupManager.forgetSession(sessionId, expectedState);
@@ -2409,6 +2518,81 @@ export class LiveDubbingCoordinator {
       && left.targetLanguage === right.targetLanguage
       && left.eventSequence === right.eventSequence
       && left.status === right.status);
+  }
+
+  /**
+   * Reconcile one controller-ready response that crossed the Coordinator's
+   * provider-ready bridge before its reservation was installed. Public input
+   * has already been authorized against the descriptor sequence; this helper
+   * may only install the exact next transport fence and replay once.
+   */
+  async _reconcileVolumeSequenceMismatch({
+    descriptor,
+    response,
+    transportDescriptor,
+    setRequestToken = null,
+    setRequestLane = null,
+    createMessage,
+    sendMessage,
+  }) {
+    const responseData = response?.data && typeof response.data === 'object'
+      ? response.data
+      : response;
+    const expectedEventSequence = descriptor?.eventSequence + 1;
+    const isReconciliationCandidate = responseData?.success === false
+      && responseData.error === 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH'
+      && responseData.ignored === true
+      && responseData.status === LIVE_DUBBING_STATUS.RUNNING
+      && responseData.eventSequence === expectedEventSequence
+      && isExactSessionResponse(responseData, descriptor?.sessionId, descriptor?.providerId);
+    if (!isReconciliationCandidate) return { response, transportDescriptor };
+
+    const current = await this._readDescriptor();
+    const state = descriptor?.sessionId
+      ? this.sessionRegistry.getSessionState(descriptor.sessionId)
+      : null;
+    if (this._storageReadFailed()
+      || this._storageDescriptorInvalid()
+      || !current
+      || !this._isSameDescriptorFence(current, descriptor)
+      || !state
+      || state.terminalRequested
+      || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
+      || !this._isSameDescriptorFence(state.descriptor, current)
+      || current.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || (setRequestLane
+        && !this._isLatestVolumeSetRequestToken(state, setRequestLane, setRequestToken))) {
+      return { response, transportDescriptor };
+    }
+
+    if (!this._reserveVolumeEventSequence(current, expectedEventSequence)) {
+      return { response, transportDescriptor };
+    }
+    const replayTransportDescriptor = this._resolveVolumeTransportDescriptor(current);
+    return {
+      response: await sendMessage(createMessage(replayTransportDescriptor)),
+      transportDescriptor: replayTransportDescriptor,
+    };
+  }
+
+  _resolveVolumeTransportDescriptor(descriptor) {
+    if (!descriptor) return descriptor;
+
+    const state = this.sessionRegistry.getSessionState(descriptor.sessionId);
+    const reservation = state?.volumeEventSequenceReservation;
+    const isReservedBridge = descriptor.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      && !state?.terminalRequested
+      && state?.descriptor?.sessionId === descriptor.sessionId
+      && state?.descriptor?.providerId === descriptor.providerId
+      && state?.descriptor?.status === descriptor.status
+      && state?.descriptor?.eventSequence === descriptor.eventSequence
+      && reservation?.sessionId === descriptor.sessionId
+      && reservation?.providerId === descriptor.providerId
+      && reservation.eventSequence === descriptor.eventSequence + 1;
+
+    return isReservedBridge
+      ? { ...descriptor, eventSequence: reservation.eventSequence }
+      : descriptor;
   }
 
   _isRecoverableRunningStatus(response, sessionId, providerId) {

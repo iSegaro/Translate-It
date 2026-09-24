@@ -1546,6 +1546,18 @@ describe('LiveDubbingController', () => {
       ack: 'PROVIDER_READY',
       eventSequence: 3,
     });
+    expect(controller.getOriginalVolume('session-1', 'gemini', 3)).toMatchObject({
+      success: true,
+      eventSequence: 3,
+    });
+    expect(controller.getOriginalVolume('session-1', 'gemini', 2)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+    });
+    expect(controller.setOriginalVolume('session-1', 'gemini', 0.5, 2)).toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
+    });
     expect(controller.connectProvider('session-1', 'gemini', 'en', 2)).toMatchObject({
       success: false,
       error: 'LIVE_DUBBING_EVENT_SEQUENCE_MISMATCH',
