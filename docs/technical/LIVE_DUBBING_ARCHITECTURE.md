@@ -776,9 +776,11 @@ or descriptor adoption is performed for an uncertain owner.
 ## Transcript Subsystem
 
 Translated and original (source) transcript displays are optional, both default
-off, and apply to new Live Dubbing sessions. When enabled, the displays are
-rendered inside the existing Shadow DOM UI host in the top frame. The pipeline is strictly
-provider-neutral downstream of the adapter boundary:
+off. Gemini applies both visibility preferences in realtime. OpenAI applies
+translated visibility in realtime, while original visibility is session-based
+because input transcription is selected at START. When enabled, the displays
+are rendered inside the existing Shadow DOM UI host in the top frame. The
+pipeline is strictly provider-neutral downstream of the adapter boundary:
 
 ```
 Provider Adapter → LiveDubbingController → Background Coordinator

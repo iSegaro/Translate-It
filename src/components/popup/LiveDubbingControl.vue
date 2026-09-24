@@ -163,7 +163,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['busy-change'])
+const emit = defineEmits(['busy-change', 'status-resolved'])
 const { sendMessage } = useMessaging(MessageContexts.POPUP)
 const extensionBrowser = typeof browser !== 'undefined' ? browser : null
 const SAFE_TERMINAL_ERROR = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/
@@ -176,6 +176,7 @@ const errorMessage = ref('')
 const terminalOutcome = ref(null)
 let operationGeneration = 0
 let removeRuntimeListener = null
+let initialStatusResolved = false
 
 // ── Volume state (local only, no Pinia/storage) ──────────────────────────────
 // desiredVolume: optimistic value the UI reflects, 0..1
@@ -890,7 +891,7 @@ const queryStatus = async (generation = nextOperationGeneration()) => {
   const prevFence = volumeFence.value
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
-    if (generation !== operationGeneration) return
+    if (generation !== operationGeneration) return false
     applyStatus(response, { syncTerminalOutcome: true })
     // After status recovery, recover volume if controllable — independent round trip.
     // The volumeFence watcher handles all fence transitions (active→active).
@@ -903,13 +904,15 @@ const queryStatus = async (generation = nextOperationGeneration()) => {
       resetVolumeState()
       resetDubbedVolumeState()
     }
+    return true
   } catch (error) {
-    if (generation !== operationGeneration) return
+    if (generation !== operationGeneration) return false
     state.value = 'unavailable'
     authoritativeStatus.value = null
     errorMessage.value = getErrorMessage(error?.message, 'Live dubbing is unavailable.')
     resetVolumeState()
     resetDubbedVolumeState()
+    return false
   }
 }
 
@@ -994,12 +997,20 @@ const handleRuntimeMessage = (message, sender) => {
   void queryStatus()
 }
 
+const resolveInitialStatus = async () => {
+  const resolved = await queryStatus()
+  if (resolved && !initialStatusResolved) {
+    initialStatusResolved = true
+    emit('status-resolved')
+  }
+}
+
 onMounted(() => {
   if (typeof extensionBrowser?.runtime?.onMessage?.addListener === 'function') {
     extensionBrowser.runtime.onMessage.addListener(handleRuntimeMessage)
     removeRuntimeListener = () => extensionBrowser.runtime.onMessage.removeListener(handleRuntimeMessage)
   }
-  void queryStatus()
+  void resolveInitialStatus()
 })
 
 onUnmounted(() => {

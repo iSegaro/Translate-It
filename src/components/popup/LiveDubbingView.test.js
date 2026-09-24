@@ -13,7 +13,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 const harness = vi.hoisted(() => ({
   store: null,
   i18n: {},
-  locale: { value: 'en' }
+  locale: { value: 'en' },
+  controlStatusResolved: true
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -61,7 +62,10 @@ const LiveDubbingControlStub = {
     targetLanguage: { type: String, default: '' },
     providerId: { type: String, default: '' }
   },
-  emits: ['busy-change'],
+  emits: ['busy-change', 'status-resolved'],
+  mounted() {
+    if (harness.controlStatusResolved) this.$emit('status-resolved')
+  },
   template: '<div class="live-dubbing-control-stub" />'
 }
 
@@ -147,6 +151,7 @@ describe('LiveDubbingView', () => {
   beforeEach(() => {
     setupLifecycle.mounts = 0
     harness.locale.value = 'en'
+    harness.controlStatusResolved = true
     harness.store = makeStore({
       GEMINI_API_KEY: 'gemini-configured-key',
       OPENAI_API_KEY: 'openai-configured-key'
@@ -279,18 +284,101 @@ describe('LiveDubbingView', () => {
     expect(harness.store.settings.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(true)
   })
 
-  it('disables both preference toggles while busy without affecting the stop control', async () => {
+  it('keeps the Gemini preference toggles editable while busy', async () => {
     const wrapper = mountView()
     const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
 
     control.vm.$emit('busy-change', true)
     await nextTick()
 
-    expect(wrapper.findAllComponents({ name: 'BaseToggle' }).every(toggle => toggle.props('disabled')))
+    expect(wrapper.findAllComponents({ name: 'BaseToggle' }).every(toggle => !toggle.props('disabled')))
       .toBe(true)
-    // The view only locks preferences/configuration; LiveDubbingControl retains
-    // its running-session Stop action unchanged.
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+  })
+
+  it('does not lock Gemini preferences while initial status is unresolved', async () => {
+    harness.controlStatusResolved = false
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    expect(toggles.every(toggle => !toggle.props('disabled'))).toBe(true)
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    expect(toggles.every(toggle => !toggle.props('disabled'))).toBe(true)
+  })
+
+  it('keeps Gemini translated and original preferences independently persistent while busy', async () => {
+    const wrapper = mountView()
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    await toggles[0].vm.$emit('update:modelValue', true)
+    await toggles[1].vm.$emit('update:modelValue', true)
+
+    expect(harness.store.updateSettingAndPersist).toHaveBeenNthCalledWith(
+      1, 'LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', true
+    )
+    expect(harness.store.updateSettingAndPersist).toHaveBeenNthCalledWith(
+      2, 'LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', true
+    )
+  })
+
+  it('keeps the OpenAI translated preference editable while busy', async () => {
+    const wrapper = mountView({ providerId: 'openai' })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    expect(toggles[0].props('disabled')).toBe(false)
+    expect(toggles[1].props('disabled')).toBe(true)
+
+    await toggles[0].vm.$emit('update:modelValue', true)
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledWith(
+      'LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', true
+    )
+  })
+
+  it('re-enables the OpenAI original preference after the session ends', async () => {
+    const wrapper = mountView({ providerId: 'openai' })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const original = wrapper.findAllComponents({ name: 'BaseToggle' })[1]
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+    expect(original.props('disabled')).toBe(true)
+
+    control.vm.$emit('busy-change', false)
+    await nextTick()
+
+    expect(original.props('disabled')).toBe(false)
     expect(control.exists()).toBe(true)
+  })
+
+  it('keeps OpenAI original disabled until initial status resolves, including remounts', async () => {
+    harness.controlStatusResolved = false
+    const wrapper = mountView({ providerId: 'openai' })
+    let original = wrapper.findAllComponents({ name: 'BaseToggle' })[1]
+
+    expect(original.props('disabled')).toBe(true)
+
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+    control.vm.$emit('status-resolved')
+    await nextTick()
+    expect(original.props('disabled')).toBe(false)
+
+    await wrapper.setProps({ providerId: 'gemini' })
+    await wrapper.setProps({ providerId: 'openai' })
+    original = wrapper.findAllComponents({ name: 'BaseToggle' })[1]
+
+    expect(original.props('disabled')).toBe(true)
   })
 
   it('starts one write immediately and disables only that toggle while pending', async () => {

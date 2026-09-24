@@ -45,7 +45,7 @@
         <span>{{ t('live_dubbing_show_translated_transcript', 'Translated subtitles') }}</span>
         <BaseToggle
           :model-value="showTranslatedTranscript"
-          :disabled="isControlBusy || hasTranslatedPreferenceWritePending"
+          :disabled="hasTranslatedPreferenceWritePending"
           :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
           @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
         />
@@ -54,7 +54,7 @@
         <span>{{ t('live_dubbing_show_original_transcript', 'Original subtitles') }}</span>
         <BaseToggle
           :model-value="showOriginalTranscript"
-          :disabled="isControlBusy || hasOriginalPreferenceWritePending"
+          :disabled="hasOriginalPreferenceWritePending || (providerModel === LIVE_DUBBING_OPENAI_PROVIDER_ID && (!isControlStatusResolved || isControlBusy))"
           :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
           @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
         />
@@ -83,6 +83,7 @@
         :target-language="targetLanguage"
         :provider-id="providerModel"
         @busy-change="handleBusyChange"
+        @status-resolved="handleControlStatusResolved"
       />
     </section>
   </div>
@@ -126,6 +127,7 @@ const isRtlLocale = computed(() => /^fa(?:-|$)/i.test(locale.value || ''))
 
 /** Mirrors LiveDubbingControl's busy state so the config card can lock while a session is active. */
 const isControlBusy = ref(false)
+const isControlStatusResolved = ref(false)
 
 const showTranslatedTranscript = computed(() =>
   settingsStore.settings?.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT === true
@@ -208,6 +210,9 @@ const controlKey = ref(`${providerModel.value}:${setupEpoch.value}`)
 watch([providerModel, setupEpoch, isControlBusy], ([provider, epoch, busy]) => {
   if (!busy) controlKey.value = `${provider}:${epoch}`
 })
+watch(controlKey, () => {
+  isControlStatusResolved.value = false
+})
 
 const needsSetup = computed(() => {
   // A pending save keeps the card mounted even though the store mutates first.
@@ -226,6 +231,10 @@ const showSessionControl = computed(() => isControlBusy.value || !needsSetup.val
 const handleBusyChange = (busy) => {
   isControlBusy.value = busy
   emit('busy-change', busy)
+}
+
+const handleControlStatusResolved = () => {
+  isControlStatusResolved.value = true
 }
 
 /**

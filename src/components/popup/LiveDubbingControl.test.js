@@ -92,6 +92,26 @@ describe('LiveDubbingControl', () => {
     })
   })
 
+  it('emits status-resolved once after the initial status query succeeds', async () => {
+    const wrapper = await mountAndFlush()
+
+    expect(wrapper.emitted('status-resolved')).toEqual([[]])
+
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await flushPromises(wrapper)
+
+    expect(wrapper.emitted('status-resolved')).toEqual([[]])
+  })
+
+  it('does not emit status-resolved after the initial status query fails', async () => {
+    sendMessage.mockImplementationOnce(() => Promise.reject(new Error('status unavailable')))
+    const wrapper = await mountAndFlush()
+
+    expect(wrapper.emitted('status-resolved')).toBeUndefined()
+  })
+
   it('offers cleanup for retained incomplete sessions and blocks start', async () => {
     sendMessage.mockImplementation(({ action }) => {
       if (action === 'GET_LIVE_DUBBING_STATUS') {
@@ -3339,4 +3359,3 @@ describe('LiveDubbingControl', () => {
   })
 
 })
-
