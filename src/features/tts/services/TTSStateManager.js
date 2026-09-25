@@ -19,13 +19,6 @@ export class TTSStateManager {
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
-    // Physical handoff boundary flag: true once the pending successor's
-    // PLAY command has been issued/accepted by the offscreen runtime. Until
-    // that point, the committed predecessor is safe to preserve; after that
-    // point, the predecessor may already be physically interrupted by
-    // offscreen's createPlayback() and must be terminalized via the same
-    // path as failPlaybackHandoff. Token-fenced via pendingPlaybackToken.
-    this.pendingPlaybackStarted = false;
     this.playbackRevision = 0;
 
     // Centralized audio reference for Firefox direct playback
@@ -48,10 +41,10 @@ export class TTSStateManager {
 
     return new Promise((resolve, reject) => {
       try {
-        const url = typeof audioBlobOrUrl === 'string' 
-          ? audioBlobOrUrl 
+        const url = typeof audioBlobOrUrl === 'string'
+          ? audioBlobOrUrl
           : URL.createObjectURL(audioBlobOrUrl);
-        
+
         this.activeFirefoxAudioUrl = url;
         const audio = new Audio(url);
         this.activeFirefoxAudio = audio;
@@ -174,7 +167,7 @@ export class TTSStateManager {
   /**
    * Check if a sender is the current owner of the active TTS session.
    * This is used for owner-aware cleanup.
-   * 
+   *
    * @param {Object} sender - The message sender to check
    * @param {Object} [ownerSender] - Sender snapshot to check against; defaults to current owner
    * @returns {boolean} True if the sender matches the selected owner
@@ -206,7 +199,6 @@ export class TTSStateManager {
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
-    this.pendingPlaybackStarted = false;
     this.playbackRevision++;
   }
 
@@ -254,7 +246,7 @@ export class TTSStateManager {
    * This uses a "Targeted Broadcast" approach:
    * 1. If initiated from a tab, only that tab receives the message (all frames/Shadow DOM).
    * 2. All internal contexts (popup, sidepanel) receive the message for global sync.
-   * 
+   *
    * @param {string} status - The new TTS status ('idle', 'playing', 'error', etc.)
    * @param {Object} data - Additional data to include in the broadcast
    * @param {string} [data.action] - Optional action override (defaults to GOOGLE_TTS_ENDED)
@@ -288,7 +280,7 @@ export class TTSStateManager {
       // 2. Internal Context Broadcast: Always notify popup and sidepanel
       // This is efficient and keeps extension-wide UI in sync.
       await browserAPI.runtime.sendMessage(message).catch(() => {});
-      
+
       logger.debug(`Broadcasted TTS status: ${status} for ID: ${snapshot.ttsId}`);
     } catch (err) {
       logger.debug('Broadcast failed:', err.message);
@@ -323,7 +315,7 @@ export class TTSStateManager {
       return;
     }
 
-    // CRITICAL: Check with QueueManager first. If there are more chunks, 
+    // CRITICAL: Check with QueueManager first. If there are more chunks,
     // it will handle the next playback and we DON'T notify the UI yet.
     if (reason === 'completed' && ttsQueueManager.chunks.length > 0 && ttsQueueManager.currentIndex < ttsQueueManager.chunks.length - 1) {
       await ttsQueueManager.onChunkEnded('completed');
@@ -360,7 +352,7 @@ export class TTSStateManager {
           if (metadata.sender.frameId !== undefined) {
             options.frameId = metadata.sender.frameId;
           }
-          
+
           await browserAPI.tabs.sendMessage(metadata.sender.tab.id, message, options);
         } else {
           await browserAPI.runtime.sendMessage({
@@ -491,9 +483,6 @@ export class TTSStateManager {
     this.pendingPlaybackToken = playbackToken;
     this.predecessorPlaybackToken = previousPlaybackToken;
     this.pendingPlaybackMetadata = this.normalizePlaybackMetadata(metadata);
-    // A fresh pending generation has not yet issued its physical PLAY command;
-    // the predecessor remains safe to preserve until that boundary is crossed.
-    this.pendingPlaybackStarted = false;
 
     try {
       const acquired = await offscreenRuntimeLeaseManager.acquire({
@@ -510,30 +499,10 @@ export class TTSStateManager {
         this.pendingPlaybackToken = null;
         this.predecessorPlaybackToken = null;
         this.pendingPlaybackMetadata = null;
-        this.pendingPlaybackStarted = false;
       }
       logger.error('Playback lease acquisition failed:', error);
       throw error;
     }
-  }
-
-  /**
-   * Mark the pending successor as having crossed the physical handoff boundary:
-   * the offscreen PLAY command for this generation has been issued/accepted,
-   * and may already have interrupted the committed predecessor. Caller MUST
-   * invoke this immediately before sending the successor PLAY message to
-   * offscreen. Token-fenced: a stale token for a superseded pending generation
-   * cannot mark a replacement.
-   *
-   * @param {string} playbackToken - The exact pending playback token issued by
-   *   acquirePlaybackLease.
-   * @returns {boolean} True when the flag was applied to the current pending.
-   */
-  markPendingPlaybackStarted(playbackToken) {
-    if (!playbackToken) return false;
-    if (this.pendingPlaybackToken !== playbackToken) return false;
-    this.pendingPlaybackStarted = true;
-    return true;
   }
 
   /**
@@ -557,7 +526,6 @@ export class TTSStateManager {
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
-    this.pendingPlaybackStarted = false;
     this.currentPlaybackToken = playbackToken;
     this.currentTTSSender = committedMetadata.sender;
     this.currentTTSId = committedMetadata.ttsId;
@@ -582,6 +550,10 @@ export class TTSStateManager {
     const isPending = this.pendingPlaybackToken === playbackToken;
     const isCurrent = this.currentPlaybackToken === playbackToken;
     if (!isPending && !isCurrent) {
+      // Stale token (already logically cancelled or superseded). Send a
+      // token-scoped TTS_STOP so the offscreen tombstone rejects any
+      // delayed PLAY for this generation, then release its lease.
+      await this.stopPlaybackToken(playbackToken);
       await this.releaseOffscreenLease(playbackToken);
       return false;
     }
@@ -599,7 +571,6 @@ export class TTSStateManager {
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
-    this.pendingPlaybackStarted = false;
     if (isPending || isCurrent || this.currentPlaybackToken === predecessorPlaybackToken) {
       this.currentPlaybackToken = null;
       this.currentTTSSender = null;
@@ -767,81 +738,293 @@ export class TTSStateManager {
   }
 
   /**
-   * Stop only the pending successor playback. Honors the physical handoff
-   * boundary:
+   * Stop only the pending successor playback. Uses the offscreen runtime as
+   * the authoritative boundary signal via the structured `TTS_STOP` response:
    *
-   *   - If the pending PLAY command has NOT yet crossed into offscreen
-   *     (`pendingPlaybackStarted === false`), the committed predecessor has
-   *     not been physically interrupted and can be preserved as valid
-   *     committed state.
-   *   - If the pending PLAY command HAS already been issued/accepted
-   *     (`pendingPlaybackStarted === true`), the predecessor may already be
-   *     physically interrupted by offscreen. In that window the predecessor
-   *     must be terminalized via the same handoff-failure invariant used by
-   *     `failPlaybackHandoff` (it was displaced by the handoff, not explicitly
-   *     stopped by the predecessor owner). The displaced predecessor receives
-   *     a terminal notification with `reason: 'interrupted'` (not `'stopped'`),
-   *     and it is never attributed to the successor owner.
+   *   - `{ success: true, stopped: true, playbackToken }` — supplied token
+   *       was physically current and was stopped.
+   *   - `{ success: true, skipped: true, currentPlaybackToken: <token|null> }`
+   *       — supplied token was NOT current; the current physical playback is
+   *       either the supplied token's owner-scope predecessor, a different
+   *       (possibly newer) generation, or null.
+   *   - Anything else — undefined, transport failure, malformed response —
+   *       physical state is unknown and must be treated conservatively.
+   *
+   * Reconciliation branches on the structured response:
+   *
+   *   A. `stopped === true`: the successor had become physical current, so
+   *      the predecessor was displaced. Clear committed state only when it
+   *      still matches the captured predecessor token; never touch a newer
+   *      generation. Release the exact captured predecessor lease. Notify
+   *      the predecessor owner with `interrupted`.
+   *   B. `skipped === true` AND `currentPlaybackToken === capturedPredecessorToken`:
+   *      the predecessor IS the current physical playback. Preserve it.
+   *      Release only the pending lease. Notify successor with `stopped`.
+   *   C. `skipped === true` AND `currentPlaybackToken` is null OR different
+   *      from the captured predecessor: we cannot positively prove the
+   *      captured predecessor is still alive. If StateManager still points
+   *      to the captured predecessor token, reconcile that STALE predecessor
+   *      generation (clear, release lease, notify owner with `interrupted`).
+   *      Never touch a different/newer StateManager generation.
+   *   D. Unknown / unavailable / transport failure: do not claim predecessor
+   *      preservation. Take the conservative path: do not speculate-stop
+   *      another owner; do not falsely succeed. Reconcile the captured
+   *      predecessor conservatively (clear + release lease + notify owner
+   *      with `interrupted`) ONLY when StateManager still points to it;
+   *      never touch a different/newer StateManager generation.
    *
    * Cross-owner isolation is preserved: the foreign predecessor is never
-   * marked as having been stopped by the successor owner.
+   * marked as having been explicitly stopped by the successor owner; its
+   * terminal state reflects a handoff displacement or conservative
+   * reconciliation, not a successor-initiated Stop.
+   *
+   * All post-`await` state changes are token-fenced against the captured
+   * generation so a newer playback that arrived during the async window
+   * cannot be cleared.
    */
   async _stopPendingOnly() {
+    // 1. Capture exact identity synchronously before any await yields.
     const pendingToken = this.pendingPlaybackToken;
     const pendingMetaSnapshot = this.pendingPlaybackMetadata
       ? this.createMetadataSnapshot(this.pendingPlaybackMetadata)
       : null;
-    const handoffAttempted = this.pendingPlaybackStarted;
-    const displacedPredecessorToken = handoffAttempted ? this.currentPlaybackToken : null;
-    // Capture the predecessor's owner-facing metadata BEFORE clearing
-    // committed state, so the displaced predecessor's terminal notification
-    // can be delivered to its original owner.
-    const displacedPredecessorSnapshot = (handoffAttempted && this.currentTTSSender)
+    const capturedPredecessorToken = this.currentPlaybackToken;
+    const capturedPredecessorSnapshot = (capturedPredecessorToken && this.currentTTSSender)
       ? this.capturePlaybackMetadata()
       : null;
 
+    if (!pendingToken) {
+      // Nothing to do: no pending generation. The owner-scoped Stop should
+      // not have routed here, but this guard preserves cross-owner isolation
+      // and prevents any tokenless TTS_STOP from being emitted.
+      return { success: true, skipped: true, reason: 'no_pending' };
+    }
+
+    // 2. Invalidate the pending logical generation synchronously so a late
+    // commit is rejected and no late PLAY can adopt the tombstoned token.
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
-    this.pendingPlaybackStarted = false;
     this.playbackRevision++;
 
-    if (handoffAttempted) {
-      // The pending PLAY already crossed into offscreen. The committed
-      // predecessor may be physically interrupted; terminalize it through the
-      // handoff-failure path and clear committed state. We do NOT claim the
-      // successor owner explicitly stopped the predecessor; the predecessor's
-      // terminal reason reflects a handoff displacement.
+    // 3. Send exact-token TTS_STOP and inspect the structured offscreen
+    // response. The offscreen runtime is authoritative for the physical
+    // state of the playback generations.
+    const offscreenResponse = await this.stopPlaybackToken(pendingToken);
+    const classification = this._classifyPendingStopResponse(
+      offscreenResponse,
+      pendingToken,
+      capturedPredecessorToken,
+    );
+
+    // 4. Release the pending lease regardless of branch — the pending
+    // generation is logically gone in every classification.
+    await this.releaseOffscreenLease(pendingToken);
+
+    // 5. Reconcile the captured predecessor generation ONLY when
+    // classification.reconcilePredecessor is true AND StateManager still
+    // points to the captured predecessor token. Branch B preserves the
+    // predecessor; branches C/D reconcile the captured predecessor only
+    // when StateManager STILL references it (token-fenced). A newer
+    // replacement generation that already replaced StateManager's
+    // committed slot is never cleared by this cleanup path.
+    const stillReferencesCaptured = this.currentPlaybackToken === capturedPredecessorToken;
+    if (classification.reconcilePredecessor && stillReferencesCaptured) {
       this.currentPlaybackToken = null;
       this.currentTTSSender = null;
       this.currentTTSId = null;
       this.lastTTSLanguage = null;
       this.lastTTSText = null;
+    }
+    if (classification.reconcilePredecessor) {
+      // Release the exact captured predecessor lease regardless of whether
+      // StateManager still references it: the captured generation's lease
+      // is ours to release and must not be stranded. We deliberately do NOT
+      // call stopAudioOnly here: the predecessor's physical state is
+      // already settled by offscreen (branch A) or unknown/foreign (C/D).
+      await this.releaseOffscreenLease(capturedPredecessorToken);
 
-      await this.stopAudioOnly(displacedPredecessorToken);
-      await this.releaseOffscreenLease(displacedPredecessorToken);
+      if (capturedPredecessorSnapshot?.sender && stillReferencesCaptured) {
+        await this.notifyCapturedEnded(
+          classification.predecessorReason,
+          null,
+          capturedPredecessorToken,
+          capturedPredecessorSnapshot,
+        );
+      }
     }
 
-    await this.stopAudioOnly(pendingToken);
-    await this.releaseOffscreenLease(pendingToken);
-
-    // Notify the displaced predecessor's original owner with `interrupted`
-    // (NOT `stopped`). `interrupted` is already treated as terminal/idle by
-    // existing UI semantics, so no new public status is required.
-    if (displacedPredecessorSnapshot?.sender) {
-      await this.notifyCapturedEnded(
-        'interrupted',
-        null,
-        displacedPredecessorToken,
-        displacedPredecessorSnapshot,
-      );
-    }
-
+    // 6. Notify the successor owner that its generation was stopped.
     if (pendingMetaSnapshot) {
       await this.notifyCapturedEnded('stopped', null, pendingToken, pendingMetaSnapshot);
     }
 
-    return { success: true, action: 'stopped', playbackToken: pendingToken };
+    // Branch D result semantics: physical state could NOT be confirmed, so
+    // this must NOT be reported as a normal successful physical Stop. The
+    // pending logical generation is invalidated and its lease released, but
+    // the caller must be able to distinguish a confirmed stop/reconciliation
+    // from an unconfirmed/unknown one. Return a structured failure result
+    // that reuses the existing `{ success, error }` TTS failure shape
+    // (see `TTS_STOP_FAILED` in ErrorTypes) while still surfacing the
+    // classification and exact token for downstream fencing.
+    if (classification.label === 'D') {
+      return {
+        success: false,
+        error: 'offscreen_state_unknown',
+        action: 'stopped',
+        playbackToken: pendingToken,
+        predecessorDisplaced: false,
+        classification: 'D',
+      };
+    }
+
+    return {
+      success: true,
+      action: 'stopped',
+      playbackToken: pendingToken,
+      predecessorDisplaced: classification.predecessorDisplaced,
+      classification: classification.label,
+    };
+  }
+
+  /**
+   * Classify the structured offscreen `TTS_STOP` response into one of the
+   * four reconciliation branches described on `_stopPendingOnly`. Pure
+   * helper; no state mutation, no await.
+   *
+   * Strict identity validation is applied: a response must carry the full
+   * authoritative shape for its branch to be accepted. Any missing,
+   * contradictory, or mismatched identity field routes to Branch D so the
+   * caller can treat physical state as unknown rather than inferring it
+   * from absent fields.
+   *
+   * Branch A is valid only when:
+   *   `success === true && stopped === true && playbackToken === pendingToken`
+   * Branch B/C is valid only when:
+   *   `success === true && skipped === true` AND the response explicitly
+   *   owns a `currentPlaybackToken` property (explicit null is meaningful;
+   *   absent is malformed).
+   * Contradictory shapes (both `stopped` and `skipped`) fall into Branch D.
+   *
+   * @param {Object|undefined} response - Offscreen response from
+   *   `stopPlaybackToken`.
+   * @param {string|null|undefined} pendingToken - The exact pending token
+   *   sent to offscreen; used to validate the returned `playbackToken`
+   *   identity in Branch A.
+   * @param {string|null|undefined} capturedPredecessorToken - The
+   *   StateManager predecessor token captured before the goto.
+   * @returns {{label: 'A'|'B'|'C-null'|'C-different'|'D', reconcilePredecessor: boolean,
+   *           predecessorDisplaced: boolean, predecessorReason: 'interrupted'}}
+   */
+  _classifyPendingStopResponse(response, pendingToken, capturedPredecessorToken) {
+    // Defensive: no response or non-object response → Branch D.
+    if (!response || typeof response !== 'object') {
+      return {
+        label: 'D',
+        reconcilePredecessor: Boolean(capturedPredecessorToken),
+        predecessorDisplaced: false,
+        predecessorReason: 'interrupted',
+      };
+    }
+
+    const success = response.success === true;
+    const stopped = response.stopped === true;
+    const skipped = response.skipped === true;
+
+    // Contradictory shapes: cannot both have stopped and skipped.
+    if (stopped && skipped) {
+      return {
+        label: 'D',
+        reconcilePredecessor: Boolean(capturedPredecessorToken),
+        predecessorDisplaced: false,
+        predecessorReason: 'interrupted',
+      };
+    }
+
+    // Branch A: pending token WAS physically current and stopped. Requires
+    // success && stopped AND a `playbackToken` field that matches the exact
+    // token sent to offscreen. A missing or mismatched `playbackToken` is
+    // malformed and routes to Branch D.
+    if (success && stopped) {
+      const returnedToken = response.playbackToken;
+      const isIdentified = returnedToken !== undefined && returnedToken === pendingToken;
+      if (!isIdentified) {
+        return {
+          label: 'D',
+          reconcilePredecessor: Boolean(capturedPredecessorToken),
+          predecessorDisplaced: false,
+          predecessorReason: 'interrupted',
+        };
+      }
+      return {
+        label: 'A',
+        reconcilePredecessor: Boolean(capturedPredecessorToken),
+        predecessorDisplaced: true,
+        predecessorReason: 'interrupted',
+      };
+    }
+
+    // Branch B/C: pending token was NOT current; offscreen tells us who is.
+    // Requires success && skipped AND an explicitly-own `currentPlaybackToken`
+    // property. Absence of the property is malformed and routes to Branch D;
+    // explicit `null` is a meaningful "nothing is current" signal.
+    if (success && skipped) {
+      const ownsCurrentPlaybackToken = Object.prototype.hasOwnProperty.call(
+        response,
+        'currentPlaybackToken',
+      );
+      if (!ownsCurrentPlaybackToken) {
+        return {
+          label: 'D',
+          reconcilePredecessor: Boolean(capturedPredecessorToken),
+          predecessorDisplaced: false,
+          predecessorReason: 'interrupted',
+        };
+      }
+      const currentPhysical = response.currentPlaybackToken;
+
+      // Branch B: the captured predecessor IS the current physical playback.
+      if (capturedPredecessorToken && currentPhysical === capturedPredecessorToken) {
+        return {
+          label: 'B',
+          reconcilePredecessor: false,
+          predecessorDisplaced: false,
+          predecessorReason: 'interrupted',
+        };
+      }
+
+      // Branch C-null: offscreen explicitly reports nothing is physically
+      // playing. This is the only "no playback" signal that is authoritative.
+      if (currentPhysical === null) {
+        return {
+          label: 'C-null',
+          reconcilePredecessor: Boolean(capturedPredecessorToken),
+          predecessorDisplaced: false,
+          predecessorReason: 'interrupted',
+        };
+      }
+
+      // Branch C-different: a NEWER/different generation is physically
+      // current. The captured predecessor is definitely not physical; it
+      // is stale. Reconcile it without touching the newer generation.
+      return {
+        label: 'C-different',
+        reconcilePredecessor: Boolean(capturedPredecessorToken),
+        predecessorDisplaced: false,
+        predecessorReason: 'interrupted',
+      };
+    }
+
+    // Branch D: unknown / unavailable / transport failure / malformed.
+    // Conservative: do not claim preservation, do not speculate-stop.
+    // Reconcile the captured predecessor if StateManager still references
+    // it; never touch a different/newer StateManager generation.
+    return {
+      label: 'D',
+      reconcilePredecessor: Boolean(capturedPredecessorToken),
+      predecessorDisplaced: false,
+      predecessorReason: 'interrupted',
+    };
   }
 
   /**
@@ -897,7 +1080,6 @@ export class TTSStateManager {
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
-    this.pendingPlaybackStarted = false;
     this.currentPlaybackToken = null;
     this.currentTTSSender = null;
     this.currentTTSId = null;
@@ -941,10 +1123,6 @@ export class TTSStateManager {
       if (this.pendingPlaybackToken === playbackToken) {
         this.pendingPlaybackToken = null;
         this.predecessorPlaybackToken = null;
-        // The pending generation's physical boundary is gone with its lease;
-        // reset the flag so a later stopForOwner decision cannot read a stale
-        // "physical handoff attempted" against a replacement token.
-        this.pendingPlaybackStarted = false;
       } else if (this.predecessorPlaybackToken === playbackToken) {
         this.predecessorPlaybackToken = null;
       }
@@ -956,7 +1134,10 @@ export class TTSStateManager {
   }
 
   /**
-   * Stop only the audio playback without closing the document
+   * Stop only the audio playback without closing the document.
+   * This is the LEGACY intentionally-tokenless global stop path used by
+   * manual/explicit cleanup paths only. Selective generation cleanup MUST
+   * use `stopPlaybackToken` instead, which strictly requires an exact token.
    */
   async stopAudioOnly(playbackToken = this.currentPlaybackToken) {
     try {
@@ -971,6 +1152,54 @@ export class TTSStateManager {
         logger.debug('Sent stop command to offscreen document');
       }
     } catch { /* ignore */ }
+  }
+
+  /**
+   * Strict token-scoped stop for selective generation cleanup.
+   *
+   * Sends a token-scoped `TTS_STOP` to the offscreen runtime and returns the
+   * structured offscreen response:
+   *   - `{ success: true, stopped: <boolean>, skipped: <boolean> }`
+   *
+   * Requirements:
+   *   - Requires a non-null/undefined playbackToken. A missing token returns
+   *     a safe skipped/no-op result and never falls back to a tokenless
+   *     `TTS_STOP` against the live current playback.
+   *   - Always sends `playbackToken` when present, so offscreen can tombstone
+   *     it and reject any delayed PLAY for the same generation.
+   *   - Returns the offscreen response to the caller. The caller MUST inspect
+   *     it: `stopped === true` means the physical handoff had already crossed
+   *     the boundary and the predecessor was already displaced;
+   *     `stopped === false` (or `skipped === true`) means the PLAY had not
+   *     yet crossed the boundary and the predecessor is still physically live.
+   *
+   * This is the authoritative boundary signal — no background-side flag or
+   * timing assumption is required.
+   *
+   * @param {string|null|undefined} playbackToken - Exact token to stop.
+   * @returns {Promise<Object>} Structured response from offscreen, or a safe
+   *   skipped/no-op result when the token is missing or offscreen is
+   *   unreachable.
+   */
+  async stopPlaybackToken(playbackToken) {
+    if (playbackToken === null || playbackToken === undefined || playbackToken === '') {
+      return { success: true, skipped: true, reason: 'missing_token' };
+    }
+    try {
+      const browserAPI = await initializebrowserAPI();
+      const ensured = await offscreenRuntimeLeaseManager.ensureDocument();
+      if (!ensured) {
+        return { success: true, skipped: true, reason: 'offscreen_unavailable' };
+      }
+      return await browserAPI.runtime.sendMessage({
+        action: MessageActions.TTS_STOP,
+        target: 'offscreen',
+        playbackToken,
+      });
+    } catch (error) {
+      logger.debug('Token-scoped stop failed:', error?.message);
+      return { success: false, error: error?.message ?? 'token_stop_failed' };
+    }
   }
 }
 

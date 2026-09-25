@@ -90,12 +90,6 @@ const resolveGoogleTTSSpeak = async ({
       };
       playbackToken = await ttsStateManager.acquirePlaybackLease(playbackMetadata);
 
-      // Mark the physical handoff boundary: from this point onward, the
-      // pending successor's offscreen PLAY command may have already
-      // interrupted the committed predecessor, so a selective pending stop
-      // must terminalize the displaced predecessor instead of preserving it.
-      ttsStateManager.markPendingPlaybackStarted(playbackToken);
-
       const response = await browserAPI.runtime.sendMessage({
         action: MessageActions.PLAY_OFFSCREEN_AUDIO,
         url: ttsUrl,

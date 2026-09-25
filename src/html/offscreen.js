@@ -669,12 +669,30 @@ function handleTTSStop(sendResponse, playbackToken) {
       hasPlaybackToken &&
       (!currentPlayback || currentPlayback.playbackToken !== playbackToken)
     ) {
-      safeResponse({ success: true, skipped: true });
+      // Token-scoped stop against a non-current playback token. Return the
+      // CURRENT physical playback identity so the caller can reconcile
+      // whether its captured predecessor is still active (B), already
+      // displaced by something else (C-null), or replaced by a newer
+      // generation (C-different). Playback tokens are internal generation
+      // identifiers, safe to surface across the background/offscreen boundary.
+      const currentPhysical = currentPlayback?.playbackToken ?? null;
+      safeResponse({
+        success: true,
+        skipped: true,
+        currentPlaybackToken: currentPhysical,
+      });
       return;
     }
 
     const stopped = currentPlayback ? stopPlayback(currentPlayback) : false;
-    safeResponse({ success: true, stopped });
+    // When the supplied token matched the current physical playback, include
+    // the stopped token so the caller can confirm exact identity without
+    // round-tripping to read StateManager state.
+    safeResponse({
+      success: true,
+      stopped,
+      playbackToken: hasPlaybackToken ? playbackToken : (currentPlayback?.playbackToken ?? null),
+    });
   } catch (error) {
     console.error('[Offscreen] TTS stop failed', getSafeErrorName(error));
     safeResponse({ success: false, error: error.message });

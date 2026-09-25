@@ -1,6 +1,6 @@
 # Azure Speech Translation Spike Result
 
-Status: **REJECTED — ROLLBACK COMPLETE**  
+Status: **REJECTED — ROLLBACK COMPLETE**
 Date: `2026-09-14`
 
 ## Findings

@@ -13,6 +13,13 @@ const mocks = vi.hoisted(() => ({
   acquire: vi.fn(),
   release: vi.fn(),
   ensureDocument: vi.fn(),
+  // Simulated offscreen current physical playback token. When a TTS_STOP
+  // request matches this token, the simulated offscreen returns
+  // `{ success: true, stopped: true }`; otherwise it returns
+  // `{ success: true, skipped: true }`. Mirrors src/html/offscreen.js
+  // handleTTSStop behavior so token-scoped selective cleanup tests can
+  // observe the authoritative boundary signal deterministically.
+  offscreenCurrentToken: null,
   queue: {
     chunks: [],
     currentIndex: -1,
@@ -49,11 +56,61 @@ function resetState() {
 beforeEach(() => {
   resetState();
   mocks.browserAPI.offscreen = { hasDocument: vi.fn(async () => true) };
-  mocks.browserAPI.runtime.sendMessage.mockReset().mockResolvedValue(undefined);
+  // Default: simulate offscreen TTS_STOP behavior mirroring
+  // src/html/offscreen.js handleTTSStop:
+  //   - supplied token == current physical  → { success: true, stopped: true, playbackToken }
+  //   - supplied token != current physical  → { success: true, skipped: true, currentPlaybackToken }
+  //   - no supplied token (legacy)          → { success: true, stopped: true }
+  // Tests can override the simulated offscreen behavior per case.
+  mocks.offscreenCurrentToken = undefined; // sentinel: "not set" → fall back to StateManager
+  mocks.offscreenFailureMode = null; // 'unavailable' | 'transport' | null
+  // By default the simulated offscreen current mirrors StateManager's
+  // currentPlaybackToken: committing a generation makes it the physical
+  // current, stopping clears it. This lets the existing selective-stop
+  // tests assert Branch B (predecessor preserved) without per-test setup.
+  mocks.browserAPI.runtime.sendMessage.mockReset().mockImplementation(async (message) => {
+    if (message?.action === 'TTS_STOP') {
+      if (mocks.offscreenFailureMode === 'transport') {
+        // Simulated transport failure on the runtime side.
+        throw new Error('runtime unavailable');
+      }
+      // When the test did not override offscreenCurrentToken explicitly,
+      // mirror StateManager's current physical playback so that ordinary
+      // selective-stop scenarios naturally land on Branch B (predecessor
+      // preserved). Tests that want different branches set
+      // mocks.offscreenCurrentToken themselves (including null) before
+      // the stop call.
+      const effectiveCurrent = mocks.offscreenCurrentToken !== undefined
+        ? mocks.offscreenCurrentToken
+        : ttsStateManager.currentPlaybackToken;
+      if (message.playbackToken && message.playbackToken === effectiveCurrent) {
+        // Mirror offscreen: tombstone + stop the current physical playback.
+        mocks.offscreenCurrentToken = null;
+        return { success: true, stopped: true, playbackToken: message.playbackToken };
+      }
+      if (message.playbackToken) {
+        // Foreign token: tombstone the supplied token, report who is current.
+        return {
+          success: true,
+          skipped: true,
+          currentPlaybackToken: effectiveCurrent,
+        };
+      }
+      // No supplied token (legacy global path).
+      return { success: true, stopped: true };
+    }
+    return undefined;
+  });
   mocks.browserAPI.tabs.sendMessage.mockReset().mockResolvedValue(undefined);
   mocks.acquire.mockReset().mockResolvedValue(true);
   mocks.release.mockReset().mockResolvedValue(true);
-  mocks.ensureDocument.mockReset().mockResolvedValue(true);
+  mocks.ensureDocument.mockReset().mockImplementation(async () => {
+    // When offscreenFailureMode === 'unavailable', mirror the real
+    // ensureDocument() returning false (no offscreen document), which
+    // exercises the actual `stopPlaybackToken()` offscreen-unavailable
+    // path rather than only stubbing sendMessage to return undefined.
+    return mocks.offscreenFailureMode !== 'unavailable';
+  });
   mocks.queue.onChunkEnded.mockReset().mockResolvedValue(undefined);
 });
 
@@ -894,90 +951,187 @@ describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () =>
   });
 
   // ---------------------------------------------------------------------------
-  // Physical handoff boundary: once the pending PLAY command has been issued
-  // to offscreen, the committed predecessor may already be physically
-  // interrupted. A selective pending stop in that window must terminalize the
-  // displaced predecessor through the handoff-failure path, NOT preserve it
-  // as valid committed playback.
+  // Physical handoff boundary via offscreen truth.
+  //
+  // Background can NOT reliably know whether the pending PLAY has displaced
+  // the predecessor by marking a flag ahead of runtime.sendMessage(). The
+  // offscreen runtime itself returns the authoritative answer via the
+  // token-scoped TTS_STOP response:
+  //   - token matches offscreen's current physical playback → stopped: true
+  //   - token is foreign / no current playback              → skipped: true
+  //
+  // The StateManager uses that response as the boundary signal. No
+  // background-side timing flag is used.
   // ---------------------------------------------------------------------------
 
-  it('successor-owner selective stop preserves foreign predecessor when physical handoff has NOT started', async () => {
+  it('Branch B: STOP skipped AND offscreen current IS the captured predecessor → preserved as committed', async () => {
     const { predecessor, successor } = await seedHandoff();
-    // pendingPlaybackStarted is false by default after acquire.
-
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+    // Branch B: offscreen reports the captured predecessor is still the
+    // physical current playback. This is the ONLY case where preservation is
+    // positively proven.
+    mocks.offscreenCurrentToken = predecessor;
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
 
     const result = await ttsStateManager.stopForOwner(successorSender, {
       ttsId: 'successor-id',
       stopOnlyIfOwner: true,
     });
 
-    expect(result).toMatchObject({ success: true, action: 'stopped' });
-    // Pending is gone, predecessor is preserved as valid committed state.
+    expect(result).toMatchObject({
+      success: true,
+      action: 'stopped',
+      predecessorDisplaced: false,
+      classification: 'B',
+    });
+    // Predecessor preserved as valid committed state.
     expect(ttsStateManager.pendingPlaybackToken).toBeNull();
     expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
     expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
 
     // Only the pending lease is released.
     const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
     expect(releasedLeaseIds).toContain(successor);
     expect(releasedLeaseIds).not.toContain(predecessor);
+
+    // Predecessor owner receives no terminal notification.
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages).toHaveLength(0);
   });
 
-  it('successor-owner selective stop terminalizes displaced predecessor when physical handoff HAS started', async () => {
+  it('Branch A: STOP returns stopped: true → predecessor reconciled as displaced', async () => {
     const { predecessor, successor } = await seedHandoff();
-
-    // Caller (handler) marks the handoff boundary before the offscreen PLAY
-    // command, simulating the race window where the predecessor has already
-    // been physically interrupted.
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(true);
+    // Branch A: the pending PLAY already displaced the predecessor as the
+    // current physical playback.
+    mocks.offscreenCurrentToken = successor;
 
     const result = await ttsStateManager.stopForOwner(successorSender, {
       ttsId: 'successor-id',
       stopOnlyIfOwner: true,
     });
 
-    expect(result).toMatchObject({ success: true, action: 'stopped' });
-    // Pending is gone AND the predecessor is terminalized as well: cleared
-    // committed state, flag reset, no longer reported as committed playback.
+    expect(result).toMatchObject({
+      success: true,
+      action: 'stopped',
+      predecessorDisplaced: true,
+      classification: 'A',
+    });
     expect(ttsStateManager.pendingPlaybackToken).toBeNull();
     expect(ttsStateManager.currentPlaybackToken).toBeNull();
     expect(ttsStateManager.currentTTSSender).toBeNull();
     expect(ttsStateManager.currentTTSId).toBeNull();
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
 
-    // Both affected leases are released (the predecessor's lease must NOT be
-    // stranded).
     const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
     expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
   });
 
-  it('markPendingPlaybackStarted is token-fenced against a stale token', async () => {
-    const { successor } = await seedHandoff();
+  it('Branch C-null: STOP skipped + offscreen current is null → captured predecessor is reconciled as stale (NOT falsely preserved)', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    // Branch C-null: nothing is physically playing. Offscreen does NOT
+    // prove the captured predecessor is still alive; StateManager must
+    // reconcile it as stale rather than falsely preserve it.
+    mocks.offscreenCurrentToken = null;
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
 
-    // A stale token (different from the live pending) must NOT mark the
-    // replacement pending generation.
-    expect(ttsStateManager.markPendingPlaybackStarted('stale-token-uuid')).toBe(false);
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
 
-    // The correct token does mark it.
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(true);
+    expect(result).toMatchObject({
+      success: true,
+      action: 'stopped',
+      predecessorDisplaced: false,
+      classification: 'C-null',
+    });
+    // Captured predecessor reconciled: cleared, lease released, owner notified.
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
 
-    // After commit / fail / reset / full-stop, the flag must be cleared.
-    await ttsStateManager.commitPlaybackLease(successor);
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+    // Predecessor owner receives `interrupted` (NOT `stopped`).
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages.length).toBeGreaterThan(0);
+    predecessorTabMessages.forEach(([, msg]) => {
+      expect(msg.reason).toBe('interrupted');
+    });
   });
 
-  it('same-session chunk transition still stops whole session after handoff boundary is marked', async () => {
+  it('Branch C-different: STOP skipped + offscreen current is a newer/different token → captured stale predecessor reconciled ONLY if StateManager still references it', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    // Simulate the race: while the pending cleanup is awaiting the offscreen
+    // TTS_STOP, a replacement generation is acquired and committed, becoming
+    // the new physical current playback. The captured predecessor token
+    // (taken synchronously before await) is no longer in StateManager, and
+    // offscreen's current is the replacement (different from captured
+    // predecessor). StateManager must not touch the replacement and must
+    // not synthesize a predecessor terminal notification (the captured
+    // token is no longer referenced).
+    mocks.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP' && message.playbackToken === successor) {
+        const replacement = await ttsStateManager.acquirePlaybackLease({
+          sender: successorSender,
+          ttsId: 'replacement-id',
+          language: 'fr',
+          text: 'replacement text',
+        });
+        await ttsStateManager.commitPlaybackLease(replacement, {
+          sender: successorSender,
+          ttsId: 'replacement-id',
+          language: 'fr',
+          text: 'replacement text',
+        });
+        // Offscreen current is the NEWER replacement; the supplied pending
+        // token does NOT match → Branch C-different.
+        return {
+          success: true,
+          skipped: true,
+          currentPlaybackToken: replacement,
+        };
+      }
+      return undefined;
+    });
+    mocks.offscreenCurrentToken = null;
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      action: 'stopped',
+      classification: 'C-different',
+    });
+    // Replacement generation survives untouched.
+    const replacementPlaybackToken = ttsStateManager.currentPlaybackToken;
+    expect(replacementPlaybackToken).not.toBe(predecessor);
+    expect(replacementPlaybackToken).not.toBe(successor);
+    expect(ttsStateManager.currentTTSId).toBe('replacement-id');
+
+    // No predecessor terminal notification (StateManager no longer
+    // references the captured predecessor; we did not falsely claim a
+    // reconciliation against a foreign token).
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages).toHaveLength(0);
+  });
+
+  it('same-session chunk transition still stops whole session when predecessor and successor share the same owner', async () => {
     const { predecessor, successor } = await seedHandoff({
       predecessorId: 'session-tts-id',
       successorId: 'session-tts-id',
       sharedOwner: true,
     });
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
 
     const result = await ttsStateManager.stopForOwner(predecessorSender, {
       ttsId: 'session-tts-id',
@@ -987,15 +1141,14 @@ describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () =>
     expect(result).toMatchObject({ success: true, action: 'stopped' });
     expect(ttsStateManager.pendingPlaybackToken).toBeNull();
     expect(ttsStateManager.currentPlaybackToken).toBeNull();
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
 
     const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
     expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
   });
 
-  it('late successor commit after selective cancellation is rejected (post-boundary)', async () => {
+  it('late successor commit after selective cancellation is rejected (token-fenced)', async () => {
     const { successor } = await seedHandoff();
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    mocks.offscreenCurrentToken = successor;
 
     await ttsStateManager.stopForOwner(successorSender, {
       ttsId: 'successor-id',
@@ -1008,7 +1161,7 @@ describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () =>
 
   it('post-boundary successor-owner selective stop notifies predecessor owner with `interrupted`, not `stopped`', async () => {
     const { predecessor, successor } = await seedHandoff();
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    mocks.offscreenCurrentToken = successor;
     mocks.browserAPI.tabs.sendMessage.mockClear();
     mocks.browserAPI.runtime.sendMessage.mockClear();
 
@@ -1037,38 +1190,11 @@ describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () =>
     expect(predecessor).toBeDefined();
   });
 
-  it('pre-boundary selective pending stop sends no terminal notification to predecessor owner and preserves it as committed', async () => {
-    const { predecessor } = await seedHandoff();
-    // pendingPlaybackStarted stays false.
-    mocks.browserAPI.tabs.sendMessage.mockClear();
-    mocks.browserAPI.runtime.sendMessage.mockClear();
-
-    await ttsStateManager.stopForOwner(successorSender, {
-      ttsId: 'successor-id',
-      stopOnlyIfOwner: true,
-    });
-
-    // Predecessor is preserved as committed state (not terminalized).
-    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
-    expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
-
-    // Predecessor owner receives no terminal notification.
-    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
-      .filter(([tabId]) => tabId === 10);
-    expect(predecessorTabMessages).toHaveLength(0);
-  });
-
   it('stale/replacement playback tokens cannot generate a predecessor terminal notification', async () => {
     const { predecessor, successor } = await seedHandoff();
-    // Live handoff boundary is marked correctly.
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    // Simulated offscreen already knows the pending token is current.
+    mocks.offscreenCurrentToken = successor;
 
-    // A stale token for a replacement generation cannot mark the live
-    // generation as having crossed the boundary.
-    expect(ttsStateManager.markPendingPlaybackStarted('stale-replacement-uuid')).toBe(false);
-
-    // A pre-existing replacement pending that has NOT been marked cannot
-    // bypass the fence: only the exact pendingPlaybackToken flip is honored.
     mocks.browserAPI.tabs.sendMessage.mockClear();
     mocks.browserAPI.runtime.sendMessage.mockClear();
 
@@ -1077,48 +1203,523 @@ describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () =>
       stopOnlyIfOwner: true,
     });
 
-    // The notification is targeted by the exact predecessor owner tab (10),
-    // and the playbackToken carried in the notification matches the live
-    // predecessor token, not a stale UUID.
     const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
       .filter(([tabId]) => tabId === 10);
     expect(predecessorTabMessages.length).toBeGreaterThan(0);
     predecessorTabMessages.forEach(([, msg]) => {
+      // The notification carries the exact live predecessor token, not any
+      // stale replacement UUID.
       expect(msg.playbackToken).toBe(predecessor);
       expect(msg.playbackToken).not.toBe('stale-replacement-uuid');
       expect(msg.reason).toBe('interrupted');
     });
   });
 
-  it('same-session full stop after handoff boundary is marked still uses the global stop path with one consolidated notification per owner', async () => {
-    const { successor } = await seedHandoff({
-      predecessorId: 'session-tts-id',
-      successorId: 'session-tts-id',
-      sharedOwner: true,
-    });
-    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
-    mocks.browserAPI.tabs.sendMessage.mockClear();
-    mocks.browserAPI.runtime.sendMessage.mockClear();
+  it('replacement generation that appears during async pending cleanup is NEVER cleared', async () => {
+    const { predecessor, successor } = await seedHandoff();
 
-    const result = await ttsStateManager.stopForOwner(predecessorSender, {
-      ttsId: 'session-tts-id',
+    // Simulate the race: while the pending cleanup is awaiting the offscreen
+    // TTS_STOP, a replacement pending generation appears. The captured
+    // predecessor token must remain the only generation that may be cleared;
+    // the replacement must survive untouched.
+    let replacementToken;
+    mocks.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP' && message.playbackToken === successor) {
+        // While this awaited token-scoped stop is in flight, a brand-new
+        // successor is acquired and committed.
+        replacementToken = await ttsStateManager.acquirePlaybackLease({
+          sender: successorSender,
+          ttsId: 'replacement-id',
+          language: 'fr',
+          text: 'replacement',
+        });
+        await ttsStateManager.commitPlaybackLease(replacementToken);
+        return { success: true, stopped: true };
+      }
+      return undefined;
+    });
+    mocks.offscreenCurrentToken = successor;
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Replacement generation survived — it must NOT be cleared by the
+    // pending cleanup. The committed state points to the replacement, not
+    // to the captured predecessor token.
+    expect(ttsStateManager.currentPlaybackToken).toBe(replacementToken);
+    expect(ttsStateManager.currentTTSId).toBe('replacement-id');
+    // Captured predecessor token was terminalized (its lease released, its
+    // metadata cleared) but only because currentPlaybackToken still
+    // matched at the time of the post-await check; the fence logic must
+    // not have touched the replacement.
+    expect(replacementToken).not.toBe(predecessor);
+  });
+
+  it('tombstoned token cannot become current or interrupt existing playback after pending cancellation (Branch B)', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    // Branch B: offscreen confirms the captured predecessor is the current
+    // physical playback. The pending PLAY had not displaced it.
+    mocks.offscreenCurrentToken = predecessor;
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // The tombstoned pending token must NOT be adoptable by any later
+    // PLAY: commitPlaybackLease is fenced against it, and the offscreen
+    // tombstone (canceledPlaybackTokens) would reject any delayed PLAY in
+    // the real runtime. Here we verify the StateManager-side fence.
+    await expect(ttsStateManager.commitPlaybackLease(successor)).resolves.toBe(false);
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+
+    // The live predecessor is preserved — a delayed PLAY for the canceled
+    // successor token cannot have displaced it.
+    expect(ttsStateManager.currentTTSSender).toBe(predecessorSender);
+    expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
+  });
+
+  it('selective pending stop without a predecessor (first playback) never emits tokenless TTS_STOP', async () => {
+    // No committed predecessor: just a freshly acquired pending.
+    const pending = await ttsStateManager.acquirePlaybackLease({
+      sender: successorSender,
+      ttsId: 'first-pending-id',
+      language: 'fr',
+      text: 'first pending',
+    });
+    mocks.offscreenCurrentToken = pending;
+    const callsBefore = mocks.browserAPI.runtime.sendMessage.mock.calls.length;
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'first-pending-id',
       stopOnlyIfOwner: true,
     });
 
     expect(result).toMatchObject({ success: true, action: 'stopped' });
-    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
-    expect(ttsStateManager.currentPlaybackToken).toBeNull();
-    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
-
-    // Global stop uses `stopped` reason for both notifications (not
-    // `interrupted`) because the user explicitly stopped the session.
-    const ownerTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
-      .filter(([tabId]) => tabId === 10);
-    expect(ownerTabMessages.length).toBeGreaterThan(0);
-    ownerTabMessages.forEach(([, msg]) => {
-      expect(msg.reason).toBe('stopped');
-      expect(msg.reason).not.toBe('interrupted');
+    const stopCalls = mocks.browserAPI.runtime.sendMessage.mock.calls
+      .slice(callsBefore)
+      .filter(([msg]) => msg?.action === 'TTS_STOP');
+    expect(stopCalls).toHaveLength(1);
+    // Every TTS_STOP in the selective path carries an exact playbackToken.
+    stopCalls.forEach(([msg]) => {
+      expect(msg.playbackToken).toBe(pending);
+      expect(msg.playbackToken).not.toBeNull();
+      expect(msg.playbackToken).not.toBeUndefined();
     });
+  });
+
+  it('null playback token in stopPlaybackToken returns a safe skipped result and never reaches offscreen', async () => {
+    const beforeCalls = mocks.browserAPI.runtime.sendMessage.mock.calls.length;
+    const result = await ttsStateManager.stopPlaybackToken(null);
+    expect(result).toEqual({ success: true, skipped: true, reason: 'missing_token' });
+
+    const resultUndef = await ttsStateManager.stopPlaybackToken(undefined);
+    expect(resultUndef).toEqual({ success: true, skipped: true, reason: 'missing_token' });
+
+    const resultEmpty = await ttsStateManager.stopPlaybackToken('');
+    expect(resultEmpty).toEqual({ success: true, skipped: true, reason: 'missing_token' });
+
+    const stopCalls = mocks.browserAPI.runtime.sendMessage.mock.calls
+      .slice(beforeCalls)
+      .filter(([msg]) => msg?.action === 'TTS_STOP');
+    expect(stopCalls).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Branch D: offscreen unavailable / transport failure must NOT be treated
+  // as confirmed predecessor preservation. Take the conservative path:
+  // reconcile the captured predecessor ONLY when StateManager still points
+  // to it; never touch a different/newer StateManager generation; never
+  // speculate-stop another owner.
+  // ---------------------------------------------------------------------------
+
+  it('Branch D: offscreen unavailable → NOT predecessor preservation; result is explicit failure', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    mocks.offscreenCurrentToken = null;
+    mocks.offscreenFailureMode = 'unavailable';
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Classification is D (unknown state). The result must NOT be the
+    // normal successful physical Stop; it must communicate failure/unconfirmed.
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      predecessorDisplaced: false,
+      classification: 'D',
+    });
+    // The pending logical generation is still invalidated locally.
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    // The captured predecessor is reconciled conservatively (StateManager
+    // still referenced it).
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+
+    // Predecessor owner receives `interrupted` (conservative reconciliation).
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages.length).toBeGreaterThan(0);
+    predecessorTabMessages.forEach(([, msg]) => {
+      expect(msg.reason).toBe('interrupted');
+    });
+  });
+
+  it('Branch D: offscreen transport failure → NOT silent successful pre-boundary result', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    mocks.offscreenCurrentToken = null;
+    mocks.offscreenFailureMode = 'transport';
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      predecessorDisplaced: false,
+      classification: 'D',
+    });
+    // Conserved reconciliation clears the captured predecessor.
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+
+    // The successor owner still receives `stopped` (the pending logical
+    // generation IS gone locally). The predecessor owner is NOT silently
+    // told "you stopped this" — they get `interrupted` because the
+    // physical state is unknown, so we conservatively terminalize.
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages.length).toBeGreaterThan(0);
+    predecessorTabMessages.forEach(([, msg]) => {
+      expect(msg.reason).toBe('interrupted');
+      expect(msg.reason).not.toBe('stopped');
+    });
+  });
+
+  it('Branch D with a replacement committed generation: captured predecessor already gone, replacement is untouched', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    // Simulate the race: while the pending cleanup is awaiting the offscreen
+    // TTS_STOP, a replacement generation is acquired and committed, becoming
+    // the new committed generation in StateManager. offscreen transport
+    // fails (Branch D). StateManager no longer points to the captured
+    // predecessor token; the replacement must survive untouched.
+    mocks.browserAPI.runtime.sendMessage.mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP' && message.playbackToken === successor) {
+        const replacement = await ttsStateManager.acquirePlaybackLease({
+          sender: successorSender,
+          ttsId: 'replacement-id',
+          language: 'fr',
+          text: 'replacement text',
+        });
+        await ttsStateManager.commitPlaybackLease(replacement, {
+          sender: successorSender,
+          ttsId: 'replacement-id',
+          language: 'fr',
+          text: 'replacement text',
+        });
+        // Simulated transport failure on the runtime side.
+        throw new Error('runtime unavailable');
+      }
+      return undefined;
+    });
+    mocks.offscreenCurrentToken = null;
+    mocks.offscreenFailureMode = null;
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+    // Replacement survives untouched; StateManager no longer points to the
+    // captured predecessor so we must not fabricate a predecessor terminal
+    // notification against a foreign generation.
+    const replacementPlaybackToken = ttsStateManager.currentPlaybackToken;
+    expect(replacementPlaybackToken).not.toBe(predecessor);
+    expect(replacementPlaybackToken).not.toBe(successor);
+    expect(ttsStateManager.currentTTSId).toBe('replacement-id');
+
+    // No predecessor terminal notification (StateManager no longer
+    // references the captured predecessor; we don't synthesize one).
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages).toHaveLength(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Late logically-cancelled PLAY/commit: failPlaybackHandoff for a stale
+  // (already cancelled) token must still exact-token-stop/tombstone in
+  // offscreen rather than merely releasing its lease. A delayed PLAY for
+  // the cancelled token must remain fenced.
+  // ---------------------------------------------------------------------------
+
+  it('failPlaybackHandoff for a stale token exact-token-stops and tombstones; late PLAY for that token is rejected', async () => {
+    const predecessor = await ttsStateManager.acquirePlaybackLease();
+    await ttsStateManager.commitPlaybackLease(predecessor, {
+      sender: predecessorSender,
+      ttsId: 'predecessor-id',
+      language: 'en',
+      text: 'predecessor text',
+    });
+
+    const stale = await ttsStateManager.acquirePlaybackLease({
+      sender: successorSender,
+      ttsId: 'successor-id',
+      language: 'fr',
+      text: 'successor text',
+    });
+    // Logically cancel the pending via selective stop.
+    mocks.offscreenCurrentToken = predecessor; // Branch B: predecessor preserved
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+
+    // A delayed handler failure path arrives for the cancelled token.
+    // StateManager's pending/current slots no longer reference it.
+    const callsBefore = mocks.browserAPI.runtime.sendMessage.mock.calls.length;
+    const result = await ttsStateManager.failPlaybackHandoff(stale);
+    expect(result).toBe(false);
+
+    // failPlaybackHandoff issued an exact-token TTS_STOP to tombstone the
+    // stale token before releasing its lease.
+    const stopCalls = mocks.browserAPI.runtime.sendMessage.mock.calls
+      .slice(callsBefore)
+      .filter(([msg]) => msg?.action === 'TTS_STOP');
+    expect(stopCalls.length).toBeGreaterThanOrEqual(1);
+    stopCalls.forEach(([msg]) => {
+      expect(msg.playbackToken).toBe(stale);
+      expect(msg.playbackToken).not.toBeNull();
+    });
+
+    // The lease is released (the existing release path still runs).
+    const releaseForStale = mocks.release.mock.calls
+      .filter(([arg]) => arg.leaseId === stale);
+    expect(releaseForStale.length).toBeGreaterThanOrEqual(1);
+
+    // StateManager state is untouched (the live predecessor is unaffected).
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Strict offscreen response-identity validation.
+  //
+  // Classification must validate the COMPLETE response identity. A missing,
+  // contradictory, or mismatched identity field is malformed and routes to
+  // Branch D — never silently inferred as Branch A or B/C. The caller must
+  // be able to distinguish confirmed stop/reconciliation from unknown state.
+  // ---------------------------------------------------------------------------
+
+  it('offscreen_unavailable response (no currentPlaybackToken) is Branch D, never C-null', async () => {
+    await seedHandoff();
+    // stopPlaybackToken returns this exact shape when ensureDocument() is
+    // false: skipped:true, reason:'offscreen_unavailable', NO
+    // currentPlaybackToken property.
+    mocks.offscreenCurrentToken = null;
+    mocks.offscreenFailureMode = 'unavailable';
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Must be classified D (unconfirmed physical state), NOT C-null
+    // (which would falsely claim "nothing is playing"). The result must be
+    // an explicit failure, not the normal successful pre-boundary shape.
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+    expect(result.classification).not.toBe('C-null');
+    expect(result.success).not.toBe(true);
+  });
+
+  it('{ success:true, skipped:true } with no currentPlaybackToken → Branch D', async () => {
+    await seedHandoff();
+    // Directly inject a malformed response that lacks currentPlaybackToken.
+    mocks.offscreenCurrentToken = null;
+    mocks.browserAPI.runtime.sendMessage.mockReset().mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP') {
+        // Malformed: skipped but no currentPlaybackToken property.
+        return { success: true, skipped: true };
+      }
+      return undefined;
+    });
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+  });
+
+  it('explicit { success:true, skipped:true, currentPlaybackToken:null } → Branch C-null', async () => {
+    await seedHandoff();
+    mocks.offscreenCurrentToken = null; // authoritative: nothing is playing
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Explicit null is a meaningful "nothing is current" signal — this IS
+    // authoritative enough for C-null (not the ambiguous absent-property D).
+    expect(result).toMatchObject({
+      success: true,
+      action: 'stopped',
+      predecessorDisplaced: false,
+      classification: 'C-null',
+    });
+  });
+
+  it('{ success:true, stopped:true, playbackToken: pendingToken } → Branch A', async () => {
+    const { successor } = await seedHandoff();
+    mocks.offscreenCurrentToken = successor;
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      action: 'stopped',
+      predecessorDisplaced: true,
+      classification: 'A',
+    });
+  });
+
+  it('{ success:true, stopped:true } without playbackToken → Branch D (malformed identity)', async () => {
+    const { successor } = await seedHandoff();
+    mocks.offscreenCurrentToken = successor;
+    mocks.browserAPI.runtime.sendMessage.mockReset().mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP') {
+        // Malformed: stopped:true but no playbackToken field at all.
+        return { success: true, stopped: true };
+      }
+      return undefined;
+    });
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+  });
+
+  it('{ success:true, stopped:true, playbackToken:\'different-token\' } → Branch D (mismatched identity)', async () => {
+    const { successor } = await seedHandoff();
+    mocks.offscreenCurrentToken = successor;
+    mocks.browserAPI.runtime.sendMessage.mockReset().mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP') {
+        // Malformed: stopped:true but the returned playbackToken does not
+        // match the pending token we sent.
+        return { success: true, stopped: true, playbackToken: 'different-token' };
+      }
+      return undefined;
+    });
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+  });
+
+  it('contradictory { success:true, stopped:true, skipped:true } → Branch D', async () => {
+    const { successor } = await seedHandoff();
+    mocks.offscreenCurrentToken = successor;
+    mocks.browserAPI.runtime.sendMessage.mockReset().mockImplementation(async (message) => {
+      if (message?.action === 'TTS_STOP') {
+        // Contradictory shape: both stopped and skipped.
+        return { success: true, stopped: true, skipped: true, playbackToken: successor };
+      }
+      return undefined;
+    });
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+  });
+
+  it('Branch D: pending generation remains locally invalidated, newer generations untouched, result does NOT claim normal success', async () => {
+    const { successor } = await seedHandoff();
+    mocks.offscreenFailureMode = 'transport';
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Result explicitly signals unconfirmed physical state (not a normal
+    // successful stop).
+    expect(result.success).toBe(false);
+    expect(result.classification).toBe('D');
+    // Pending logical generation is still invalidated (late commit rejected).
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    await expect(ttsStateManager.commitPlaybackLease(successor)).resolves.toBe(false);
+    // The captured predecessor was reconciled (StateManager still referenced
+    // it), so committed state is cleared; any newer generation that had
+    // replaced it during the async window would be preserved by the
+    // token-fence (covered by the separate replacement-generation test).
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
   });
 });
 

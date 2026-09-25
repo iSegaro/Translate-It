@@ -289,7 +289,11 @@ describe('offscreen TTS terminal playback lifecycle', () => {
       action: 'TTS_STOP',
       playbackToken: 'old-token',
     });
-    expect(staleResponse).toEqual({ success: true, skipped: true });
+    expect(staleResponse).toEqual({
+      success: true,
+      skipped: true,
+      currentPlaybackToken: 'active-token',
+    });
 
     const stopResponse = await sendMessage({
       target: 'offscreen',
@@ -298,7 +302,11 @@ describe('offscreen TTS terminal playback lifecycle', () => {
     });
     utterance.onend?.();
 
-    expect(stopResponse).toEqual({ success: true, stopped: true });
+    expect(stopResponse).toEqual({
+      success: true,
+      stopped: true,
+      playbackToken: 'active-token',
+    });
     expect(terminalMessages()).toHaveLength(0);
   });
 
