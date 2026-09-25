@@ -155,6 +155,8 @@ const mountView = (props = {}) => mount(LiveDubbingView, {
 })
 
 const providerSelect = (wrapper) => wrapper.find('#live-dubbing-provider-select')
+const transcriptHeader = (wrapper) => wrapper.find('.live-dubbing-transcript-preferences-header')
+const transcriptContent = (wrapper) => wrapper.find('#live-dubbing-transcript-preferences-content')
 
 describe('LiveDubbingView', () => {
   beforeEach(() => {
@@ -249,7 +251,75 @@ describe('LiveDubbingView', () => {
     ])
   })
 
+  it('starts the Subtitles card collapsed when both subtitle preferences are off', () => {
+    const wrapper = mountView()
+
+    expect(transcriptHeader(wrapper).element.tagName).toBe('BUTTON')
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
+    expect(transcriptHeader(wrapper).attributes('aria-controls'))
+      .toBe('live-dubbing-transcript-preferences-content')
+    expect(transcriptContent(wrapper).attributes('style')).toBe('display: none;')
+    expect(wrapper.find('.live-dubbing-change-font-link').isVisible()).toBe(false)
+  })
+
+  it.each([
+    ['translated', { LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: true }],
+    ['original', { LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT: true }]
+  ])('starts the Subtitles card expanded when %s subtitles are enabled', (_label, settings) => {
+    harness.store = makeStore(settings)
+    const wrapper = mountView()
+
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
+    expect(transcriptContent(wrapper).attributes('style')).toBeUndefined()
+  })
+
+  it('toggles the disclosure state without changing subtitle settings or remounting control', async () => {
+    const wrapper = mountView()
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const updateCount = harness.store.updateSettingAndPersist.mock.calls.length
+    const localUpdateCount = harness.store.updateSettingLocally.mock.calls.length
+
+    await transcriptHeader(wrapper).trigger('click')
+
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
+    expect(transcriptContent(wrapper).isVisible()).toBe(true)
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledTimes(updateCount)
+    expect(harness.store.updateSettingLocally).toHaveBeenCalledTimes(localUpdateCount)
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).vm).toBe(control.vm)
+
+    await transcriptHeader(wrapper).trigger('click')
+    await settle()
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
+    expect(transcriptContent(wrapper).attributes('style')).toBe('display: none;')
+  })
+
+  it('keeps the existing subtitle controls hidden or visible with the disclosure state', async () => {
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+    const sizeSelect = wrapper.find('#live-dubbing-subtitle-size-select')
+
+    expect(toggles).toHaveLength(2)
+    expect(transcriptContent(wrapper).isVisible()).toBe(false)
+    await transcriptHeader(wrapper).trigger('click')
+    await settle()
+    expect(transcriptContent(wrapper).attributes('style')).toBe('')
+    expect(wrapper.findAllComponents({ name: 'BaseToggle' })).toHaveLength(2)
+    expect(sizeSelect.exists()).toBe(true)
+  })
+
+  it('does not auto-toggle the disclosure when subtitle preferences change', async () => {
+    const collapsed = mountView()
+    await collapsed.findAllComponents({ name: 'BaseToggle' })[0].vm.$emit('update:modelValue', true)
+    expect(transcriptHeader(collapsed).attributes('aria-expanded')).toBe('false')
+
+    harness.store = makeStore({ LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: true })
+    const expanded = mountView()
+    await expanded.findAllComponents({ name: 'BaseToggle' })[0].vm.$emit('update:modelValue', false)
+    expect(transcriptHeader(expanded).attributes('aria-expanded')).toBe('true')
+  })
+
   it('opens Appearance at the translation-font setting and closes the popup', async () => {
+    harness.store = makeStore({ LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: true })
     harness.openOptionsPageMock.mockResolvedValue({ success: true })
     const wrapper = mountView()
     const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
@@ -830,6 +900,10 @@ describe('LiveDubbingView', () => {
     // Control alignment is owned by this card, not shared control styles.
     expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-header[\s\S]*?inline-size:\s*100%/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-inline-end:/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-block-end:/)
+    expect(scss).toMatch(/aria-expanded="true"[\s\S]*?transform:\s*rotate\(225deg\)/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+120px\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?inline-size:\s*120px\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?height:\s*36px\s*!important/)
