@@ -87,6 +87,15 @@
 
       <!-- Mouse on Hover Translation Tooltip -->
       <MouseHoverTooltip />
+
+      <!-- Live dubbing transcript: top-frame, display-only surface. -->
+      <LiveDubbingTranscript
+        v-if="isTopFrame && (showTranslatedTranscript || showOriginalTranscript)"
+        :show-translated-transcript="showTranslatedTranscript"
+        :show-original-transcript="showOriginalTranscript"
+        :font-family="liveDubbingFontFamily"
+        :subtitle-size="liveDubbingSubtitleSize"
+      />
     </template>
 
     <!-- 
@@ -118,7 +127,7 @@
 
 <script setup>
 import './ContentApp.scss'
-import { onUnmounted, defineAsyncComponent } from 'vue';
+import { computed, onUnmounted, defineAsyncComponent } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
@@ -140,6 +149,7 @@ const TranslationWindow = defineAsyncComponent(() => import('@/features/windows/
 const TranslationIcon = defineAsyncComponent(() => import('@/features/windows/components/TranslationIcon.vue'));
 const PageTranslationTooltip = defineAsyncComponent(() => import('./components/PageTranslationTooltip.vue'));
 const MouseHoverTooltip = defineAsyncComponent(() => import('./components/MouseHoverTooltip.vue'));
+const LiveDubbingTranscript = defineAsyncComponent(() => import('@/features/live-dubbing/components/LiveDubbingTranscript.vue'));
 
 // Device-Specific Lazy Components
 const MobileSheet = defineAsyncComponent(() => import('./components/mobile/MobileSheet.vue'));
@@ -147,6 +157,9 @@ const MobileFab = defineAsyncComponent(() => import('./components/mobile/MobileF
 const DesktopFabMenu = defineAsyncComponent(() => import('./components/desktop/DesktopFabMenu.vue'));
 
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { CONFIG } from '@/shared/config/config.js';
+import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
+import { normalizeLiveDubbingSubtitleSize } from '@/features/live-dubbing/content/liveDubbingSubtitleSize.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -167,6 +180,25 @@ useUnifiedI18n();
 const settingsStore = useSettingsStore();
 const mobileStore = useMobileStore();
 const tracker = useResourceTracker('content-app');
+
+const showTranslatedTranscript = computed(() =>
+  settingsStore.settings?.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT === true
+);
+const showOriginalTranscript = computed(() =>
+  settingsStore.settings?.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT === true
+);
+const liveDubbingFontFamily = computed(() => {
+  const settings = settingsStore.settings;
+  if (settings?.LIVE_DUBBING_USE_TRANSLATION_FONT !== true) return '';
+
+  return resolveTranslationFontFamily(
+    settings.TRANSLATION_FONT_FAMILY || CONFIG.TRANSLATION_FONT_FAMILY,
+    settings.LIVE_DUBBING_TARGET_LANGUAGE || CONFIG.LIVE_DUBBING_TARGET_LANGUAGE
+  );
+});
+const liveDubbingSubtitleSize = computed(() => normalizeLiveDubbingSubtitleSize(
+  settingsStore.settings?.LIVE_DUBBING_SUBTITLE_SIZE
+));
 
 // 2. Localization & RTL Management
 const { toastRTL, updateToastRTL } = useContentAppLocalization(settingsStore);

@@ -257,6 +257,117 @@
   "providers_tab_title": {
     "message": "سرویس‌ها"
   },
+  "live_dubbing_provider_description": {
+    "message": "برای جلسه‌های جدید دوبله زنده استفاده می‌شود."
+  },
+  "live_dubbing_config_label": {
+    "message": "پیکربندی"
+  },
+  "live_dubbing_transcript_preferences_label": {
+    "message": "زیرنویس‌ها"
+  },
+  "live_dubbing_change_font_label": {
+    "message": "تغییر فونت"
+  },
+  "live_dubbing_show_translated_transcript": {
+    "message": "زیرنویس ترجمه‌شده"
+  },
+  "live_dubbing_show_original_transcript": {
+    "message": "زیرنویس اصلی"
+  },
+  "live_dubbing_setup_save": {
+    "message": "ذخیره"
+  },
+  "live_dubbing_setup_save_error": {
+    "message": "ذخیره کلید API انجام نشد. لطفا دوباره تلاش کنید."
+  },
+  "live_dubbing_provider_bootstrap_gemini_error": {
+    "message": "امکان راه‌اندازی دوبله زنده Gemini وجود ندارد. کلید API Gemini و اتصال خود را بررسی کنید و دوباره تلاش کنید."
+  },
+  "live_dubbing_provider_bootstrap_openai_error": {
+    "message": "امکان راه‌اندازی دوبله زنده OpenAI وجود ندارد. کلید API OpenAI و اتصال خود را بررسی کنید و دوباره تلاش کنید."
+  },
+  "live_dubbing_provider_setup_failed_error": {
+    "message": "امکان اتصال به ارائه‌دهنده انتخاب شده وجود ندارد. اتصال و پیکربندی خود را بررسی کنید و دوباره تلاش کنید."
+  },
+  "live_dubbing_offscreen_lost_error": {
+    "message": "دوبله زنده به‌طور غیرمنتظره متوقف شد. دوباره آن را شروع کنید."
+  },
+  "live_dubbing_action_start": {
+    "message": "شروع"
+  },
+  "live_dubbing_action_stop": {
+    "message": "توقف"
+  },
+  "live_dubbing_action_cleanup": {
+    "message": "پاک‌سازی"
+  },
+  "live_dubbing_action_start_aria_label": {
+    "message": "شروع دوبله زنده"
+  },
+  "live_dubbing_action_stop_aria_label": {
+    "message": "توقف دوبله زنده"
+  },
+  "live_dubbing_action_cleanup_aria_label": {
+    "message": "پاک‌سازی دوبله زنده"
+  },
+  "live_dubbing_status_loading": {
+    "message": "در حال بررسی در دسترس بودن…"
+  },
+  "live_dubbing_status_idle": {
+    "message": "آماده"
+  },
+  "live_dubbing_status_starting": {
+    "message": "در حال شروع…"
+  },
+  "live_dubbing_status_preparing_capture": {
+    "message": "در حال آماده‌سازی ضبط…"
+  },
+  "live_dubbing_status_connecting_provider": {
+    "message": "در حال اتصال به ارائه‌دهنده…"
+  },
+  "live_dubbing_status_running": {
+    "message": "در حال اجرا"
+  },
+  "live_dubbing_status_stopping": {
+    "message": "در حال توقف…"
+  },
+  "live_dubbing_status_error": {
+    "message": "خطا"
+  },
+  "live_dubbing_status_unavailable": {
+    "message": "در دسترس نیست"
+  },
+  "live_dubbing_status_cleanup": {
+    "message": "نیاز به پاک‌سازی"
+  },
+  "live_dubbing_volume_original_label": {
+    "message": "اصلی"
+  },
+  "live_dubbing_volume_dubbed_label": {
+    "message": "صدای دوبله"
+  },
+  "popup_more_actions_title": {
+    "message": "اقدامات بیشتر"
+  },
+  "popup_select_element_options_title": {
+    "message": "گزینه‌های انتخاب عنصر"
+  },
+  "popup_exclude_enable_label": {
+    "message": "فعال‌سازی در این سایت"
+  },
+  "popup_exclude_disable_label": {
+    "message": "غیرفعال‌سازی در این سایت"
+  },
+  "page_translation_auto_translate_enable_label": {
+    "message": "فعال‌سازی ترجمه خودکار صفحه"
+  },
+  "page_translation_auto_translate_disable_label": {
+    "message": "غیرفعال‌سازی ترجمه خودکار صفحه"
+  },
+  "page_translation_auto_translate_inherited_label": {
+    "message": "ترجمه خودکار توسط یک قاعدهٔ گسترده‌تر مدیریت می‌شود"
+  },
   "configure_service_button": {
     "message": "تنظیم سرویس ⚙️"
   },
@@ -1529,6 +1640,21 @@
   "popup_select_element_title_icon": {
     "message": "حالت انتخاب با ماوس"
   },
+  "popup_view_switcher_label": {
+    "message": "نماهای پنجره"
+  },
+  "popup_view_translate": {
+    "message": "ترجمه"
+  },
+  "popup_view_live_dubbing": {
+    "message": "دوبله زنده"
+  },
+  "popup_view_switcher_translate_label": {
+    "message": "متن"
+  },
+  "popup_view_switcher_dubbing_label": {
+    "message": "دوبله"
+  },
   "popup_revert_alt_icon": {
     "message": "بازگرداندن"
   },
@@ -1657,6 +1783,27 @@
   },
   "page_translation_btn_restore": {
     "message": "بازگشت به اصلی"
+  },
+  "page_translation_tooltip_translate": {
+    "message": "ترجمه کل صفحه"
+  },
+  "page_translation_tooltip_in_progress": {
+    "message": "ترجمه در حال انجام است..."
+  },
+  "page_translation_tooltip_stop_auto": {
+    "message": "توقف ترجمه خودکار"
+  },
+  "page_translation_tooltip_cancel": {
+    "message": "لغو ترجمه"
+  },
+  "page_translation_tooltip_restore_blocked": {
+    "message": "بازیابی در حین ترجمه امکانپذیر نیست"
+  },
+  "page_translation_tooltip_nothing_to_restore": {
+    "message": "ترجمه‌ای برای بازیابی وجود ندارد"
+  },
+  "page_translation_tooltip_restore": {
+    "message": "بازیابی محتوای اصلی صفحه"
   },
   "sync_page_label": {
     "message": "همگام صفحه"
@@ -2050,6 +2197,24 @@
   },
   "whole_page_use_translation_font_label": {
     "message": "استفاده از فونت ترجمه در ترجمه صفحه"
+  },
+  "live_dubbing_use_translation_font_label": {
+    "message": "استفاده از فونت ترجمه در زیرنویس‌های دوبله زنده"
+  },
+  "live_dubbing_subtitle_size_label": {
+    "message": "اندازه زیرنویس"
+  },
+  "live_dubbing_subtitle_size_small": {
+    "message": "کوچک"
+  },
+  "live_dubbing_subtitle_size_medium": {
+    "message": "متوسط"
+  },
+  "live_dubbing_subtitle_size_large": {
+    "message": "بزرگ"
+  },
+  "live_dubbing_subtitle_size_xlarge": {
+    "message": "خیلی بزرگ"
   },
   "font_family_label": {
     "message": "نوع فونت"

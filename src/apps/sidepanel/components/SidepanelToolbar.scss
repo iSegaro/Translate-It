@@ -13,13 +13,11 @@
   flex-shrink: 0;
   z-index: 20;
   position: relative;
-}
 
-/* 
-   EXTREME SPECIFICITY: Target all buttons inside side-toolbar 
-   to kill any inherited blue hover effects from UI library.
-*/
-.side-toolbar {
+  /*
+     EXTREME SPECIFICITY: Target all buttons inside side-toolbar
+     to kill any inherited blue hover effects from UI library.
+  */
   .toolbar-button,
   .ti-provider-icon-button,
   .ti-btn,
@@ -71,10 +69,61 @@
       position: relative !important;
     }
   }
+
+  /* ---- Layout groups ---- */
+  .toolbar-group,
+  .toolbar-group-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .toolbar-separator {
+    width: 24px;
+    height: 1px;
+    background-color: var(--color-border);
+    margin: 6px 0;
+    opacity: 0.5;
+  }
+
+  /* ---- Specific Wrapper Fixes ---- */
+  .toolbar-page-translation,
+  .ti-provider-icon-only-container {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ---- Icon Sizing Standardization ---- */
+  img,
+  .toolbar-icon {
+    width: 22px !important;
+    height: 22px !important;
+    object-fit: contain !important;
+  }
+
+  /* ---- Icon opacity / filter behavior ----
+     Migrated from legacy _sidepanel.scss (body.sidepanel-context .toolbar-icon).
+     Provides base icon theming: opacity, CSS-variable filter, smooth
+     transitions, and hover brighten. Dark-theme block below overrides
+     specific utility icons (filter: invert, opacity: 0.8) and protects
+     provider/page-translation colored icons. */
+  .toolbar-icon {
+    opacity: var(--icon-opacity);
+    filter: var(--icon-filter);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+
+    &:hover {
+      opacity: var(--icon-hover-opacity);
+    }
+  }
 }
 
-/* 
-   DARK THEME: Explicit #424242 Override 
+/*
+   DARK THEME: Explicit #424242 Override
 */
 .theme-dark,
 :root.theme-dark {
@@ -91,8 +140,8 @@
         background-color: #555555 !important;
       }
 
-      /* 
-         Standardize ONLY utility icons to White 
+      /*
+         Standardize ONLY utility icons to White
          Leave Provider and Page Translation colored
       */
       &#selectElementBtn img,
@@ -126,38 +175,4 @@
       }
     }
   }
-}
-
-/* Icon Sizing Standardization */
-.side-toolbar img,
-.side-toolbar .toolbar-icon {
-  width: 22px !important;
-  height: 22px !important;
-  object-fit: contain !important;
-}
-
-.toolbar-group,
-.toolbar-group-bottom {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-}
-
-.toolbar-separator {
-  width: 24px;
-  height: 1px;
-  background-color: var(--color-border);
-  margin: 6px 0;
-  opacity: 0.5;
-}
-
-/* Specific Wrapper Fixes */
-.toolbar-page-translation,
-.ti-provider-icon-only-container {
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }

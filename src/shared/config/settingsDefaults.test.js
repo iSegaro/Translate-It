@@ -23,6 +23,24 @@ describe('getPersistedDefaultSettings', () => {
 
     expect(defaults.THEME).toBe(CONFIG.THEME);
     expect(defaults.TIMEOUT).toBe(CONFIG.TIMEOUT);
+    expect(CONFIG.LIVE_DUBBING_PROVIDER).toBe('gemini');
+    expect(defaults.LIVE_DUBBING_PROVIDER).toBe(CONFIG.LIVE_DUBBING_PROVIDER);
+    expect(CONFIG.LIVE_DUBBING_TARGET_LANGUAGE).toBe('en');
+    expect(defaults.LIVE_DUBBING_TARGET_LANGUAGE).toBe(CONFIG.LIVE_DUBBING_TARGET_LANGUAGE);
+    expect(CONFIG.POPUP_ACTIVE_VIEW).toBe('translate');
+    expect(defaults.POPUP_ACTIVE_VIEW).toBe(CONFIG.POPUP_ACTIVE_VIEW);
+    expect(CONFIG.LIVE_DUBBING_ORIGINAL_VOLUME).toBe(0);
+    expect(defaults.LIVE_DUBBING_ORIGINAL_VOLUME).toBe(0);
+    expect(CONFIG.LIVE_DUBBING_DUBBED_VOLUME).toBe(1);
+    expect(defaults.LIVE_DUBBING_DUBBED_VOLUME).toBe(1);
+    expect(CONFIG.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(false);
+    expect(defaults.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(false);
+    expect(CONFIG.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(false);
+    expect(defaults.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(false);
+    expect(CONFIG.LIVE_DUBBING_USE_TRANSLATION_FONT).toBe(false);
+    expect(defaults.LIVE_DUBBING_USE_TRANSLATION_FONT).toBe(false);
+    expect(CONFIG.LIVE_DUBBING_SUBTITLE_SIZE).toBe('medium');
+    expect(defaults.LIVE_DUBBING_SUBTITLE_SIZE).toBe('medium');
     expect(defaults.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
     expect(defaults.GEMINI_API_URL).toBe(CONFIG.GEMINI_API_URL);
     expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);

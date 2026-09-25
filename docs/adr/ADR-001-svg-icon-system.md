@@ -1,6 +1,6 @@
 # ADR-001: SVG Icon System
 
-**Status:** Accepted
+**Status:** Accepted (amended: `SvgIcon` renamed to `MaskIcon`; scope generalized to alpha-mask-compatible PNGs — see "Generalized rule" below).
 
 **Scope:** Monochrome UI icon assets and rendering conventions.
 
@@ -24,22 +24,28 @@ This fragmentation created:
 
 ## Decision
 
-Standardize on **CSS Mask** as the rendering technique for all monochrome UI icons, mediated by a shared `SvgIcon` component.
+Standardize on **CSS Mask** as the rendering technique for all monochrome UI icons, mediated by a shared `MaskIcon` component (renamed from `SvgIcon`; same mask-mode:alpha behavior and size/decorative API).
+
+### Generalized rule
+
+- **Monochrome SVG or alpha-mask-compatible PNG → shared mask component + `currentColor`.** File format is not the distinction; alpha-channel shape is. Monochrome PNGs whose alpha channel carries the glyph (e.g. `translate-view.png`, `dubbing.png`, `clear.png`) render through `MaskIcon` like SVGs and inherit parent color automatically.
+- **Brand/multicolor assets stay `<img>`** (provider logos, subtitle/PDF/translate icons, any icon whose colors carry meaning).
+- **Prefer SVG for new icons when a clean vector source exists;** suitable existing PNGs need no recreation or conversion.
 
 ### How it works
 
-- SVG files are stored in `src/icons/ui/` — the single source of truth.
-- `SvgIcon` renders a `<span>` with `mask-image: url(<asset>)` and `background-color: currentColor`.
+- Monochrome icon assets live in `src/icons/ui/` — the single source of truth (SVG preferred for new icons; suitable existing PNGs are used as-is).
+- `MaskIcon` renders a `<span>` with `mask-image: url(<asset>)` and `background-color: currentColor`.
 - Icon color is inherited from the parent element — theming is automatic.
 - Icon size is controlled via the `:size` prop.
 
 ### Why CSS Mask
 
-- **Zero build changes.** No new Vite plugin, no loader configuration. The `?url` suffix (already supported by Vite) resolves the SVG to a public URL.
+- **Zero build changes.** No new Vite plugin, no loader configuration. The `?url` suffix (already supported by Vite) resolves the asset to a public URL.
 - **currentColor theming.** The icon always matches parent text color — solves the color bug at the architectural level.
 - **Decorative by default.** The `<span>` has no semantic meaning; `aria-hidden="true"` is the natural default. Only opt in to `role="img"` when the icon carries information.
-- **Incremental adoption.** Any component can switch to `SvgIcon` independently. No flag day migration.
-- **No asset preloading.** Unlike `@font-face` icon fonts, SVG files are loaded on demand by the browser.
+- **Incremental adoption.** Any component can switch to `MaskIcon` independently. No flag day migration.
+- **No asset preloading.** Unlike `@font-face` icon fonts, mask assets are loaded on demand by the browser.
 
 ---
 

@@ -113,6 +113,9 @@ function generateChromeManifest(baseManifest) {
   const manifest = {
     ...baseManifest,
     manifest_version: 3,
+    // WORKERS is available from Chrome 114; shared offscreen reasons including
+    // USER_MEDIA require Chrome/Chromium 116.
+    minimum_chrome_version: '116',
     
     // Chrome MV3 background service worker
     background: {
@@ -124,6 +127,8 @@ function generateChromeManifest(baseManifest) {
     permissions: [
       ...baseManifest.permissions,
       'offscreen',
+      'tabCapture',
+      'activeTab',
       'contextMenus',
       'sidePanel'
     ],
@@ -153,18 +158,6 @@ function generateChromeManifest(baseManifest) {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; trusted-types default vue dompurify;"
     },
 
-    // Chrome-specific web accessible resources
-    web_accessible_resources: [
-      ...baseManifest.web_accessible_resources,
-      {
-        resources: [
-          'src/html/offscreen.html',
-          'src/html/offscreen.js'
-        ],
-        matches: ['<all_urls>', 'file://*/*'],
-        use_dynamic_url: true
-      }
-    ]
   };
 
   return manifest;
@@ -245,7 +238,8 @@ function generateFirefoxManifest(baseManifest) {
     
     // Firefox-specific web accessible resources format (stripping use_dynamic_url which is unsupported)
     web_accessible_resources: baseManifest.web_accessible_resources.map(resource => {
-      const { use_dynamic_url, ...rest } = resource;
+      const rest = { ...resource };
+      delete rest.use_dynamic_url;
       return rest;
     })
   };

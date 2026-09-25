@@ -26,6 +26,7 @@ vi.mock('@/core/browserHandlers.js', () => ({ addBrowserSpecificHandlers: vi.fn(
 vi.mock('@/utils/UtilsFactory.js', () => ({ utilsFactory: {} }))
 
 const { MessageActions } = await import('@/shared/messaging/core/MessageActions.js')
+const { LIVE_DUBBING_ACTIONS } = await import('@/features/live-dubbing/constants.js')
 const Handlers = await import('@/core/background/handlers/index.js')
 const { LifecycleManager } = await import('./LifecycleManager.js')
 
@@ -42,6 +43,14 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.get(MessageActions.TRANSLATE_TEXT)).toBe(translateTextHandler)
     expect(registeredHandlers.get('translateText')).toBe(translateTextHandler)
     expect(registeredHandlers.get(MessageActions.SETTINGS_UPDATED)).toBe(settingsUpdatedHandler)
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME)).toEqual(expect.any(Function))
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME)).toEqual(expect.any(Function))
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME)).toEqual(expect.any(Function))
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME)).toEqual(expect.any(Function))
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME_OFFSCREEN)).toBe(false)
     expect(registeredHandlers.get(MessageActions.IFRAME_SELECT_ELEMENT_FINISHED)).toEqual(expect.any(Function))
     expect(registeredHandlers.get(MessageActions.SELECT_ELEMENT_FRAME_READY)).toEqual(expect.any(Function))
     expect(registeredHandlers.has(MessageActions.TRANSLATION_RESULT_UPDATE)).toBe(false)
@@ -51,12 +60,40 @@ describe('LifecycleManager translation text routing', () => {
     expect(registerHandlerMock.mock.calls.filter(([action]) => action === MessageActions.SELECT_ELEMENT_FRAME_READY)).toHaveLength(1)
   })
 
+  it('registers original transcript routing alongside translated transcript routing', () => {
+    const manager = new LifecycleManager()
+    manager.registerMessageHandlers()
+
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT)).toEqual(expect.any(Function))
+    expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT)).toEqual(expect.any(Function))
+    expect(registerHandlerMock.mock.calls.filter(([action]) => action === LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT))
+      .toHaveLength(1)
+    expect(registerHandlerMock.mock.calls.filter(([action]) => action === LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT))
+      .toHaveLength(1)
+  })
+
   it('keeps refresh action registered without an undefined action mapping', () => {
     const manager = new LifecycleManager()
     manager.registerMessageHandlers()
 
     expect(registeredHandlers.get(MessageActions.REFRESH_CONTEXT_MENUS)).toEqual(expect.any(Function))
     expect(registeredHandlers.has('undefined')).toBe(false)
+  })
+
+  it('does not register live-dubbing routes in Firefox builds', () => {
+    vi.stubGlobal('__BROWSER__', 'firefox')
+    const manager = new LifecycleManager()
+
+    manager.registerMessageHandlers()
+
+    expect(registeredHandlers.has(MessageActions.START_LIVE_DUBBING)).toBe(false)
+    expect(registeredHandlers.has(MessageActions.STOP_LIVE_DUBBING)).toBe(false)
+    expect(registeredHandlers.has(MessageActions.GET_LIVE_DUBBING_STATUS)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME)).toBe(false)
+    expect(registeredHandlers.has(LIVE_DUBBING_ACTIONS.GET_DUBBED_VOLUME)).toBe(false)
+    vi.unstubAllGlobals()
   })
 })
 

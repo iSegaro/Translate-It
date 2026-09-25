@@ -1,5 +1,8 @@
 @use "@/assets/styles/base/variables" as *;
 
+$popup-view-transition-duration: 170ms;
+$popup-view-transition-easing: cubic-bezier(.2, .8, .25, 1);
+
 /* Fixed action-popup flex hierarchy. */
 .popup-wrapper {
   width: 100%;
@@ -12,146 +15,126 @@
   font-size: var(--translation-font-size, 14px);
   color: var(--text-color);
   overflow: hidden;
-}
 
-.popup-container,
-.popup-content-container {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-color);
-  box-shadow: none;
-  position: relative;
-  box-sizing: border-box;
-  margin: 0;
-  border-radius: 0;
-  overflow: hidden;
-}
-
-/* Header section remains visible during scroll */
-.sticky-header {
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--bg-color);
-  border-bottom: 1px solid var(--header-border-color);
-}
-
-/* Main form area that can scroll if content exceeds viewport */
-.translation-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-height: 0;
-}
-
-.loading-container, .error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  gap: 1rem;
-  flex: 1;
-}
-
-.loading-text {
-  font-size: 14px;
-  opacity: 0.7;
-}
-
-.error-message {
-  color: var(--text-color);
-  opacity: 0.8;
-  margin: 0;
-  text-align: center;
-}
-
-.retry-button {
-  padding: 0.5rem 1rem;
-  background-color: var(--toolbar-link-color);
-  color: var(--bg-color);
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.popup-content-container .language-controls {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  padding: 6px 10px !important;
-  gap: 8px !important;
-  background: var(--language-controls-bg-color);
-  min-height: 40px !important;
-  box-sizing: border-box !important;
-  width: 100% !important;
-  overflow: visible !important;
-}
-
-.popup-content-container .language-controls > :first-child {
-  flex-shrink: 0 !important;
-}
-
-/* The middle element (LanguageSelector) should take the remaining space */
-.popup-content-container .language-controls > .ti-language-controls {
-  flex: 1 !important;
-  min-width: 0 !important;
-}
-
-.ti-btn-min-clear {
-  width: 24px !important;
-  height: 24px !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  border-radius: 4px !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  padding: 0 !important;
-  transition: all 0.2s ease !important;
-  flex-shrink: 0 !important;
-  opacity: 0.6 !important;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.08) !important;
-    opacity: 1 !important;
+  .popup-container,
+  .popup-content-container {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-color);
+    box-shadow: none;
+    position: relative;
+    box-sizing: border-box;
+    margin: 0;
+    border-radius: 0;
+    overflow: hidden;
   }
 
-  img {
-    width: 14px !important;
-    height: 14px !important;
-    object-fit: contain !important;
+  /* Header section remains visible during scroll.
+     `.sticky-header` is the outer stacking-context owner (`position: sticky`
+     forms one), so the dropdown layer token lives here — this lets the
+     anchored ToolbarMenu panel (inside) overlay all Popup content below. */
+  .sticky-header {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: var(--ti-z-dropdown);
+    background: var(--bg-color);
+    border-bottom: 1px solid var(--header-border-color);
   }
 
-  /* Standard Dark Mode override using the project's architectural pattern */
-  @at-root :global(.ti-dark-mode) &, 
-           :global(.theme-dark) & {
-    opacity: 0.8 !important;
+  /* Absolute panels keep the popup content area stable while views switch. */
+  .popup-view-stage {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.15) !important;
-      opacity: 1 !important;
+  .popup-view-panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(0);
+    transition:
+      opacity $popup-view-transition-duration $popup-view-transition-easing,
+      transform $popup-view-transition-duration $popup-view-transition-easing,
+      visibility 0s linear $popup-view-transition-duration;
+
+    > * {
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
-    .ti-toolbar-icon {
-      filter: brightness(0) invert(1) !important;
-      opacity: 1 !important;
-    }
+  }
+
+  .popup-view-panel--translate.is-inactive {
+    transform: translateY(10px);
+  }
+
+  .popup-view-panel--live-dubbing.is-inactive {
+    transform: translateY(-10px);
+  }
+
+  /* The inactive panel supplies the directional starting position for the next switch. */
+  .popup-view-panel.is-active {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition:
+      opacity $popup-view-transition-duration $popup-view-transition-easing,
+      transform $popup-view-transition-duration $popup-view-transition-easing,
+      visibility 0s linear 0s;
+  }
+
+  .loading-container, .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    gap: 1rem;
+    flex: 1;
+  }
+
+  .loading-text {
+    font-size: 14px;
+    opacity: 0.7;
+  }
+
+  .error-message {
+    color: var(--text-color);
+    opacity: 0.8;
+    margin: 0;
+    text-align: center;
+  }
+
+  .retry-button {
+    padding: 0.5rem 1rem;
+    background-color: var(--toolbar-link-color);
+    color: var(--bg-color);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
   }
 }
 
-/* Maintain single row even on small screens for the main popup controls */
-@media (max-width: 340px) {
-  .popup-content-container .language-controls {
-    gap: 4px !important;
-    padding: 4px 6px !important;
+@media (prefers-reduced-motion: reduce) {
+  .popup-wrapper {
+    .popup-view-panel {
+      transition: none;
+    }
   }
 }

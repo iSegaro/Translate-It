@@ -2,16 +2,33 @@ import { describe, expect, it } from 'vitest'
 import { mapOcrError } from './ocrErrorMapper.js'
 
 describe('mapOcrError', () => {
-  it('preserves the missing model error code', () => {
-    expect(mapOcrError(new Error('model-not-installed'))).toBe('model-not-installed')
+  it.each([
+    ['string', 'model-not-installed'],
+    ['Error', new Error('model-not-installed')],
+    ['legacy error object', { message: 'model-not-installed', type: 'OCR_FAILED' }],
+  ])('preserves the missing model error code from %s', (_label, error) => {
+    expect(mapOcrError(error)).toBe('model-not-installed')
   })
 
-  it('classifies cancellation errors', () => {
-    expect(mapOcrError(new Error('cancelled'))).toBe('cancelled')
-    expect(mapOcrError({ name: 'RenderingCancelledException' })).toBe('cancelled')
+  it.each([
+    'cancelled',
+    new Error('cancelled'),
+    { message: 'cancelled', type: 'OCR_CANCELLED' },
+    { name: 'RenderingCancelledException' },
+  ])('classifies cancellation error %o', (error) => {
+    expect(mapOcrError(error)).toBe('cancelled')
   })
 
-  it('maps unknown errors to the generic OCR failure code', () => {
-    expect(mapOcrError(new Error('Tesseract worker crashed'))).toBe('ocr-failed')
+  it('preserves no-text from a string response', () => {
+    expect(mapOcrError('no-text')).toBe('no-text')
+  })
+
+  it.each([
+    new Error('Tesseract worker crashed'),
+    { message: 'Tesseract worker crashed', type: 'OCR_FAILED' },
+    { message: { unexpected: true }, type: 'OCR_FAILED' },
+  ])('maps unknown errors safely to the generic OCR failure code', (error) => {
+    expect(mapOcrError(error)).toBe('ocr-failed')
+    expect(mapOcrError(error)).not.toBe('[object Object]')
   })
 })

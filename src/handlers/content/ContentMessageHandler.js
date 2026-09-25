@@ -13,6 +13,12 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
 import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
 import { getPageTranslationErrorPresentation } from '@/features/page-translation/utils/PageTranslationErrorPresenter.js';
+import { LIVE_DUBBING_ACTIONS } from '@/features/live-dubbing/constants.js';
+import {
+  acceptLiveDubbingTranscript,
+  clearLiveDubbingTranscript,
+  sanitizeLiveDubbingTranscriptEnvelope,
+} from '@/features/live-dubbing/content/liveDubbingTranscriptStore.js';
 
 // Singleton instance for ContentMessageHandler
 let contentMessageHandlerInstance = null;
@@ -354,6 +360,14 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, this.handlePageGetStatus.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_STOP_AUTO, this.handlePageStopAuto.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE, this.handlePageTranslationLifecycle.bind(this));
+
+    // Live dubbing transcript is a display-only, session-fenced bridge. The
+    // translated and original (source) transcript actions share one accept
+    // path; the store routes each envelope to its buffer by kind.
+    this.registerHandler(LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT, this.handleLiveDubbingStatus.bind(this));
+    this.registerHandler(LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT, this.handleLiveDubbingStatus.bind(this));
+    // Single kind-agnostic clear path for STOP/terminal handling.
+    this.registerHandler(LIVE_DUBBING_ACTIONS.TRANSCRIPT_CLEAR, this.handleLiveDubbingClear.bind(this));
   }
 
   registerHandler(action, handler) {
@@ -1119,6 +1133,24 @@ export class ContentMessageHandler extends ResourceTracker {
     }
 
     return coordinator.handleTrustedPageLifecycle(message.data || {});
+  }
+
+  /**
+   * Accept a transcript envelope (translated or original/source) into the
+   * plain-JS store. No extra notification mechanism: the store's own
+   * subscription drives the renderer, and no transcript text is logged.
+   */
+  handleLiveDubbingStatus(message) {
+    const envelope = sanitizeLiveDubbingTranscriptEnvelope(message?.data);
+    const acceptedEnvelope = envelope ? acceptLiveDubbingTranscript(envelope) : null;
+    const accepted = acceptedEnvelope !== null;
+    return { success: true, accepted };
+  }
+
+  /** Kind-agnostic clear: one path resets both transcript buffers. */
+  handleLiveDubbingClear(message) {
+    clearLiveDubbingTranscript(message?.data?.sessionId);
+    return { success: true };
   }
 
   async cleanup() {

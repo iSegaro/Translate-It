@@ -236,3 +236,23 @@ describe('ProvidersTab.vue - Config-panel selector labeling', () => {
     expect(custom.requiredSettings).not.toContain('CUSTOM_API_COMPATIBILITY_CHECK');
   });
 });
+
+describe('ProvidersTab.vue - Live Dubbing provider separation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentRouteQuery.value = {};
+    mockSettingsStore.settings.TRANSLATION_API = 'google';
+    mockSettingsStore.settings.HIDDEN_PROVIDERS = [];
+    mockSettingsStore.activeConfigProvider = 'google';
+  });
+
+  it('keeps translation provider selection independent of LIVE_DUBBING_PROVIDER', () => {
+    const wrapper = mount(ProvidersTab);
+
+    expect(wrapper.find('.primary-service-selection').exists()).toBe(true);
+    // LIVE_DUBBING_PROVIDER was removed from the Providers UI; its persistence
+    // and selection live behind the dedicated Live Dubbing control in Popup.
+    expect(wrapper.find('#LIVE_DUBBING_PROVIDER').exists()).toBe(false);
+    expect(mockSettingsStore.settings.TRANSLATION_API).toBe('google');
+  });
+});

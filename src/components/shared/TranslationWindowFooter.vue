@@ -44,7 +44,7 @@
       @mousedown.stop
       @touchstart.stop
     >
-      <SvgIcon
+      <MaskIcon
         :src="retryIcon"
         :size="14"
       />
@@ -54,7 +54,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import SvgIcon from './SvgIcon.vue'
+import MaskIcon from './MaskIcon.vue'
 import retryIcon from '@/icons/ui/retry.svg?url'
 import './TranslationWindowFooter.scss'
 

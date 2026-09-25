@@ -6,25 +6,27 @@ The project uses three icon strategies. Each has a clear purpose:
 
 | Strategy | When to use | Example |
 |---|---|---|
-| `SvgIcon` (CSS Mask) | Monochrome UI icons | Toolbar buttons, action icons, chevrons |
+| `MaskIcon` (CSS Mask) | Monochrome UI icons (SVG or alpha-mask-compatible PNG) | Toolbar buttons, action icons, chevrons |
 | `<img>` with PNG | Brand/multicolor assets | Provider logos, extension icons |
 | CSS-only | Unique non-SVG patterns | Three-dot kebab menu |
 
-Avoid new inline `<svg>` for reusable monochrome UI icons. Existing inline SVGs should be migrated incrementally to `SvgIcon`. Exceptional cases with a justified architectural reason may still use inline `<svg>`, but this should be rare.
+Avoid new inline `<svg>` for reusable monochrome UI icons. Existing inline SVGs should be migrated incrementally to `MaskIcon`. Exceptional cases with a justified architectural reason may still use inline `<svg>`, but this should be rare.
+
+> **Generalized rule:** monochrome SVG **or** alpha-mask-compatible PNG → shared mask component + `currentColor`; brand/multicolor stay `<img>`. Format is not the distinction — alpha-channel shape is. Prefer SVG for new icons when a clean vector source exists; suitable existing PNGs need no recreation.
 
 ---
 
-## SvgIcon — Monochrome UI Icons
+## `MaskIcon` — Monochrome UI Icons (SVG or mask-compatible PNG)
 
 ### Component
 
-`src/components/shared/SvgIcon.vue`
+`src/components/shared/MaskIcon.vue` (renamed from `SvgIcon.vue`; same mask-mode:alpha behavior and size/decorative API)
 
 ### Props
 
 | Prop | Type | Default | Description |
 |---|---|---|---|
-| `src` | String | required | Imported SVG URL (must use `?url` suffix) |
+| `src` | String | required | Asset URL: SVG via `?url` import, or mask-compatible PNG via `safeGetURL` |
 | `size` | Number \| String | `'1em'` | Number → px. String → any CSS unit. |
 | `ariaLabel` | String | `''` | When set: `role="img"` + `aria-label`. When empty: `aria-hidden="true"` (decorative). |
 
@@ -32,16 +34,21 @@ Avoid new inline `<svg>` for reusable monochrome UI icons. Existing inline SVGs 
 
 ```vue
 <script setup>
-import SvgIcon from '@/components/shared/SvgIcon.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import closeIcon from '@/icons/ui/close.svg?url'
 </script>
 
 <template>
   <button aria-label="Close">
-    <SvgIcon :src="closeIcon" :size="16" />
+    <MaskIcon :src="closeIcon" :size="16" />
   </button>
 </template>
 ```
+
+Monochrome PNGs whose alpha channel carries the glyph work the same way —
+pass the resolved URL (e.g. via `ExtensionContextManager.safeGetURL('icons/ui/clear.png')`).
+Prefer SVG for new icons when a clean vector source exists; suitable existing
+PNGs need no recreation.
 
 ### Import Convention
 
@@ -58,7 +65,7 @@ The `?url` suffix tells Vite to resolve the import to the asset's public URL, wh
 Color is inherited from the parent element via `background-color: currentColor`:
 
 ```css
-.svg-icon {
+.mask-icon {
   background-color: currentColor;
 }
 ```
@@ -77,15 +84,23 @@ The SVG asset's `fill` attribute is ignored in mask context. It does not need to
 Pass as a number (px) or string (any CSS unit):
 
 ```vue
-<SvgIcon :src="icon" :size="16" />       <!-- 16px -->
-<SvgIcon :src="icon" :size="'1.5em'" />   <!-- 1.5em -->
-<SvgIcon :src="icon" :size="'2rem'" />    <!-- 2rem -->
+<MaskIcon :src="icon" :size="16" />       <!-- 16px -->
+<MaskIcon :src="icon" :size="'1.5em'" />   <!-- 1.5em -->
+<MaskIcon :src="icon" :size="'2rem'" />    <!-- 2rem -->
 ```
 
 ### Accessibility
 
 - **Decorative icons (default):** Omit `ariaLabel`. The `<span>` renders `aria-hidden="true"`. The parent button must carry `aria-label`.
 - **Informational icons:** Pass `ariaLabel`. The component renders `role="img"` with the label. Rarely needed — most icons in the project are decorative.
+
+### IconButton mask opt-in
+
+`IconButton` renders `<img>` by default. For toolbar buttons whose asset is
+mask-compatible, pass `:mask="true"`: the native `<button>` root is preserved
+and the inner `<img>` is replaced by a decorative `MaskIcon` (button owns the
+accessible name from `alt`, with `title` fallback). Non-toolbar types ignore
+`mask` and stay byte-identical.
 
 ---
 
@@ -161,11 +176,11 @@ Do not use `transform` on the root `<svg>` element. Browsers may not apply it re
 
 ### Process
 
-1. Extract the SVG to `src/icons/ui/` if not already there.
-2. Import with `?url` suffix.
-3. Replace inline `<svg>` or `<img>` with `<SvgIcon>`.
+1. Keep/place the monochrome asset in `src/icons/ui/` (prefer SVG when a clean vector source exists; do not recreate a suitable PNG).
+2. Import with `?url` suffix (SVG) or resolve via `ExtensionContextManager.safeGetURL` (PNG).
+3. Replace inline `<svg>` or `<img>` with `<MaskIcon>`.
 4. Verify size and color match visually.
-5. Verify `aria-hidden` is correctly inherited from SvgIcon default.
+5. Verify `aria-hidden` is correctly inherited from MaskIcon default.
 6. Remove any now-unused CSS sizing classes.
 
 ### What NOT to do
@@ -173,7 +188,7 @@ Do not use `transform` on the root `<svg>` element. Browsers may not apply it re
 - Do not add `ariaLabel` to icons inside interactive buttons (they are decorative).
 - Avoid new inline `<svg>` for reusable monochrome UI icons.
 - Do not import monochrome SVGs without `?url`.
-- Do not use SvgIcon for brand/multicolor assets.
+- Do not use MaskIcon for brand/multicolor assets.
 
 ---
 
@@ -184,10 +199,9 @@ Do not use `transform` on the root `<svg>` element. Browsers may not apply it re
 | 29 inline SVGs across 14 components | High |
 | TTS icons duplicated in 3 components | High |
 | 4 identical back chevrons | High |
-| `capture.svg` lacks `viewBox` (26.8KB) | High |
 | `?url` imports used with `<img>` tags (eye-open, eye-hide) | Medium |
 | 14 provider `.svg` files unused (PNG is standard) | Medium |
-| `IconButton` component overlap with SvgIcon | Medium |
+| `IconButton` component overlap with MaskIcon | Medium |
 | SVGRepo metadata in several SVGs | Low |
 | `Firefox_Browser_Add-ons_logo.svg` naming inconsistency | Low |
 

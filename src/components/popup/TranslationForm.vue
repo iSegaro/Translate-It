@@ -91,11 +91,11 @@ const props = defineProps({
   }
 })
 
-// Stores
-const settingsStore = useSettingsStore()
-
 // Emits
 const emit = defineEmits(['can-translate-change'])
+
+// Stores
+const settingsStore = useSettingsStore()
 
 const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
@@ -199,16 +199,7 @@ const clearStorage = () => {
 }
 
 const revertTranslation = () => {
-  const languages = revertCurrentTranslation()
-  if (languages?.sourceLanguage && languages?.targetLanguage) {
-    // Two independent best-effort writes: neither blocks nor awaits the other.
-    void settingsStore.updateSettingAndPersist('SOURCE_LANGUAGE', languages.sourceLanguage).catch(error => {
-      logger.warn('Failed to persist SOURCE_LANGUAGE:', error);
-    });
-    void settingsStore.updateSettingAndPersist('TARGET_LANGUAGE', languages.targetLanguage).catch(error => {
-      logger.warn('Failed to persist TARGET_LANGUAGE:', error);
-    });
-  }
+  revertCurrentTranslation()
 }
 
 

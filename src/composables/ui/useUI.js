@@ -12,7 +12,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'useUI');
 export function useUI() {
   // State
   const isHistoryPanelOpen = ref(false);
-  const isApiDropdownOpen = ref(false);
   const isSelectElementModeActive = ref(false);
   const feedbackStates = ref({});
 
@@ -29,21 +28,6 @@ export function useUI() {
   // Close history panel
   const closeHistoryPanel = () => {
     isHistoryPanelOpen.value = false;
-  };
-
-  // Toggle API dropdown
-  const toggleApiDropdown = () => {
-    isApiDropdownOpen.value = !isApiDropdownOpen.value;
-  };
-
-  // Open API dropdown
-  const openApiDropdown = () => {
-    isApiDropdownOpen.value = true;
-  };
-
-  // Close API dropdown
-  const closeApiDropdown = () => {
-    isApiDropdownOpen.value = false;
   };
 
   // Toggle inline toolbar visibility based on content (matches uiManager.js)
@@ -102,40 +86,6 @@ export function useUI() {
     isSelectElementModeActive.value = false;
   };
 
-  // Close all dropdowns and panels
-  const closeAllOverlays = () => {
-    isApiDropdownOpen.value = false;
-    // Note: History panel usually stays open when clicked elsewhere
-  };
-
-  // Handle global click outside
-  const handleGlobalClick = (event) => {
-    // Close API dropdown if clicking outside
-    if (isApiDropdownOpen.value) {
-      const apiDropdown = document.querySelector(".api-dropdown");
-      const apiButton = document.querySelector("#apiProviderBtn");
-
-      if (
-        apiDropdown &&
-        apiButton &&
-        !apiDropdown.contains(event.target) &&
-        !apiButton.contains(event.target)
-      ) {
-        closeApiDropdown();
-      }
-    }
-  };
-
-  // Setup global event listeners
-  const setupGlobalListeners = () => {
-    document.addEventListener("click", handleGlobalClick);
-  };
-
-  // Cleanup global event listeners
-  const cleanupGlobalListeners = () => {
-    document.removeEventListener("click", handleGlobalClick);
-  };
-
   // Focus management
   const focusElement = async (element) => {
     if (!element) return false;
@@ -166,7 +116,6 @@ export function useUI() {
   return {
     // State
     isHistoryPanelOpen,
-    isApiDropdownOpen,
     isSelectElementModeActive,
     feedbackStates,
 
@@ -174,11 +123,6 @@ export function useUI() {
     toggleHistoryPanel,
     openHistoryPanel,
     closeHistoryPanel,
-
-    // API Dropdown
-    toggleApiDropdown,
-    openApiDropdown,
-    closeApiDropdown,
 
     // Element Selection
     toggleElementSelection,
@@ -189,11 +133,6 @@ export function useUI() {
     toggleInlineToolbarVisibility,
     showVisualFeedback,
     updateToolbarVisibilities,
-    closeAllOverlays,
-
-    // Global Events
-    setupGlobalListeners,
-    cleanupGlobalListeners,
 
     // Focus & Scroll
     focusElement,

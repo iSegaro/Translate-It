@@ -1,0 +1,427 @@
+/* src/components/popup/LiveDubbingView.scss */
+@use "@/assets/styles/base/variables" as *;
+
+.live-dubbing-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Shared card chrome: symmetric padding (RTL-safe), theme-aware tokens only. */
+.live-dubbing-card {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--header-border-color);
+  border-radius: 8px;
+  background: var(--language-controls-bg-color);
+}
+
+/* ── Configuration card ───────────────────────────────────────────────────── */
+
+.live-dubbing-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+
+.live-dubbing-config-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.live-dubbing-config-label {
+  display: block;
+  margin-block-end: 4px;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.25;
+  opacity: 0.7;
+}
+
+/* The selector ships its own bar styling (margin/padding/background);
+   inside the card it must stretch edge-to-edge without a nested bar. */
+.live-dubbing-config-card .live-dubbing-config-field--language > .ti-language-controls {
+  width: 100%;
+  min-width: 0;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-group,
+.live-dubbing-config-field--language .ti-language-control-shell,
+.live-dubbing-config-field--language .ti-language-select,
+.live-dubbing-config-field--provider .ti-select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  border: 1px solid var(--header-border-color) !important;
+  border-radius: 6px !important;
+  vertical-align: baseline !important;
+}
+
+.live-dubbing-config-field--language .ti-language-select,
+.live-dubbing-config-field--provider .ti-select {
+  padding-block: 0 !important;
+  padding-inline: 10px 34px !important;
+  background-position: right 10px center !important;
+}
+
+/* The popup's responsive rule is more specific than the shared selector.
+   Keep this correction scoped to the configuration card. */
+.live-dubbing-config-card .live-dubbing-config-field--language
+  .ti-language-controls:not(.ti-compact-mode) .ti-language-select {
+  height: 36px !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  padding-block: 0 !important;
+  padding-inline: 10px 34px !important;
+  background-position: right 10px center !important;
+}
+
+.live-dubbing-config-card .live-dubbing-config-field--language
+  .ti-language-select:disabled {
+  background-color: var(--color-background-muted) !important;
+  color: var(--color-text-muted) !important;
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-config-card
+  .live-dubbing-config-field--language
+  .ti-language-controls:not(.ti-compact-mode) .ti-language-select {
+  padding-inline: 10px 34px !important;
+  background-position: left 10px center !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-config-card
+  .live-dubbing-config-field--provider .ti-select {
+  padding-inline: 10px 34px !important;
+  background-position: left 10px center !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-group,
+.live-dubbing-config-field--language .ti-language-control-shell {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-group {
+  align-items: stretch !important;
+}
+
+.live-dubbing-config-field--language .ti-language-control-shell {
+  flex: 1 1 auto !important;
+}
+
+/* Stack only when the popup cannot give each field a usable width. */
+@media (max-width: 420px) {
+  .live-dubbing-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Transcript preferences card ───────────────────────────────────────────── */
+
+.live-dubbing-card-title {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+  text-align: start;
+  opacity: 0.7;
+}
+
+.live-dubbing-transcript-preferences-header {
+  display: flex;
+  inline-size: 100%;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-color);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.live-dubbing-transcript-preferences-header:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.live-dubbing-transcript-preferences-chevron {
+  flex: 0 0 auto;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-inline-start: auto;
+  border-inline-end: 1.5px solid currentColor;
+  border-block-end: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 190ms cubic-bezier(0.2, 0, 0, 1);
+  opacity: 0.7;
+}
+
+.live-dubbing-transcript-preferences-header[aria-expanded="true"]
+  .live-dubbing-transcript-preferences-chevron {
+  transform: rotate(225deg);
+}
+
+.live-dubbing-transcript-preferences-content {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.live-dubbing-transcript-preferences-content-inner {
+  padding-block-start: 6px;
+}
+
+.live-dubbing-transcript-preferences-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+  margin-block-end: 6px;
+}
+
+.live-dubbing-change-font-link {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-color);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: end;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.live-dubbing-change-font-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.live-dubbing-change-font-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.live-dubbing-transcript-preferences-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-dubbing-transcript-preference {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.live-dubbing-transcript-preference-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-color);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.live-dubbing-transcript-preference-toggle {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+}
+
+.live-dubbing-subtitle-size-select {
+  flex: 0 1 120px !important;
+  inline-size: 120px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  padding-block: 0 !important;
+  padding-inline: 10px 34px !important;
+  background-position: right 10px center !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-subtitle-size-select {
+  padding-inline: 10px 34px !important;
+  background-position: left 10px center !important;
+}
+
+/* Temporary pending-write presentation: the toggle stays functionally
+   disabled (input) but must not flash BaseToggle's real disabled visual
+   (opacity 0.6 + not-allowed cursor) for the short persistence window.
+   Only the pending-only state receives this modifier; genuine restrictions
+   (OpenAI session/status) never do, so they keep the real disabled look.
+   Specificity deliberately exceeds `.base-toggle.disabled` so the override
+   wins regardless of stylesheet order. */
+.live-dubbing-transcript-preference-toggle.live-dubbing-toggle--pending-neutral.base-toggle {
+  opacity: 1;
+  cursor: pointer;
+
+  .slider {
+    cursor: pointer;
+  }
+}
+
+/* ── Session card ─────────────────────────────────────────────────────────── */
+
+/* The control keeps its runtime markup; the card supplies the chrome. */
+.live-dubbing-session-card .ti-live-dubbing-control {
+  padding: 0;
+  border-bottom: 0;
+  background: transparent;
+}
+
+/* ── Credential setup card ────────────────────────────────────────────────── */
+
+.live-dubbing-setup-explanation,
+.live-dubbing-setup-source {
+  margin: 0;
+  max-width: 100%;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.live-dubbing-setup-source {
+  margin-block-start: 4px;
+  opacity: 0.85;
+}
+
+.live-dubbing-setup-link {
+  color: var(--color-primary);
+  margin-inline-start: 4px;
+  text-decoration: underline;
+}
+
+.live-dubbing-setup-row {
+  display: block;
+  margin-block-start: 8px;
+}
+
+.live-dubbing-setup-input-field {
+  position: relative;
+  direction: ltr;
+  min-width: 0;
+}
+
+.live-dubbing-setup-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.live-dubbing-setup-input .ti-input {
+  width: 100% !important;
+  min-height: 36px !important;
+  padding-inline: 10px 42px !important;
+  direction: ltr !important;
+}
+
+.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__label,
+.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__help {
+  direction: rtl !important;
+  text-align: start !important;
+}
+
+.live-dubbing-setup-toggle {
+  position: absolute;
+  inset-inline-end: 4px;
+  inset-block-start: 31px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-color);
+  background: transparent;
+  cursor: pointer;
+}
+
+.live-dubbing-setup-toggle:hover:not(:disabled),
+.live-dubbing-setup-toggle:focus-visible {
+  background: var(--language-controls-bg-color);
+}
+
+.live-dubbing-setup-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.live-dubbing-setup-toggle img {
+  width: 16px;
+  height: 16px;
+}
+
+:root.theme-dark .live-dubbing-setup-toggle img,
+.theme-dark .live-dubbing-setup-toggle img {
+  filter: invert(1);
+}
+
+.live-dubbing-setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 8px;
+}
+
+.live-dubbing-view--rtl .live-dubbing-setup-actions {
+  direction: rtl;
+  justify-content: flex-end;
+}
+
+.live-dubbing-setup-actions > .ti-btn.live-dubbing-setup-save {
+  width: auto !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  min-inline-size: 72px;
+  padding-inline: 14px !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dubbing-transcript-preferences-chevron {
+    transition: none;
+  }
+}

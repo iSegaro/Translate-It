@@ -1,3 +1,11 @@
+#### Unreleased
+
+##### Added
+
+- Added Live Dubbing for Chrome.
+
+---
+
 #### v1.19.1 – Released on September 11, 2026
 
 ##### Added

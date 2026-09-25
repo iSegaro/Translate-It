@@ -257,6 +257,117 @@
   "providers_tab_title": {
     "message": "サービス"
   },
+  "live_dubbing_provider_description": {
+    "message": "新しいライブ吹き替えセッションで使用されます。"
+  },
+  "live_dubbing_config_label": {
+    "message": "設定"
+  },
+  "live_dubbing_transcript_preferences_label": {
+    "message": "字幕"
+  },
+  "live_dubbing_change_font_label": {
+    "message": "フォント変更"
+  },
+  "live_dubbing_show_translated_transcript": {
+    "message": "翻訳字幕"
+  },
+  "live_dubbing_show_original_transcript": {
+    "message": "元の字幕"
+  },
+  "live_dubbing_setup_save": {
+    "message": "保存"
+  },
+  "live_dubbing_setup_save_error": {
+    "message": "APIキーを保存できませんでした。もう一度お試しください。"
+  },
+  "live_dubbing_provider_bootstrap_gemini_error": {
+    "message": "Geminiライブ吹き替えを初期化できません。Gemini APIキーと接続を確認して、もう一度お試しください。"
+  },
+  "live_dubbing_provider_bootstrap_openai_error": {
+    "message": "OpenAIライブ吹き替えを初期化できません。OpenAI APIキーと接続を確認して、もう一度お試しください。"
+  },
+  "live_dubbing_provider_setup_failed_error": {
+    "message": "選択したプロバイダーに接続できません。接続と設定を確認して、もう一度お試しください。"
+  },
+  "live_dubbing_offscreen_lost_error": {
+    "message": "ライブ吹き替えが予期せず停止しました。もう一度開始してください。"
+  },
+  "live_dubbing_action_start": {
+    "message": "開始"
+  },
+  "live_dubbing_action_stop": {
+    "message": "停止"
+  },
+  "live_dubbing_action_cleanup": {
+    "message": "クリーンアップ"
+  },
+  "live_dubbing_action_start_aria_label": {
+    "message": "ライブ吹き替えを開始"
+  },
+  "live_dubbing_action_stop_aria_label": {
+    "message": "ライブ吹き替えを停止"
+  },
+  "live_dubbing_action_cleanup_aria_label": {
+    "message": "ライブ吹き替えをクリーンアップ"
+  },
+  "live_dubbing_status_loading": {
+    "message": "利用可能性を確認中…"
+  },
+  "live_dubbing_status_idle": {
+    "message": "準備完了"
+  },
+  "live_dubbing_status_starting": {
+    "message": "開始中…"
+  },
+  "live_dubbing_status_preparing_capture": {
+    "message": "キャプチャを準備中…"
+  },
+  "live_dubbing_status_connecting_provider": {
+    "message": "プロバイダーに接続中…"
+  },
+  "live_dubbing_status_running": {
+    "message": "実行中"
+  },
+  "live_dubbing_status_stopping": {
+    "message": "停止中…"
+  },
+  "live_dubbing_status_error": {
+    "message": "エラー"
+  },
+  "live_dubbing_status_unavailable": {
+    "message": "利用不可"
+  },
+  "live_dubbing_status_cleanup": {
+    "message": "クリーンアップが必要です"
+  },
+  "live_dubbing_volume_original_label": {
+    "message": "オリジナル"
+  },
+  "live_dubbing_volume_dubbed_label": {
+    "message": "吹き替え音量"
+  },
+  "popup_more_actions_title": {
+    "message": "その他のアクション"
+  },
+  "popup_select_element_options_title": {
+    "message": "要素選択オプション"
+  },
+  "popup_exclude_enable_label": {
+    "message": "このサイトで有効にする"
+  },
+  "popup_exclude_disable_label": {
+    "message": "このサイトで無効にする"
+  },
+  "page_translation_auto_translate_enable_label": {
+    "message": "ページの自動翻訳を有効にする"
+  },
+  "page_translation_auto_translate_disable_label": {
+    "message": "ページの自動翻訳を無効にする"
+  },
+  "page_translation_auto_translate_inherited_label": {
+    "message": "自動翻訳はより広いルールで管理されています"
+  },
   "configure_service_button": {
     "message": "サービスを設定 ⚙️"
   },
@@ -1529,6 +1640,21 @@
   "popup_select_element_title_icon": {
     "message": "要素選択モード"
   },
+  "popup_view_switcher_label": {
+    "message": "ポップアップ表示"
+  },
+  "popup_view_translate": {
+    "message": "翻訳"
+  },
+  "popup_view_live_dubbing": {
+    "message": "ライブ吹き替え"
+  },
+  "popup_view_switcher_translate_label": {
+    "message": "テキスト"
+  },
+  "popup_view_switcher_dubbing_label": {
+    "message": "吹き替え"
+  },
   "popup_revert_alt_icon": {
     "message": "元に戻す"
   },
@@ -1657,6 +1783,27 @@
   },
   "page_translation_btn_restore": {
     "message": "原文に戻す"
+  },
+  "page_translation_tooltip_translate": {
+    "message": "ページ全体を翻訳"
+  },
+  "page_translation_tooltip_in_progress": {
+    "message": "翻訳中..."
+  },
+  "page_translation_tooltip_stop_auto": {
+    "message": "自動翻訳を停止"
+  },
+  "page_translation_tooltip_cancel": {
+    "message": "翻訳をキャンセル"
+  },
+  "page_translation_tooltip_restore_blocked": {
+    "message": "翻訳中は復元できません"
+  },
+  "page_translation_tooltip_nothing_to_restore": {
+    "message": "復元する翻訳がありません"
+  },
+  "page_translation_tooltip_restore": {
+    "message": "元のページ内容を復元"
   },
   "sync_page_label": {
     "message": "ページ同期"
@@ -2050,6 +2197,24 @@
   },
   "whole_page_use_translation_font_label": {
     "message": "ページ翻訳で翻訳フォントを使用"
+  },
+  "live_dubbing_use_translation_font_label": {
+    "message": "ライブ吹き替え字幕で翻訳フォントを使用"
+  },
+  "live_dubbing_subtitle_size_label": {
+    "message": "字幕サイズ"
+  },
+  "live_dubbing_subtitle_size_small": {
+    "message": "小"
+  },
+  "live_dubbing_subtitle_size_medium": {
+    "message": "中"
+  },
+  "live_dubbing_subtitle_size_large": {
+    "message": "大"
+  },
+  "live_dubbing_subtitle_size_xlarge": {
+    "message": "特大"
   },
   "font_family_label": {
     "message": "フォントファミリー"

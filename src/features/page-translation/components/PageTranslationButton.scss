@@ -1,5 +1,6 @@
 @use "@/assets/styles/base/mixins" as *;
 
+/* ── Component root (own layout only — no child rules nested here) ──── */
 .page-translation-controls {
   position: relative !important;
   display: flex !important;
@@ -18,7 +19,13 @@
   }
 }
 
-.progress-bar {
+/* ── Internal rules — zero-specificity boundary via :where() ─────────
+   `:where(.page-translation-controls)` contributes 0 specificity, so
+   pre-Patch-A precedence is restored while ownership is still enforced.
+   Every rule below compiles through `:where(.page-translation-controls)`. */
+
+/* ── Progress ─────────────────────────────────────────────────────── */
+:where(.page-translation-controls) .progress-bar {
   position: relative !important;
   flex: 1 !important;
   min-width: 100px !important;
@@ -33,13 +40,13 @@
   }
 }
 
-.progress-fill {
+:where(.page-translation-controls) .progress-fill {
   height: 100% !important;
   background: var(--color-primary, #4a90d9) !important;
   transition: width 0.3s ease !important;
 }
 
-.progress-text {
+:where(.page-translation-controls) .progress-text {
   position: absolute !important;
   inset: 0 !important;
   display: flex !important;
@@ -51,7 +58,8 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
-.error-message {
+/* ── Error ────────────────────────────────────────────────────────── */
+:where(.page-translation-controls) .error-message {
   color: var(--color-error, #e74c3c) !important;
   font-size: 12px !important;
   padding: 4px 8px !important;
@@ -59,19 +67,14 @@
   border-radius: 4px !important;
 }
 
-.ti-btn-status-container {
+/* ── Status container / badge ─────────────────────────────────────── */
+:where(.page-translation-controls) .ti-btn-status-container {
   position: relative !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: auto !important;
   height: auto !important;
-
-  /* Match standard icon size in sidepanel/popup to keep layout stable when icon is hidden */
-  .compact-wrapper & {
-    width: 22px !important;
-    height: 22px !important;
-  }
 
   .ti-base-loading-spinner {
     position: absolute !important;
@@ -83,26 +86,20 @@
   }
 }
 
-.ti-btn-status-badge {
+:where(.page-translation-controls) .ti-btn-status-badge {
   position: absolute !important;
   bottom: -2px !important;
   right: -2px !important;
   z-index: 10 !important;
-
-  /* Adjust for compact sidepanel buttons (34px button with 22px icon) */
-  .compact-wrapper & {
-    bottom: -1px !important;
-    right: -1px !important;
-  }
 }
 
-.ti-text-status-wrapper {
+:where(.page-translation-controls) .ti-text-status-wrapper {
   display: inline-flex !important;
   align-items: center !important;
 }
 
-/* Toolbar link style to match PopupHeader */
-.toolbar-link {
+/* ── Toolbar link (textOnly mode) ─────────────────────────────────── */
+:where(.page-translation-controls) .toolbar-link {
   position: relative !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -147,7 +144,8 @@
   }
 }
 
-.toolbar-icon {
+/* ── Toolbar icon ─────────────────────────────────────────────────── */
+:where(.page-translation-controls) .toolbar-icon {
   width: 20px !important;
   height: 20px !important;
   display: block !important;
@@ -158,16 +156,16 @@
   transition: opacity 0.2s ease-in-out !important;
 }
 
-.ti-btn:hover .toolbar-icon {
+:where(.page-translation-controls) .ti-btn:hover .toolbar-icon {
   opacity: var(--icon-hover-opacity, 1) !important;
 }
 
-.ti-btn.is-active .toolbar-icon {
+:where(.page-translation-controls) .ti-btn.is-active .toolbar-icon {
   opacity: 1 !important;
 }
 
-/* Compact Icon Style (Unification) */
-.is-compact-icon {
+/* ── Compact icon (BaseButton ghost variant) ──────────────────────── */
+:where(.page-translation-controls) .is-compact-icon {
   @include ti-toolbar-button-minimal;
 
   /* Force internal BaseButton content to center */
@@ -182,21 +180,92 @@
   }
 
   &:disabled {
+      /* Required override: BaseButton's `.ti-btn--disabled` sets
+    `opacity: 0.6 !important`, so this must stay `!important` to win.
+    No background reset is needed — `.ti-btn--ghost` (and the Sidepanel
+    `.side-toolbar .ti-btn` rule) already keep the background transparent;
+    any unguarded mixin hover background is non-important and cannot override
+    those rules. */
     opacity: 0.5 !important;
-    background: none !important;
   }
 }
 
-.page-translate-star-btn {
+/* ── Popup-only compact padding + hover ─────────────────────────────
+   Compound form: both classes on the same root element.
+   `:where()` keeps the root at 0 specificity; .ti-page-translate-btn
+   and .compact-wrapper contribute normally, giving (0,3,0) for the
+   padding rule and (0,5,0) for the hover rule — sufficient to beat
+   the generic (0,1,0) is-compact-icon rule without raising the
+   base toolbar-icon specificity. */
+:where(.page-translation-controls).ti-page-translate-btn.compact-wrapper .is-compact-icon {
+  padding-left: 2px !important;
+  padding-right: 22px !important;
+}
+
+:where(.page-translation-controls).ti-page-translate-btn.compact-wrapper .is-compact-icon:hover:not(.ti-btn--disabled) {
+  background-color: var(--ti-action-hover-bg) !important;
+}
+
+/* ── Compact-mode status overrides (same root element) ──────────────
+   Both .page-translation-controls and .compact-wrapper are on the
+   same Vue template root <div>. Compound form (0,2,0) matches the
+   DOM and replaces the former top-level `.compact-wrapper .ti-btn-*`
+   rules that leaked without ownership. */
+:where(.page-translation-controls).compact-wrapper .ti-btn-status-container {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+/* Generic compact status badge — shared by every compact consumer that
+   keeps the INNER presentation (Sidepanel passes no statusBadgePosition,
+   so it always lands here). Historical bottom-right offsets unchanged. */
+:where(.page-translation-controls).compact-wrapper .ti-btn-status-badge {
+  bottom: -1px !important;
+  right: -1px !important;
+}
+
+/* ── Root-level corner status badge (opt-in) ─────────────────────────
+   Rendered only when compact + statusBadgePosition="corner"
+   (PopupHeader opts in; Sidepanel never does — no marker-class coupling).
+   Anchored to .page-translation-controls itself (position: relative on
+   the root), NOT translated from the 22×22 .ti-btn-status-container —
+   the dot sits in the control's empty top-right area as the upper half
+   of a vertical indicator pair:
+
+           ● status
+   [ Page Translate ]
+           ☆ auto
+
+   Star geometry: right: 0, padding: 5px, 14px glyph → glyph center at
+   12px from the root's right edge. The badge is 5px wide → right: 9px
+   puts its center at 11.5px, within 0.5px of the star column.
+   top: -4px clears the control's top edge; star stays bottom: -6px —
+   opposite vertical halves, no overlap. The theme-aware 2px ring is
+   paint-only (non-layout) separation from the header surface in both
+   themes; it scales with the pulse transform, which is fine — the ring
+   IS the separation. pointer-events: none keeps the dot decorative:
+   it blocks neither the Page Translate button nor the star, and it
+   carries no tabindex/role/ARIA of its own. */
+:where(.page-translation-controls).compact-wrapper .ti-compact-corner-status-badge {
   position: absolute !important;
-  bottom: -10px !important;
+  top: -4px !important;
+  right: 9px !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+  box-shadow: 0 0 0 2px var(--header-bg-color);
+}
+
+/* ── Auto-Translate star toggle ───────────────────────────────────── */
+:where(.page-translation-controls) .page-translate-star-btn {
+  position: absolute !important;
+  bottom: -6px !important;
   right: 0 !important;
   z-index: 100 !important;
-  
+
   background: none !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 4px !important;
+  padding: 5px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -234,36 +303,39 @@
       }
     }
   }
+}
 
-  /* Specific Dark Mode overrides */
-  @at-root :global(.ti-dark-mode) &, 
-           :global(.theme-dark) & {
-    color: rgba(255, 255, 255, 0.45) !important;
+/* ── Dark-mode overrides for star ───────────────────────────────────
+   @at-root + `:where(.page-translation-controls)` keeps the dark
+   selectors at 0 root-specificity, matching the pre-Patch-A
+   `.theme-dark .page-translate-star-btn` (0,2,0). */
+.theme-dark :where(.page-translation-controls) .page-translate-star-btn,
+.ti-dark-mode :where(.page-translation-controls) .page-translate-star-btn {
+  color: rgba(255, 255, 255, 0.45) !important;
+
+  &:hover {
+    background: none !important;
+    color: #ffc300 !important;
+  }
+
+  &.is-active {
+    color: #ffc300 !important;
+  }
+
+  &.is-disabled {
+    opacity: 0.45 !important;
 
     &:hover {
       background: none !important;
-      color: #ffc300 !important;
+      color: rgba(255, 255, 255, 0.45) !important;
+      transform: none !important;
     }
 
     &.is-active {
       color: #ffc300 !important;
-    }
-
-    &.is-disabled {
-      opacity: 0.45 !important;
 
       &:hover {
-        background: none !important;
-        color: rgba(255, 255, 255, 0.45) !important;
-        transform: none !important;
-      }
-
-      &.is-active {
         color: #ffc300 !important;
-
-        &:hover {
-          color: #ffc300 !important;
-        }
       }
     }
   }

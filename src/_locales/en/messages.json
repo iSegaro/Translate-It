@@ -257,6 +257,117 @@
   "providers_tab_title": {
     "message": "Providers"
   },
+  "live_dubbing_provider_description": {
+    "message": "Used for new live dubbing sessions."
+  },
+  "live_dubbing_config_label": {
+    "message": "Configuration"
+  },
+  "live_dubbing_transcript_preferences_label": {
+    "message": "Subtitles"
+  },
+  "live_dubbing_change_font_label": {
+    "message": "Change font"
+  },
+  "live_dubbing_show_translated_transcript": {
+    "message": "Translated subtitles"
+  },
+  "live_dubbing_show_original_transcript": {
+    "message": "Original subtitles"
+  },
+  "live_dubbing_setup_save": {
+    "message": "Save"
+  },
+  "live_dubbing_setup_save_error": {
+    "message": "Your API key couldn't be saved. Please try again."
+  },
+  "live_dubbing_provider_bootstrap_gemini_error": {
+    "message": "Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again."
+  },
+  "live_dubbing_provider_bootstrap_openai_error": {
+    "message": "Unable to initialize OpenAI Live Dubbing. Check your OpenAI API key and connection, then try again."
+  },
+  "live_dubbing_provider_setup_failed_error": {
+    "message": "Unable to connect to the selected provider. Check your connection and configuration, then try again."
+  },
+  "live_dubbing_offscreen_lost_error": {
+    "message": "Live Dubbing stopped unexpectedly. Start it again."
+  },
+  "live_dubbing_action_start": {
+    "message": "Start"
+  },
+  "live_dubbing_action_stop": {
+    "message": "Stop"
+  },
+  "live_dubbing_action_cleanup": {
+    "message": "Clean up"
+  },
+  "live_dubbing_action_start_aria_label": {
+    "message": "Start live dubbing"
+  },
+  "live_dubbing_action_stop_aria_label": {
+    "message": "Stop live dubbing"
+  },
+  "live_dubbing_action_cleanup_aria_label": {
+    "message": "Clean up live dubbing"
+  },
+  "live_dubbing_status_loading": {
+    "message": "Checking availability…"
+  },
+  "live_dubbing_status_idle": {
+    "message": "Ready"
+  },
+  "live_dubbing_status_starting": {
+    "message": "Starting…"
+  },
+  "live_dubbing_status_preparing_capture": {
+    "message": "Preparing capture…"
+  },
+  "live_dubbing_status_connecting_provider": {
+    "message": "Connecting to provider…"
+  },
+  "live_dubbing_status_running": {
+    "message": "Running"
+  },
+  "live_dubbing_status_stopping": {
+    "message": "Stopping…"
+  },
+  "live_dubbing_status_error": {
+    "message": "Error"
+  },
+  "live_dubbing_status_unavailable": {
+    "message": "Unavailable"
+  },
+  "live_dubbing_status_cleanup": {
+    "message": "Cleanup required"
+  },
+  "live_dubbing_volume_original_label": {
+    "message": "Original"
+  },
+  "live_dubbing_volume_dubbed_label": {
+    "message": "Dubbed Volume"
+  },
+  "popup_more_actions_title": {
+    "message": "More actions"
+  },
+  "popup_select_element_options_title": {
+    "message": "Select Element options"
+  },
+  "popup_exclude_enable_label": {
+    "message": "Enable on this site"
+  },
+  "popup_exclude_disable_label": {
+    "message": "Disable on this site"
+  },
+  "page_translation_auto_translate_enable_label": {
+    "message": "Enable automatic page translation"
+  },
+  "page_translation_auto_translate_disable_label": {
+    "message": "Disable automatic page translation"
+  },
+  "page_translation_auto_translate_inherited_label": {
+    "message": "Automatic translation is managed by a broader rule"
+  },
   "configure_service_button": {
     "message": "Configure Service ⚙️"
   },
@@ -1529,6 +1640,21 @@
   "popup_select_element_title_icon": {
     "message": "Select Element Mode"
   },
+  "popup_view_switcher_label": {
+    "message": "Popup views"
+  },
+  "popup_view_translate": {
+    "message": "Translate"
+  },
+  "popup_view_live_dubbing": {
+    "message": "Live Dubbing"
+  },
+  "popup_view_switcher_translate_label": {
+    "message": "Text"
+  },
+  "popup_view_switcher_dubbing_label": {
+    "message": "Dubbing"
+  },
   "popup_revert_alt_icon": {
     "message": "Revert"
   },
@@ -1657,6 +1783,27 @@
   },
   "page_translation_btn_restore": {
     "message": "Restore Original"
+  },
+  "page_translation_tooltip_translate": {
+    "message": "Translate entire page"
+  },
+  "page_translation_tooltip_in_progress": {
+    "message": "Translation in progress..."
+  },
+  "page_translation_tooltip_stop_auto": {
+    "message": "Stop auto-translation"
+  },
+  "page_translation_tooltip_cancel": {
+    "message": "Cancel translation"
+  },
+  "page_translation_tooltip_restore_blocked": {
+    "message": "Cannot restore during translation"
+  },
+  "page_translation_tooltip_nothing_to_restore": {
+    "message": "No translation to restore"
+  },
+  "page_translation_tooltip_restore": {
+    "message": "Restore original page content"
   },
   "sync_page_label": {
     "message": "Sync Page"
@@ -2050,6 +2197,24 @@
   },
   "whole_page_use_translation_font_label": {
     "message": "Use translation font in Page Translation"
+  },
+  "live_dubbing_use_translation_font_label": {
+    "message": "Use translation font in Dubbing Subtitles"
+  },
+  "live_dubbing_subtitle_size_label": {
+    "message": "Subtitle size"
+  },
+  "live_dubbing_subtitle_size_small": {
+    "message": "Small"
+  },
+  "live_dubbing_subtitle_size_medium": {
+    "message": "Medium"
+  },
+  "live_dubbing_subtitle_size_large": {
+    "message": "Large"
+  },
+  "live_dubbing_subtitle_size_xlarge": {
+    "message": "Extra Large"
   },
   "font_family_label": {
     "message": "Font Family"

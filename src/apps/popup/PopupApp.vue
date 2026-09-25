@@ -36,71 +36,68 @@
       <div class="popup-content-container">
         <!-- Sticky Header: Contains Toolbar and Language/Provider Selectors -->
         <div class="sticky-header">
-          <PopupHeader 
-            :target-language="targetLanguage" 
+          <PopupHeader
+            :target-language="targetLanguage"
             :provider="currentProvider"
-          />
-          <div class="language-controls">
-            <!-- Provider Selector: Manages temporary session-based provider overrides -->
-            <ProviderSelector
-              v-model="currentProvider"
-              mode="split"
-              :is-global="false"
-              :show-sync="true"
-              allow-set-default
-              only-configured
-              :loading="translationFormRef?.isTranslating"
-              @translate="handleTranslate"
-              @cancel="handleCancel"
+          >
+            <PopupViewSwitcher
+              v-if="isLiveDubbingSupported"
+              :model-value="activeView"
+              :show-live-dubbing="isLiveDubbingSupported"
+              @update:model-value="handleActiveViewChange"
             />
+          </PopupHeader>
+        </div>
 
-            <!-- Language Selector: Handles source and target language selection -->
-            <LanguageSelector
-              v-model:source-language="sourceLanguage"
-              v-model:target-language="targetLanguage"
-              :provider="currentProvider"
-              :last-keyword="lastTranslation?.source"
-              :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
-              show-default-actions
-              :default-actions-enabled="isReady"
+        <!-- Both panels stay mounted so their local state and listeners survive view switches. -->
+        <div
+          class="popup-view-stage"
+        >
+          <div
+            class="popup-view-panel popup-view-panel--translate"
+            :class="activeView === 'translate' ? 'is-active' : 'is-inactive'"
+            :aria-hidden="activeView !== 'translate'"
+            :inert="activeView !== 'translate' ? '' : undefined"
+          >
+            <TranslationView
+              ref="translationFormRef"
+              :source-language="sourceLanguage"
+              :target-language="targetLanguage"
+              :current-provider="currentProvider"
+              :translation="translation"
+              :live-dubbing-busy="isLiveDubbingBusy"
+              :is-ready="isReady"
               :source-is-saved-default="sourceIsSavedDefault"
               :target-is-saved-default="targetIsSavedDefault"
               :source-default-title="sourceDefaultTitle"
               :target-default-title="targetDefaultTitle"
-              :source-title="t('popup_source_language_title') || 'زبان مبدا'"
-              :target-title="t('popup_target_language_title') || 'زبان مقصد'"
-              :swap-title="t('popup_swap_languages_title') || 'جابجایی زبان‌ها'"
-              :swap-alt="t('popup_swap_languages_alt_icon') || 'Swap'"
-              :auto-detect-label="'Auto-Detect'"
+              :last-keyword="lastKeyword"
+              @translate="handleTranslate"
+              @cancel="handleCancel"
+              @clear="handleClearFields"
               @set-default-source="handleSetDefaultSource"
               @set-default-target="handleSetDefaultTarget"
+              @can-translate-change="canTranslateFromForm = $event"
+              @update:source-language="sourceLanguage = $event"
+              @update:target-language="targetLanguage = $event"
+              @update:current-provider="currentProvider = $event"
             />
-
-            <!-- Clear Button: Minimized clear fields button -->
-            <button
-              class="ti-btn-min-clear"
-              :title="t('popup_clear_storage_title_icon') || 'پاک کردن فیلدها'"
-              @click="handleClearFields"
-            >
-              <img
-                :src="browser.runtime.getURL('icons/ui/clear.png')"
-                class="ti-toolbar-icon"
-                alt="Clear"
-              >
-            </button>
           </div>
-        </div>
-        
-        <!-- Scrollable Translation Area: Contains the main translation form -->
-        <div class="translation-container">
-          <TranslationForm
-            ref="translationFormRef"
-            :translation="translation"
-            :source-language="sourceLanguage"
-            :target-language="targetLanguage"
-            :provider="currentProvider"
-            @can-translate-change="canTranslateFromForm = $event" 
-          />
+          <div
+            v-if="isLiveDubbingSupported"
+            class="popup-view-panel popup-view-panel--live-dubbing"
+            :class="activeView === 'live-dubbing' ? 'is-active' : 'is-inactive'"
+            :aria-hidden="activeView !== 'live-dubbing'"
+            :inert="activeView !== 'live-dubbing' ? '' : undefined"
+          >
+            <LiveDubbingView
+              :target-language="liveDubbingTargetLanguage"
+              :target-language-pending="isLiveDubbingTargetLanguagePending"
+              :provider-id="liveDubbingProvider"
+              @busy-change="isLiveDubbingBusy = $event"
+              @update:target-language="handleLiveDubbingTargetLanguageChange"
+            />
+          </div>
         </div>
       </div>
     </template>
@@ -115,9 +112,9 @@ import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import PopupHeader from '@/components/popup/PopupHeader.vue'
-import LanguageSelector from '@/components/shared/LanguageSelector.vue'
-import ProviderSelector from '@/components/shared/ProviderSelector.vue'
-import TranslationForm from '@/components/popup/TranslationForm.vue'
+import PopupViewSwitcher from '@/components/popup/PopupViewSwitcher.vue'
+import TranslationView from '@/components/popup/TranslationView.vue'
+import LiveDubbingView from '@/components/popup/LiveDubbingView.vue'
 import browser from 'webextension-polyfill'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 import { getScopedLogger } from '@/shared/logging/logger.js'
@@ -131,6 +128,7 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js';
 import { matchErrorToType } from '@/shared/error-management/ErrorMatcher.js';
 import { useGlobalFont } from '@/composables/shared/useFont.js';
+import { CONFIG } from '@/shared/config/config.js';
 
 // --- Initialization & Setup ---
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'PopupApp')
@@ -157,12 +155,13 @@ const { handleError } = useErrorHandler()
 const { t } = useUnifiedI18n()
 const currentProvider = ref('')
 const translation = useUnifiedTranslation('popup', { provider: currentProvider });
-const { 
+const {
   sourceLanguage,
   targetLanguage,
   clearTranslation,
   lastTranslation
 } = translation;
+const lastKeyword = computed(() => lastTranslation.value?.source ?? '');
 const {
   savedSourceLanguage,
   savedTargetLanguage,
@@ -188,6 +187,66 @@ const hasError = ref(false)
 const errorMessage = ref('')
 const errorType = ref(null)
 const canTranslateFromForm = ref(false)
+const isLiveDubbingBusy = ref(false)
+const liveDubbingTargetLanguage = ref(CONFIG.LIVE_DUBBING_TARGET_LANGUAGE)
+const isLiveDubbingTargetLanguagePending = ref(false)
+// Active popup view: 'translate' (default) or 'live-dubbing'.
+const activeView = ref('translate')
+let activeViewPersistenceTail = Promise.resolve()
+const isLiveDubbingSupported = typeof __BROWSER__ !== 'undefined' && __BROWSER__ === 'chrome'
+const liveDubbingProvider = computed(() => (
+  ['gemini', 'openai'].includes(settingsStore.settings?.LIVE_DUBBING_PROVIDER)
+    ? settingsStore.settings.LIVE_DUBBING_PROVIDER
+    : 'gemini'
+))
+
+const isValidActiveView = (value) => value === 'translate'
+  || (value === 'live-dubbing' && isLiveDubbingSupported)
+
+const restoreActiveView = () => {
+  const persistedView = settingsStore.settings?.POPUP_ACTIVE_VIEW
+  activeView.value = isValidActiveView(persistedView) ? persistedView : 'translate'
+}
+
+const restoreLiveDubbingTargetLanguage = () => {
+  const persistedLanguage = settingsStore.settings?.LIVE_DUBBING_TARGET_LANGUAGE
+  liveDubbingTargetLanguage.value = typeof persistedLanguage === 'string' && persistedLanguage
+    ? persistedLanguage
+    : CONFIG.LIVE_DUBBING_TARGET_LANGUAGE
+}
+
+const persistActiveView = (value) => {
+  activeViewPersistenceTail = activeViewPersistenceTail
+    .then(() => settingsStore.updateSettingAndPersist('POPUP_ACTIVE_VIEW', value))
+    .catch((error) => logger.warn('[PopupApp] Failed to persist active view:', error))
+}
+
+/** Apply supported switcher changes immediately and persist them opportunistically. */
+const handleActiveViewChange = (value) => {
+  if (!isValidActiveView(value) || activeView.value === value) return
+
+  activeView.value = value
+  persistActiveView(value)
+}
+
+/** Persist Live Dubbing's target without changing the Translation target. */
+const handleLiveDubbingTargetLanguageChange = async (value) => {
+  if (isLiveDubbingTargetLanguagePending.value) return
+
+  const previousValue = liveDubbingTargetLanguage.value
+  liveDubbingTargetLanguage.value = value
+  isLiveDubbingTargetLanguagePending.value = true
+
+  try {
+    await settingsStore.updateSettingAndPersist('LIVE_DUBBING_TARGET_LANGUAGE', value)
+  } catch (error) {
+    liveDubbingTargetLanguage.value = previousValue
+    settingsStore.updateSettingLocally('LIVE_DUBBING_TARGET_LANGUAGE', previousValue)
+    logger.warn('[PopupApp] Failed to persist live dubbing target language:', error)
+  } finally {
+    isLiveDubbingTargetLanguagePending.value = false
+  }
+}
 
 // Reactive error message display with i18n support
 const displayErrorMessage = computed(() => {
@@ -279,6 +338,10 @@ const initialize = async () => {
         tracker.trackTimeout(() => reject(new Error('Settings loading timeout')), 10000)
       )
     ])
+
+    // Restore only after settings have loaded so the initial rendered view never flickers.
+    restoreActiveView()
+    restoreLiveDubbingTargetLanguage()
 
     // Step 3: Apply global font variables
     applyGlobalCSSVariables()

@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import { ref } from 'vue';
 import TranslationForm from './TranslationForm.vue';
 
 const mockSettingsCallback = vi.fn();
+const resourceTrackerMocks = vi.hoisted(() => ({
+  addEventListener: vi.fn((target, event, handler) => target.addEventListener(event, handler)),
+}));
+let mockSettingsStore;
 const mockTranslation = {
   sourceText: ref('hello'),
   translatedText: ref('bonjour'),
@@ -25,21 +29,12 @@ const mockTranslation = {
   revertTranslation: vi.fn(),
 };
 
-const mockUpdateSettingAndPersist = vi.fn();
-const mockFormLoggerWarn = vi.fn();
-const mockTrackerAddEventListener = vi.fn();
-
 vi.mock('@/features/translation/composables/useUnifiedTranslation.js', () => ({
   useUnifiedTranslation: () => mockTranslation,
 }));
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
-  useSettingsStore: () => ({
-    settings: {
-      AUTO_TRANSLATE_ON_PASTE: false,
-    },
-    updateSettingAndPersist: mockUpdateSettingAndPersist,
-  }),
+  useSettingsStore: () => mockSettingsStore,
 }));
 
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
@@ -51,14 +46,16 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 }));
 
 vi.mock('@/composables/core/useResourceTracker.js', () => ({
-  useResourceTracker: () => ({ addEventListener: mockTrackerAddEventListener }),
+  useResourceTracker: () => ({
+    addEventListener: vi.fn((target, event, handler) => resourceTrackerMocks.addEventListener(target, event, handler)),
+  }),
 }));
 
 vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({
     debug: vi.fn(),
     info: vi.fn(),
-    warn: mockFormLoggerWarn,
+    warn: vi.fn(),
     error: vi.fn(),
   }),
 }));
@@ -90,12 +87,15 @@ vi.mock('@/components/shared/TranslationDisplay.vue', () => ({
 describe('TranslationForm.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSettingsStore = {
+      settings: { AUTO_TRANSLATE_ON_PASTE: false },
+      updateSettingAndPersist: vi.fn(),
+    };
     mockTranslation.canRetry.value = false;
     mockTranslation.canOpenSettings.value = false;
     mockTranslation.getRetryCallback.mockImplementation((retryFunction) => retryFunction);
     mockTranslation.getSettingsCallback.mockReturnValue(mockSettingsCallback);
-    mockUpdateSettingAndPersist.mockResolvedValue(true);
-    mockTranslation.revertTranslation.mockReset();
+    mockTranslation.revertTranslation.mockReturnValue({ sourceLanguage: 'fr', targetLanguage: 'en' });
   });
 
   const mountForm = () => mount(TranslationForm, {
@@ -135,81 +135,15 @@ describe('TranslationForm.vue', () => {
     expect(mockSettingsCallback).toHaveBeenCalledTimes(1);
   });
 
-  describe('revert persistence failure handling', () => {
-    const getRevertHandler = () => mockTrackerAddEventListener.mock.calls.find(
-      ([, event]) => event === 'revert-translation'
-    )[2];
+  it('reverts UI state without persisting language defaults', () => {
+    const wrapper = mountForm();
 
-    const collectUnhandledRejections = () => {
-      const failures = [];
-      const onUnhandled = (reason) => failures.push(reason);
-      process.on('unhandledRejection', onUnhandled);
-      return {
-        failures,
-        release: () => process.off('unhandledRejection', onUnhandled),
-      };
-    };
+    const revertListener = resourceTrackerMocks.addEventListener.mock.calls
+      .find(([, event]) => event === 'revert-translation')[2];
+    revertListener();
 
-    it('revert updates UI/local immediately and persists both languages', async () => {
-      mockTranslation.revertTranslation.mockReturnValue({ sourceLanguage: 'fa', targetLanguage: 'en' });
-      mountForm();
-      const revertHandler = getRevertHandler();
-
-      revertHandler();
-      // Immediate local revert runs synchronously, before any persistence settles.
-      expect(mockTranslation.revertTranslation).toHaveBeenCalledTimes(1);
-
-      await flushPromises();
-
-      expect(mockUpdateSettingAndPersist).toHaveBeenCalledWith('SOURCE_LANGUAGE', 'fa');
-      expect(mockUpdateSettingAndPersist).toHaveBeenCalledWith('TARGET_LANGUAGE', 'en');
-      expect(mockFormLoggerWarn).not.toHaveBeenCalled();
-    });
-
-    it('handles SOURCE rejection independently; TARGET is still attempted', async () => {
-      const { failures, release } = collectUnhandledRejections();
-      try {
-        mockTranslation.revertTranslation.mockReturnValue({ sourceLanguage: 'fa', targetLanguage: 'en' });
-        mockUpdateSettingAndPersist.mockImplementationOnce(
-          async () => { throw new Error('storage failed'); }
-        );
-        mountForm();
-
-        getRevertHandler()();
-        await flushPromises();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        // Both independent writes attempted despite one rejecting.
-        expect(mockUpdateSettingAndPersist).toHaveBeenCalledWith('SOURCE_LANGUAGE', 'fa');
-        expect(mockUpdateSettingAndPersist).toHaveBeenCalledWith('TARGET_LANGUAGE', 'en');
-        expect(mockFormLoggerWarn).toHaveBeenCalledTimes(1);
-        expect(failures).toHaveLength(0);
-      } finally {
-        release();
-      }
-    });
-
-    it('handles TARGET rejection; SOURCE still succeeds silently', async () => {
-      const { failures, release } = collectUnhandledRejections();
-      try {
-        mockTranslation.revertTranslation.mockReturnValue({ sourceLanguage: 'fa', targetLanguage: 'en' });
-        mockUpdateSettingAndPersist.mockImplementationOnce(async () => true);
-        mockUpdateSettingAndPersist.mockImplementationOnce(
-          async () => { throw new Error('storage failed'); }
-        );
-        mountForm();
-
-        getRevertHandler()();
-        await flushPromises();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(mockUpdateSettingAndPersist).toHaveBeenNthCalledWith(1, 'SOURCE_LANGUAGE', 'fa');
-        expect(mockUpdateSettingAndPersist).toHaveBeenNthCalledWith(2, 'TARGET_LANGUAGE', 'en');
-        expect(mockFormLoggerWarn).toHaveBeenCalledTimes(1);
-        expect(failures).toHaveLength(0);
-      } finally {
-        release();
-      }
-    });
+    expect(mockTranslation.revertTranslation).toHaveBeenCalledTimes(1);
+    expect(mockSettingsStore.updateSettingAndPersist).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 });

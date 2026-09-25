@@ -73,3 +73,53 @@ export async function handleSettingsUpdatedLazy(message, sender, sendResponse) {
         return { success: false, error: 'Failed to load settings update functionality' };
     }
 }
+
+export async function handleLiveDubbingStartLazy(message, sender) {
+    try {
+        const { handleLiveDubbingStart } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingStart(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing start handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}
+
+export async function handleLiveDubbingStopLazy(message, sender) {
+    try {
+        const { handleLiveDubbingStop } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingStop(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing stop handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}
+
+export async function handleLiveDubbingGetStatusLazy(message, sender) {
+    try {
+        const { handleLiveDubbingGetStatus } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingGetStatus(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing status handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}
+
+export async function handleLiveDubbingBootstrapRequestLazy(message, sender) {
+    try {
+        const { handleLiveDubbingBootstrapRequest } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingBootstrapRequest(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing bootstrap handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}
+
+export async function handleLiveDubbingTranslatedTranscriptLazy(message, sender) {
+    try {
+        const { handleLiveDubbingTranslatedTranscript } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingTranslatedTranscript(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing translated transcript handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}

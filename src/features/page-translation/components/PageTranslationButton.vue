@@ -43,8 +43,8 @@
         @click="handleTranslate"
       >
         <div class="ti-btn-status-container">
-          <PageTranslationStatus 
-            v-if="hasError"
+          <PageTranslationStatus
+            v-if="hasError && !useCornerStatus"
             :status-data="{ hasError: true }"
             mode="compact"
             class="ti-btn-status-badge"
@@ -94,8 +94,10 @@
             size="sm"
           />
           
-          <!-- Status Badge absolute via CSS -->
-          <PageTranslationStatus 
+          <!-- Status Badge absolute via CSS (suppressed when the root-level
+               corner badge owns the status — never two active statuses) -->
+          <PageTranslationStatus
+            v-if="!useCornerStatus"
             :status-data="{ isTranslating, isAutoTranslating, isTranslated, progress }"
             mode="compact"
             class="ti-btn-status-badge"
@@ -138,7 +140,8 @@
         @click="handleRestore"
       >
         <div class="ti-btn-status-container">
-          <PageTranslationStatus 
+          <PageTranslationStatus
+            v-if="!useCornerStatus"
             :status-data="{ isTranslated: true, isTranslating: false, isAutoTranslating: false }"
             mode="compact"
             class="ti-btn-status-badge"
@@ -161,6 +164,16 @@
       {{ message }}
     </div>
 
+    <!-- Root-level corner status badge (compact + statusBadgePosition="corner").
+         Lives on .page-translation-controls itself — top-right of the WHOLE
+         control, opposite the bottom-right Auto-Translate star. -->
+    <PageTranslationStatus
+      v-if="compactCornerStatusData"
+      :status-data="compactCornerStatusData"
+      mode="compact"
+      class="ti-compact-corner-status-badge"
+    />
+
     <!-- Auto-Translate Star Toggle -->
     <button
       v-if="showAutoTranslateToggle && isAutoTranslateToggleVisible"
@@ -171,6 +184,8 @@
       }"
       :disabled="isAutoTranslateToggleDisabled"
       :title="autoTranslateToggleTitle"
+      :aria-pressed="isAutoTranslateToggleActive"
+      :aria-label="autoTranslateToggleLabel"
       @click.stop="toggleAutoTranslateForCurrentPage()"
     >
       <svg 
@@ -224,6 +239,17 @@ const props = defineProps({
   showAutoTranslateToggle: {
     type: Boolean,
     default: false
+  },
+  /**
+   * Status badge presentation:
+   * - 'inner'  — badge inside .ti-btn-status-container (default; Sidepanel).
+   * - 'corner' — root-level top-right badge (only meaningful with compact;
+   *              PopupHeader opts in). Explicit prop — no DOM/class detection.
+   */
+  statusBadgePosition: {
+    type: String,
+    default: 'inner',
+    validator: (value) => ['inner', 'corner'].includes(value)
   }
 });
 
@@ -238,6 +264,21 @@ const {
   autoTranslateToggleTitle,
   toggleAutoTranslateForCurrentPage
 } = useAutoTranslateRules({ currentUrl: activeTabUrl });
+
+/**
+ * Localized accessible label for the star toggle:
+ * - inherited/disabled (managed by a broader rule): describes the managed state,
+ * - active (exact rule): describes the disabling action,
+ * - inactive: describes the enabling action.
+ */
+const autoTranslateToggleLabel = computed(() => {
+  if (isAutoTranslateToggleDisabled.value) {
+    return t('page_translation_auto_translate_inherited_label', 'Automatic translation is managed by a broader rule');
+  }
+  return isAutoTranslateToggleActive.value
+    ? t('page_translation_auto_translate_disable_label', 'Disable automatic page translation')
+    : t('page_translation_auto_translate_enable_label', 'Enable automatic page translation');
+});
 
 const {
   isTranslating,
@@ -257,6 +298,36 @@ const {
 // Computed properties
 const canTranslate = computed(() => baseCanTranslate.value && !props.disabled);
 const showProgress = computed(() => isTranslating.value && progress.value > 0 && !props.compact);
+
+/** Corner presentation is opt-in, compact-only, and never textOnly — textOnly
+ *  keeps its own status path; every other consumer (Sidepanel default,
+ *  non-compact) keeps the internal badge path. */
+const useCornerStatus = computed(
+  () => props.compact
+    && !props.textOnly
+    && props.statusBadgePosition === 'corner'
+);
+
+/**
+ * Status payload for the root-level corner badge, preserving the exact
+ * precedence of the state templates above:
+ * translating/auto → completed → idle-with-error; `null` when no state
+ * currently renders a status (idle without a previous error).
+ * @returns {object|null} PageTranslationStatus status-data payload
+ */
+const compactCornerStatusData = computed(() => {
+  if (!useCornerStatus.value) return null;
+  if (isTranslating.value || isAutoTranslating.value) {
+    return { isTranslating: isTranslating.value, isAutoTranslating: isAutoTranslating.value, isTranslated: isTranslated.value, progress: progress.value };
+  }
+  if (isTranslated.value) {
+    return { isTranslated: true, isTranslating: false, isAutoTranslating: false };
+  }
+  if (hasError.value) {
+    return { hasError: true };
+  }
+  return null;
+});
 
 const progressText = computed(() => {
   if (message.value) return message.value;
@@ -288,21 +359,21 @@ const translateButtonTitle = computed(() => {
     return t('provider_does_not_support_bulk') || 'This provider does not support page/element translation';
   }
   if (!canTranslate.value) {
-    return isTranslating.value || isAutoTranslating.value ? 'Translation in progress...' : 'Translate entire page';
+    return isTranslating.value || isAutoTranslating.value ? t('page_translation_tooltip_in_progress', 'Translation in progress...') : t('page_translation_tooltip_translate', 'Translate entire page');
   }
-  return 'Translate entire page';
+  return t('page_translation_tooltip_translate', 'Translate entire page');
 });
 
 const cancelButtonTitle = computed(() => {
-  if (isAutoTranslating.value) return 'Stop auto-translation';
-  return 'Cancel translation';
+  if (isAutoTranslating.value) return t('page_translation_tooltip_stop_auto', 'Stop auto-translation');
+  return t('page_translation_tooltip_cancel', 'Cancel translation');
 });
 
 const restoreButtonTitle = computed(() => {
   if (!canRestore.value) {
-    return isTranslating.value || isAutoTranslating.value ? 'Cannot restore during translation' : 'No translation to restore';
+    return isTranslating.value || isAutoTranslating.value ? t('page_translation_tooltip_restore_blocked', 'Cannot restore during translation') : t('page_translation_tooltip_nothing_to_restore', 'No translation to restore');
   }
-  return 'Restore original page content';
+  return t('page_translation_tooltip_restore', 'Restore original page content');
 });
 
 // Actions

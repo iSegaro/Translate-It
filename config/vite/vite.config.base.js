@@ -69,7 +69,7 @@ export const createBaseConfig = (browser, options = {}) => {
       ...(options.extraPlugins || [])
     ],
 
-    // browser-specific definitions  
+    // browser-specific definitions
     define: {
       __BROWSER__: JSON.stringify(browser),
       __BUILD_YEAR__: new Date().getFullYear(),

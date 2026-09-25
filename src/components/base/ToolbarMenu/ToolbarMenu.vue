@@ -16,7 +16,7 @@
     />
 
     <!-- Desktop: inline anchored popover -->
-    <template v-if="!isMobile">
+    <template v-if="!useMobileLayout">
       <div
         v-if="isOpen"
         class="toolbar-menu__backdrop"
@@ -41,7 +41,7 @@
     <!-- Mobile: teleported full-height drawer -->
     <Teleport
       v-else
-      :disabled="!isMobile"
+      :disabled="!useMobileLayout"
       :to="teleportTarget"
     >
       <Transition name="toolbar-menu-backdrop">
@@ -102,6 +102,15 @@ const props = defineProps({
   offset: {
     type: Number,
     default: 8
+  },
+  /**
+   * Force the inline anchored popover layout even at narrow viewport widths.
+   * Use in contexts (e.g. browser-extension Popups) where the mobile full-height
+   * drawer would not make sense. Default `false` preserves existing behaviour.
+   */
+  forcePopover: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -118,12 +127,20 @@ const rootClasses = computed(() => {
   const classes = []
   if (props.variant) classes.push(`toolbar-menu--${props.variant}`)
   classes.push(`toolbar-menu--placement-${props.placement}`)
+  if (props.forcePopover) classes.push('toolbar-menu--force-popover')
   return classes
 })
 
 const rootStyle = computed(() => ({
   '--tm-offset': `${props.offset}px`
 }))
+
+/**
+ * Whether to render the mobile drawer branch. Honours the explicit
+ * `forcePopover` opt-out so Popups (always narrower than 750px) keep using
+ * the anchored popover layout instead of being hijacked by the drawer.
+ */
+const useMobileLayout = computed(() => isMobile.value && !props.forcePopover)
 
 const tracker = useResourceTracker('toolbar-menu')
 const rootRef = ref(null)

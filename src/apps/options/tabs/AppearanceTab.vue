@@ -35,6 +35,13 @@
                 <span>{{ t('whole_page_use_translation_font_label') || 'Use translation font in Page Translation' }}</span>
                 <BaseToggle v-model="wholePageUseTranslationFont" />
               </div>
+              <div
+                id="LIVE_DUBBING_USE_TRANSLATION_FONT"
+                class="ti-translation-font-toggle"
+              >
+                <span>{{ t('live_dubbing_use_translation_font_label') || 'Use translation font in Dubbing Subtitles' }}</span>
+                <BaseToggle v-model="liveDubbingUseTranslationFont" />
+              </div>
             </template>
           </FontSelector>
         </div>
@@ -89,6 +96,7 @@ const fontSize = createSetting('TRANSLATION_FONT_SIZE', '14', {
 
 const selectElementUseTranslationFont = createSetting('SELECT_ELEMENT_USE_TRANSLATION_FONT', false)
 const wholePageUseTranslationFont = createSetting('WHOLE_PAGE_USE_TRANSLATION_FONT', false)
+const liveDubbingUseTranslationFont = createSetting('LIVE_DUBBING_USE_TRANSLATION_FONT', false)
 
 // Get target language for font preview
 const targetLanguage = computed(() => settingsStore.settings?.TARGET_LANGUAGE || 'en')

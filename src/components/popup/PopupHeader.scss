@@ -15,29 +15,44 @@
   width: 100% !important;
   box-sizing: border-box !important;
   min-height: 52px !important;
-  gap: 8px !important;
-  
+  gap: 4px !important;
+
+  /* Action contract ownership boundary: every ordinary toolbar action
+     (More, Settings, Mouse Hover, Capture, Sidepanel, Select, and the
+     Revert badge) consumes these shared values. Declared on the toolbar
+     root so BOTH .ti-header-left (Page Translate) and .ti-header-actions
+     inherit them. Header-local only — no new component/global tokens. */
+  --ti-action-icon: var(--tab-button-color);
+  --ti-action-icon-hover: var(--color-action-hover-accent);
+  --ti-action-hover-bg: rgba(0, 0, 0, 0.08);
+  --ti-action-active-bg: rgba(0, 0, 0, 0.12);
+
   // Force LTR and Row direction
   direction: ltr !important;
   flex-direction: row !important;
 
-  .ti-horizontal-action-scroller__track {
-    justify-content: flex-end;
-
-    .ti-switch { order: 1 !important; }
-    .ti-btn-subtitle { order: 2 !important; }
-    .ti-btn-pdf { order: 3 !important; }
-    .ti-btn-settings { order: 4 !important; }
-    .ti-btn-mouse-hover { order: 5 !important; }
-    .ti-btn-capture { order: 6 !important; }
-    .ti-btn-revert { order: 7 !important; }
-    .ti-btn-select { order: 8 !important; }
-    .ti-btn-sidepanel { order: 9 !important; }
+  /* Left group: Page Translation + View Switcher slot */
+  .ti-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    min-width: 0 !important;
   }
 
-  /* Toolbar Buttons Base Style */
-  .ti-toolbar-button,
-  .ti-horizontal-action-scroller__control {
+  /* Right group: direct actions, pushed to the far right.
+     DOM order inside is the visual left-to-right order. */
+  .ti-header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    flex: 0 0 auto;
+    margin-inline-start: auto;
+    padding-inline-end: 4px !important;
+  }
+
+  /* Toolbar Buttons Base Style: consumes the .ti-header-actions contract.
+     Mask icons are driven by color only (currentColor); legacy imgs ignore it. */
+  .ti-toolbar-button {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -46,35 +61,51 @@
     flex-shrink: 0 !important;
     background-color: transparent !important;
     border: none !important;
+    color: var(--ti-action-icon) !important;
     cursor: pointer !important;
     padding: 0 !important;
     margin: 0 !important;
 
     &:hover {
-      background-color: rgba(0, 0, 0, 0.08) !important;
+      background-color: var(--ti-action-hover-bg) !important;
+      color: var(--ti-action-icon-hover) !important;
       transform: translateY(-1px) !important;
     }
 
     &.ti-active {
-      background-color: rgba(0, 0, 0, 0.12) !important;
+      background-color: var(--ti-action-active-bg) !important;
     }
 
     &:active {
       transform: translateY(0) scale(0.95) !important;
     }
 
-    /* Target the icon inside and KILL any background/hover on it */
+    /* Toolbar MaskIcon appearance is driven by color only: fully opaque
+       here, with base/hover distinction coming from the action contract
+       colors above (no opacity tricks, no filters). All header toolbar
+       buttons live inside .ti-header-actions; global --icon-opacity and
+       IconButton outside the header are untouched. */
+    & .mask-icon {
+      opacity: 1 !important;
+    }
+
+    /* Target the icon inside and KILL any background/hover on it.
+       Sizing covers mask icons too; the background/object-fit resets are
+       img-only so MaskIcon keeps its currentColor fill. */
     img, .ti-toolbar-icon, .ti-icon-button {
       width: 22px !important;
       height: 22px !important;
+      display: block !important;
+      margin: 0 !important;
+    }
+
+    img.ti-toolbar-icon, img.ti-icon-button {
       background: transparent !important;
       background-color: transparent !important;
       border: none !important;
       box-shadow: none !important;
-      display: block !important;
-      margin: 0 !important;
       object-fit: contain !important;
-      
+
       &:hover {
         background: transparent !important;
         background-color: transparent !important;
@@ -82,107 +113,369 @@
     }
   }
 
-  .ti-horizontal-action-scroller__control {
-    color: var(--color-text-secondary) !important;
+  /* Header action hit-target contract: 24×24 boxes for all direct header
+   actions. Glyphs stay 22px; the extra 2px total per axis adds 1px of
+   internal space on each side. The reduced gap preserves approximately
+   the same perceived glyph spacing.
+   Scoped to .ti-header-actions so Page Translate compact geometry is
+   untouched. */
+  .ti-header-actions .ti-toolbar-button {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+  }
 
-    &:hover {
-      color: var(--color-text) !important;
+/* Visible keyboard focus for Popup Header toolbar buttons only.
+   Scoped here so IconButton/BaseButton global focus behavior is untouched.
+   Outline (not border) avoids layout shift. */
+.ti-toolbar-button:focus-visible {
+  outline: 2px solid var(--color-primary, #1976d2);
+  outline-offset: 1px;
+}
+
+/* Select + Revert badge: Select is an ordinary 24×24 header button (shared
+   hit-target + hover rules above). The Revert badge's 24×24 native hit
+   target is absolutely anchored so its TOP-LEFT coincides with the visible
+   16×16 surface — hit box x13..37 × y13..37, surface x13..29 × y13..29
+   (relative to the container). The only Select overlap is the visible
+   badge itself; transparent slack (x29..37 × y13..37 plus x13..29 ×
+   y29..37) sits entirely outside Select's 0..24 × 0..24 box, so it never
+   steals clicks that visually belong to Select. The 13px overflow past
+   the container is absorbed by an 8px inline-end reservation + the 5px
+   actions gap, keeping the hit target clear of Sidepanel. Bottom sits
+   13px below the container, inside the header's ≥14px slack so it never
+   overflows into the popup body. Controls stay independent: no
+   parent-level :hover. */
+.ti-header-actions > .ti-select-action {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-inline-start: 7px;
+  /* Reserve the Revert hit target's overflow (13px) minus the 5px actions
+     gap so the 24×24 native target never overlaps the Sidepanel button. */
+  margin-inline-end: 8px;
+}
+
+/* Revert badge hit target: 24×24 transparent button anchored top-left on
+   the visible surface (right/bottom -13px each). No .ti-toolbar-button
+   class — it opts out of the shared sizing/hover/focus rules entirely. */
+.ti-header-actions .ti-select-action .ti-btn-revert-badge {
+  position: absolute;
+  right: -13px;
+  bottom: -13px;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+  color: var(--ti-action-icon);
+  cursor: pointer;
+  /* Native press only — no transform, so the badge never shifts under the cursor. */
+}
+
+/* Own keyboard focus (the shared .ti-toolbar-button:focus-visible rule does
+   not apply — badge is not a .ti-toolbar-button). Outline, not border. */
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:focus-visible {
+  outline: 2px solid var(--color-primary, #1976d2);
+  outline-offset: 1px;
+}
+
+/* Visible badge surface: 16×16 opaque circle centered on Select's
+   lower-right corner (x13..29 × y13..29). Opaque background so Select's
+   hover paint underneath never tints it; border uses the theme-aware header
+   border token. Quiet default: glyph-only opacity (surface stays fully
+   opaque, independent of Select hover). */
+.ti-select-action .ti-btn-revert-badge .ti-revert-badge-surface {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--header-border-color, transparent);
+  border-radius: 50%;
+  background-color: var(--header-bg-color, #f8f9fa);
+}
+
+.ti-select-action .ti-btn-revert-badge .mask-icon {
+  opacity: 0.65;
+}
+
+/* Revert hover/focus (light/default): emphasis ONLY on this badge's surface
+   (and its glyph opacity). Opaque light-neutral hover surface keeps the 12px
+   glyph readable; accent border signals interaction; glyph color stays the
+   dark action-icon (badge stays secondary — no orange glyph on translucent
+   overlay). Select relies on the ordinary per-button hover — the two never
+   light up together. Badge button itself stays transparent.
+   Dark theme reasserts the current appearance in the @at-root block below. */
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:hover .ti-revert-badge-surface,
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:focus-visible .ti-revert-badge-surface {
+  background-color: var(--toolbar-link-hover-bg-color) !important;
+  border-color: var(--ti-action-icon-hover) !important;
+  color: var(--ti-action-icon) !important;
+}
+
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:hover .mask-icon,
+.ti-header-actions .ti-select-action .ti-btn-revert-badge:focus-visible .mask-icon {
+  opacity: 1;
+}
+
+/* Optical icon centering: Settings, Mouse Hover, and Capture already align with
+   each other, but sit slightly lower than Select Element and Sidepanel. Apply
+   one shared post-layout shift to their icons. */
+.ti-header-actions .ti-btn-settings .ti-toolbar-icon,
+.ti-header-actions .ti-btn-mouse-hover .ti-toolbar-icon,
+.ti-header-actions .ti-btn-capture .ti-toolbar-icon {
+  translate: 0 -1px;
+}
+
+/* Per-action optical sizing: keep the shared 22×22 layout box, shrink only
+   the rendered mask glyph. Capture, Select, Mouse Hover keep the shared 22px. */
+.ti-header-actions .ti-btn-settings .ti-toolbar-icon,
+.ti-header-actions .ti-btn-sidepanel .ti-toolbar-icon {
+  mask-size: 20px 20px;
+  -webkit-mask-size: 20px 20px;
+}
+
+/* More menu trigger: real ellipsis glyph (U+22EF), no icon asset.
+   No color exception: it consumes the action contract like every button.
+   Bump font-size and letter-spacing slightly so the glyph reads at the
+   same visual weight as neighbouring 22px mask icons. The span box
+   stays 22×22 — only the rendered text footprint grows. */
+.ti-btn-more {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    letter-spacing: 1.5px !important;
+
+    span {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 22px !important;
+      height: 22px !important;
     }
   }
 
-  /* Specific Dark Mode overrides */
-  @at-root :global(.ti-dark-mode) &, 
-           :global(.theme-dark) & {
+/* More trigger open state: driven purely by the aria-expanded attribute
+   ToolbarMenu already binds on the trigger — no component state, no extra
+   class. Active surface + accent glyph mirror the header's pressed action
+   contract; !important beats the shared hover/base background rules. */
+.ti-btn-more[aria-expanded="true"] {
+    background-color: var(--ti-action-active-bg) !important;
+    color: var(--ti-action-icon-hover) !important;
+  }
+
+/* Popup menu panels: opaque surface so stacked content (e.g. the language
+   toolbar) is not visible through them, plus compact action-menu polish
+   (radius, soft two-layer shadow, 6px internal padding). Scoped to the
+   Popup More menu only — ToolbarMenu global defaults stay transparent and
+   unpadded for other consumers (PDF toolbar etc.). The .ti-header-actions
+   prefix lifts specificity to (0,3,0) so these custom properties beat
+   ToolbarMenu's scoped .toolbar-menu[data-v] (0,2,0) declared on the same
+   root element regardless of style-block order. NO width here: viewport /
+   max-inline-size stays owned by ToolbarMenu so translated labels never
+   overflow. */
+.ti-header-actions .ti-btn-more-menu {
+  --tm-panel-background: var(--bg-color);
+  --tm-panel-border: 1px solid var(--header-border-color);
+  --tm-panel-radius: 11px;
+  --tm-panel-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+
+  /* Compact internal padding for this panel only. */
+  .toolbar-menu__panel {
+    padding: 6px;
+  }
+}
+
+  /* Specific Dark Mode overrides.
+     Plain selectors: this file is a standard SCSS import (not a Vue
+     scoped block and not CSS-Modules), so a :global wrapper would be
+     emitted literally and invalidate the selector. .theme-dark lands on
+     the document root via applyTheme; .ti-dark-mode is a retained hook. */
+  @at-root .theme-dark &, .ti-dark-mode & {
     background-color: #2d2d2d !important;
     border-bottom-color: #404040 !important;
 
-    .ti-toolbar-button:hover,
-    .ti-horizontal-action-scroller__control:hover {
-      background-color: #424242 !important;
-    }
+    /* Dark side of the action contract: declared on the toolbar root so
+       both .ti-header-left (Page Translate) and .ti-header-actions
+       inherit the dark values. The shared button rules above pick these
+       up, so no duplicate button-state literals are needed. */
+    --ti-action-icon: #fff;
+    --ti-action-hover-bg: #424242;
+    --ti-action-active-bg: #555555;
 
-    .ti-toolbar-button.ti-active {
-      background-color: #555555 !important;
-    }
-
-    /* Whiten utility icons in dark mode */
-    .ti-btn-settings img,
-    .ti-btn-capture img,
-    .ti-btn-revert img,
-    .ti-btn-select img,
-    .ti-btn-mouse-hover img,
-    .ti-btn-sidepanel img,
-    .ti-toolbar-icon {
-      filter: brightness(0) invert(1) !important;
-      opacity: 0.8 !important;
-    }
-
-    .ti-toolbar-button:hover img {
-      opacity: 1 !important;
-    }
-
-    /* Keep branded icons colorful */
-    .ti-page-translate-btn img,
-    .ti-page-translate-btn .ti-toolbar-icon {
+    /* Keep the branded Translate icon colorful. Scoped to the Translate
+       state only (.is-translate-btn on the BaseButton): the Restore icon
+       (monochrome) sits under the same .ti-page-translate-btn root but
+       carries .is-restore-btn, so it falls through to the shared base rule
+       (PageTranslationButton.scss .toolbar-icon) and keeps the dark
+       --icon-filter for a readable light outline. */
+    .ti-page-translate-btn .is-translate-btn .toolbar-icon {
       filter: none !important;
       opacity: 1 !important;
     }
+
+    /* Revert badge hover/focus in dark: preserve the pre-contrast-fix
+       appearance (dark neutral hover surface + accent border/glyph). The
+       light rule above would otherwise paint the opaque light token here. */
+    .ti-select-action .ti-btn-revert-badge:hover .ti-revert-badge-surface,
+    .ti-select-action .ti-btn-revert-badge:focus-visible .ti-revert-badge-surface {
+      background-color: var(--ti-action-hover-bg) !important;
+      border-color: var(--ti-action-icon-hover) !important;
+      color: var(--ti-action-icon-hover) !important;
+    }
+
+    /* More menu items: on the dark panel surface the light-only black
+       overlay is imperceptible, so hover uses the neutral dark action
+       background. Text and currentColor MaskIcons shift to the shared
+       accent; brand/multicolor <img> assets ignore `color` and stay as-is.
+       focus-visible keeps its separate blue ring. */
+    .ti-header-menu-item:hover {
+      background-color: var(--ti-action-hover-bg, #424242) !important;
+      color: var(--color-action-hover-accent) !important;
+    }
   }
 }
 
-/* Toggle Switch Styles */
-.ti-switch {
+/* More menu items: compact action rows — 36px min-height band, 10px
+   horizontal padding/gap, 8px pill radius. Subtle bg/color transition on
+   hover; focus-visible keeps its separate blue ring; nowrap survives
+   translated labels (panel max-inline-size handles overflow, not wrapping). */
+.ti-header-menu-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  box-sizing: border-box !important;
+  padding: 0 10px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  font-size: 13px !important;
+  color: var(--color-text) !important;
+  text-align: start !important;
+  white-space: nowrap !important;
+  transition: background-color 0.15s ease, color 0.15s ease !important;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.06) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #1976d2) !important;
+    outline-offset: -2px !important;
+  }
+
+  &.is-active {
+    color: var(--color-primary, #007bff) !important;
+  }
+
+  img,
+  .mask-icon {
+    width: 18px !important;
+    height: 18px !important;
+    flex-shrink: 0 !important;
+  }
+
+  img {
+    object-fit: contain !important;
+  }
+}
+
+/* Grouping divider between the feature actions and the final site-scope
+   action. Always rendered immediately before the site action (responsive
+   duplicates sit ABOVE it in the DOM, so it stays adjacent at every
+   viewport width). Subtle theme-border token, no hardcoded gray. */
+.ti-header-menu-separator {
+  height: 1px !important;
+  margin: 4px 2px !important;
+  background-color: var(--header-border-color, #ced4da) !important;
+  border: none !important;
+}
+
+/* Site-exclusion status control: decorative, CSS-only — no unicode
+   checkbox/checkmark, no image asset, no interaction (plain span,
+   aria-hidden). Reads the CURRENT state: neutral outline while the site
+   is enabled (unchecked); accent fill + border-drawn check while excluded
+   (checked). The button label keeps describing the ACTION. */
+.ti-header-menu-site-indicator {
   position: relative !important;
   display: inline-block !important;
-  width: 36px !important;
-  height: 20px !important;
-  vertical-align: middle !important;
+  width: 18px !important;
+  height: 18px !important;
   flex-shrink: 0 !important;
-  margin: 0 4px !important;
+  box-sizing: border-box !important;
+  border: 1.5px solid var(--color-text-secondary) !important;
+  border-radius: 5px !important;
+  background: transparent !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
 
-  input {
-    opacity: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
+  &.is-excluded {
+    background-color: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
 
-    &:checked + .ti-slider {
-      background-color: #4caf50 !important;
-      &:before { transform: translateX(16px) !important; }
-    }
-  }
-
-  .ti-slider {
-    position: absolute !important;
-    cursor: pointer !important;
-    inset: 0 !important;
-    background-color: #ccc !important;
-    transition: 0.3s !important;
-    border-radius: 30px !important;
-    &:before {
+    /* Check mark: two CSS borders rotated 45° — glyph drawn, not typed. */
+    &::after {
+      content: '' !important;
       position: absolute !important;
-      content: "" !important;
-      height: 14px !important;
-      width: 14px !important;
-      left: 3px !important;
-      bottom: 3px !important;
-      background-color: white !important;
-      transition: 0.3s !important;
-      border-radius: 50% !important;
+      left: 5.5px !important;
+      top: 2px !important;
+      width: 4px !important;
+      height: 9px !important;
+      border: solid #fff !important;
+      border-width: 0 2px 2px 0 !important;
+      transform: rotate(45deg) !important;
     }
   }
 }
 
-// PageTranslationButton link
-.ti-header-toolbar .toolbar-link {
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  padding: 4px 10px !important;
-  border-radius: 4px !important;
-  white-space: nowrap !important;
-  background-color: rgba(0, 0, 0, 0.05) !important;
-  color: var(--color-primary, #007bff) !important;
-  text-decoration: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
+/* Breakpoint ownership (CSS-only responsive routing, no JS):
+   - Normal width (>380px): Mouse Hover, Screen Capture, Sidepanel render
+     as direct toolbar buttons; their More-menu duplicates
+     (.ti-header-menu-item--narrow-only / --very-narrow-only) stay hidden,
+     so More visually contains only Subtitle, PDF, Exclude.
+   - Narrow (<=380px): direct Capture + Sidepanel hide
+     (.ti-header-toolbar-button--narrow-hide); their More duplicates show.
+   - Very narrow (<=340px): direct Mouse Hover hides too; its More
+     duplicate shows.
+   An action is never visible in both places at the same width.
+   Priority (always visible first): view switcher > page translation
+   > select > settings > mouse hover > capture > sidepanel. */
+.ti-header-menu-item--narrow-only,
+.ti-header-menu-item--very-narrow-only {
+  display: none !important;
+}
+
+@media (max-width: 380px) {
+  .ti-header-toolbar .ti-btn-capture.ti-header-toolbar-button--narrow-hide,
+  .ti-header-toolbar .ti-btn-sidepanel.ti-header-toolbar-button--narrow-hide {
+    display: none !important;
+  }
+
+  .ti-header-menu-item--narrow-only {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 340px) {
+  .ti-header-toolbar .ti-btn-mouse-hover.ti-header-toolbar-button--narrow-hide {
+    display: none !important;
+  }
+
+  .ti-header-menu-item--very-narrow-only {
+    display: flex !important;
+  }
 }

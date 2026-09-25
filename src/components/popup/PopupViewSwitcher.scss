@@ -1,0 +1,129 @@
+/* src/components/popup/PopupViewSwitcher.scss */
+@use "@/assets/styles/base/variables" as *;
+
+.ti-popup-view-switcher {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background-color: var(--color-surface-variant, rgba(0, 0, 0, 0.06));
+  flex-shrink: 0;
+
+  /* Dark theme: inactive tabs use the muted secondary text color so they
+     read weaker than the active tab; active uses the LIGHT primary token
+     (dark's --color-primary is a darker blue that lost the hierarchy);
+     hover shifts to the action-hover accent. Plain selectors: this file is
+     a standard SCSS import (not a Vue scoped block and not CSS-Modules), so
+     a :global wrapper would be emitted literally and invalidate the
+     selector. .theme-dark lands on the document root via applyTheme;
+     .ti-dark-mode is a retained hook. */
+  @at-root .theme-dark &,
+           .ti-dark-mode & {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+
+    .ti-popup-view-switcher__pill {
+      background-color: #2d2d2d !important;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .ti-popup-view-switcher__tab {
+      color: var(--color-text-secondary);
+
+      &:not(.is-active):hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+        color: var(--color-action-hover-accent) !important;
+      }
+
+      &.is-active {
+        color: var(--color-primary-light) !important;
+      }
+    }
+  }
+}
+
+.ti-popup-view-switcher__pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  border-radius: 6px;
+  background-color: var(--color-surface, #ffffff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  z-index: 0;
+  transition: left 0.2s cubic-bezier(0.65, 0, 0.35, 1), width 0.2s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.ti-popup-view-switcher__tab {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 0 8px;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+
+  /* Hover background applies to INACTIVE tabs only: the active surface is
+     owned by the sliding pill, so the active tab must not paint over it. */
+  &:not(.is-active):hover {
+    background-color: rgba(0, 0, 0, 0.08);
+    color: var(--color-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #1976d2);
+    outline-offset: 1px;
+  }
+
+  &.is-active {
+    color: var(--color-primary);
+  }
+}
+
+.ti-popup-view-switcher__icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.ti-popup-view-switcher__label {
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  color: currentColor;
+}
+
+/* Narrow widths: fall back to icon-only tabs so the switcher stays compact.
+   Icons keep their size; other Header controls are untouched. */
+@media (max-width: 380px) {
+  .ti-popup-view-switcher__tab {
+    width: 28px;
+    padding: 0;
+  }
+
+  .ti-popup-view-switcher__label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-popup-view-switcher__pill {
+    transition: none;
+  }
+
+  .ti-popup-view-switcher__tab {
+    transition-duration: 0s;
+  }
+}

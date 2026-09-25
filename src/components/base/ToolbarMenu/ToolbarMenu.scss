@@ -75,7 +75,7 @@ $tm-mobile-breakpoint: 749px;
 
 // ── Mobile Drawer ────────────────────────────────────────────
 
-.toolbar-menu__drawer {
+.toolbar-menu:not(.toolbar-menu--force-popover) .toolbar-menu__drawer {
   display: none;
 
   @media (max-width: $tm-mobile-breakpoint) {
@@ -158,8 +158,13 @@ $tm-mobile-breakpoint: 749px;
 }
 
 // ── Mobile Backdrop ──────────────────────────────────────────
+//
+// Skipped when the menu is in forced popover mode (`toolbar-menu--force-popover`).
+// Otherwise at narrow viewport widths the backdrop would render as a fullscreen
+// overlay even though the desktop/popover template branch is active — defeating
+// the purpose of `forcePopover` in narrow contexts like the browser Popup.
 
-.toolbar-menu__backdrop {
+.toolbar-menu:not(.toolbar-menu--force-popover) .toolbar-menu__backdrop {
   @media (max-width: $tm-mobile-breakpoint) {
     display: block;
     position: fixed;

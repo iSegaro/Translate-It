@@ -21,6 +21,10 @@ import {
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { isRestrictedUrl } from '@/core/tabPermissions.js';
 import { reconstructTranslationError, isStructuredTranslationError } from './MessagingCore.js';
+import {
+  LIVE_DUBBING_ACTION_TIMEOUTS,
+  LIVE_DUBBING_ACTIONS,
+} from '@/features/live-dubbing/constants.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.MESSAGING, 'UnifiedMessaging');
 
@@ -76,6 +80,7 @@ const OPERATION_TIMEOUTS = {
   'START_AREA_CAPTURE': 15000,
   'START_SCREEN_AREA_SELECTION': 10000,
   'CAPTURE_SCREEN_AREA': 30000,
+  ...LIVE_DUBBING_ACTION_TIMEOUTS,
   'DEFAULT': 8000
 };
 
@@ -125,6 +130,82 @@ function getFailureMessage(response, responseError) {
     || response.message
     || response.statusText
     || 'Unknown technical error';
+}
+
+// Live-dubbing UI actions whose structured failure context (ownership,
+// cleanup/lease, retryability, authoritative descriptor, safe error identity)
+// must survive the messaging boundary so a reopened or failed UI can
+// recover instead of resetting to clean idle. providerDiagnostic is excluded
+// by design (see below).
+const LIVE_DUBBING_UI_ACTIONS = new Set([
+  LIVE_DUBBING_ACTIONS.START,
+  LIVE_DUBBING_ACTIONS.START_ALIAS,
+  LIVE_DUBBING_ACTIONS.STOP,
+  LIVE_DUBBING_ACTIONS.STOP_ALIAS,
+  LIVE_DUBBING_ACTIONS.GET_STATUS,
+  LIVE_DUBBING_ACTIONS.GET_STATUS_ALIAS,
+]);
+
+// Scalar-only descriptor fields. Anything outside this allowlist (media,
+// bootstrap, stream IDs, transcripts, raw payloads) never crosses on failure.
+const LIVE_DUBBING_STATUS_FIELDS = [
+  'sessionId',
+  'tabId',
+  'providerId',
+  'targetLanguage',
+  'status',
+  'startedAt',
+  'lastError',
+  'eventSequence',
+];
+
+function copyLiveDubbingRecord(value, fields) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  let copied = null;
+  for (const field of fields) {
+    let fieldValue;
+    try {
+      fieldValue = value[field];
+    } catch {
+      continue;
+    }
+    const type = typeof fieldValue;
+    if (fieldValue === null || fieldValue === undefined) {
+      copied = copied || {};
+      copied[field] = null;
+    } else if (type === 'string' || type === 'number' || type === 'boolean') {
+      copied = copied || {};
+      copied[field] = fieldValue;
+    }
+  }
+  return copied;
+}
+
+function attachLiveDubbingFailureContext(error, action, response) {
+  if (!LIVE_DUBBING_UI_ACTIONS.has(action)) return;
+  try {
+    const data = { success: false };
+    if (typeof response.error === 'string') data.error = response.error;
+    for (const flag of ['retryable', 'cleanupPending', 'busy', 'stopped', 'pending', 'idempotent', 'ignored']) {
+      if (typeof response[flag] === 'boolean') data[flag] = response[flag];
+    }
+    if (typeof response.reason === 'string') data.reason = response.reason;
+    if (typeof response.available === 'boolean') data.available = response.available;
+    const status = copyLiveDubbingRecord(response.status, LIVE_DUBBING_STATUS_FIELDS);
+    if (status) data.status = status;
+    const current = copyLiveDubbingRecord(response.current, LIVE_DUBBING_STATUS_FIELDS);
+    if (current) data.current = current;
+    // providerDiagnostic is intentionally never forwarded: its code and
+    // terminalCategory fields are open provider vocabulary with no closed
+    // canonical token enum, so no value check can distinguish a legitimate
+    // code from a secret-shaped string. The popup keys all guidance off the
+    // authoritative descriptor (lastError code + providerId) and never reads
+    // this field, so omitting it loses nothing and closes the exfiltration
+    // surface entirely.
+    error.data = data;
+  } catch {
+    // Sanitization must never break messaging; the base error still throws.
+  }
 }
 
 function reconstructResponseError(response) {
@@ -284,7 +365,9 @@ export async function sendRegularMessage(message, options = {}) {
 
       if (returnFailureResponse && response.isTransportFailure !== true) return response;
 
-      throw reconstructResponseError(response);
+      const reconstructed = reconstructResponseError(response);
+      attachLiveDubbingFailureContext(reconstructed, message.action, response);
+      throw reconstructed;
     }
 
     return response;

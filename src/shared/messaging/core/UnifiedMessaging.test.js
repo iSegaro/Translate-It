@@ -543,6 +543,155 @@ describe('UnifiedMessaging', () => {
       await expect(sendRegularMessage({ action: 'FAIL' })).rejects.toThrow('Unknown technical error');
     });
 
+    it('preserves live-dubbing START failure structure on the thrown error', async () => {
+      const failure = {
+        success: false,
+        error: 'LIVE_DUBBING_START_FAILED',
+        retryable: true,
+        cleanupPending: true,
+        status: {
+          sessionId: 'session-1',
+          tabId: 42,
+          providerId: 'gemini',
+          targetLanguage: 'en',
+          status: 'ERROR',
+          startedAt: 1,
+          lastError: 'LIVE_DUBBING_START_FAILED',
+          eventSequence: 2,
+          streamId: 'secret-stream',
+          bootstrap: { secret: 'secret-bootstrap' },
+        },
+        streamId: 'secret-stream',
+        transcript: 'secret words',
+        arbitrary: { nested: 'drop me' },
+      };
+      browser.runtime.sendMessage.mockResolvedValue(failure);
+
+      const rejection = sendRegularMessage({ action: 'START_LIVE_DUBBING' });
+      await expect(rejection).rejects.toThrow('LIVE_DUBBING_START_FAILED');
+      await rejection.catch((error) => {
+        expect(error.data).toMatchObject({
+          success: false,
+          error: 'LIVE_DUBBING_START_FAILED',
+          retryable: true,
+          cleanupPending: true,
+          status: {
+            sessionId: 'session-1',
+            tabId: 42,
+            providerId: 'gemini',
+            targetLanguage: 'en',
+            status: 'ERROR',
+            startedAt: 1,
+            lastError: 'LIVE_DUBBING_START_FAILED',
+            eventSequence: 2,
+          },
+        });
+        expect(error.data.status).not.toHaveProperty('streamId');
+        expect(error.data.status).not.toHaveProperty('bootstrap');
+        expect(error.data).not.toHaveProperty('streamId');
+        expect(error.data).not.toHaveProperty('transcript');
+        expect(error.data).not.toHaveProperty('arbitrary');
+        expect(JSON.stringify(error.data)).not.toContain('secret');
+      });
+    });
+
+    it('never forwards providerDiagnostic values into live-dubbing error.data', async () => {
+      // code/terminalCategory are open provider vocabulary with no closed
+      // canonical token enum, so even pattern-valid secret-shaped strings
+      // must not cross; the popup keys guidance off lastError + providerId.
+      const failure = {
+        success: false,
+        error: 'LIVE_DUBBING_START_FAILED',
+        retryable: true,
+        cleanupPending: true,
+        status: {
+          sessionId: 'session-1',
+          tabId: 42,
+          providerId: 'gemini',
+          targetLanguage: 'en',
+          status: 'ERROR',
+          startedAt: 1,
+          lastError: 'LIVE_DUBBING_START_FAILED',
+          eventSequence: 2,
+        },
+        providerDiagnostic: {
+          stage: 'secret-stage-value',
+          code: 'sk-secret-value',
+          closeCode: 1006,
+          wasClean: false,
+          terminalCategory: 'raw-provider-payload',
+          malformedAt: 'JSON_PARSE',
+          wsOpen: true,
+          setupSent: true,
+          setupComplete: false,
+        },
+      };
+      browser.runtime.sendMessage.mockResolvedValue(failure);
+
+      const rejection = sendRegularMessage({ action: 'START_LIVE_DUBBING' });
+      await expect(rejection).rejects.toThrow('LIVE_DUBBING_START_FAILED');
+      await rejection.catch((error) => {
+        expect(error.data).not.toHaveProperty('providerDiagnostic');
+        expect(JSON.stringify(error.data)).not.toContain('secret-stage-value');
+        expect(JSON.stringify(error.data)).not.toContain('sk-secret-value');
+        expect(JSON.stringify(error.data)).not.toContain('raw-provider-payload');
+        // Lifecycle fields still survive alongside the omission.
+        expect(error.data).toMatchObject({
+          success: false,
+          error: 'LIVE_DUBBING_START_FAILED',
+          retryable: true,
+          cleanupPending: true,
+          status: { sessionId: 'session-1', status: 'ERROR' },
+        });
+      });
+    });
+
+    it('preserves live-dubbing STOP failure structure across aliases', async () => {
+      const failure = {
+        success: false,
+        error: 'STOP_FAILED',
+        retryable: true,
+        cleanupPending: true,
+        status: {
+          sessionId: 'session-1',
+          tabId: 42,
+          providerId: 'openai',
+          targetLanguage: 'en-US',
+          status: 'STOPPING',
+          startedAt: 1,
+          lastError: 'STOP_FAILED',
+          eventSequence: 3,
+        },
+      };
+      browser.runtime.sendMessage.mockResolvedValue(failure);
+
+      await expect(sendRegularMessage({ action: 'LIVE_DUBBING_STOP' }))
+        .rejects.toMatchObject({
+          message: 'STOP_FAILED',
+          data: {
+            success: false,
+            error: 'STOP_FAILED',
+            retryable: true,
+            cleanupPending: true,
+            status: { sessionId: 'session-1', status: 'STOPPING' },
+          },
+        });
+    });
+
+    it('attaches no failure context to non-live-dubbing actions', async () => {
+      browser.runtime.sendMessage.mockResolvedValue({
+        success: false,
+        error: 'Some failure',
+        retryable: true,
+        status: { sessionId: 'unrelated' },
+      });
+
+      await sendRegularMessage({ action: 'FAIL' }).catch((error) => {
+        expect(error.message).toBe('Some failure');
+        expect(error).not.toHaveProperty('data');
+      });
+    });
+
     it('returns restricted-page failures unchanged', async () => {
       const response = {
         success: false,
