@@ -13,8 +13,14 @@ const here = dirname(fileURLToPath(import.meta.url))
 const harness = vi.hoisted(() => ({
   store: null,
   i18n: {},
+  tCalls: [],
+  openOptionsPageMock: vi.fn(),
   locale: { value: 'en' },
   controlStatusResolved: true
+}))
+
+vi.mock('@/core/helpers.js', () => ({
+  openOptionsPage: (...args) => harness.openOptionsPageMock(...args)
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -24,10 +30,11 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 // Mirrors useUnifiedI18n semantics: (key, 'fallback') uses the fallback when
 // untranslated; (key, { params }) interpolates; bare key falls back to key.
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
-  useUnifiedI18n: () => ({
-    locale: harness.locale,
-    t: (key, options) => {
-      const message = harness.i18n[key]
+    useUnifiedI18n: () => ({
+      locale: harness.locale,
+      t: (key, options) => {
+        harness.tCalls.push([key, options])
+        const message = harness.i18n[key]
       if (typeof options === 'string') return message ?? options
       if (message == null) return key
       if (options && typeof options === 'object') {
@@ -165,15 +172,18 @@ describe('LiveDubbingView', () => {
       target_language_label: 'Target Language',
       live_dubbing_provider_description: 'Used for new live dubbing sessions.',
        live_dubbing_config_label: 'Configuration',
-       live_dubbing_transcript_preferences_label: 'Subtitle preferences',
+      live_dubbing_transcript_preferences_label: 'Subtitle preferences',
+        live_dubbing_change_font_label: 'Change font',
        live_dubbing_show_translated_transcript: 'Translated subtitles',
        live_dubbing_show_original_transcript: 'Original subtitles',
        live_dubbing_subtitle_size_label: 'Subtitle size',
        live_dubbing_subtitle_size_small: 'Small',
        live_dubbing_subtitle_size_medium: 'Medium',
        live_dubbing_subtitle_size_large: 'Large',
-       live_dubbing_subtitle_size_xlarge: 'Extra Large'
+      live_dubbing_subtitle_size_xlarge: 'Extra Large'
     }
+    harness.tCalls = []
+    harness.openOptionsPageMock.mockReset()
   })
 
   it('renders the LanguageSelector in target-only mode', () => {
@@ -224,6 +234,36 @@ describe('LiveDubbingView', () => {
     ])
     expect(wrapper.find('label[for="live-dubbing-provider-select"]').classes())
       .toContain('live-dubbing-config-label')
+  })
+
+  it('renders the localized Change font action in the Subtitles card', () => {
+    harness.i18n.live_dubbing_change_font_label = 'Change font locally'
+    const wrapper = mountView()
+
+    const link = wrapper.find('.live-dubbing-change-font-link')
+    expect(link.exists()).toBe(true)
+    expect(link.text()).toBe('Change font locally')
+    expect(harness.tCalls).toContainEqual([
+      'live_dubbing_change_font_label',
+      'Change font'
+    ])
+  })
+
+  it('opens Appearance at the translation-font setting and closes the popup', async () => {
+    harness.openOptionsPageMock.mockResolvedValue({ success: true })
+    const wrapper = mountView()
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+    await wrapper.find('.live-dubbing-change-font-link').trigger('click')
+    await settle()
+
+    expect(harness.openOptionsPageMock).toHaveBeenCalledWith(
+      '/appearance?highlight=LIVE_DUBBING_USE_TRANSLATION_FONT'
+    )
+    expect(harness.openOptionsPageMock.mock.calls[0][0])
+      .toContain('LIVE_DUBBING_USE_TRANSLATION_FONT')
+    expect(closeSpy).toHaveBeenCalledOnce()
+    closeSpy.mockRestore()
   })
 
   it('marks the view locally for Persian RTL styling', async () => {
@@ -790,8 +830,11 @@ describe('LiveDubbingView', () => {
     // Control alignment is owned by this card, not shared control styles.
     expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
-    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+132px\s*!important/)
-    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?inline-size:\s*132px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+120px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?inline-size:\s*120px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?height:\s*36px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?font-size:\s*13px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?border-radius:\s*6px\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?min-width:\s*0\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-view--rtl \.live-dubbing-subtitle-size-select\s*\{[\s\S]*?background-position:\s*left 10px center\s*!important/)
     expect(scss).not.toMatch(/^\.ti-language-select/m)

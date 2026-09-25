@@ -41,9 +41,18 @@
       class="live-dubbing-card live-dubbing-transcript-preferences"
       :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitles')"
     >
-      <h3 class="live-dubbing-card-title">
-        {{ t('live_dubbing_transcript_preferences_label', 'Subtitles') }}
-      </h3>
+      <div class="live-dubbing-transcript-preferences-header">
+        <h3 class="live-dubbing-card-title">
+          {{ t('live_dubbing_transcript_preferences_label', 'Subtitles') }}
+        </h3>
+        <button
+          type="button"
+          class="live-dubbing-change-font-link"
+          @click="handleChangeFont"
+        >
+          {{ t('live_dubbing_change_font_label', 'Change font') }}
+        </button>
+      </div>
       <div class="live-dubbing-transcript-preferences-list">
         <div class="live-dubbing-transcript-preference">
           <span class="live-dubbing-transcript-preference-label">
@@ -122,6 +131,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { openOptionsPage } from '@/core/helpers.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
 import LiveDubbingProviderSetup from '@/components/popup/LiveDubbingProviderSetup.vue'
@@ -138,6 +148,8 @@ import {
   LIVE_DUBBING_SUBTITLE_SIZE_PRESETS,
   normalizeLiveDubbingSubtitleSize,
 } from '@/features/live-dubbing/content/liveDubbingSubtitleSize.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 // Import adjacent SCSS
 import './LiveDubbingView.scss'
@@ -161,6 +173,21 @@ const emit = defineEmits(['busy-change', 'update:targetLanguage'])
 
 const { t, locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
+const logger = getScopedLogger(LOG_COMPONENTS.UI, 'LiveDubbingView')
+
+const handleChangeFont = async () => {
+  try {
+    const response = await openOptionsPage('/appearance?highlight=LIVE_DUBBING_USE_TRANSLATION_FONT')
+    if (response?.success) {
+      window.close()
+      return
+    }
+
+    logger.warn('Unable to open Appearance settings for Live Dubbing font selection.')
+  } catch (error) {
+    logger.error('Failed to open Appearance settings for Live Dubbing font selection:', error)
+  }
+}
 
 const isRtlLocale = computed(() => /^fa(?:-|$)/i.test(locale.value || ''))
 

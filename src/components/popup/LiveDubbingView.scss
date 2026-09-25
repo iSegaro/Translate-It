@@ -143,13 +143,47 @@
 /* ── Transcript preferences card ───────────────────────────────────────────── */
 
 .live-dubbing-card-title {
-  margin: 0 0 6px;
+  margin: 0;
   color: var(--text-color);
   font-size: 12px;
   line-height: 1.25;
   font-weight: 600;
   text-align: start;
   opacity: 0.7;
+}
+
+.live-dubbing-transcript-preferences-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-block-end: 6px;
+}
+
+.live-dubbing-change-font-link {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-color);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: end;
+  opacity: 0.7;
+  cursor: pointer;
+}
+
+.live-dubbing-change-font-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.live-dubbing-change-font-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 .live-dubbing-transcript-preferences-list {
@@ -183,12 +217,18 @@
 }
 
 .live-dubbing-subtitle-size-select {
-  flex: 0 1 132px !important;
-  inline-size: 132px !important;
+  flex: 0 1 120px !important;
+  inline-size: 120px !important;
   min-width: 0 !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  padding-block: 0 !important;
   padding-inline: 10px 34px !important;
+  background-position: right 10px center !important;
 }
 
 .live-dubbing-view--rtl .live-dubbing-subtitle-size-select {

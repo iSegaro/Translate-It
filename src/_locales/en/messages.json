@@ -257,6 +257,9 @@
   "live_dubbing_transcript_preferences_label": {
     "message": "Subtitles"
   },
+  "live_dubbing_change_font_label": {
+    "message": "Change font"
+  },
   "live_dubbing_show_translated_transcript": {
     "message": "Translated subtitles"
   },

@@ -257,6 +257,9 @@
   "live_dubbing_transcript_preferences_label": {
     "message": "字幕"
   },
+  "live_dubbing_change_font_label": {
+    "message": "フォント変更"
+  },
   "live_dubbing_show_translated_transcript": {
     "message": "翻訳字幕"
   },
