@@ -47,8 +47,74 @@
   text-align: start;
 }
 
-.ti-live-dubbing-control-spinner {
-  flex-shrink: 0;
+.ti-live-dubbing-wave {
+  display: inline-flex;
+  flex: 0 0 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 16px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.ti-live-dubbing-wave__bar {
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.65;
+  transform: scaleY(0.5);
+  transform-origin: center;
+  animation: none;
+}
+
+.ti-live-dubbing-wave--calm .ti-live-dubbing-wave__bar {
+  animation: ti-live-dubbing-wave-motion 1.35s ease-in-out infinite;
+}
+
+.ti-live-dubbing-wave--active .ti-live-dubbing-wave__bar {
+  animation: ti-live-dubbing-wave-motion 0.85s ease-in-out infinite;
+}
+
+.ti-live-dubbing-wave--slow .ti-live-dubbing-wave__bar {
+  animation: ti-live-dubbing-wave-motion 1.8s ease-in-out infinite;
+}
+
+.ti-live-dubbing-wave__bar:nth-child(2) {
+  animation-delay: -0.2s;
+}
+
+.ti-live-dubbing-wave__bar:nth-child(3) {
+  animation-delay: -0.4s;
+}
+
+.ti-live-dubbing-wave__bar:nth-child(4) {
+  animation-delay: -0.6s;
+}
+
+.ti-live-dubbing-wave__bar:nth-child(5) {
+  animation-delay: -0.8s;
+}
+
+@keyframes ti-live-dubbing-wave-motion {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scaleY(0.5);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-live-dubbing-wave--calm .ti-live-dubbing-wave__bar,
+  .ti-live-dubbing-wave--active .ti-live-dubbing-wave__bar,
+  .ti-live-dubbing-wave--slow .ti-live-dubbing-wave__bar {
+    animation: none;
+  }
 }
 
 .ti-live-dubbing-control-unavailable {

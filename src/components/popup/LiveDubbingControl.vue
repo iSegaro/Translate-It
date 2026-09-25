@@ -6,23 +6,27 @@
     <!-- Section 1: Status + primary action row -->
     <div class="ti-live-dubbing-control-action-row">
       <span
+        v-if="statusText"
+        class="ti-live-dubbing-wave"
+        :class="`ti-live-dubbing-wave--${waveState}`"
+        aria-hidden="true"
+      >
+        <span
+          v-for="bar in 5"
+          :key="bar"
+          class="ti-live-dubbing-wave__bar"
+        />
+      </span>
+      <span
         class="ti-live-dubbing-control-status"
         dir="auto"
         aria-live="polite"
       >{{ statusText }}</span>
 
-      <LoadingSpinner
-        v-if="isTransitioning"
-        class="ti-live-dubbing-control-spinner"
-        size="xs"
-        aria-hidden="true"
-      />
-
       <BaseButton
         v-if="!isRunning && !isStopping"
         size="sm"
-        :loading="isStarting"
-        :disabled="startDisabled || isUnavailable || isLoading || isStopping || isCleanupPending"
+        :disabled="startDisabled || isUnavailable || isLoading || isStarting || isStopping || isCleanupPending"
         :text="t('live_dubbing_action_start', 'Start')"
         :aria-label="t('live_dubbing_action_start_aria_label', 'Start live dubbing')"
         @click="start"
@@ -31,7 +35,6 @@
         v-if="isRunning || isStopping"
         size="sm"
         variant="danger"
-        :loading="isStopping"
         :disabled="isStopping"
         :text="isCleanupPending ? t('live_dubbing_action_cleanup', 'Clean up') : t('live_dubbing_action_stop', 'Stop')"
         :aria-label="isCleanupPending ? t('live_dubbing_action_cleanup_aria_label', 'Clean up live dubbing') : t('live_dubbing_action_stop_aria_label', 'Stop live dubbing')"
@@ -137,7 +140,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import BaseButton from '@/components/base/BaseButton.vue'
-import LoadingSpinner from '@/components/base/LoadingSpinner.vue'
 import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
 import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import './LiveDubbingControl.scss'
@@ -274,6 +276,12 @@ const statusText = computed(() => {
     unavailable: t('live_dubbing_status_unavailable', 'Unavailable'),
     cleanup: t('live_dubbing_status_cleanup', 'Cleanup required')
   }[displayStatus.value] || t('live_dubbing_status_error', 'Error'))
+})
+const waveState = computed(() => {
+  if (['PREPARING_CAPTURE', 'CONNECTING_PROVIDER', 'starting'].includes(displayStatus.value)) return 'calm'
+  if (['RUNNING', 'running'].includes(displayStatus.value)) return 'active'
+  if (['STOPPING', 'stopping'].includes(displayStatus.value)) return 'slow'
+  return 'static'
 })
 
 const isVolumeControllable = computed(() =>

@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import LiveDubbingControl from './LiveDubbingControl.vue'
 
 const sendMessage = vi.hoisted(() => vi.fn())
@@ -14,6 +17,8 @@ const mockI18nMap = vi.hoisted(() => ({
   live_dubbing_offscreen_lost_error: 'Live Dubbing stopped unexpectedly. Start it again.'
 }))
 const mockI18nSnapshot = vi.hoisted(() => ({ ...mockI18nMap }))
+const here = dirname(fileURLToPath(import.meta.url))
+const liveDubbingControlScss = readFileSync(resolve(here, 'LiveDubbingControl.scss'), 'utf8')
 
 vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
   useMessaging: () => ({ sendMessage })
@@ -73,6 +78,14 @@ describe('LiveDubbingControl', () => {
       if (!(key in mockI18nSnapshot)) delete mockI18nMap[key]
     }
     Object.assign(mockI18nMap, mockI18nSnapshot)
+  })
+
+  it('disables waveform animation for reduced-motion users', () => {
+    const reducedMotionRule = liveDubbingControlScss.match(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?animation:\s*none;/
+    )?.[0]
+
+    expect(reducedMotionRule).toBeTruthy()
   })
 
   it('queries status and sends target language and resolved session on start/stop', async () => {
@@ -3699,6 +3712,7 @@ describe('LiveDubbingControl', () => {
 
   describe('transient local status presentation', () => {
     const statusLine = (wrapper) => wrapper.find('.ti-live-dubbing-control-status').text()
+    const wave = (wrapper) => wrapper.find('.ti-live-dubbing-wave')
     const runningDescriptor = { status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 } }
 
     it('shows "Starting…" immediately while START is pending and never "Error"', async () => {
@@ -3717,6 +3731,12 @@ describe('LiveDubbingControl', () => {
       // Local pending START presents as "Starting…" — never the Error fallback.
       expect(statusLine(wrapper)).toBe('Starting…')
       expect(statusLine(wrapper)).not.toBe('Error')
+      expect(wave(wrapper).classes()).toContain('ti-live-dubbing-wave--calm')
+      expect(wave(wrapper).attributes('aria-hidden')).toBe('true')
+      expect(wrapper.find('.ti-live-dubbing-control-spinner').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('button[aria-label="Start live dubbing"] .ti-base-loading-spinner').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Start live dubbing"]').classes()).not.toContain('ti-btn--loading')
 
       // Resolving START swaps in the authoritative status directly.
       resolveStart(runningDescriptor)
@@ -3764,6 +3784,12 @@ describe('LiveDubbingControl', () => {
       // Local pending STOP presents as "Stopping…", never "Error".
       expect(statusLine(wrapper)).toBe('Stopping…')
       expect(statusLine(wrapper)).not.toBe('Error')
+      expect(wave(wrapper).classes()).toContain('ti-live-dubbing-wave--slow')
+      expect(wave(wrapper).attributes('aria-hidden')).toBe('true')
+      expect(wrapper.find('.ti-live-dubbing-control-spinner').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('button[aria-label="Stop live dubbing"] .ti-base-loading-spinner').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').classes()).not.toContain('ti-btn--loading')
     })
 
     it('still shows "Error" for a real START failure', async () => {
@@ -3779,6 +3805,35 @@ describe('LiveDubbingControl', () => {
 
       expect(statusLine(wrapper)).toBe('Error')
       expect(wrapper.text()).toContain('transport down')
+    })
+
+    it('marks the Ready waveform as static', async () => {
+      const wrapper = await mountAndFlush()
+
+      expect(wave(wrapper).classes()).toContain('ti-live-dubbing-wave--static')
+    })
+
+    it('marks the Running waveform as active', async () => {
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve({ status: { status: 'RUNNING', sessionId: 's1' } })
+        : Promise.resolve({ status: 'idle' }))
+      const wrapper = await mountAndFlush()
+
+      expect(statusLine(wrapper)).toBe('Running')
+      expect(wave(wrapper).classes()).toContain('ti-live-dubbing-wave--active')
+    })
+
+    it.each([
+      ['Error', { status: 'ERROR' }],
+      ['Unavailable', { available: false }],
+      ['Cleanup', { status: 'ERROR', sessionId: 'retained-session' }]
+    ])('marks the %s waveform as static', async (_label, response) => {
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve(response)
+        : Promise.resolve({ status: 'idle' }))
+      const wrapper = await mountAndFlush()
+
+      expect(wave(wrapper).classes()).toContain('ti-live-dubbing-wave--static')
     })
   })
 
