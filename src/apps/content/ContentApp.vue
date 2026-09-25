@@ -94,6 +94,7 @@
         :show-translated-transcript="showTranslatedTranscript"
         :show-original-transcript="showOriginalTranscript"
         :font-family="liveDubbingFontFamily"
+        :subtitle-size="liveDubbingSubtitleSize"
       />
     </template>
 
@@ -158,6 +159,7 @@ const DesktopFabMenu = defineAsyncComponent(() => import('./components/desktop/D
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
 import { CONFIG } from '@/shared/config/config.js';
 import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
+import { normalizeLiveDubbingSubtitleSize } from '@/features/live-dubbing/content/liveDubbingSubtitleSize.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -194,6 +196,9 @@ const liveDubbingFontFamily = computed(() => {
     settings.LIVE_DUBBING_TARGET_LANGUAGE || CONFIG.LIVE_DUBBING_TARGET_LANGUAGE
   );
 });
+const liveDubbingSubtitleSize = computed(() => normalizeLiveDubbingSubtitleSize(
+  settingsStore.settings?.LIVE_DUBBING_SUBTITLE_SIZE
+));
 
 // 2. Localization & RTL Management
 const { toastRTL, updateToastRTL } = useContentAppLocalization(settingsStore);

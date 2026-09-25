@@ -114,6 +114,7 @@ export const CONFIG = {
   LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: false,
   LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT: false,
   LIVE_DUBBING_USE_TRANSLATION_FONT: false,
+  LIVE_DUBBING_SUBTITLE_SIZE: 'medium',
 
   // --- Mode Specific Provider Settings (Generated Dynamically) ---
   MODE_PROVIDERS: Object.fromEntries(

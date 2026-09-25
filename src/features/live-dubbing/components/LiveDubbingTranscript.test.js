@@ -6,6 +6,7 @@ import {
   acceptLiveDubbingTranscript,
   resetLiveDubbingTranscriptState,
 } from '../content/liveDubbingTranscriptStore.js';
+import { LIVE_DUBBING_SUBTITLE_SIZE_PRESETS } from '../content/liveDubbingSubtitleSize.js';
 
 const envelope = (eventSequence, text, kind = 'translated') => ({
   sessionId: 'session-1',
@@ -32,7 +33,10 @@ describe('LiveDubbingTranscript renderer', () => {
     expect(container.exists()).toBe(true);
     expect(container.attributes('aria-live')).toBeUndefined();
     expect(container.attributes('aria-atomic')).toBeUndefined();
-    expect(container.attributes('style')).toBeUndefined();
+    expect(container.attributes('style')).toContain(
+      `--ti-live-dubbing-original-font-size: ${LIVE_DUBBING_SUBTITLE_SIZE_PRESETS.medium.original}`
+    );
+    expect(container.attributes('style')).not.toContain('--ti-live-dubbing-font-family');
     expect(source.text()).toBe('Bonjour le monde');
     expect(translated.text()).toBe('Hello world');
     expect(source.attributes('dir')).toBe('auto');
@@ -52,15 +56,21 @@ describe('LiveDubbingTranscript renderer', () => {
         showTranslatedTranscript: true,
         showOriginalTranscript: true,
         fontFamily: 'Arial, Helvetica, sans-serif',
+        subtitleSize: 'large',
       },
     });
 
-    expect(wrapper.find('.live-dubbing-transcript').attributes('style')).toContain('Arial');
+    const container = wrapper.find('.live-dubbing-transcript');
+    expect(container.attributes('style')).toContain('Arial');
+    expect(container.element.style.getPropertyValue('--ti-live-dubbing-original-font-size'))
+      .toBe(LIVE_DUBBING_SUBTITLE_SIZE_PRESETS.large.original);
     expect(wrapper.find('.live-dubbing-transcript__source').text()).toBe('Bonjour le monde');
     expect(wrapper.find('.live-dubbing-transcript__translated').text()).toBe('Hello world');
 
     await wrapper.setProps({ fontFamily: 'Georgia, Times, serif' });
-    expect(wrapper.find('.live-dubbing-transcript').attributes('style')).toContain('Georgia');
+    expect(container.attributes('style')).toContain('Georgia');
+    expect(container.element.style.getPropertyValue('--ti-live-dubbing-translated-font-size'))
+      .toBe(LIVE_DUBBING_SUBTITLE_SIZE_PRESETS.large.translated);
 
     wrapper.unmount();
   });
@@ -147,8 +157,36 @@ describe('LiveDubbingTranscript renderer', () => {
     expect(scss).toContain('.live-dubbing-transcript__translated');
   });
 
+  it('applies every canonical subtitle-size preset to both rows and normalizes invalid values', async () => {
+    acceptLiveDubbingTranscript(envelope(1, 'Hello world'));
+    acceptLiveDubbingTranscript(envelope(2, 'Bonjour le monde', 'source'));
+
+    const wrapper = mount(LiveDubbingTranscript, {
+      props: {
+        showTranslatedTranscript: true,
+        showOriginalTranscript: true,
+        subtitleSize: 'invalid',
+      },
+    });
+    const container = wrapper.find('.live-dubbing-transcript');
+
+    expect(container.element.style.getPropertyValue('--ti-live-dubbing-original-font-size'))
+      .toBe(LIVE_DUBBING_SUBTITLE_SIZE_PRESETS.medium.original);
+
+    for (const [size, preset] of Object.entries(LIVE_DUBBING_SUBTITLE_SIZE_PRESETS)) {
+      await wrapper.setProps({ subtitleSize: size });
+      expect(container.element.style.getPropertyValue('--ti-live-dubbing-original-font-size'))
+        .toBe(preset.original);
+      expect(container.element.style.getPropertyValue('--ti-live-dubbing-translated-font-size'))
+        .toBe(preset.translated);
+    }
+
+    wrapper.unmount();
+  });
+
   it('keeps the visible transcript surface bounded and pinned to newest text', () => {
     const scss = readFileSync('src/features/live-dubbing/components/LiveDubbingTranscript.scss', 'utf8');
+    const translationFontSizeSetting = ['TRANSLATION', 'FONT_SIZE'].join('_');
     const source = scss.match(
       /\.live-dubbing-transcript__source\s*\{\s*color:[\s\S]*?\n\}/
     )?.[0];
@@ -156,14 +194,14 @@ describe('LiveDubbingTranscript renderer', () => {
       /\.live-dubbing-transcript__translated\s*\{\s*font-size:[\s\S]*?\n\}/
     )?.[0];
 
-    expect(source).toMatch(/font-size:\s*clamp\(16px,\s*1\.5vw,\s*19px\)/);
+    expect(source).toMatch(/font-size:\s*var\(--ti-live-dubbing-original-font-size\)/);
     expect(source).toMatch(/font-weight:\s*500/);
     expect(source).toMatch(/line-height:\s*1\.35(?:\s*!important)?/);
     expect(source).toMatch(/rgb\(255\s+255\s+255\s*\/\s*82%\)/);
     expect(source).not.toMatch(/font-size:[^;]*(?:rem|em)/);
     expect(source).toMatch(/max-height:\s*1\.35em/);
 
-    expect(translated).toMatch(/font-size:\s*clamp\(20px,\s*2vw,\s*26px\)/);
+    expect(translated).toMatch(/font-size:\s*var\(--ti-live-dubbing-translated-font-size\)/);
     expect(translated).toMatch(/font-weight:\s*500/);
     expect(translated).toMatch(/line-height:\s*1\.35(?:\s*!important)?/);
     expect(translated).not.toMatch(/font-size:[^;]*(?:rem|em)/);
@@ -181,6 +219,9 @@ describe('LiveDubbingTranscript renderer', () => {
     expect(scss).toMatch(/font-weight:\s*500/);
     expect(scss).toMatch(/line-height:\s*1\.45/);
     expect(scss).toMatch(/font-family:\s*var\(--ti-live-dubbing-font-family,/);
+    expect(scss).toMatch(/--ti-live-dubbing-original-font-size:\s*clamp\(16px,\s*1\.5vw,\s*19px\)/);
+    expect(scss).toMatch(/--ti-live-dubbing-translated-font-size:\s*clamp\(20px,\s*2vw,\s*26px\)/);
     expect(scss).toMatch(/@media\s*\(max-width:\s*36rem\),\s*\(max-height:\s*30rem\)/);
+    expect(scss).not.toContain(translationFontSizeSetting);
   });
 });

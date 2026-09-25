@@ -2093,6 +2093,21 @@
   "live_dubbing_use_translation_font_label": {
     "message": "ライブ吹き替え字幕で翻訳フォントを使用"
   },
+  "live_dubbing_subtitle_size_label": {
+    "message": "字幕サイズ"
+  },
+  "live_dubbing_subtitle_size_small": {
+    "message": "小"
+  },
+  "live_dubbing_subtitle_size_medium": {
+    "message": "中"
+  },
+  "live_dubbing_subtitle_size_large": {
+    "message": "大"
+  },
+  "live_dubbing_subtitle_size_xlarge": {
+    "message": "特大"
+  },
   "font_family_label": {
     "message": "フォントファミリー"
   },

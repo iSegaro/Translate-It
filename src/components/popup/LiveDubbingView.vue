@@ -71,6 +71,21 @@
             @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
           />
         </div>
+        <div class="live-dubbing-transcript-preference">
+          <label
+            class="live-dubbing-transcript-preference-label"
+            for="live-dubbing-subtitle-size-select"
+          >
+            {{ t('live_dubbing_subtitle_size_label', 'Subtitle size') }}
+          </label>
+          <BaseSelect
+            id="live-dubbing-subtitle-size-select"
+            v-model="subtitleSizeModel"
+            class="live-dubbing-subtitle-size-select"
+            :options="subtitleSizeOptions"
+            :disabled="hasSubtitleSizePreferenceWritePending"
+          />
+        </div>
       </div>
     </section>
 
@@ -119,6 +134,10 @@ import {
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_PROVIDER_IDS
 } from '@/features/live-dubbing/constants.js'
+import {
+  LIVE_DUBBING_SUBTITLE_SIZE_PRESETS,
+  normalizeLiveDubbingSubtitleSize,
+} from '@/features/live-dubbing/content/liveDubbingSubtitleSize.js'
 
 // Import adjacent SCSS
 import './LiveDubbingView.scss'
@@ -157,6 +176,7 @@ const showOriginalTranscript = computed(() =>
 )
 const hasTranslatedPreferenceWritePending = ref(false)
 const hasOriginalPreferenceWritePending = ref(false)
+const hasSubtitleSizePreferenceWritePending = ref(false)
 
 /**
  * Real UI restriction on the original-subtitle toggle: OpenAI applies the
@@ -170,15 +190,34 @@ const isOriginalOpenAIRestricted = computed(() =>
   && (!isControlStatusResolved.value || isControlBusy.value)
 )
 
+const subtitleSizeOptions = computed(() => Object.keys(LIVE_DUBBING_SUBTITLE_SIZE_PRESETS).map(value => ({
+  value,
+  label: t(`live_dubbing_subtitle_size_${value}`, value),
+})))
+
+const subtitleSizeModel = computed({
+  get: () => normalizeLiveDubbingSubtitleSize(
+    settingsStore.getSetting('LIVE_DUBBING_SUBTITLE_SIZE', 'medium')
+  ),
+  set: value => updateTranscriptPreference(
+    'LIVE_DUBBING_SUBTITLE_SIZE',
+    normalizeLiveDubbingSubtitleSize(value)
+  )
+})
+
 /** Persist one transcript preference and restore its prior value on failure. */
 const updateTranscriptPreference = async (key, value) => {
   const pending = key === 'LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT'
     ? hasTranslatedPreferenceWritePending
-    : hasOriginalPreferenceWritePending
+    : key === 'LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT'
+      ? hasOriginalPreferenceWritePending
+      : hasSubtitleSizePreferenceWritePending
 
   if (pending.value) return
 
-  const previousValue = settingsStore.getSetting(key, false) === true
+  const previousValue = key === 'LIVE_DUBBING_SUBTITLE_SIZE'
+    ? normalizeLiveDubbingSubtitleSize(settingsStore.getSetting(key, 'medium'))
+    : settingsStore.getSetting(key, false) === true
   pending.value = true
   try {
     await settingsStore.updateSettingAndPersist(key, value)

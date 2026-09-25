@@ -884,5 +884,7 @@ Provider Adapter → LiveDubbingController → Background Coordinator
   independent latest transcript streams, not guaranteed paired bilingual
   cues. Subtitle font family can optionally inherit the shared Translation
   Font Family setting when `LIVE_DUBBING_USE_TRANSLATION_FONT` is enabled;
-  font size remains owned by the Live Dubbing renderer. Feature-local
+  font size remains owned by the Live Dubbing renderer. The feature-specific
+  `LIVE_DUBBING_SUBTITLE_SIZE` preference does not use `TRANSLATION_FONT_SIZE`;
+  size changes are presentation-only and apply reactively. Feature-local
   component SCSS follows the project's Shadow DOM `!important` convention.

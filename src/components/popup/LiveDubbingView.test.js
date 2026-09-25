@@ -92,6 +92,7 @@ const makeStore = (settings = {}) => {
        TRANSLATION_API: 'google',
        LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: false,
         LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT: false,
+        LIVE_DUBBING_SUBTITLE_SIZE: 'medium',
         ...settings
     }),
     updateSettingLocally: vi.fn((key, value) => {
@@ -166,7 +167,12 @@ describe('LiveDubbingView', () => {
        live_dubbing_config_label: 'Configuration',
        live_dubbing_transcript_preferences_label: 'Subtitle preferences',
        live_dubbing_show_translated_transcript: 'Translated subtitles',
-       live_dubbing_show_original_transcript: 'Original subtitles'
+       live_dubbing_show_original_transcript: 'Original subtitles',
+       live_dubbing_subtitle_size_label: 'Subtitle size',
+       live_dubbing_subtitle_size_small: 'Small',
+       live_dubbing_subtitle_size_medium: 'Medium',
+       live_dubbing_subtitle_size_large: 'Large',
+       live_dubbing_subtitle_size_xlarge: 'Extra Large'
     }
   })
 
@@ -312,6 +318,72 @@ describe('LiveDubbingView', () => {
     )
     expect(harness.store.settings.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT).toBe(true)
     expect(harness.store.settings.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT).toBe(true)
+  })
+
+  it('renders all subtitle size options independently of subtitle visibility and session state', async () => {
+    const wrapper = mountView()
+    const sizeSelect = wrapper.find('#live-dubbing-subtitle-size-select')
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    expect(sizeSelect.exists()).toBe(true)
+    expect(sizeSelect.classes()).toContain('live-dubbing-subtitle-size-select')
+    expect(sizeSelect.element.value).toBe('medium')
+    expect(sizeSelect.findAll('option').map(option => option.attributes('value')))
+      .toEqual(['small', 'medium', 'large', 'xlarge'])
+    expect(sizeSelect.element.disabled).toBe(false)
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+    expect(sizeSelect.element.disabled).toBe(false)
+  })
+
+  it('persists a successful subtitle size change without remounting the control', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const sizeSelect = wrapper.findAllComponents({ name: 'BaseSelect' })[1]
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+
+    await sizeSelect.vm.$emit('update:modelValue', 'large')
+    expect(deferred.writes).toHaveLength(1)
+    expect(deferred.writes[0]).toMatchObject({
+      key: 'LIVE_DUBBING_SUBTITLE_SIZE',
+      value: 'large'
+    })
+    expect(harness.store.settings.LIVE_DUBBING_SUBTITLE_SIZE).toBe('large')
+    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).vm).toBe(control.vm)
+
+    deferred.writes[0].resolve()
+    await settle()
+    expect(sizeSelect.props('disabled')).toBe(false)
+  })
+
+  it('restores the previous subtitle size after persistence failure', async () => {
+    const deferred = makeDeferredWriteStore({ LIVE_DUBBING_SUBTITLE_SIZE: 'large' })
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const sizeSelect = wrapper.findAllComponents({ name: 'BaseSelect' })[1]
+
+    await sizeSelect.vm.$emit('update:modelValue', 'small')
+    expect(harness.store.settings.LIVE_DUBBING_SUBTITLE_SIZE).toBe('small')
+    deferred.writes[0].reject(new Error('storage unavailable'))
+    await settle()
+
+    expect(harness.store.settings.LIVE_DUBBING_SUBTITLE_SIZE).toBe('large')
+    expect(sizeSelect.props('modelValue')).toBe('large')
+  })
+
+  it('prevents overlapping subtitle size writes', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const sizeSelect = wrapper.findAllComponents({ name: 'BaseSelect' })[1]
+
+    await sizeSelect.vm.$emit('update:modelValue', 'large')
+    await sizeSelect.vm.$emit('update:modelValue', 'small')
+
+    expect(deferred.writes).toHaveLength(1)
+    expect(deferred.writes[0].value).toBe('large')
   })
 
   it('keeps the Gemini preference toggles editable while busy', async () => {
@@ -718,6 +790,10 @@ describe('LiveDubbingView', () => {
     // Control alignment is owned by this card, not shared control styles.
     expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+132px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?inline-size:\s*132px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?min-width:\s*0\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-view--rtl \.live-dubbing-subtitle-size-select\s*\{[\s\S]*?background-position:\s*left 10px center\s*!important/)
     expect(scss).not.toMatch(/^\.ti-language-select/m)
     expect(scss).not.toMatch(/^\.ti-select/m)
     expect(scss).not.toMatch(/\.live-dubbing-view--rtl\s*\{[\s\S]*?direction:\s*rtl/)

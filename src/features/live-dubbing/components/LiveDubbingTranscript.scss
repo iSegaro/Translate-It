@@ -1,4 +1,6 @@
 .live-dubbing-transcript {
+  --ti-live-dubbing-original-font-size: clamp(16px, 1.5vw, 19px);
+  --ti-live-dubbing-translated-font-size: clamp(20px, 2vw, 26px);
   position: fixed !important;
   z-index: 2147483646 !important;
   left: 50% !important;
@@ -49,7 +51,7 @@
 
 .live-dubbing-transcript__source {
   color: rgb(255 255 255 / 82%) !important;
-  font-size: clamp(16px, 1.5vw, 19px) !important;
+  font-size: var(--ti-live-dubbing-original-font-size) !important;
   font-weight: 500 !important;
   line-height: 1.35 !important;
   letter-spacing: 0.02em !important;
@@ -57,7 +59,7 @@
 }
 
 .live-dubbing-transcript__translated {
-  font-size: clamp(20px, 2vw, 26px) !important;
+  font-size: var(--ti-live-dubbing-translated-font-size) !important;
   font-weight: 500 !important;
   line-height: 1.35 !important;
   max-height: 2.7em !important;

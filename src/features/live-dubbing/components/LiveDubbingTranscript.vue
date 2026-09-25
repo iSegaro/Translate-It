@@ -32,6 +32,10 @@ import {
   getVisibleLiveDubbingSourceTranscript,
   getVisibleLiveDubbingTranscript,
 } from '../content/liveDubbingTranscriptPresentation.js';
+import {
+  LIVE_DUBBING_SUBTITLE_SIZE_PRESETS,
+  normalizeLiveDubbingSubtitleSize,
+} from '../content/liveDubbingSubtitleSize.js';
 
 const transcript = ref(getLiveDubbingTranscriptSnapshot());
 const props = defineProps({
@@ -47,13 +51,23 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  subtitleSize: {
+    type: String,
+    default: 'medium',
+  },
 });
-const { showTranslatedTranscript, showOriginalTranscript, fontFamily } = toRefs(props);
+const { showTranslatedTranscript, showOriginalTranscript, fontFamily, subtitleSize } = toRefs(props);
 const visibleText = computed(() => getVisibleLiveDubbingTranscript(transcript.value));
 const visibleSourceText = computed(() => getVisibleLiveDubbingSourceTranscript(transcript.value));
-const transcriptStyle = computed(() => (
-  fontFamily.value ? { '--ti-live-dubbing-font-family': fontFamily.value } : undefined
-));
+const transcriptStyle = computed(() => {
+  const preset = LIVE_DUBBING_SUBTITLE_SIZE_PRESETS[normalizeLiveDubbingSubtitleSize(subtitleSize.value)];
+  const style = {
+    '--ti-live-dubbing-original-font-size': preset.original,
+    '--ti-live-dubbing-translated-font-size': preset.translated,
+  };
+  if (fontFamily.value) style['--ti-live-dubbing-font-family'] = fontFamily.value;
+  return style;
+});
 const unsubscribe = subscribeLiveDubbingTranscript((snapshot) => {
   transcript.value = snapshot;
 });

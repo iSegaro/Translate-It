@@ -2093,6 +2093,21 @@
   "live_dubbing_use_translation_font_label": {
     "message": "Use translation font in Dubbing Subtitles"
   },
+  "live_dubbing_subtitle_size_label": {
+    "message": "Subtitle size"
+  },
+  "live_dubbing_subtitle_size_small": {
+    "message": "Small"
+  },
+  "live_dubbing_subtitle_size_medium": {
+    "message": "Medium"
+  },
+  "live_dubbing_subtitle_size_large": {
+    "message": "Large"
+  },
+  "live_dubbing_subtitle_size_xlarge": {
+    "message": "Extra Large"
+  },
   "font_family_label": {
     "message": "Font Family"
   },

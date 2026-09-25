@@ -17,5 +17,9 @@ describe('ContentApp transcript preference gate', () => {
     expect(source).toContain('settings?.LIVE_DUBBING_USE_TRANSLATION_FONT !== true');
     expect(source).toContain('settings.LIVE_DUBBING_TARGET_LANGUAGE || CONFIG.LIVE_DUBBING_TARGET_LANGUAGE');
     expect(source).toContain(':font-family="liveDubbingFontFamily"');
+    expect(source).toContain('normalizeLiveDubbingSubtitleSize');
+    expect(source).toContain('settingsStore.settings?.LIVE_DUBBING_SUBTITLE_SIZE');
+    expect(source).toContain(':subtitle-size="liveDubbingSubtitleSize"');
+    expect(source).not.toContain('TRANSLATION_FONT_SIZE');
   });
 });
