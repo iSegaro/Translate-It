@@ -56,67 +56,76 @@
           aria-hidden="true"
         />
       </button>
-      <div
-        id="live-dubbing-transcript-preferences-content"
-        class="live-dubbing-transcript-preferences-content"
-        :class="{ 'is-expanded': isTranscriptPreferencesExpanded }"
-        :inert="!isTranscriptPreferencesExpanded ? '' : undefined"
+      <Transition
+        :css="false"
+        @before-enter="handleTranscriptPreferencesBeforeEnter"
+        @enter="handleTranscriptPreferencesEnter"
+        @before-leave="handleTranscriptPreferencesBeforeLeave"
+        @leave="handleTranscriptPreferencesLeave"
       >
-        <div class="live-dubbing-transcript-preferences-content-inner">
-          <div class="live-dubbing-transcript-preferences-actions">
-            <button
-              type="button"
-              class="live-dubbing-change-font-link"
-              @click="handleChangeFont"
-            >
-              {{ t('live_dubbing_change_font_label', 'Change font') }}
-            </button>
-          </div>
-          <div class="live-dubbing-transcript-preferences-list">
-            <div class="live-dubbing-transcript-preference">
-              <span class="live-dubbing-transcript-preference-label">
-                {{ t('live_dubbing_show_translated_transcript', 'Translated subtitles') }}
-              </span>
-              <BaseToggle
-                class="live-dubbing-transcript-preference-toggle"
-                :class="{ 'live-dubbing-toggle--pending-neutral': hasTranslatedPreferenceWritePending }"
-                :model-value="showTranslatedTranscript"
-                :disabled="hasTranslatedPreferenceWritePending"
-                :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
-                @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
-              />
-            </div>
-            <div class="live-dubbing-transcript-preference">
-              <span class="live-dubbing-transcript-preference-label">
-                {{ t('live_dubbing_show_original_transcript', 'Original subtitles') }}
-              </span>
-              <BaseToggle
-                class="live-dubbing-transcript-preference-toggle"
-                :class="{ 'live-dubbing-toggle--pending-neutral': hasOriginalPreferenceWritePending && !isOriginalOpenAIRestricted }"
-                :model-value="showOriginalTranscript"
-                :disabled="hasOriginalPreferenceWritePending || isOriginalOpenAIRestricted"
-                :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
-                @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
-              />
-            </div>
-            <div class="live-dubbing-transcript-preference">
-              <label
-                class="live-dubbing-transcript-preference-label"
-                for="live-dubbing-subtitle-size-select"
+        <div
+          v-show="isTranscriptPreferencesExpanded"
+          id="live-dubbing-transcript-preferences-content"
+          ref="transcriptPreferencesContentRef"
+          class="live-dubbing-transcript-preferences-content"
+          :inert="!isTranscriptPreferencesExpanded ? '' : undefined"
+        >
+          <div class="live-dubbing-transcript-preferences-content-inner">
+            <div class="live-dubbing-transcript-preferences-actions">
+              <button
+                type="button"
+                class="live-dubbing-change-font-link"
+                @click="handleChangeFont"
               >
-                {{ t('live_dubbing_subtitle_size_label', 'Subtitle size') }}
-              </label>
-              <BaseSelect
-                id="live-dubbing-subtitle-size-select"
-                v-model="subtitleSizeModel"
-                class="live-dubbing-subtitle-size-select"
-                :options="subtitleSizeOptions"
-                :disabled="hasSubtitleSizePreferenceWritePending"
-              />
+                {{ t('live_dubbing_change_font_label', 'Change font') }}
+              </button>
+            </div>
+            <div class="live-dubbing-transcript-preferences-list">
+              <div class="live-dubbing-transcript-preference">
+                <span class="live-dubbing-transcript-preference-label">
+                  {{ t('live_dubbing_show_translated_transcript', 'Translated subtitles') }}
+                </span>
+                <BaseToggle
+                  class="live-dubbing-transcript-preference-toggle"
+                  :class="{ 'live-dubbing-toggle--pending-neutral': hasTranslatedPreferenceWritePending }"
+                  :model-value="showTranslatedTranscript"
+                  :disabled="hasTranslatedPreferenceWritePending"
+                  :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
+                  @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
+                />
+              </div>
+              <div class="live-dubbing-transcript-preference">
+                <span class="live-dubbing-transcript-preference-label">
+                  {{ t('live_dubbing_show_original_transcript', 'Original subtitles') }}
+                </span>
+                <BaseToggle
+                  class="live-dubbing-transcript-preference-toggle"
+                  :class="{ 'live-dubbing-toggle--pending-neutral': hasOriginalPreferenceWritePending && !isOriginalOpenAIRestricted }"
+                  :model-value="showOriginalTranscript"
+                  :disabled="hasOriginalPreferenceWritePending || isOriginalOpenAIRestricted"
+                  :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
+                  @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
+                />
+              </div>
+              <div class="live-dubbing-transcript-preference">
+                <label
+                  class="live-dubbing-transcript-preference-label"
+                  for="live-dubbing-subtitle-size-select"
+                >
+                  {{ t('live_dubbing_subtitle_size_label', 'Subtitle size') }}
+                </label>
+                <BaseSelect
+                  id="live-dubbing-subtitle-size-select"
+                  v-model="subtitleSizeModel"
+                  class="live-dubbing-subtitle-size-select"
+                  :options="subtitleSizeOptions"
+                  :disabled="hasSubtitleSizePreferenceWritePending"
+                />
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </section>
 
     <!-- Credential setup: rendered only while the selected provider has no key -->
@@ -151,7 +160,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { openOptionsPage } from '@/core/helpers.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
@@ -200,6 +209,135 @@ const isTranscriptPreferencesExpanded = ref(
   settingsStore.settings?.LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT === true
   || settingsStore.settings?.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT === true
 )
+
+const TRANSCRIPT_PREFERENCES_TRANSITION_DURATION = 190
+const TRANSCRIPT_PREFERENCES_TRANSITION_EASING = 'cubic-bezier(0.2, 0, 0, 1)'
+const transcriptPreferencesContentRef = ref(null)
+let transcriptPreferencesTransitionGeneration = 0
+let activeTranscriptPreferencesTransition = null
+
+const clearTranscriptPreferencesTransitionStyles = (element) => {
+  element.style.removeProperty('height')
+  element.style.removeProperty('overflow')
+  element.style.removeProperty('transition')
+}
+
+const prefersReducedMotion = () => typeof window !== 'undefined'
+  && typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+const scheduleAnimationFrame = (callback) => {
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    const frameId = window.requestAnimationFrame(callback)
+    return () => window.cancelAnimationFrame(frameId)
+  }
+
+  const timeoutId = setTimeout(callback, 0)
+  return () => clearTimeout(timeoutId)
+}
+
+const cancelActiveTranscriptPreferencesTransition = () => {
+  transcriptPreferencesTransitionGeneration += 1
+  const activeTransition = activeTranscriptPreferencesTransition
+  activeTranscriptPreferencesTransition = null
+  if (!activeTransition) return
+
+  activeTransition.cancel()
+  activeTransition.complete()
+}
+
+const runTranscriptPreferencesHeightTransition = (element, fromHeight, toHeight, done) => {
+  cancelActiveTranscriptPreferencesTransition()
+  const generation = transcriptPreferencesTransitionGeneration
+  let frameCancel = () => {}
+  let timerId = null
+  let cancelled = false
+  let completed = false
+
+  const cancel = () => {
+    if (cancelled || completed) return
+    cancelled = true
+    frameCancel()
+    if (timerId !== null) clearTimeout(timerId)
+  }
+
+  const complete = () => {
+    if (completed) return
+    completed = true
+    frameCancel()
+    if (timerId !== null) clearTimeout(timerId)
+
+    if (generation === transcriptPreferencesTransitionGeneration) {
+      element.style.height = toHeight === 'auto' ? 'auto' : toHeight
+      clearTranscriptPreferencesTransitionStyles(element)
+      activeTranscriptPreferencesTransition = null
+    }
+
+    done()
+  }
+
+  activeTranscriptPreferencesTransition = { cancel, complete }
+  element.style.height = fromHeight
+  element.style.overflow = 'hidden'
+  element.style.transition = 'none'
+  void element.offsetHeight
+
+  if (prefersReducedMotion()) {
+    complete()
+    return
+  }
+
+  frameCancel = scheduleAnimationFrame(() => {
+    if (cancelled || generation !== transcriptPreferencesTransitionGeneration) return
+    element.style.transition = `height ${TRANSCRIPT_PREFERENCES_TRANSITION_DURATION}ms ${TRANSCRIPT_PREFERENCES_TRANSITION_EASING}`
+    element.style.height = toHeight
+    timerId = setTimeout(complete, TRANSCRIPT_PREFERENCES_TRANSITION_DURATION)
+  })
+}
+
+const handleTranscriptPreferencesBeforeEnter = (element) => {
+  cancelActiveTranscriptPreferencesTransition()
+  element.style.height = '0px'
+  element.style.overflow = 'hidden'
+  element.style.transition = 'none'
+}
+
+const handleTranscriptPreferencesEnter = (element, done) => {
+  runTranscriptPreferencesHeightTransition(element, '0px', `${element.scrollHeight}px`, done)
+}
+
+const getCurrentTranscriptPreferencesHeight = (element) => {
+  const inlineHeight = Number.parseFloat(element.style.height)
+  if (Number.isFinite(inlineHeight)) return inlineHeight
+
+  const renderedHeight = element.getBoundingClientRect().height
+  return renderedHeight || element.scrollHeight
+}
+
+const handleTranscriptPreferencesBeforeLeave = (element) => {
+  cancelActiveTranscriptPreferencesTransition()
+  const currentHeight = getCurrentTranscriptPreferencesHeight(element)
+  element.style.height = `${currentHeight}px`
+  element.style.overflow = 'hidden'
+  element.style.transition = 'none'
+  void element.offsetHeight
+}
+
+const handleTranscriptPreferencesLeave = (element, done) => {
+  runTranscriptPreferencesHeightTransition(
+    element,
+    element.style.height || `${getCurrentTranscriptPreferencesHeight(element)}px`,
+    '0px',
+    done
+  )
+}
+
+onBeforeUnmount(() => {
+  cancelActiveTranscriptPreferencesTransition()
+  if (transcriptPreferencesContentRef.value) {
+    clearTranscriptPreferencesTransitionStyles(transcriptPreferencesContentRef.value)
+  }
+})
 
 const handleChangeFont = async () => {
   try {
