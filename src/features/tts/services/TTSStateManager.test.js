@@ -441,6 +441,687 @@ describe('TTSStateManager offscreen lease lifecycle', () => {
   });
 });
 
+describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () => {
+  const predecessorSender = { tab: { id: 10 }, frameId: 0 };
+  const successorSender = { tab: { id: 20 }, frameId: 0 };
+  const foreignSender = { tab: { id: 30 }, frameId: 0 };
+
+  // Build a deterministic handoff with both predecessor (committed) and
+  // successor (pending) generations, owned by different senders.
+  async function seedHandoff({
+    predecessorId = 'predecessor-id',
+    successorId = 'successor-id',
+    sharedOwner = false,
+  } = {}) {
+    const predecessorOwner = sharedOwner ? predecessorSender : predecessorSender;
+    const successorOwner = sharedOwner ? predecessorSender : successorSender;
+
+    const predecessor = await ttsStateManager.acquirePlaybackLease();
+    await ttsStateManager.commitPlaybackLease(predecessor, {
+      sender: predecessorOwner,
+      ttsId: predecessorId,
+      language: 'en',
+      text: 'predecessor text',
+    });
+
+    const successor = await ttsStateManager.acquirePlaybackLease({
+      sender: successorOwner,
+      ttsId: successorId,
+      language: 'fr',
+      text: 'successor text',
+    });
+
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+    mocks.release.mockClear();
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    return { predecessor, successor };
+  }
+
+  it('lets the predecessor owner stop its own still-active playback while a foreign successor is pending', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'predecessor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+    // Foreign successor stays pending, untouched.
+    expect(ttsStateManager.pendingPlaybackToken).not.toBeNull();
+    expect(ttsStateManager.pendingPlaybackMetadata?.ttsId).toBe('successor-id');
+
+    expect(mocks.browserAPI.runtime.sendMessage).toHaveBeenCalledWith({
+      action: 'TTS_STOP',
+      target: 'offscreen',
+      playbackToken: predecessor,
+    });
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: predecessor });
+    // Successor lease must NOT be released. Use the actual UUID, never an
+    // inferred prefix match: playback tokens are random UUIDs.
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).not.toContain(successor);
+  });
+
+  it('lets the successor owner stop only its own pending generation when a foreign predecessor is active', async () => {
+    const { successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.pendingPlaybackMetadata).toBeNull();
+    // Foreign predecessor stays committed.
+    expect(ttsStateManager.currentPlaybackToken).not.toBeNull();
+    expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
+
+    expect(mocks.browserAPI.runtime.sendMessage).toHaveBeenCalledWith({
+      action: 'TTS_STOP',
+      target: 'offscreen',
+      playbackToken: successor,
+    });
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: successor });
+  });
+
+  it('stops both generations on owner-scoped stop-all when predecessor and successor share the same owner', async () => {
+    const { predecessor, successor } = await seedHandoff({ sharedOwner: true });
+
+    const result = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'all',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+
+    const stoppedTokens = mocks.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([msg]) => msg?.action === 'TTS_STOP')
+      .map(([msg]) => msg.playbackToken);
+    expect(stoppedTokens).toEqual(expect.arrayContaining([predecessor, successor]));
+  });
+
+  it('skips a request whose ttsId matches neither committed nor pending generations', async () => {
+    await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'mismatched-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toEqual({ success: true, skipped: true });
+    expect(ttsStateManager.pendingPlaybackToken).not.toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).not.toBeNull();
+    expect(mocks.release).not.toHaveBeenCalled();
+    expect(mocks.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('skips a request whose sender does not own the matched generation', async () => {
+    await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toEqual({ success: true, skipped: true, reason: 'not_owner' });
+    expect(ttsStateManager.pendingPlaybackToken).not.toBeNull();
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it('owner-scoped stop-all stops only generations owned by the sender during handoff', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    // Successor owner requests stop-all: should stop ONLY the successor.
+    const successorResult = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: null,
+      stopOnlyIfOwner: true,
+    });
+
+    expect(successorResult).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).not.toBeNull();
+
+    const releasedAfterFirst = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedAfterFirst).toContain(successor);
+    expect(releasedAfterFirst).not.toContain(predecessor);
+
+    // Predecessor owner requests stop-all: should stop ONLY the predecessor.
+    mocks.release.mockClear();
+    const predecessorResult = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: undefined,
+      stopOnlyIfOwner: true,
+    });
+
+    expect(predecessorResult).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+  });
+
+  it('keeps explicit global/manual stop behavior unchanged', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: null,
+      stopOnlyIfOwner: false,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+
+    const stoppedTokens = mocks.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([msg]) => msg?.action === 'TTS_STOP')
+      .map(([msg]) => msg.playbackToken);
+    expect(stoppedTokens).toEqual(expect.arrayContaining([predecessor, successor]));
+  });
+
+  it('rejects a late successor commit when that successor was actually stopped', async () => {
+    const { successor } = await seedHandoff();
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Successor token is cleared from pending state; commit must return false.
+    await expect(ttsStateManager.commitPlaybackLease(successor)).resolves.toBe(false);
+    expect(ttsStateManager.currentPlaybackToken).not.toBe(successor);
+  });
+
+  it('Google and Edge handlers return identical stopForOwner results for the same inputs', async () => {
+    // Seed two equivalent handoffs.
+    const google = await seedHandoff();
+    await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'predecessor-id',
+      stopOnlyIfOwner: true,
+    });
+    const googleResult = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+    // Reset for the Edge scenario.
+    await ttsStateManager.fullReset();
+    const edge = await seedHandoff();
+    await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'predecessor-id',
+      stopOnlyIfOwner: true,
+    });
+    const edgeResult = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(google).not.toBeNull();
+    expect(edge).not.toBeNull();
+    expect(googleResult).toEqual(edgeResult);
+    expect(googleResult).toEqual({ success: true, skipped: true, reason: 'not_owner' });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Specific-ttsId fencing must apply regardless of stopOnlyIfOwner. A
+  // mismatched ttsId must NEVER trigger a global stop, even when ownerless.
+  // ---------------------------------------------------------------------------
+
+  it('skips a stale specific ttsId with stopOnlyIfOwner absent (fence preserved)', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'stale-id',
+      stopOnlyIfOwner: undefined,
+    });
+
+    expect(result).toEqual({ success: true, skipped: true });
+    // Nothing was stopped: both generations are still live.
+    expect(ttsStateManager.pendingPlaybackToken).toBe(successor);
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    expect(mocks.release).not.toHaveBeenCalled();
+    const stoppedTokens = mocks.browserAPI.runtime.sendMessage.mock.calls
+      .filter(([msg]) => msg?.action === 'TTS_STOP');
+    expect(stoppedTokens).toHaveLength(0);
+  });
+
+  it('skips a stale specific ttsId with stopOnlyIfOwner false (no owner check, fence still applies)', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'stale-id',
+      stopOnlyIfOwner: false,
+    });
+
+    expect(result).toEqual({ success: true, skipped: true });
+    expect(ttsStateManager.pendingPlaybackToken).toBe(successor);
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  it('stops matching current specific ttsId without owner check (stopOnlyIfOwner absent)', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'predecessor-id',
+      stopOnlyIfOwner: undefined,
+    });
+
+    // Foreign sender with matching current ttsId is allowed when owner check
+    // is not requested: only the matched generation is stopped.
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.pendingPlaybackToken).toBe(successor);
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: predecessor });
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).not.toContain(successor);
+  });
+
+  it('stops matching pending specific ttsId without owner check (stopOnlyIfOwner false)', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: false,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: successor });
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).not.toContain(predecessor);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Predecessor-only stop must preserve the in-flight successor request
+  // tracking (currentTTSRequest / pendingRequestKey) so its deduplication
+  // and handoff fencing stay intact.
+  // ---------------------------------------------------------------------------
+
+  it('predecessor-only stop preserves pending successor request tracking (currentTTSRequest / pendingRequestKey)', async () => {
+    // Build committed predecessor.
+    const predecessor = await ttsStateManager.acquirePlaybackLease();
+    await ttsStateManager.commitPlaybackLease(predecessor, {
+      sender: predecessorSender,
+      ttsId: 'predecessor-id',
+      language: 'en',
+      text: 'predecessor text',
+    });
+
+    // Build pending successor lease + an actual in-flight successor request
+    // registered through the public setPendingRequest / currentTTSRequest API.
+    const successor = await ttsStateManager.acquirePlaybackLease({
+      sender: successorSender,
+      ttsId: 'successor-id',
+      language: 'fr',
+      text: 'successor text',
+    });
+    const successorRequestKey = ttsStateManager.createPendingRequestKey({
+      engine: 'google',
+      text: 'successor text',
+      language: 'fr',
+      ttsId: 'successor-id',
+    });
+    const successorRequest = Promise.resolve('successor-in-flight');
+    ttsStateManager.setPendingRequest(successorRequestKey, successorRequest);
+    const trackedRequestBefore = ttsStateManager.currentTTSRequest;
+    const trackedKeyBefore = ttsStateManager.pendingRequestKey;
+
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+    mocks.release.mockClear();
+
+    await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'predecessor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Predecessor committed state is cleared.
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+
+    // Successor request tracking is preserved verbatim.
+    expect(ttsStateManager.currentTTSRequest).toBe(trackedRequestBefore);
+    expect(ttsStateManager.pendingRequestKey).toEqual(trackedKeyBefore);
+    expect(ttsStateManager.isPendingRequest(successorRequestKey, successorRequest)).toBe(true);
+
+    // Successor playback state is also preserved (handoff still viable).
+    expect(ttsStateManager.pendingPlaybackToken).toBe(successor);
+    expect(ttsStateManager.pendingPlaybackMetadata?.ttsId).toBe('successor-id');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Same-session handoff (TTSQueueManager reuses one ttsId across chunks).
+  // A chunk transition can legitimately leave a committed predecessor and a
+  // pending successor with the SAME ttsId (and often the same owner). The
+  // owner-aware Stop must consider both generations before deciding.
+  // ---------------------------------------------------------------------------
+
+  it('same-session specific Stop with stopOnlyIfOwner stops both when sender owns both generations', async () => {
+    const { predecessor, successor } = await seedHandoff({
+      predecessorId: 'session-tts-id',
+      successorId: 'session-tts-id',
+      sharedOwner: true,
+    });
+
+    const result = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+  });
+
+  it('same-session specific Stop without stopOnlyIfOwner clears the queue and stops both generations', async () => {
+    const { predecessor, successor } = await seedHandoff({
+      predecessorId: 'session-tts-id',
+      successorId: 'session-tts-id',
+      sharedOwner: true,
+    });
+    mocks.queue.chunks.push({ id: 'chunk-1' }, { id: 'chunk-2' });
+    mocks.queue.currentIndex = 0;
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: false,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    // Global path: queue cleared and both leases released.
+    expect(mocks.queue.stop).toHaveBeenCalledTimes(1);
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+  });
+
+  it('same-session specific Stop affects only the generation owned by the requester when owners differ', async () => {
+    const { predecessor } = await seedHandoff({
+      predecessorId: 'session-tts-id',
+      successorId: 'session-tts-id',
+      sharedOwner: false,
+    });
+
+    // Successor owner asks to stop the session: stops ONLY its pending.
+    const successorResult = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: true,
+    });
+    expect(successorResult).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+
+    // Predecessor owner asks to stop the session: stops ONLY its committed.
+    const predecessorResult = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: true,
+    });
+    expect(predecessorResult).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+
+    // The two stops targeted different generations; neither stop ever tried
+    // to release the foreign generation's lease in the same call.
+  });
+
+  it('same-session owner-scoped Stop skips when the requester owns neither generation', async () => {
+    await seedHandoff({
+      predecessorId: 'session-tts-id',
+      successorId: 'session-tts-id',
+      sharedOwner: false,
+    });
+
+    const result = await ttsStateManager.stopForOwner(foreignSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toEqual({ success: true, skipped: true, reason: 'not_owner' });
+    expect(ttsStateManager.pendingPlaybackToken).not.toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).not.toBeNull();
+    expect(mocks.release).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Physical handoff boundary: once the pending PLAY command has been issued
+  // to offscreen, the committed predecessor may already be physically
+  // interrupted. A selective pending stop in that window must terminalize the
+  // displaced predecessor through the handoff-failure path, NOT preserve it
+  // as valid committed playback.
+  // ---------------------------------------------------------------------------
+
+  it('successor-owner selective stop preserves foreign predecessor when physical handoff has NOT started', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    // pendingPlaybackStarted is false by default after acquire.
+
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    // Pending is gone, predecessor is preserved as valid committed state.
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+
+    // Only the pending lease is released.
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toContain(successor);
+    expect(releasedLeaseIds).not.toContain(predecessor);
+  });
+
+  it('successor-owner selective stop terminalizes displaced predecessor when physical handoff HAS started', async () => {
+    const { predecessor, successor } = await seedHandoff();
+
+    // Caller (handler) marks the handoff boundary before the offscreen PLAY
+    // command, simulating the race window where the predecessor has already
+    // been physically interrupted.
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(true);
+
+    const result = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    // Pending is gone AND the predecessor is terminalized as well: cleared
+    // committed state, flag reset, no longer reported as committed playback.
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+
+    // Both affected leases are released (the predecessor's lease must NOT be
+    // stranded).
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+  });
+
+  it('markPendingPlaybackStarted is token-fenced against a stale token', async () => {
+    const { successor } = await seedHandoff();
+
+    // A stale token (different from the live pending) must NOT mark the
+    // replacement pending generation.
+    expect(ttsStateManager.markPendingPlaybackStarted('stale-token-uuid')).toBe(false);
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+
+    // The correct token does mark it.
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(true);
+
+    // After commit / fail / reset / full-stop, the flag must be cleared.
+    await ttsStateManager.commitPlaybackLease(successor);
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+  });
+
+  it('same-session chunk transition still stops whole session after handoff boundary is marked', async () => {
+    const { predecessor, successor } = await seedHandoff({
+      predecessorId: 'session-tts-id',
+      successorId: 'session-tts-id',
+      sharedOwner: true,
+    });
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+
+    const result = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+
+    const releasedLeaseIds = mocks.release.mock.calls.map(([arg]) => arg.leaseId);
+    expect(releasedLeaseIds).toEqual(expect.arrayContaining([predecessor, successor]));
+  });
+
+  it('late successor commit after selective cancellation is rejected (post-boundary)', async () => {
+    const { successor } = await seedHandoff();
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    await expect(ttsStateManager.commitPlaybackLease(successor)).resolves.toBe(false);
+    expect(ttsStateManager.currentPlaybackToken).not.toBe(successor);
+  });
+
+  it('post-boundary successor-owner selective stop notifies predecessor owner with `interrupted`, not `stopped`', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Successor owner receives `stopped` for its own generation.
+    const successorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 20);
+    expect(successorTabMessages.length).toBeGreaterThan(0);
+    successorTabMessages.forEach(([, msg]) => {
+      expect(msg.reason).toBe('stopped');
+    });
+
+    // Predecessor owner receives `interrupted` (NOT `stopped`) — the
+    // predecessor was displaced by the handoff, not explicitly stopped.
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages.length).toBeGreaterThan(0);
+    predecessorTabMessages.forEach(([, msg]) => {
+      expect(msg.reason).toBe('interrupted');
+      expect(msg.reason).not.toBe('stopped');
+    });
+    expect(predecessor).toBeDefined();
+  });
+
+  it('pre-boundary selective pending stop sends no terminal notification to predecessor owner and preserves it as committed', async () => {
+    const { predecessor } = await seedHandoff();
+    // pendingPlaybackStarted stays false.
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // Predecessor is preserved as committed state (not terminalized).
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    expect(ttsStateManager.currentTTSId).toBe('predecessor-id');
+
+    // Predecessor owner receives no terminal notification.
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages).toHaveLength(0);
+  });
+
+  it('stale/replacement playback tokens cannot generate a predecessor terminal notification', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    // Live handoff boundary is marked correctly.
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+
+    // A stale token for a replacement generation cannot mark the live
+    // generation as having crossed the boundary.
+    expect(ttsStateManager.markPendingPlaybackStarted('stale-replacement-uuid')).toBe(false);
+
+    // A pre-existing replacement pending that has NOT been marked cannot
+    // bypass the fence: only the exact pendingPlaybackToken flip is honored.
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    // The notification is targeted by the exact predecessor owner tab (10),
+    // and the playbackToken carried in the notification matches the live
+    // predecessor token, not a stale UUID.
+    const predecessorTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(predecessorTabMessages.length).toBeGreaterThan(0);
+    predecessorTabMessages.forEach(([, msg]) => {
+      expect(msg.playbackToken).toBe(predecessor);
+      expect(msg.playbackToken).not.toBe('stale-replacement-uuid');
+      expect(msg.reason).toBe('interrupted');
+    });
+  });
+
+  it('same-session full stop after handoff boundary is marked still uses the global stop path with one consolidated notification per owner', async () => {
+    const { successor } = await seedHandoff({
+      predecessorId: 'session-tts-id',
+      successorId: 'session-tts-id',
+      sharedOwner: true,
+    });
+    expect(ttsStateManager.markPendingPlaybackStarted(successor)).toBe(true);
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    mocks.browserAPI.runtime.sendMessage.mockClear();
+
+    const result = await ttsStateManager.stopForOwner(predecessorSender, {
+      ttsId: 'session-tts-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(result).toMatchObject({ success: true, action: 'stopped' });
+    expect(ttsStateManager.pendingPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.pendingPlaybackStarted).toBe(false);
+
+    // Global stop uses `stopped` reason for both notifications (not
+    // `interrupted`) because the user explicitly stopped the session.
+    const ownerTabMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === 10);
+    expect(ownerTabMessages.length).toBeGreaterThan(0);
+    ownerTabMessages.forEach(([, msg]) => {
+      expect(msg.reason).toBe('stopped');
+      expect(msg.reason).not.toBe('interrupted');
+    });
+  });
+});
+
 describe('TTSStateManager Firefox audio lifecycle', () => {
   const audios = [];
 

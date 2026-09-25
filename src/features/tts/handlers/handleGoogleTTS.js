@@ -90,6 +90,12 @@ const resolveGoogleTTSSpeak = async ({
       };
       playbackToken = await ttsStateManager.acquirePlaybackLease(playbackMetadata);
 
+      // Mark the physical handoff boundary: from this point onward, the
+      // pending successor's offscreen PLAY command may have already
+      // interrupted the committed predecessor, so a selective pending stop
+      // must terminalize the displaced predecessor instead of preserving it.
+      ttsStateManager.markPendingPlaybackStarted(playbackToken);
+
       const response = await browserAPI.runtime.sendMessage({
         action: MessageActions.PLAY_OFFSCREEN_AUDIO,
         url: ttsUrl,
@@ -170,48 +176,11 @@ export const handleGoogleTTSSpeak = (message, sender, overrideLanguage = null) =
 export const handleGoogleTTSStopAll = async (message, sender) => {
   try {
     const { ttsId, stopOnlyIfOwner } = message.data || {};
-    const isSpecificStop = ttsId && ttsId !== 'all';
-    const hasPendingPlayback = Boolean(ttsStateManager.pendingPlaybackToken);
-    const pendingPlaybackMetadata = hasPendingPlayback
-      ? ttsStateManager.pendingPlaybackMetadata
-      : null;
-
-    // Pending handoffs supersede predecessor identity for specific stops.
-    if (isSpecificStop) {
-      if (hasPendingPlayback) {
-        if (pendingPlaybackMetadata?.ttsId !== ttsId) {
-          return { success: true, skipped: true };
-        }
-
-        if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(
-          sender,
-          pendingPlaybackMetadata?.sender ?? null,
-        )) {
-          logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
-          return { success: true, skipped: true, reason: 'not_owner' };
-        }
-      } else {
-        if (ttsStateManager.currentTTSId !== ttsId) {
-          return { success: true, skipped: true };
-        }
-
-        if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(sender)) {
-          logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
-          return { success: true, skipped: true, reason: 'not_owner' };
-        }
-      }
-    } else if (stopOnlyIfOwner && !ttsStateManager.isCurrentOwner(
-      sender,
-      hasPendingPlayback ? pendingPlaybackMetadata?.sender ?? null : undefined,
-    )) {
-      // Stop-all requests validate pending owner during handoff.
-      logger.debug('[GoogleTTS] Ignoring stop request: sender is not the owner');
-      return { success: true, skipped: true, reason: 'not_owner' };
+    const result = await ttsStateManager.stopForOwner(sender, { ttsId, stopOnlyIfOwner });
+    if (result?.skipped) {
+      logger.debug('[GoogleTTS] Ignoring stop request:', result.reason || 'mismatch');
     }
-    
-    await ttsStateManager.stopPlayback();
-    
-    return { success: true, action: 'stopped' };
+    return result;
   } catch (error) {
     logger.warn('[GoogleTTS] Stop failed:', error);
     return { success: false, error: error.message };

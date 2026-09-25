@@ -1,15 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  currentOwner: { tab: { id: 1 }, frameId: 0 },
-  pendingOwner: { tab: { id: 2 }, frameId: 0 },
   stateManager: {
-    currentTTSId: 'current',
-    currentTTSSender: null,
-    pendingPlaybackToken: null,
-    pendingPlaybackMetadata: null,
-    isCurrentOwner: vi.fn(),
-    stopPlayback: vi.fn(),
+    stopForOwner: vi.fn(),
     notifyTTSEnded: vi.fn(),
   },
 }));
@@ -42,11 +35,11 @@ vi.mock('@/shared/messaging/core/MessageActions.js', () => ({
 }));
 
 vi.mock('@/shared/constants/tts.js', () => ({
-  TTS_ENGINES: { GOOGLE: 'google' },
+  TTS_ENGINES: { GOOGLE: 'google', EDGE: 'edge' },
 }));
 
 vi.mock('@/features/tts/constants/ttsProviders.js', () => ({
-  PROVIDER_CONFIGS: { google: {} },
+  PROVIDER_CONFIGS: { google: {}, edge: {} },
 }));
 
 vi.mock('@/features/tts/services/EdgeTTSClient.js', () => ({
@@ -65,114 +58,104 @@ const handlers = [
   ['Edge', handleEdgeTTSStopAll],
 ];
 
+const ownerSender = { tab: { id: 1 }, frameId: 0 };
+
 beforeEach(() => {
-  mocks.stateManager.currentTTSId = 'current';
-  mocks.stateManager.currentTTSSender = mocks.currentOwner;
-  mocks.stateManager.pendingPlaybackToken = 'successor-token';
-  mocks.stateManager.pendingPlaybackMetadata = {
-    sender: mocks.pendingOwner,
-    ttsId: 'successor',
-  };
-  mocks.stateManager.isCurrentOwner.mockReset().mockImplementation(
-    (sender, owner = mocks.stateManager.currentTTSSender) => sender === owner,
+  mocks.stateManager.stopForOwner.mockReset().mockImplementation(
+    async (_sender, { stopOnlyIfOwner }) => (
+      stopOnlyIfOwner ? { success: true, skipped: true, reason: 'not_owner' }
+        : { success: true, action: 'stopped' }
+    ),
   );
-  mocks.stateManager.stopPlayback.mockReset().mockResolvedValue({
-    success: true,
-    action: 'stopped',
-  });
   mocks.stateManager.notifyTTSEnded.mockReset().mockResolvedValue(undefined);
 });
 
-describe.each(handlers)('%s TTS stop handler', (provider, handleStop) => {
-  it('stops pending successor when ID and owner match', async () => {
+describe.each(handlers)('%s TTS stop handler delegation', (_provider, handleStop) => {
+  it('delegates specific owner-scoped stop to TTSStateManager.stopForOwner', async () => {
+    mocks.stateManager.stopForOwner.mockResolvedValueOnce({
+      success: true,
+      action: 'stopped',
+      playbackToken: 'successor-token',
+    });
+
     await expect(handleStop(
       { data: { ttsId: 'successor', stopOnlyIfOwner: true } },
-      mocks.pendingOwner,
-    )).resolves.toEqual({ success: true, action: 'stopped' });
+      ownerSender,
+    )).resolves.toEqual({
+      success: true,
+      action: 'stopped',
+      playbackToken: 'successor-token',
+    });
 
-    expect(mocks.stateManager.isCurrentOwner).toHaveBeenCalledWith(
-      mocks.pendingOwner,
-      mocks.pendingOwner,
+    expect(mocks.stateManager.stopForOwner).toHaveBeenCalledWith(
+      ownerSender,
+      { ttsId: 'successor', stopOnlyIfOwner: true },
     );
-    expect(mocks.stateManager.stopPlayback).toHaveBeenCalledTimes(1);
   });
 
-  it('skips pending successor with wrong ID', async () => {
+  it('returns the StateManager skip result for mismatched owner/ttsId', async () => {
+    mocks.stateManager.stopForOwner.mockResolvedValueOnce({
+      success: true,
+      skipped: true,
+      reason: 'not_owner',
+    });
+
     await expect(handleStop(
-      { data: { ttsId: 'wrong-id', stopOnlyIfOwner: true } },
-      mocks.pendingOwner,
-    )).resolves.toEqual({ success: true, skipped: true });
-
-    expect(mocks.stateManager.isCurrentOwner).not.toHaveBeenCalled();
-    expect(mocks.stateManager.stopPlayback).not.toHaveBeenCalled();
-  });
-
-  it('skips stale predecessor ID and owner while successor is pending', async () => {
-    await expect(handleStop(
-      { data: { ttsId: 'current', stopOnlyIfOwner: true } },
-      mocks.currentOwner,
-    )).resolves.toEqual({ success: true, skipped: true });
-
-    expect(mocks.stateManager.isCurrentOwner).not.toHaveBeenCalled();
-    expect(mocks.stateManager.stopPlayback).not.toHaveBeenCalled();
-  });
-
-  it('skips pending successor from wrong owner', async () => {
-    await expect(handleStop(
-      { data: { ttsId: 'successor', stopOnlyIfOwner: true } },
-      mocks.currentOwner,
+      { data: { ttsId: 'foreign', stopOnlyIfOwner: true } },
+      ownerSender,
     )).resolves.toEqual({ success: true, skipped: true, reason: 'not_owner' });
 
-    expect(mocks.stateManager.isCurrentOwner).toHaveBeenCalledWith(
-      mocks.currentOwner,
-      mocks.pendingOwner,
-    );
-    expect(mocks.stateManager.stopPlayback).not.toHaveBeenCalled();
+    expect(mocks.stateManager.stopForOwner).toHaveBeenCalledTimes(1);
   });
 
-  it('skips stale predecessor owner during pending stop-all', async () => {
-    await expect(handleStop(
-      { data: { ttsId: 'all', stopOnlyIfOwner: true } },
-      mocks.currentOwner,
-    )).resolves.toEqual({ success: true, skipped: true, reason: 'not_owner' });
+  it('delegates global/manual stop with stopOnlyIfOwner false', async () => {
+    mocks.stateManager.stopForOwner.mockResolvedValueOnce({
+      success: true,
+      action: 'stopped',
+      playbackToken: 'current-token',
+    });
 
-    expect(mocks.stateManager.isCurrentOwner).toHaveBeenCalledWith(
-      mocks.currentOwner,
-      mocks.pendingOwner,
-    );
-    expect(mocks.stateManager.stopPlayback).not.toHaveBeenCalled();
-
-    await expect(handleStop(
-      { data: { ttsId: 'all', stopOnlyIfOwner: true } },
-      mocks.pendingOwner,
-    )).resolves.toEqual({ success: true, action: 'stopped' });
-
-    expect(mocks.stateManager.stopPlayback).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps ownerless stop-all unconditional during pending playback', async () => {
     await expect(handleStop(
       { data: { ttsId: 'all', stopOnlyIfOwner: false } },
-      mocks.currentOwner,
-    )).resolves.toEqual({ success: true, action: 'stopped' });
+      ownerSender,
+    )).resolves.toEqual({
+      success: true,
+      action: 'stopped',
+      playbackToken: 'current-token',
+    });
 
-    expect(mocks.stateManager.isCurrentOwner).not.toHaveBeenCalled();
-    expect(mocks.stateManager.stopPlayback).toHaveBeenCalledTimes(1);
+    expect(mocks.stateManager.stopForOwner).toHaveBeenCalledWith(
+      ownerSender,
+      { ttsId: 'all', stopOnlyIfOwner: false },
+    );
   });
 
-  it('keeps current playback checks when no successor is pending', async () => {
-    mocks.stateManager.pendingPlaybackToken = null;
-    mocks.stateManager.pendingPlaybackMetadata = null;
+  it('tolerates a missing message.data payload by delegating with undefined fields', async () => {
+    mocks.stateManager.stopForOwner.mockResolvedValueOnce({
+      success: true,
+      action: 'stopped',
+      playbackToken: 'current-token',
+    });
+
+    await expect(handleStop({}, ownerSender)).resolves.toEqual({
+      success: true,
+      action: 'stopped',
+      playbackToken: 'current-token',
+    });
+
+    expect(mocks.stateManager.stopForOwner).toHaveBeenCalledWith(
+      ownerSender,
+      { ttsId: undefined, stopOnlyIfOwner: undefined },
+    );
+  });
+
+  it('returns a structured error result when the StateManager throws', async () => {
+    mocks.stateManager.stopForOwner.mockRejectedValueOnce(new Error('boom'));
 
     await expect(handleStop(
-      { data: { ttsId: 'current', stopOnlyIfOwner: true } },
-      mocks.currentOwner,
-    )).resolves.toEqual({ success: true, action: 'stopped' });
-
-    await expect(handleStop(
-      { data: { ttsId: 'current', stopOnlyIfOwner: true } },
-      mocks.pendingOwner,
-    )).resolves.toEqual({ success: true, skipped: true, reason: 'not_owner' });
+      { data: { ttsId: 'all', stopOnlyIfOwner: true } },
+      ownerSender,
+    )).resolves.toEqual({ success: false, error: 'boom' });
   });
 });
 

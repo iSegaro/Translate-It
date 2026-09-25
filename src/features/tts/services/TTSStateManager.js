@@ -19,8 +19,15 @@ export class TTSStateManager {
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
+    // Physical handoff boundary flag: true once the pending successor's
+    // PLAY command has been issued/accepted by the offscreen runtime. Until
+    // that point, the committed predecessor is safe to preserve; after that
+    // point, the predecessor may already be physically interrupted by
+    // offscreen's createPlayback() and must be terminalized via the same
+    // path as failPlaybackHandoff. Token-fenced via pendingPlaybackToken.
+    this.pendingPlaybackStarted = false;
     this.playbackRevision = 0;
-    
+
     // Centralized audio reference for Firefox direct playback
     this.activeFirefoxAudio = null;
     this.activeFirefoxAudioUrl = null;
@@ -199,6 +206,7 @@ export class TTSStateManager {
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
+    this.pendingPlaybackStarted = false;
     this.playbackRevision++;
   }
 
@@ -483,6 +491,9 @@ export class TTSStateManager {
     this.pendingPlaybackToken = playbackToken;
     this.predecessorPlaybackToken = previousPlaybackToken;
     this.pendingPlaybackMetadata = this.normalizePlaybackMetadata(metadata);
+    // A fresh pending generation has not yet issued its physical PLAY command;
+    // the predecessor remains safe to preserve until that boundary is crossed.
+    this.pendingPlaybackStarted = false;
 
     try {
       const acquired = await offscreenRuntimeLeaseManager.acquire({
@@ -499,10 +510,30 @@ export class TTSStateManager {
         this.pendingPlaybackToken = null;
         this.predecessorPlaybackToken = null;
         this.pendingPlaybackMetadata = null;
+        this.pendingPlaybackStarted = false;
       }
       logger.error('Playback lease acquisition failed:', error);
       throw error;
     }
+  }
+
+  /**
+   * Mark the pending successor as having crossed the physical handoff boundary:
+   * the offscreen PLAY command for this generation has been issued/accepted,
+   * and may already have interrupted the committed predecessor. Caller MUST
+   * invoke this immediately before sending the successor PLAY message to
+   * offscreen. Token-fenced: a stale token for a superseded pending generation
+   * cannot mark a replacement.
+   *
+   * @param {string} playbackToken - The exact pending playback token issued by
+   *   acquirePlaybackLease.
+   * @returns {boolean} True when the flag was applied to the current pending.
+   */
+  markPendingPlaybackStarted(playbackToken) {
+    if (!playbackToken) return false;
+    if (this.pendingPlaybackToken !== playbackToken) return false;
+    this.pendingPlaybackStarted = true;
+    return true;
   }
 
   /**
@@ -526,6 +557,7 @@ export class TTSStateManager {
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
+    this.pendingPlaybackStarted = false;
     this.currentPlaybackToken = playbackToken;
     this.currentTTSSender = committedMetadata.sender;
     this.currentTTSId = committedMetadata.ttsId;
@@ -567,6 +599,7 @@ export class TTSStateManager {
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
+    this.pendingPlaybackStarted = false;
     if (isPending || isCurrent || this.currentPlaybackToken === predecessorPlaybackToken) {
       this.currentPlaybackToken = null;
       this.currentTTSSender = null;
@@ -585,6 +618,260 @@ export class TTSStateManager {
 
     await this.notifyCapturedEnded('error', errorData || { error: 'TTS playback handoff failed' }, playbackToken, metadata);
     return true;
+  }
+
+  /**
+   * Owner-aware stop with handoff awareness.
+   * Decides which playback generation(s) to stop based on sender ownership.
+   *
+   * Pre-handoff state:
+   *   - committed: currentPlaybackToken / currentTTSSender / currentTTSId
+   *   - pending:   pendingPlaybackToken   / pendingPlaybackMetadata
+   *   - predecessor token: predecessorPlaybackToken (== currentPlaybackToken during handoff)
+   *
+   * Same-session handoff note: `TTSQueueManager` reuses one request `ttsId`
+   * across every chunk of a multi-chunk session. A chunk transition can
+   * therefore produce a predecessor and a pending successor that share the
+   * SAME `ttsId` (and often the same owner). For specific-`ttsId` Stops we
+   * must consider BOTH generations before deciding what to stop — matching
+   * pending first and stopping only the successor would leave a same-session
+   * predecessor (and its remaining queue) alive, which is wrong.
+   *
+   * Behavior:
+   *   - Specific ttsId (not 'all', not null/undefined): always fenced by ttsId.
+   *       * matchesPending && matchesCurrent (same-session handoff):
+   *           - stopOnlyIfOwner false/absent → existing global stopPlayback()
+   *             (clears the queue and the whole session).
+   *           - stopOnlyIfOwner true:
+   *               · owns both   → stopPlayback() (exclusive-playback / queue clear).
+   *               · owns only current → _stopPredecessorOnly()
+   *                                     (queue-managed chunk still in flight
+   *                                      is abandoned with the predecessor; the
+   *                                      foreign pending is left intact).
+   *               · owns only pending → _stopPendingOnly().
+   *               · owns neither       → skipped (not_owner).
+   *       * only one generation matches:
+   *           - matchesCurrent only → if a successor is pending,
+   *             _stopPredecessorOnly(); otherwise stopPlayback().
+   *             Ownership check applies only when stopOnlyIfOwner is true.
+   *           - matchesPending only → _stopPendingOnly(). Ownership check
+   *             applies only when stopOnlyIfOwner is true.
+   *       * neither generation matches → skipped (specific-ttsId fence); no
+   *         playback affected, even when ownerless.
+   *   - No specific ttsId (or 'all'):
+   *       * stopOnlyIfOwner false/absent → delegates to existing global stopPlayback().
+   *       * stopOnlyIfOwner true:
+   *           - owns both pending and current (same owner) → full stop.
+   *           - owns only current, no pending              → full stop.
+   *           - owns only current, foreign successor pending → stops ONLY predecessor.
+   *           - owns only pending, foreign current          → stops ONLY pending successor.
+   *           - owns neither                                → skipped (not_owner).
+   *
+   * @param {Object} sender - Message sender
+   * @param {Object} options
+   * @param {string|null|undefined} [options.ttsId=null] - Specific ttsId; null/'all'/absent = stop-all
+   * @param {boolean} [options.stopOnlyIfOwner=false] - Enforce ownership
+   * @returns {Promise<Object>} { success, action, skipped?, reason?, playbackToken? }
+   */
+  async stopForOwner(sender, { ttsId = null, stopOnlyIfOwner = false } = {}) {
+    const isSpecific = Boolean(ttsId && ttsId !== 'all');
+    const hasPending = Boolean(this.pendingPlaybackToken);
+    const pendingMetadata = this.pendingPlaybackMetadata;
+    const currentSender = this.currentTTSSender;
+    const currentTTSId = this.currentTTSId;
+
+    if (isSpecific) {
+      // Specific ttsId is ALWAYS fenced, regardless of stopOnlyIfOwner.
+      // Compute both matches BEFORE deciding so a same-session handoff
+      // (TTSQueueManager reuses one ttsId across chunks) cannot trick us
+      // into stopping only the pending successor.
+      const matchesPending = hasPending && pendingMetadata?.ttsId === ttsId;
+      const matchesCurrent = currentTTSId === ttsId;
+
+      if (matchesPending && matchesCurrent) {
+        // Same-session handoff: predecessor + successor share this ttsId.
+        if (!stopOnlyIfOwner) {
+          // Ownerless specific Stop for the session: clear the whole session
+          // and the queue via the existing global path.
+          return this.stopPlayback();
+        }
+        const ownsPending = this.isCurrentOwner(sender, pendingMetadata?.sender ?? null);
+        const ownsCurrent = this.isCurrentOwner(sender, currentSender);
+        if (ownsPending && ownsCurrent) {
+          return this.stopPlayback();
+        }
+        if (ownsCurrent) {
+          return this._stopPredecessorOnly();
+        }
+        if (ownsPending) {
+          return this._stopPendingOnly();
+        }
+        return { success: true, skipped: true, reason: 'not_owner' };
+      }
+
+      if (matchesPending) {
+        if (stopOnlyIfOwner && !this.isCurrentOwner(sender, pendingMetadata?.sender ?? null)) {
+          return { success: true, skipped: true, reason: 'not_owner' };
+        }
+        return this._stopPendingOnly();
+      }
+
+      if (matchesCurrent) {
+        if (stopOnlyIfOwner && !this.isCurrentOwner(sender, currentSender)) {
+          return { success: true, skipped: true, reason: 'not_owner' };
+        }
+        if (hasPending) {
+          return this._stopPredecessorOnly();
+        }
+        // No pending successor: full stop is the existing behavior.
+        return this.stopPlayback();
+      }
+
+      // Neither generation matches: do not stop anything, even when ownerless.
+      return { success: true, skipped: true };
+    }
+
+    // ID-less / 'all' + no ownership gating: preserve existing global behavior.
+    if (!stopOnlyIfOwner) {
+      return this.stopPlayback();
+    }
+
+    // Owner-scoped stop-all: only generations owned by the sender are stopped.
+    const ownsPending = hasPending
+      && this.isCurrentOwner(sender, pendingMetadata?.sender ?? null);
+    const ownsCurrent = this.isCurrentOwner(sender, currentSender);
+
+    if (!ownsPending && !ownsCurrent) {
+      return { success: true, skipped: true, reason: 'not_owner' };
+    }
+
+    // Same owner owns both generations: existing exclusive-playback semantic.
+    if (ownsPending && ownsCurrent) {
+      return this.stopPlayback();
+    }
+
+    if (ownsCurrent && !hasPending) {
+      return this.stopPlayback();
+    }
+
+    if (ownsCurrent && hasPending) {
+      return this._stopPredecessorOnly();
+    }
+
+    if (ownsPending && !ownsCurrent) {
+      return this._stopPendingOnly();
+    }
+
+    // Unreachable given the guard above, but kept for exhaustive branching.
+    return { success: true, skipped: true };
+  }
+
+  /**
+   * Stop only the pending successor playback. Honors the physical handoff
+   * boundary:
+   *
+   *   - If the pending PLAY command has NOT yet crossed into offscreen
+   *     (`pendingPlaybackStarted === false`), the committed predecessor has
+   *     not been physically interrupted and can be preserved as valid
+   *     committed state.
+   *   - If the pending PLAY command HAS already been issued/accepted
+   *     (`pendingPlaybackStarted === true`), the predecessor may already be
+   *     physically interrupted by offscreen. In that window the predecessor
+   *     must be terminalized via the same handoff-failure invariant used by
+   *     `failPlaybackHandoff` (it was displaced by the handoff, not explicitly
+   *     stopped by the predecessor owner). The displaced predecessor receives
+   *     a terminal notification with `reason: 'interrupted'` (not `'stopped'`),
+   *     and it is never attributed to the successor owner.
+   *
+   * Cross-owner isolation is preserved: the foreign predecessor is never
+   * marked as having been stopped by the successor owner.
+   */
+  async _stopPendingOnly() {
+    const pendingToken = this.pendingPlaybackToken;
+    const pendingMetaSnapshot = this.pendingPlaybackMetadata
+      ? this.createMetadataSnapshot(this.pendingPlaybackMetadata)
+      : null;
+    const handoffAttempted = this.pendingPlaybackStarted;
+    const displacedPredecessorToken = handoffAttempted ? this.currentPlaybackToken : null;
+    // Capture the predecessor's owner-facing metadata BEFORE clearing
+    // committed state, so the displaced predecessor's terminal notification
+    // can be delivered to its original owner.
+    const displacedPredecessorSnapshot = (handoffAttempted && this.currentTTSSender)
+      ? this.capturePlaybackMetadata()
+      : null;
+
+    this.pendingPlaybackToken = null;
+    this.predecessorPlaybackToken = null;
+    this.pendingPlaybackMetadata = null;
+    this.pendingPlaybackStarted = false;
+    this.playbackRevision++;
+
+    if (handoffAttempted) {
+      // The pending PLAY already crossed into offscreen. The committed
+      // predecessor may be physically interrupted; terminalize it through the
+      // handoff-failure path and clear committed state. We do NOT claim the
+      // successor owner explicitly stopped the predecessor; the predecessor's
+      // terminal reason reflects a handoff displacement.
+      this.currentPlaybackToken = null;
+      this.currentTTSSender = null;
+      this.currentTTSId = null;
+      this.lastTTSLanguage = null;
+      this.lastTTSText = null;
+
+      await this.stopAudioOnly(displacedPredecessorToken);
+      await this.releaseOffscreenLease(displacedPredecessorToken);
+    }
+
+    await this.stopAudioOnly(pendingToken);
+    await this.releaseOffscreenLease(pendingToken);
+
+    // Notify the displaced predecessor's original owner with `interrupted`
+    // (NOT `stopped`). `interrupted` is already treated as terminal/idle by
+    // existing UI semantics, so no new public status is required.
+    if (displacedPredecessorSnapshot?.sender) {
+      await this.notifyCapturedEnded(
+        'interrupted',
+        null,
+        displacedPredecessorToken,
+        displacedPredecessorSnapshot,
+      );
+    }
+
+    if (pendingMetaSnapshot) {
+      await this.notifyCapturedEnded('stopped', null, pendingToken, pendingMetaSnapshot);
+    }
+
+    return { success: true, action: 'stopped', playbackToken: pendingToken };
+  }
+
+  /**
+   * Stop only the committed predecessor playback without affecting a pending
+   * successor. Used when the requester owns the predecessor but a foreign
+   * successor is pending. Invalidates current state synchronously before
+   * yielding so the pending successor remains handoff-eligible.
+   *
+   * NOTE: `currentTTSRequest` / `pendingRequestKey` are intentionally NOT
+   * cleared: during a handoff they may still represent the in-flight successor
+   * request, and clearing them would corrupt its deduplication/fencing.
+   */
+  async _stopPredecessorOnly() {
+    const predecessorToken = this.currentPlaybackToken;
+    const predecessorMetaSnapshot = this.capturePlaybackMetadata();
+
+    this.currentPlaybackToken = null;
+    this.currentTTSSender = null;
+    this.currentTTSId = null;
+    this.lastTTSLanguage = null;
+    this.lastTTSText = null;
+    this.predecessorPlaybackToken = null;
+    this.playbackRevision++;
+
+    await this.stopAudioOnly(predecessorToken);
+    await this.releaseOffscreenLease(predecessorToken);
+
+    await this.notifyCapturedEnded('stopped', null, predecessorToken, predecessorMetaSnapshot);
+
+    return { success: true, action: 'stopped', playbackToken: predecessorToken };
   }
 
   /**
@@ -610,6 +897,7 @@ export class TTSStateManager {
     this.pendingPlaybackToken = null;
     this.predecessorPlaybackToken = null;
     this.pendingPlaybackMetadata = null;
+    this.pendingPlaybackStarted = false;
     this.currentPlaybackToken = null;
     this.currentTTSSender = null;
     this.currentTTSId = null;
@@ -653,6 +941,10 @@ export class TTSStateManager {
       if (this.pendingPlaybackToken === playbackToken) {
         this.pendingPlaybackToken = null;
         this.predecessorPlaybackToken = null;
+        // The pending generation's physical boundary is gone with its lease;
+        // reset the flag so a later stopForOwner decision cannot read a stale
+        // "physical handoff attempted" against a replacement token.
+        this.pendingPlaybackStarted = false;
       } else if (this.predecessorPlaybackToken === playbackToken) {
         this.predecessorPlaybackToken = null;
       }

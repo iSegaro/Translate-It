@@ -98,6 +98,32 @@ To prevent cross-context interruptions (e.g., closing the Popup stopping a Deskt
 - **`stopOnlyIfOwner` Flag**: Automatic cleanup triggers (like window closure or visibility changes) pass this flag. The background script only executes the stop command if the sender is the verified owner.
 - **Manual Overrides**: User-initiated actions (clicking a Stop button or starting new text) bypass this check to ensure the **Exclusive Playback** rule is maintained.
 
+#### Handoff-Aware Owner-Scoped Stop
+During a playback handoff a committed predecessor and a pending successor can coexist. `TTSStateManager.stopForOwner(sender, { ttsId, stopOnlyIfOwner })` is the single owner-aware stop decision point used by the Google and Edge stop handlers (which delegate instead of duplicating ownership logic):
+
+- Specific `ttsId` (not 'all', not null/undefined) is **always fenced** by `ttsId`, regardless of `stopOnlyIfOwner`. The match is evaluated against BOTH generations before any decision, because `TTSQueueManager` reuses one request `ttsId` across every chunk of a multi-chunk session — a chunk transition can therefore legitimately produce a predecessor and a pending successor that share the SAME `ttsId` (and often the same owner).
+  - matches BOTH pending and current (same-session handoff):
+    - `stopOnlyIfOwner: false` or absent → existing global `stopPlayback()` (clears the queue and the whole session).
+    - `stopOnlyIfOwner: true`:
+      - owns both → `stopPlayback()` (exclusive-playback / queue clear).
+      - owns only current → `_stopPredecessorOnly()` (the queue-managed chunk still in flight is abandoned with the predecessor; the foreign pending successor is left intact).
+      - owns only pending → `_stopPendingOnly()`.
+      - owns neither → skipped with `reason: 'not_owner'`.
+  - matches ONLY pending → `_stopPendingOnly()`; ownership check applies only when `stopOnlyIfOwner: true`.
+  - matches ONLY current → if a successor is pending, `_stopPredecessorOnly()`; otherwise full global stop. Ownership check applies only when `stopOnlyIfOwner: true`.
+  - matches NEITHER → skipped; no playback is affected (this prevents a stale specific `ttsId` from triggering a global stop even when ownerless).
+- No specific `ttsId` (or `ttsId: 'all'`):
+  - `stopOnlyIfOwner: false` or absent → existing global `stopPlayback()` (manual/cleanup paths).
+  - `stopOnlyIfOwner: true`:
+    - same owner owns both generations → existing exclusive-playback stop (`stopPlayback()`).
+    - owns only the predecessor, foreign successor pending → stops ONLY the predecessor.
+    - owns only the successor, foreign predecessor committed → stops ONLY the successor.
+    - owns neither → skipped with `reason: 'not_owner'`.
+
+A predecessor-only stop (`_stopPredecessorOnly`) intentionally does **not** clear `currentTTSRequest` / `pendingRequestKey`: during a handoff those fields may still represent the in-flight successor request, and clearing them would corrupt the successor's deduplication and handoff fencing. The pending playback token/metadata are also preserved so the successor remains handoff-eligible until its own request settles.
+
+Late successor commands that try to `commitPlaybackLease` a token that was already stopped by its owner are rejected, preserving the existing handoff fencing.
+
 ---
 
 ## Smart Language Detection & Voice Selection
