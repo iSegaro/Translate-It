@@ -305,6 +305,9 @@
   "live_dubbing_status_idle": {
     "message": "Ready"
   },
+  "live_dubbing_status_starting": {
+    "message": "Starting…"
+  },
   "live_dubbing_status_preparing_capture": {
     "message": "Preparing capture…"
   },

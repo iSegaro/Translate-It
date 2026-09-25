@@ -3692,4 +3692,94 @@ describe('LiveDubbingControl', () => {
     })
   })
 
+  // ── Transient local status presentation ─────────────────────────────────────
+  // Local `starting`/`stopping` are valid presentation states of their own;
+  // they must never fall through to the generic "Error" fallback, while the
+  // authoritative backend stages keep replacing them as they arrive.
+
+  describe('transient local status presentation', () => {
+    const statusLine = (wrapper) => wrapper.find('.ti-live-dubbing-control-status').text()
+    const runningDescriptor = { status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 } }
+
+    it('shows "Starting…" immediately while START is pending and never "Error"', async () => {
+      let resolveStart
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        if (action === 'START_LIVE_DUBBING') return new Promise(resolve => { resolveStart = resolve })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+      expect(statusLine(wrapper)).toBe('Ready')
+
+      await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+
+      // Local pending START presents as "Starting…" — never the Error fallback.
+      expect(statusLine(wrapper)).toBe('Starting…')
+      expect(statusLine(wrapper)).not.toBe('Error')
+
+      // Resolving START swaps in the authoritative status directly.
+      resolveStart(runningDescriptor)
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(statusLine(wrapper)).toBe('Running')
+    })
+
+    it('shows "Starting…" after retrying from Error until START resolves', async () => {
+      let resolveStart
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'ERROR' })
+        if (action === 'START_LIVE_DUBBING') return new Promise(resolve => { resolveStart = resolve })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+      expect(statusLine(wrapper)).toBe('Error')
+
+      await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+      expect(statusLine(wrapper)).toBe('Starting…')
+      expect(statusLine(wrapper)).not.toBe('Error')
+
+      resolveStart(runningDescriptor)
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(statusLine(wrapper)).toBe('Running')
+    })
+
+    it('shows "Stopping…" while STOP is pending instead of the stale RUNNING status', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          return Promise.resolve({ status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 } })
+        }
+        if (action === 'STOP_LIVE_DUBBING') return new Promise(() => {})
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+      expect(statusLine(wrapper)).toBe('Running')
+
+      await wrapper.find('button[aria-label="Stop live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+
+      // Local pending STOP presents as "Stopping…", never "Error".
+      expect(statusLine(wrapper)).toBe('Stopping…')
+      expect(statusLine(wrapper)).not.toBe('Error')
+    })
+
+    it('still shows "Error" for a real START failure', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+        if (action === 'START_LIVE_DUBBING') return Promise.reject(new Error('transport down'))
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+      await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(statusLine(wrapper)).toBe('Error')
+      expect(wrapper.text()).toContain('transport down')
+    })
+  })
+
 })

@@ -245,7 +245,13 @@ const isIdle = computed(() => state.value === 'idle')
 const isBusy = computed(() => isTransitioning.value || isRunning.value || isCleanupPending.value)
 // Presentation-only: UI state is authoritative for the status line. State
 // transitions, session retention and cleanup behavior are untouched.
-const displayStatus = computed(() => state.value === 'cleanup' ? 'cleanup' : authoritativeStatus.value || state.value)
+const displayStatus = computed(() => {
+  if (state.value === 'cleanup') return 'cleanup'
+  // Local pending STOP always presents as "stopping" (same message as the
+  // authoritative STOPPING stage) instead of a stale RUNNING/ERROR status.
+  if (state.value === 'stopping') return 'stopping'
+  return authoritativeStatus.value || state.value
+})
 const statusText = computed(() => {
   // Hidden initial-loading window: the GET is still pending and the
   // presentation delay has not elapsed — render no status text at all, so
@@ -256,6 +262,10 @@ const statusText = computed(() => {
   return ({
     loading: t('live_dubbing_status_loading', 'Checking availability…'),
     idle: t('live_dubbing_status_idle', 'Ready'),
+    // Local transient states — explicit so they never fall through to the
+    // generic "Error" fallback (e.g. Ready → Error → Running on START).
+    starting: t('live_dubbing_status_starting', 'Starting…'),
+    stopping: t('live_dubbing_status_stopping', 'Stopping…'),
     PREPARING_CAPTURE: t('live_dubbing_status_preparing_capture', 'Preparing capture…'),
     CONNECTING_PROVIDER: t('live_dubbing_status_connecting_provider', 'Connecting to provider…'),
     RUNNING: t('live_dubbing_status_running', 'Running'),
@@ -951,6 +961,8 @@ const start = async () => {
   const generation = nextOperationGeneration()
   const prevFence = volumeFence.value
   state.value = 'starting'
+  // Presentation-only: drop stale authoritative status so a retry shows "Starting…".
+  authoritativeStatus.value = null
   errorMessage.value = ''
   try {
     const response = await sendMessage({

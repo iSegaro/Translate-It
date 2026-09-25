@@ -305,6 +305,9 @@
   "live_dubbing_status_idle": {
     "message": "準備完了"
   },
+  "live_dubbing_status_starting": {
+    "message": "開始中…"
+  },
   "live_dubbing_status_preparing_capture": {
     "message": "キャプチャを準備中…"
   },

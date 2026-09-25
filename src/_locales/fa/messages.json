@@ -305,6 +305,9 @@
   "live_dubbing_status_idle": {
     "message": "آماده"
   },
+  "live_dubbing_status_starting": {
+    "message": "در حال شروع…"
+  },
   "live_dubbing_status_preparing_capture": {
     "message": "در حال آماده‌سازی ضبط…"
   },
