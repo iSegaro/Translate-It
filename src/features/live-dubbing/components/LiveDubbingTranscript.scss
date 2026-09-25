@@ -16,7 +16,10 @@
   border: 1px solid rgb(255 255 255 / 15%) !important;
   border-radius: 0.65rem !important;
   box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 28%) !important;
-  font: 500 clamp(0.95rem, 1.8vw, 1.2rem) / 1.45 ui-sans-serif, system-ui, sans-serif !important;
+  font-family: var(--ti-live-dubbing-font-family, ui-sans-serif, system-ui, sans-serif) !important;
+  font-size: clamp(0.95rem, 1.8vw, 1.2rem) !important;
+  font-weight: 500 !important;
+  line-height: 1.45 !important;
   letter-spacing: 0.01em !important;
   text-align: center !important;
   text-wrap: pretty !important;
@@ -40,6 +43,7 @@
   overflow: hidden !important;
   overflow-wrap: anywhere !important;
   word-break: break-word !important;
+  font-family: var(--ti-live-dubbing-font-family, ui-sans-serif, system-ui, sans-serif) !important;
   pointer-events: none !important;
 }
 

@@ -9,4 +9,13 @@ describe('ContentApp transcript preference gate', () => {
     expect(source).toContain(':show-translated-transcript="showTranslatedTranscript"');
     expect(source).toContain(':show-original-transcript="showOriginalTranscript"');
   });
+
+  it('resolves and passes the optional shared translation font at the content boundary', () => {
+    const source = readFileSync('src/apps/content/ContentApp.vue', 'utf8');
+
+    expect(source).toContain("import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';");
+    expect(source).toContain('settings?.LIVE_DUBBING_USE_TRANSLATION_FONT !== true');
+    expect(source).toContain('settings.LIVE_DUBBING_TARGET_LANGUAGE || CONFIG.LIVE_DUBBING_TARGET_LANGUAGE');
+    expect(source).toContain(':font-family="liveDubbingFontFamily"');
+  });
 });

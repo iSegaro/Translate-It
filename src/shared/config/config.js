@@ -113,6 +113,7 @@ export const CONFIG = {
   LIVE_DUBBING_DUBBED_VOLUME: 1,
   LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: false,
   LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT: false,
+  LIVE_DUBBING_USE_TRANSLATION_FONT: false,
 
   // --- Mode Specific Provider Settings (Generated Dynamically) ---
   MODE_PROVIDERS: Object.fromEntries(

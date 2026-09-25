@@ -32,12 +32,35 @@ describe('LiveDubbingTranscript renderer', () => {
     expect(container.exists()).toBe(true);
     expect(container.attributes('aria-live')).toBeUndefined();
     expect(container.attributes('aria-atomic')).toBeUndefined();
+    expect(container.attributes('style')).toBeUndefined();
     expect(source.text()).toBe('Bonjour le monde');
     expect(translated.text()).toBe('Hello world');
     expect(source.attributes('dir')).toBe('auto');
     expect(translated.attributes('dir')).toBe('auto');
     // Source row sits above the primary translated row.
     expect(source.element.nextElementSibling).toBe(translated.element);
+
+    wrapper.unmount();
+  });
+
+  it('applies the resolved font family to both rows and reacts to changes', async () => {
+    acceptLiveDubbingTranscript(envelope(1, 'Hello world'));
+    acceptLiveDubbingTranscript(envelope(2, 'Bonjour le monde', 'source'));
+
+    const wrapper = mount(LiveDubbingTranscript, {
+      props: {
+        showTranslatedTranscript: true,
+        showOriginalTranscript: true,
+        fontFamily: 'Arial, Helvetica, sans-serif',
+      },
+    });
+
+    expect(wrapper.find('.live-dubbing-transcript').attributes('style')).toContain('Arial');
+    expect(wrapper.find('.live-dubbing-transcript__source').text()).toBe('Bonjour le monde');
+    expect(wrapper.find('.live-dubbing-transcript__translated').text()).toBe('Hello world');
+
+    await wrapper.setProps({ fontFamily: 'Georgia, Times, serif' });
+    expect(wrapper.find('.live-dubbing-transcript').attributes('style')).toContain('Georgia');
 
     wrapper.unmount();
   });
@@ -153,6 +176,11 @@ describe('LiveDubbingTranscript renderer', () => {
     expect(scss).toMatch(/overflow-wrap:\s*anywhere/);
     expect(scss).toMatch(/word-break:\s*break-word/);
     expect(scss).toMatch(/box-sizing:\s*border-box/);
+    expect(scss).not.toMatch(/^\s*font:/m);
+    expect(scss).toMatch(/font-size:\s*clamp\(0\.95rem,\s*1\.8vw,\s*1\.2rem\)/);
+    expect(scss).toMatch(/font-weight:\s*500/);
+    expect(scss).toMatch(/line-height:\s*1\.45/);
+    expect(scss).toMatch(/font-family:\s*var\(--ti-live-dubbing-font-family,/);
     expect(scss).toMatch(/@media\s*\(max-width:\s*36rem\),\s*\(max-height:\s*30rem\)/);
   });
 });

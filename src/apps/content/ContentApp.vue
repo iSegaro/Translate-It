@@ -93,6 +93,7 @@
         v-if="isTopFrame && (showTranslatedTranscript || showOriginalTranscript)"
         :show-translated-transcript="showTranslatedTranscript"
         :show-original-transcript="showOriginalTranscript"
+        :font-family="liveDubbingFontFamily"
       />
     </template>
 
@@ -155,6 +156,8 @@ const MobileFab = defineAsyncComponent(() => import('./components/mobile/MobileF
 const DesktopFabMenu = defineAsyncComponent(() => import('./components/desktop/DesktopFabMenu.vue'));
 
 import { TRANSLATION_HTML } from '@/shared/constants/translation.js';
+import { CONFIG } from '@/shared/config/config.js';
+import { resolveTranslationFontFamily } from '@/shared/fonts/TranslationFontResolver.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -182,6 +185,15 @@ const showTranslatedTranscript = computed(() =>
 const showOriginalTranscript = computed(() =>
   settingsStore.settings?.LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT === true
 );
+const liveDubbingFontFamily = computed(() => {
+  const settings = settingsStore.settings;
+  if (settings?.LIVE_DUBBING_USE_TRANSLATION_FONT !== true) return '';
+
+  return resolveTranslationFontFamily(
+    settings.TRANSLATION_FONT_FAMILY || CONFIG.TRANSLATION_FONT_FAMILY,
+    settings.LIVE_DUBBING_TARGET_LANGUAGE || CONFIG.LIVE_DUBBING_TARGET_LANGUAGE
+  );
+});
 
 // 2. Localization & RTL Management
 const { toastRTL, updateToastRTL } = useContentAppLocalization(settingsStore);

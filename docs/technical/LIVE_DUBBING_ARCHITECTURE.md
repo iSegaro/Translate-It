@@ -882,5 +882,7 @@ Provider Adapter → LiveDubbingController → Background Coordinator
   enabled row. The streaming container is not an `aria-live` region, while
   its plain subtitle text remains accessible. Original and Translated are
   independent latest transcript streams, not guaranteed paired bilingual
-  cues. Feature-local component SCSS follows the project's Shadow DOM
-  `!important` convention.
+  cues. Subtitle font family can optionally inherit the shared Translation
+  Font Family setting when `LIVE_DUBBING_USE_TRANSLATION_FONT` is enabled;
+  font size remains owned by the Live Dubbing renderer. Feature-local
+  component SCSS follows the project's Shadow DOM `!important` convention.

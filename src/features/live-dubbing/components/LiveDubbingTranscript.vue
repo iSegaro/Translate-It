@@ -2,6 +2,7 @@
   <div
     v-if="(showTranslatedTranscript && visibleText) || (showOriginalTranscript && visibleSourceText)"
     class="live-dubbing-transcript"
+    :style="transcriptStyle"
   >
     <div
       v-if="showOriginalTranscript && visibleSourceText"
@@ -42,10 +43,17 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  fontFamily: {
+    type: String,
+    default: '',
+  },
 });
-const { showTranslatedTranscript, showOriginalTranscript } = toRefs(props);
+const { showTranslatedTranscript, showOriginalTranscript, fontFamily } = toRefs(props);
 const visibleText = computed(() => getVisibleLiveDubbingTranscript(transcript.value));
 const visibleSourceText = computed(() => getVisibleLiveDubbingSourceTranscript(transcript.value));
+const transcriptStyle = computed(() => (
+  fontFamily.value ? { '--ti-live-dubbing-font-family': fontFamily.value } : undefined
+));
 const unsubscribe = subscribeLiveDubbingTranscript((snapshot) => {
   transcript.value = snapshot;
 });

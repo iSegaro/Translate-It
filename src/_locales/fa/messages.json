@@ -2090,6 +2090,9 @@
   "whole_page_use_translation_font_label": {
     "message": "استفاده از فونت ترجمه در ترجمه صفحه"
   },
+  "live_dubbing_use_translation_font_label": {
+    "message": "استفاده از فونت ترجمه در زیرنویس‌های دوبله زنده"
+  },
   "font_family_label": {
     "message": "نوع فونت"
   },
