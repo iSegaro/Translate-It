@@ -11,10 +11,6 @@
   box-sizing: border-box !important;
   overflow: visible !important;
 
-  &:hover .ti-input-toolbar {
-    opacity: 1 !important;
-    visibility: visible !important;
-  }
 }
 
 .ti-translation-textarea {
@@ -57,7 +53,7 @@
   left: 10px !important;
   opacity: 0.5 !important;
   visibility: visible !important;
-  transition: all 0.2s ease !important;
+  transition: opacity 0.14s ease !important;
   background: rgba(255, 255, 255, 0.1) !important;
   backdrop-filter: blur(4px) !important;
   border-radius: 6px !important;
@@ -93,6 +89,31 @@
       opacity: 1 !important;
       pointer-events: none !important;
     }
+  }
+}
+
+/* Hide input actions only on hover-capable pointer devices. The textarea is
+   autofocus, so its focus must not reveal the toolbar on Popup/Sidepanel open. */
+@media (hover: hover) and (pointer: fine) {
+  .ti-input-toolbar {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  .ti-textarea-container:hover .ti-input-toolbar,
+  .ti-textarea-container .ti-input-toolbar:focus-within,
+  .ti-textarea-container .ti-input-toolbar:focus {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .ti-input-toolbar:has(
+    .ti-tts-button--loading,
+    .ti-tts-button--playing,
+    .ti-tts-button--error
+  ) {
+    opacity: 1 !important;
+    pointer-events: auto !important;
   }
 }
 
