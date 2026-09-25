@@ -766,17 +766,12 @@ export class TTSStateManager {
    *      to the captured predecessor token, reconcile that STALE predecessor
    *      generation (clear, release lease, notify owner with `interrupted`).
    *      Never touch a different/newer StateManager generation.
-   *   D. Unknown / unavailable / transport failure: do not claim predecessor
-   *      preservation. Take the conservative path: do not speculate-stop
-   *      another owner; do not falsely succeed. Reconcile the captured
-   *      predecessor conservatively (clear + release lease + notify owner
-   *      with `interrupted`) ONLY when StateManager still points to it;
-   *      never touch a different/newer StateManager generation.
+   *   D. Unknown / unavailable / transport failure: physical state is unknown.
+   *      Invalidate and release only the pending generation; preserve the
+   *      captured predecessor state and lease, and do not notify its owner.
    *
    * Cross-owner isolation is preserved: the foreign predecessor is never
-   * marked as having been explicitly stopped by the successor owner; its
-   * terminal state reflects a handoff displacement or conservative
-   * reconciliation, not a successor-initiated Stop.
+   * marked as having been explicitly stopped by the successor owner.
    *
    * All post-`await` state changes are token-fenced against the captured
    * generation so a newer playback that arrived during the async window
@@ -823,9 +818,9 @@ export class TTSStateManager {
 
     // 5. Reconcile the captured predecessor generation ONLY when
     // classification.reconcilePredecessor is true AND StateManager still
-    // points to the captured predecessor token. Branch B preserves the
-    // predecessor; branches C/D reconcile the captured predecessor only
-    // when StateManager STILL references it (token-fenced). A newer
+    // points to the captured predecessor token. Branch B and Branch D
+    // preserve the predecessor; branches A/C reconcile it only when
+    // StateManager STILL references it (token-fenced). A newer
     // replacement generation that already replaced StateManager's
     // committed slot is never cleared by this cleanup path.
     const stillReferencesCaptured = this.currentPlaybackToken === capturedPredecessorToken;
@@ -921,7 +916,7 @@ export class TTSStateManager {
     if (!response || typeof response !== 'object') {
       return {
         label: 'D',
-        reconcilePredecessor: Boolean(capturedPredecessorToken),
+        reconcilePredecessor: false,
         predecessorDisplaced: false,
         predecessorReason: 'interrupted',
       };
@@ -935,7 +930,7 @@ export class TTSStateManager {
     if (stopped && skipped) {
       return {
         label: 'D',
-        reconcilePredecessor: Boolean(capturedPredecessorToken),
+        reconcilePredecessor: false,
         predecessorDisplaced: false,
         predecessorReason: 'interrupted',
       };
@@ -951,7 +946,7 @@ export class TTSStateManager {
       if (!isIdentified) {
         return {
           label: 'D',
-          reconcilePredecessor: Boolean(capturedPredecessorToken),
+          reconcilePredecessor: false,
           predecessorDisplaced: false,
           predecessorReason: 'interrupted',
         };
@@ -976,7 +971,7 @@ export class TTSStateManager {
       if (!ownsCurrentPlaybackToken) {
         return {
           label: 'D',
-          reconcilePredecessor: Boolean(capturedPredecessorToken),
+          reconcilePredecessor: false,
           predecessorDisplaced: false,
           predecessorReason: 'interrupted',
         };
@@ -1016,12 +1011,11 @@ export class TTSStateManager {
     }
 
     // Branch D: unknown / unavailable / transport failure / malformed.
-    // Conservative: do not claim preservation, do not speculate-stop.
-    // Reconcile the captured predecessor if StateManager still references
-    // it; never touch a different/newer StateManager generation.
+    // Physical state is unknown, so preserve the captured predecessor rather
+    // than reconciling or notifying an owner based on speculation.
     return {
       label: 'D',
-      reconcilePredecessor: Boolean(capturedPredecessorToken),
+      reconcilePredecessor: false,
       predecessorDisplaced: false,
       predecessorReason: 'interrupted',
     };
