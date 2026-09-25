@@ -258,8 +258,11 @@ describe('LiveDubbingView', () => {
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
     expect(transcriptHeader(wrapper).attributes('aria-controls'))
       .toBe('live-dubbing-transcript-preferences-content')
-    expect(transcriptContent(wrapper).attributes('style')).toBe('display: none;')
-    expect(wrapper.find('.live-dubbing-change-font-link').isVisible()).toBe(false)
+    expect(transcriptContent(wrapper).exists()).toBe(true)
+    expect(transcriptContent(wrapper).classes()).not.toContain('is-expanded')
+    expect(transcriptContent(wrapper).attributes('inert')).toBe('')
+    expect(wrapper.findAllComponents({ name: 'BaseToggle' })).toHaveLength(2)
+    expect(wrapper.find('.live-dubbing-change-font-link').exists()).toBe(true)
   })
 
   it.each([
@@ -270,7 +273,8 @@ describe('LiveDubbingView', () => {
     const wrapper = mountView()
 
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
-    expect(transcriptContent(wrapper).attributes('style')).toBeUndefined()
+    expect(transcriptContent(wrapper).classes()).toContain('is-expanded')
+    expect(transcriptContent(wrapper).attributes('inert')).toBeUndefined()
   })
 
   it('toggles the disclosure state without changing subtitle settings or remounting control', async () => {
@@ -282,7 +286,8 @@ describe('LiveDubbingView', () => {
     await transcriptHeader(wrapper).trigger('click')
 
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
-    expect(transcriptContent(wrapper).isVisible()).toBe(true)
+    expect(transcriptContent(wrapper).classes()).toContain('is-expanded')
+    expect(transcriptContent(wrapper).attributes('inert')).toBeUndefined()
     expect(harness.store.updateSettingAndPersist).toHaveBeenCalledTimes(updateCount)
     expect(harness.store.updateSettingLocally).toHaveBeenCalledTimes(localUpdateCount)
     expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).vm).toBe(control.vm)
@@ -290,7 +295,8 @@ describe('LiveDubbingView', () => {
     await transcriptHeader(wrapper).trigger('click')
     await settle()
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
-    expect(transcriptContent(wrapper).attributes('style')).toBe('display: none;')
+    expect(transcriptContent(wrapper).classes()).not.toContain('is-expanded')
+    expect(transcriptContent(wrapper).attributes('inert')).toBe('')
   })
 
   it('keeps the existing subtitle controls hidden or visible with the disclosure state', async () => {
@@ -299,12 +305,12 @@ describe('LiveDubbingView', () => {
     const sizeSelect = wrapper.find('#live-dubbing-subtitle-size-select')
 
     expect(toggles).toHaveLength(2)
-    expect(transcriptContent(wrapper).isVisible()).toBe(false)
+    expect(transcriptContent(wrapper).classes()).not.toContain('is-expanded')
+    expect(sizeSelect.exists()).toBe(true)
     await transcriptHeader(wrapper).trigger('click')
     await settle()
-    expect(transcriptContent(wrapper).attributes('style')).toBe('')
+    expect(transcriptContent(wrapper).classes()).toContain('is-expanded')
     expect(wrapper.findAllComponents({ name: 'BaseToggle' })).toHaveLength(2)
-    expect(sizeSelect.exists()).toBe(true)
   })
 
   it('does not auto-toggle the disclosure when subtitle preferences change', async () => {
@@ -903,7 +909,12 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-header[\s\S]*?inline-size:\s*100%/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-inline-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-block-end:/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*transform\s+220ms\s+cubic-bezier\(0\.4,\s*0,\s*0\.2,\s*1\)/)
     expect(scss).toMatch(/aria-expanded="true"[\s\S]*?transform:\s*rotate\(225deg\)/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-content\s*\{[\s\S]*?display:\s*grid[\s\S]*?grid-template-rows:\s*0fr[\s\S]*?opacity:\s*0[\s\S]*?grid-template-rows\s+240ms\s+cubic-bezier\(0\.4,\s*0,\s*0\.2,\s*1\)[\s\S]*?opacity\s+180ms\s+cubic-bezier\(0\.4,\s*0,\s*0\.2,\s*1\)/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-content\.is-expanded\s*\{[\s\S]*?grid-template-rows:\s*1fr[\s\S]*?opacity:\s*1/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-content-inner\s*\{[\s\S]*?min-height:\s*0[\s\S]*?overflow:\s*hidden/)
+    expect(scss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.live-dubbing-transcript-preferences-content,[\s\S]*?\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*none/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+120px\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?inline-size:\s*120px\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?height:\s*36px\s*!important/)
