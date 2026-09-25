@@ -180,6 +180,7 @@ class SecureStorage {
       "API_KEY",
       "OPENAI_API_KEY",
       "OPENROUTER_API_KEY",
+      "REQUESTY_API_KEY",
       "DEEPSEEK_API_KEY",
       "CUSTOM_API_KEY",
     ];
@@ -204,6 +205,7 @@ class SecureStorage {
       "API_KEY",
       "OPENAI_API_KEY",
       "OPENROUTER_API_KEY",
+      "REQUESTY_API_KEY",
       "DEEPSEEK_API_KEY",
       "CUSTOM_API_KEY",
     ];

@@ -250,6 +250,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         'yandex': '#FF0000',
         'openai': '#412991',
         'openrouter': '#FF6B35',
+        'requesty': '#34D399',
         'deepseek': '#00A67E',
         'webai': '#FF9500',
         'custom': '#9CA3AF',

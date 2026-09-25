@@ -68,6 +68,9 @@
   "api_provider_openrouter": {
     "message": "OpenRouter"
   },
+  "api_provider_requesty": {
+    "message": "Requesty"
+  },
   "api_provider_deepseek": {
     "message": "DeepSeek"
   },
@@ -155,8 +158,14 @@
   "provider_openrouter_title": {
     "message": "OpenRouter"
   },
+  "provider_requesty_title": {
+    "message": "Requesty"
+  },
   "provider_openrouter_description": {
     "message": "Access to multiple AI models via OpenRouter. Requires an API key."
+  },
+  "provider_requesty_description": {
+    "message": "Access to multiple AI models via Requesty. Requires an API key."
   },
   "provider_deepseek_title": {
     "message": "DeepSeek"
@@ -638,6 +647,9 @@
   "help_api_providers_openrouter": {
     "message": "OpenRouter - Access multiple models via [OpenRouter]({url})"
   },
+  "help_api_providers_requesty": {
+    "message": "Requesty - Access multiple models via [Requesty]({url})"
+  },
   "help_api_providers_deepseek": {
     "message": "DeepSeek - Get API access from [DeepSeek Platform]({url})"
   },
@@ -1019,6 +1031,9 @@
   "openrouter_api_key_info": {
     "message": "You can get your OpenRouter API key from OpenRouter Platform."
   },
+  "requesty_api_key_info": {
+    "message": "You can get your Requesty API key from the Requesty dashboard."
+  },
   "webai_api_key_info": {
     "message": "You can get and run your locally hosted WebAI API server."
   },
@@ -1032,6 +1047,9 @@
     "message": "Get Your API Key"
   },
   "openrouter_api_key_link": {
+    "message": "Get Your API Key"
+  },
+  "requesty_api_key_link": {
     "message": "Get Your API Key"
   },
   "webai_api_key_link": {
@@ -1115,17 +1133,32 @@
   "openrouter_api_settings_title": {
     "message": "OpenRouter Settings"
   },
+  "requesty_api_settings_title": {
+    "message": "Requesty Settings"
+  },
   "openrouter_api_settings_api_key_label": {
+    "message": "API Key"
+  },
+  "requesty_api_settings_api_key_label": {
     "message": "API Key"
   },
   "openrouter_api_key_placeholder": {
     "message": "Paste your OpenRouter API key here"
   },
+  "requesty_api_key_placeholder": {
+    "message": "Paste your Requesty API key here"
+  },
   "openrouter_api_settings_model_label": {
+    "message": "Model"
+  },
+  "requesty_api_settings_model_label": {
     "message": "Model"
   },
   "openrouter_api_model_placeholder": {
     "message": "Enter OpenRouter model (e.g., openai/gpt-4o)"
+  },
+  "requesty_api_model_placeholder": {
+    "message": "Enter Requesty model (e.g., openai/gpt-4o)"
   },
   "deepseek_api_settings_title": {
     "message": "DeepSeek Settings"
@@ -1847,7 +1880,13 @@
   "openrouter_custom_model_placeholder": {
     "message": "Enter model name (e.g., provider/model-name)"
   },
+  "requesty_custom_model_placeholder": {
+    "message": "Enter model name (e.g., provider/model-name)"
+  },
   "openrouter_custom_model_label": {
+    "message": "Model Name"
+  },
+  "requesty_custom_model_label": {
     "message": "Model Name"
   },
   "deepseek_custom_model_placeholder": {

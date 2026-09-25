@@ -247,6 +247,7 @@ function runMainMigration(currentSettings) {
     'EXCLUDED_SITES',        // User's custom exclusions
     'OPENAI_API_KEY',
     'OPENROUTER_API_KEY',
+    'REQUESTY_API_KEY',
     'DEEPSEEK_API_KEY',
     'DEEPL_API_KEY',
     'CUSTOM_API_KEY',

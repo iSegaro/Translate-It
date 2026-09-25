@@ -29,7 +29,7 @@ const safePrefixes = [
   'provider_', 'api_provider_', 'ERRORS_', 'STATUS_', 'validation_', 
   'history_', 'SIDEPANEL_', 'options_', 'popup_', 'window_', 'action_',
   'help_', 'activation_', 'prompt_', 'api_', 'gemini_', 'openai_', 
-  'deepseek_', 'openrouter_', 'webai_', 'lingva_', 'deepl_', 'custom_', 
+  'deepseek_', 'openrouter_', 'requesty_', 'webai_', 'lingva_', 'deepl_', 'custom_', 
   'browser_', 'proxy_', 'theme_', 'font_', 'whole_page_', 'optimization_level_'
 ];
 
