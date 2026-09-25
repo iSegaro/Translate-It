@@ -16,71 +16,210 @@
   min-height: 0;
 }
 
+/* ── Language toolbar ───────────────────────────────────────────────────
+   Visual contract mirrors .ti-header-toolbar (PopupHeader.scss) so the Text
+   Popup toolbar and the Popup Header read as one family:
+     44px band · 32px primary controls · 6px radius · 13px labels ·
+     28×28 actions with 18px glyphs · 6px gaps.
+   Everything below is scoped to .translation-view, so Sidepanel, Mobile
+   (compact) and select-element consumers of LanguageSelector keep their own
+   sizing. PopupHeader itself is referenced, never modified. */
 .translation-view .language-controls {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
   padding: 6px 10px !important;
-  gap: 8px !important;
+  gap: 6px !important;
   background: var(--language-controls-bg-color);
-  min-height: 40px !important;
+  min-height: 44px !important;
   box-sizing: border-box !important;
   width: 100% !important;
   overflow: visible !important;
+
+  /* Header action contract, declared on the toolbar root so BOTH actions
+     (Swap, inside LanguageSelector, and Clear) inherit the same neutral
+     default + Header hover. Toolbar-local only — no new component/global
+     tokens; .ti-header-toolbar keeps its own copy. */
+  --ti-action-icon: var(--tab-button-color, #5f6368);
+  --ti-action-icon-hover: var(--color-action-hover-accent, #ff9800);
+  --ti-action-hover-bg: rgba(0, 0, 0, 0.08);
+  --ti-action-active-bg: rgba(0, 0, 0, 0.12);
+
+  /* Dark side of the action contract. Plain selectors: this file is a
+     standard SCSS import (not a Vue scoped block), so a :global wrapper
+     would be emitted literally and invalidate the selector — same hook
+     pattern PopupHeader.scss documents. */
+  @at-root .theme-dark &, .ti-dark-mode & {
+    --ti-action-icon: #fff;
+    --ti-action-hover-bg: #424242;
+    --ti-action-active-bg: #555555;
+  }
 }
 
 .translation-view .language-controls > :first-child {
   flex-shrink: 0 !important;
 }
 
-/* The middle element (LanguageSelector) should take the remaining space */
+/* The middle element (LanguageSelector) takes the remaining space and must
+   be free to hold 32px controls — PopupApp pins it to 28px otherwise. */
 .translation-view .language-controls > .ti-language-controls {
   flex: 1 !important;
   min-width: 0 !important;
+  height: auto !important;
 }
 
-.translation-view .ti-btn-min-clear {
-  width: 24px !important;
-  height: 24px !important;
+/* Primary control 1 — Provider. Already a 32px split button; it only adopts
+   the shared 6px control radius so it matches the selects beside it. */
+.translation-view .language-controls .ti-split-translate-button {
+  height: 32px !important;
+  border-radius: 6px !important;
+}
+
+/* Primary controls 2–3 — Source / Target selects: 32px band, 6px radius,
+   13px label, balanced inline padding (8px text side / 44px arrow+star side).
+   Specificity (0,4,0) beats LanguageSelector's `.popup-wrapper` block
+   (0,2,0), its ≤480px responsive block (0,3,0) and the RTL block (0,2,1),
+   so the contract holds whatever width the popup is opened at. Logical
+   properties keep the padding on the correct side in RTL. */
+.translation-view .language-controls .ti-language-controls .ti-language-select {
+  box-sizing: border-box !important;
+  height: 32px !important;
+  max-width: none !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  padding-block: 0 !important;
+  padding-inline-start: 8px !important;
+  padding-inline-end: 44px !important;
+}
+
+/* Source / Target star — quieter than the select label, accent only when
+   the language is the saved default (hover paints the Header surface, never
+   the accent), 6px clear of the dropdown arrow (arrow ends at 18px, star
+   starts at 24px) and optically centred on the toolbar centerline. */
+.translation-view .language-controls .ti-language-controls .ti-default-action-button {
+  box-sizing: border-box !important;
+  inset-inline-end: 24px !important;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  border-radius: 6px !important;
+  color: var(--tab-button-color, #6c757d) !important;
+
+  &:hover:not(:disabled) {
+    background-color: var(--ti-action-hover-bg) !important;
+    color: var(--tab-button-color, #6c757d) !important;
+  }
+
+  &.is-active,
+  &.is-active:hover:not(:disabled) {
+    color: var(--color-primary, #007bff) !important;
+  }
+}
+
+/* Action 1 — Swap: 28×28 hit, 18px glyph, neutral default, Header hover.
+   The bundled swap.png is a solid brand-green bitmap, so inside the Popup
+   toolbar it is re-rendered as a CSS mask driven by currentColor (the same
+   treatment the Clear MaskIcon already gets): neutral at rest, accent on
+   hover, white in dark mode. The <img> stays in the layout and accessibility
+   tree — it carries the accessible name — but paints nothing. Sidepanel,
+   Mobile and select-element still consume the original green <img>. */
+.translation-view .language-controls .ti-language-controls .ti-swap-button {
+  position: relative !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border-radius: 6px !important;
+  color: var(--ti-action-icon) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+  img {
+    width: 18px !important;
+    height: 18px !important;
+    opacity: 0 !important;
+  }
+
+  &::after {
+    /* Same optical flip the --mirrored class gives the <img>. */
+    content: '' !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background-color: currentColor !important;
+    -webkit-mask-image: url('@/icons/ui/swap.png') !important;
+    mask-image: url('@/icons/ui/swap.png') !important;
+    -webkit-mask-repeat: no-repeat !important;
+    mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important;
+    mask-position: center !important;
+    -webkit-mask-size: 18px 18px !important;
+    mask-size: 18px 18px !important;
+    transform: scaleX(-1) !important;
+    pointer-events: none !important;
+  }
+
+  &:hover:not(:disabled) {
+    background-color: var(--ti-action-hover-bg) !important;
+    color: var(--ti-action-icon-hover) !important;
+    transform: translateY(-1px) !important;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0) scale(0.95) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #1976d2) !important;
+    outline-offset: 1px !important;
+  }
+}
+
+/* Action 2 — Clear (MaskIcon): same 28×28 / 18px / neutral / Header hover
+   contract as Swap. Color drives the mask glyph, so dark mode follows the
+   toolbar action contract above instead of an opacity ladder. */
+.translation-view .language-controls .ti-btn-min-clear {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border-radius: 4px !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
   padding: 0 !important;
-  transition: all 0.2s ease !important;
+  border: none !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--ti-action-icon) !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
   flex-shrink: 0 !important;
-  opacity: 0.6 !important;
-
-  &:hover {
-    background-color: rgba(0, 0, 0, 0.08) !important;
-    opacity: 1 !important;
-  }
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 
   img,
   .mask-icon {
-    width: 14px !important;
-    height: 14px !important;
+    width: 18px !important;
+    height: 18px !important;
+    opacity: 1 !important;
   }
 
   img {
     object-fit: contain !important;
   }
 
-  /* Standard Dark Mode override using the project's architectural pattern.
-     The clear icon is a CSS mask (currentColor) so no whitening filter
-     is needed — it follows the button color automatically. */
-  @at-root :global(.ti-dark-mode) &,
-           :global(.theme-dark) & {
-    opacity: 0.8 !important;
+  &:hover {
+    background-color: var(--ti-action-hover-bg) !important;
+    color: var(--ti-action-icon-hover) !important;
+    transform: translateY(-1px) !important;
+  }
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.15) !important;
-      opacity: 1 !important;
-    }
+  &:active {
+    transform: translateY(0) scale(0.95) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary, #1976d2) !important;
+    outline-offset: 1px !important;
   }
 }
 
