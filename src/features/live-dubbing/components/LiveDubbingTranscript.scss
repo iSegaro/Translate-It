@@ -4,11 +4,13 @@
   left: 50% !important;
   bottom: clamp(1.5rem, 8vh, 5rem) !important;
   width: min(90vw, 52rem) !important;
+  max-width: calc(100vw - 1rem) !important;
   transform: translate3d(-50%, 0, 0) !important;
   display: flex !important;
   flex-direction: column !important;
   row-gap: 0.15rem !important;
   padding: 0.7rem 1rem !important;
+  box-sizing: border-box !important;
   color: #fff !important;
   background: rgb(12 16 24 / 82%) !important;
   border: 1px solid rgb(255 255 255 / 15%) !important;
@@ -20,19 +22,52 @@
   text-wrap: pretty !important;
   pointer-events: none !important;
   user-select: none !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
   contain: layout paint !important;
 }
 
 // Secondary row: original (source) speech, smaller and muted above the
 // primary translated row, which inherits the container's visual unchanged.
+.live-dubbing-transcript__source,
+.live-dubbing-transcript__translated {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  pointer-events: none !important;
+}
+
 .live-dubbing-transcript__source {
   color: rgb(255 255 255 / 66%) !important;
   font-size: 0.78em !important;
   font-weight: 400 !important;
   letter-spacing: 0.02em !important;
-  pointer-events: none !important;
+  max-height: 1.45em !important;
 }
 
 .live-dubbing-transcript__translated {
-  pointer-events: none !important;
+  max-height: 2.9em !important;
+}
+
+.live-dubbing-transcript__text {
+  display: block !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+@media (max-width: 36rem), (max-height: 30rem) {
+  .live-dubbing-transcript {
+    width: min(88vw, 52rem) !important;
+    padding: 0.45rem 0.65rem !important;
+  }
 }

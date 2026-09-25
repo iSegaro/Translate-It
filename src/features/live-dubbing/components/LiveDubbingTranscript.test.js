@@ -30,7 +30,8 @@ describe('LiveDubbingTranscript renderer', () => {
     const translated = wrapper.find('.live-dubbing-transcript__translated');
 
     expect(container.exists()).toBe(true);
-    expect(container.attributes('aria-live')).toBe('polite');
+    expect(container.attributes('aria-live')).toBeUndefined();
+    expect(container.attributes('aria-atomic')).toBeUndefined();
     expect(source.text()).toBe('Bonjour le monde');
     expect(translated.text()).toBe('Hello world');
     expect(source.attributes('dir')).toBe('auto');
@@ -121,5 +122,18 @@ describe('LiveDubbingTranscript renderer', () => {
     expect(scss).toContain('pointer-events: none');
     expect(scss).toContain('.live-dubbing-transcript__source');
     expect(scss).toContain('.live-dubbing-transcript__translated');
+  });
+
+  it('keeps the visible transcript surface bounded and pinned to newest text', () => {
+    const scss = readFileSync('src/features/live-dubbing/components/LiveDubbingTranscript.scss', 'utf8');
+    expect(scss).toMatch(/\.live-dubbing-transcript__source\s*\{\s*color:[\s\S]*?max-height:\s*1\.45em/);
+    expect(scss).toMatch(/\.live-dubbing-transcript__translated\s*\{\s*max-height:\s*2\.9em/);
+    expect(scss).toMatch(/justify-content:\s*flex-end/);
+    expect(scss).toMatch(/overflow:\s*hidden/);
+    expect(scss).toMatch(/min-width:\s*0/);
+    expect(scss).toMatch(/overflow-wrap:\s*anywhere/);
+    expect(scss).toMatch(/word-break:\s*break-word/);
+    expect(scss).toMatch(/box-sizing:\s*border-box/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*36rem\),\s*\(max-height:\s*30rem\)/);
   });
 });

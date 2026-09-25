@@ -873,6 +873,14 @@ Provider Adapter → LiveDubbingController → Background Coordinator
   The source row is shown above the translated row (secondary, smaller,
   muted). Translated remains primary. Both rows use `dir="auto"`, are
   non-interactive (`pointer-events: none`, no click capture), and
-  presentation clipping is bounded independently per kind. Feature-local
-  component SCSS follows the project's Shadow DOM `!important`
-  convention.
+  presentation clipping is bounded independently per kind. The Original row
+  is limited to at most one visible line and the Translated row to at most two
+  visible lines. Both rows and the overlay use hidden overflow with safe
+  wrapping, and each row's flex layout pins the newest text at the bottom;
+  no visible scrollbar is exposed. A compact media query reduces overlay
+  width and padding on narrow or short viewports without disabling either
+  enabled row. The streaming container is not an `aria-live` region, while
+  its plain subtitle text remains accessible. Original and Translated are
+  independent latest transcript streams, not guaranteed paired bilingual
+  cues. Feature-local component SCSS follows the project's Shadow DOM
+  `!important` convention.

@@ -2,22 +2,20 @@
   <div
     v-if="(showTranslatedTranscript && visibleText) || (showOriginalTranscript && visibleSourceText)"
     class="live-dubbing-transcript"
-    aria-live="polite"
-    aria-atomic="false"
   >
     <div
       v-if="showOriginalTranscript && visibleSourceText"
       class="live-dubbing-transcript__source"
       dir="auto"
     >
-      {{ visibleSourceText }}
+      <span class="live-dubbing-transcript__text">{{ visibleSourceText }}</span>
     </div>
     <div
       v-if="showTranslatedTranscript && visibleText"
       class="live-dubbing-transcript__translated"
       dir="auto"
     >
-      {{ visibleText }}
+      <span class="live-dubbing-transcript__text">{{ visibleText }}</span>
     </div>
   </div>
 </template>
