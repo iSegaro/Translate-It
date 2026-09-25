@@ -304,6 +304,28 @@ export class TTSStateManager {
     const notificationRevision = this.playbackRevision;
     const metadata = this.capturePlaybackMetadata();
     const hasPendingSuccessor = this.pendingPlaybackToken && this.pendingPlaybackToken !== playbackToken;
+
+    // An explicit interrupted event from offscreen is authoritative for the
+    // exact generation it identifies, even while a successor is pending.
+    // Capture metadata before retiring the committed slot; the pending
+    // successor and request-deduplication state belong to a separate flow.
+    if (reason === 'interrupted' && hasPlaybackToken && playbackToken === this.currentPlaybackToken) {
+      await this.notifyCapturedEnded('interrupted', null, playbackToken, metadata);
+      if (this.currentPlaybackToken === playbackToken) {
+        this.currentPlaybackToken = null;
+        this.currentTTSSender = null;
+        this.currentTTSId = null;
+        this.lastTTSLanguage = null;
+        this.lastTTSText = null;
+      }
+      await this.releaseOffscreenLease(playbackToken);
+      // The terminalized predecessor's lease is released and its committed
+      // state cleared. `predecessorPlaybackToken` must remain cleared too:
+      // restoring it here would reintroduce a dead generation. The pending
+      // successor's token/metadata and request tracking stay untouched.
+      return;
+    }
+
     if (hasPlaybackToken && (playbackToken !== this.currentPlaybackToken || hasPendingSuccessor)) {
       if (this.pendingPlaybackToken === playbackToken) {
         await this.failPlaybackHandoff(playbackToken, errorData || {

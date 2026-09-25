@@ -198,6 +198,119 @@ describe('TTSStateManager offscreen lease lifecycle', () => {
     expect(ttsStateManager.currentTTSId).toBe('current');
   });
 
+  it.each(['Google', 'Edge'])('retires the exact current generation for %s token-scoped interrupted events', async () => {
+    const sender = { tab: { id: 11 }, frameId: 0 };
+    const playbackToken = await ttsStateManager.acquirePlaybackLease({
+      sender,
+      ttsId: 'interrupted-id',
+      language: 'en',
+      text: 'interrupted text',
+    });
+    await ttsStateManager.commitPlaybackLease(playbackToken);
+    mocks.release.mockClear();
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    await ttsStateManager.notifyTTSEnded('interrupted', null, playbackToken);
+
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+    expect(ttsStateManager.lastTTSLanguage).toBeNull();
+    expect(ttsStateManager.lastTTSText).toBeNull();
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: playbackToken });
+    const terminalMessages = mocks.browserAPI.tabs.sendMessage.mock.calls
+      .filter(([tabId]) => tabId === sender.tab.id);
+    expect(terminalMessages.length).toBeGreaterThan(0);
+    terminalMessages.forEach(([, message]) => {
+      expect(message.reason).toBe('interrupted');
+      expect(message.reason).not.toBe('stopped');
+    });
+  });
+
+  it('retires an interrupted predecessor without disturbing a pending successor or request tracking', async () => {
+    const predecessorSender = { tab: { id: 12 }, frameId: 0 };
+    const predecessor = await ttsStateManager.acquirePlaybackLease({
+      sender: predecessorSender,
+      ttsId: 'predecessor-id',
+      language: 'en',
+      text: 'predecessor text',
+    });
+    await ttsStateManager.commitPlaybackLease(predecessor);
+    const successor = await ttsStateManager.acquirePlaybackLease({
+      sender: { tab: { id: 13 }, frameId: 0 },
+      ttsId: 'successor-id',
+      language: 'fr',
+      text: 'successor text',
+    });
+    const pendingMetadata = ttsStateManager.pendingPlaybackMetadata;
+    const pendingRequest = new Promise(() => {});
+    const pendingRequestKey = ttsStateManager.createPendingRequestKey({
+      engine: 'google',
+      text: 'successor text',
+      language: 'fr',
+      ttsId: 'successor-id',
+    });
+    ttsStateManager.setPendingRequest(pendingRequestKey, pendingRequest);
+    mocks.release.mockClear();
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    await ttsStateManager.notifyTTSEnded('interrupted', null, predecessor);
+
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.pendingPlaybackToken).toBe(successor);
+    expect(ttsStateManager.pendingPlaybackMetadata).toBe(pendingMetadata);
+    // The terminalized predecessor is fully retired: its token must NOT be
+    // reintroduced as a dead generation via predecessorPlaybackToken.
+    expect(ttsStateManager.predecessorPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSRequest).toBe(pendingRequest);
+    expect(ttsStateManager.pendingRequestKey).toEqual(pendingRequestKey);
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: predecessor });
+    expect(mocks.release).not.toHaveBeenCalledWith({ owner: 'tts', leaseId: successor });
+  });
+
+  it('retains newer playback for an explicit interrupted event from a stale token', async () => {
+    const staleToken = await ttsStateManager.acquirePlaybackLease();
+    await ttsStateManager.commitPlaybackLease(staleToken);
+    const currentToken = await ttsStateManager.acquirePlaybackLease({
+      sender: { tab: { id: 14 }, frameId: 0 },
+      ttsId: 'current-id',
+      language: 'de',
+      text: 'current text',
+    });
+    await ttsStateManager.commitPlaybackLease(currentToken);
+    mocks.release.mockClear();
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    await ttsStateManager.notifyTTSEnded('interrupted', null, staleToken);
+
+    expect(ttsStateManager.currentPlaybackToken).toBe(currentToken);
+    expect(ttsStateManager.currentTTSId).toBe('current-id');
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: staleToken });
+    expect(mocks.browserAPI.tabs.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('preserves existing no-token interrupted behavior', async () => {
+    const playbackToken = await ttsStateManager.acquirePlaybackLease({
+      sender: { tab: { id: 15 }, frameId: 0 },
+      ttsId: 'active-id',
+      language: 'en',
+      text: 'active text',
+    });
+    await ttsStateManager.commitPlaybackLease(playbackToken);
+    mocks.release.mockClear();
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+
+    await ttsStateManager.notifyTTSEnded('interrupted');
+
+    expect(ttsStateManager.currentPlaybackToken).toBe(playbackToken);
+    expect(mocks.release).not.toHaveBeenCalled();
+    expect(mocks.browserAPI.tabs.sendMessage).toHaveBeenCalledWith(
+      15,
+      expect.objectContaining({ reason: 'interrupted', playbackToken }),
+      { frameId: 0 },
+    );
+  });
+
   it('releases matching playback generation on terminal completion', async () => {
     const playbackToken = await ttsStateManager.acquirePlaybackLease();
     await ttsStateManager.commitPlaybackLease(playbackToken);
@@ -1694,6 +1807,53 @@ describe('TTSStateManager handoff-aware owner-scoped stop (stopForOwner)', () =>
     expect(mocks.release.mock.calls.map(([arg]) => arg.leaseId)).not.toContain(predecessor);
     expect(mocks.browserAPI.tabs.sendMessage.mock.calls
       .filter(([tabId]) => tabId === predecessorSender.tab.id)).toHaveLength(0);
+  });
+
+  it('retires a Branch D predecessor when delayed PLAY later reports authoritative interruption', async () => {
+    const { predecessor, successor } = await seedHandoff();
+    mocks.offscreenFailureMode = 'transport';
+
+    const branchDResult = await ttsStateManager.stopForOwner(successorSender, {
+      ttsId: 'successor-id',
+      stopOnlyIfOwner: true,
+    });
+
+    expect(branchDResult).toMatchObject({
+      success: false,
+      error: 'offscreen_state_unknown',
+      classification: 'D',
+    });
+    expect(ttsStateManager.currentPlaybackToken).toBe(predecessor);
+    await expect(ttsStateManager.commitPlaybackLease(successor)).resolves.toBe(false);
+
+    mocks.release.mockClear();
+    mocks.browserAPI.tabs.sendMessage.mockClear();
+    await ttsStateManager.notifyTTSEnded('interrupted', null, predecessor);
+
+    expect(ttsStateManager.currentPlaybackToken).toBeNull();
+    expect(ttsStateManager.currentTTSSender).toBeNull();
+    expect(ttsStateManager.currentTTSId).toBeNull();
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: predecessor });
+    expect(mocks.browserAPI.tabs.sendMessage).toHaveBeenCalledWith(
+      predecessorSender.tab.id,
+      expect.objectContaining({ reason: 'interrupted', playbackToken: predecessor }),
+      { frameId: predecessorSender.frameId },
+    );
+
+    const newer = await ttsStateManager.acquirePlaybackLease({
+      sender: successorSender,
+      ttsId: 'newer-id',
+      language: 'de',
+      text: 'newer text',
+    });
+    await ttsStateManager.commitPlaybackLease(newer);
+    mocks.release.mockClear();
+
+    await ttsStateManager.notifyTTSEnded('interrupted', null, successor);
+
+    expect(ttsStateManager.currentPlaybackToken).toBe(newer);
+    expect(ttsStateManager.currentTTSId).toBe('newer-id');
+    expect(mocks.release).toHaveBeenCalledWith({ owner: 'tts', leaseId: successor });
   });
 });
 
