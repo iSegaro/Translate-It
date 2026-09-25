@@ -458,26 +458,39 @@ describe('LiveDubbingView', () => {
     })
   })
 
-  it('keeps START unavailable until both independent writes settle', async () => {
+  it('keeps LiveDubbingControl mounted and Start disabled until both independent writes settle', async () => {
     const deferred = makeDeferredWriteStore()
     harness.store = deferred.store
     const wrapper = mountView()
     const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+    const control = () => wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const initialControl = control().vm
 
     toggles[0].vm.$emit('update:modelValue', true)
     toggles[1].vm.$emit('update:modelValue', true)
 
     expect(deferred.writes).toHaveLength(2)
     await nextTick()
-    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(false)
+    // Control stays mounted while either write is pending — its status/session
+    // presentation must not flicker through remounts.
+    expect(control().exists()).toBe(true)
+    expect(control().vm).toBe(initialControl)
+    // Start is gated on every pending write.
+    expect(control().props('startDisabled')).toBe(true)
 
+    // Resolving one write still leaves Start gated on the other pending write.
     deferred.writes[0].resolve()
     await settle()
-    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(false)
+    expect(control().exists()).toBe(true)
+    expect(control().vm).toBe(initialControl)
+    expect(control().props('startDisabled')).toBe(true)
 
+    // Once both writes settle, Start is re-enabled.
     deferred.writes[1].resolve()
     await settle()
-    expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
+    expect(control().exists()).toBe(true)
+    expect(control().vm).toBe(initialControl)
+    expect(control().props('startDisabled')).toBe(false)
   })
 
   it('rolls back a rejected preference write without retrying or an unhandled rejection', async () => {

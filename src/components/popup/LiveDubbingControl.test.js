@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import LiveDubbingControl from './LiveDubbingControl.vue'
 
@@ -46,6 +46,10 @@ const flushPromises = async (wrapper) => {
 }
 
 describe('LiveDubbingControl', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     runtimeListener = null
     vi.stubGlobal('browser', {
@@ -425,12 +429,26 @@ describe('LiveDubbingControl', () => {
   ])('resolves the %s status text through i18n', async (state, response, key, label) => {
     mockI18nMap[key] = label
     if (response === 'PENDING') {
-      // Status query never resolves: the control stays in its initial loading state.
-      sendMessage.mockImplementation(() => new Promise(() => {}))
-      const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
-      await wrapper.vm.$nextTick()
+      // Status query never resolves: the control stays in its initial loading
+      // state. The loading text is gated by a small presentation delay, so
+      // the timer must elapse before the label is visible.
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(() => new Promise(() => {}))
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await wrapper.vm.$nextTick()
 
-      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+        // Before the delay: blank — neither "Ready" nor the loading label.
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('')
+
+        vi.advanceTimersByTime(150)
+        await wrapper.vm.$nextTick()
+
+        // After the delay: the loading label becomes visible.
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+      } finally {
+        vi.useRealTimers()
+      }
       return
     }
     sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
@@ -439,6 +457,113 @@ describe('LiveDubbingControl', () => {
     const wrapper = await mountAndFlush()
 
     expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+  })
+
+  it('does not flash the initial loading status when status resolves quickly', async () => {
+    vi.useFakeTimers()
+    sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+      ? Promise.resolve({ status: 'idle' })
+      : Promise.resolve({ status: 'idle' }))
+
+    const wrapper = await mountAndFlush()
+
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Ready')
+    vi.advanceTimersByTime(150)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Ready')
+    expect(wrapper.text()).not.toContain('Checking availability…')
+    wrapper.unmount()
+  })
+
+  it('reveals slow initial loading only while the status query is pending', async () => {
+    vi.useFakeTimers()
+    let resolveStatus
+    sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+      ? new Promise(resolve => { resolveStatus = resolve })
+      : Promise.resolve({ status: 'idle' }))
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.pendingStatusReveal).toBe(true)
+    expect(wrapper.vm.isInitialStatusLoadingVisible).toBe(false)
+    // Hidden window: blank, not "Ready" — and Start stays disabled.
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('')
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+
+    vi.advanceTimersByTime(149)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('')
+
+    vi.advanceTimersByTime(1)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.vm.isInitialStatusLoadingVisible).toBe(true)
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Checking availability…')
+    // Behavioral loading is independent of presentation visibility: Start is
+    // still disabled while the GET is unresolved.
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+
+    resolveStatus({ status: 'idle' })
+    await flushPromises(wrapper)
+    await flushPromises(wrapper)
+
+    expect(wrapper.vm.pendingStatusReveal).toBe(false)
+    expect(wrapper.vm.isInitialStatusLoadingVisible).toBe(false)
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Ready')
+    wrapper.unmount()
+  })
+
+  it('does not debounce status refreshes after the initial query', async () => {
+    vi.useFakeTimers()
+    let statusReads = 0
+    let resolveRefresh
+    sendMessage.mockImplementation(({ action }) => {
+      if (action !== 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+      statusReads += 1
+      return statusReads === 1
+        ? Promise.resolve({ status: 'idle' })
+        : new Promise(resolve => { resolveRefresh = resolve })
+    })
+
+    const wrapper = await mountAndFlush()
+    expect(vi.getTimerCount()).toBe(0)
+
+    runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await Promise.resolve()
+    expect(statusReads).toBe(2)
+    expect(vi.getTimerCount()).toBe(0)
+
+    resolveRefresh({ status: { status: 'RUNNING', sessionId: 'refresh-session' } })
+    await flushPromises(wrapper)
+    await flushPromises(wrapper)
+    expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Running')
+    wrapper.unmount()
+  })
+
+  it('clears the initial loading reveal timer on unmount', async () => {
+    vi.useFakeTimers()
+    let resolveStatus
+    sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+      ? new Promise(resolve => { resolveStatus = resolve })
+      : Promise.resolve({ status: 'idle' }))
+
+    const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+    await Promise.resolve()
+    expect(wrapper.vm.pendingStatusReveal).toBe(true)
+    expect(vi.getTimerCount()).toBe(1)
+
+    wrapper.unmount()
+    expect(wrapper.vm.pendingStatusReveal).toBe(false)
+    expect(wrapper.vm.isInitialStatusLoadingVisible).toBe(false)
+    expect(vi.getTimerCount()).toBe(0)
+
+    resolveStatus({ status: 'idle' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(wrapper.vm.isInitialStatusLoadingVisible).toBe(false)
   })
 
   it('resolves volume labels through i18n', async () => {
@@ -3386,6 +3511,184 @@ describe('LiveDubbingControl', () => {
       const wrapper = await mountAndFlush()
 
       expect(wrapper.find('.ti-live-dubbing-control-error').attributes('dir')).toBe('auto')
+    })
+  })
+
+  // ── Initial status loading presentation ────────────────────────────────────
+  // The presentation-only delay gates the "Checking availability…" text so
+  // very fast initial reads never flash it. Lifecycle/session ownership is
+  // untouched — only the rendering of the pending state is delayed.
+
+  describe('Initial status loading presentation', () => {
+    it('shows no status text while pending, then the authoritative status after a fast resolve', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveStatus
+        sendMessage.mockImplementation(({ action }) => (
+          action === 'GET_LIVE_DUBBING_STATUS'
+            ? new Promise(resolve => { resolveStatus = resolve })
+            : Promise.resolve({ status: 'idle' })
+        ))
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await flushPromises(wrapper)
+
+        // Hidden window while pending: blank — neither "Ready" nor
+        // "Checking availability…" may flash.
+        const status = wrapper.find('.ti-live-dubbing-control-status')
+        expect(status.text()).toBe('')
+        expect(status.text()).not.toBe('Ready')
+        expect(status.text()).not.toBe('Checking availability…')
+        // Behavioral loading: Start stays disabled until the GET resolves,
+        // regardless of whether the loading text is visible.
+        expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+
+        // Resolve within the 150ms window → authoritative status directly.
+        resolveStatus({ status: 'idle' })
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(status.text()).toBe('Ready')
+        expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeUndefined()
+
+        // Advancing past the delay must not flash the loading text afterwards.
+        vi.advanceTimersByTime(500)
+        await flushPromises(wrapper)
+        expect(status.text()).toBe('Ready')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('shows blank first, then "Checking availability…" only after the delay for slow reads', async () => {
+      vi.useFakeTimers()
+      try {
+        // GET never resolves — control stays in its initial loading state.
+        sendMessage.mockImplementation(() => new Promise(() => {}))
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await flushPromises(wrapper)
+
+        // Before the delay elapses: blank — no "Ready", no loading text.
+        const status = wrapper.find('.ti-live-dubbing-control-status')
+        expect(status.text()).toBe('')
+        expect(status.text()).not.toBe('Ready')
+        expect(status.text()).not.toBe('Checking availability…')
+        expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+
+        // Advance past the small presentation delay.
+        vi.advanceTimersByTime(150)
+        await flushPromises(wrapper)
+        expect(status.text()).toBe('Checking availability…')
+        // Still pending → Start still disabled.
+        expect(wrapper.find('button[aria-label="Start live dubbing"]').attributes('disabled')).toBeDefined()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('returns to the authoritative status once the GET resolves after the loading text appears', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveStatus
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') {
+            return new Promise(resolve => { resolveStatus = resolve })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await flushPromises(wrapper)
+
+        // Still in the hidden window: blank, not "Ready".
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('')
+
+        // Advance past the presentation delay so the loading text is visible.
+        vi.advanceTimersByTime(200)
+        await flushPromises(wrapper)
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Checking availability…')
+
+        // Resolve the GET with a RUNNING session — the authoritative status
+        // must replace the loading text immediately, not linger.
+        resolveStatus({
+          status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 }
+        })
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Running')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('does not flash "Checking availability…" after the GET resolves mid-delay', async () => {
+      vi.useFakeTimers()
+      try {
+        let resolveStatus
+        sendMessage.mockImplementation(({ action }) => {
+          if (action === 'GET_LIVE_DUBBING_STATUS') {
+            return new Promise(resolve => { resolveStatus = resolve })
+          }
+          return Promise.resolve({ status: 'idle' })
+        })
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await flushPromises(wrapper)
+
+        // Resolve BEFORE the presentation delay elapses.
+        resolveStatus({ status: 'idle' })
+        await flushPromises(wrapper)
+        await flushPromises(wrapper)
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Ready')
+
+        // The timer still fires, but its activation conditional must skip
+        // because state has already left 'loading'.
+        vi.advanceTimersByTime(500)
+        await flushPromises(wrapper)
+        expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Ready')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('clears the pending loading presentation timer on unmount (no stale update)', async () => {
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(() => new Promise(() => {}))
+
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await flushPromises(wrapper)
+
+        // Unmount BEFORE the presentation delay elapses. The pending timer
+        // must be cleared — no callback survives the unmount.
+        wrapper.unmount()
+
+        // Advancing past the delay must not throw — the timer was cleared.
+        expect(() => vi.advanceTimersByTime(500)).not.toThrow()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps status-resolved emission independent of the presentation delay', async () => {
+      // The presentation delay is a UI-only gate; the lifecycle status-resolved
+      // emit must still happen exactly once when the initial GET resolves.
+      vi.useFakeTimers()
+      try {
+        sendMessage.mockImplementation(({ action }) => (
+          action === 'GET_LIVE_DUBBING_STATUS'
+            ? Promise.resolve({ status: 'idle' })
+            : Promise.resolve({ status: 'idle' })
+        ))
+        const wrapper = mount(LiveDubbingControl, { props: { targetLanguage: 'de' } })
+        await flushPromises(wrapper)
+
+        // Resolved before the delay — emit fires immediately.
+        expect(wrapper.emitted('status-resolved')).toEqual([[]])
+
+        // Advancing the timer must not emit status-resolved a second time.
+        vi.advanceTimersByTime(500)
+        await flushPromises(wrapper)
+        expect(wrapper.emitted('status-resolved')).toEqual([[]])
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 

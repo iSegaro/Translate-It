@@ -84,16 +84,18 @@
     />
 
     <!-- Session: start/stop, status feedback and volumes (owned by the control) -->
+    <!-- The control stays mounted across subtitle preference writes so its
+         status/session presentation remains stable. Start is gated through the
+         :start-disabled prop until every relevant write settles. -->
     <section
       v-show="showSessionControl"
       class="live-dubbing-card live-dubbing-session-card"
     >
       <LiveDubbingControl
-        v-if="isControlBusy || (!hasTranslatedPreferenceWritePending && !hasOriginalPreferenceWritePending)"
         :key="controlKey"
         :target-language="targetLanguage"
         :provider-id="providerModel"
-        :start-disabled="targetLanguagePending"
+        :start-disabled="targetLanguagePending || hasTranslatedPreferenceWritePending || hasOriginalPreferenceWritePending"
         @busy-change="handleBusyChange"
         @status-resolved="handleControlStatusResolved"
       />

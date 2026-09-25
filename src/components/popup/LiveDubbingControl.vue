@@ -178,6 +178,22 @@ const sessionDescriptor = ref(null)
 const sessionProviderId = ref(null)
 const errorMessage = ref('')
 const terminalOutcome = ref(null)
+
+// ── Presentation-only loading delay ──────────────────────────────────────────
+// The initial GET_LIVE_DUBBING_STATUS read can resolve quickly for a cached
+// session. The first 150ms while it is still pending render no status text
+// (not "Ready", not "Checking availability…"); only if it is still pending
+// after 150ms does "Checking availability…" appear. A resolve within the
+// window goes straight to the authoritative status. This only gates
+// presentation — the GET request, lifecycle ownership, behavioral loading
+// (Start disabled), and status resolution are not delayed.
+const pendingStatusReveal = ref(false)
+const statusRevealTimerElapsed = ref(false)
+const isInitialStatusLoadingVisible = computed(() =>
+  state.value === 'loading' && pendingStatusReveal.value && statusRevealTimerElapsed.value
+)
+let statusRevealTimer = null
+const LOADING_PRESENTATION_DELAY_MS = 150
 let operationGeneration = 0
 let removeRuntimeListener = null
 let initialStatusResolved = false
@@ -221,23 +237,34 @@ const isStopping = computed(() => state.value === 'stopping')
 const isCleanupPending = computed(() => state.value === 'cleanup')
 const isTransitioning = computed(() => isStarting.value || isStopping.value)
 const isUnavailable = computed(() => state.value === 'unavailable')
+// Behavioral loading state — true whenever the initial status query is
+// pending, independent of whether the loading text is presentation-visible.
+// Start stays disabled for this entire window.
 const isLoading = computed(() => state.value === 'loading')
 const isIdle = computed(() => state.value === 'idle')
 const isBusy = computed(() => isTransitioning.value || isRunning.value || isCleanupPending.value)
 // Presentation-only: UI state is authoritative for the status line. State
 // transitions, session retention and cleanup behavior are untouched.
 const displayStatus = computed(() => state.value === 'cleanup' ? 'cleanup' : authoritativeStatus.value || state.value)
-const statusText = computed(() => ({
-  loading: t('live_dubbing_status_loading', 'Checking availability…'),
-  idle: t('live_dubbing_status_idle', 'Ready'),
-  PREPARING_CAPTURE: t('live_dubbing_status_preparing_capture', 'Preparing capture…'),
-  CONNECTING_PROVIDER: t('live_dubbing_status_connecting_provider', 'Connecting to provider…'),
-  RUNNING: t('live_dubbing_status_running', 'Running'),
-  STOPPING: t('live_dubbing_status_stopping', 'Stopping…'),
-  ERROR: t('live_dubbing_status_error', 'Error'),
-  unavailable: t('live_dubbing_status_unavailable', 'Unavailable'),
-  cleanup: t('live_dubbing_status_cleanup', 'Cleanup required')
-}[displayStatus.value] || t('live_dubbing_status_error', 'Error')))
+const statusText = computed(() => {
+  // Hidden initial-loading window: the GET is still pending and the
+  // presentation delay has not elapsed — render no status text at all, so
+  // fast reads never flash "Ready" or "Checking availability…". Once the
+  // delay elapses the loading text shows; once resolved the authoritative
+  // status replaces it immediately.
+  if (state.value === 'loading' && !isInitialStatusLoadingVisible.value) return ''
+  return ({
+    loading: t('live_dubbing_status_loading', 'Checking availability…'),
+    idle: t('live_dubbing_status_idle', 'Ready'),
+    PREPARING_CAPTURE: t('live_dubbing_status_preparing_capture', 'Preparing capture…'),
+    CONNECTING_PROVIDER: t('live_dubbing_status_connecting_provider', 'Connecting to provider…'),
+    RUNNING: t('live_dubbing_status_running', 'Running'),
+    STOPPING: t('live_dubbing_status_stopping', 'Stopping…'),
+    ERROR: t('live_dubbing_status_error', 'Error'),
+    unavailable: t('live_dubbing_status_unavailable', 'Unavailable'),
+    cleanup: t('live_dubbing_status_cleanup', 'Cleanup required')
+  }[displayStatus.value] || t('live_dubbing_status_error', 'Error'))
+})
 
 const isVolumeControllable = computed(() =>
   ['PREPARING_CAPTURE', 'CONNECTING_PROVIDER', 'RUNNING'].includes(authoritativeStatus.value)
@@ -1001,11 +1028,31 @@ const handleRuntimeMessage = (message, sender) => {
   void queryStatus()
 }
 
+const clearInitialStatusReveal = () => {
+  pendingStatusReveal.value = false
+  statusRevealTimerElapsed.value = false
+  if (statusRevealTimer != null) {
+    clearTimeout(statusRevealTimer)
+    statusRevealTimer = null
+  }
+}
+
 const resolveInitialStatus = async () => {
-  const resolved = await queryStatus()
-  if (resolved && !initialStatusResolved) {
-    initialStatusResolved = true
-    emit('status-resolved')
+  pendingStatusReveal.value = true
+  statusRevealTimerElapsed.value = false
+  statusRevealTimer = setTimeout(() => {
+    statusRevealTimer = null
+    if (pendingStatusReveal.value) statusRevealTimerElapsed.value = true
+  }, LOADING_PRESENTATION_DELAY_MS)
+
+  try {
+    const resolved = await queryStatus()
+    if (resolved && !initialStatusResolved) {
+      initialStatusResolved = true
+      emit('status-resolved')
+    }
+  } finally {
+    clearInitialStatusReveal()
   }
 }
 
@@ -1022,6 +1069,9 @@ onUnmounted(() => {
   removeRuntimeListener = null
   flushPendingVolumeSend()
   flushPendingDubbedVolumeSend()
+  // Clear any pending presentation delay so a mid-fetch unmount never causes
+  // a stale "Checking availability…" update on a returned component.
+  clearInitialStatusReveal()
 })
 
 watch(isBusy, (busy) => emit('busy-change', busy), { immediate: true })
