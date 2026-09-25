@@ -1139,9 +1139,6 @@
   "openrouter_api_settings_api_key_label": {
     "message": "API Key"
   },
-  "requesty_api_settings_api_key_label": {
-    "message": "API Key"
-  },
   "openrouter_api_key_placeholder": {
     "message": "Paste your OpenRouter API key here"
   },
@@ -1151,14 +1148,8 @@
   "openrouter_api_settings_model_label": {
     "message": "Model"
   },
-  "requesty_api_settings_model_label": {
-    "message": "Model"
-  },
   "openrouter_api_model_placeholder": {
     "message": "Enter OpenRouter model (e.g., openai/gpt-4o)"
-  },
-  "requesty_api_model_placeholder": {
-    "message": "Enter Requesty model (e.g., openai/gpt-4o)"
   },
   "deepseek_api_settings_title": {
     "message": "DeepSeek Settings"

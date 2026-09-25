@@ -1139,9 +1139,6 @@
   "openrouter_api_settings_api_key_label": {
     "message": "کلید API"
   },
-  "requesty_api_settings_api_key_label": {
-    "message": "کلید API"
-  },
   "openrouter_api_key_placeholder": {
     "message": "کلید API خود را اینجا وارد کنید"
   },
@@ -1151,14 +1148,8 @@
   "openrouter_api_settings_model_label": {
     "message": "مدل"
   },
-  "requesty_api_settings_model_label": {
-    "message": "مدل"
-  },
   "openrouter_api_model_placeholder": {
     "message": "مدل OpenRouter (مثلا: openai/gpt-4o) را وارد کنید"
-  },
-  "requesty_api_model_placeholder": {
-    "message": "مدل Requesty (مثلا: openai/gpt-4o) را وارد کنید"
   },
   "deepseek_api_settings_title": {
     "message": "تنظیمات DeepSeek"

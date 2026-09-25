@@ -1139,9 +1139,6 @@
   "openrouter_api_settings_api_key_label": {
     "message": "APIキー"
   },
-  "requesty_api_settings_api_key_label": {
-    "message": "APIキー"
-  },
   "openrouter_api_key_placeholder": {
     "message": "OpenRouter APIキーを貼り付けてください"
   },
@@ -1151,14 +1148,8 @@
   "openrouter_api_settings_model_label": {
     "message": "モデル"
   },
-  "requesty_api_settings_model_label": {
-    "message": "モデル"
-  },
   "openrouter_api_model_placeholder": {
     "message": "OpenRouterモデルを入力（例：openai/gpt-4o）"
-  },
-  "requesty_api_model_placeholder": {
-    "message": "Requestyモデルを入力（例：openai/gpt-4o）"
   },
   "deepseek_api_settings_title": {
     "message": "DeepSeek 設定"
