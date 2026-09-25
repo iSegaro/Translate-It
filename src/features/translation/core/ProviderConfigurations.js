@@ -279,6 +279,47 @@ export const PROVIDER_CONFIGURATIONS = {
     }
   },
 
+  // Requesty - Optimized settings for multi-model support
+  Requesty: {
+    rateLimit: {
+      maxConcurrent: 2,
+      delayBetweenRequests: 0, // No delay for first request
+      adaptiveBackoff: {
+        enabled: true,
+        baseMultiplier: 1.8,
+        maxDelay: 45000,
+        resetAfterSuccess: 2
+      },
+      // Mode-specific overrides
+      modeOverrides: {
+        select_element: {
+          maxConcurrent: 3 // Increased from 2 for Select Element
+        }
+      }
+    },
+    batching: UNIFIED_AI_BATCHING_CONFIG,
+    streaming: {
+      enabled: true, // Most models support streaming
+      chunkSize: 'adaptive',
+      realTimeUpdates: true
+    },
+    errorHandling: {
+      quotaTypes: [
+        'requests_per_minute',
+        'tokens_per_minute',
+        'model_overloaded'
+      ],
+      enableCircuitBreaker: true
+    },
+    features: {
+      supportsTranslation: true,
+      supportsBatchRequests: true,
+      supportsThinking: false, // Varies by model
+      reliableJsonMode: true,
+      supportsDictionary: true
+    }
+  },
+
   // WebAI - External API service (similar to other providers)
   WebAI: {
     rateLimit: {
@@ -803,6 +844,7 @@ const PROVIDER_NAME_MAPPING = {
   'chatgpt': ProviderNames.OPENAI,
   'deepseek': ProviderNames.DEEPSEEK,
   'openrouter': ProviderNames.OPENROUTER,
+  'requesty': ProviderNames.REQUESTY,
   'webai': ProviderNames.WEBAI,
   'googletranslate': ProviderNames.GOOGLE_TRANSLATE,
   'google-translate': ProviderNames.GOOGLE_TRANSLATE,

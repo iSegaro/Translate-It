@@ -39,6 +39,7 @@ const PROVIDER_SETTINGS_KEYS = {
   GEMINI: 'API_KEY',
   DEEPSEEK: 'DEEPSEEK_API_KEY',
   OPENROUTER: 'OPENROUTER_API_KEY',
+  REQUESTY: 'REQUESTY_API_KEY',
   DEEPL: 'DEEPL_API_KEY',
   CUSTOM: 'CUSTOM_API_KEY'
 };
@@ -51,6 +52,7 @@ const PROVIDER_NAMES = {
   GEMINI: 'Gemini',
   DEEPSEEK: 'DeepSeek',
   OPENROUTER: 'OpenRouter',
+  REQUESTY: 'Requesty',
   DEEPL: 'DeepL',
   CUSTOM: 'Custom'
 };
@@ -235,6 +237,7 @@ class ApiKeyManager {
       [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key),
       [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key),
       [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key),
+      [ProviderRegistryIds.REQUESTY]: async (key) => await this._testRequestyKey(key),
       [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key, deepLContext),
       [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key)
     };
@@ -317,6 +320,7 @@ class ApiKeyManager {
       [ProviderRegistryIds.GEMINI]: async (key) => await this._testGeminiKey(key, context),
       [ProviderRegistryIds.DEEPSEEK]: async (key) => await this._testDeepSeekKey(key, context),
       [ProviderRegistryIds.OPENROUTER]: async (key) => await this._testOpenRouterKey(key, context),
+      [ProviderRegistryIds.REQUESTY]: async (key) => await this._testRequestyKey(key, context),
       [ProviderRegistryIds.DEEPL]: async (key) => await this._testDeepLKey(key, context),
       [ProviderRegistryIds.CUSTOM]: async (key) => await this._testCustomKey(key, context)
     };
@@ -523,6 +527,31 @@ class ApiKeyManager {
       // Use auth/key endpoint instead of models to properly validate the key
       // models endpoint is public and may return 200 even for invalid keys
       const apiUrl = context.apiUrl || 'https://openrouter.ai/api/v1/auth/key';
+      const response = await this._fetchWithCurrentProxy(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'HTTP-Referer': 'https://github.com/iSegaro/Translate-It',
+          'X-Title': 'Translate-It Extension'
+        }
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Test Requesty API key
+   * @param {string} key - API key to test
+   * @param {Object} [context={}] - Optional context with URL
+   * @returns {Promise<boolean>} - True if key is valid
+   * @private
+   */
+  static async _testRequestyKey(key, context = {}) {
+    try {
+      // Authenticated models request returns 403 for an invalid key
+      const apiUrl = context.apiUrl || 'https://router.requesty.ai/v1/models';
       const response = await this._fetchWithCurrentProxy(apiUrl, {
         method: 'GET',
         headers: {

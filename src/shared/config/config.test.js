@@ -172,6 +172,23 @@ describe('Config Module', () => {
       expect(CONFIG.OPENROUTER_MODELS.at(-1)).toEqual({ value: 'custom', name: 'Custom Model' });
     });
 
+    it('should expose the curated Requesty models in order', () => {
+      expect(CONFIG.REQUESTY_API_MODEL).toBe('openai/gpt-4o-mini');
+      expect(CONFIG.REQUESTY_API_URL).toBe('https://router.requesty.ai/v1/chat/completions');
+      expect(CONFIG.REQUESTY_MODELS).toEqual([
+        { value: 'openai/gpt-4o-mini', name: 'OpenAI GPT-4o Mini' },
+        { value: 'gpt-5.4-mini', name: 'OpenAI GPT-5.4 Mini' },
+        { value: 'gemini-3.5-flash-lite', name: 'Google Gemini 3.5 Flash-Lite' },
+        { value: 'gemini-3.5-flash', name: 'Google Gemini 3.5 Flash' },
+        { value: 'claude-haiku-4-5', name: 'Anthropic Claude Haiku 4.5' },
+        { value: 'claude-sonnet-4-6', name: 'Anthropic Claude Sonnet 4.6' },
+        { value: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash' },
+        { value: 'mistral-small-2603', name: 'Mistral Small' },
+        { value: 'qwen3.8-flash', name: 'Qwen 3.8 Flash' },
+        { value: 'custom', name: 'Custom Model' }
+      ]);
+    });
+
     it('should expose approved Gemini selector models in order', () => {
       expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.5-flash');
       expect(CONFIG.GEMINI_API_URL).toBe(

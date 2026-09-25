@@ -208,12 +208,12 @@ const currentOptimizationLevel = computed({
   }
 })
 
-const isAIProvider = computed(() => ['gemini', 'openai', 'openrouter', 'deepseek', 'webai', 'custom'].includes(selectedProvider.value))
+const isAIProvider = computed(() => ['gemini', 'openai', 'openrouter', 'requesty', 'deepseek', 'webai', 'custom'].includes(selectedProvider.value))
 const isAutoLanguageProvider = computed(() => selectedProviderInfo.value?.features?.includes('autoLanguage'))
 const selectedProviderInfo = computed(() => findProviderById(selectedProvider.value))
 const providerSettingsComponent = computed(() => {
   const p = selectedProvider.value
-  const map = { gemini: 'Gemini', deepl: 'DeepL', browser: 'Browser', webai: 'WebAI', lingva: 'Lingva', openai: 'OpenAI', openrouter: 'OpenRouter', deepseek: 'Deepseek', custom: 'Custom' }
+  const map = { gemini: 'Gemini', deepl: 'DeepL', browser: 'Browser', webai: 'WebAI', lingva: 'Lingva', openai: 'OpenAI', openrouter: 'OpenRouter', requesty: 'Requesty', deepseek: 'Deepseek', custom: 'Custom' }
   return map[p] ? defineAsyncComponent(() => import(`@/components/feature/api-settings/${map[p]}ApiSettings.vue`)) : null
 })
 

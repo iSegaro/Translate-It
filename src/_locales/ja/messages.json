@@ -68,6 +68,9 @@
   "api_provider_openrouter": {
     "message": "OpenRouter"
   },
+  "api_provider_requesty": {
+    "message": "Requesty"
+  },
   "api_provider_deepseek": {
     "message": "DeepSeek"
   },
@@ -155,8 +158,14 @@
   "provider_openrouter_title": {
     "message": "OpenRouter"
   },
+  "provider_requesty_title": {
+    "message": "Requesty"
+  },
   "provider_openrouter_description": {
     "message": "OpenRouter経由で複数のAIモデルにアクセスできます。APIキーが必要です。"
+  },
+  "provider_requesty_description": {
+    "message": "Requesty経由で複数のAIモデルにアクセスできます。APIキーが必要です。"
   },
   "provider_deepseek_title": {
     "message": "DeepSeek"
@@ -638,6 +647,9 @@
   "help_api_providers_openrouter": {
     "message": "OpenRouter - [OpenRouter]({url}) を通じて複数のモデルにアクセスできます"
   },
+  "help_api_providers_requesty": {
+    "message": "Requesty - [Requesty]({url}) を通じて複数のモデルにアクセスできます"
+  },
   "help_api_providers_deepseek": {
     "message": "DeepSeek - [DeepSeek Platform]({url}) から API アクセスを取得できます"
   },
@@ -1019,6 +1031,9 @@
   "openrouter_api_key_info": {
     "message": "OpenRouterのAPIキーはOpenRouter Platformで取得できます。"
   },
+  "requesty_api_key_info": {
+    "message": "RequestyのAPIキーはRequestyダッシュボードで取得できます。"
+  },
   "webai_api_key_info": {
     "message": "ローカルにホストしたWebAI APIサーバーを取得・実行できます。"
   },
@@ -1032,6 +1047,9 @@
     "message": "APIキーを取得"
   },
   "openrouter_api_key_link": {
+    "message": "APIキーを取得"
+  },
+  "requesty_api_key_link": {
     "message": "APIキーを取得"
   },
   "webai_api_key_link": {
@@ -1115,11 +1133,17 @@
   "openrouter_api_settings_title": {
     "message": "OpenRouter 設定"
   },
+  "requesty_api_settings_title": {
+    "message": "Requesty 設定"
+  },
   "openrouter_api_settings_api_key_label": {
     "message": "APIキー"
   },
   "openrouter_api_key_placeholder": {
     "message": "OpenRouter APIキーを貼り付けてください"
+  },
+  "requesty_api_key_placeholder": {
+    "message": "Requesty APIキーを貼り付けてください"
   },
   "openrouter_api_settings_model_label": {
     "message": "モデル"
@@ -1847,7 +1871,13 @@
   "openrouter_custom_model_placeholder": {
     "message": "モデル名を入力（例：provider/model-name）"
   },
+  "requesty_custom_model_placeholder": {
+    "message": "モデル名を入力（例：provider/model-name）"
+  },
   "openrouter_custom_model_label": {
+    "message": "モデル名"
+  },
+  "requesty_custom_model_label": {
     "message": "モデル名"
   },
   "deepseek_custom_model_placeholder": {
