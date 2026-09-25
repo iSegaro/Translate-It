@@ -126,8 +126,27 @@ describe('LiveDubbingTranscript renderer', () => {
 
   it('keeps the visible transcript surface bounded and pinned to newest text', () => {
     const scss = readFileSync('src/features/live-dubbing/components/LiveDubbingTranscript.scss', 'utf8');
-    expect(scss).toMatch(/\.live-dubbing-transcript__source\s*\{\s*color:[\s\S]*?max-height:\s*1\.45em/);
-    expect(scss).toMatch(/\.live-dubbing-transcript__translated\s*\{\s*max-height:\s*2\.9em/);
+    const source = scss.match(
+      /\.live-dubbing-transcript__source\s*\{\s*color:[\s\S]*?\n\}/
+    )?.[0];
+    const translated = scss.match(
+      /\.live-dubbing-transcript__translated\s*\{\s*font-size:[\s\S]*?\n\}/
+    )?.[0];
+
+    expect(source).toMatch(/font-size:\s*clamp\(16px,\s*1\.5vw,\s*19px\)/);
+    expect(source).toMatch(/font-weight:\s*500/);
+    expect(source).toMatch(/line-height:\s*1\.35(?:\s*!important)?/);
+    expect(source).toMatch(/rgb\(255\s+255\s+255\s*\/\s*82%\)/);
+    expect(source).not.toMatch(/font-size:[^;]*(?:rem|em)/);
+    expect(source).toMatch(/max-height:\s*1\.35em/);
+
+    expect(translated).toMatch(/font-size:\s*clamp\(20px,\s*2vw,\s*26px\)/);
+    expect(translated).toMatch(/font-weight:\s*500/);
+    expect(translated).toMatch(/line-height:\s*1\.35(?:\s*!important)?/);
+    expect(translated).not.toMatch(/font-size:[^;]*(?:rem|em)/);
+    expect(translated).toMatch(/max-height:\s*2\.7em/);
+
+    expect(scss).not.toMatch(/-webkit-line-clamp/);
     expect(scss).toMatch(/justify-content:\s*flex-end/);
     expect(scss).toMatch(/overflow:\s*hidden/);
     expect(scss).toMatch(/min-width:\s*0/);
