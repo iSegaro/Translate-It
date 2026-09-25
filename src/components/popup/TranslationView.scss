@@ -93,10 +93,11 @@
   padding-inline-end: 44px !important;
 }
 
-/* Source / Target star — quieter than the select label, accent only when
-   the language is the saved default (hover paints the Header surface, never
-   the accent), 6px clear of the dropdown arrow (arrow ends at 18px, star
-   starts at 24px) and optically centred on the toolbar centerline. */
+/* Source / Target star — quieter than the select label, hidden at rest only
+   when the language is the saved default, and revealed by group hover/focus
+   (hover paints the Header surface, never the accent), 6px clear of the
+   dropdown arrow (arrow ends at 18px, star starts at 24px) and optically
+   centred on the toolbar centerline. */
 .translation-view .language-controls .ti-language-controls .ti-default-action-button {
   box-sizing: border-box !important;
   inset-inline-end: 24px !important;
@@ -105,6 +106,11 @@
   min-width: 18px !important;
   border-radius: 6px !important;
   color: var(--tab-button-color, #6c757d) !important;
+  opacity: 1 !important;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.14s ease !important;
 
   &:hover:not(:disabled) {
     background-color: var(--ti-action-hover-bg) !important;
@@ -115,6 +121,21 @@
   &.is-active:hover:not(:disabled) {
     color: var(--color-primary, #007bff) !important;
   }
+
+  &.is-active {
+    opacity: 0 !important;
+  }
+}
+
+.translation-view .language-controls .ti-language-controls
+  .ti-language-control-group:hover .ti-default-action-button.is-active,
+.translation-view .language-controls .ti-language-controls
+  .ti-language-control-group:focus-within .ti-default-action-button.is-active,
+.translation-view .language-controls .ti-language-controls
+  .ti-language-control-group .ti-default-action-button.is-active:focus,
+.translation-view .language-controls .ti-language-controls
+  .ti-language-control-group .ti-default-action-button.is-active:focus-visible {
+  opacity: 1 !important;
 }
 
 /* Action 1 — Swap: 28×28 hit, 18px glyph, neutral default, Header hover.

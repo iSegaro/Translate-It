@@ -76,6 +76,12 @@ describe('TranslationView.scss language toolbar contract', () => {
     expect(base).toMatch(/inset-inline-end:\s*24px/)
     expect(base).toMatch(/width:\s*18px/)
     expect(base).toMatch(/color:\s*var\(--tab-button-color/)
+    expect(base).toMatch(/opacity:\s*1/)
+    // All three properties must transition so hover background/color changes do
+    // not become abrupt when the idle-hide opacity transition was added.
+    expect(base).toMatch(/transition:[^;]*background-color\s+0\.2s\s+ease/)
+    expect(base).toMatch(/,\s*color\s+0\.2s\s+ease/)
+    expect(base).toMatch(/,\s*opacity\s+0\.14s\s+ease\s+!important/)
 
     const hover = rule(css, /(\.translation-view \.language-controls \.ti-language-controls \.ti-default-action-button:hover:not\(:disabled\)\s*\{[^}]*\})/)
     expect(hover).not.toContain('var(--color-primary')
@@ -83,6 +89,21 @@ describe('TranslationView.scss language toolbar contract', () => {
 
     expect(css).toMatch(
       /\.translation-view \.language-controls \.ti-language-controls \.ti-default-action-button\.is-active[^{]*\{[^}]*color:\s*var\(--color-primary/
+    )
+  })
+
+  it('hides only the active star at idle and reveals it from group or star focus', () => {
+    expect(css).toMatch(
+      /\.translation-view \.language-controls \.ti-language-controls \.ti-default-action-button\.is-active\s*\{[^}]*opacity:\s*0/
+    )
+    expect(css).toMatch(
+      /\.translation-view \.language-controls \.ti-language-controls\s+\.ti-language-control-group:hover \.ti-default-action-button\.is-active[^{]*\{[^}]*opacity:\s*1/
+    )
+    expect(css).toMatch(
+      /\.translation-view \.language-controls \.ti-language-controls\s+\.ti-language-control-group:focus-within \.ti-default-action-button\.is-active[^{]*\{[^}]*opacity:\s*1/
+    )
+    expect(css).toMatch(
+      /\.translation-view \.language-controls \.ti-language-controls\s+\.ti-language-control-group \.ti-default-action-button\.is-active:focus(?:-visible)?[^{]*\{[^}]*opacity:\s*1/
     )
   })
 
