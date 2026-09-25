@@ -12,6 +12,7 @@ import { ErrorHandler } from '@/shared/error-management/ErrorHandler.js';
 import { handleInstallationEvent } from '@/handlers/lifecycle/InstallHandler.js';
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { initializeBackgroundService } from './backgroundStartup.js';
+import { OFFSCREEN_IDLE_ALARM_NAME, offscreenRuntimeLeaseManager } from '@/shared/runtime/OffscreenRuntimeLeaseManager.js';
 import { liveDubbingCoordinator } from '@/features/live-dubbing/background/LiveDubbingCoordinator.js';
 import { registerLiveDubbingTabLifecycle } from '@/features/live-dubbing/background/tabLifecycle.js';
 import * as browserCapabilities from '@/core/browserHandlers.js';
@@ -142,6 +143,17 @@ runtime.onConnect.addListener((port) => {
     });
   }
 });
+
+// Idle offscreen cleanup fires through a single alarms listener (Chromium only;
+// Firefox has no offscreen document to leak). The lease manager re-checks
+// guards and physical presence before closing so stale alarms stay harmless.
+if (isChromeRuntime()) {
+  browser.alarms?.onAlarm?.addListener?.((alarm) => {
+    if (alarm?.name === OFFSCREEN_IDLE_ALARM_NAME) {
+      offscreenRuntimeLeaseManager._handleIdleCloseAlarm();
+    }
+  });
+}
 
 // --- Initialization ---
 

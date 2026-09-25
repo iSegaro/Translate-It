@@ -126,6 +126,7 @@ function generateChromeManifest(baseManifest) {
     // Chrome-specific permissions
     permissions: [
       ...baseManifest.permissions,
+      'alarms',
       'offscreen',
       'tabCapture',
       'activeTab',

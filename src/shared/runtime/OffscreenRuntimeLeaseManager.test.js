@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  OFFSCREEN_IDLE_ALARM_NAME,
   OFFSCREEN_RUNTIME_CONFIG,
   OFFSCREEN_RUNTIME_LEASE_STORAGE_KEY,
   OffscreenRuntimeLeaseManager,
@@ -11,6 +12,7 @@ function createBrowser({
   withSession = true,
   withHasDocument = true,
   withOffscreen = true,
+  withAlarms = true,
   runtime = {},
   clients,
 } = {}) {
@@ -41,9 +43,21 @@ function createBrowser({
     }),
   };
 
+  let capturedAlarmListener = null;
+  const alarms = withAlarms ? {
+    create: vi.fn(async () => {}),
+    clear: vi.fn(async () => {}),
+    onAlarm: {
+      addListener: vi.fn((listener) => {
+        capturedAlarmListener = listener;
+      }),
+    },
+  } : undefined;
+
   return {
     ...(withOffscreen ? { offscreen } : {}),
     storage: { session },
+    ...(withAlarms ? { alarms } : {}),
     runtime: {
       getURL: vi.fn((url) => `chrome-extension://test/${url}`),
       ...runtime,
@@ -52,7 +66,15 @@ function createBrowser({
     setDocumentExists: (value) => {
       present = value;
     },
+    fireAlarm: (name) => capturedAlarmListener?.({ name }),
   };
+}
+
+function wireIdleAlarms(browser, manager) {
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm?.name === OFFSCREEN_IDLE_ALARM_NAME) return manager._handleIdleCloseAlarm();
+    return undefined;
+  });
 }
 
 function lease(owner, leaseId, requiredReasons) {
@@ -162,7 +184,7 @@ describe('OffscreenRuntimeLeaseManager', () => {
     expect(manager.hasActiveLeases()).toBe(false);
   });
 
-  it('keeps document while another owner remains and closes on final release', async () => {
+  it('keeps document while another owner remains and schedules idle close on final release', async () => {
     const browser = createBrowser();
     const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
 
@@ -171,6 +193,7 @@ describe('OffscreenRuntimeLeaseManager', () => {
     await manager.release(lease('one', 'playback'));
 
     expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).not.toHaveBeenCalled();
     expect(manager.getSnapshot().leases).toEqual([{
       owner: 'two',
       leaseId: 'capture',
@@ -178,8 +201,17 @@ describe('OffscreenRuntimeLeaseManager', () => {
     }]);
 
     await manager.release(lease('two', 'capture'));
-    expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).toHaveBeenCalledWith(
+      OFFSCREEN_IDLE_ALARM_NAME,
+      { delayInMinutes: 0.5 },
+    );
+    expect(manager.getSnapshot().idleCloseScheduled).toBe(true);
     expect(manager.hasActiveLeases()).toBe(false);
+
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
+    expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
   });
 
   it('makes duplicate release safe', async () => {
@@ -188,6 +220,10 @@ describe('OffscreenRuntimeLeaseManager', () => {
 
     await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
     await manager.release(lease('tts', 'playback'));
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     await manager.release(lease('tts', 'playback'));
 
     expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
@@ -359,13 +395,23 @@ describe('OffscreenRuntimeLeaseManager', () => {
     await expect(manager.release(requestedLease)).rejects.toThrow('session set failed');
 
     expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).not.toHaveBeenCalled();
     expect(manager.getSnapshot()).toMatchObject({
       documentExists: true,
       ownership: 'owned',
+      idleCloseScheduled: false,
       leases: [requestedLease],
     });
 
     await expect(manager.release(requestedLease)).resolves.toBe(true);
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).toHaveBeenCalledWith(
+      OFFSCREEN_IDLE_ALARM_NAME,
+      { delayInMinutes: 0.5 },
+    );
+
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
   });
 
@@ -377,14 +423,22 @@ describe('OffscreenRuntimeLeaseManager', () => {
     await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
     await manager.release(lease('tts', 'playback'));
 
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).toHaveBeenCalledTimes(1);
+
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
+
     expect(manager.getSnapshot()).toMatchObject({
       documentExists: true,
       ownership: 'owned',
       closePending: true,
       leases: [],
     });
+    expect(browser.alarms.create).toHaveBeenCalledTimes(2);
 
     await manager.release(lease('tts', 'playback'));
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(2);
     expect(manager.getSnapshot().documentExists).toBe(false);
   });
@@ -404,6 +458,14 @@ describe('OffscreenRuntimeLeaseManager', () => {
     const recreatedManager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
     await recreatedManager.release(lease('tts', 'playback'));
 
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).toHaveBeenCalledWith(
+      OFFSCREEN_IDLE_ALARM_NAME,
+      { delayInMinutes: 0.5 },
+    );
+
+    wireIdleAlarms(browser, recreatedManager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
     expect(recreatedManager.hasActiveLeases()).toBe(false);
   });
@@ -545,10 +607,21 @@ describe('OffscreenRuntimeLeaseManager', () => {
     expect(clients.matchAll).toHaveBeenCalledTimes(1);
 
     await expect(manager.release(lease('tts', 'playback'))).resolves.toBe(true);
-    expect(clients.matchAll).toHaveBeenCalledTimes(2);
-    expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
-    expect(manager.getSnapshot().documentExists).toBe(false);
-    expect(manager.getSnapshot().closePending).toBe(false);
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(browser.alarms.create).toHaveBeenCalledWith(
+      OFFSCREEN_IDLE_ALARM_NAME,
+      { delayInMinutes: 0.5 },
+    );
+    wireIdleAlarms(browser, manager);
+    await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+    expect(clients.matchAll).toHaveBeenCalledTimes(3);
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    expect(manager.getSnapshot()).toMatchObject({
+      documentExists: false,
+      ownership: 'none',
+      closePending: false,
+      leases: [],
+    });
   });
 
   it('prevents creation when exact Chrome 109 client exists', async () => {
@@ -588,6 +661,8 @@ describe('OffscreenRuntimeLeaseManager', () => {
 
     await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
     await manager.release(lease('tts', 'playback'));
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     await expect(manager.acquire(lease('screen-capture', 'capture-1', ['WORKERS'])))
       .resolves.toBe(true);
 
@@ -621,6 +696,9 @@ describe('OffscreenRuntimeLeaseManager', () => {
       contextTypes: ['OFFSCREEN_DOCUMENT'],
       documentUrls: [documentUrl],
     });
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
   });
 
@@ -644,8 +722,11 @@ describe('OffscreenRuntimeLeaseManager', () => {
     await expect(manager.release(lease('tts', 'playback'))).resolves.toBe(true);
 
     expect(browser.offscreen.createDocument).not.toHaveBeenCalled();
+    expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+    wireIdleAlarms(browser, manager);
+    await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
     expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
-    expect(clients.matchAll).toHaveBeenCalledTimes(1);
+    expect(clients.matchAll).toHaveBeenCalledTimes(2);
   });
 
   it('does not create or claim a lease when no exact detector is available', async () => {
@@ -692,5 +773,409 @@ describe('OffscreenRuntimeLeaseManager', () => {
     expect(manager._supportsReasons(browser, ['AUDIO_PLAYBACK', 'USER_MEDIA'])).toBe(false);
     expect(manager._supportsReasons(browser, ['WEB_RTC'])).toBe(true);
     expect(manager._supportsReasons(browser, ['AUDIO_PLAYBACK', 'WEB_RTC'])).toBe(false);
+  });
+
+  describe('idle grace close', () => {
+    it('does not synchronously close on final lease release', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: true,
+        ownership: 'owned',
+        leases: [],
+      });
+    });
+
+    it('schedules idle cleanup with the alarm name and grace delay', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+
+      expect(browser.alarms.create).toHaveBeenCalledTimes(1);
+      expect(browser.alarms.create).toHaveBeenCalledWith(
+        OFFSCREEN_IDLE_ALARM_NAME,
+        { delayInMinutes: 0.5 },
+      );
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(true);
+    });
+
+    it('does not schedule a close while another lease remains', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+      await manager.release(lease('tts', 'playback'));
+
+      expect(browser.alarms.create).not.toHaveBeenCalled();
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(false);
+    });
+
+    it('reuses the existing document for acquire during idle grace', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+
+      expect(browser.offscreen.createDocument).toHaveBeenCalledTimes(1);
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot().leases).toHaveLength(1);
+    });
+
+    it('invalidates a pending idle close on acquire', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(true);
+
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+
+      expect(browser.alarms.clear).toHaveBeenCalledWith(OFFSCREEN_IDLE_ALARM_NAME);
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(false);
+    });
+
+    it('preserves idle cleanup when lease persistence fails during grace', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(true);
+
+      browser.storage.session.set.mockRejectedValueOnce(new Error('session set failed'));
+      await expect(manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS'])))
+        .rejects.toThrow('session set failed');
+
+      expect(browser.alarms.clear).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        idleCloseScheduled: true,
+        leases: [],
+      });
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(true);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+      expect(manager.getSnapshot().documentExists).toBe(false);
+    });
+
+    it('does not strand an idle document when acquire fails before publication', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(true);
+
+      await expect(manager.acquire(lease('x', 'y', ['WEB_RTC', 'BOGUS_REASON'])))
+        .rejects.toThrow('unsupported offscreen reason');
+
+      expect(browser.alarms.clear).not.toHaveBeenCalled();
+      expect(manager.getSnapshot().idleCloseScheduled).toBe(true);
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(true);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+    });
+
+    it('prevents a pending alarm from closing after a successful acquire', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+
+      expect(browser.alarms.clear).toHaveBeenCalledTimes(1);
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot().leases).toEqual([
+        lease('screen-capture', 'ocr-1', ['WORKERS']),
+      ]);
+    });
+
+    it('does not close on idle alarm while a lease is active', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.hasActiveLeases()).toBe(true);
+    });
+
+    it('closes on idle alarm with zero leases and owned document', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(true);
+
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: false,
+        ownership: 'none',
+        idleCloseScheduled: false,
+      });
+    });
+
+    it('does not close on idle alarm without proven ownership', async () => {
+      const browser = createBrowser({ documentExists: true });
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+
+      expect(browser.alarms.create).not.toHaveBeenCalled();
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: true,
+        ownership: 'unknown',
+        leases: [],
+      });
+    });
+
+    it('treats duplicate and stale alarms as harmless', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+      wireIdleAlarms(browser, manager);
+
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+
+      await manager.release(lease('tts', 'playback'));
+      await manager.release(lease('screen-capture', 'ocr-1'));
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(true);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not schedule an alarm when release persistence fails', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+      const requestedLease = lease('tts', 'playback', ['AUDIO_PLAYBACK']);
+
+      await manager.acquire(requestedLease);
+      browser.storage.session.set.mockRejectedValueOnce(new Error('session set failed'));
+
+      await expect(manager.release(requestedLease)).rejects.toThrow('session set failed');
+
+      expect(browser.alarms.create).not.toHaveBeenCalled();
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        idleCloseScheduled: false,
+        leases: [requestedLease],
+      });
+    });
+
+    it('keeps retryable state when close fails during idle alarm', async () => {
+      const browser = createBrowser();
+      browser.offscreen.closeDocument.mockRejectedValueOnce(new Error('close failed'));
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: true,
+        ownership: 'owned',
+        closePending: true,
+        leases: [],
+      });
+      expect(browser.alarms.create).toHaveBeenCalledTimes(2);
+
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(true);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(2);
+      expect(manager.getSnapshot().documentExists).toBe(false);
+    });
+
+    it('clears state safely when the alarm finds the document already gone', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      browser.setDocumentExists(false);
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: false,
+        ownership: 'none',
+        closePending: false,
+        idleCloseScheduled: false,
+        leases: [],
+      });
+    });
+
+    it('never closes when alarm-time presence detection is uncertain', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.release(lease('tts', 'playback'));
+      browser.offscreen.hasDocument = undefined;
+      browser.runtime.getURL = undefined;
+
+      wireIdleAlarms(browser, manager);
+      await expect(browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME)).resolves.toBe(false);
+
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: true,
+        ownership: 'owned',
+        closePending: false,
+        idleCloseScheduled: false,
+        leases: [],
+      });
+    });
+
+    it('never marks idle close scheduled without an alarms API', async () => {
+      const browserWithoutAlarms = createBrowser({ withAlarms: false });
+      const managerWithoutAlarms = new OffscreenRuntimeLeaseManager({ browserAPI: browserWithoutAlarms });
+
+      await managerWithoutAlarms.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await expect(managerWithoutAlarms.release(lease('tts', 'playback'))).resolves.toBe(true);
+
+      expect(browserWithoutAlarms.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(managerWithoutAlarms.getSnapshot().idleCloseScheduled).toBe(false);
+
+      const browserWithoutCreate = createBrowser();
+      browserWithoutCreate.alarms.create = null;
+      const managerWithoutCreate = new OffscreenRuntimeLeaseManager({ browserAPI: browserWithoutCreate });
+
+      await managerWithoutCreate.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await expect(managerWithoutCreate.release(lease('tts', 'playback'))).resolves.toBe(true);
+
+      expect(browserWithoutCreate.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(managerWithoutCreate.getSnapshot().idleCloseScheduled).toBe(false);
+    });
+
+    it('serializes a concurrent acquire against an idle close', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+      wireIdleAlarms(browser, manager);
+
+      const acquiring = manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      const alarming = browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
+      await Promise.all([acquiring, alarming]);
+
+      expect(browser.offscreen.createDocument).toHaveBeenCalledTimes(1);
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+      expect(manager.getSnapshot().leases).toEqual([
+        lease('tts', 'playback', ['AUDIO_PLAYBACK']),
+      ]);
+    });
+
+    it('shares one document across TTS, OCR, and live-dubbing leases under idle grace', async () => {
+      const browser = createBrowser();
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await manager.acquire(lease('tts', 'playback', ['AUDIO_PLAYBACK']));
+      await manager.acquire(lease('screen-capture', 'ocr-1', ['WORKERS']));
+      await manager.acquire(lease('live-dubbing', 'session-1', ['USER_MEDIA', 'AUDIO_PLAYBACK']));
+
+      expect(browser.offscreen.createDocument).toHaveBeenCalledTimes(1);
+
+      await manager.release(lease('tts', 'playback'));
+      await manager.release(lease('screen-capture', 'ocr-1'));
+      expect(browser.alarms.create).not.toHaveBeenCalled();
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+
+      await manager.release(lease('live-dubbing', 'session-1'));
+      expect(browser.alarms.create).toHaveBeenCalledWith(
+        OFFSCREEN_IDLE_ALARM_NAME,
+        { delayInMinutes: 0.5 },
+      );
+      expect(browser.offscreen.closeDocument).not.toHaveBeenCalled();
+
+      wireIdleAlarms(browser, manager);
+      await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+      expect(manager.hasActiveLeases()).toBe(false);
+    });
+
+    it('re-schedules idle close on restart with owned metadata and zero leases', async () => {
+      const browser = createBrowser({
+        documentExists: true,
+        metadata: {
+          version: 2,
+          documentOwned: true,
+          leases: [],
+        },
+      });
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await expect(manager.ensureDocument()).resolves.toBe(true);
+
+      expect(browser.alarms.create).toHaveBeenCalledWith(
+        OFFSCREEN_IDLE_ALARM_NAME,
+        { delayInMinutes: 0.5 },
+      );
+      expect(manager.getSnapshot()).toMatchObject({
+        documentExists: true,
+        ownership: 'owned',
+        idleCloseScheduled: true,
+      });
+
+      wireIdleAlarms(browser, manager);
+      await browser.fireAlarm(OFFSCREEN_IDLE_ALARM_NAME);
+      expect(browser.offscreen.closeDocument).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not schedule idle close on restart with owned metadata and active leases', async () => {
+      const browser = createBrowser({
+        documentExists: true,
+        metadata: {
+          version: 2,
+          documentOwned: true,
+          leases: [lease('tts', 'playback', ['AUDIO_PLAYBACK'])],
+        },
+      });
+      const manager = new OffscreenRuntimeLeaseManager({ browserAPI: browser });
+
+      await expect(manager.ensureDocument()).resolves.toBe(true);
+
+      expect(browser.alarms.create).not.toHaveBeenCalled();
+      expect(manager.getSnapshot()).toMatchObject({
+        ownership: 'owned',
+        idleCloseScheduled: false,
+        leases: [lease('tts', 'playback', ['AUDIO_PLAYBACK'])],
+      });
+    });
   });
 });

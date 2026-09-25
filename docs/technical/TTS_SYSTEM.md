@@ -66,7 +66,7 @@ Manages long-form text by breaking it into smaller, manageable pieces:
 ### 4. `TTSStateManager.js` (Unified State & Targeted Broadcast)
 Manages the shared state across all handlers:
 - **Targeted Broadcast**: Implements a `broadcastStatus` mechanism that notifies ONLY the initiating tab (all its frames/Shadow DOM) and internal extension contexts (Popup/Sidepanel). This improves performance by reducing unnecessary cross-tab traffic while ensuring UI synchronization in complex environments.
-- **Offscreen Persistence**: Controls the lifecycle of the Offscreen document. Uses `stopAudioOnly()` instead of closing the document to eliminate latency.
+- **Offscreen Persistence**: Physical TTS audio stops immediately via `stopAudioOnly()` and the TTS lease releases at once; the shared Offscreen document itself becomes eligible for close after a 30-second idle grace. Final close is owned by `OffscreenRuntimeLeaseManager` (idle grace via alarms).
 - **Status Mapping**: Translates internal engine events into unified statuses: `completed`, `error`, `stopped`, and `idle`.
 
 ### 5. `EdgeTTSClient.js` (Neural Worker)
@@ -189,7 +189,7 @@ Users can control the system through the **TTS Tab** in Options:
 | **Playback** | Offscreen Document | Direct Background Audio |
 | **Edge TTS** | Full (Signature + Token) | Full |
 | **Detection** | Multi-tiered Script Analysis | Multi-tiered Script Analysis |
-| **Cleanup** | `stopAudioOnly()` (Persistent) | `Audio.pause() + null` |
+| **Cleanup** | `stopAudioOnly()` + immediate lease release (the lease manager schedules close after 30 seconds of idle time) | `Audio.pause() + null` |
 
 ---
 
