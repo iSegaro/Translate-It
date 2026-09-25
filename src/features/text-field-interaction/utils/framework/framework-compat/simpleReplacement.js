@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { buildMultilineFragment, ensureCEAim, hasScopedCESelection } from './contentEditableScope.js';
 
 // Use scoped cached logger
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'simpleReplacement');
@@ -15,7 +16,7 @@ export function handleSimpleReplacement(element, newValue, start, end, applicati
   if (!isCurrent()) return false;
   try {
     if (element.isContentEditable) {
-      return handleContentEditableWithUndo(element, newValue, start, end, isCurrent);
+      return handleContentEditableWithUndo(element, newValue, start, end, isCurrent, applicationContext);
     } else {
       return handleInputWithUndo(element, newValue, start, end, isCurrent);
     }
@@ -28,7 +29,7 @@ export function handleSimpleReplacement(element, newValue, start, end, applicati
 /**
  * جایگزینی contentEditable با حفظ undo
  */
-function handleContentEditableWithUndo(element, newValue, start, end, isCurrent) {
+function handleContentEditableWithUndo(element, newValue, start, end, isCurrent, applicationContext = null) {
   try {
     if (typeof window === 'undefined') {
       return false;
@@ -36,10 +37,13 @@ function handleContentEditableWithUndo(element, newValue, start, end, isCurrent)
 
     // استفاده از execCommand برای حفظ undo (deprecated ولی هنوز کار می‌کند)
     const selection = window.getSelection();
-    let hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+    // Whitespace-scoped aims count as selections here (trim-based live checks
+    // would otherwise drop them to a full replace).
+    const effectiveHasSelection = (selection && !selection.isCollapsed && selection.toString().trim().length > 0)
+      || hasScopedCESelection(element, applicationContext);
     
   logger.debug('Processing:', {
-      hasSelection,
+      hasSelection: effectiveHasSelection,
       selectionText: selection?.toString(),
       newValue: newValue.substring(0, 50)
     });
@@ -47,8 +51,12 @@ function handleContentEditableWithUndo(element, newValue, start, end, isCurrent)
     // Focus element
     element.focus();
     if (!isCurrent()) return false;
+
+    // JIT aim just before mutating: revalidate + restore the captured CE scope
+    // (or fail closed) so a moved live selection cannot redirect output.
+    if (!ensureCEAim(element, applicationContext)) return false;
     
-    if (hasSelection && selection.rangeCount > 0) {
+    if (effectiveHasSelection && selection.rangeCount > 0) {
       // جایگزینی انتخاب با execCommand
       try {
         if (document.execCommand) {
@@ -66,10 +74,15 @@ function handleContentEditableWithUndo(element, newValue, start, end, isCurrent)
       // fallback: استفاده از range API
       const range = selection.getRangeAt(0);
       range.deleteContents();
-      const textNode = document.createTextNode(newValue);
-      range.insertNode(textNode);
-      range.setStartAfter(textNode);
-      range.setEndAfter(textNode);
+
+      // درج fragment با حفظ خطوط جدید (گره متنی تنها، \n را مسطح می‌کند)
+      const fragment = buildMultilineFragment(newValue);
+      const anchor = fragment.lastChild || element;
+      range.insertNode(fragment);
+
+      // تنظیم cursor بعد از متن
+      range.setStartAfter(anchor);
+      range.setEndAfter(anchor);
       selection.removeAllRanges();
       selection.addRange(range);
     } else {
@@ -90,8 +103,9 @@ function handleContentEditableWithUndo(element, newValue, start, end, isCurrent)
         logger.warn('execCommand failed:', execError);
       }
       
-      // fallback
-      element.textContent = newValue;
+      // fallback: ساختار بلوکی با حفظ خطوط جدید (textContent تنها، \n را مسطح می‌کند)
+      element.textContent = "";
+      element.appendChild(buildMultilineFragment(newValue));
     }
     
     // رویدادهای ضروری

@@ -243,7 +243,9 @@ onUnmounted(() => {
 
 const togglePin = () => {
   isPinned.value = !isPinned.value;
-  settings.updateSettingAndPersist('WINDOW_IS_PINNED', isPinned.value);
+  void settings.updateSettingAndPersist('WINDOW_IS_PINNED', isPinned.value).catch(error => {
+    logger.warn('Failed to persist WINDOW_IS_PINNED:', error);
+  });
   
   const windowsManager = window.windowsManagerInstance;
   if (windowsManager && windowsManager.state) {
@@ -346,7 +348,9 @@ const {
 watch(currentDockMode, (newVal) => {
   if (newVal !== dockMode.value) {
     dockMode.value = newVal;
-    settings.updateSettingAndPersist('WINDOW_DOCK_MODE', newVal);
+    void settings.updateSettingAndPersist('WINDOW_DOCK_MODE', newVal).catch(error => {
+      logger.warn('Failed to persist WINDOW_DOCK_MODE:', error);
+    });
     const windowsManager = window.windowsManagerInstance;
     if (windowsManager && windowsManager.state) {
       windowsManager.state.setDockMode(newVal);
@@ -454,7 +458,9 @@ const startResize = (event) => {
 
   const stopResize = () => {
     isResizing.value = false;
-    settings.updateSettingAndPersist('WINDOW_DOCKED_WIDTH', dockedWidth.value);
+    void settings.updateSettingAndPersist('WINDOW_DOCKED_WIDTH', dockedWidth.value).catch(error => {
+      logger.warn('Failed to persist WINDOW_DOCKED_WIDTH:', error);
+    });
     document.removeEventListener('mousemove', handleResizeMove);
     document.removeEventListener('mouseup', stopResize);
     document.removeEventListener('touchmove', handleResizeMove);

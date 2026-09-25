@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { nextTick, reactive, ref } from 'vue';
 import TranslationWindow from './TranslationWindow.vue';
 
@@ -18,8 +18,11 @@ const createSettingsStore = () => {
   });
 
   store.getSetting = vi.fn((key, fallback) => store.settings[key] ?? fallback);
-  store.updateSettingAndPersist = vi.fn((key, value) => {
+  // Mirrors the real store: Pinia state applies synchronously, persistence
+  // resolves afterwards (and rejects on storage failure).
+  store.updateSettingAndPersist = vi.fn(async (key, value) => {
     store.settings[key] = value;
+    return true;
   });
 
   return store;
@@ -73,6 +76,7 @@ vi.mock('@/composables/ui/usePositioning.js', () => ({
   usePositioning: () => {
     const currentPosition = ref({ x: 0, y: 0 });
     const currentDockMode = ref('none');
+    globalThis.__mockCurrentDockMode = currentDockMode;
 
     return {
       currentPosition,
@@ -121,6 +125,20 @@ vi.mock('@/store/modules/mobile.js', () => ({
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => globalThis.__mockSettingsStore,
+}));
+
+// Silent logger; warn is observed by the persistence-failure tests.
+const { mockLoggerWarn } = vi.hoisted(() => ({ mockLoggerWarn: vi.fn() }));
+
+vi.mock('@/shared/logging/logger.js', () => ({
+  getScopedLogger: () => ({
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    warn: mockLoggerWarn,
+    trace: vi.fn(),
+    operation: vi.fn(),
+  }),
 }));
 
 vi.mock('@/core/content-scripts/chunks/lazy-styles.js', () => ({
@@ -297,6 +315,28 @@ describe('TranslationWindow.vue', () => {
     expect(windowRoot.classes()).not.toContain('dark');
   });
 
+  // Shared persistence-failure helpers (used by the resize lifecycle and the
+  // persistence failure handling suites).
+  const collectUnhandledRejections = () => {
+    const failures = [];
+    const onUnhandled = (reason) => failures.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    return {
+      failures,
+      release: () => process.off('unhandledRejection', onUnhandled),
+    };
+  };
+
+  // Mirrors the real store: state applies synchronously, persistence rejects.
+  const rejectPersistOnce = () => {
+    globalThis.__mockSettingsStore.updateSettingAndPersist.mockImplementationOnce(
+      async (key, value) => {
+        globalThis.__mockSettingsStore.settings[key] = value;
+        throw new Error('storage failed');
+      }
+    );
+  };
+
   describe('docked window resize lifecycle', () => {
     const mountDocked = () => {
       globalThis.__mockSettingsStore.settings.WINDOW_DOCK_MODE = 'left';
@@ -365,6 +405,121 @@ describe('TranslationWindow.vue', () => {
       }
       addSpy.mockRestore();
       removeSpy.mockRestore();
+    });
+
+    it('handles persistence rejection on resize stop without interrupting interaction', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        const wrapper = mountDocked();
+        const handle = wrapper.find('.ti-dock-resize-handle');
+        await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+        dispatchTouchOnDocument('touchmove', 150);
+        await nextTick();
+
+        rejectPersistOnce();
+        dispatchTouchOnDocument('touchend', 150);
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        // Resize completes normally with the resized width staged in state.
+        expect(globalThis.__mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledWith(
+          'WINDOW_DOCKED_WIDTH',
+          400
+        );
+        expect(globalThis.__mockSettingsStore.settings.WINDOW_DOCKED_WIDTH).toBe(400);
+        expect(wrapper.find('.translation-window').attributes('style')).toContain('width: 400px');
+        // Failure is logged, not thrown: no unhandled rejection.
+        expect(mockLoggerWarn).toHaveBeenCalled();
+        expect(failures).toHaveLength(0);
+
+        // Event cleanup still happens: further moves are ignored, body restored.
+        expect(document.body.style.userSelect).toBe('');
+        dispatchTouchOnDocument('touchmove', 250);
+        await nextTick();
+        expect(wrapper.find('.translation-window').attributes('style')).toContain('width: 400px');
+
+        // Interaction uninterrupted: a new resize session still persists.
+        await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+        dispatchTouchOnDocument('touchmove', 160);
+        dispatchTouchOnDocument('touchend', 160);
+        await flushPromises();
+        expect(globalThis.__mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledWith(
+          'WINDOW_DOCKED_WIDTH',
+          460
+        );
+      } finally {
+        release();
+      }
+    });
+  });
+
+  describe('settings persistence failure handling', () => {
+    it('pin toggle applies immediately and handles persistence rejection without rollback', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        const wrapper = mount(TranslationWindow, { props: baseProps });
+        rejectPersistOnce();
+
+        await wrapper.find('.ti-action-btn[title="window_pin"]').trigger('click');
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        // Runtime (local + manager) updates stay immediate and are kept.
+        expect(globalThis.__mockSettingsStore.settings.WINDOW_IS_PINNED).toBe(true);
+        expect(window.windowsManagerInstance.state.setPinned).toHaveBeenCalledWith(true);
+        // Failure is logged, not thrown: no unhandled rejection, no rollback.
+        expect(mockLoggerWarn).toHaveBeenCalled();
+        expect(failures).toHaveLength(0);
+        expect(globalThis.__mockSettingsStore.settings.WINDOW_IS_PINNED).toBe(true);
+        expect(window.windowsManagerInstance.state.setPinned).toHaveBeenCalledWith(true);
+      } finally {
+        release();
+      }
+    });
+
+    it('dock-mode change applies immediately and handles persistence rejection without rollback', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        mount(TranslationWindow, { props: baseProps });
+        rejectPersistOnce();
+
+        globalThis.__mockCurrentDockMode.value = 'left';
+        await nextTick();
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(globalThis.__mockSettingsStore.settings.WINDOW_DOCK_MODE).toBe('left');
+        expect(window.windowsManagerInstance.state.setDockMode).toHaveBeenCalledWith('left');
+        expect(mockLoggerWarn).toHaveBeenCalled();
+        expect(failures).toHaveLength(0);
+        expect(globalThis.__mockSettingsStore.settings.WINDOW_DOCK_MODE).toBe('left');
+      } finally {
+        release();
+      }
+    });
+
+    it('a later change still persists after a persistence failure', async () => {
+      const { failures, release } = collectUnhandledRejections();
+      try {
+        const wrapper = mount(TranslationWindow, { props: baseProps });
+        rejectPersistOnce();
+
+        await wrapper.find('.ti-action-btn[title="window_pin"]').trigger('click');
+        await flushPromises();
+
+        // Title flips while pinned; toggle back with the updated selector.
+        await wrapper.find('.ti-action-btn[title="window_unpin"]').trigger('click');
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        const persist = globalThis.__mockSettingsStore.updateSettingAndPersist;
+        expect(persist).toHaveBeenCalledTimes(2);
+        expect(persist).toHaveBeenNthCalledWith(2, 'WINDOW_IS_PINNED', false);
+        expect(globalThis.__mockSettingsStore.settings.WINDOW_IS_PINNED).toBe(false);
+        expect(failures).toHaveLength(0);
+      } finally {
+        release();
+      }
     });
   });
 });

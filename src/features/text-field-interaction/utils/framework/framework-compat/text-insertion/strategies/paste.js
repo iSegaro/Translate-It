@@ -1,6 +1,7 @@
 // src/utils/framework-compat/text-insertion/strategies/paste.js
 
 import { smartDelay } from "../helpers.js";
+import { serializeContentEditableText, ensureCEAim, hasScopedCESelection } from "../../contentEditableScope.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'paste');
@@ -33,8 +34,9 @@ export async function tryPasteInsertion(element, text, hasSelection, application
       dataType: { value: "text/plain", writable: false },
     });
 
-    // اگر انتخاب ندارد، کل محتوا را انتخاب کن (برای حفظ undo)
-    if (!hasSelection) {
+    // اگر انتخاب ندارد، کل محتوا را انتخاب کن — مگر اینکه محدوده انتخاب
+    // دارای scope معتبر باشد که از قبل هدف‌گیری شده است.
+    if (!hasSelection && !hasScopedCESelection(element, applicationContext)) {
       if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         const range = document.createRange();
@@ -50,16 +52,19 @@ export async function tryPasteInsertion(element, text, hasSelection, application
 
     // ارسال event
     if (!isCurrent()) return false;
+    // JIT aim just before dispatching: revalidate + restore the captured CE
+    // scope (or fail closed) so a moved live selection cannot redirect output.
+    if (!ensureCEAim(element, applicationContext)) return false;
     element.dispatchEvent(pasteEvent);
 
     // تأیید موفقیت
     await smartDelay(100);
     if (!isCurrent()) return false;
 
-    // بررسی اینکه متن واقعاً اضافه شده
+    // بررسی اینکه متن واقعاً اضافه شده (فرم canonical برای CE)
     const currentText =
       element.isContentEditable ?
-        element.textContent || element.innerText
+        serializeContentEditableText(element)
       : element.value;
 
     if (currentText && currentText.includes(text)) {

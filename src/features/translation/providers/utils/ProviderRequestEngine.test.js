@@ -349,6 +349,77 @@ describe('ProviderRequestEngine', () => {
       expect(error).toMatchObject({ message, code: 'nested-code' });
     });
 
+    it('preserves a top-level string error message', async () => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: 'specific provider error' }));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error).toMatchObject({
+        message: 'specific provider error',
+        type: ErrorTypes.HTTP_ERROR,
+        statusCode: 400,
+      });
+    });
+
+    it.each([
+      ['detail precedence over string error', {
+        detail: 'Detailed provider failure',
+        error: 'String provider failure',
+        message: 'Top-level provider failure',
+      }, 'Detailed provider failure'],
+      ['nested message precedence over string error', {
+        error: { message: 'Nested provider failure', code: 'nested-code' },
+      }, 'Nested provider failure'],
+      ['string error precedence over top-level message', {
+        error: 'String provider failure',
+        message: 'Top-level provider failure',
+      }, 'String provider failure'],
+      ['top-level message unchanged without string error', {
+        message: 'Top-level provider failure',
+      }, 'Top-level provider failure'],
+    ])('keeps precedence for %s', async (_label, body, message) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.message).toBe(message);
+    });
+
+    it.each([
+      ['empty string', { error: '' }],
+      ['whitespace string', { error: '   ' }],
+      ['number', { error: 123 }],
+      ['null', { error: null }],
+      ['array', { error: ['unsafe'] }],
+      ['object without message', { error: { code: 'no-message' } }],
+    ])('falls back safely for %s top-level error', async (_label, body) => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse(body));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.message).toBe('Bad Request');
+    });
+
+    it('keeps an over-limit top-level string error bounded', async () => {
+      proxyManager.fetch.mockResolvedValue(httpErrorResponse({ error: 'x'.repeat(2049) }));
+
+      const error = await ProviderRequestEngine.executeApiCall(mockProvider, {
+        url: 'https://api.test.com',
+        fetchOptions: { headers: {} },
+      }).catch(value => value);
+
+      expect(error.message).toBe('Bad Request');
+    });
+
     it.each([
       ['overlong string', { code: 'x'.repeat(129) }],
       ['object', { code: { unsafe: true } }],

@@ -31,6 +31,32 @@ function getDefaultSettings() {
   };
 }
 
+/**
+ * Filters a source object to canonical persisted-settings keys.
+ *
+ * Ownership invariant: SettingsStore owns key membership (from
+ * getPersistedDefaultSettings(), keys only); StorageCore owns plain-data
+ * conversion (StorageCore.set() runs _convertToPlainObject() on every write,
+ * so reactive proxies never reach browser storage as proxies). Values here
+ * keep their original references — no store-level cloning.
+ *
+ * Values are always taken from the source and never backfilled from defaults.
+ * Keys absent from the source — or explicitly undefined — are skipped.
+ * translationHistory and any non-schema runtime keys are excluded by
+ * construction — history owns its own storage key via the history feature.
+ *
+ * Used for full-state writes (performSave reads settings.value) and for
+ * narrowed writes (updateMultipleSettings reads the updates object only).
+ */
+function buildPersistedSnapshot(source) {
+  const snapshot = {};
+  Object.keys(getPersistedDefaultSettings()).forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(source, key) || source[key] === undefined) return;
+    snapshot[key] = source[key];
+  });
+  return snapshot;
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
   const settings = ref(getDefaultSettings())
@@ -154,18 +180,8 @@ export const useSettingsStore = defineStore('settings', () => {
     return __loadInFlight;
   }
   
-  // Debounced save (simple trailing debounce)
-  let __saveTimer = null;
-  const saveAllSettings = async (immediate = false) => {
-    if (immediate) {
-      clearTimeout(__saveTimer);
-      return performSave();
-    }
-    return new Promise((resolve, reject) => {
-      clearTimeout(__saveTimer);
-      __saveTimer = setTimeout(() => performSave().then(resolve).catch(reject), 120);
-    });
-  }
+  // Immediate save: resolves only after the storage operation finishes.
+  const saveAllSettings = async () => performSave()
 
   /**
    * Sanitizes settings before saving to prevent logical inconsistencies.
@@ -190,8 +206,9 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       // Run sanitization before saving
       sanitizeSettings();
-      
-      await storageManager.set(settings.value);
+
+      // Write-boundary: persist canonical schema keys only, with live values.
+      await storageManager.set(buildPersistedSnapshot(settings.value));
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -247,7 +264,13 @@ export const useSettingsStore = defineStore('settings', () => {
         }
       }
 
-      await storageManager.set(updates) // Persist all changes
+      // Canonical write boundary: persist only schema keys from the final
+      // updates object (including DEBUG_MODE cleanup additions, which are
+      // canonical). An empty result skips the storage round-trip; local state
+      // and the true return are unaffected.
+      const filtered = buildPersistedSnapshot(updates)
+      if (Object.keys(filtered).length === 0) return true
+      await storageManager.set(filtered)
       return true
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -261,11 +284,17 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const updateMultipleSettings = async (updates) => {
     try {
-      // Update local state
+      // Update local state (all keys, including non-schema runtime keys)
       Object.assign(settings.value, updates)
-      
-      // Get browser API and save to storage
-  await storageManager.set(settings.value)
+
+      // Narrow write: persist only the canonical keys from this update.
+      // Unrelated canonical settings already in state are NOT rewritten, which
+      // removes the concurrent-overwrite window of a whole-snapshot write.
+      // An empty result skips the storage round-trip (set({}) writes nothing
+      // and emits no events); local state and the true return are unaffected.
+      const filtered = buildPersistedSnapshot(updates || {})
+      if (Object.keys(filtered).length === 0) return true
+      await storageManager.set(filtered)
       
       return true
     } catch (error) {

@@ -435,6 +435,18 @@ describe('Settings Migrations', () => {
     expect(current.updates.OPENROUTER_API_MODEL).toBeUndefined();
   });
 
+  it.each(CONFIG.REQUESTY_MODELS
+    .filter(model => model.value !== 'custom')
+    .map(model => model.value))('preserves curated Requesty model ID %s during list synchronization', async (model) => {
+    const current = await runSettingsMigrations({
+      REQUESTY_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
+      REQUESTY_API_MODEL: model
+    });
+
+    expect(current.updates.REQUESTY_MODELS).toEqual(CONFIG.REQUESTY_MODELS);
+    expect(current.updates.REQUESTY_API_MODEL).toBeUndefined();
+  });
+
   it('preserves removed and arbitrary OpenRouter model IDs during list synchronization', async () => {
     const removed = await runSettingsMigrations({
       OPENROUTER_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],

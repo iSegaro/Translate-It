@@ -134,7 +134,11 @@ export default class TelegramStrategy extends PlatformStrategy {
             CONFIG.RTL_REGEX.test(translatedText) ? "rtl" : "ltr",
           );
         }
-        this.setCursorToEnd(telegramField);
+        // A scoped selection replace already parks the caret after the inserted
+        // range; yanking it to the end would misbehave for partial replaces.
+        if (applicationContext?.fieldSource?.scope !== 'selection') {
+          this.setCursorToEnd(telegramField);
+        }
         logger.debug('Telegram field updated successfully using smartTextReplacement');
       }
 

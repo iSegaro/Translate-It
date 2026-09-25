@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { serializeContentEditableText } from '../contentEditableScope.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'helpers');
 
 
@@ -18,7 +19,9 @@ export async function verifyTextInsertion(element, expectedText, initialContent 
 
     const currentText =
       element.isContentEditable ?
-        element.textContent || element.innerText
+        // Canonical text (meaningful \n): flattened textContent would make
+        // multiline insertions unverifiable (false negative → needless retry).
+        serializeContentEditableText(element)
       : element.value;
 
     // بررسی که متن جدید اضافه شده یا تغییری رخ داده

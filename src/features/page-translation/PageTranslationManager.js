@@ -574,6 +574,17 @@ export class PageTranslationManager extends ResourceTracker {
   }
 
   /**
+   * Best-effort persistence for the "don't show again" token warning choice.
+   * Never blocks or alters the confirm/cancel flow; failures are logged.
+   * @private
+   */
+  _persistTokenWarningHidden() {
+    void storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true }).catch(error => {
+      this.logger.warn('Failed to persist token warning preference:', error);
+    });
+  }
+
+  /**
    * Shows a confirmation dialog for token-heavy providers (AI, DeepL) 
    * to warn the user about potential high usage in Page Translation.
    * 
@@ -609,7 +620,7 @@ export class PageTranslationManager extends ResourceTracker {
             onClick: (dontShowAgain) => {
               this.logger.info('User confirmed token usage', { dontShowAgain });
               if (dontShowAgain) {
-                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+                this._persistTokenWarningHidden();
               }
               resolve(true);
             }
@@ -619,7 +630,7 @@ export class PageTranslationManager extends ResourceTracker {
             onClick: (dontShowAgain) => {
               this.logger.info('User cancelled translation due to token warning', { dontShowAgain });
               if (dontShowAgain) {
-                storageManager.set({ WHOLE_PAGE_TOKEN_WARNING_HIDDEN: true });
+                this._persistTokenWarningHidden();
               }
               resolve(false);
             }

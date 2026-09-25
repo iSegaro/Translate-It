@@ -2,6 +2,7 @@
 
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { checkTextSelection } from "../selectionUtils.js";
+import { hasScopedCESelection, serializeContentEditableText } from "../contentEditableScope.js";
 import { detectOptimalStrategy } from "./detector.js";
 import {
   findTextNodeAtPosition,
@@ -39,26 +40,37 @@ export async function optimizedTextInsertion(
   if (!isCurrent()) return false;
 
   const strategy = detectOptimalStrategy(element);
-  const hasSelection = checkTextSelection(element);
 
   logger.debug('Using optimized insertion strategy', { strategy, hostname: typeof window !== 'undefined' ? window.location.hostname : '' });
 
-  // تنظیم انتخاب در صورت نیاز
+  // تنظیم انتخاب در صورت نیاز (authoritative: explicit range first, so the
+  // effective selection below describes it rather than the old live state)
   if (start !== null && end !== null) {
-    if (element.isContentEditable && typeof window !== 'undefined') {
-      const selection = window.getSelection();
-      const range = document.createRange();
-      const textNode = findTextNodeAtPosition(element, start);
-      if (textNode) {
-        range.setStart(textNode, Math.min(start, textNode.textContent.length));
-        range.setEnd(textNode, Math.min(end, textNode.textContent.length));
-        selection.removeAllRanges();
-        selection.addRange(range);
+    try {
+      if (element.isContentEditable && typeof window !== 'undefined') {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        const textNode = findTextNodeAtPosition(element, start);
+        if (textNode) {
+          range.setStart(textNode, Math.min(start, textNode.textContent.length));
+          range.setEnd(textNode, Math.min(end, textNode.textContent.length));
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      } else {
+        element.setSelectionRange(start, end);
       }
-    } else {
-      element.setSelectionRange(start, end);
+    } catch (installError) {
+      // Capability-safe (e.g. INPUT types without selection support): keep the
+      // live selection; downstream layers fail safe on their own guards.
+      logger.debug('Explicit range install failed, keeping live selection', installError);
     }
   }
+
+  // Describe the EFFECTIVE selection for downstream layers. Reading live state
+  // before installing the explicit range would hand exec/paste layers a stale
+  // hasSelection=false, making them select-all and full-replace a scoped request.
+  const hasSelection = checkTextSelection(element);
 
   switch (strategy) {
     case "google-docs": {
@@ -128,10 +140,11 @@ export async function universalTextInsertion(
       if (!isCurrent()) return false;
     }
 
-    // ذخیره محتوای اولیه برای تأیید تغییرات
+    // ذخیره محتوای اولیه برای تأیید تغییرات (فرم canonical برای CE تا مقایسه
+    // با متن canonical لایه‌های بعدی مثبت/منفی کاذب ندهد)
     const initialContent =
       element.isContentEditable ?
-        element.textContent || element.innerText
+        serializeContentEditableText(element)
       : element.value;
 
     // تنظیم انتخاب در صورت نیاز یا انتخاب کل محتوا برای جایگزینی
@@ -156,7 +169,11 @@ export async function universalTextInsertion(
         // برای input/textarea
         element.setSelectionRange(start, end);
       }
-    } else {
+    } else if (!hasScopedCESelection(element, applicationContext)) {
+      // A centrally-restored CE selection scope already aimed the live
+      // selection at the captured bookmark; a legacy select-all here would
+      // wipe it and full-replace a partial request. Scoped full CE was also
+      // aimed (select-all) by central restore, so skipping is safe there too.
       // انتخاب کل محتوا برای جایگزینی کامل
       if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();

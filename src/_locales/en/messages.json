@@ -68,6 +68,9 @@
   "api_provider_openrouter": {
     "message": "OpenRouter"
   },
+  "api_provider_requesty": {
+    "message": "Requesty"
+  },
   "api_provider_deepseek": {
     "message": "DeepSeek"
   },
@@ -155,8 +158,14 @@
   "provider_openrouter_title": {
     "message": "OpenRouter"
   },
+  "provider_requesty_title": {
+    "message": "Requesty"
+  },
   "provider_openrouter_description": {
     "message": "Access to multiple AI models via OpenRouter. Requires an API key."
+  },
+  "provider_requesty_description": {
+    "message": "Access to multiple AI models via Requesty. Requires an API key."
   },
   "provider_deepseek_title": {
     "message": "DeepSeek"
@@ -749,6 +758,9 @@
   "help_api_providers_openrouter": {
     "message": "OpenRouter - Access multiple models via [OpenRouter]({url})"
   },
+  "help_api_providers_requesty": {
+    "message": "Requesty - Access multiple models via [Requesty]({url})"
+  },
   "help_api_providers_deepseek": {
     "message": "DeepSeek - Get API access from [DeepSeek Platform]({url})"
   },
@@ -1109,6 +1121,9 @@
   "translation_api_label": {
     "message": "Service"
   },
+  "providers_configure_label": {
+    "message": "Provider to configure"
+  },
   "provider_label": {
     "message": "Provider"
   },
@@ -1127,6 +1142,9 @@
   "openrouter_api_key_info": {
     "message": "You can get your OpenRouter API key from OpenRouter Platform."
   },
+  "requesty_api_key_info": {
+    "message": "You can get your Requesty API key from the Requesty dashboard."
+  },
   "webai_api_key_info": {
     "message": "You can get and run your locally hosted WebAI API server."
   },
@@ -1140,6 +1158,9 @@
     "message": "Get Your API Key"
   },
   "openrouter_api_key_link": {
+    "message": "Get Your API Key"
+  },
+  "requesty_api_key_link": {
     "message": "Get Your API Key"
   },
   "webai_api_key_link": {
@@ -1223,11 +1244,17 @@
   "openrouter_api_settings_title": {
     "message": "OpenRouter Settings"
   },
+  "requesty_api_settings_title": {
+    "message": "Requesty Settings"
+  },
   "openrouter_api_settings_api_key_label": {
     "message": "API Key"
   },
   "openrouter_api_key_placeholder": {
     "message": "Paste your OpenRouter API key here"
+  },
+  "requesty_api_key_placeholder": {
+    "message": "Paste your Requesty API key here"
   },
   "openrouter_api_settings_model_label": {
     "message": "Model"
@@ -1354,6 +1381,78 @@
   },
   "custom_api_model_placeholder": {
     "message": "Enter the model name"
+  },
+  "custom_api_test_connection": {
+    "message": "Check Compatibility"
+  },
+  "custom_api_testing_connection": {
+    "message": "Checking…"
+  },
+  "custom_api_not_tested": {
+    "message": "Not checked"
+  },
+  "custom_api_verdict_compatible": {
+    "message": "Compatible."
+  },
+  "custom_api_verdict_inconclusive": {
+    "message": "Compatibility could not be fully verified."
+  },
+  "custom_api_verdict_incompatible": {
+    "message": "Not compatible."
+  },
+  "custom_api_verdict_unreachable": {
+    "message": "Cannot connect."
+  },
+  "custom_api_verdict_auth_failed": {
+    "message": "Authentication failed."
+  },
+  "custom_api_verdict_check_failed": {
+    "message": "Compatibility check failed."
+  },
+  "custom_api_verdict_timed_out": {
+    "message": "Compatibility check timed out."
+  },
+  "custom_api_connection_success": {
+    "message": ""
+  },
+  "custom_api_connection_fallback": {
+    "message": "Compatibility mode will be used."
+  },
+  "custom_api_connection_inconclusive": {
+    "message": ""
+  },
+  "custom_api_connection_structured_invalid": {
+    "message": "The model returned an unusable response."
+  },
+  "custom_api_connection_model_mismatch": {
+    "message": "The server used {effectiveModel} instead of {requestedModel}."
+  },
+  "custom_api_connection_model_mismatch_fallback": {
+    "message": "The server used {effectiveModel} instead of {requestedModel}. Compatibility mode will be used."
+  },
+  "custom_api_connection_model_mismatch_inconclusive": {
+    "message": "The server used {effectiveModel} instead of {requestedModel}."
+  },
+  "custom_api_connection_model_mismatch_unusable": {
+    "message": "The server used {effectiveModel} instead of {requestedModel}, and its output may not work reliably."
+  },
+  "custom_api_connection_unreachable": {
+    "message": "Check the server address and network."
+  },
+  "custom_api_connection_auth_failed": {
+    "message": "Check the API key."
+  },
+  "custom_api_connection_completion_failed": {
+    "message": "The server responded, but returned nothing usable."
+  },
+  "custom_api_connection_request_failed": {
+    "message": "Check the server settings."
+  },
+  "custom_api_connection_failed_unexpected": {
+    "message": ""
+  },
+  "custom_api_connection_timed_out": {
+    "message": "Try again."
   },
   "import_export_section_title": {
     "message": "Import/Export Settings"
@@ -1919,7 +2018,13 @@
   "openrouter_custom_model_placeholder": {
     "message": "Enter model name (e.g., provider/model-name)"
   },
+  "requesty_custom_model_placeholder": {
+    "message": "Enter model name (e.g., provider/model-name)"
+  },
   "openrouter_custom_model_label": {
+    "message": "Model Name"
+  },
+  "requesty_custom_model_label": {
     "message": "Model Name"
   },
   "deepseek_custom_model_placeholder": {

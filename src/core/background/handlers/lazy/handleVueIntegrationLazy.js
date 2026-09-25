@@ -20,6 +20,7 @@ async function loadVueIntegrationHandlers() {
 
   const [
     testProviderModule,
+    testCustomConnectionModule,
     saveProviderModule,
     getProviderModule,
     startScreenCaptureModule,
@@ -31,6 +32,7 @@ async function loadVueIntegrationHandlers() {
     vueBridgeModule
   ] = await Promise.all([
     import('../vue-integration/handleTestProviderConnection.js'),
+    import('../vue-integration/handleTestCustomConnection.js'),
     import('../vue-integration/handleSaveProviderConfig.js'),
     import('../vue-integration/handleGetProviderConfig.js'),
     import('../vue-integration/handleStartScreenCapture.js'),
@@ -44,6 +46,7 @@ async function loadVueIntegrationHandlers() {
 
   vueIntegrationHandlers = {
     handleTestProviderConnection: testProviderModule.handleTestProviderConnection,
+    handleTestCustomConnection: testCustomConnectionModule.handleTestCustomConnection,
     handleSaveProviderConfig: saveProviderModule.handleSaveProviderConfig,
     handleGetProviderConfig: getProviderModule.handleGetProviderConfig,
     handleStartScreenCapture: startScreenCaptureModule.handleStartScreenCapture,
@@ -65,6 +68,14 @@ async function loadVueIntegrationHandlers() {
 export const handleTestProviderConnectionLazy = async (message, sender, sendResponse) => {
   const { handleTestProviderConnection } = await loadVueIntegrationHandlers();
   return await handleTestProviderConnection(message, sender, sendResponse);
+};
+
+/**
+ * Lazy handler for TEST_CUSTOM_CONNECTION
+ */
+export const handleTestCustomConnectionLazy = async (message, sender, sendResponse) => {
+  const { handleTestCustomConnection } = await loadVueIntegrationHandlers();
+  return await handleTestCustomConnection(message, sender, sendResponse);
 };
 
 /**

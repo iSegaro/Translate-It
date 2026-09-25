@@ -1,6 +1,7 @@
 // src/utils/framework-compat/text-insertion/strategies/paste-optimized.js
 
 import { smartDelay } from "../helpers.js";
+import { serializeContentEditableText, ensureCEAim, hasScopedCESelection } from "../../contentEditableScope.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'paste-optimized');
@@ -34,8 +35,9 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection, ap
       pasteEvent.docs_plus_ = true;
     }
 
-    // اگر انتخاب ندارد، کل محتوا را انتخاب کن
-    if (!hasSelection) {
+    // اگر انتخاب ندارد، کل محتوا را انتخاب کن — مگر اینکه محدوده انتخاب
+    // دارای scope معتبر باشد که از قبل هدف‌گیری شده است.
+    if (!hasSelection && !hasScopedCESelection(element, applicationContext)) {
       if (element.isContentEditable && typeof window !== 'undefined') {
         const selection = window.getSelection();
         const range = document.createRange();
@@ -54,6 +56,10 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection, ap
     await smartDelay(10);
     if (!isCurrent()) return false;
 
+    // JIT aim just before dispatching: revalidate + restore the captured CE
+    // scope (or fail closed) so a moved live selection cannot redirect output.
+    if (!ensureCEAim(element, applicationContext)) return false;
+
     // ارسال event
     if (!isCurrent()) return false;
     element.dispatchEvent(pasteEvent);
@@ -65,10 +71,10 @@ export async function tryOptimizedPasteInsertion(element, text, hasSelection, ap
     // تنظیف clipboard data
     clipboardData.clearData();
 
-    // بررسی موفقیت
+    // بررسی موفقیت (فرم canonical برای CE تا چندخطی‌ها قابل راستی‌آزمایی باشند)
     const currentText =
       element.isContentEditable ?
-        element.textContent || element.innerText
+        serializeContentEditableText(element)
       : element.value;
 
     const success = currentText && currentText.includes(text);

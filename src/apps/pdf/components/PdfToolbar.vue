@@ -53,6 +53,7 @@
               :class="{ 'pdf-toolbar__mode-button--active': contentView === opt.value }"
               type="button"
               :aria-label="opt.ariaLabel ?? opt.label"
+              :title="opt.tooltip"
               @click="$emit('content-view-change', opt.value)"
             >
               {{ opt.label }}
@@ -67,6 +68,7 @@
           <select
             class="pdf-toolbar__view-mode-select"
             :value="contentView"
+            :title="selectedContentTooltip"
             :tabindex="showTranslationOption ? 0 : -1"
             :aria-hidden="!showTranslationOption"
             aria-label="View mode"
@@ -668,12 +670,16 @@ const activeMenu = ref(null)
 const zoomPercentOptions = PDF_ZOOM_PERCENT_OPTIONS
 
 const allContentOptions = [
-  { value: CONTENT_VIEW.ORIGINAL, label: 'Original', ariaLabel: 'Original' },
-  { value: CONTENT_VIEW.TRANSLATION, label: 'Text', ariaLabel: 'Translation' },
-  { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'PDF', ariaLabel: 'Translated PDF' }
+  { value: CONTENT_VIEW.ORIGINAL, label: 'Original', ariaLabel: 'Original', tooltip: 'Original PDF' },
+  { value: CONTENT_VIEW.TRANSLATION, label: 'Text', ariaLabel: 'Translation', tooltip: 'Translated Text (Beta)' },
+  { value: CONTENT_VIEW.TRANSLATED_PDF, label: 'PDF', ariaLabel: 'Translated PDF', tooltip: 'Translated PDF (Experimental)' }
 ]
 
 const contentOptions = computed(() => allContentOptions)
+
+const selectedContentTooltip = computed(() => {
+  return contentOptions.value.find((opt) => opt.value === props.contentView)?.tooltip ?? ''
+})
 
 const isSideBySide = computed(() => props.layoutMode === LAYOUT_MODE.SIDE_BY_SIDE)
 const hasExecutionModeChoice = computed(() => props.executionModes.length > 1)

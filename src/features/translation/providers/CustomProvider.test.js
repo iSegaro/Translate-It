@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CustomProvider } from './CustomProvider.js';
+import { CustomProvider, clearCustomResponseFormatSupportCache } from './CustomProvider.js';
 import { proxyManager } from '@/shared/proxy/ProxyManager.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
-import { getCustomApiKeysAsync } from '@/shared/config/config.js';
+import { getCustomApiKeysAsync, getCustomApiUrlAsync, getCustomApiModelAsync } from '@/shared/config/config.js';
 import { TranslationCallPurpose } from './ProviderConstants.js';
 import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { CompletionTermination } from '@/features/translation/ir/CompletionContract.js';
@@ -99,6 +99,9 @@ describe('CustomProvider Error Handling', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearCustomResponseFormatSupportCache();
+    vi.mocked(getCustomApiUrlAsync).mockResolvedValue('https://custom-api.com/v1/chat/completions');
+    vi.mocked(getCustomApiModelAsync).mockResolvedValue('custom-model');
     provider = new CustomProvider();
   });
 
@@ -369,7 +372,7 @@ describe('CustomProvider Error Handling', () => {
     expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).not.toHaveProperty('response_format');
   });
 
-  it('probes response_format again for a fresh capability scope', async () => {
+  it('reuses cached unsupported capability for a fresh ref with the same endpoint', async () => {
     const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
       statusCode: 400,
       type: ErrorTypes.HTTP_ERROR,
@@ -391,7 +394,8 @@ describe('CustomProvider Error Handling', () => {
     });
 
     expect(executeRequest).toHaveBeenCalledTimes(3);
-    expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).toHaveProperty('response_format');
+    expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).not.toHaveProperty('response_format');
+    expect(secondCapabilityRef.responseFormatUnsupported).toBe(true);
   });
 
   it('reuses capability state across the actual BaseAI rate-limit retry boundary', async () => {
@@ -440,7 +444,7 @@ describe('CustomProvider Error Handling', () => {
     }
   });
 
-  it('starts fresh capability scope for a new BaseAI structured execution', async () => {
+  it('reuses cached unsupported capability across BaseAI structured executions', async () => {
     const unsupported = Object.assign(new Error('Unsupported parameter: response_format'), {
       statusCode: 422,
       type: ErrorTypes.HTTP_ERROR,
@@ -472,14 +476,14 @@ describe('CustomProvider Error Handling', () => {
       expect(executeRequest).toHaveBeenCalledTimes(3);
       expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).toHaveProperty('response_format');
       expect(JSON.parse(executeRequest.mock.calls[1][0].fetchOptions.body)).not.toHaveProperty('response_format');
-      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).not.toHaveProperty('response_format');
     } finally {
       parseBatchResult.mockRestore();
       executeWithRateLimit.mockRestore();
     }
   });
 
-  it('gives each sequential item an independent capability scope', async () => {
+  it('reuses cached unsupported capability across sequential items', async () => {
     const unsupported = Object.assign(new Error('Unknown parameter `response_format`'), {
       statusCode: 400,
       type: ErrorTypes.HTTP_ERROR,
@@ -507,7 +511,7 @@ describe('CustomProvider Error Handling', () => {
       expect(executeRequest).toHaveBeenCalledTimes(3);
       expect(JSON.parse(executeRequest.mock.calls[0][0].fetchOptions.body)).toHaveProperty('response_format');
       expect(JSON.parse(executeRequest.mock.calls[1][0].fetchOptions.body)).not.toHaveProperty('response_format');
-      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).toHaveProperty('response_format');
+      expect(JSON.parse(executeRequest.mock.calls[2][0].fetchOptions.body)).not.toHaveProperty('response_format');
     } finally {
       executeWithRateLimit.mockRestore();
     }

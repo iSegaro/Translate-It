@@ -103,7 +103,7 @@ export const CONFIG = {
 
 
   // --- API Settings ---
-  TRANSLATION_API: isFirefox ? ProviderRegistryIds.YANDEX : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, deepseek, custom, google, browserapi
+  TRANSLATION_API: isFirefox ? ProviderRegistryIds.YANDEX : ProviderRegistryIds.GOOGLE_V2, // gemini, webai, openai, openrouter, requesty, deepseek, custom, google, browserapi
 
   // --- Live Dubbing Settings ---
   POPUP_ACTIVE_VIEW: 'translate',
@@ -222,6 +222,21 @@ export const CONFIG = {
     { value: "anthropic/claude-sonnet-4.6", name: "Anthropic Claude Sonnet 4.6" },
     { value: "google/gemma-4-26b-a4b-it:free", name: "Google Gemma 4 26B A4B (Free)" },
     { value: "nvidia/nemotron-3-super-120b-a12b:free", name: "NVIDIA Nemotron 3 Super (Free)" },
+    { value: "custom", name: "Custom Model" }
+  ],
+  REQUESTY_API_KEY: "",
+  REQUESTY_API_URL: "https://router.requesty.ai/v1/chat/completions",
+  REQUESTY_API_MODEL: "openai/gpt-4o-mini",
+  REQUESTY_MODELS: [
+    { value: "openai/gpt-4o-mini", name: "OpenAI GPT-4o Mini" },
+    { value: "gpt-5.4-mini", name: "OpenAI GPT-5.4 Mini" },
+    { value: "gemini-3.5-flash-lite", name: "Google Gemini 3.5 Flash-Lite" },
+    { value: "gemini-3.5-flash", name: "Google Gemini 3.5 Flash" },
+    { value: "claude-haiku-4-5", name: "Anthropic Claude Haiku 4.5" },
+    { value: "claude-sonnet-4-6", name: "Anthropic Claude Sonnet 4.6" },
+    { value: "deepseek-v4-flash", name: "DeepSeek V4 Flash" },
+    { value: "mistral-small-2603", name: "Mistral Small" },
+    { value: "qwen3.8-flash", name: "Qwen 3.8 Flash" },
     { value: "custom", name: "Custom Model" }
   ],
   DEEPSEEK_API_KEY: "",
@@ -659,6 +674,9 @@ $_{TEXT}
 
 $_{TEXT}`,
   /*--- End PROMPT_BASE_SCREEN_CAPTURE ---*/
+
+  /*--- Prompt editor UI state (Options page only, not a prompt template) ---*/
+  PROMPT_EDITOR_SELECTED_KEY: 'PROMPT_TEMPLATE',
 
   /*--- Start PROMPT_TEMPLATE ---*/
   PROMPT_TEMPLATE: `- Translate the input text from $_{SOURCE} (or any other language) into $_{TARGET}.
@@ -1124,6 +1142,18 @@ export const getOpenRouterApiModelAsync = async () => {
   );
 };
 
+// Requesty Specific
+export const getRequestyApiKeyAsync = async () => {
+  return getSettingValueAsync("REQUESTY_API_KEY", CONFIG.REQUESTY_API_KEY);
+};
+
+export const getRequestyApiModelAsync = async () => {
+  return getSettingValueAsync(
+    "REQUESTY_API_MODEL",
+    CONFIG.REQUESTY_API_MODEL
+  );
+};
+
 // --- New Activation Settings Getters ---
 export const getShowDesktopFabAsync = async () => {
   return getSettingValueAsync(
@@ -1251,6 +1281,10 @@ export const getOpenRouterModelSelectionAsync = async () => {
   return getSettingValueAsync("OPENROUTER_API_MODEL", CONFIG.OPENROUTER_API_MODEL);
 };
 
+export const getRequestyModelSelectionAsync = async () => {
+  return getSettingValueAsync("REQUESTY_API_MODEL", CONFIG.REQUESTY_API_MODEL);
+};
+
 export const getEnableScreenCaptureAsync = async () => {
   return getSettingValueAsync("ENABLE_SCREEN_CAPTURE", CONFIG.ENABLE_SCREEN_CAPTURE);
 };
@@ -1313,6 +1347,15 @@ export const getDeepSeekApiKeysAsync = async () => {
 export const getOpenRouterApiKeysAsync = async () => {
   const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
   return ApiKeyManager.getKeys('OPENROUTER_API_KEY');
+};
+
+/**
+ * Get all Requesty API keys as array
+ * @returns {Promise<string[]>} - Array of API keys
+ */
+export const getRequestyApiKeysAsync = async () => {
+  const { ApiKeyManager } = await import("@/features/translation/providers/ApiKeyManager.js");
+  return ApiKeyManager.getKeys('REQUESTY_API_KEY');
 };
 
 /**

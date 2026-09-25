@@ -305,6 +305,22 @@ const edgeVoices = ref([])
 const playingLangCode = ref(null)
 const tempPreferredVoices = ref({})
 
+// Shape-aware copy for the voices draft/store boundary. Evidence (default {},
+// writer savePreferredVoice, readers TTSLanguageService/TTSDispatcher, tests):
+// TTS_PREFERRED_VOICES is { languageCode: { engine: voiceId } } with primitive
+// voice values (legacy string entries pass through by value). Fresh outer object
+// plus a spread per language map fully isolates draft and store — no JSON
+// serialization, and no structuredClone (which throws DataCloneError on the
+// live reactive state these copies originate from).
+const clonePreferredVoices = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const copy = {}
+  Object.entries(value).forEach(([lang, entry]) => {
+    copy[lang] = (entry !== null && typeof entry === 'object') ? { ...entry } : entry
+  })
+  return copy
+}
+
 // Composable for dynamic languages
 const { isLoaded: isLanguagesLoaded, translationLanguages, loadLanguages } = useLanguages()
 
@@ -342,18 +358,21 @@ const activeEngineName = computed(() => {
 
 const openVoicesDrawer = async () => {
   searchQuery.value = ''
-  tempPreferredVoices.value = JSON.parse(JSON.stringify(settingsStore.settings?.TTS_PREFERRED_VOICES || {}))
+  tempPreferredVoices.value = clonePreferredVoices(settingsStore.settings?.TTS_PREFERRED_VOICES)
   isDrawerOpen.value = true
   if (edgeVoices.value.length === 0) {
     edgeVoices.value = await ttsVoiceService.getVoices()
   }
 }
 
-const saveAndCloseVoicesDrawer = async () => {
+const saveAndCloseVoicesDrawer = () => {
   if (isPlaying.value) {
     stop()
   }
-  await settingsStore.updateSettingAndPersist('TTS_PREFERRED_VOICES', tempPreferredVoices.value)
+  // Staged save: apply to local store state only (deep copy so later draft
+  // edits never alias store state). Persistence happens via the normal
+  // options saveAllSettings() flow, like other staged option tabs.
+  settingsStore.updateSettingLocally('TTS_PREFERRED_VOICES', clonePreferredVoices(tempPreferredVoices.value))
   isDrawerOpen.value = false
 }
 
@@ -363,7 +382,7 @@ const closeVoicesDrawer = () => {
   }
   isDrawerOpen.value = false
   // Revert any unsaved changes to avoid leaking local changes
-  tempPreferredVoices.value = JSON.parse(JSON.stringify(settingsStore.settings?.TTS_PREFERRED_VOICES || {}))
+  tempPreferredVoices.value = clonePreferredVoices(settingsStore.settings?.TTS_PREFERRED_VOICES)
 }
 
 // Get Farsi SVG flag URL from extension assets

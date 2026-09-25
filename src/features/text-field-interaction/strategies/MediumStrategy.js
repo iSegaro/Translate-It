@@ -84,6 +84,21 @@ export default class MediumStrategy extends PlatformStrategy {
       }
 
       // 2. برای فیلدهای contenteditable مدیوم
+      // Explicit CE descriptor: operate on the original request target/root with
+      // the shared scoped pipeline directly. Bookmarks and identity are rooted
+      // at the request target; resolving a different paragraph/editor root here
+      // would misalign them, so an incompatible original target fails closed
+      // centrally instead. Historical current-line behavior below is legacy-only.
+      const ceFieldSource = applicationContext?.fieldSource?.targetKind === 'contenteditable'
+        ? applicationContext.fieldSource
+        : null;
+      if (ceFieldSource) {
+        if (!element.isContentEditable && element.contentEditable !== 'true') return false;
+        await this.applyVisualFeedback(element);
+        if (!isCurrent()) return false;
+        return await smartTextReplacement(element, translatedText, null, null, undefined, applicationContext);
+      }
+
       const mediumField = this.findMediumTextField(element);
       if (!mediumField) {
         return false;

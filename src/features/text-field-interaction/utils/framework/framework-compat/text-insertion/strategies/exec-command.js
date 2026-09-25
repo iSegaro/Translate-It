@@ -1,6 +1,7 @@
 // src/utils/framework-compat/text-insertion/strategies/exec-command.js
 
 import { smartDelay } from "../helpers.js";
+import { ensureCEAim, hasScopedCESelection } from "../../contentEditableScope.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.FRAMEWORK, 'exec-command');
@@ -55,9 +56,14 @@ export async function tryExecCommandInsertion(element, text, hasSelection, appli
 
     // برای contentEditable
     if (element.isContentEditable && typeof window !== 'undefined') {
+      // JIT aim: the live selection may have moved during an awaited insertion
+      // step; revalidate + restore the captured scope (or fail closed) before
+      // mutating. A whitespace-scoped aim counts as a selection here.
+      if (!ensureCEAim(element, applicationContext)) return false;
       const selection = window.getSelection();
+      const effectiveHasSelection = hasSelection || hasScopedCESelection(element, applicationContext);
 
-      if (hasSelection && selection && !selection.isCollapsed) {
+      if (effectiveHasSelection && selection && !selection.isCollapsed) {
         // جایگزینی مستقیم انتخاب با متن جدید
         // فراخوانی delete قبل از insertText باعث ایجاد مراحل جداگانه در Undo و به هم ریختن State فریم‌ورک‌هایی مثل React می‌شود
         const insertResult = document.execCommand("insertText", false, text);

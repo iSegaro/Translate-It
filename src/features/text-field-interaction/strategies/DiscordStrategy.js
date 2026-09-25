@@ -164,7 +164,10 @@ export default class DiscordStrategy extends PlatformStrategy {
       );
 
       // روش 1: استفاده از Slate API (بهترین روش اختصاصی دیسکورد)
-      if (this._isSlateEditor(element)) {
+      // Slate Transforms select-all + full-document replace is incompatible
+      // with a CE selection scope (it would full-replace a partial request),
+      // so scoped selections route to the range-aware shared pipeline below.
+      if (this._isSlateEditor(element) && applicationContext?.fieldSource?.scope !== 'selection') {
         logger.debug('تلاش با Slate API...');
         success = await this._updateViaSlateAPI(element, translatedText, applicationContext);
         if (!isCurrent()) return false;

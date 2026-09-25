@@ -14,6 +14,7 @@ import { PositionCalculator } from '../utils/PositionCalculator.js';
 import { ElementAttachment } from '../utils/ElementAttachment.js';
 import { textFieldIconConfig } from '../config/positioning.js';
 import { ExclusionChecker } from '@/features/exclusion/core/ExclusionChecker.js';
+import { captureFieldTranslationSource } from '../utils/framework/framework-compat/fieldSourceSnapshot.js';
 
 
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
@@ -94,10 +95,15 @@ export class TextFieldIconManager extends ResourceTracker {
   async executeTranslation(iconData) {
     try {
       const { translateFieldViaSmartHandler } = await import('@/handlers/smartTranslationIntegration.js');
-      
+
+      // Request-time selection defines the source; no selection preserves full-field behavior.
+      const snapshot = captureFieldTranslationSource(iconData.targetElement);
+
       await translateFieldViaSmartHandler({
-        text: iconData.targetElement.value || iconData.targetElement.textContent,
+        text: snapshot.text,
         target: iconData.targetElement,
+        selectionRange: snapshot.selectionRange,
+        sourceSnapshot: snapshot.sourceSnapshot,
       });
       
       this.cleanupElement(iconData.targetElement);

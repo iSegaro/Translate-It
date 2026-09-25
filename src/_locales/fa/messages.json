@@ -68,6 +68,9 @@
   "api_provider_openrouter": {
     "message": "OpenRouter"
   },
+  "api_provider_requesty": {
+    "message": "Requesty"
+  },
   "api_provider_deepseek": {
     "message": "DeepSeek"
   },
@@ -155,8 +158,14 @@
   "provider_openrouter_title": {
     "message": "OpenRouter"
   },
+  "provider_requesty_title": {
+    "message": "Requesty"
+  },
   "provider_openrouter_description": {
     "message": "دسترسی به مجموعه‌ای از مدل‌های هوش مصنوعی از طریق OpenRouter. نیاز به کلید API دارد."
+  },
+  "provider_requesty_description": {
+    "message": "دسترسی به مجموعه‌ای از مدل‌های هوش مصنوعی از طریق Requesty. نیاز به کلید API دارد."
   },
   "provider_deepseek_title": {
     "message": "DeepSeek"
@@ -749,6 +758,9 @@
   "help_api_providers_openrouter": {
     "message": "OpenRouter - دسترسی به چندین مدل از طریق [OpenRouter]({url})"
   },
+  "help_api_providers_requesty": {
+    "message": "Requesty - دسترسی به چندین مدل از طریق [Requesty]({url})"
+  },
   "help_api_providers_deepseek": {
     "message": "DeepSeek - دریافت دسترسی API از [DeepSeek Platform]({url})"
   },
@@ -1109,6 +1121,9 @@
   "translation_api_label": {
     "message": "سرویس دهنده"
   },
+  "providers_configure_label": {
+    "message": "سرویس‌دهنده برای تنظیم"
+  },
   "provider_label": {
     "message": "سرویس‌دهنده"
   },
@@ -1127,6 +1142,9 @@
   "openrouter_api_key_info": {
     "message": "شما می‌توانید کلید API خود را از وبسایت OpenRouter دریافت کنید."
   },
+  "requesty_api_key_info": {
+    "message": "شما می‌توانید کلید API خود را از وبسایت Requesty دریافت کنید."
+  },
   "webai_api_key_info": {
     "message": "شما می‌توانید یک API Server شخصی در کامپیوتر خود اجرا کنید."
   },
@@ -1140,6 +1158,9 @@
     "message": "دریافت کلید API"
   },
   "openrouter_api_key_link": {
+    "message": "دریافت کلید API"
+  },
+  "requesty_api_key_link": {
     "message": "دریافت کلید API"
   },
   "webai_api_key_link": {
@@ -1223,10 +1244,16 @@
   "openrouter_api_settings_title": {
     "message": "تنظیمات OpenRouter"
   },
+  "requesty_api_settings_title": {
+    "message": "تنظیمات Requesty"
+  },
   "openrouter_api_settings_api_key_label": {
     "message": "کلید API"
   },
   "openrouter_api_key_placeholder": {
+    "message": "کلید API خود را اینجا وارد کنید"
+  },
+  "requesty_api_key_placeholder": {
     "message": "کلید API خود را اینجا وارد کنید"
   },
   "openrouter_api_settings_model_label": {
@@ -1354,6 +1381,78 @@
   },
   "custom_api_model_placeholder": {
     "message": "نام مدل را وارد کنید"
+  },
+  "custom_api_test_connection": {
+    "message": "بررسی سازگاری"
+  },
+  "custom_api_testing_connection": {
+    "message": "در حال بررسی..."
+  },
+  "custom_api_not_tested": {
+    "message": "بررسی نشده"
+  },
+  "custom_api_verdict_compatible": {
+    "message": "سازگار است."
+  },
+  "custom_api_verdict_inconclusive": {
+    "message": "سازگاری به‌طور کامل تأیید نشد."
+  },
+  "custom_api_verdict_incompatible": {
+    "message": "سازگار نیست."
+  },
+  "custom_api_verdict_unreachable": {
+    "message": "اتصال ممکن نیست."
+  },
+  "custom_api_verdict_auth_failed": {
+    "message": "احراز هویت ناموفق بود."
+  },
+  "custom_api_verdict_check_failed": {
+    "message": "بررسی سازگاری ناموفق بود."
+  },
+  "custom_api_verdict_timed_out": {
+    "message": "زمان بررسی سازگاری به پایان رسید."
+  },
+  "custom_api_connection_success": {
+    "message": ""
+  },
+  "custom_api_connection_fallback": {
+    "message": "از حالت سازگاری استفاده می‌شود."
+  },
+  "custom_api_connection_inconclusive": {
+    "message": ""
+  },
+  "custom_api_connection_structured_invalid": {
+    "message": "مدل پاسخی غیرقابل استفاده برگرداند."
+  },
+  "custom_api_connection_model_mismatch": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد."
+  },
+  "custom_api_connection_model_mismatch_fallback": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد. از حالت سازگاری استفاده می‌شود."
+  },
+  "custom_api_connection_model_mismatch_inconclusive": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد."
+  },
+  "custom_api_connection_model_mismatch_unusable": {
+    "message": "سرور به‌جای {requestedModel} از {effectiveModel} استفاده کرد و ممکن است خروجی آن به‌درستی کار نکند."
+  },
+  "custom_api_connection_unreachable": {
+    "message": "نشانی سرور و شبکه را بررسی کنید."
+  },
+  "custom_api_connection_auth_failed": {
+    "message": "کلید API را بررسی کنید."
+  },
+  "custom_api_connection_completion_failed": {
+    "message": "سرور پاسخ داد، اما خروجی قابل استفاده‌ای برنگرداند."
+  },
+  "custom_api_connection_request_failed": {
+    "message": "تنظیمات سرور را بررسی کنید."
+  },
+  "custom_api_connection_failed_unexpected": {
+    "message": ""
+  },
+  "custom_api_connection_timed_out": {
+    "message": "دوباره تلاش کنید."
   },
   "import_export_section_title": {
     "message": "پشتیبان‌گیری و بازیابی تنظیمات"
@@ -1919,7 +2018,13 @@
   "openrouter_custom_model_placeholder": {
     "message": "نام مدل را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
   },
+  "requesty_custom_model_placeholder": {
+    "message": "نام مدل را وارد کنید (مثل: ارائه‌دهنده/نام-مدل)"
+  },
   "openrouter_custom_model_label": {
+    "message": "نام مدل"
+  },
+  "requesty_custom_model_label": {
     "message": "نام مدل"
   },
   "deepseek_custom_model_placeholder": {

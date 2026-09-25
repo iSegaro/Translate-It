@@ -1921,6 +1921,56 @@ describe('PdfToolbar', () => {
     })
   })
 
+  describe('content view mode tooltips', () => {
+    const tooltipProps = (overrides = {}) => ({
+      fileName: 'doc.pdf',
+      pageCount: 3,
+      currentPageNumber: 1,
+      contentView: 'original',
+      showTranslationOption: true,
+      ...overrides
+    })
+
+    const findDesktopButtonByLabel = (wrapper, label) => wrapper
+      .findAll('.pdf-toolbar__view-mode--desktop .pdf-toolbar__mode-button')
+      .find((button) => button.text().trim() === label)
+
+    it('exposes per-mode tooltips on desktop buttons while keeping visible labels unchanged', () => {
+      const wrapper = mount(PdfToolbar, { props: tooltipProps() })
+
+      const buttons = wrapper.findAll('.pdf-toolbar__view-mode--desktop .pdf-toolbar__mode-button')
+      expect(buttons.map((button) => button.text().trim())).toEqual(['Original', 'Text', 'PDF'])
+
+      expect(findDesktopButtonByLabel(wrapper, 'Original').attributes('title')).toBe('Original PDF')
+      expect(findDesktopButtonByLabel(wrapper, 'Text').attributes('title')).toBe('Translated Text (Beta)')
+      expect(findDesktopButtonByLabel(wrapper, 'PDF').attributes('title')).toBe('Translated PDF (Experimental)')
+    })
+
+    it('sets mobile select title from the selected content view', async () => {
+      const wrapper = mount(PdfToolbar, { props: tooltipProps({ contentView: 'original' }) })
+      const select = () => wrapper.find('.pdf-toolbar__view-mode--mobile select')
+
+      expect(select().attributes('title')).toBe('Original PDF')
+      expect(wrapper.findAll('.pdf-toolbar__view-mode--mobile option').map((option) => option.text().trim()))
+        .toEqual(['Original', 'Text', 'PDF'])
+
+      await wrapper.setProps({ contentView: 'translation' })
+      expect(select().attributes('title')).toBe('Translated Text (Beta)')
+
+      await wrapper.setProps({ contentView: 'translated-pdf' })
+      expect(select().attributes('title')).toBe('Translated PDF (Experimental)')
+    })
+
+    it('keeps mode-change behavior unchanged', async () => {
+      const wrapper = mount(PdfToolbar, { props: tooltipProps({ contentView: 'original' }) })
+
+      await findDesktopButtonByLabel(wrapper, 'Text').trigger('click')
+      await wrapper.find('.pdf-toolbar__view-mode--mobile select').setValue('translated-pdf')
+
+      expect(wrapper.emitted('content-view-change')).toEqual([['translation'], ['translated-pdf']])
+    })
+  })
+
   describe('page navigation buttons', () => {
     const baseProps = () => ({
       fileName: 'doc.pdf',

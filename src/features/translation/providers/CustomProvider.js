@@ -27,19 +27,35 @@ const STRUCTURED_RESPONSE_FORMATS = new Set([
   ResponseFormat.JSON_ARRAY,
 ]);
 
-const UNSUPPORTED_RESPONSE_FORMAT_PATTERNS = [
-  /\b(?:unknown|unsupported|unrecognized)\s+(?:parameter|field|property|key)?\s*[:=]?\s*[`'" ]*response_format\b/i,
-  /[`'"]?response_format[`'"]?\s+(?:is\s+)?(?:not\s+supported|unsupported|unrecognized|unknown)\b/i,
-];
+// Capability state lives in CustomResponseFormatCapability (single owner).
+// Re-exported here for backward compatibility with existing import sites.
+import {
+  CUSTOM_RESPONSE_FORMAT_SUPPORT,
+  normalizeCustomResponseFormatCacheKey,
+  getCustomResponseFormatSupport,
+  setCustomResponseFormatSupport,
+  clearCustomResponseFormatSupportCache,
+  isUnsupportedResponseFormatError,
+} from './CustomResponseFormatCapability.js';
+export {
+  CUSTOM_RESPONSE_FORMAT_SUPPORT,
+  normalizeCustomResponseFormatCacheKey,
+  getCustomResponseFormatSupport,
+  setCustomResponseFormatSupport,
+  clearCustomResponseFormatSupportCache,
+  isUnsupportedResponseFormatError,
+};
 
 const CUSTOM_MODEL_NOT_FOUND_CODES = new Set(['model_not_found']);
 
-function isUnsupportedResponseFormatError(error) {
-  const statusCode = Number(error?.statusCode);
-  if (statusCode !== 400 && statusCode !== 422) return false;
+function didSendResponseFormat(fetchOptions) {
+  if (typeof fetchOptions?.body !== 'string') return false;
 
-  const message = typeof error?.message === 'string' ? error.message : '';
-  return UNSUPPORTED_RESPONSE_FORMAT_PATTERNS.some((pattern) => pattern.test(message));
+  try {
+    return JSON.parse(fetchOptions.body)?.response_format != null;
+  } catch {
+    return false;
+  }
 }
 
 function removeResponseFormat(fetchOptions) {
@@ -152,6 +168,20 @@ export class CustomProvider extends BaseAIProvider {
       headers.Authorization = `Bearer ${apiKey}`;
     }
 
+    // Keyed runtime cache (CustomResponseFormatCapability, sole authority)
+    // decides send/omit. The per-batch ref is a compat/observer mirror only
+    // and never suppresses a probe: a stale ref reused across URL/model
+    // change must not leak into a new key. _validateConfig above guarantees
+    // truthy apiUrl/model in normal execution; a null key (e.g.
+    // whitespace-only) probes conservatively instead of omitting.
+    const cachedSupport = getCustomResponseFormatSupport(apiUrl, model);
+    const responseFormatUnsupported = cachedSupport === CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED;
+    if (customResponseFormatCapabilityRef) {
+      customResponseFormatCapabilityRef.responseFormatUnsupported = responseFormatUnsupported;
+    }
+    const shouldSendResponseFormat = STRUCTURED_RESPONSE_FORMATS.has(expectedFormat)
+      && !responseFormatUnsupported;
+
     const fetchOptions = {
       method: "POST",
       headers,
@@ -160,9 +190,7 @@ export class CustomProvider extends BaseAIProvider {
         messages: messages,
         max_tokens: 4096,
         // Apply JSON mode if requested by the contract
-        ...((STRUCTURED_RESPONSE_FORMATS.has(expectedFormat)
-          && customResponseFormatCapabilityRef?.responseFormatUnsupported !== true)
-          && { response_format: { type: "json_object" } })
+        ...(shouldSendResponseFormat && { response_format: { type: "json_object" } })
       }),
     };
 
@@ -193,11 +221,21 @@ export class CustomProvider extends BaseAIProvider {
     let result;
     try {
       result = await this._executeRequest(request);
+      // Structured success while sending response_format proves support.
+      if (shouldSendResponseFormat) {
+        setCustomResponseFormatSupport(apiUrl, model, CUSTOM_RESPONSE_FORMAT_SUPPORT.SUPPORTED);
+        if (customResponseFormatCapabilityRef) {
+          customResponseFormatCapabilityRef.responseFormatUnsupported = false;
+        }
+      }
     } catch (error) {
-      if (!STRUCTURED_RESPONSE_FORMATS.has(expectedFormat) || !isUnsupportedResponseFormatError(error)) {
+      // Fallback only when ALL hold: 400/422 + request actually contained
+      // response_format + error specifically rejects the response_format field.
+      if (!didSendResponseFormat(fetchOptions) || !isUnsupportedResponseFormatError(error)) {
         throw error;
       }
 
+      setCustomResponseFormatSupport(apiUrl, model, CUSTOM_RESPONSE_FORMAT_SUPPORT.UNSUPPORTED);
       if (customResponseFormatCapabilityRef) {
         customResponseFormatCapabilityRef.responseFormatUnsupported = true;
       }

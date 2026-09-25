@@ -361,6 +361,7 @@ Text Field → Direct Request → UnifiedTranslationService → Direct Response 
 - **Yandex** (Free tier)
 - **DeepSeek** (AI service)
 - **OpenRouter** (AI aggregator)
+- **Requesty** (AI aggregator)
 - **WebAI** (AI service)
 - **Browser API** (Chrome 138+)
 - **Custom APIs** (OpenAI-compatible)

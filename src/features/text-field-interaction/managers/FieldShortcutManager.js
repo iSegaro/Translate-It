@@ -12,6 +12,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { translateFieldViaSmartHandler } from '@/handlers/smartTranslationIntegration.js';
+import { captureFieldTranslationSource } from '@/features/text-field-interaction/utils/framework/framework-compat/fieldSourceSnapshot.js';
 import { isFieldTranslationRequestError } from '@/handlers/smart-translation/translationErrorOwnership.js';
 import { getFieldTranslationErrorPresentation } from '@/features/text-field-interaction/utils/FieldTranslationErrorPresenter.js';
 
@@ -121,8 +122,9 @@ export class FieldShortcutManager {
       return false;
     }
 
-    // Extract text from active element
-    const text = this.extractTextFromElement(activeElement);
+    // Extract text from active element (request-time selection defines source)
+    const snapshot = captureFieldTranslationSource(activeElement);
+    const text = snapshot.text;
     if (!text) {
       this.logger.debug('No text found in active element');
       return false;
@@ -144,8 +146,10 @@ export class FieldShortcutManager {
       // Get active element
       const activeElement = document.activeElement;
 
-      // Extract text from active element
-      const text = this.extractTextFromElement(activeElement);
+      // Extract text from active element (request-time selection defines source;
+      // no selection preserves existing full-field behavior)
+      const snapshot = captureFieldTranslationSource(activeElement);
+      const text = snapshot.text;
 
       if (!text) {
         this.logger.debug('No text found in active element');
@@ -157,7 +161,12 @@ export class FieldShortcutManager {
       }
       this.logger.debug(`Translating text via Ctrl+/: "${text.substring(0, 50)}..."`);
 
-      await translateFieldViaSmartHandler({ text, target: activeElement });
+      await translateFieldViaSmartHandler({
+        text: snapshot.text,
+        target: activeElement,
+        selectionRange: snapshot.selectionRange,
+        sourceSnapshot: snapshot.sourceSnapshot,
+      });
 
       this.logger.debug('Translation completed successfully');
       return {

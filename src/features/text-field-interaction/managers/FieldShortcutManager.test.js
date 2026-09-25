@@ -305,10 +305,123 @@ describe('FieldShortcutManager', () => {
       expect(result.type).toBe('ctrl-slash');
       expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
         text: 'hello',
-        target: el
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: { scope: 'full', targetKind: 'native', expectedSourceText: 'hello' },
       });
       expect(errorHandler.handle).not.toHaveBeenCalled();
       
+      document.body.removeChild(el);
+    });
+
+    it('sends only the selected substring with its request-time range (selection scope)', async () => {
+      const el = document.createElement('textarea');
+      el.value = 'Hello سلام world';
+      document.body.appendChild(el);
+      el.focus();
+      // Select "سلام" (indices 6-10)
+      el.setSelectionRange(6, 10);
+
+      const result = await manager.execute();
+
+      expect(result.success).toBe(true);
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'سلام',
+        target: el,
+        selectionRange: { start: 6, end: 10 },
+        sourceSnapshot: { scope: 'selection', targetKind: 'native', expectedSourceText: 'سلام' },
+      });
+
+      document.body.removeChild(el);
+    });
+
+    it('sends the full value with an explicit full scope when nothing is selected (full-field)', async () => {
+      const el = document.createElement('textarea');
+      el.value = 'Hello سلام world';
+      document.body.appendChild(el);
+      el.focus();
+      el.setSelectionRange(0, 0);
+
+      await manager.execute();
+
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'Hello سلام world',
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: { scope: 'full', targetKind: 'native', expectedSourceText: 'Hello سلام world' },
+      });
+
+      document.body.removeChild(el);
+    });
+
+    it('sends only the contained contentEditable selection with a bookmarked CE scope', async () => {
+      const el = document.createElement('div');
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('tabindex', '0');
+      // jsdom does not reflect contenteditable IDL attributes; stub the flag
+      // the way real browsers expose it.
+      Object.defineProperty(el, 'isContentEditable', { value: true, configurable: true });
+      el.innerHTML = '<p>Hello <b>سلام</b> world</p>';
+      document.body.appendChild(el);
+      el.focus();
+
+      const boldText = el.querySelector('b').firstChild;
+      const range = document.createRange();
+      range.setStart(boldText, 0);
+      range.setEnd(boldText, 4);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const result = await manager.execute();
+
+      expect(result.success).toBe(true);
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'سلام',
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: expect.objectContaining({
+          scope: 'selection',
+          targetKind: 'contenteditable',
+          expectedSourceText: 'سلام',
+        }),
+      });
+      const sentSnapshot = mockTranslateFieldViaSmartHandler.mock.calls.at(-1)[0].sourceSnapshot;
+      expect(sentSnapshot.bookmark).toMatchObject({
+        startPath: expect.any(Array),
+        endPath: expect.any(Array),
+      });
+      // Serializable: no live refs survive the structured-clone round trip.
+      expect(JSON.parse(JSON.stringify(sentSnapshot))).toEqual(sentSnapshot);
+
+      selection.removeAllRanges();
+      document.body.removeChild(el);
+    });
+
+    it('sends full canonical contentEditable text when nothing is selected', async () => {
+      const el = document.createElement('div');
+      el.setAttribute('contenteditable', 'true');
+      el.setAttribute('tabindex', '0');
+      Object.defineProperty(el, 'isContentEditable', { value: true, configurable: true });
+      el.innerHTML = '<p>line1</p><p>line2</p>';
+      document.body.appendChild(el);
+      el.focus();
+      window.getSelection().removeAllRanges();
+
+      const result = await manager.execute();
+
+      expect(result.success).toBe(true);
+      expect(mockTranslateFieldViaSmartHandler).toHaveBeenCalledWith({
+        text: 'line1\nline2',
+        target: el,
+        selectionRange: null,
+        sourceSnapshot: {
+          scope: 'full',
+          targetKind: 'contenteditable',
+          expectedSourceText: 'line1\nline2',
+        },
+      });
+
       document.body.removeChild(el);
     });
 
