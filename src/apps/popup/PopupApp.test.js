@@ -173,6 +173,13 @@ vi.mock('@/shared/logging/logger.js', () => ({
 }))
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0))
+const getViewPanel = (wrapper, view) => wrapper.find(`.popup-view-panel--${view}`)
+const expectActiveView = (wrapper, activeView) => {
+  const inactiveView = activeView === 'translate' ? 'live-dubbing' : 'translate'
+
+  expect(getViewPanel(wrapper, activeView).classes()).toContain('is-active')
+  expect(getViewPanel(wrapper, inactiveView).classes()).toContain('is-inactive')
+}
 const deferred = () => {
   let resolve
   let reject
@@ -419,8 +426,8 @@ describe('PopupApp', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(false)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-active')
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-inactive')
     expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(true)
   })
 
@@ -432,8 +439,8 @@ describe('PopupApp', () => {
 
     expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).props('modelValue'))
       .toBe('live-dubbing')
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(false)
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-inactive')
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-active')
   })
 
   it('normalizes an invalid persisted view to translate', async () => {
@@ -444,7 +451,7 @@ describe('PopupApp', () => {
 
     expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).props('modelValue'))
       .toBe('translate')
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-active')
   })
 
   it('falls back to translate when persisted live dubbing is unsupported', async () => {
@@ -456,7 +463,7 @@ describe('PopupApp', () => {
 
     expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'LiveDubbingView' }).exists()).toBe(false)
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-active')
   })
 
   it('renders only after settings resolve so restoring the view does not flicker', async () => {
@@ -475,7 +482,7 @@ describe('PopupApp', () => {
     await flushPromises()
     await flushPromises()
 
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-active')
   })
 
   it('updates the active view immediately and persists the supported switch', async () => {
@@ -485,7 +492,7 @@ describe('PopupApp', () => {
 
     await wrapper.find('.switch-to-live-dubbing').trigger('click')
 
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-active')
     await flushPromises()
     expect(mockSettingsStore.updateSettingAndPersist)
       .toHaveBeenCalledWith('POPUP_ACTIVE_VIEW', 'live-dubbing')
@@ -515,14 +522,14 @@ describe('PopupApp', () => {
     await flushPromises()
 
     await wrapper.find('.switch-to-live-dubbing').trigger('click')
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-active')
 
     await flushPromises()
     expect(popupLogger.warn).toHaveBeenCalledWith(
       '[PopupApp] Failed to persist active view:',
       expect.any(Error)
     )
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-active')
   })
 
   it('serializes rapid active-view writes in selection order', async () => {
@@ -619,8 +626,8 @@ describe('PopupApp', () => {
 
     await wrapper.find('.switch-to-live-dubbing').trigger('click')
 
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(false)
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-inactive')
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-active')
   })
 
   it('switching back restores the translation view', async () => {
@@ -631,8 +638,69 @@ describe('PopupApp', () => {
     await wrapper.find('.switch-to-live-dubbing').trigger('click')
     await wrapper.find('.switch-to-translate').trigger('click')
 
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
-    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).isVisible()).toBe(false)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-active')
+    expect(getViewPanel(wrapper, 'live-dubbing').classes()).toContain('is-inactive')
+  })
+
+  it('keeps both view panels mounted and disables interaction for the inactive panel', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    const translationView = wrapper.findComponent({ name: 'TranslationView' })
+    const liveDubbingView = wrapper.findComponent({ name: 'LiveDubbingView' })
+    const initialTranslationRef = wrapper.vm.$refs.translationFormRef
+
+    expect(translationView.exists()).toBe(true)
+    expect(liveDubbingView.exists()).toBe(true)
+    expect(getViewPanel(wrapper, 'live-dubbing').attributes('inert')).toBe('')
+    expect(getViewPanel(wrapper, 'live-dubbing').attributes('aria-hidden')).toBe('true')
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    expectActiveView(wrapper, 'live-dubbing')
+    expect(getViewPanel(wrapper, 'translate').attributes('inert')).toBe('')
+    expect(getViewPanel(wrapper, 'translate').attributes('aria-hidden')).toBe('true')
+    expect(getViewPanel(wrapper, 'live-dubbing').attributes('inert')).toBeUndefined()
+    expect(wrapper.findComponent({ name: 'TranslationView' }).vm).toBe(translationView.vm)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).vm).toBe(liveDubbingView.vm)
+
+    await wrapper.find('.switch-to-translate').trigger('click')
+    expectActiveView(wrapper, 'translate')
+    expect(wrapper.vm.$refs.translationFormRef).toBe(initialTranslationRef)
+  })
+
+  it('preserves TranslationView props and ref after multiple switches', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+    const translationView = wrapper.findComponent({ name: 'TranslationView' })
+    const translationRef = wrapper.vm.$refs.translationFormRef
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+
+    expect(wrapper.vm.$refs.translationFormRef).toBe(translationRef)
+    expect(wrapper.findComponent({ name: 'TranslationView' }).vm).toBe(translationView.vm)
+    expect(translationView.props('translation')).toBe(mockUnifiedTranslation)
+    expect(translationView.props('sourceLanguage')).toBe('fr')
+    expect(translationView.props('targetLanguage')).toBe('de')
+  })
+
+  it('ends on the latest active view after rapid repeated switching', async () => {
+    const wrapper = mount(PopupApp)
+    await flushPromises()
+    await flushPromises()
+
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+    await wrapper.find('.switch-to-live-dubbing').trigger('click')
+    await wrapper.find('.switch-to-translate').trigger('click')
+
+    expectActiveView(wrapper, 'translate')
+    expect(wrapper.findComponent({ name: 'TranslationView' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'LiveDubbingView' }).exists()).toBe(true)
   })
 
   it('hides live dubbing entirely when unsupported', async () => {
@@ -644,7 +712,7 @@ describe('PopupApp', () => {
     expect(wrapper.find('.switch-to-live-dubbing').exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'PopupViewSwitcher' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'LiveDubbingView' }).exists()).toBe(false)
-    expect(wrapper.findComponent({ name: 'TranslationView' }).isVisible()).toBe(true)
+    expect(getViewPanel(wrapper, 'translate').classes()).toContain('is-active')
   })
 
   it('keeps header actions independent from the active view', async () => {

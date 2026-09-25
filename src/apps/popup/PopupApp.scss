@@ -1,5 +1,8 @@
 @use "@/assets/styles/base/variables" as *;
 
+$popup-view-transition-duration: 170ms;
+$popup-view-transition-easing: cubic-bezier(.2, .8, .25, 1);
+
 /* Fixed action-popup flex hierarchy. */
 .popup-wrapper {
   width: 100%;
@@ -42,6 +45,59 @@
     border-bottom: 1px solid var(--header-border-color);
   }
 
+  /* Absolute panels keep the popup content area stable while views switch. */
+  .popup-view-stage {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .popup-view-panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(0);
+    transition:
+      opacity $popup-view-transition-duration $popup-view-transition-easing,
+      transform $popup-view-transition-duration $popup-view-transition-easing,
+      visibility 0s linear $popup-view-transition-duration;
+
+    > * {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+  }
+
+  .popup-view-panel--translate.is-inactive {
+    transform: translateY(10px);
+  }
+
+  .popup-view-panel--live-dubbing.is-inactive {
+    transform: translateY(-10px);
+  }
+
+  /* The inactive panel supplies the directional starting position for the next switch. */
+  .popup-view-panel.is-active {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition:
+      opacity $popup-view-transition-duration $popup-view-transition-easing,
+      transform $popup-view-transition-duration $popup-view-transition-easing,
+      visibility 0s linear 0s;
+  }
+
   .loading-container, .error-container {
     display: flex;
     flex-direction: column;
@@ -75,3 +131,10 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .popup-wrapper {
+    .popup-view-panel {
+      transition: none;
+    }
+  }
+}

@@ -49,41 +49,56 @@
           </PopupHeader>
         </div>
 
-        <!-- Active view (v-show keeps both mounted so LiveDubbingControl preserves
-             its local UI runtime state and TranslationView keeps its listeners) -->
-        <TranslationView
-          v-show="activeView === 'translate'"
-          ref="translationFormRef"
-          :source-language="sourceLanguage"
-          :target-language="targetLanguage"
-          :current-provider="currentProvider"
-          :translation="translation"
-          :live-dubbing-busy="isLiveDubbingBusy"
-          :is-ready="isReady"
-          :source-is-saved-default="sourceIsSavedDefault"
-          :target-is-saved-default="targetIsSavedDefault"
-          :source-default-title="sourceDefaultTitle"
-          :target-default-title="targetDefaultTitle"
-          :last-keyword="lastKeyword"
-          @translate="handleTranslate"
-          @cancel="handleCancel"
-          @clear="handleClearFields"
-          @set-default-source="handleSetDefaultSource"
-          @set-default-target="handleSetDefaultTarget"
-          @can-translate-change="canTranslateFromForm = $event"
-          @update:source-language="sourceLanguage = $event"
-          @update:target-language="targetLanguage = $event"
-          @update:current-provider="currentProvider = $event"
-        />
-        <LiveDubbingView
-          v-show="activeView === 'live-dubbing'"
-          v-if="isLiveDubbingSupported"
-          :target-language="liveDubbingTargetLanguage"
-          :target-language-pending="isLiveDubbingTargetLanguagePending"
-          :provider-id="liveDubbingProvider"
-          @busy-change="isLiveDubbingBusy = $event"
-          @update:target-language="handleLiveDubbingTargetLanguageChange"
-        />
+        <!-- Both panels stay mounted so their local state and listeners survive view switches. -->
+        <div
+          class="popup-view-stage"
+        >
+          <div
+            class="popup-view-panel popup-view-panel--translate"
+            :class="activeView === 'translate' ? 'is-active' : 'is-inactive'"
+            :aria-hidden="activeView !== 'translate'"
+            :inert="activeView !== 'translate' ? '' : undefined"
+          >
+            <TranslationView
+              ref="translationFormRef"
+              :source-language="sourceLanguage"
+              :target-language="targetLanguage"
+              :current-provider="currentProvider"
+              :translation="translation"
+              :live-dubbing-busy="isLiveDubbingBusy"
+              :is-ready="isReady"
+              :source-is-saved-default="sourceIsSavedDefault"
+              :target-is-saved-default="targetIsSavedDefault"
+              :source-default-title="sourceDefaultTitle"
+              :target-default-title="targetDefaultTitle"
+              :last-keyword="lastKeyword"
+              @translate="handleTranslate"
+              @cancel="handleCancel"
+              @clear="handleClearFields"
+              @set-default-source="handleSetDefaultSource"
+              @set-default-target="handleSetDefaultTarget"
+              @can-translate-change="canTranslateFromForm = $event"
+              @update:source-language="sourceLanguage = $event"
+              @update:target-language="targetLanguage = $event"
+              @update:current-provider="currentProvider = $event"
+            />
+          </div>
+          <div
+            v-if="isLiveDubbingSupported"
+            class="popup-view-panel popup-view-panel--live-dubbing"
+            :class="activeView === 'live-dubbing' ? 'is-active' : 'is-inactive'"
+            :aria-hidden="activeView !== 'live-dubbing'"
+            :inert="activeView !== 'live-dubbing' ? '' : undefined"
+          >
+            <LiveDubbingView
+              :target-language="liveDubbingTargetLanguage"
+              :target-language-pending="isLiveDubbingTargetLanguagePending"
+              :provider-id="liveDubbingProvider"
+              @busy-change="isLiveDubbingBusy = $event"
+              @update:target-language="handleLiveDubbingTargetLanguageChange"
+            />
+          </div>
+        </div>
       </div>
     </template>
   </div>
