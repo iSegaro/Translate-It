@@ -51,6 +51,7 @@
           </span>
           <BaseToggle
             class="live-dubbing-transcript-preference-toggle"
+            :class="{ 'live-dubbing-toggle--pending-neutral': hasTranslatedPreferenceWritePending }"
             :model-value="showTranslatedTranscript"
             :disabled="hasTranslatedPreferenceWritePending"
             :title="t('live_dubbing_show_translated_transcript', 'Translated subtitles')"
@@ -63,8 +64,9 @@
           </span>
           <BaseToggle
             class="live-dubbing-transcript-preference-toggle"
+            :class="{ 'live-dubbing-toggle--pending-neutral': hasOriginalPreferenceWritePending && !isOriginalOpenAIRestricted }"
             :model-value="showOriginalTranscript"
-            :disabled="hasOriginalPreferenceWritePending || (providerModel === LIVE_DUBBING_OPENAI_PROVIDER_ID && (!isControlStatusResolved || isControlBusy))"
+            :disabled="hasOriginalPreferenceWritePending || isOriginalOpenAIRestricted"
             :title="t('live_dubbing_show_original_transcript', 'Original subtitles')"
             @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT', $event)"
           />
@@ -155,6 +157,18 @@ const showOriginalTranscript = computed(() =>
 )
 const hasTranslatedPreferenceWritePending = ref(false)
 const hasOriginalPreferenceWritePending = ref(false)
+
+/**
+ * Real UI restriction on the original-subtitle toggle: OpenAI applies the
+ * preference only at session start, so it stays locked while the control
+ * status is unresolved or a session is busy. Takes precedence over the
+ * temporary pending-write presentation — when both conditions apply the
+ * genuine disabled appearance (opacity + not-allowed cursor) wins.
+ */
+const isOriginalOpenAIRestricted = computed(() =>
+  providerModel.value === LIVE_DUBBING_OPENAI_PROVIDER_ID
+  && (!isControlStatusResolved.value || isControlBusy.value)
+)
 
 /** Persist one transcript preference and restore its prior value on failure. */
 const updateTranscriptPreference = async (key, value) => {

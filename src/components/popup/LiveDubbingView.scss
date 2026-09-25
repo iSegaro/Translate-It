@@ -182,6 +182,22 @@
   margin-inline-start: auto;
 }
 
+/* Temporary pending-write presentation: the toggle stays functionally
+   disabled (input) but must not flash BaseToggle's real disabled visual
+   (opacity 0.6 + not-allowed cursor) for the short persistence window.
+   Only the pending-only state receives this modifier; genuine restrictions
+   (OpenAI session/status) never do, so they keep the real disabled look.
+   Specificity deliberately exceeds `.base-toggle.disabled` so the override
+   wins regardless of stylesheet order. */
+.live-dubbing-transcript-preference-toggle.live-dubbing-toggle--pending-neutral.base-toggle {
+  opacity: 1;
+  cursor: pointer;
+
+  .slider {
+    cursor: pointer;
+  }
+}
+
 /* ── Session card ─────────────────────────────────────────────────────────── */
 
 /* The control keeps its runtime markup; the card supplies the chrome. */

@@ -458,6 +458,79 @@ describe('LiveDubbingView', () => {
     })
   })
 
+  it('keeps a pending write functionally disabled while showing the neutral pending visual', async () => {
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView()
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+    const labels = () => wrapper.findAll('label.base-toggle')
+
+    toggles[0].vm.$emit('update:modelValue', true)
+    await nextTick()
+
+    // Functionally disabled while its own write is pending.
+    expect(toggles[0].props('disabled')).toBe(true)
+    expect(toggles[1].props('disabled')).toBe(false)
+    // Neutral visual only on the pending lane, never on the idle one.
+    expect(labels()[0].classes()).toContain('live-dubbing-toggle--pending-neutral')
+    expect(labels()[1].classes()).not.toContain('live-dubbing-toggle--pending-neutral')
+
+    // Settling the write removes both the functional disable and the class.
+    deferred.writes[0].resolve()
+    await settle()
+    expect(toggles[0].props('disabled')).toBe(false)
+    expect(labels()[0].classes()).not.toContain('live-dubbing-toggle--pending-neutral')
+  })
+
+  it('keeps the real OpenAI restriction visual without the pending-neutral override', async () => {
+    harness.controlStatusResolved = false
+    const wrapper = mountView({ providerId: 'openai' })
+    const original = wrapper.findAllComponents({ name: 'BaseToggle' })[1]
+    const originalLabel = () => wrapper.findAll('label.base-toggle')[1]
+
+    // Real restriction: functionally disabled with BaseToggle's disabled look.
+    expect(original.props('disabled')).toBe(true)
+    expect(originalLabel().classes()).toContain('disabled')
+    expect(originalLabel().classes()).not.toContain('live-dubbing-toggle--pending-neutral')
+    // The translated toggle has no restriction of its own.
+    expect(wrapper.findAllComponents({ name: 'BaseToggle' })[0].props('disabled')).toBe(false)
+  })
+
+  it('lets the real OpenAI restriction win over the pending-neutral visual when both apply', async () => {
+    harness.controlStatusResolved = false
+    const deferred = makeDeferredWriteStore()
+    harness.store = deferred.store
+    const wrapper = mountView({ providerId: 'openai' })
+    const toggles = wrapper.findAllComponents({ name: 'BaseToggle' })
+    const originalLabel = () => wrapper.findAll('label.base-toggle')[1]
+
+    toggles[1].vm.$emit('update:modelValue', true)
+    await nextTick()
+
+    // The write is pending and the restriction is active: the genuine
+    // disabled presentation must win — no neutral override.
+    expect(deferred.writes).toHaveLength(1)
+    expect(toggles[1].props('disabled')).toBe(true)
+    expect(originalLabel().classes()).toContain('disabled')
+    expect(originalLabel().classes()).not.toContain('live-dubbing-toggle--pending-neutral')
+  })
+
+  it('applies the pending-only visual override locally in LiveDubbingView, not in BaseToggle', () => {
+    const viewScss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+    const override = viewScss.match(
+      /\.live-dubbing-transcript-preference-toggle\.live-dubbing-toggle--pending-neutral\.base-toggle\s*\{[\s\S]*?\n\}/
+    )?.[0]
+    expect(override).toBeTruthy()
+    expect(override).toMatch(/opacity:\s*1/)
+    expect(override).toMatch(/cursor:\s*pointer/)
+    // Both the label root and the slider keep the neutral pointer cursor.
+    expect(override).toMatch(/\.slider\s*\{[^}]*cursor:\s*pointer/)
+
+    // The shared BaseToggle is untouched — no global behavior change.
+    const baseToggleScss = readFileSync(resolve(here, '../base/BaseToggle.scss'), 'utf8')
+    expect(baseToggleScss).not.toMatch(/pending-neutral/)
+  })
+
   it('keeps LiveDubbingControl mounted and Start disabled until both independent writes settle', async () => {
     const deferred = makeDeferredWriteStore()
     harness.store = deferred.store
