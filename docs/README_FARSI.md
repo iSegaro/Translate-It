@@ -72,6 +72,19 @@
 
 ---
 
+## سرویس‌های پشتیبانی‌شده
+
+این افزونه از سرویس‌های ترجمه معمولی، هوش مصنوعی، محلی و تخصصی پشتیبانی می‌کند:
+
+- **سرویس‌های معمولی:** [Google](https://translate.google.com/)، [Microsoft](https://www.microsoft.com/translator/)، [DeepL](https://www.deepl.com/translator)، [Yandex](https://translate.yandex.com/)، [Lingva](https://github.com/TheDavidDelta/lingva-translate)، [Bing](https://www.bing.com/translator)
+- **هوش مصنوعی:** [Gemini](https://ai.google.dev/)، [OpenAI](https://openai.com/api/)، [OpenRouter](https://openrouter.ai/)، [Requesty](https://www.requesty.ai/)، [DeepSeek](https://platform.deepseek.com/)
+- **سفارشی و محلی:** OpenAI Compatible، [WebAI-to-API](https://github.com/Amm1rr/WebAI-to-API/)، Browser Translation
+- **دیکشنری:** [Vajehyab](https://vajehyab.com/)
+
+بعضی سرویس‌ها به API Key نیاز دارند و بعضی بدون آن قابل استفاده‌اند.
+
+---
+
 ## شروع به کار
 
 ### ۱. نصب

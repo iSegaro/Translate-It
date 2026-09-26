@@ -73,6 +73,19 @@
 
 ---
 
+## 対応プロバイダー
+
+Translate It は、一般的な翻訳サービス、AI、ローカル、辞書など、さまざまなプロバイダーに対応しています。
+
+- **一般的な翻訳サービス:** [Google](https://translate.google.com/)、[Microsoft](https://www.microsoft.com/translator/)、[DeepL](https://www.deepl.com/translator)、[Yandex](https://translate.yandex.com/)、[Lingva](https://github.com/TheDavidDelta/lingva-translate)、[Bing](https://www.bing.com/translator)
+- **AI:** [Gemini](https://ai.google.dev/)、[OpenAI](https://openai.com/api/)、[OpenRouter](https://openrouter.ai/)、[Requesty](https://www.requesty.ai/)、[DeepSeek](https://platform.deepseek.com/)
+- **カスタム・ローカル:** OpenAI Compatible、[WebAI-to-API](https://github.com/Amm1rr/WebAI-to-API/)、Browser Translation
+- **辞書:** [Vajehyab](https://vajehyab.com/)
+
+API キーが必要なプロバイダーと、設定なしで使えるプロバイダーがあります。
+
+---
+
 ## はじめに
 
 ### 1. インストール

@@ -72,6 +72,20 @@
 
 ---
 
+## Supported Providers
+
+Choose from traditional, AI, local, and specialized providers:
+
+- **Traditional:** [Google](https://translate.google.com/), [Microsoft](https://www.microsoft.com/translator/), [DeepL](https://www.deepl.com/translator), [Yandex](https://translate.yandex.com/), [Lingva](https://github.com/TheDavidDelta/lingva-translate), [Bing](https://www.bing.com/translator)
+- **AI:** [Gemini](https://ai.google.dev/), [OpenAI](https://openai.com/api/), [OpenRouter](https://openrouter.ai/), [Requesty](https://www.requesty.ai/), [DeepSeek](https://platform.deepseek.com/)
+- **Custom & Local:** OpenAI Compatible, [WebAI-to-API](https://github.com/Amm1rr/WebAI-to-API/), Browser Translation
+- **Dictionary:** [Vajehyab](https://vajehyab.com/)
+
+Some providers require an API key, while others work without one.
+
+
+---
+
 ## Getting Started
 
 ### 1. Installation
