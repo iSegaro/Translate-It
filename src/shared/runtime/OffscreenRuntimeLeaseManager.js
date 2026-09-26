@@ -229,7 +229,7 @@ export class OffscreenRuntimeLeaseManager {
         }
       }
 
-      await this._scheduleIdleClose();
+      await this._scheduleIdleCloseWithFallback(browserAPI, offscreen);
       return released;
     });
   }
@@ -456,6 +456,16 @@ export class OffscreenRuntimeLeaseManager {
     return true;
   }
 
+  // Best-effort idle cleanup with a bounded immediate-close fallback. When the
+  // retry alarm cannot be scheduled for an owned idle document, attempt one
+  // direct close instead of stranding it. _closeIfEligible re-checks guards,
+  // and its catch only re-schedules (never re-closes), so the chain always
+  // terminates: schedule -> close -> schedule -> stop.
+  async _scheduleIdleCloseWithFallback(browserAPI, offscreen) {
+    if (await this._scheduleIdleClose()) return true;
+    return this._closeIfEligible(browserAPI, offscreen);
+  }
+
   async _cancelIdleClose() {
     if (!this.idleCloseScheduled) return false;
     try {
@@ -482,9 +492,15 @@ export class OffscreenRuntimeLeaseManager {
         hasDocument = await this._detectDocument(browserAPI, offscreen);
       } catch (error) {
         this.log.debug('Skipping idle offscreen close after uncertain presence detection', error);
+      }
+      if (hasDocument === null) {
+        // Uncertain presence: never close now — physical presence was not
+        // confirmed. Re-arm idle cleanup at the normal cadence; if even the
+        // retry alarm cannot be scheduled, stop safely and leave cleanup to
+        // a later lifecycle transition. No immediate-close fallback here.
+        await this._scheduleIdleClose();
         return false;
       }
-      if (hasDocument === null) return false;
       if (!hasDocument) {
         await this._markDocumentAbsent(browserAPI);
         return false;
