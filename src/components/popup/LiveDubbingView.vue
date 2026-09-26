@@ -20,12 +20,26 @@
           />
         </div>
         <div class="live-dubbing-config-field live-dubbing-config-field--provider">
-          <label
-            class="live-dubbing-config-label"
-            for="live-dubbing-provider-select"
-          >
-            {{ t('provider_label', 'Provider') }}
-          </label>
+          <div class="ti-live-dubbing-provider-header">
+            <label
+              class="live-dubbing-config-label"
+              for="live-dubbing-provider-select"
+            >
+              {{ t('provider_label', 'Provider') }}
+            </label>
+            <button
+              type="button"
+              class="ti-live-dubbing-manage-keys"
+              :aria-label="t('live_dubbing_manage_api_keys', 'Manage API keys')"
+              :title="t('live_dubbing_manage_api_keys', 'Manage API keys')"
+              @click="handleManageApiKeys"
+            >
+              <MaskIcon
+                :src="keyIcon"
+                :size="15"
+              />
+            </button>
+          </div>
           <BaseSelect
             id="live-dubbing-provider-select"
             v-model="providerModel"
@@ -172,6 +186,8 @@ import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
 import LiveDubbingProviderSetup from '@/components/popup/LiveDubbingProviderSetup.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseToggle from '@/components/base/BaseToggle.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
+import keyIcon from '@/icons/ui/key.svg?url'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import {
@@ -355,6 +371,15 @@ const handleChangeFont = async () => {
     logger.warn('Unable to open Appearance settings for Live Dubbing font selection.')
   } catch (error) {
     logger.error('Failed to open Appearance settings for Live Dubbing font selection:', error)
+  }
+}
+
+const handleManageApiKeys = async () => {
+  try {
+    const response = await openOptionsPage('providers')
+    if (response?.success) window.close()
+  } catch (error) {
+    logger.error('Failed to open provider settings for Live Dubbing API keys:', error)
   }
 }
 

@@ -260,6 +260,9 @@
   "live_dubbing_provider_description": {
     "message": "Used for new live dubbing sessions."
   },
+  "live_dubbing_manage_api_keys": {
+    "message": "Manage API keys"
+  },
   "live_dubbing_config_label": {
     "message": "Configuration"
   },

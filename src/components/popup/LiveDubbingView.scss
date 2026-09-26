@@ -2,6 +2,10 @@
 @use "@/assets/styles/base/variables" as *;
 
 .live-dubbing-view {
+  --ti-action-icon: var(--tab-button-color, #5f6368);
+  --ti-action-icon-hover: var(--color-action-hover-accent, #ff9800);
+  --ti-action-hover-bg: rgb(0 0 0 / 8%);
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -11,6 +15,12 @@
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+@at-root .theme-dark .live-dubbing-view,
+.ti-dark-mode .live-dubbing-view {
+  --ti-action-icon: #fff;
+  --ti-action-hover-bg: #424242;
 }
 
 /* Shared card chrome: symmetric padding (RTL-safe), theme-aware tokens only. */
@@ -47,6 +57,48 @@
   line-height: 1.25;
   opacity: 0.7;
 }
+
+.ti-live-dubbing-provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  block-size: 19px;
+  min-width: 0;
+  margin-block-end: 4px;
+}
+
+.ti-live-dubbing-provider-header .live-dubbing-config-label {
+  min-width: 0;
+  margin: 0;
+}
+
+.ti-live-dubbing-manage-keys {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ti-action-icon);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.ti-live-dubbing-manage-keys:hover {
+  color: var(--ti-action-icon-hover);
+  background-color: var(--ti-action-hover-bg);
+}
+
+.ti-live-dubbing-manage-keys:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
 
 /* The selector ships its own bar styling (margin/padding/background);
    inside the card it must stretch edge-to-edge without a nested bar. */

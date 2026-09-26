@@ -172,6 +172,7 @@ describe('LiveDubbingView', () => {
       provider_gemini_title: 'Google Gemini',
       provider_openai_title: 'OpenAI GPT',
       provider_label: 'Provider',
+      live_dubbing_manage_api_keys: 'Manage API keys',
       target_language_label: 'Target Language',
       live_dubbing_provider_description: 'Used for new live dubbing sessions.',
        live_dubbing_config_label: 'Configuration',
@@ -463,6 +464,97 @@ describe('LiveDubbingView', () => {
     const options = providerSelect(wrapper).findAll('option')
     expect(options.map((option) => option.attributes('value'))).toEqual(['gemini', 'openai'])
     expect(options.map((option) => option.text())).toEqual(['Google Gemini', 'OpenAI GPT'])
+  })
+
+  it('places a keyboard-focusable Manage API keys icon button in the Provider header', () => {
+    const wrapper = mountView({ providerId: 'openai' })
+    const button = wrapper.find('button.ti-live-dubbing-manage-keys')
+    const providerLabel = wrapper.find('label[for="live-dubbing-provider-select"]')
+    const select = providerSelect(wrapper).element
+    const icon = button.find('.mask-icon')
+
+    expect(button.exists()).toBe(true)
+    expect(button.element.tagName).toBe('BUTTON')
+    expect(button.attributes('type')).toBe('button')
+    expect(button.element.tabIndex).toBe(0)
+    expect(button.attributes('aria-label')).toBe('Manage API keys')
+    expect(button.attributes('title')).toBe('Manage API keys')
+    expect(button.element.parentElement).toBe(providerLabel.element.parentElement)
+    expect(select.contains(button.element)).toBe(false)
+    expect(icon.exists()).toBe(true)
+    expect(icon.attributes('aria-hidden')).toBe('true')
+    expect(icon.element.style.maskImage).toMatch(/^url\("data:image\/svg\+xml/)
+    expect(icon.element.style.webkitMaskImage).toMatch(/^url\("data:image\/svg\+xml/)
+    const source = readFileSync(resolve(here, 'LiveDubbingView.vue'), 'utf8')
+    expect(source).toMatch(/import keyIcon from ['"]@\/icons\/ui\/key\.svg\?url['"];?/)
+    expect(source).toMatch(/<MaskIcon\s+:src="keyIcon"/)
+
+    expect(button.element.matches(':enabled')).toBe(true)
+  })
+
+  it('opens provider settings from Manage API keys and closes only after successful navigation', async () => {
+    harness.store = makeStore({ LIVE_DUBBING_PROVIDER: 'openai' })
+    harness.openOptionsPageMock.mockResolvedValue({ success: true })
+    const wrapper = mountView({ providerId: 'openai' })
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+    await wrapper.find('button.ti-live-dubbing-manage-keys').trigger('click')
+    await settle()
+
+    expect(harness.openOptionsPageMock).toHaveBeenCalledOnce()
+    expect(harness.openOptionsPageMock).toHaveBeenCalledWith('providers')
+    expect(closeSpy).toHaveBeenCalledOnce()
+    expect(providerSelect(wrapper).element.value).toBe('openai')
+    expect(harness.store.settings.LIVE_DUBBING_PROVIDER).toBe('openai')
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+    closeSpy.mockRestore()
+  })
+
+  it.each([undefined, { success: false }, {}])(
+    'keeps the popup open when provider navigation does not report success (%s)',
+    async (response) => {
+      harness.openOptionsPageMock.mockResolvedValue(response)
+      const wrapper = mountView()
+      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+      await wrapper.find('button.ti-live-dubbing-manage-keys').trigger('click')
+      await settle()
+
+      expect(harness.openOptionsPageMock).toHaveBeenCalledWith('providers')
+      expect(closeSpy).not.toHaveBeenCalled()
+      closeSpy.mockRestore()
+    }
+  )
+
+  it('keeps the provider icon/header layout logical and the narrow provider grid single-column', () => {
+    const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+    const headerRule = scss.match(/\.ti-live-dubbing-provider-header\s*\{[^}]*\}/m)?.[0]
+    expect(headerRule).toMatch(/display:\s*flex/)
+    expect(headerRule).toMatch(/justify-content:\s*space-between/)
+    expect(headerRule).toMatch(/gap\s*:/)
+    expect(headerRule).toMatch(/margin-block-end\s*:/)
+    expect(headerRule).not.toMatch(/(?:^|\n)\s*(?:left|right)\s*:/)
+
+    const buttonRule = scss.match(/\.ti-live-dubbing-manage-keys\s*\{[^}]*\}/m)?.[0]
+    expect(buttonRule).toMatch(/inline-size\s*:/)
+    expect(buttonRule).toMatch(/block-size\s*:/)
+    expect(buttonRule).not.toMatch(/overflow\s*:/)
+    expect(buttonRule).toMatch(/color:\s*var\(--ti-action-icon\)/)
+    expect(buttonRule).toMatch(/transition:\s*background-color 140ms ease, color 140ms ease/)
+    expect(buttonRule).not.toMatch(/(?:^|\n)\s*(?:transform|box-shadow)\s*:/)
+    const hoverRule = scss.match(/\.ti-live-dubbing-manage-keys:hover\s*\{[^}]*\}/m)?.[0]
+    expect(hoverRule).toMatch(/color:\s*var\(--ti-action-icon-hover\)/)
+    expect(hoverRule).toMatch(/background-color:\s*var\(--ti-action-hover-bg\)/)
+    const viewRule = scss.match(/\.live-dubbing-view\s*\{[^}]*\}/m)?.[0]
+    expect(viewRule).toMatch(/--ti-action-icon:\s*var\(--tab-button-color/)
+    expect(viewRule).toMatch(/--ti-action-icon-hover:\s*var\(--color-action-hover-accent/)
+    expect(viewRule).toMatch(/--ti-action-hover-bg:/)
+    expect(scss).toMatch(/\.theme-dark \.live-dubbing-view[\s\S]*?--ti-action-hover-bg:\s*#424242/)
+
+    const narrowGrid = scss.match(/@media\s*\(max-width:\s*420px\)\s*\{[^}]*\.live-dubbing-config-grid\s*\{[^}]*\}\s*\}/m)?.[0]
+    expect(narrowGrid).toMatch(/grid-template-columns:\s*1fr/)
+    expect(narrowGrid).not.toMatch(/overflow(?:-x|-y)?\s*:/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select[\s\S]*?width:\s*100%\s*!important/)
   })
 
   it('persists provider changes under LIVE_DUBBING_PROVIDER without touching TRANSLATION_API', async () => {

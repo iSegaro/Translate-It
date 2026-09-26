@@ -260,6 +260,9 @@
   "live_dubbing_provider_description": {
     "message": "新しいライブ吹き替えセッションで使用されます。"
   },
+  "live_dubbing_manage_api_keys": {
+    "message": "APIキーを管理"
+  },
   "live_dubbing_config_label": {
     "message": "設定"
   },

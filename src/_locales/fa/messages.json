@@ -260,6 +260,9 @@
   "live_dubbing_provider_description": {
     "message": "برای جلسه‌های جدید دوبله زنده استفاده می‌شود."
   },
+  "live_dubbing_manage_api_keys": {
+    "message": "مدیریت کلیدهای API"
+  },
   "live_dubbing_config_label": {
     "message": "پیکربندی"
   },
