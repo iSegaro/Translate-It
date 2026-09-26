@@ -2,7 +2,8 @@
 
 ##### Added
 
-- Added Live Dubbing for Chrome.
+- Added **Live Dubbing** support for Chrome.
+- Added **Requesty** as a provider.
 
 ---
 
