@@ -47,7 +47,7 @@ describe('BaseTextarea password masking', () => {
 
     expect(event.defaultPrevented).toBe(true)
     expect(wrapper.emitted('update:modelValue')).toHaveLength(1)
-    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['before-first-key\nsecond-key'])
+    expect(wrapper.emitted('update:modelValue')).toEqual([['before-first-key\nsecond-key']])
     expect(wrapper.emitted('input')).toHaveLength(1)
     expect(cursorSpy).toHaveBeenCalledWith(27, 27)
   })
@@ -62,9 +62,15 @@ describe('BaseTextarea password masking', () => {
     const event = new Event('paste', { bubbles: true, cancelable: true })
 
     field.dispatchEvent(event)
+    if (!event.defaultPrevented) {
+      field.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertFromPaste' }))
+      field.value = 'before-after'
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    }
     await nextTick()
 
-    expect(event.defaultPrevented).toBe(false)
+    expect(event.defaultPrevented).toBe(true)
+    expect(wrapper.props('modelValue')).toBe('before-after')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     expect(wrapper.emitted('input')).toBeUndefined()
     expect(field.value).toBe(initialDisplay)
@@ -80,9 +86,15 @@ describe('BaseTextarea password masking', () => {
     const event = new Event('paste', { bubbles: true, cancelable: true })
 
     field.dispatchEvent(event)
+    if (!event.defaultPrevented) {
+      field.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertFromPaste' }))
+      field.value = 'before-after'
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    }
     await nextTick()
 
-    expect(event.defaultPrevented).toBe(false)
+    expect(event.defaultPrevented).toBe(true)
+    expect(wrapper.props('modelValue')).toBe('before-after')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
     expect(wrapper.emitted('input')).toBeUndefined()
     expect(field.value).toBe(initialDisplay)
@@ -100,11 +112,16 @@ describe('BaseTextarea password masking', () => {
     })
 
     field.dispatchEvent(event)
+    if (!event.defaultPrevented) {
+      field.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertFromPaste' }))
+      field.value = 'before-key-after'
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    }
     await nextTick()
 
     expect(event.defaultPrevented).toBe(false)
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('input')).toBeUndefined()
+    expect(wrapper.emitted('update:modelValue')).toEqual([['before-key-after']])
+    expect(wrapper.emitted('input')).toHaveLength(1)
   })
 
   it('leaves paste native when unmasked', async () => {
@@ -118,10 +135,15 @@ describe('BaseTextarea password masking', () => {
     })
 
     field.dispatchEvent(event)
+    if (!event.defaultPrevented) {
+      field.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertFromPaste' }))
+      field.value = 'before-key-after'
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    }
     await nextTick()
 
     expect(event.defaultPrevented).toBe(false)
-    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-    expect(wrapper.emitted('input')).toBeUndefined()
+    expect(wrapper.emitted('update:modelValue')).toEqual([['before-key-after']])
+    expect(wrapper.emitted('input')).toHaveLength(1)
   })
 })

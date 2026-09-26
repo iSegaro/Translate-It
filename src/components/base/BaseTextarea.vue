@@ -235,8 +235,8 @@ const handleBeforeInput = (event) => {
 const handlePaste = (event) => {
   if (!props.passwordMask || visibilityVisible.value) return
   const pastedText = event.clipboardData?.getData('text/plain')
-  if (pastedText == null) return
   event.preventDefault()
+  if (pastedText == null) return
   const target = event.target
   const currentValue = props.modelValue || ''
   const cursorStart = target.selectionStart
