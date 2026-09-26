@@ -345,24 +345,41 @@
   min-width: 0;
 }
 
+.live-dubbing-setup-label {
+  display: block;
+  margin-block-end: 4px;
+  color: var(--text-color);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: start;
+}
+
+.live-dubbing-setup-input-control {
+  position: relative;
+  min-width: 0;
+}
+
 .live-dubbing-setup-input {
   width: 100%;
   min-width: 0;
 }
 
-.live-dubbing-setup-input .ti-input {
+.live-dubbing-setup-input.ti-textarea-wrapper {
   width: 100% !important;
-  min-height: 36px !important;
+}
+
+.live-dubbing-setup-input .ti-textarea {
+  min-height: 92px !important;
   padding-inline: 10px 42px !important;
   direction: ltr !important;
 }
 
-/* BaseInput mounts/unmounts its inline help with v-if, so an error would
-   resize the input column and push Save down. The card keeps BaseInput's
-   error styling (border, label, focus) but routes feedback through its own
-   always-mounted row instead. Scoped to this card — BaseInput is untouched. */
-.live-dubbing-setup-input .ti-input__help {
-  display: none !important;
+.live-dubbing-setup-guidance {
+  margin: 3px 0 0;
+  color: var(--text-color);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.7;
 }
 
 /* Always-mounted feedback, placed after the action row. No height is reserved
@@ -377,9 +394,7 @@
   overflow-wrap: anywhere;
 }
 
-.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__label,
-.live-dubbing-view--rtl .live-dubbing-setup-feedback,
-.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__help {
+.live-dubbing-view--rtl .live-dubbing-setup-feedback {
   direction: rtl !important;
   text-align: start !important;
 }
@@ -387,7 +402,7 @@
 .live-dubbing-setup-toggle {
   position: absolute;
   inset-inline-end: 4px;
-  inset-block-start: 31px;
+  inset-block-start: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

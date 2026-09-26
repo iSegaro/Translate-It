@@ -340,17 +340,24 @@ background. No legacy credential action or helper remains.
 
 Credential validation (`LIVE_DUBBING_VALIDATE_CREDENTIAL`) is a separate
 background-owned check for unsaved draft keys; the current consumer is the
-Popup Live Dubbing credential setup card (`LiveDubbingProviderSetup.vue`),
-which invokes the action before `updateSettingAndPersist` and persists the
-draft only when the result is `VALID`. The action stays background-owned and
-remains reusable by other trusted Live Dubbing UIs (Sidepanel, Options) if
-integrated later, but is not presently wired there. A trusted UI sender posts
-`{ providerId, apiKey, targetLanguage }`, background runs exactly one
-provider mint attempt with that draft key only, discards the ephemeral
-token/secret, and returns only `{ ok, valid, reason }` with a coarse reason
-(`VALID`, `AUTH_INVALID`, `FORBIDDEN`, usage/transient codes, never raw
-provider text). It creates no session/descriptor/lease, touches no capture or
+Popup Live Dubbing credential setup card (`LiveDubbingProviderSetup.vue`).
+Popup setup accepts up to 10 unique keys separated by newlines and validates
+each independently through the existing single-key background action, with at
+most two validation requests in flight concurrently. Each request posts
+`{ providerId, apiKey, targetLanguage }`; background makes one provider mint
+attempt with that draft key only, discards the ephemeral token/secret, and
+returns only `{ ok, valid, reason }` with a coarse reason (`VALID`,
+`AUTH_INVALID`, `FORBIDDEN`, usage/transient codes, never raw provider text).
+The Popup persists the ordered key list in one settings write only after every
+key returns `VALID`; no partial list is saved on validation failure. The action
+stays background-owned and remains reusable by other trusted Live Dubbing UIs
+(Sidepanel, Options) if integrated later, but is not presently wired there.
+Validation creates no session/descriptor/lease, touches no capture or
 streaming, and never reads, fails over, promotes, or saves stored keys.
+
+Live Dubbing bootstrap uses stored keys in their stored order and does not
+promote a key. Shared text translation can promote keys in the same settings,
+however, so this is not a global immutable-order guarantee.
 
 The `LiveDubbingProviderRegistry` is the feature-local mapping from provider id
 to adapter. It contains Gemini (`pcm`) and the production OpenAI adapter

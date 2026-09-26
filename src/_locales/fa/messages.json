@@ -281,6 +281,15 @@
   "live_dubbing_setup_save_error": {
     "message": "ذخیره کلید API انجام نشد. لطفا دوباره تلاش کنید."
   },
+  "live_dubbing_setup_key_guidance": {
+    "message": "در هر خط یک کلید API وارد کنید"
+  },
+  "live_dubbing_setup_too_many_keys": {
+    "message": "حداکثر ۱۰ کلید API یکتا وارد کنید."
+  },
+  "live_dubbing_setup_key_failed": {
+    "message": "بررسی کلید API شمارهٔ {position} ناموفق بود. {reason}"
+  },
   "live_dubbing_validation_auth_error": {
     "message": "این کلید رد شده است یا به دوبله زنده دسترسی ندارد."
   },

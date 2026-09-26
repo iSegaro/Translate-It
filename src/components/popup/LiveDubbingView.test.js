@@ -1063,7 +1063,7 @@ describe('LiveDubbingView', () => {
       /\.live-dubbing-setup-input-field\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(setupInputField).toMatch(/direction:\s*ltr/)
-    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-input[\s\S]*?padding-inline:\s*10px 42px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-textarea\s*\{[\s\S]*?padding-inline:\s*10px 42px\s*!important/)
     expect(scss).toMatch(/:root\.theme-dark \.live-dubbing-setup-toggle img[\s\S]*?filter:\s*invert\(1\)/)
 
     const saveButton = scss.match(
@@ -1093,11 +1093,11 @@ describe('LiveDubbingView', () => {
     expect(disabledLanguage).toMatch(/cursor:\s*not-allowed\s*!important/)
     expect(scss).not.toMatch(/^\.ti-language-select:disabled\s*\{/m)
 
-    const rtlInputText = scss.match(
-      /\.live-dubbing-view--rtl \.live-dubbing-setup-input \.ti-input__label,[\s\S]*?\.ti-input__help\s*\{[\s\S]*?\n\}/m
+    const rtlSetupFeedback = scss.match(
+      /\.live-dubbing-view--rtl \.live-dubbing-setup-feedback\s*\{[\s\S]*?\n\}/m
     )?.[0]
-    expect(rtlInputText).toMatch(/direction:\s*rtl\s*!important/)
-    expect(rtlInputText).toMatch(/text-align:\s*start\s*!important/)
+    expect(rtlSetupFeedback).toMatch(/direction:\s*rtl\s*!important/)
+    expect(rtlSetupFeedback).toMatch(/text-align:\s*start\s*!important/)
 
     const rtlActions = scss.match(
       /\.live-dubbing-view--rtl \.live-dubbing-setup-actions\s*\{[\s\S]*?\n\}/m
