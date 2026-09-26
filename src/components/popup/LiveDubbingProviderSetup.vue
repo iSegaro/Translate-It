@@ -4,12 +4,6 @@
     :aria-label="`${providerName} — ${t('custom_api_settings_api_key_label', 'API Key')}`"
   >
     <p
-      class="live-dubbing-setup-explanation"
-      dir="auto"
-    >
-      {{ explanation }}
-    </p>
-    <p
       class="live-dubbing-setup-source"
       dir="auto"
     >
@@ -22,18 +16,9 @@
       >{{ linkText }}</a>
     </p>
 
-    <!-- Stacked in DOM order: field, then Save below it, then the
-         always-mounted feedback — the last child, so its height can only
-         grow downward and never moves the controls above it. -->
+    <!-- Field, guidance/Save row, then always-mounted feedback in normal flow. -->
     <div class="live-dubbing-setup-row">
       <div class="live-dubbing-setup-input-field">
-        <label
-          class="live-dubbing-setup-label"
-          for="live-dubbing-key-input"
-          dir="auto"
-        >
-          {{ t('custom_api_settings_api_key_label', 'API Key') }}
-        </label>
         <div class="live-dubbing-setup-input-control">
           <BaseTextarea
             id="live-dubbing-key-input"
@@ -42,9 +27,10 @@
             class="live-dubbing-setup-input"
             password-mask
             hide-toggle
-            :rows="4"
+            :rows="3"
             resize="none"
             dir="ltr"
+            :aria-label="t('custom_api_settings_api_key_label', 'API Key')"
             :aria-describedby="errorMessage ? 'live-dubbing-key-guidance live-dubbing-key-error' : 'live-dubbing-key-guidance'"
             :aria-invalid="Boolean(errorMessage)"
             :placeholder="t(placeholderKey, 'Paste your API key here')"
@@ -68,6 +54,8 @@
             >
           </button>
         </div>
+      </div>
+      <div class="live-dubbing-setup-controls-row">
         <p
           id="live-dubbing-key-guidance"
           class="live-dubbing-setup-guidance"
@@ -75,8 +63,6 @@
         >
           {{ t('live_dubbing_setup_key_guidance', 'One API key per line') }}
         </p>
-      </div>
-      <div class="live-dubbing-setup-actions">
         <BaseButton
           class="live-dubbing-setup-save"
           size="sm"
@@ -87,8 +73,7 @@
           @click="save"
         />
       </div>
-      <!-- Normal-flow feedback follows the action row and grows downward,
-           keeping the field and Save control in place. -->
+      <!-- Feedback follows the guidance/Save row in normal flow. -->
       <p
         class="live-dubbing-setup-feedback"
         dir="auto"
@@ -144,11 +129,6 @@ const providerName = computed(() => (isOpenAI.value
   : t('provider_gemini_title', 'Google Gemini')))
 
 /** Localized explanation that names the selected provider. */
-const explanation = computed(() => t(
-  'provider_config_required_api',
-  { provider: providerName.value }
-) || `This service (${providerName.value}) requires an API Key.`)
-
 const infoText = computed(() => (isOpenAI.value
   ? t('openai_api_key_info', 'You can get your OpenAI API key from OpenAI Platform.')
   : t('gemini_api_key_info', 'You can get your Gemini API key from Google AI Studio.')))

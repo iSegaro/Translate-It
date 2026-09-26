@@ -93,29 +93,31 @@ describe('LiveDubbingProviderSetup', () => {
     }
   })
 
-  it('names the provider and links to the matching key page', () => {
+  it('shows provider information and matching key links without a service-required line', () => {
     const gemini = mountSetup()
-    expect(gemini.text()).toContain('This service (Google Gemini) requires an API Key.')
+    expect(gemini.text()).not.toContain('This service (Google Gemini) requires an API Key.')
     expect(gemini.find('a').attributes('href')).toBe('https://aistudio.google.com/app/apikey')
     expect(gemini.text()).toContain('You can get your Gemini API key from Google AI Studio.')
     const openai = mountSetup({ providerId: 'openai' })
-    expect(openai.text()).toContain('This service (OpenAI GPT) requires an API Key.')
+    expect(openai.text()).not.toContain('This service (OpenAI GPT) requires an API Key.')
     expect(openai.find('a').attributes('href')).toBe('https://platform.openai.com/api-keys')
+    expect(openai.text()).toContain('You can get your OpenAI API key from OpenAI Platform.')
   })
 
-  it('uses a masked LTR textarea, preserving lines and truly revealing/hiding its value', async () => {
+  it('uses a masked LTR textarea with accessible name, guidance and visibility controls', async () => {
     const wrapper = mountSetup()
     const field = textarea(wrapper)
     expect(field.exists()).toBe(true)
     expect(field.attributes('dir')).toBe('ltr')
     expect(field.attributes('placeholder')).toBe('Paste your Gemini API key here')
-    const label = wrapper.findAll('label').find((candidate) => candidate.text() === 'API Key')
-    expect(label, 'visible API key label').toBeTruthy()
-    expect(label.attributes('dir')).toBe('auto')
-    expect(field.attributes('id')).toBeTruthy()
-    expect(label.attributes('for')).toBe(field.attributes('id'))
+    expect(field.attributes('rows')).toBe('3')
+    expect(field.attributes('aria-label')).toBe('API Key')
     expect(field.attributes('aria-describedby')).toBe('live-dubbing-key-guidance')
+    expect(field.attributes('aria-invalid')).toBe('false')
     expect(wrapper.find('#live-dubbing-key-guidance').text()).toBe('One API key per line')
+    const inputControl = wrapper.find('.live-dubbing-setup-input-control')
+    expect(inputControl.element.contains(field.element)).toBe(true)
+    expect(inputControl.element.contains(wrapper.find('.live-dubbing-setup-toggle').element)).toBe(true)
 
     await typeKey(wrapper, 'first-secret\nsecond-secret')
     expect(textarea(wrapper).element.value).toBe('••••••••••••\n•••••••••••••')
@@ -377,23 +379,28 @@ describe('LiveDubbingProviderSetup', () => {
     expect(wrapper.emitted('save-pending')).toEqual([[true], [false]])
   })
 
-  it('keeps feedback mounted in place and below the field and Save', async () => {
+  it('keeps guidance and Save together after the field and feedback mounted last', async () => {
     const wrapper = mountSetup()
     const row = wrapper.find('.live-dubbing-setup-row')
     const field = wrapper.find('.live-dubbing-setup-input-field')
-    const actions = wrapper.find('.live-dubbing-setup-actions')
+    const guidance = wrapper.find('#live-dubbing-key-guidance')
+    const controls = wrapper.find('.live-dubbing-setup-controls-row')
+    const saveButton = wrapper.find('.live-dubbing-setup-save')
     const feedback = wrapper.find('.live-dubbing-setup-feedback')
-    const save = wrapper.find('.live-dubbing-setup-save').element
     expect(feedback.attributes('role')).toBe('alert')
+    expect(feedback.attributes('dir')).toBe('auto')
     expect(feedback.text()).toBe('')
-    expect(Array.from(row.element.children)).toEqual([field.element, actions.element, feedback.element])
+    expect(guidance.element.parentElement).toBe(controls.element)
+    expect(saveButton.element.parentElement).toBe(controls.element)
+    expect(Array.from(row.element.children)).toEqual([field.element, controls.element, feedback.element])
+    expect(Array.from(controls.element.children)).toEqual([guidance.element, saveButton.element])
 
     await clickButton(wrapper, 'Save')
     expect(wrapper.find('.live-dubbing-setup-feedback').element).toBe(feedback.element)
     expect(feedback.text()).toContain('API key for Google Gemini cannot be empty.')
-    expect(wrapper.find('.live-dubbing-setup-save').element).toBe(save)
+    expect(wrapper.find('.live-dubbing-setup-save').element).toBe(saveButton.element)
     expect(field.element.contains(feedback.element)).toBe(false)
-    expect(actions.element.previousElementSibling).toBe(field.element)
+    expect(feedback.element.previousElementSibling).toBe(controls.element)
   })
 
   it('keeps the setup guidance and feedback accessible without rendering secret text', async () => {
@@ -408,15 +415,41 @@ describe('LiveDubbingProviderSetup', () => {
     expect(wrapper.text()).not.toContain('secret-not-for-feedback')
   })
 
-  it('keeps Save stacked and feedback in normal flow', () => {
+  it('uses an RTL-safe grid and bounded local feedback scrolling without clipping the card', () => {
     const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
     const rowRule = scss.match(/\.live-dubbing-setup-row\s*\{[^}]*\}/m)?.[0]
     expect(rowRule).toMatch(/display:\s*block/)
-    expect(rowRule).not.toMatch(/display:\s*grid/)
+    const controlsRule = scss.match(/\.live-dubbing-setup-controls-row\s*\{[^}]*\}/m)?.[0]
+    expect(controlsRule).toMatch(/display:\s*grid/)
+    expect(controlsRule).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto/)
+    expect(controlsRule).toMatch(/gap\s*:/)
+    expect(controlsRule).not.toMatch(/(?:^|\n)\s*(?:left|right)\s*:/)
+    const rtlControlsRule = scss.match(/\.live-dubbing-view--rtl \.live-dubbing-setup-controls-row\s*\{[^}]*\}/m)?.[0]
+    expect(rtlControlsRule).toMatch(/direction:\s*rtl/)
+    const textareaRule = scss.match(/\.live-dubbing-setup-input \.ti-textarea\s*\{[^}]*\}/m)?.[0]
+    expect(textareaRule).not.toMatch(/min-height:\s*92px/)
+
+    const rtlRules = scss.match(/\.live-dubbing-view--rtl[^{}]*\{[^}]*\}/gm) ?? []
+    const setupRtlRules = rtlRules.filter((rule) => /live-dubbing-setup/.test(rule))
+    expect(setupRtlRules.length).toBeGreaterThan(0)
+    expect(setupRtlRules.join('\n')).not.toMatch(/(?:^|\n)\s*(?:left|right)\s*:/)
+    expect(setupRtlRules.join('\n')).toMatch(/direction:\s*rtl/)
+
     const slotRule = scss.match(/\.live-dubbing-setup-feedback\s*\{[^}]*\}/m)?.[0]
     expect(slotRule).toMatch(/overflow-wrap:\s*anywhere/)
-    expect(slotRule).not.toMatch(/(?:^|\n)\s*(?:min-|max-)?(?:block-size|height)\s*:/)
-    expect(slotRule).not.toMatch(/overflow:\s*(?:hidden|auto|scroll)/)
-    expect(slotRule).not.toMatch(/position:\s*(?:absolute|fixed)/)
+    expect(slotRule).toMatch(/min-block-size:\s*2\.8em\s*;/)
+    expect(slotRule).toMatch(/max-block-size:\s*5\.6em\s*;/)
+    expect(slotRule).toMatch(/line-height:\s*1\.4\s*;/)
+    expect(slotRule).toMatch(/overflow-y\s*:\s*auto\s*;/)
+    expect(slotRule).not.toMatch(/text-overflow\s*:/)
+    expect(slotRule).not.toMatch(/overflow\s*:\s*hidden/)
+    expect(slotRule).not.toMatch(/white-space\s*:\s*nowrap/)
+    expect(slotRule).not.toMatch(/position\s*:\s*(?:absolute|fixed)/)
+
+    const saveRule = scss.match(/\.live-dubbing-setup-controls-row\s*>\s*\.ti-btn\.live-dubbing-setup-save\s*\{[^}]*\}/m)?.[0]
+    expect(saveRule).toBeTruthy()
+    expect(saveRule).not.toMatch(/position\s*:\s*(?:absolute|fixed)/)
+    const setupCardRule = scss.match(/\.live-dubbing-setup-card\s*\{[^}]*\}/m)?.[0] ?? ''
+    expect(setupCardRule).not.toMatch(/(?:^|\n)\s*(?:height|block-size)\s*:/)
   })
 })

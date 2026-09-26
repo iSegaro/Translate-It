@@ -1067,7 +1067,7 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/:root\.theme-dark \.live-dubbing-setup-toggle img[\s\S]*?filter:\s*invert\(1\)/)
 
     const saveButton = scss.match(
-      /\.live-dubbing-setup-actions > \.ti-btn\.live-dubbing-setup-save\s*\{[\s\S]*?\n\}/m
+      /\.live-dubbing-setup-controls-row > \.ti-btn\.live-dubbing-setup-save\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(saveButton).toBeTruthy()
     const saveButtonSelector = saveButton.split('{')[0]
@@ -1100,10 +1100,10 @@ describe('LiveDubbingView', () => {
     expect(rtlSetupFeedback).toMatch(/text-align:\s*start\s*!important/)
 
     const rtlActions = scss.match(
-      /\.live-dubbing-view--rtl \.live-dubbing-setup-actions\s*\{[\s\S]*?\n\}/m
+      /\.live-dubbing-view--rtl \.live-dubbing-setup-controls-row\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(rtlActions).toMatch(/direction:\s*rtl/)
-    expect(rtlActions).toMatch(/justify-content:\s*flex-end/)
+    expect(scss).toMatch(/\.live-dubbing-setup-controls-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto/)
 
     const languageWrapper = scss.match(
       /\.live-dubbing-config-card \.live-dubbing-config-field--language > \.ti-language-controls\s*\{[\s\S]*?\n\}/m
