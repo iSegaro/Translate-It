@@ -46,14 +46,12 @@
 
 ---
 
-## Why Translate It?
+## Goals
 
-- **Privacy First:** OCR and core processes happen locally. Your data stays in your browser.
-- **PDF Translator:** Open local or online PDF documents with intelligent page translation, bilingual reading, OCR for scanned PDFs, and TXT/Markdown/HTML export.
-- **AI-Powered:** Support for Gemini, OpenAI, DeepSeek and more.
-- **Cost-Efficient:** Save up to **70% on AI tokens** with the unique Economy Mode.
-- **Zero-Pressure Engineering:** Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
-- **Platform Agnostic:** Seamless experience from **Desktop Chrome** to **Android Firefox**.
+- **Privacy and control:** You decide how your translations are processed. Where supported, you can use local or offline providers, or configure the cloud service you prefer.
+- **Freedom to choose:** You’re not tied to a single provider. Switch between local, free, traditional, and AI-powered services whenever you need.
+- **One tool for different needs:** Translate selected text, input fields, page elements, full pages, PDFs, subtitles, images with OCR, text on hover, and live audio.
+- **Built for everyday browsing:** Designed to work smoothly with dynamic pages, long content, continuous translation, and both desktop and mobile browsers.
 
 ---
 
