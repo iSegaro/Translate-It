@@ -72,6 +72,32 @@
 
 ---
 
+## Getting Started
+
+### 1. Installation
+Install via the official stores for the best experience:
+
+<p align="center">
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="50" />
+  </a>
+  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
+    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="50" />
+  </a>
+</p>
+
+*For manual installation, see the [Installation Guide](./docs/guides/INSTALLATION.md).*
+
+### 2. Configuration
+Most AI providers require an API key.
+- Follow the [**API Configuration Guide**](./docs/guides/API_GUIDE.md) to set up Gemini, OpenAI, etc.
+- *Free providers like Google and Yandex work out of the box.*
+
+### 3. Mastering Shortcuts
+Maximize your productivity with the [**User Guide**](./docs/guides/USAGE.md).
+
+---
+
 ## Key Features
 
 ### 1. Advanced Translation Engines
@@ -138,32 +164,6 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 ### 9. Mouse on Hover (Instant Glance)
 - **Glance-to-Translate:** Move your mouse over any text while holding a modifier key (like Ctrl) to see an instant translation in a non-intrusive tooltip.
 - **Smart Scoping:** Choose your focus: translate a single **Word**, a full **Sentence**, or the entire **Container** block automatically.
-
----
-
-## Getting Started
-
-### 1. Installation
-Install via the official stores for the best experience:
-
-<p align="center">
-  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
-    <img src="./docs/Store/Chrome-Store.png" alt="Chrome" height="50" />
-  </a>
-  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="./docs/Store/Firefox-Store.png" alt="Firefox" height="50" />
-  </a>
-</p>
-
-*For manual installation, see the [Installation Guide](./docs/guides/INSTALLATION.md).*
-
-### 2. Configuration
-Most AI providers require an API key. 
-- Follow the [**API Configuration Guide**](./docs/guides/API_GUIDE.md) to set up Gemini, OpenAI, etc.
-- *Free providers like Google and Yandex work out of the box.*
-
-### 3. Mastering Shortcuts
-Maximize your productivity with the [**User Guide**](./docs/guides/USAGE.md).
 
 ---
 

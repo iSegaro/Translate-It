@@ -72,6 +72,32 @@
 
 ---
 
+## شروع به کار
+
+### ۱. نصب
+برای بهترین تجربه، از طریق فروشگاه‌های رسمی اقدام به نصب کنید:
+
+<p align="center">
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="./Store/Chrome-Store.png" alt="فروشگاه کروم" height="50" />
+  </a>
+  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
+    <img src="./Store/Firefox-Store.png" alt="فروشگاه فایرفاکس" height="50" />
+  </a>
+</p>
+
+*برای نصب دستی، [راهنمای نصب](./guides/INSTALLATION_FA.md) را مطالعه کنید.*
+
+### ۲. تنظیمات
+اکثر سرویس‌های هوش مصنوعی نیاز به کلید API دارند.
+- [**راهنمای تنظیمات API**](./guides/API_GUIDE_FA.md) را برای راه‌اندازی Gemini، OpenAI و غیره دنبال کنید.
+- *سرویس‌های رایگان مانند گوگل و یاندکس بدون تنظیمات کار می‌کنند.*
+
+### ۳. تسلط بر میان‌برها
+بهره‌وری خود را با [**راهنمای کاربر**](./guides/USAGE_FA.md) افزایش دهید.
+
+---
+
 ## قابلیت‌های کلیدی
 
 ### ۱. موتورهای ترجمه پیشرفته
@@ -138,32 +164,6 @@
 ### ۹. ترجمه با حرکت موس (نگاه سریع)
 - **ترجمه در لحظه:** موس خود را روی هر متنی ببرید و با نگه داشتن یک کلید میانبر (مانند Ctrl)، ترجمه آن را فورا در یک تولتیپ ظریف ببینید.
 - **تشخیص هوشمند محدوده:** تمرکز خود را انتخاب کنید: ترجمه یک **کلمه**، یک **جمله** کامل، یا کل یک **بلاک (Container)** به صورت خودکار.
-
----
-
-## شروع به کار
-
-### ۱. نصب
-برای بهترین تجربه، از طریق فروشگاه‌های رسمی اقدام به نصب کنید:
-
-<p align="center">
-  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
-    <img src="./Store/Chrome-Store.png" alt="فروشگاه کروم" height="50" />
-  </a>
-  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="./Store/Firefox-Store.png" alt="فروشگاه فایرفاکس" height="50" />
-  </a>
-</p>
-
-*برای نصب دستی، [راهنمای نصب](./guides/INSTALLATION_FA.md) را مطالعه کنید.*
-
-### ۲. تنظیمات
-اکثر سرویس‌های هوش مصنوعی نیاز به کلید API دارند.
-- [**راهنمای تنظیمات API**](./guides/API_GUIDE_FA.md) را برای راه‌اندازی Gemini، OpenAI و غیره دنبال کنید.
-- *سرویس‌های رایگان مانند گوگل و یاندکس بدون تنظیمات کار می‌کنند.*
-
-### ۳. تسلط بر میان‌برها
-بهره‌وری خود را با [**راهنمای کاربر**](./guides/USAGE_FA.md) افزایش دهید.
 
 ---
 

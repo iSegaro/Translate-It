@@ -73,6 +73,32 @@
 
 ---
 
+## はじめに
+
+### 1. インストール
+最適な体験のために、公式ストアからインストールしてください：
+
+<p align="center">
+  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
+    <img src="../docs/Store/Chrome-Store.png" alt="Chrome" height="50" />
+  </a>
+  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
+    <img src="../docs/Store/Firefox-Store.png" alt="Firefox" height="50" />
+  </a>
+</p>
+
+*手動でのインストールについては、[インストールガイド](./guides/INSTALLATION.md)をご覧ください。*
+
+### 2. 設定
+ほとんどの AI プロバイダーには API キーが必要です。
+- [**API 設定ガイド**](./guides/API_GUIDE.md)に従って、Gemini や OpenAI などを設定してください。
+- *Google や Yandex などの無料プロバイダーは、設定なしですぐに使用できます。*
+
+### 3. ショートカットの活用
+[**ユーザーガイド**](./guides/USAGE.md)でショートカットを確認し、生産性を最大限に高めましょう。
+
+---
+
 ## 主な機能
 
 ### 1. 高度な翻訳エンジン
@@ -139,32 +165,6 @@ API コストと UI スピードを **最適化レベル（1〜5）** で完全�
 ### 9. マウスホバー翻訳 (インスタント・グランス)
 - **一瞬で翻訳:** 修飾キー（Ctrlなど）を押しながらテキストにマウスを合わせるだけで、目立たないツールチップに翻訳結果を即座に表示します。
 - **スマートな範囲指定:** 翻訳対象を自由に選択：**単語**、**一文**、または**コンテナ全体**を自動的に認識して翻訳します。
-
----
-
-## はじめに
-
-### 1. インストール
-最適な体験のために、公式ストアからインストールしてください：
-
-<p align="center">
-  <a target="_blank" href="https://chromewebstore.google.com/detail/AI%20Writing%20Companion%20for%20Chrome/jfkpmcnebiamnbbkpmmldomjijiahmbd/">
-    <img src="../docs/Store/Chrome-Store.png" alt="Chrome" height="50" />
-  </a>
-  <a target="_blank" href="https://addons.mozilla.org/en-GB/firefox/addon/ai-writing-companion/">
-    <img src="../docs/Store/Firefox-Store.png" alt="Firefox" height="50" />
-  </a>
-</p>
-
-*手動でのインストールについては、[インストールガイド](./guides/INSTALLATION.md)をご覧ください。*
-
-### 2. 設定
-ほとんどの AI プロバイダーには API キーが必要です。
-- [**API 設定ガイド**](./guides/API_GUIDE.md)に従って、Gemini や OpenAI などを設定してください。
-- *Google や Yandex などの無料プロバイダーは、設定なしですぐに使用できます。*
-
-### 3. ショートカットの活用
-[**ユーザーガイド**](./guides/USAGE.md)でショートカットを確認し、生産性を最大限に高めましょう。
 
 ---
 
