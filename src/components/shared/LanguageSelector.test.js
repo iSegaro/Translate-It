@@ -203,6 +203,16 @@ describe('LanguageSelector', () => {
       expect(wrapper.find('.ti-language-control-group--target').exists()).toBe(true)
     })
 
+    it('applies targetSelectId to the target select only when provided', () => {
+      const withId = mountSelector({ targetSelectId: 'live-dubbing-target-language-select' })
+      const withoutId = mountSelector()
+
+      expect(withId.find('.ti-language-control-group--target select').attributes('id'))
+        .toBe('live-dubbing-target-language-select')
+      expect(withoutId.find('.ti-language-control-group--target select').attributes('id'))
+        .toBeUndefined()
+    })
+
     it('emits update:targetLanguage when the target changes in target-only mode', async () => {
       const wrapper = mountSelector({ targetOnly: true })
 

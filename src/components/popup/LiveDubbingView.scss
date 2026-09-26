@@ -2,6 +2,10 @@
 @use "@/assets/styles/base/variables" as *;
 
 .live-dubbing-view {
+  --ti-action-icon: var(--tab-button-color, #5f6368);
+  --ti-action-icon-hover: var(--color-action-hover-accent, #ff9800);
+  --ti-action-hover-bg: rgb(0 0 0 / 8%);
+
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -11,6 +15,12 @@
   box-sizing: border-box;
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+@at-root .theme-dark .live-dubbing-view,
+.ti-dark-mode .live-dubbing-view {
+  --ti-action-icon: #fff;
+  --ti-action-hover-bg: #424242;
 }
 
 /* Shared card chrome: symmetric padding (RTL-safe), theme-aware tokens only. */
@@ -28,7 +38,10 @@
 .live-dubbing-config-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-areas:
+    "language-header provider-header"
+    "language-control provider-control";
+  gap: 4px 8px;
   align-items: stretch;
 }
 
@@ -41,12 +54,60 @@
 
 .live-dubbing-config-label {
   display: block;
-  margin-block-end: 4px;
+  margin: 0;
   color: var(--text-color);
   font-size: 12px;
   line-height: 1.25;
   opacity: 0.7;
 }
+
+.ti-live-dubbing-language-header {
+  display: flex;
+  align-items: center;
+  grid-area: language-header;
+  min-width: 0;
+}
+
+.ti-live-dubbing-provider-header {
+  grid-area: provider-header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ti-live-dubbing-provider-header .live-dubbing-config-label {
+  min-width: 0;
+  margin: 0;
+}
+
+.ti-live-dubbing-manage-keys {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--ti-action-icon);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.ti-live-dubbing-manage-keys:hover {
+  color: var(--ti-action-icon-hover);
+  background-color: var(--ti-action-hover-bg);
+}
+
+.ti-live-dubbing-manage-keys:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
 
 /* The selector ships its own bar styling (margin/padding/background);
    inside the card it must stretch edge-to-edge without a nested bar. */
@@ -129,6 +190,14 @@
   align-items: stretch !important;
 }
 
+.ti-live-dubbing-language-control {
+  grid-area: language-control;
+}
+
+.ti-live-dubbing-provider-control {
+  grid-area: provider-control;
+}
+
 .live-dubbing-config-field--language .ti-language-control-shell {
   flex: 1 1 auto !important;
 }
@@ -137,14 +206,24 @@
 @media (max-width: 420px) {
   .live-dubbing-config-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "language-header"
+      "language-control"
+      "provider-header"
+      "provider-control";
+    gap: 8px;
   }
 }
 
 /* ── Transcript preferences card ───────────────────────────────────────────── */
 
+.ti-live-dubbing-transcript-card {
+  padding: 0;
+}
+
 .live-dubbing-card-title {
   margin: 0;
-  color: var(--text-color);
+  color: inherit;
   font-size: 12px;
   line-height: 1.25;
   font-weight: 600;
@@ -153,19 +232,29 @@
 }
 
 .live-dubbing-transcript-preferences-header {
+  box-sizing: border-box;
   display: flex;
   inline-size: 100%;
   align-items: center;
   gap: 8px;
   min-width: 0;
   margin: 0;
-  padding: 0;
+  padding-block: 8px;
+  padding-inline: 10px;
   border: 0;
   background: transparent;
   color: var(--text-color);
   font: inherit;
   text-align: start;
   cursor: pointer;
+
+  &[aria-expanded="true"] {
+    padding-block-end: 6px;
+  }
+
+  &:hover {
+    color: var(--ti-action-icon-hover);
+  }
 }
 
 .live-dubbing-transcript-preferences-header:focus-visible {
@@ -197,7 +286,8 @@
 }
 
 .live-dubbing-transcript-preferences-content-inner {
-  padding-block-start: 6px;
+  padding-block: 0 8px;
+  padding-inline: 10px;
 }
 
 .live-dubbing-transcript-preferences-actions {
@@ -310,19 +400,15 @@
 
 /* ── Credential setup card ────────────────────────────────────────────────── */
 
-.live-dubbing-setup-explanation,
 .live-dubbing-setup-source {
   margin: 0;
+  margin-block-start: 4px;
   max-width: 100%;
   color: var(--text-color);
   font-size: 12px;
   line-height: 1.45;
   text-align: start;
   overflow-wrap: anywhere;
-}
-
-.live-dubbing-setup-source {
-  margin-block-start: 4px;
   opacity: 0.85;
 }
 
@@ -332,8 +418,7 @@
   text-decoration: underline;
 }
 
-/* Stacked flow, in DOM order: field → Save → feedback. Feedback is last, so
-   its height can only grow downward and never moves the controls above it. */
+/* Field first, followed by guidance/Save and then feedback in normal flow. */
 .live-dubbing-setup-row {
   display: block;
   margin-block-start: 8px;
@@ -345,41 +430,62 @@
   min-width: 0;
 }
 
+.live-dubbing-setup-input-control {
+  position: relative;
+  min-width: 0;
+}
+
 .live-dubbing-setup-input {
   width: 100%;
   min-width: 0;
 }
 
-.live-dubbing-setup-input .ti-input {
+.live-dubbing-setup-input.ti-textarea-wrapper {
   width: 100% !important;
-  min-height: 36px !important;
+}
+
+.live-dubbing-setup-input .ti-textarea {
   padding-inline: 10px 42px !important;
   direction: ltr !important;
 }
 
-/* BaseInput mounts/unmounts its inline help with v-if, so an error would
-   resize the input column and push Save down. The card keeps BaseInput's
-   error styling (border, label, focus) but routes feedback through its own
-   always-mounted row instead. Scoped to this card — BaseInput is untouched. */
-.live-dubbing-setup-input .ti-input__help {
-  display: none !important;
+.live-dubbing-setup-guidance {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-color);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.7;
 }
 
-/* Always-mounted feedback, placed after the action row. No height is reserved
-   when it is empty and nothing is capped when it is filled: it wraps naturally
-   to any number of lines and only grows downward, so the field and Save above
-   it stay put. */
+/* Feedback stays mounted, reserves two lines, and scrolls locally only when
+   unusually long so its content is never truncated. */
 .live-dubbing-setup-feedback {
+  box-sizing: border-box;
+  min-block-size: 2.8em;
+  max-block-size: 5.6em;
   margin-block: 4px 0;
   color: var(--color-error);
   font-size: var(--font-size-xs);
   line-height: 1.4;
   overflow-wrap: anywhere;
+  overflow-y: auto;
 }
 
-.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__label,
-.live-dubbing-view--rtl .live-dubbing-setup-feedback,
-.live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__help {
+.live-dubbing-setup-controls-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-block-start: 6px;
+}
+
+.live-dubbing-view--rtl .live-dubbing-setup-controls-row {
+  direction: rtl;
+}
+
+.live-dubbing-view--rtl .live-dubbing-setup-feedback {
   direction: rtl !important;
   text-align: start !important;
 }
@@ -387,7 +493,7 @@
 .live-dubbing-setup-toggle {
   position: absolute;
   inset-inline-end: 4px;
-  inset-block-start: 31px;
+  inset-block-start: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -421,18 +527,7 @@
   filter: invert(1);
 }
 
-.live-dubbing-setup-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-block-start: 8px;
-}
-
-.live-dubbing-view--rtl .live-dubbing-setup-actions {
-  direction: rtl;
-  justify-content: flex-end;
-}
-
-.live-dubbing-setup-actions > .ti-btn.live-dubbing-setup-save {
+.live-dubbing-setup-controls-row > .ti-btn.live-dubbing-setup-save {
   width: auto !important;
   height: 36px !important;
   min-height: 36px !important;

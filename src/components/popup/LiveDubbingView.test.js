@@ -52,13 +52,15 @@ const LanguageSelectorStub = {
   name: 'LanguageSelector',
   props: {
     targetLanguage: { type: String, default: 'en' },
+    targetSelectId: { type: String, default: '' },
+    targetTitle: { type: String, default: '' },
     provider: { type: String, default: '' },
     enableSelectElementIntegration: { type: Boolean, default: true },
     targetOnly: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false }
   },
   emits: ['update:targetLanguage'],
-  template: '<div class="language-selector-stub" />'
+  template: '<div class="language-selector-stub"><select :id="targetSelectId || undefined" :title="targetTitle" /></div>'
 }
 
 const setupLifecycle = { mounts: 0 }
@@ -172,6 +174,7 @@ describe('LiveDubbingView', () => {
       provider_gemini_title: 'Google Gemini',
       provider_openai_title: 'OpenAI GPT',
       provider_label: 'Provider',
+      live_dubbing_manage_api_keys: 'Manage API keys',
       target_language_label: 'Target Language',
       live_dubbing_provider_description: 'Used for new live dubbing sessions.',
        live_dubbing_config_label: 'Configuration',
@@ -235,8 +238,18 @@ describe('LiveDubbingView', () => {
       'Target Language',
       'Provider'
     ])
+    const targetLabel = wrapper.find('label[for="live-dubbing-target-language-select"]')
+    const targetSelector = wrapper.findComponent({ name: 'LanguageSelector' })
+    expect(targetLabel.exists()).toBe(true)
+    expect(targetLabel.element.tagName).toBe('LABEL')
+    expect(targetLabel.text()).toBe('Target Language')
+    expect(targetSelector.props('targetSelectId')).toBe('live-dubbing-target-language-select')
+    expect(targetSelector.props('targetTitle')).toBe('Target Language')
+    expect(targetLabel.attributes('for'))
+      .toBe(targetSelector.find('select').attributes('id'))
     expect(wrapper.find('label[for="live-dubbing-provider-select"]').classes())
       .toContain('live-dubbing-config-label')
+    expect(wrapper.find('label[for="live-dubbing-provider-select"]').element.tagName).toBe('LABEL')
   })
 
   it('renders the localized Change font action in the Subtitles card', () => {
@@ -263,6 +276,39 @@ describe('LiveDubbingView', () => {
     expect(transcriptContent(wrapper).attributes('inert')).toBe('')
     expect(wrapper.findAllComponents({ name: 'BaseToggle' })).toHaveLength(2)
     expect(wrapper.find('.live-dubbing-change-font-link').exists()).toBe(true)
+  })
+
+  it('keeps the full-width disclosure as one semantic button with no nested controls', () => {
+    const wrapper = mountView()
+    const header = transcriptHeader(wrapper)
+
+    expect(wrapper.findAll('button.live-dubbing-transcript-preferences-header')).toHaveLength(1)
+    expect(header.attributes('type')).toBe('button')
+    expect(header.element.tabIndex).toBe(0)
+    expect(header.find('.live-dubbing-card-title').exists()).toBe(true)
+    expect(header.find('.live-dubbing-transcript-preferences-chevron').exists()).toBe(true)
+    expect(header.findAll('button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .toHaveLength(0)
+
+    const source = readFileSync(resolve(here, 'LiveDubbingView.vue'), 'utf8')
+    const headerTemplate = source.match(/<button\s+type="button"\s+class="live-dubbing-transcript-preferences-header"[\s\S]*?<\/button>/)?.[0]
+    expect(headerTemplate).toBeTruthy()
+    expect(headerTemplate).not.toMatch(/@key(?:down|up|press)/)
+    expect(header.attributes('onkeydown')).toBeUndefined()
+  })
+
+  it('toggles once from title and chevron clicks, but not from content clicks', async () => {
+    const wrapper = mountView()
+    const header = transcriptHeader(wrapper)
+
+    await header.find('.live-dubbing-card-title').trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('true')
+
+    await header.find('.live-dubbing-transcript-preferences-chevron').trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('false')
+
+    await transcriptContent(wrapper).trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('false')
   })
 
   it.each([
@@ -463,6 +509,128 @@ describe('LiveDubbingView', () => {
     const options = providerSelect(wrapper).findAll('option')
     expect(options.map((option) => option.attributes('value'))).toEqual(['gemini', 'openai'])
     expect(options.map((option) => option.text())).toEqual(['Google Gemini', 'OpenAI GPT'])
+  })
+
+  it('places a keyboard-focusable Manage API keys icon button in the Provider header', () => {
+    const wrapper = mountView({ providerId: 'openai' })
+    const button = wrapper.find('button.ti-live-dubbing-manage-keys')
+    const providerLabel = wrapper.find('label[for="live-dubbing-provider-select"]')
+    const select = providerSelect(wrapper).element
+    const icon = button.find('.mask-icon')
+
+    expect(button.exists()).toBe(true)
+    expect(button.element.tagName).toBe('BUTTON')
+    expect(button.attributes('type')).toBe('button')
+    expect(button.element.tabIndex).toBe(0)
+    expect(button.attributes('aria-label')).toBe('Manage API keys')
+    expect(button.attributes('title')).toBe('Manage API keys')
+    expect(button.element.parentElement).toBe(providerLabel.element.parentElement)
+    expect(select.contains(button.element)).toBe(false)
+    expect(icon.exists()).toBe(true)
+    expect(icon.attributes('aria-hidden')).toBe('true')
+    expect(icon.element.style.maskImage).toMatch(/^url\("data:image\/svg\+xml/)
+    expect(icon.element.style.webkitMaskImage).toMatch(/^url\("data:image\/svg\+xml/)
+    const source = readFileSync(resolve(here, 'LiveDubbingView.vue'), 'utf8')
+    expect(source).toMatch(/import keyIcon from ['"]@\/icons\/ui\/key\.svg\?url['"];?/)
+    expect(source).toMatch(/<MaskIcon\s+:src="keyIcon"/)
+
+    expect(button.element.matches(':enabled')).toBe(true)
+  })
+
+  it.each([
+    ['openai', 'gemini', '/providers?highlight=OPENAI_API_KEY'],
+    ['gemini', 'openai', '/providers?highlight=GEMINI_API_KEY']
+  ])('opens settings for the selected %s provider, independent of global %s setting', async (providerId, globalProvider, path) => {
+    harness.store = makeStore({ LIVE_DUBBING_PROVIDER: providerId, TRANSLATION_API: globalProvider })
+    harness.openOptionsPageMock.mockResolvedValue({ success: true })
+    const wrapper = mountView({ providerId })
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+
+    await wrapper.find('button.ti-live-dubbing-manage-keys').trigger('click')
+    await settle()
+
+    expect(harness.openOptionsPageMock).toHaveBeenCalledOnce()
+    expect(harness.openOptionsPageMock).toHaveBeenCalledWith(path)
+    expect(closeSpy).toHaveBeenCalledOnce()
+    expect(providerSelect(wrapper).element.value).toBe(providerId)
+    expect(harness.store.settings.LIVE_DUBBING_PROVIDER).toBe(providerId)
+    expect(harness.store.settings.TRANSLATION_API).toBe(globalProvider)
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+    closeSpy.mockRestore()
+  })
+
+  it.each([
+    ['openai', '/providers?highlight=OPENAI_API_KEY'],
+    ['gemini', '/providers?highlight=GEMINI_API_KEY']
+  ])('uses the selected %s key route without closing when navigation does not report success', async (providerId, path) => {
+    const globalProvider = providerId === 'openai' ? 'gemini' : 'openai'
+    harness.store = makeStore({ LIVE_DUBBING_PROVIDER: providerId, TRANSLATION_API: globalProvider })
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+    const wrapper = mountView({ providerId })
+
+    for (const response of [undefined, { success: false }]) {
+      harness.openOptionsPageMock.mockResolvedValue(response)
+
+      await wrapper.find('button.ti-live-dubbing-manage-keys').trigger('click')
+      await settle()
+
+      expect(harness.openOptionsPageMock).toHaveBeenLastCalledWith(path)
+      expect(closeSpy).not.toHaveBeenCalled()
+      expect(providerSelect(wrapper).element.value).toBe(providerId)
+      expect(harness.store.settings.LIVE_DUBBING_PROVIDER).toBe(providerId)
+      expect(harness.store.settings.TRANSLATION_API).toBe(globalProvider)
+      expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+      harness.openOptionsPageMock.mockClear()
+    }
+
+    closeSpy.mockRestore()
+  })
+
+  it('keeps configuration headers and controls aligned across desktop, narrow, and RTL layouts', () => {
+    const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+    const headerRule = scss.match(/\.ti-live-dubbing-provider-header\s*\{[^}]*\}/m)?.[0]
+    expect(headerRule).toMatch(/display:\s*flex/)
+    expect(headerRule).toMatch(/justify-content:\s*space-between/)
+    expect(headerRule).toMatch(/gap\s*:/)
+    expect(headerRule).not.toMatch(/(?:block-size|height|min-height)\s*:/)
+    expect(headerRule).not.toMatch(/(?:^|\n)\s*(?:left|right)\s*:/)
+
+    const buttonRule = scss.match(/\.ti-live-dubbing-manage-keys\s*\{[^}]*\}/m)?.[0]
+    expect(buttonRule).toMatch(/inline-size\s*:/)
+    expect(buttonRule).toMatch(/block-size\s*:/)
+    expect(buttonRule).not.toMatch(/overflow\s*:/)
+    expect(buttonRule).toMatch(/color:\s*var\(--ti-action-icon\)/)
+    expect(buttonRule).toMatch(/transition:\s*background-color 140ms ease, color 140ms ease/)
+    expect(buttonRule).not.toMatch(/(?:^|\n)\s*(?:transform|box-shadow)\s*:/)
+    const hoverRule = scss.match(/\.ti-live-dubbing-manage-keys:hover\s*\{[^}]*\}/m)?.[0]
+    expect(hoverRule).toMatch(/color:\s*var\(--ti-action-icon-hover\)/)
+    expect(hoverRule).toMatch(/background-color:\s*var\(--ti-action-hover-bg\)/)
+    const viewRule = scss.match(/\.live-dubbing-view\s*\{[^}]*\}/m)?.[0]
+    expect(viewRule).toMatch(/--ti-action-icon:\s*var\(--tab-button-color/)
+    expect(viewRule).toMatch(/--ti-action-icon-hover:\s*var\(--color-action-hover-accent/)
+    expect(viewRule).toMatch(/--ti-action-hover-bg:/)
+    expect(scss).toMatch(/\.theme-dark \.live-dubbing-view[\s\S]*?--ti-action-hover-bg:\s*#424242/)
+
+    const configGridRule = scss.match(/\.live-dubbing-config-grid\s*\{[^}]*\}/m)?.[0]
+    expect(configGridRule).toMatch(/grid-template-areas:\s*["']language-header\s+provider-header["']\s+["']language-control\s+provider-control["']/)
+    const narrowGrid = scss.match(/@media\s*\(max-width:\s*420px\)\s*\{[\s\S]*?\.live-dubbing-config-grid\s*\{[^}]*\}/m)?.[0]
+    expect(narrowGrid).toMatch(/grid-template-areas:\s*["']language-header["']\s+["']language-control["']\s+["']provider-header["']\s+["']provider-control["']/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select[\s\S]*?width:\s*100%\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select[\s\S]*?height:\s*36px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select[\s\S]*?height:\s*36px\s*!important/)
+
+    const wrapper = mountView()
+    const configGrid = wrapper.find('.live-dubbing-config-grid').element
+    const orderedElements = [
+      configGrid.querySelector('.ti-live-dubbing-language-header'),
+      configGrid.querySelector('.ti-live-dubbing-provider-header'),
+      configGrid.querySelector('.live-dubbing-config-field--language .language-selector-stub'),
+      configGrid.querySelector('#live-dubbing-provider-select')
+    ]
+    expect(orderedElements.every(Boolean)).toBe(true)
+    expect(orderedElements.slice(0, -1).every((element, index) => (
+      element.compareDocumentPosition(orderedElements[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING
+    ))).toBe(true)
   })
 
   it('persists provider changes under LIVE_DUBBING_PROVIDER without touching TRANSLATION_API', async () => {
@@ -1031,10 +1199,46 @@ describe('LiveDubbingView', () => {
     // Control alignment is owned by this card, not shared control styles.
     expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
-    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-header[\s\S]*?inline-size:\s*100%/)
+    const sharedCardRule = scss.match(/\.live-dubbing-card\s*\{[^}]*\}/m)?.[0]
+    const transcriptCardRule = scss.match(/\.ti-live-dubbing-transcript-card\s*\{[^}]*\}/m)?.[0]
+    expect(sharedCardRule).toMatch(/padding:\s*8px 10px/)
+    expect(transcriptCardRule).toMatch(/padding:\s*0/)
+    const viewSource = readFileSync(resolve(here, 'LiveDubbingView.vue'), 'utf8')
+    expect(viewSource).toMatch(/class="(?=[^"]*\blive-dubbing-transcript-preferences\b)(?=[^"]*\bti-live-dubbing-transcript-card\b)[^"]*"/)
+    const headerRule = scss.match(
+      /\.live-dubbing-transcript-preferences-header\s*\{[\s\S]*?^\}/m
+    )?.[0]
+    const expandedHeaderRule = headerRule?.match(/&\[aria-expanded="true"\]\s*\{[^}]*\}/)?.[0]
+    const headerHoverRule = headerRule?.match(/&:hover\s*\{[\s\S]*?\n[ \t]*\}/)?.[0]
+    const headerFocusRule = scss.match(
+      /\.live-dubbing-transcript-preferences-header:focus-visible\s*\{[^}]*\}/m
+    )?.[0]
+    const titleRule = scss.match(/\.live-dubbing-card-title\s*\{[^}]*\}/m)?.[0]
+    expect(headerRule).toMatch(/inline-size:\s*100%/)
+    expect(headerRule).toMatch(/box-sizing:\s*border-box/)
+    expect(headerRule).toMatch(/cursor:\s*pointer/)
+    expect(headerRule).toMatch(/padding-block:\s*8px/)
+    expect(headerRule).toMatch(/padding-inline:\s*10px/)
+    expect(expandedHeaderRule).toMatch(/padding-block-end:\s*6px/)
+    expect(headerRule).not.toMatch(/transition\s*:/)
+    expect(headerRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
+    expect(headerHoverRule).toBeTruthy()
+    expect(headerHoverRule).not.toMatch(/^\s*background(?:-color)?\s*:/m)
+    expect(headerHoverRule).toMatch(/color:\s*var\(--ti-action-icon-hover\)/)
+    expect(headerHoverRule).not.toMatch(/(?:transform|box-shadow|border(?:-[\w-]+)?|transition|animation)\s*:/)
+    expect(titleRule).toMatch(/color:\s*inherit/)
+    expect(headerFocusRule).toBeTruthy()
+    expect(headerFocusRule).toMatch(/outline:\s*2px\s+solid\s+var\(--color-primary\)/)
+    expect(headerFocusRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
+    expect(scss.match(/\.live-dubbing-transcript-preferences-header(?::hover)?\s*\{/g))
+      .toEqual(['.live-dubbing-transcript-preferences-header {'])
+    expect(scss.match(/\.live-dubbing-transcript-preferences-header:focus-visible\s*\{/g))
+      .toEqual(['.live-dubbing-transcript-preferences-header:focus-visible {'])
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-inline-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-block-end:/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron\s*\{[^}]*border-(?:inline-end|block-end):\s*[^;]*currentColor/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*transform\s+190ms\s+cubic-bezier\(0\.2,\s*0,\s*0,\s*1\)/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron\s*\{[^}]*margin-inline-start:\s*auto/)
     expect(scss).toMatch(/aria-expanded="true"[\s\S]*?transform:\s*rotate\(225deg\)/)
     expect(scss).not.toMatch(/grid-template-rows/)
     const contentRule = scss.match(
@@ -1045,7 +1249,8 @@ describe('LiveDubbingView', () => {
     const contentInnerRule = scss.match(
       /\.live-dubbing-transcript-preferences-content-inner\s*\{[\s\S]*?\n\}/m
     )?.[0]
-    expect(contentInnerRule).toMatch(/padding-block-start:\s*6px/)
+    expect(contentInnerRule).toMatch(/padding-block:\s*0 8px/)
+    expect(contentInnerRule).toMatch(/padding-inline:\s*10px/)
     expect(contentRule).not.toMatch(/opacity|transition/)
     expect(scss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*none/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+120px\s*!important/)
@@ -1063,11 +1268,11 @@ describe('LiveDubbingView', () => {
       /\.live-dubbing-setup-input-field\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(setupInputField).toMatch(/direction:\s*ltr/)
-    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-input[\s\S]*?padding-inline:\s*10px 42px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-textarea\s*\{[\s\S]*?padding-inline:\s*10px 42px\s*!important/)
     expect(scss).toMatch(/:root\.theme-dark \.live-dubbing-setup-toggle img[\s\S]*?filter:\s*invert\(1\)/)
 
     const saveButton = scss.match(
-      /\.live-dubbing-setup-actions > \.ti-btn\.live-dubbing-setup-save\s*\{[\s\S]*?\n\}/m
+      /\.live-dubbing-setup-controls-row > \.ti-btn\.live-dubbing-setup-save\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(saveButton).toBeTruthy()
     const saveButtonSelector = saveButton.split('{')[0]
@@ -1093,17 +1298,17 @@ describe('LiveDubbingView', () => {
     expect(disabledLanguage).toMatch(/cursor:\s*not-allowed\s*!important/)
     expect(scss).not.toMatch(/^\.ti-language-select:disabled\s*\{/m)
 
-    const rtlInputText = scss.match(
-      /\.live-dubbing-view--rtl \.live-dubbing-setup-input \.ti-input__label,[\s\S]*?\.ti-input__help\s*\{[\s\S]*?\n\}/m
+    const rtlSetupFeedback = scss.match(
+      /\.live-dubbing-view--rtl \.live-dubbing-setup-feedback\s*\{[\s\S]*?\n\}/m
     )?.[0]
-    expect(rtlInputText).toMatch(/direction:\s*rtl\s*!important/)
-    expect(rtlInputText).toMatch(/text-align:\s*start\s*!important/)
+    expect(rtlSetupFeedback).toMatch(/direction:\s*rtl\s*!important/)
+    expect(rtlSetupFeedback).toMatch(/text-align:\s*start\s*!important/)
 
     const rtlActions = scss.match(
-      /\.live-dubbing-view--rtl \.live-dubbing-setup-actions\s*\{[\s\S]*?\n\}/m
+      /\.live-dubbing-view--rtl \.live-dubbing-setup-controls-row\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(rtlActions).toMatch(/direction:\s*rtl/)
-    expect(rtlActions).toMatch(/justify-content:\s*flex-end/)
+    expect(scss).toMatch(/\.live-dubbing-setup-controls-row\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\) auto/)
 
     const languageWrapper = scss.match(
       /\.live-dubbing-config-card \.live-dubbing-config-field--language > \.ti-language-controls\s*\{[\s\S]*?\n\}/m

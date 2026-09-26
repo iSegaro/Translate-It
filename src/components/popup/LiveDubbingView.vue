@@ -9,23 +9,44 @@
       :aria-label="t('live_dubbing_config_label', 'Configuration')"
     >
       <div class="live-dubbing-config-grid">
-        <div class="live-dubbing-config-field live-dubbing-config-field--language">
-          <span class="live-dubbing-config-label">{{ t('target_language_label', 'Target Language') }}</span>
-          <LanguageSelector
-            v-model:target-language="targetLanguageModel"
-            :provider="providerModel"
-            :enable-select-element-integration="false"
-            :target-only="true"
-            :disabled="isControlBusy || targetLanguagePending || isSetupSaving"
-          />
-        </div>
-        <div class="live-dubbing-config-field live-dubbing-config-field--provider">
+        <label
+          class="ti-live-dubbing-language-header live-dubbing-config-label"
+          for="live-dubbing-target-language-select"
+        >
+          {{ t('target_language_label', 'Target Language') }}
+        </label>
+        <div class="ti-live-dubbing-provider-header">
           <label
             class="live-dubbing-config-label"
             for="live-dubbing-provider-select"
           >
             {{ t('provider_label', 'Provider') }}
           </label>
+          <button
+            type="button"
+            class="ti-live-dubbing-manage-keys"
+            :aria-label="t('live_dubbing_manage_api_keys', 'Manage API keys')"
+            :title="t('live_dubbing_manage_api_keys', 'Manage API keys')"
+            @click="handleManageApiKeys"
+          >
+            <MaskIcon
+              :src="keyIcon"
+              :size="15"
+            />
+          </button>
+        </div>
+        <div class="live-dubbing-config-field live-dubbing-config-field--language ti-live-dubbing-language-control">
+          <LanguageSelector
+            v-model:target-language="targetLanguageModel"
+            :provider="providerModel"
+            target-select-id="live-dubbing-target-language-select"
+            :target-title="t('target_language_label', 'Target Language')"
+            :enable-select-element-integration="false"
+            :target-only="true"
+            :disabled="isControlBusy || targetLanguagePending || isSetupSaving"
+          />
+        </div>
+        <div class="live-dubbing-config-field live-dubbing-config-field--provider ti-live-dubbing-provider-control">
           <BaseSelect
             id="live-dubbing-provider-select"
             v-model="providerModel"
@@ -42,7 +63,7 @@
          visible during an active session even if credentials disappear. -->
     <section
       v-show="showSessionControl"
-      class="live-dubbing-card live-dubbing-transcript-preferences"
+      class="live-dubbing-card live-dubbing-transcript-preferences ti-live-dubbing-transcript-card"
       :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitles')"
     >
       <button
@@ -172,6 +193,8 @@ import LiveDubbingControl from '@/components/popup/LiveDubbingControl.vue'
 import LiveDubbingProviderSetup from '@/components/popup/LiveDubbingProviderSetup.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
 import BaseToggle from '@/components/base/BaseToggle.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
+import keyIcon from '@/icons/ui/key.svg?url'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import {
@@ -355,6 +378,16 @@ const handleChangeFont = async () => {
     logger.warn('Unable to open Appearance settings for Live Dubbing font selection.')
   } catch (error) {
     logger.error('Failed to open Appearance settings for Live Dubbing font selection:', error)
+  }
+}
+
+const handleManageApiKeys = async () => {
+  try {
+    const apiKey = providerModel.value === LIVE_DUBBING_OPENAI_PROVIDER_ID ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'
+    const response = await openOptionsPage(`/providers?highlight=${apiKey}`)
+    if (response?.success) window.close()
+  } catch (error) {
+    logger.error('Failed to open provider settings for Live Dubbing API keys:', error)
   }
 }
 

@@ -4,12 +4,6 @@
     :aria-label="`${providerName} — ${t('custom_api_settings_api_key_label', 'API Key')}`"
   >
     <p
-      class="live-dubbing-setup-explanation"
-      dir="auto"
-    >
-      {{ explanation }}
-    </p>
-    <p
       class="live-dubbing-setup-source"
       dir="auto"
     >
@@ -22,40 +16,53 @@
       >{{ linkText }}</a>
     </p>
 
-    <!-- Stacked in DOM order: field, then Save below it, then the
-         always-mounted feedback — the last child, so its height can only
-         grow downward and never moves the controls above it. -->
+    <!-- Field, guidance/Save row, then always-mounted feedback in normal flow. -->
     <div class="live-dubbing-setup-row">
       <div class="live-dubbing-setup-input-field">
-        <BaseInput
-          v-model="draft"
-          class="live-dubbing-setup-input"
-          :type="revealed ? 'text' : 'password'"
-          dir="ltr"
-          :label="t('custom_api_settings_api_key_label', 'API Key')"
-          :placeholder="t(placeholderKey, 'Paste your API key here')"
-          :error="errorMessage"
-          :disabled="saving"
-        />
-        <button
-          type="button"
-          class="live-dubbing-setup-toggle"
-          :title="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
-          :aria-label="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
-          :aria-pressed="revealed"
-          :disabled="saving"
-          @click="revealed = !revealed"
-        >
-          <img
-            :src="revealed ? eyeHideIcon : eyeIcon"
-            alt=""
-            aria-hidden="true"
-            width="16"
-            height="16"
+        <div class="live-dubbing-setup-input-control">
+          <BaseTextarea
+            id="live-dubbing-key-input"
+            ref="keyInput"
+            v-model="draft"
+            class="live-dubbing-setup-input"
+            password-mask
+            hide-toggle
+            :rows="3"
+            resize="none"
+            dir="ltr"
+            :aria-label="t('custom_api_settings_api_key_label', 'API Key')"
+            :aria-describedby="errorMessage ? 'live-dubbing-key-guidance live-dubbing-key-error' : 'live-dubbing-key-guidance'"
+            :aria-invalid="Boolean(errorMessage)"
+            :placeholder="t(placeholderKey, 'Paste your API key here')"
+            :disabled="saving"
+          />
+          <button
+            type="button"
+            class="live-dubbing-setup-toggle"
+            :title="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
+            :aria-label="revealed ? t('api_key_hide', 'Hide') : t('api_key_show', 'Show')"
+            :aria-pressed="revealed"
+            :disabled="saving"
+            @click="toggleReveal"
           >
-        </button>
+            <img
+              :src="revealed ? eyeHideIcon : eyeIcon"
+              alt=""
+              aria-hidden="true"
+              width="16"
+              height="16"
+            >
+          </button>
+        </div>
       </div>
-      <div class="live-dubbing-setup-actions">
+      <div class="live-dubbing-setup-controls-row">
+        <p
+          id="live-dubbing-key-guidance"
+          class="live-dubbing-setup-guidance"
+          dir="auto"
+        >
+          {{ t('live_dubbing_setup_key_guidance', 'One API key per line') }}
+        </p>
         <BaseButton
           class="live-dubbing-setup-save"
           size="sm"
@@ -66,15 +73,13 @@
           @click="save"
         />
       </div>
-      <!-- Normal-flow block after the action row: it is the only element whose
-           height can grow, and it grows downward. BaseInput's error border,
-           label and focus styling still come from the error prop above. -->
+      <!-- Feedback follows the guidance/Save row in normal flow. -->
       <p
         class="live-dubbing-setup-feedback"
         dir="auto"
         role="alert"
       >
-        {{ errorMessage }}
+        <span id="live-dubbing-key-error">{{ errorMessage }}</span>
       </p>
     </div>
   </section>
@@ -82,7 +87,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import BaseInput from '@/components/base/BaseInput.vue'
+import BaseTextarea from '@/components/base/BaseTextarea.vue'
 import BaseButton from '@/components/base/BaseButton.vue'
 import eyeIcon from '@/icons/ui/eye-open.svg?url'
 import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
@@ -124,11 +129,6 @@ const providerName = computed(() => (isOpenAI.value
   : t('provider_gemini_title', 'Google Gemini')))
 
 /** Localized explanation that names the selected provider. */
-const explanation = computed(() => t(
-  'provider_config_required_api',
-  { provider: providerName.value }
-) || `This service (${providerName.value}) requires an API Key.`)
-
 const infoText = computed(() => (isOpenAI.value
   ? t('openai_api_key_info', 'You can get your OpenAI API key from OpenAI Platform.')
   : t('gemini_api_key_info', 'You can get your Gemini API key from Google AI Studio.')))
@@ -147,6 +147,13 @@ const draft = ref('')
 const revealed = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+const keyInput = ref(null)
+
+const toggleReveal = () => {
+  if (saving.value) return
+  keyInput.value?.toggleVisibility()
+  revealed.value = !revealed.value
+}
 
 const validationErrorKey = (reason) => {
   if (reason === 'AUTH_INVALID' || reason === 'FORBIDDEN') return 'live_dubbing_validation_auth_error'
@@ -160,62 +167,77 @@ const validationErrorKey = (reason) => {
 }
 
 /**
- * Validate and persist the trimmed key under the provider's own storage key.
+ * Validate and persist the trimmed key list under the provider's own storage key.
  * updateSettingAndPersist() mutates reactive local state BEFORE storage
  * persistence resolves, so the parent is told a save is pending first (it
  * keeps this card mounted) and the previous value is snapshotted for a
- * transactional restore on failure. The draft stays in the masked input on
- * failure; raw errors are never rendered or logged — only a fixed localized
- * message is shown, so the secret cannot leak through feedback.
+  * local restore on a reported write failure. The draft stays in the field on
+  * failure; raw errors are never rendered or logged — only a fixed localized
+  * message is shown, so the secret cannot leak through feedback.
  */
 const save = async () => {
   if (saving.value) return
   errorMessage.value = ''
-  if (!draft.value.trim()) {
+  const keys = [...new Set(draft.value.split('\n').map((key) => key.trim()).filter(Boolean))]
+  if (!keys.length) {
     errorMessage.value = t('validation_api_key_empty', { provider: providerName.value })
       || `API key for ${providerName.value} cannot be empty.`
+    return
+  }
+  if (keys.length > 10) {
+    errorMessage.value = t('live_dubbing_setup_too_many_keys', 'Enter no more than 10 unique API keys.')
     return
   }
   const snapshot = Object.freeze({
     providerId: props.providerId,
     targetLanguage: props.targetLanguage,
-    apiKey: draft.value.trim(),
+    keys: Object.freeze(keys),
     storageKey: storageKey.value,
     previous: settingsStore.settings?.[storageKey.value] ?? ''
   })
   saving.value = true
   emit('save-pending', true)
   try {
-    let response
-    try {
-      response = await sendMessage({
-        action: LIVE_DUBBING_ACTIONS.VALIDATE_CREDENTIAL,
-        data: {
-          providerId: snapshot.providerId,
-          apiKey: snapshot.apiKey,
-          targetLanguage: snapshot.targetLanguage
+    let nextIndex = 0
+    let failure = null
+    const validateNext = async () => {
+      while (!failure && nextIndex < snapshot.keys.length) {
+        const index = nextIndex++
+        try {
+          const response = await sendMessage({
+            action: LIVE_DUBBING_ACTIONS.VALIDATE_CREDENTIAL,
+            data: { providerId: snapshot.providerId, apiKey: snapshot.keys[index], targetLanguage: snapshot.targetLanguage }
+          })
+          if (!(response?.ok === true && response?.valid === true && response?.reason === 'VALID')) {
+            failure = !failure || index < failure.index
+              ? { index, reason: response?.reason }
+              : failure
+          }
+        } catch {
+          failure = !failure || index < failure.index
+            ? { index, reason: 'REQUEST_FAILED' }
+            : failure
         }
-      })
-    } catch {
-      response = { ok: false, reason: 'REQUEST_FAILED' }
+      }
     }
-
-    if (!(response?.ok === true && response?.valid === true && response?.reason === 'VALID')) {
-      errorMessage.value = t(
-        validationErrorKey(response?.reason),
-        'Unable to validate this key with the selected provider and language. Check your configuration and try again.'
-      )
+    await Promise.all([validateNext(), validateNext()])
+    if (failure) {
+      const reason = t(validationErrorKey(failure.reason), 'This key could not be validated. Check it and try again.')
+      errorMessage.value = t('live_dubbing_setup_key_failed', { position: failure.index + 1, reason })
       return
     }
 
-    await settingsStore.updateSettingAndPersist(snapshot.storageKey, snapshot.apiKey)
+    await settingsStore.updateSettingAndPersist(snapshot.storageKey, snapshot.keys.join('\n'))
     // Success: the parent hides this card and freshens the session control.
     draft.value = ''
-    revealed.value = false
+    if (revealed.value) {
+      keyInput.value?.toggleVisibility()
+      revealed.value = false
+    }
     emit('saved')
   } catch {
-    // Restore the pre-save store value so storage stays the source of truth
-    // and the card (which never unmounted) keeps showing the draft + error.
+    // Restore the pre-save reactive value after a reported write failure;
+    // this does not guarantee rollback of an already-completed storage write.
     settingsStore.updateSettingLocally(snapshot.storageKey, snapshot.previous)
     errorMessage.value = t('live_dubbing_setup_save_error', "Your API key couldn't be saved. Please try again.")
   } finally {

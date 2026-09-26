@@ -7,7 +7,9 @@
       v-if="passwordMask && !hideToggle"
       type="button"
       class="ti-textarea__toggle-visibility"
-      :tabindex="-1"
+      :aria-label="visibilityVisible ? hideLabel : showLabel"
+      :aria-pressed="visibilityVisible"
+      :disabled="disabled || loading"
       :title="toggleTitle || (visibilityVisible ? hideLabel : showLabel)"
       @click="toggleVisibility"
     >
@@ -30,6 +32,7 @@
     </button>
 
     <textarea
+      :id="id"
       ref="textareaRef"
       :value="displayValue"
       :placeholder="placeholder"
@@ -38,7 +41,11 @@
       :readonly="readonly"
       :class="textareaClasses"
       :dir="dir"
+      :aria-label="ariaLabel"
+      :aria-describedby="ariaDescribedby"
+      :aria-invalid="ariaInvalid"
       @beforeinput="handleBeforeInput"
+      @paste="handlePaste"
       @input="handleInput"
       @focus="handleFocus"
       @blur="handleBlur"
@@ -113,7 +120,11 @@ const props = defineProps({
     type: String,
     default: null,
     validator: (value) => ['ltr', 'rtl', 'auto'].includes(value)
-  }
+  },
+  id: { type: String, default: null },
+  ariaLabel: { type: String, default: null },
+  ariaDescribedby: { type: String, default: null },
+  ariaInvalid: { type: [Boolean, String], default: null }
 })
 
 const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'input'])
@@ -132,7 +143,7 @@ const displayValue = computed(() => {
 
   // When masked, use bullet replacement as fallback
   // CSS will also apply -webkit-text-security for double-protection
-  return props.modelValue ? '•'.repeat(Math.min(props.modelValue.length, 1000)) : ''
+  return props.modelValue ? props.modelValue.replace(/[^\n]/g, '•') : ''
 })
 
 const toggleVisibility = () => {
@@ -159,6 +170,10 @@ const handleBeforeInput = (event) => {
   if (!props.passwordMask || visibilityVisible.value) {
     return // Let default behavior happen when unmasked
   }
+
+  // Paste is handled by the paste event, whose clipboard data is reliable in
+  // browsers that omit it from beforeinput (including Firefox).
+  if (event.inputType === 'insertFromPaste') return
 
   // Prevent default to avoid corruption when typing into bullets
   event.preventDefault()
@@ -200,11 +215,6 @@ const handleBeforeInput = (event) => {
       newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd)
       newCursorPos = cursorStart
     }
-  } else if (inputType === 'insertFromPaste') {
-    // Paste
-    const pastedText = event.data || ''
-    newValue = currentValue.slice(0, cursorStart) + pastedText + currentValue.slice(cursorEnd)
-    newCursorPos = cursorStart + pastedText.length
   } else {
     // For other input types, let it through
     return
@@ -220,6 +230,22 @@ const handleBeforeInput = (event) => {
       textareaRef.value.setSelectionRange(newCursorPos, newCursorPos)
     }
   })
+}
+
+const handlePaste = (event) => {
+  if (!props.passwordMask || visibilityVisible.value) return
+  const pastedText = event.clipboardData?.getData('text/plain')
+  event.preventDefault()
+  if (pastedText == null) return
+  const target = event.target
+  const currentValue = props.modelValue || ''
+  const cursorStart = target.selectionStart
+  const cursorEnd = target.selectionEnd
+  const newValue = currentValue.slice(0, cursorStart) + pastedText + currentValue.slice(cursorEnd)
+  emit('update:modelValue', newValue)
+  emit('input', event)
+  const newCursorPos = cursorStart + pastedText.length
+  nextTick(() => textareaRef.value?.setSelectionRange(newCursorPos, newCursorPos))
 }
 
 // Handle input event for cases where beforeinput didn't handle
