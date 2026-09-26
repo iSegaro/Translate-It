@@ -22,6 +22,9 @@
       >{{ linkText }}</a>
     </p>
 
+    <!-- Stacked in DOM order: field, then Save below it, then the
+         always-mounted feedback — the last child, so its height can only
+         grow downward and never moves the controls above it. -->
     <div class="live-dubbing-setup-row">
       <div class="live-dubbing-setup-input-field">
         <BaseInput
@@ -63,6 +66,16 @@
           @click="save"
         />
       </div>
+      <!-- Normal-flow block after the action row: it is the only element whose
+           height can grow, and it grows downward. BaseInput's error border,
+           label and focus styling still come from the error prop above. -->
+      <p
+        class="live-dubbing-setup-feedback"
+        dir="auto"
+        role="alert"
+      >
+        {{ errorMessage }}
+      </p>
     </div>
   </section>
 </template>

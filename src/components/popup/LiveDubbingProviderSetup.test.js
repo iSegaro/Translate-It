@@ -1,7 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import LiveDubbingProviderSetup from './LiveDubbingProviderSetup.vue'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 const harness = vi.hoisted(() => ({
   store: null,
@@ -318,5 +323,130 @@ describe('LiveDubbingProviderSetup', () => {
 
     resolvePersistence(true)
     await nextTick()
+  })
+
+  it('stacks field, Save and feedback in that DOM order', () => {
+    const wrapper = mountSetup()
+    const row = wrapper.find('.live-dubbing-setup-row')
+    const field = wrapper.find('.live-dubbing-setup-input-field')
+    const actions = wrapper.find('.live-dubbing-setup-actions')
+    const slot = wrapper.find('.live-dubbing-setup-feedback')
+
+    expect(slot.exists()).toBe(true)
+    expect(slot.text()).toBe('')
+    expect(slot.attributes('role')).toBe('alert')
+    expect(slot.attributes('dir')).toBe('auto')
+    expect(slot.attributes('style') ?? '').toBe('')
+
+    // Required order: field → Save below it → feedback last, so feedback can
+    // only grow downward and never sits between the field and Save.
+    expect(Array.from(row.element.children))
+      .toEqual([field.element, actions.element, slot.element])
+    expect(field.element.contains(slot.element)).toBe(false)
+    expect(actions.element.previousElementSibling).toBe(field.element)
+    // Empty feedback reserves no height; BaseInput has no help box yet.
+    expect(wrapper.find('.ti-input__help').exists()).toBe(false)
+  })
+
+  it('renders a validation error after Save without touching Save', async () => {
+    harness.sendMessage.mockResolvedValue({ ok: true, valid: false, reason: 'AUTH_INVALID' })
+    const wrapper = mountSetup()
+    const row = wrapper.find('.live-dubbing-setup-row')
+    const field = wrapper.find('.live-dubbing-setup-input-field')
+    const actions = wrapper.find('.live-dubbing-setup-actions')
+    const saveBefore = wrapper.find('.live-dubbing-setup-save').element
+
+    await typeKey(wrapper, 'sk-slot-secret')
+    await clickButton(wrapper, 'Save')
+    await nextTick()
+
+    const slot = wrapper.find('.live-dubbing-setup-feedback')
+    expect(slot.text()).toContain('This key was rejected')
+    // Structure is identical to the pre-error render: same order, same Save
+    // node — only the feedback text content changed.
+    expect(Array.from(row.element.children))
+      .toEqual([field.element, actions.element, slot.element])
+    expect(field.element.contains(slot.element)).toBe(false)
+    expect(actions.element.previousElementSibling).toBe(field.element)
+    expect(wrapper.find('.live-dubbing-setup-save').element).toBe(saveBefore)
+    // The secret stays out of the visible feedback (BaseInput's suppressed copy
+    // carries the same fixed message, never the draft).
+    expect(slot.text()).not.toContain('sk-slot-secret')
+    expect(wrapper.text()).not.toContain('sk-slot-secret')
+  })
+
+  it('keeps the same feedback row mounted when the error clears', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    const wrapper = mountSetup()
+    const row = wrapper.find('.live-dubbing-setup-row')
+    const slotBefore = wrapper.find('.live-dubbing-setup-feedback').element
+
+    // Local empty-key validation fills the slot.
+    await clickButton(wrapper, 'Save')
+    expect(wrapper.find('.live-dubbing-setup-feedback').text())
+      .toContain('API key for Google Gemini cannot be empty.')
+    // BaseInput mirrors the same fixed message in its conditional help box;
+    // that copy is kept out of layout by the scoped rule asserted below.
+    expect(wrapper.find('.ti-input__help').text())
+      .toContain('API key for Google Gemini cannot be empty.')
+
+    // A retry clears the error at submit start: the slot empties in place and
+    // BaseInput's transient help disappears again without any layout change.
+    await typeKey(wrapper, 'sk-clears-error')
+    await clickButton(wrapper, 'Save')
+    await nextTick()
+
+    expect(wrapper.find('.live-dubbing-setup-feedback').element).toBe(slotBefore)
+    expect(wrapper.find('.live-dubbing-setup-feedback').text()).toBe('')
+    expect(wrapper.find('.ti-input__help').exists()).toBe(false)
+    expect(row.element.lastElementChild).toBe(slotBefore)
+    expect(wrapper.find('.live-dubbing-setup-actions').element
+      .previousElementSibling).toBe(wrapper.find('.live-dubbing-setup-input-field').element)
+
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
+  })
+
+  it('stacks Save under the field and lets feedback grow freely below it', () => {
+    const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+
+    // Stacked block flow — no two-column grid, no row positioning.
+    const rowRule = scss.match(/\.live-dubbing-setup-row\s*\{[^}]*\}/m)?.[0]
+    expect(rowRule).toBeTruthy()
+    expect(rowRule).toMatch(/display:\s*block/)
+    expect(rowRule).not.toMatch(/display:\s*grid/)
+    expect(rowRule).not.toMatch(/grid-template-columns/)
+    expect(rowRule).not.toMatch(/position:/)
+
+    // Save sits below the field, right-aligned (mirrored for RTL by the
+    // scoped RTL rule) and never absolutely positioned or height-capped.
+    const actionsRule = scss.match(/\.live-dubbing-setup-actions\s*\{[^}]*\}/m)?.[0]
+    expect(actionsRule).toBeTruthy()
+    expect(actionsRule).toMatch(/justify-content:\s*flex-end/)
+    expect(actionsRule).not.toMatch(/position:\s*(?:absolute|fixed)/)
+    expect(actionsRule).not.toMatch(/(?<![-\w])(?:min-|max-)?(?:block-size|height)\s*:/)
+
+    // Feedback is normal-flow after the action row: natural, unbounded wrapping
+    // for EN/FA/JA messages, growing only downward.
+    const slotRule = scss.match(/\.live-dubbing-setup-feedback\s*\{[^}]*\}/m)?.[0]
+    expect(slotRule).toBeTruthy()
+    expect(slotRule).toMatch(/overflow-wrap:\s*anywhere/)
+    expect(slotRule).toMatch(/line-height:\s*1\.4/)
+    // No fixed or max height, no clipping, no scrolling, no truncation, no
+    // absolute/side-specific positioning — and no reservation when empty.
+    expect(slotRule).not.toMatch(/(?<![-\w])(?:min-|max-)?(?:block-size|height)\s*:/)
+    expect(slotRule).not.toMatch(/overflow:\s*(?:hidden|auto|scroll)/)
+    expect(slotRule).not.toMatch(/text-overflow/)
+    expect(slotRule).not.toMatch(/white-space:\s*nowrap/)
+    expect(slotRule).not.toMatch(/position:\s*(?:absolute|fixed)/)
+    expect(slotRule).not.toMatch(/\b(?:left|right)\s*:/)
+    expect(scss).not.toMatch(/\.live-dubbing-setup-feedback[^{]*\{[^}]*min-block-size/)
+
+    // BaseInput's conditional help stays suppressed so it cannot resize the
+    // field above Save; its error prop still drives border/label/focus.
+    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-input__help\s*\{[^}]*display:\s*none/)
   })
 })

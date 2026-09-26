@@ -332,6 +332,8 @@
   text-decoration: underline;
 }
 
+/* Stacked flow, in DOM order: field → Save → feedback. Feedback is last, so
+   its height can only grow downward and never moves the controls above it. */
 .live-dubbing-setup-row {
   display: block;
   margin-block-start: 8px;
@@ -355,7 +357,28 @@
   direction: ltr !important;
 }
 
+/* BaseInput mounts/unmounts its inline help with v-if, so an error would
+   resize the input column and push Save down. The card keeps BaseInput's
+   error styling (border, label, focus) but routes feedback through its own
+   always-mounted row instead. Scoped to this card — BaseInput is untouched. */
+.live-dubbing-setup-input .ti-input__help {
+  display: none !important;
+}
+
+/* Always-mounted feedback, placed after the action row. No height is reserved
+   when it is empty and nothing is capped when it is filled: it wraps naturally
+   to any number of lines and only grows downward, so the field and Save above
+   it stay put. */
+.live-dubbing-setup-feedback {
+  margin-block: 4px 0;
+  color: var(--color-error);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__label,
+.live-dubbing-view--rtl .live-dubbing-setup-feedback,
 .live-dubbing-view--rtl .live-dubbing-setup-input .ti-input__help {
   direction: rtl !important;
   text-align: start !important;
