@@ -97,6 +97,10 @@ describe('Gemini validateCredential', () => {
   it.each([
     ['quota exhaustion', 429, googleErrorBody({ message: 'Quota exceeded.', status: 'RESOURCE_EXHAUSTED', reasons: ['QUOTA_EXCEEDED'] }), 'QUOTA_EXCEEDED'],
     ['rate limiting', 429, googleErrorBody({ message: 'Too many requests.', status: 'RESOURCE_EXHAUSTED' }), 'RATE_LIMITED'],
+    ['quota exhaustion on forbidden response', 403, googleErrorBody({ message: 'Quota exceeded.', reasons: ['QUOTA_EXCEEDED'] }), 'QUOTA_EXCEEDED'],
+    ['rate limiting on forbidden response', 403, googleErrorBody({ message: 'Rate limit exceeded.' }), 'RATE_LIMITED'],
+    ['generic forbidden response', 403, googleErrorBody(), 'FORBIDDEN'],
+    ['insufficient balance', 402, googleErrorBody(), 'INSUFFICIENT_BALANCE'],
   ])('maps %s to an indeterminate usage reason', async (_label, status, body, reason) => {
     const fetchImpl = vi.fn(async () => ({ ok: false, status, json: async () => body }));
     const service = createService(fetchImpl);
@@ -211,6 +215,10 @@ describe('OpenAI validateCredential', () => {
   it.each([
     ['quota exhaustion', 429, openAIError({ type: 'insufficient_quota', code: 'insufficient_quota' }), 'QUOTA_EXCEEDED'],
     ['rate limiting', 429, openAIError({ code: 'rate_limit_exceeded' }), 'RATE_LIMITED'],
+    ['quota exhaustion on forbidden response', 403, openAIError({ type: 'insufficient_quota', code: 'insufficient_quota' }), 'QUOTA_EXCEEDED'],
+    ['rate limiting on forbidden response', 403, openAIError({ code: 'rate_limit_exceeded' }), 'RATE_LIMITED'],
+    ['generic forbidden response', 403, openAIError(), 'FORBIDDEN'],
+    ['insufficient balance', 402, openAIError(), 'INSUFFICIENT_BALANCE'],
   ])('maps %s to an indeterminate usage reason', async (_label, status, body, reason) => {
     const fetchImpl = vi.fn(async () => ({ ok: false, status, json: async () => body }));
     const service = createService(fetchImpl);

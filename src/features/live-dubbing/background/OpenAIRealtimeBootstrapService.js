@@ -113,7 +113,6 @@ function toValidationReason(failure) {
   if (failure.type === ErrorTypes.API_KEY_INVALID) {
     return LIVE_DUBBING_CREDENTIAL_REASONS.AUTH_INVALID;
   }
-  if (failure.status === 403) return LIVE_DUBBING_CREDENTIAL_REASONS.FORBIDDEN;
   if (failure.type === ErrorTypes.QUOTA_EXCEEDED) {
     return LIVE_DUBBING_CREDENTIAL_REASONS.QUOTA_EXCEEDED;
   }
@@ -123,6 +122,7 @@ function toValidationReason(failure) {
   if (failure.type === ErrorTypes.INSUFFICIENT_BALANCE) {
     return LIVE_DUBBING_CREDENTIAL_REASONS.INSUFFICIENT_BALANCE;
   }
+  if (failure.status === 403) return LIVE_DUBBING_CREDENTIAL_REASONS.FORBIDDEN;
   if (failure.type === ErrorTypes.SERVER_ERROR) {
     return LIVE_DUBBING_CREDENTIAL_REASONS.SERVER_ERROR;
   }
