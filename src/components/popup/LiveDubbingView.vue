@@ -37,7 +37,11 @@
       </div>
     </section>
 
+    <!-- Subtitles follow the same visibility gate as the session/status card:
+         hidden while setup is required, visible when configured, and kept
+         visible during an active session even if credentials disappear. -->
     <section
+      v-show="showSessionControl"
       class="live-dubbing-card live-dubbing-transcript-preferences"
       :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitles')"
     >

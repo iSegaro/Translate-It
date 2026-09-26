@@ -914,6 +914,44 @@ describe('LiveDubbingView', () => {
     expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).exists()).toBe(true)
   })
 
+  it('shows setup and hides the Subtitles and session cards while credentials are missing', () => {
+    harness.store = makeStore({ OPENAI_API_KEY: 'openai-configured-key' })
+    const wrapper = mountView({ providerId: 'gemini' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(true)
+    expect(wrapper.find('.live-dubbing-transcript-preferences').attributes('style'))
+      .toContain('display: none')
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style'))
+      .toContain('display: none')
+  })
+
+  it('shows both the Subtitles and session cards for a configured credential', () => {
+    const wrapper = mountView({ providerId: 'gemini' })
+
+    expect(wrapper.findComponent({ name: 'LiveDubbingProviderSetup' }).exists()).toBe(false)
+    expect(wrapper.find('.live-dubbing-transcript-preferences').attributes('style') || '')
+      .not.toContain('display: none')
+    expect(wrapper.find('.live-dubbing-session-card').attributes('style') || '')
+      .not.toContain('display: none')
+  })
+
+  it('keeps both cards visible during a busy session after credentials are removed', async () => {
+    const wrapper = mountView({ providerId: 'gemini' })
+    const control = wrapper.findComponent({ name: 'LiveDubbingControl' })
+    const transcriptCard = () => wrapper.find('.live-dubbing-transcript-preferences')
+    const sessionCard = () => wrapper.find('.live-dubbing-session-card')
+
+    control.vm.$emit('busy-change', true)
+    await nextTick()
+
+    harness.store.settings.GEMINI_API_KEY = ''
+    harness.store.settings.API_KEY = ''
+    await nextTick()
+
+    expect(transcriptCard().attributes('style') || '').not.toContain('display: none')
+    expect(sessionCard().attributes('style') || '').not.toContain('display: none')
+  })
+
   it('shows the session control immediately after successful setup', async () => {
     harness.store = makeStore()
     const wrapper = mountView({ providerId: 'gemini' })
