@@ -6,6 +6,8 @@ import {
   LIVE_DUBBING_PROVIDER_ID,
 } from '../constants.js';
 import {
+  LIVE_DUBBING_CREDENTIAL_REASONS,
+  createLiveDubbingCredentialResult,
   createProviderBootstrapResponse,
   isAuthorizedOffscreenSender,
   isLiveDubbingProviderId,
@@ -100,6 +102,44 @@ export function handleLiveDubbingOriginalTranscript(message, sender) {
   if (!isChromeRuntime()) return unsupported();
   if (!isAuthorizedOffscreenSender(sender, liveDubbingCoordinator.browserAPI)) return unauthorized();
   return liveDubbingCoordinator.handleOffscreenOriginalTranscript(message, sender);
+}
+
+/**
+ * Validate one caller-supplied draft Live Dubbing credential without
+ * touching any session state. Background-owned: the request carries only
+ * `{ providerId, apiKey, targetLanguage }` from a trusted Live Dubbing UI
+ * sender (Popup, Sidepanel, or Options). The handler never creates a
+ * session/descriptor/lease, acquires capture, touches offscreen/WS/
+ * streaming, reads or mutates stored keys, fails over, promotes, or saves
+ * keys. The result is the sanitized `{ ok, valid, reason }` DTO only.
+ */
+export async function handleLiveDubbingValidateCredential(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (!isTrustedUi(sender)) return unauthorized();
+
+  const data = message?.data && typeof message.data === 'object' && !Array.isArray(message.data)
+    ? message.data
+    : {};
+  if (!isLiveDubbingProviderId(data.providerId)) {
+    return createLiveDubbingCredentialResult(
+      false,
+      LIVE_DUBBING_CREDENTIAL_REASONS.UNSUPPORTED_PROVIDER,
+    );
+  }
+
+  try {
+    if (data.providerId === LIVE_DUBBING_PROVIDER_ID) {
+      const { geminiLiveBootstrapService } = await import('./GeminiLiveBootstrapService.js');
+      return geminiLiveBootstrapService.validateCredential(data.apiKey, data.targetLanguage);
+    }
+    const { openAIRealtimeBootstrapService } = await import('./OpenAIRealtimeBootstrapService.js');
+    return openAIRealtimeBootstrapService.validateCredential(data.apiKey, data.targetLanguage);
+  } catch {
+    return createLiveDubbingCredentialResult(
+      false,
+      LIVE_DUBBING_CREDENTIAL_REASONS.REQUEST_FAILED,
+    );
+  }
 }
 
 /**

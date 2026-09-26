@@ -281,6 +281,18 @@
   "live_dubbing_setup_save_error": {
     "message": "Your API key couldn't be saved. Please try again."
   },
+  "live_dubbing_validation_auth_error": {
+    "message": "This key was rejected or does not have access to Live Dubbing."
+  },
+  "live_dubbing_validation_quota_error": {
+    "message": "This key can't be verified right now because of a quota, rate, or billing limit."
+  },
+  "live_dubbing_validation_unavailable_error": {
+    "message": "Live Dubbing validation is temporarily unavailable. Please try again."
+  },
+  "live_dubbing_validation_configuration_error": {
+    "message": "Unable to validate this key with the selected provider and language. Check your configuration and try again."
+  },
   "live_dubbing_provider_bootstrap_gemini_error": {
     "message": "Unable to initialize Gemini Live Dubbing. Check your Gemini API key and connection, then try again."
   },

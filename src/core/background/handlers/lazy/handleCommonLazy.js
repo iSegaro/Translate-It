@@ -114,6 +114,16 @@ export async function handleLiveDubbingBootstrapRequestLazy(message, sender) {
     }
 }
 
+export async function handleLiveDubbingValidateCredentialLazy(message, sender) {
+    try {
+        const { handleLiveDubbingValidateCredential } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingValidateCredential(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing credential validation handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}
+
 export async function handleLiveDubbingTranslatedTranscriptLazy(message, sender) {
     try {
         const { handleLiveDubbingTranslatedTranscript } = await import('@/features/live-dubbing/background/handlers.js');

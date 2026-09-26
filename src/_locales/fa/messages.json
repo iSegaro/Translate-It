@@ -281,6 +281,18 @@
   "live_dubbing_setup_save_error": {
     "message": "ذخیره کلید API انجام نشد. لطفا دوباره تلاش کنید."
   },
+  "live_dubbing_validation_auth_error": {
+    "message": "این کلید رد شده است یا به دوبله زنده دسترسی ندارد."
+  },
+  "live_dubbing_validation_quota_error": {
+    "message": "به دلیل محدودیت سهمیه، نرخ یا صورتحساب، اکنون امکان بررسی این کلید وجود ندارد."
+  },
+  "live_dubbing_validation_unavailable_error": {
+    "message": "بررسی دوبله زنده موقتاً در دسترس نیست. دوباره تلاش کنید."
+  },
+  "live_dubbing_validation_configuration_error": {
+    "message": "امکان اعتبارسنجی این کلید با ارائه‌دهنده و زبان انتخاب‌شده نیست. تنظیمات را بررسی و دوباره تلاش کنید."
+  },
   "live_dubbing_provider_bootstrap_gemini_error": {
     "message": "امکان راه‌اندازی دوبله زنده Gemini وجود ندارد. کلید API Gemini و اتصال خود را بررسی کنید و دوباره تلاش کنید."
   },

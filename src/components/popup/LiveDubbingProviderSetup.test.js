@@ -1,11 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import LiveDubbingProviderSetup from './LiveDubbingProviderSetup.vue'
+
+const here = dirname(fileURLToPath(import.meta.url))
 
 const harness = vi.hoisted(() => ({
   store: null,
-  i18n: {}
+  i18n: {},
+  sendMessage: vi.fn()
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -28,6 +34,10 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   })
 }))
 
+vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
+  useMessaging: () => ({ sendMessage: (...args) => harness.sendMessage(...args) })
+}))
+
 const makeStore = (overrides = {}) => {
   const store = {
     settings: { GEMINI_API_KEY: '', OPENAI_API_KEY: '', API_KEY: '', ...overrides },
@@ -40,7 +50,7 @@ const makeStore = (overrides = {}) => {
 }
 
 const mountSetup = (props = {}) => mount(LiveDubbingProviderSetup, {
-  props: { providerId: 'gemini', ...props }
+  props: { providerId: 'gemini', targetLanguage: 'en', ...props }
 })
 
 const typeKey = async (wrapper, value) => {
@@ -59,6 +69,8 @@ const clickButton = async (wrapper, label) => {
 describe('LiveDubbingProviderSetup', () => {
   beforeEach(() => {
     harness.store = makeStore()
+    harness.sendMessage.mockReset()
+    harness.sendMessage.mockResolvedValue({ ok: true, valid: true, reason: 'VALID' })
     harness.i18n = {
       provider_gemini_title: 'Google Gemini',
       provider_openai_title: 'OpenAI GPT',
@@ -74,7 +86,11 @@ describe('LiveDubbingProviderSetup', () => {
       api_key_hide: 'Hide',
       validation_api_key_empty: 'API key for {provider} cannot be empty.',
       live_dubbing_setup_save: 'Save',
-      live_dubbing_setup_save_error: "Your API key couldn't be saved. Please try again."
+      live_dubbing_setup_save_error: "Your API key couldn't be saved. Please try again.",
+      live_dubbing_validation_auth_error: 'This key was rejected or does not have access to Live Dubbing.',
+      live_dubbing_validation_quota_error: "This key can't be verified right now because of a quota, rate, or billing limit.",
+      live_dubbing_validation_unavailable_error: 'Live Dubbing validation is temporarily unavailable. Please try again.',
+      live_dubbing_validation_configuration_error: 'Unable to validate this key with the selected provider and language. Check your configuration and try again.'
     }
   })
 
@@ -120,6 +136,9 @@ describe('LiveDubbingProviderSetup', () => {
       'GEMINI_API_KEY',
       'gemini-secret-key'
     )
+    expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      data: { providerId: 'gemini', apiKey: 'gemini-secret-key', targetLanguage: 'en' }
+    }))
     expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalledWith(
       'OPENAI_API_KEY',
       expect.anything()
@@ -153,6 +172,66 @@ describe('LiveDubbingProviderSetup', () => {
 
     expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('API key for Google Gemini cannot be empty.')
+    expect(harness.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['AUTH_INVALID', 'rejected'],
+    ['FORBIDDEN', 'rejected'],
+    ['QUOTA_EXCEEDED', 'quota'],
+    ['RATE_LIMITED', 'quota'],
+    ['INSUFFICIENT_BALANCE', 'quota'],
+    ['NETWORK_ERROR', 'temporarily unavailable'],
+    ['SERVER_ERROR', 'temporarily unavailable'],
+    ['INVALID_RESPONSE', 'temporarily unavailable'],
+    ['REQUEST_FAILED', 'temporarily unavailable'],
+    ['UNKNOWN_REASON', 'selected provider and language']
+  ])('fails closed for %s without persisting or leaking the draft', async (reason, wording) => {
+    harness.sendMessage.mockResolvedValue({ ok: true, valid: false, reason })
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-validation-secret')
+    await clickButton(wrapper, 'Save')
+    await nextTick()
+
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+    expect(wrapper.find('input').element.value).toBe('sk-validation-secret')
+    expect(wrapper.text()).toContain(wording)
+    expect(wrapper.text()).not.toContain('sk-validation-secret')
+  })
+
+  it('uses one immutable submission snapshot for validation and persistence', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    const wrapper = mountSetup({ providerId: 'gemini', targetLanguage: 'en' })
+    await typeKey(wrapper, '  gemini-key  ')
+    await clickButton(wrapper, 'Save')
+    await wrapper.setProps({ providerId: 'openai', targetLanguage: 'ja' })
+
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
+    await nextTick()
+
+    expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      data: { providerId: 'gemini', targetLanguage: 'en', apiKey: 'gemini-key' }
+    }))
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledWith('GEMINI_API_KEY', 'gemini-key')
+  })
+
+  it('ignores duplicate saves during validation', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-only-once')
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+
+    expect(harness.sendMessage).toHaveBeenCalledOnce()
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
   })
 
   it('keeps the draft and shows a fixed safe error when persistence fails', async () => {
@@ -211,5 +290,163 @@ describe('LiveDubbingProviderSetup', () => {
 
     resolveSave(true)
     await nextTick()
+  })
+
+  it('keeps all credential controls disabled during validation and persistence', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    let resolvePersistence
+    harness.store.updateSettingAndPersist = vi.fn(() => new Promise(resolve => {
+      resolvePersistence = resolve
+    }))
+
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-validation-pending')
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-save').attributes('disabled')).toBeDefined()
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
+    await nextTick()
+
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledOnce()
+    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-save').attributes('disabled')).toBeDefined()
+
+    resolvePersistence(true)
+    await nextTick()
+  })
+
+  it('stacks field, Save and feedback in that DOM order', () => {
+    const wrapper = mountSetup()
+    const row = wrapper.find('.live-dubbing-setup-row')
+    const field = wrapper.find('.live-dubbing-setup-input-field')
+    const actions = wrapper.find('.live-dubbing-setup-actions')
+    const slot = wrapper.find('.live-dubbing-setup-feedback')
+
+    expect(slot.exists()).toBe(true)
+    expect(slot.text()).toBe('')
+    expect(slot.attributes('role')).toBe('alert')
+    expect(slot.attributes('dir')).toBe('auto')
+    expect(slot.attributes('style') ?? '').toBe('')
+
+    // Required order: field → Save below it → feedback last, so feedback can
+    // only grow downward and never sits between the field and Save.
+    expect(Array.from(row.element.children))
+      .toEqual([field.element, actions.element, slot.element])
+    expect(field.element.contains(slot.element)).toBe(false)
+    expect(actions.element.previousElementSibling).toBe(field.element)
+    // Empty feedback reserves no height; BaseInput has no help box yet.
+    expect(wrapper.find('.ti-input__help').exists()).toBe(false)
+  })
+
+  it('renders a validation error after Save without touching Save', async () => {
+    harness.sendMessage.mockResolvedValue({ ok: true, valid: false, reason: 'AUTH_INVALID' })
+    const wrapper = mountSetup()
+    const row = wrapper.find('.live-dubbing-setup-row')
+    const field = wrapper.find('.live-dubbing-setup-input-field')
+    const actions = wrapper.find('.live-dubbing-setup-actions')
+    const saveBefore = wrapper.find('.live-dubbing-setup-save').element
+
+    await typeKey(wrapper, 'sk-slot-secret')
+    await clickButton(wrapper, 'Save')
+    await nextTick()
+
+    const slot = wrapper.find('.live-dubbing-setup-feedback')
+    expect(slot.text()).toContain('This key was rejected')
+    // Structure is identical to the pre-error render: same order, same Save
+    // node — only the feedback text content changed.
+    expect(Array.from(row.element.children))
+      .toEqual([field.element, actions.element, slot.element])
+    expect(field.element.contains(slot.element)).toBe(false)
+    expect(actions.element.previousElementSibling).toBe(field.element)
+    expect(wrapper.find('.live-dubbing-setup-save').element).toBe(saveBefore)
+    // The secret stays out of the visible feedback (BaseInput's suppressed copy
+    // carries the same fixed message, never the draft).
+    expect(slot.text()).not.toContain('sk-slot-secret')
+    expect(wrapper.text()).not.toContain('sk-slot-secret')
+  })
+
+  it('keeps the same feedback row mounted when the error clears', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    const wrapper = mountSetup()
+    const row = wrapper.find('.live-dubbing-setup-row')
+    const slotBefore = wrapper.find('.live-dubbing-setup-feedback').element
+
+    // Local empty-key validation fills the slot.
+    await clickButton(wrapper, 'Save')
+    expect(wrapper.find('.live-dubbing-setup-feedback').text())
+      .toContain('API key for Google Gemini cannot be empty.')
+    // BaseInput mirrors the same fixed message in its conditional help box;
+    // that copy is kept out of layout by the scoped rule asserted below.
+    expect(wrapper.find('.ti-input__help').text())
+      .toContain('API key for Google Gemini cannot be empty.')
+
+    // A retry clears the error at submit start: the slot empties in place and
+    // BaseInput's transient help disappears again without any layout change.
+    await typeKey(wrapper, 'sk-clears-error')
+    await clickButton(wrapper, 'Save')
+    await nextTick()
+
+    expect(wrapper.find('.live-dubbing-setup-feedback').element).toBe(slotBefore)
+    expect(wrapper.find('.live-dubbing-setup-feedback').text()).toBe('')
+    expect(wrapper.find('.ti-input__help').exists()).toBe(false)
+    expect(row.element.lastElementChild).toBe(slotBefore)
+    expect(wrapper.find('.live-dubbing-setup-actions').element
+      .previousElementSibling).toBe(wrapper.find('.live-dubbing-setup-input-field').element)
+
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
+  })
+
+  it('stacks Save under the field and lets feedback grow freely below it', () => {
+    const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+
+    // Stacked block flow — no two-column grid, no row positioning.
+    const rowRule = scss.match(/\.live-dubbing-setup-row\s*\{[^}]*\}/m)?.[0]
+    expect(rowRule).toBeTruthy()
+    expect(rowRule).toMatch(/display:\s*block/)
+    expect(rowRule).not.toMatch(/display:\s*grid/)
+    expect(rowRule).not.toMatch(/grid-template-columns/)
+    expect(rowRule).not.toMatch(/position:/)
+
+    // Save sits below the field, right-aligned (mirrored for RTL by the
+    // scoped RTL rule) and never absolutely positioned or height-capped.
+    const actionsRule = scss.match(/\.live-dubbing-setup-actions\s*\{[^}]*\}/m)?.[0]
+    expect(actionsRule).toBeTruthy()
+    expect(actionsRule).toMatch(/justify-content:\s*flex-end/)
+    expect(actionsRule).not.toMatch(/position:\s*(?:absolute|fixed)/)
+    expect(actionsRule).not.toMatch(/(?<![-\w])(?:min-|max-)?(?:block-size|height)\s*:/)
+
+    // Feedback is normal-flow after the action row: natural, unbounded wrapping
+    // for EN/FA/JA messages, growing only downward.
+    const slotRule = scss.match(/\.live-dubbing-setup-feedback\s*\{[^}]*\}/m)?.[0]
+    expect(slotRule).toBeTruthy()
+    expect(slotRule).toMatch(/overflow-wrap:\s*anywhere/)
+    expect(slotRule).toMatch(/line-height:\s*1\.4/)
+    // No fixed or max height, no clipping, no scrolling, no truncation, no
+    // absolute/side-specific positioning — and no reservation when empty.
+    expect(slotRule).not.toMatch(/(?<![-\w])(?:min-|max-)?(?:block-size|height)\s*:/)
+    expect(slotRule).not.toMatch(/overflow:\s*(?:hidden|auto|scroll)/)
+    expect(slotRule).not.toMatch(/text-overflow/)
+    expect(slotRule).not.toMatch(/white-space:\s*nowrap/)
+    expect(slotRule).not.toMatch(/position:\s*(?:absolute|fixed)/)
+    expect(slotRule).not.toMatch(/\b(?:left|right)\s*:/)
+    expect(scss).not.toMatch(/\.live-dubbing-setup-feedback[^{]*\{[^}]*min-block-size/)
+
+    // BaseInput's conditional help stays suppressed so it cannot resize the
+    // field above Save; its error prop still drives border/label/focus.
+    expect(scss).toMatch(/\.live-dubbing-setup-input \.ti-input__help\s*\{[^}]*display:\s*none/)
   })
 })

@@ -329,6 +329,7 @@ class LifecycleManager {
         [MessageActions.LIVE_DUBBING_STOP]: Handlers.handleLiveDubbingStopLazy,
         [MessageActions.LIVE_DUBBING_GET_STATUS]: Handlers.handleLiveDubbingGetStatusLazy,
         [MessageActions.LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP]: Handlers.handleLiveDubbingBootstrapRequestLazy,
+        [MessageActions.LIVE_DUBBING_VALIDATE_CREDENTIAL]: Handlers.handleLiveDubbingValidateCredentialLazy,
         [LIVE_DUBBING_ACTIONS.TERMINAL]: Handlers.handleLiveDubbingStopLazy,
         [LIVE_DUBBING_ACTIONS.ORIGINAL_TRANSCRIPT]: handleLiveDubbingOriginalTranscriptLazy,
         [LIVE_DUBBING_ACTIONS.TRANSLATED_TRANSCRIPT]: Handlers.handleLiveDubbingTranslatedTranscriptLazy,

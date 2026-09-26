@@ -281,6 +281,18 @@
   "live_dubbing_setup_save_error": {
     "message": "APIキーを保存できませんでした。もう一度お試しください。"
   },
+  "live_dubbing_validation_auth_error": {
+    "message": "このキーは拒否されたか、ライブダビングへのアクセス権がありません。"
+  },
+  "live_dubbing_validation_quota_error": {
+    "message": "クォータ、レート、または請求の上限により、現在このキーを確認できません。"
+  },
+  "live_dubbing_validation_unavailable_error": {
+    "message": "ライブダビングの確認を一時的に利用できません。もう一度お試しください。"
+  },
+  "live_dubbing_validation_configuration_error": {
+    "message": "選択したプロバイダーと言語でキーを確認できません。設定を確認してもう一度お試しください。"
+  },
   "live_dubbing_provider_bootstrap_gemini_error": {
     "message": "Geminiライブ吹き替えを初期化できません。Gemini APIキーと接続を確認して、もう一度お試しください。"
   },

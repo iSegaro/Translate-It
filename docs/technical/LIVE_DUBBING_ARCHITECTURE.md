@@ -24,9 +24,11 @@ playback.
    extension-UI sender (see Security).
 2. `LiveDubbingCoordinator.start()` fixes the provider identity in the pending
    start and descriptor. An absent `providerId` defaults to `gemini`; the
-   only other supported internal id is `openai`. The dedicated Live Dubbing
-   control in the Popup has no provider selector: it forwards the persisted
-   Options choice to a new session. The Coordinator persists a
+   only other supported internal id is `openai`. The Popup's Live Dubbing
+   configuration card (`LiveDubbingView.vue`) owns the provider selector and
+   persists `LIVE_DUBBING_PROVIDER` directly; the `LiveDubbingControl`
+   itself has no selector and is forwarded the persisted choice as
+   `providerId`. The Coordinator persists a
    `PREPARING_CAPTURE` descriptor to `storage.session`, acquires the
    provider-specific offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK` for
    Gemini; OpenAI additionally requires `WEB_RTC`), and drives the
@@ -126,12 +128,14 @@ persistence; preference persistence is backend-owned.
 ## Provider Setting
 
 - `LIVE_DUBBING_PROVIDER` is the canonical persisted provider selection and is
-  edited and persisted in Options. Its default is `gemini`; the valid persisted
-  values are `gemini` and `openai`.
-- For a valid persisted value, Popup forwards that value as `providerId` for a
-  future session; the dedicated Live Dubbing control has no provider selector.
-  A provider change applies only to a future session; the provider identity is
-  immutable after an active descriptor is created.
+  edited and persisted inline in the Popup's Live Dubbing configuration card
+  (`LiveDubbingView.vue`), not Options. Its default is `gemini`; the valid
+  persisted values are `gemini` and `openai`.
+- For a valid persisted value, the Popup's configuration card owns the
+  provider selector and persists `LIVE_DUBBING_PROVIDER` directly;
+  `LiveDubbingControl` itself has no selector and is forwarded the persisted
+  choice as `providerId`. A provider change applies only to a future session;
+  the provider identity is immutable after an active descriptor is created.
 - Settings migration normalizes an invalid persisted value to `gemini`. Popup
   also has a defensive `gemini` fallback when its in-memory setting is
   malformed; that UI guard is not provider negotiation. A direct START carrying
@@ -303,9 +307,10 @@ lease release.
 ## Provider Identity and Bootstrap
 
 The internal live-dubbing contract supports exactly two provider ids:
-`gemini` (the default) and `openai`. The dedicated Live Dubbing control in the
-Popup does not select a provider; it forwards the valid persisted Options
-choice. An absent direct START `providerId` uses Gemini, while an empty or
+`gemini` (the default) and `openai`. The Popup's Live Dubbing configuration
+card owns the provider selector and persists `LIVE_DUBBING_PROVIDER`; the
+dedicated Live Dubbing control does not select a provider and is forwarded
+the persisted choice as `providerId`. An absent direct START `providerId` uses Gemini, while an empty or
 unknown value is rejected. Once START creates a pending descriptor, the provider,
 session id, tab id, canonical target language, and `startedAt` identity tuple
 are fixed for the session and carried through every offscreen request,
@@ -333,6 +338,20 @@ receives `{ accessToken }` and connects to the constrained endpoint with
 client secret for its WebRTC SDP exchange. Long-lived API keys never leave
 background. No legacy credential action or helper remains.
 
+Credential validation (`LIVE_DUBBING_VALIDATE_CREDENTIAL`) is a separate
+background-owned check for unsaved draft keys; the current consumer is the
+Popup Live Dubbing credential setup card (`LiveDubbingProviderSetup.vue`),
+which invokes the action before `updateSettingAndPersist` and persists the
+draft only when the result is `VALID`. The action stays background-owned and
+remains reusable by other trusted Live Dubbing UIs (Sidepanel, Options) if
+integrated later, but is not presently wired there. A trusted UI sender posts
+`{ providerId, apiKey, targetLanguage }`, background runs exactly one
+provider mint attempt with that draft key only, discards the ephemeral
+token/secret, and returns only `{ ok, valid, reason }` with a coarse reason
+(`VALID`, `AUTH_INVALID`, `FORBIDDEN`, usage/transient codes, never raw
+provider text). It creates no session/descriptor/lease, touches no capture or
+streaming, and never reads, fails over, promotes, or saves stored keys.
+
 The `LiveDubbingProviderRegistry` is the feature-local mapping from provider id
 to adapter. It contains Gemini (`pcm`) and the production OpenAI adapter
 (`media-stream`); it returns no adapter for an unknown provider. Each entry
@@ -340,8 +359,9 @@ declares `{ create, audioMode }`; unknown providers and unsupported modes fail
 closed at PREPARE — before getUserMedia, pipelines, provider creation, or
 bootstrap. Factory exceptions propagate to the Controller error boundary
 instead of masking as null. OpenAI is registered as a production adapter in
-this registry, while its valid choice is persisted by Options and forwarded
-by Popup without a dedicated Live Dubbing selector. See Audio Paths.
+this registry, while the valid choice is persisted and selected inline in the
+Popup's Live Dubbing configuration card and forwarded to the dedicated Live
+Dubbing control. See Audio Paths.
 
 ## Provider
 
