@@ -52,13 +52,15 @@ const LanguageSelectorStub = {
   name: 'LanguageSelector',
   props: {
     targetLanguage: { type: String, default: 'en' },
+    targetSelectId: { type: String, default: '' },
+    targetTitle: { type: String, default: '' },
     provider: { type: String, default: '' },
     enableSelectElementIntegration: { type: Boolean, default: true },
     targetOnly: { type: Boolean, default: false },
     disabled: { type: Boolean, default: false }
   },
   emits: ['update:targetLanguage'],
-  template: '<div class="language-selector-stub" />'
+  template: '<div class="language-selector-stub"><select :id="targetSelectId || undefined" :title="targetTitle" /></div>'
 }
 
 const setupLifecycle = { mounts: 0 }
@@ -236,8 +238,18 @@ describe('LiveDubbingView', () => {
       'Target Language',
       'Provider'
     ])
+    const targetLabel = wrapper.find('label[for="live-dubbing-target-language-select"]')
+    const targetSelector = wrapper.findComponent({ name: 'LanguageSelector' })
+    expect(targetLabel.exists()).toBe(true)
+    expect(targetLabel.element.tagName).toBe('LABEL')
+    expect(targetLabel.text()).toBe('Target Language')
+    expect(targetSelector.props('targetSelectId')).toBe('live-dubbing-target-language-select')
+    expect(targetSelector.props('targetTitle')).toBe('Target Language')
+    expect(targetLabel.attributes('for'))
+      .toBe(targetSelector.find('select').attributes('id'))
     expect(wrapper.find('label[for="live-dubbing-provider-select"]').classes())
       .toContain('live-dubbing-config-label')
+    expect(wrapper.find('label[for="live-dubbing-provider-select"]').element.tagName).toBe('LABEL')
   })
 
   it('renders the localized Change font action in the Subtitles card', () => {
@@ -559,13 +571,13 @@ describe('LiveDubbingView', () => {
     }
   )
 
-  it('keeps the provider icon/header layout logical and the narrow provider grid single-column', () => {
+  it('keeps configuration headers and controls aligned across desktop, narrow, and RTL layouts', () => {
     const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
     const headerRule = scss.match(/\.ti-live-dubbing-provider-header\s*\{[^}]*\}/m)?.[0]
     expect(headerRule).toMatch(/display:\s*flex/)
     expect(headerRule).toMatch(/justify-content:\s*space-between/)
     expect(headerRule).toMatch(/gap\s*:/)
-    expect(headerRule).toMatch(/margin-block-end\s*:/)
+    expect(headerRule).not.toMatch(/(?:block-size|height|min-height)\s*:/)
     expect(headerRule).not.toMatch(/(?:^|\n)\s*(?:left|right)\s*:/)
 
     const buttonRule = scss.match(/\.ti-live-dubbing-manage-keys\s*\{[^}]*\}/m)?.[0]
@@ -584,10 +596,26 @@ describe('LiveDubbingView', () => {
     expect(viewRule).toMatch(/--ti-action-hover-bg:/)
     expect(scss).toMatch(/\.theme-dark \.live-dubbing-view[\s\S]*?--ti-action-hover-bg:\s*#424242/)
 
-    const narrowGrid = scss.match(/@media\s*\(max-width:\s*420px\)\s*\{[^}]*\.live-dubbing-config-grid\s*\{[^}]*\}\s*\}/m)?.[0]
-    expect(narrowGrid).toMatch(/grid-template-columns:\s*1fr/)
-    expect(narrowGrid).not.toMatch(/overflow(?:-x|-y)?\s*:/)
+    const configGridRule = scss.match(/\.live-dubbing-config-grid\s*\{[^}]*\}/m)?.[0]
+    expect(configGridRule).toMatch(/grid-template-areas:\s*["']language-header\s+provider-header["']\s+["']language-control\s+provider-control["']/)
+    const narrowGrid = scss.match(/@media\s*\(max-width:\s*420px\)\s*\{[\s\S]*?\.live-dubbing-config-grid\s*\{[^}]*\}/m)?.[0]
+    expect(narrowGrid).toMatch(/grid-template-areas:\s*["']language-header["']\s+["']language-control["']\s+["']provider-header["']\s+["']provider-control["']/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select[\s\S]*?width:\s*100%\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select[\s\S]*?height:\s*36px\s*!important/)
+    expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select[\s\S]*?height:\s*36px\s*!important/)
+
+    const wrapper = mountView()
+    const configGrid = wrapper.find('.live-dubbing-config-grid').element
+    const orderedElements = [
+      configGrid.querySelector('.ti-live-dubbing-language-header'),
+      configGrid.querySelector('.ti-live-dubbing-provider-header'),
+      configGrid.querySelector('.live-dubbing-config-field--language .language-selector-stub'),
+      configGrid.querySelector('#live-dubbing-provider-select')
+    ]
+    expect(orderedElements.every(Boolean)).toBe(true)
+    expect(orderedElements.slice(0, -1).every((element, index) => (
+      element.compareDocumentPosition(orderedElements[index + 1]) & Node.DOCUMENT_POSITION_FOLLOWING
+    ))).toBe(true)
   })
 
   it('persists provider changes under LIVE_DUBBING_PROVIDER without touching TRANSLATION_API', async () => {

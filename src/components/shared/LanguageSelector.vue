@@ -87,6 +87,7 @@
       >
         <div class="ti-language-control-shell">
           <select
+            :id="targetSelectId || undefined"
             v-model="targetLanguage"
             class="ti-language-select"
             :title="targetTitle"
@@ -267,6 +268,10 @@ const props = defineProps({
   targetOnly: {
     type: Boolean,
     default: false
+  },
+  targetSelectId: {
+    type: String,
+    default: ''
   }
 })
 

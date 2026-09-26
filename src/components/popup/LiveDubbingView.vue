@@ -9,37 +9,44 @@
       :aria-label="t('live_dubbing_config_label', 'Configuration')"
     >
       <div class="live-dubbing-config-grid">
-        <div class="live-dubbing-config-field live-dubbing-config-field--language">
-          <span class="live-dubbing-config-label">{{ t('target_language_label', 'Target Language') }}</span>
+        <label
+          class="ti-live-dubbing-language-header live-dubbing-config-label"
+          for="live-dubbing-target-language-select"
+        >
+          {{ t('target_language_label', 'Target Language') }}
+        </label>
+        <div class="ti-live-dubbing-provider-header">
+          <label
+            class="live-dubbing-config-label"
+            for="live-dubbing-provider-select"
+          >
+            {{ t('provider_label', 'Provider') }}
+          </label>
+          <button
+            type="button"
+            class="ti-live-dubbing-manage-keys"
+            :aria-label="t('live_dubbing_manage_api_keys', 'Manage API keys')"
+            :title="t('live_dubbing_manage_api_keys', 'Manage API keys')"
+            @click="handleManageApiKeys"
+          >
+            <MaskIcon
+              :src="keyIcon"
+              :size="15"
+            />
+          </button>
+        </div>
+        <div class="live-dubbing-config-field live-dubbing-config-field--language ti-live-dubbing-language-control">
           <LanguageSelector
             v-model:target-language="targetLanguageModel"
             :provider="providerModel"
+            target-select-id="live-dubbing-target-language-select"
+            :target-title="t('target_language_label', 'Target Language')"
             :enable-select-element-integration="false"
             :target-only="true"
             :disabled="isControlBusy || targetLanguagePending || isSetupSaving"
           />
         </div>
-        <div class="live-dubbing-config-field live-dubbing-config-field--provider">
-          <div class="ti-live-dubbing-provider-header">
-            <label
-              class="live-dubbing-config-label"
-              for="live-dubbing-provider-select"
-            >
-              {{ t('provider_label', 'Provider') }}
-            </label>
-            <button
-              type="button"
-              class="ti-live-dubbing-manage-keys"
-              :aria-label="t('live_dubbing_manage_api_keys', 'Manage API keys')"
-              :title="t('live_dubbing_manage_api_keys', 'Manage API keys')"
-              @click="handleManageApiKeys"
-            >
-              <MaskIcon
-                :src="keyIcon"
-                :size="15"
-              />
-            </button>
-          </div>
+        <div class="live-dubbing-config-field live-dubbing-config-field--provider ti-live-dubbing-provider-control">
           <BaseSelect
             id="live-dubbing-provider-select"
             v-model="providerModel"

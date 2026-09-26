@@ -38,7 +38,10 @@
 .live-dubbing-config-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-areas:
+    "language-header provider-header"
+    "language-control provider-control";
+  gap: 4px 8px;
   align-items: stretch;
 }
 
@@ -51,21 +54,27 @@
 
 .live-dubbing-config-label {
   display: block;
-  margin-block-end: 4px;
+  margin: 0;
   color: var(--text-color);
   font-size: 12px;
   line-height: 1.25;
   opacity: 0.7;
 }
 
+.ti-live-dubbing-language-header {
+  display: flex;
+  align-items: center;
+  grid-area: language-header;
+  min-width: 0;
+}
+
 .ti-live-dubbing-provider-header {
+  grid-area: provider-header;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  block-size: 19px;
   min-width: 0;
-  margin-block-end: 4px;
 }
 
 .ti-live-dubbing-provider-header .live-dubbing-config-label {
@@ -181,6 +190,14 @@
   align-items: stretch !important;
 }
 
+.ti-live-dubbing-language-control {
+  grid-area: language-control;
+}
+
+.ti-live-dubbing-provider-control {
+  grid-area: provider-control;
+}
+
 .live-dubbing-config-field--language .ti-language-control-shell {
   flex: 1 1 auto !important;
 }
@@ -189,6 +206,12 @@
 @media (max-width: 420px) {
   .live-dubbing-config-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "language-header"
+      "language-control"
+      "provider-header"
+      "provider-control";
+    gap: 8px;
   }
 }
 
