@@ -16,7 +16,7 @@
             :provider="providerModel"
             :enable-select-element-integration="false"
             :target-only="true"
-            :disabled="isControlBusy || targetLanguagePending"
+            :disabled="isControlBusy || targetLanguagePending || isSetupSaving"
           />
         </div>
         <div class="live-dubbing-config-field live-dubbing-config-field--provider">
@@ -135,6 +135,7 @@
       v-if="needsSetup"
       :key="providerModel"
       :provider-id="providerModel"
+      :target-language="targetLanguage"
       @save-pending="isSetupSaving = $event"
       @saved="handleSetupSaved"
     />

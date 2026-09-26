@@ -80,7 +80,8 @@ const setupLifecycle = { mounts: 0 }
 const LiveDubbingProviderSetupStub = {
   name: 'LiveDubbingProviderSetup',
   props: {
-    providerId: { type: String, default: '' }
+    providerId: { type: String, default: '' },
+    targetLanguage: { type: String, default: '' }
   },
   emits: ['save-pending', 'saved'],
   mounted() {
@@ -870,6 +871,7 @@ describe('LiveDubbingView', () => {
     const setup = () => wrapper.findComponent({ name: 'LiveDubbingProviderSetup' })
     expect(setup().exists()).toBe(true)
     expect(setup().props('providerId')).toBe('gemini')
+    expect(setup().props('targetLanguage')).toBe('en')
 
     await wrapper.setProps({ providerId: 'openai' })
     expect(setup().exists()).toBe(false)
@@ -1149,11 +1151,13 @@ describe('LiveDubbingView', () => {
     await setup().vm.$emit('save-pending', true)
     await nextTick()
     expect(providerSelect(wrapper).attributes('disabled')).toBeDefined()
+    expect(wrapper.findComponent({ name: 'LanguageSelector' }).props('disabled')).toBe(true)
 
     harness.store.settings.GEMINI_API_KEY = 'saved-key'
     await setup().vm.$emit('save-pending', false)
     await nextTick()
     expect(providerSelect(wrapper).attributes('disabled')).toBeUndefined()
+    expect(wrapper.findComponent({ name: 'LanguageSelector' }).props('disabled')).toBe(false)
   })
 
   it('remounts the control on an idle provider switch so stale state cannot survive', async () => {

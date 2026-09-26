@@ -5,7 +5,8 @@ import LiveDubbingProviderSetup from './LiveDubbingProviderSetup.vue'
 
 const harness = vi.hoisted(() => ({
   store: null,
-  i18n: {}
+  i18n: {},
+  sendMessage: vi.fn()
 }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -28,6 +29,10 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   })
 }))
 
+vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
+  useMessaging: () => ({ sendMessage: (...args) => harness.sendMessage(...args) })
+}))
+
 const makeStore = (overrides = {}) => {
   const store = {
     settings: { GEMINI_API_KEY: '', OPENAI_API_KEY: '', API_KEY: '', ...overrides },
@@ -40,7 +45,7 @@ const makeStore = (overrides = {}) => {
 }
 
 const mountSetup = (props = {}) => mount(LiveDubbingProviderSetup, {
-  props: { providerId: 'gemini', ...props }
+  props: { providerId: 'gemini', targetLanguage: 'en', ...props }
 })
 
 const typeKey = async (wrapper, value) => {
@@ -59,6 +64,8 @@ const clickButton = async (wrapper, label) => {
 describe('LiveDubbingProviderSetup', () => {
   beforeEach(() => {
     harness.store = makeStore()
+    harness.sendMessage.mockReset()
+    harness.sendMessage.mockResolvedValue({ ok: true, valid: true, reason: 'VALID' })
     harness.i18n = {
       provider_gemini_title: 'Google Gemini',
       provider_openai_title: 'OpenAI GPT',
@@ -74,7 +81,11 @@ describe('LiveDubbingProviderSetup', () => {
       api_key_hide: 'Hide',
       validation_api_key_empty: 'API key for {provider} cannot be empty.',
       live_dubbing_setup_save: 'Save',
-      live_dubbing_setup_save_error: "Your API key couldn't be saved. Please try again."
+      live_dubbing_setup_save_error: "Your API key couldn't be saved. Please try again.",
+      live_dubbing_validation_auth_error: 'This key was rejected or does not have access to Live Dubbing.',
+      live_dubbing_validation_quota_error: "This key can't be verified right now because of a quota, rate, or billing limit.",
+      live_dubbing_validation_unavailable_error: 'Live Dubbing validation is temporarily unavailable. Please try again.',
+      live_dubbing_validation_configuration_error: 'Unable to validate this key with the selected provider and language. Check your configuration and try again.'
     }
   })
 
@@ -120,6 +131,9 @@ describe('LiveDubbingProviderSetup', () => {
       'GEMINI_API_KEY',
       'gemini-secret-key'
     )
+    expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      data: { providerId: 'gemini', apiKey: 'gemini-secret-key', targetLanguage: 'en' }
+    }))
     expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalledWith(
       'OPENAI_API_KEY',
       expect.anything()
@@ -153,6 +167,66 @@ describe('LiveDubbingProviderSetup', () => {
 
     expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('API key for Google Gemini cannot be empty.')
+    expect(harness.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['AUTH_INVALID', 'rejected'],
+    ['FORBIDDEN', 'rejected'],
+    ['QUOTA_EXCEEDED', 'quota'],
+    ['RATE_LIMITED', 'quota'],
+    ['INSUFFICIENT_BALANCE', 'quota'],
+    ['NETWORK_ERROR', 'temporarily unavailable'],
+    ['SERVER_ERROR', 'temporarily unavailable'],
+    ['INVALID_RESPONSE', 'temporarily unavailable'],
+    ['REQUEST_FAILED', 'temporarily unavailable'],
+    ['UNKNOWN_REASON', 'selected provider and language']
+  ])('fails closed for %s without persisting or leaking the draft', async (reason, wording) => {
+    harness.sendMessage.mockResolvedValue({ ok: true, valid: false, reason })
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-validation-secret')
+    await clickButton(wrapper, 'Save')
+    await nextTick()
+
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+    expect(wrapper.find('input').element.value).toBe('sk-validation-secret')
+    expect(wrapper.text()).toContain(wording)
+    expect(wrapper.text()).not.toContain('sk-validation-secret')
+  })
+
+  it('uses one immutable submission snapshot for validation and persistence', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    const wrapper = mountSetup({ providerId: 'gemini', targetLanguage: 'en' })
+    await typeKey(wrapper, '  gemini-key  ')
+    await clickButton(wrapper, 'Save')
+    await wrapper.setProps({ providerId: 'openai', targetLanguage: 'ja' })
+
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
+    await nextTick()
+
+    expect(harness.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      data: { providerId: 'gemini', targetLanguage: 'en', apiKey: 'gemini-key' }
+    }))
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledWith('GEMINI_API_KEY', 'gemini-key')
+  })
+
+  it('ignores duplicate saves during validation', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-only-once')
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+
+    expect(harness.sendMessage).toHaveBeenCalledOnce()
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
   })
 
   it('keeps the draft and shows a fixed safe error when persistence fails', async () => {
@@ -210,6 +284,39 @@ describe('LiveDubbingProviderSetup', () => {
     expect(wrapper.find('.live-dubbing-setup-save').attributes('disabled')).toBeDefined()
 
     resolveSave(true)
+    await nextTick()
+  })
+
+  it('keeps all credential controls disabled during validation and persistence', async () => {
+    let resolveValidation
+    harness.sendMessage.mockImplementation(() => new Promise(resolve => {
+      resolveValidation = resolve
+    }))
+    let resolvePersistence
+    harness.store.updateSettingAndPersist = vi.fn(() => new Promise(resolve => {
+      resolvePersistence = resolve
+    }))
+
+    const wrapper = mountSetup()
+    await typeKey(wrapper, 'sk-validation-pending')
+    await wrapper.find('.live-dubbing-setup-save').trigger('click')
+    await nextTick()
+
+    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-save').attributes('disabled')).toBeDefined()
+    expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+
+    resolveValidation({ ok: true, valid: true, reason: 'VALID' })
+    await nextTick()
+    await nextTick()
+
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledOnce()
+    expect(wrapper.find('input').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-toggle').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('.live-dubbing-setup-save').attributes('disabled')).toBeDefined()
+
+    resolvePersistence(true)
     await nextTick()
   })
 })

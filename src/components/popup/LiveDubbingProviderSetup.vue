@@ -75,7 +75,10 @@ import eyeIcon from '@/icons/ui/eye-open.svg?url'
 import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
+import { useMessaging } from '@/shared/messaging/composables/useMessaging.js'
+import { MessageContexts } from '@/shared/messaging/core/MessagingConstants.js'
 import {
+  LIVE_DUBBING_ACTIONS,
   LIVE_DUBBING_PROVIDER_ID,
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_PROVIDER_IDS
@@ -88,6 +91,10 @@ const props = defineProps({
     type: String,
     default: LIVE_DUBBING_PROVIDER_ID,
     validator: (value) => LIVE_DUBBING_PROVIDER_IDS.includes(value)
+  },
+  targetLanguage: {
+    type: String,
+    required: true
   }
 })
 
@@ -95,6 +102,7 @@ const emit = defineEmits(['save-pending', 'saved'])
 
 const { t } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
+const { sendMessage } = useMessaging(MessageContexts.POPUP)
 
 const isOpenAI = computed(() => props.providerId === LIVE_DUBBING_OPENAI_PROVIDER_ID)
 
@@ -127,8 +135,19 @@ const revealed = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 
+const validationErrorKey = (reason) => {
+  if (reason === 'AUTH_INVALID' || reason === 'FORBIDDEN') return 'live_dubbing_validation_auth_error'
+  if (['QUOTA_EXCEEDED', 'RATE_LIMITED', 'INSUFFICIENT_BALANCE'].includes(reason)) {
+    return 'live_dubbing_validation_quota_error'
+  }
+  if (['NETWORK_ERROR', 'SERVER_ERROR', 'INVALID_RESPONSE', 'REQUEST_FAILED'].includes(reason)) {
+    return 'live_dubbing_validation_unavailable_error'
+  }
+  return 'live_dubbing_validation_configuration_error'
+}
+
 /**
- * Persist the typed key immediately under the provider's own storage key.
+ * Validate and persist the trimmed key under the provider's own storage key.
  * updateSettingAndPersist() mutates reactive local state BEFORE storage
  * persistence resolves, so the parent is told a save is pending first (it
  * keeps this card mounted) and the previous value is snapshotted for a
@@ -144,12 +163,39 @@ const save = async () => {
       || `API key for ${providerName.value} cannot be empty.`
     return
   }
-  const key = storageKey.value
-  const previous = settingsStore.settings?.[key] ?? ''
+  const snapshot = Object.freeze({
+    providerId: props.providerId,
+    targetLanguage: props.targetLanguage,
+    apiKey: draft.value.trim(),
+    storageKey: storageKey.value,
+    previous: settingsStore.settings?.[storageKey.value] ?? ''
+  })
   saving.value = true
   emit('save-pending', true)
   try {
-    await settingsStore.updateSettingAndPersist(key, draft.value)
+    let response
+    try {
+      response = await sendMessage({
+        action: LIVE_DUBBING_ACTIONS.VALIDATE_CREDENTIAL,
+        data: {
+          providerId: snapshot.providerId,
+          apiKey: snapshot.apiKey,
+          targetLanguage: snapshot.targetLanguage
+        }
+      })
+    } catch {
+      response = { ok: false, reason: 'REQUEST_FAILED' }
+    }
+
+    if (!(response?.ok === true && response?.valid === true && response?.reason === 'VALID')) {
+      errorMessage.value = t(
+        validationErrorKey(response?.reason),
+        'Unable to validate this key with the selected provider and language. Check your configuration and try again.'
+      )
+      return
+    }
+
+    await settingsStore.updateSettingAndPersist(snapshot.storageKey, snapshot.apiKey)
     // Success: the parent hides this card and freshens the session control.
     draft.value = ''
     revealed.value = false
@@ -157,7 +203,7 @@ const save = async () => {
   } catch {
     // Restore the pre-save store value so storage stays the source of truth
     // and the card (which never unmounted) keeps showing the draft + error.
-    settingsStore.updateSettingLocally(key, previous)
+    settingsStore.updateSettingLocally(snapshot.storageKey, snapshot.previous)
     errorMessage.value = t('live_dubbing_setup_save_error', "Your API key couldn't be saved. Please try again.")
   } finally {
     saving.value = false
