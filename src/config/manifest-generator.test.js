@@ -13,6 +13,14 @@ describe('live dubbing manifest capability', () => {
     expect(firefoxManifest.permissions).not.toContain('activeTab');
   });
 
+  it('grants alarms only on Chrome for offscreen idle cleanup', () => {
+    const chromeManifest = generateManifest('chrome');
+    const firefoxManifest = generateManifest('firefox');
+
+    expect(chromeManifest.permissions).toContain('alarms');
+    expect(firefoxManifest.permissions).not.toContain('alarms');
+  });
+
   it('does not expose the Chrome offscreen document through web accessible resources', () => {
     const chromeManifest = generateManifest('chrome');
     const resources = chromeManifest.web_accessible_resources.flatMap(({ resources }) => resources);

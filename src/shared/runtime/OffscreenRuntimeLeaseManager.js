@@ -19,6 +19,9 @@ export const OFFSCREEN_RUNTIME_CONFIG = Object.freeze({
 
 export const OFFSCREEN_RUNTIME_LEASE_STORAGE_KEY = '__translateItOffscreenRuntimeLeases';
 
+export const OFFSCREEN_IDLE_ALARM_NAME = '__translateItOffscreenIdleClose';
+const OFFSCREEN_IDLE_GRACE_MS = 30_000;
+
 const STORAGE_VERSION = 2;
 const LEGACY_STORAGE_VERSION = 1;
 const MIN_CHROMIUM_VERSION_FOR_SHARED_REASONS = 116;
@@ -127,6 +130,7 @@ export class OffscreenRuntimeLeaseManager {
     this.reconciled = false;
     this.closePending = false;
     this.creationRequiredAfterClose = false;
+    this.idleCloseScheduled = false;
     this.transition = Promise.resolve();
   }
 
@@ -190,6 +194,13 @@ export class OffscreenRuntimeLeaseManager {
         this.closePending = false;
       }
 
+      // Only a held lease invalidates a pending idle close. Failure and
+      // early-return paths above leave any scheduled alarm untouched so an
+      // idle document is never stranded by a failed acquire.
+      if (this.leases.has(lease.key)) {
+        await this._cancelIdleClose();
+      }
+
       return true;
     });
   }
@@ -218,7 +229,7 @@ export class OffscreenRuntimeLeaseManager {
         }
       }
 
-      await this._closeIfEligible(browserAPI, offscreen);
+      await this._scheduleIdleCloseWithFallback(browserAPI, offscreen);
       return released;
     });
   }
@@ -266,6 +277,7 @@ export class OffscreenRuntimeLeaseManager {
       ownershipProven: this.documentOwnership === 'owned',
       reconciled: this.reconciled,
       closePending: this.closePending,
+      idleCloseScheduled: this.idleCloseScheduled,
       leases: activeLeases,
       activeLeases,
     };
@@ -370,6 +382,9 @@ export class OffscreenRuntimeLeaseManager {
     }
 
     this.reconciled = true;
+    if (this.leases.size === 0 && this.documentOwnership === 'owned' && this.documentPresent) {
+      await this._scheduleIdleClose();
+    }
     return true;
   }
 
@@ -423,6 +438,78 @@ export class OffscreenRuntimeLeaseManager {
     return true;
   }
 
+  async _scheduleIdleClose() {
+    if (this.leases.size > 0 || this.documentOwnership !== 'owned' || !this.documentPresent) {
+      return false;
+    }
+    if (this.idleCloseScheduled) return true;
+    if (typeof this.browserAPI?.alarms?.create !== 'function') return false;
+    try {
+      await this.browserAPI.alarms.create(
+        OFFSCREEN_IDLE_ALARM_NAME,
+        { delayInMinutes: OFFSCREEN_IDLE_GRACE_MS / 60_000 },
+      );
+    } catch {
+      return false;
+    }
+    this.idleCloseScheduled = true;
+    return true;
+  }
+
+  // Best-effort idle cleanup with a bounded immediate-close fallback. When the
+  // retry alarm cannot be scheduled for an owned idle document, attempt one
+  // direct close instead of stranding it. _closeIfEligible re-checks guards,
+  // and its catch only re-schedules (never re-closes), so the chain always
+  // terminates: schedule -> close -> schedule -> stop.
+  async _scheduleIdleCloseWithFallback(browserAPI, offscreen) {
+    if (await this._scheduleIdleClose()) return true;
+    return this._closeIfEligible(browserAPI, offscreen);
+  }
+
+  async _cancelIdleClose() {
+    if (!this.idleCloseScheduled) return false;
+    try {
+      await this.browserAPI?.alarms?.clear?.(OFFSCREEN_IDLE_ALARM_NAME);
+    } catch {
+      // Best effort; intent is invalidated regardless.
+    }
+    this.idleCloseScheduled = false;
+    return true;
+  }
+
+  _handleIdleCloseAlarm() {
+    return this._enqueue(async () => {
+      this.idleCloseScheduled = false;
+      if (this.leases.size > 0 || this.documentOwnership !== 'owned') return false;
+      const browserAPI = await this._getBrowserAPI();
+      const offscreen = this._getSupportedOffscreenAPI(browserAPI);
+      if (!offscreen) return false;
+      // Cached presence is not trusted here; prove the document still exists.
+      // Detection runs directly (not via _reconcile) so no new idle alarm is
+      // scheduled while the current one is being processed.
+      let hasDocument = null;
+      try {
+        hasDocument = await this._detectDocument(browserAPI, offscreen);
+      } catch (error) {
+        this.log.debug('Skipping idle offscreen close after uncertain presence detection', error);
+      }
+      if (hasDocument === null) {
+        // Uncertain presence: never close now — physical presence was not
+        // confirmed. Re-arm idle cleanup at the normal cadence; if even the
+        // retry alarm cannot be scheduled, stop safely and leave cleanup to
+        // a later lifecycle transition. No immediate-close fallback here.
+        await this._scheduleIdleClose();
+        return false;
+      }
+      if (!hasDocument) {
+        await this._markDocumentAbsent(browserAPI);
+        return false;
+      }
+      this.documentPresent = true;
+      return this._closeIfEligible(browserAPI, offscreen);
+    });
+  }
+
   async _closeIfEligible(browserAPI, offscreen) {
     if (this.leases.size > 0 || this.documentOwnership !== 'owned' || !this.documentPresent) {
       return false;
@@ -439,12 +526,13 @@ export class OffscreenRuntimeLeaseManager {
       await this._clearMetadata(browserAPI);
       return true;
     } catch (error) {
-      // Keep ownership and presence claims until a later transition retries close.
+      // Keep ownership and presence claims and schedule a delayed retry.
       this.documentPresent = true;
       this.documentOwnership = 'owned';
       this.closePending = true;
       this.creationRequiredAfterClose = false;
       this.log.warn('Could not close shared offscreen document; retaining ownership', error);
+      await this._scheduleIdleClose();
       return false;
     }
   }

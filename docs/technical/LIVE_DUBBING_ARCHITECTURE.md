@@ -271,6 +271,12 @@ response. The Coordinator queues the sanitized terminal outcome
 path; a storage failure leaves the outcome write unsuccessful but does not
 block the cleanup decision. A positively absent runtime can use exact lease
 release without `DISPOSE`; otherwise normal exact `DISPOSE` cleanup is used.
+A lease release alone never proves runtime absence: under the 30s offscreen
+idle grace, a lease-released document only becomes eligible for close after
+the grace, and it may remain physically present beyond that point until the
+alarm runs and close succeeds, so only the dedicated absence path
+(lease-manager reconciliation snapshot + offscreen `STATUS` probe) counts as
+absence proof.
 Even when the absence probe is unavailable, capture loss is not silently
 ignored.
 
