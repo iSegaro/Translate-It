@@ -56,7 +56,7 @@
          visible during an active session even if credentials disappear. -->
     <section
       v-show="showSessionControl"
-      class="live-dubbing-card live-dubbing-transcript-preferences"
+      class="live-dubbing-card live-dubbing-transcript-preferences ti-live-dubbing-transcript-card"
       :aria-label="t('live_dubbing_transcript_preferences_label', 'Subtitles')"
     >
       <button

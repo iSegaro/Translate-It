@@ -194,6 +194,10 @@
 
 /* ── Transcript preferences card ───────────────────────────────────────────── */
 
+.ti-live-dubbing-transcript-card {
+  padding: 0;
+}
+
 .live-dubbing-card-title {
   margin: 0;
   color: inherit;
@@ -205,19 +209,25 @@
 }
 
 .live-dubbing-transcript-preferences-header {
+  box-sizing: border-box;
   display: flex;
   inline-size: 100%;
   align-items: center;
   gap: 8px;
   min-width: 0;
   margin: 0;
-  padding: 0;
+  padding-block: 8px;
+  padding-inline: 10px;
   border: 0;
   background: transparent;
   color: var(--text-color);
   font: inherit;
   text-align: start;
   cursor: pointer;
+
+  &[aria-expanded="true"] {
+    padding-block-end: 6px;
+  }
 
   &:hover {
     color: var(--ti-action-icon-hover);
@@ -253,7 +263,8 @@
 }
 
 .live-dubbing-transcript-preferences-content-inner {
-  padding-block-start: 6px;
+  padding-block: 0 8px;
+  padding-inline: 10px;
 }
 
 .live-dubbing-transcript-preferences-actions {

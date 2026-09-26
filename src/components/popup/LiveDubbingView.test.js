@@ -1156,16 +1156,27 @@ describe('LiveDubbingView', () => {
     // Control alignment is owned by this card, not shared control styles.
     expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
+    const sharedCardRule = scss.match(/\.live-dubbing-card\s*\{[^}]*\}/m)?.[0]
+    const transcriptCardRule = scss.match(/\.ti-live-dubbing-transcript-card\s*\{[^}]*\}/m)?.[0]
+    expect(sharedCardRule).toMatch(/padding:\s*8px 10px/)
+    expect(transcriptCardRule).toMatch(/padding:\s*0/)
+    const viewSource = readFileSync(resolve(here, 'LiveDubbingView.vue'), 'utf8')
+    expect(viewSource).toMatch(/class="(?=[^"]*\blive-dubbing-transcript-preferences\b)(?=[^"]*\bti-live-dubbing-transcript-card\b)[^"]*"/)
     const headerRule = scss.match(
       /\.live-dubbing-transcript-preferences-header\s*\{[\s\S]*?^\}/m
     )?.[0]
+    const expandedHeaderRule = headerRule?.match(/&\[aria-expanded="true"\]\s*\{[^}]*\}/)?.[0]
     const headerHoverRule = headerRule?.match(/&:hover\s*\{[\s\S]*?\n[ \t]*\}/)?.[0]
     const headerFocusRule = scss.match(
       /\.live-dubbing-transcript-preferences-header:focus-visible\s*\{[^}]*\}/m
     )?.[0]
     const titleRule = scss.match(/\.live-dubbing-card-title\s*\{[^}]*\}/m)?.[0]
     expect(headerRule).toMatch(/inline-size:\s*100%/)
+    expect(headerRule).toMatch(/box-sizing:\s*border-box/)
     expect(headerRule).toMatch(/cursor:\s*pointer/)
+    expect(headerRule).toMatch(/padding-block:\s*8px/)
+    expect(headerRule).toMatch(/padding-inline:\s*10px/)
+    expect(expandedHeaderRule).toMatch(/padding-block-end:\s*6px/)
     expect(headerRule).not.toMatch(/transition\s*:/)
     expect(headerRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
     expect(headerHoverRule).toBeTruthy()
@@ -1195,7 +1206,8 @@ describe('LiveDubbingView', () => {
     const contentInnerRule = scss.match(
       /\.live-dubbing-transcript-preferences-content-inner\s*\{[\s\S]*?\n\}/m
     )?.[0]
-    expect(contentInnerRule).toMatch(/padding-block-start:\s*6px/)
+    expect(contentInnerRule).toMatch(/padding-block:\s*0 8px/)
+    expect(contentInnerRule).toMatch(/padding-inline:\s*10px/)
     expect(contentRule).not.toMatch(/opacity|transition/)
     expect(scss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*none/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*0\s+1\s+120px\s*!important/)
