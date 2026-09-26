@@ -1159,17 +1159,22 @@ describe('LiveDubbingView', () => {
     const headerRule = scss.match(
       /\.live-dubbing-transcript-preferences-header\s*\{[\s\S]*?^\}/m
     )?.[0]
-    const headerHoverRule = headerRule?.match(/&:hover\s*\{[^}]*\}/)?.[0]
+    const headerHoverRule = headerRule?.match(/&:hover\s*\{[\s\S]*?\n[ \t]*\}/)?.[0]
     const headerFocusRule = scss.match(
       /\.live-dubbing-transcript-preferences-header:focus-visible\s*\{[^}]*\}/m
     )?.[0]
+    const titleRule = scss.match(/\.live-dubbing-card-title\s*\{[^}]*\}/m)?.[0]
     expect(headerRule).toMatch(/inline-size:\s*100%/)
     expect(headerRule).toMatch(/cursor:\s*pointer/)
-    expect(headerRule).toMatch(/transition:\s*background-color\s+140ms\s+ease/)
+    expect(headerRule).not.toMatch(/transition\s*:/)
     expect(headerRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
-    expect(headerHoverRule).toMatch(/background-color:\s*var\(--ti-action-hover-bg\)/)
-    expect(headerHoverRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
+    expect(headerHoverRule).toBeTruthy()
+    expect(headerHoverRule).not.toMatch(/^\s*background(?:-color)?\s*:/m)
+    expect(headerHoverRule).toMatch(/color:\s*var\(--ti-action-icon-hover\)/)
+    expect(headerHoverRule).not.toMatch(/(?:transform|box-shadow|border(?:-[\w-]+)?|transition|animation)\s*:/)
+    expect(titleRule).toMatch(/color:\s*inherit/)
     expect(headerFocusRule).toBeTruthy()
+    expect(headerFocusRule).toMatch(/outline:\s*2px\s+solid\s+var\(--color-primary\)/)
     expect(headerFocusRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
     expect(scss.match(/\.live-dubbing-transcript-preferences-header(?::hover)?\s*\{/g))
       .toEqual(['.live-dubbing-transcript-preferences-header {'])
@@ -1177,6 +1182,7 @@ describe('LiveDubbingView', () => {
       .toEqual(['.live-dubbing-transcript-preferences-header:focus-visible {'])
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-inline-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-block-end:/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron\s*\{[^}]*border-(?:inline-end|block-end):\s*[^;]*currentColor/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*transform\s+190ms\s+cubic-bezier\(0\.2,\s*0,\s*0,\s*1\)/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron\s*\{[^}]*margin-inline-start:\s*auto/)
     expect(scss).toMatch(/aria-expanded="true"[\s\S]*?transform:\s*rotate\(225deg\)/)

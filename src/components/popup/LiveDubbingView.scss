@@ -196,7 +196,7 @@
 
 .live-dubbing-card-title {
   margin: 0;
-  color: var(--text-color);
+  color: inherit;
   font-size: 12px;
   line-height: 1.25;
   font-weight: 600;
@@ -218,10 +218,9 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: background-color 140ms ease;
 
   &:hover {
-    background-color: var(--ti-action-hover-bg);
+    color: var(--ti-action-icon-hover);
   }
 }
 
