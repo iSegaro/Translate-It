@@ -55,6 +55,23 @@
 
 ---
 
+## Features at a Glance
+
+| Feature | Description |
+| :--- | :--- |
+| **Text Selection** | Instant translation icon/box right where you select text. |
+| **Element Mode** | Click any UI element to translate it inline while keeping the layout. |
+| **Whole Page** | Auto-translate entire pages with lazy-loading and smart memory management. |
+| **PDF Translator** | Translate local and online PDF documents with bilingual reading, OCR support for scanned PDFs, and TXT/Markdown/HTML export. |
+| **Mouse Hover** | Instant translation tooltip triggered by moving mouse over text (supports Word/Sentence/Container scopes). |
+| **Desktop/Mobile FAB** | Multipurpose draggable hub for instant OCR, Page Translation, Element Mode, and rapid feature toggles. |
+| **In-Field (Ctrl+/)** | Translate your input inside text fields before sending. |
+| **Smart Dictionary** | Definitions, synonyms, and usage examples with multi-accent TTS. |
+| **History & Export** | Keep track of your translations and export them for later use. |
+| **Resource Tracker** | Advanced memory management to keep your browser fast. |
+
+---
+
 ## Key Features
 
 ### 1. Advanced Translation Engines
@@ -121,23 +138,6 @@ Take full control over your API costs and UI speed with **Optimization Levels (1
 ### 9. Mouse on Hover (Instant Glance)
 - **Glance-to-Translate:** Move your mouse over any text while holding a modifier key (like Ctrl) to see an instant translation in a non-intrusive tooltip.
 - **Smart Scoping:** Choose your focus: translate a single **Word**, a full **Sentence**, or the entire **Container** block automatically.
-
----
-
-## Features at a Glance
-
-| Feature | Description |
-| :--- | :--- |
-| **Text Selection** | Instant translation icon/box right where you select text. |
-| **Element Mode** | Click any UI element to translate it inline while keeping the layout. |
-| **Whole Page** | Auto-translate entire pages with lazy-loading and smart memory management. |
-| **PDF Translator** | Translate local and online PDF documents with bilingual reading, OCR support for scanned PDFs, and TXT/Markdown/HTML export. |
-| **Mouse Hover** | Instant translation tooltip triggered by moving mouse over text (supports Word/Sentence/Container scopes). |
-| **Desktop/Mobile FAB** | Multipurpose draggable hub for instant OCR, Page Translation, Element Mode, and rapid feature toggles. |
-| **In-Field (Ctrl+/)** | Translate your input inside text fields before sending. |
-| **Smart Dictionary** | Definitions, synonyms, and usage examples with multi-accent TTS. |
-| **History & Export** | Keep track of your translations and export them for later use. |
-| **Resource Tracker** | Advanced memory management to keep your browser fast. |
 
 ---
 
