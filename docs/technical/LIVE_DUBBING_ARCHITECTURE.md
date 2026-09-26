@@ -333,6 +333,15 @@ receives `{ accessToken }` and connects to the constrained endpoint with
 client secret for its WebRTC SDP exchange. Long-lived API keys never leave
 background. No legacy credential action or helper remains.
 
+Credential validation (`LIVE_DUBBING_VALIDATE_CREDENTIAL`) is a separate
+background-owned check for unsaved draft keys (e.g. Options API-key editing):
+a trusted UI sender posts `{ providerId, apiKey, targetLanguage }`, background
+runs exactly one provider mint attempt with that draft key only, discards the
+ephemeral token/secret, and returns only `{ ok, valid, reason }` with a coarse
+reason (`VALID`, `AUTH_INVALID`, `FORBIDDEN`, usage/transient codes, never raw
+provider text). It creates no session/descriptor/lease, touches no capture or
+streaming, and never reads, fails over, promotes, or saves stored keys.
+
 The `LiveDubbingProviderRegistry` is the feature-local mapping from provider id
 to adapter. It contains Gemini (`pcm`) and the production OpenAI adapter
 (`media-stream`); it returns no adapter for an unknown provider. Each entry

@@ -8,7 +8,11 @@ import {
   GEMINI_LIVE_MODEL,
 } from '../providers/GeminiLiveProviderAdapter.js';
 import { LIVE_DUBBING_PROVIDER_ID } from '../constants.js';
-import { normalizeProviderTargetLanguage } from '../contracts.js';
+import {
+  LIVE_DUBBING_CREDENTIAL_REASONS,
+  createLiveDubbingCredentialResult,
+  normalizeProviderTargetLanguage,
+} from '../contracts.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'GeminiLiveBootstrapService');
 const GEMINI_KEYS_SETTING = 'GEMINI_API_KEY';
@@ -106,6 +110,40 @@ function classifyMintFailure(status, metadata) {
   if (hasQuotaSignal(metadata)) return ErrorTypes.QUOTA_EXCEEDED;
   if (hasRateLimitSignal(metadata)) return ErrorTypes.RATE_LIMIT_REACHED;
   return ErrorTypes.HTTP_ERROR;
+}
+
+/**
+ * Map one classified mint failure to a coarse, sanitized validation reason.
+ * Transport throws and 5xx serving failures stay indeterminate and never
+ * report an invalid key; explicit permission-denied metadata reports a
+ * capability rejection rather than an invalid key.
+ */
+function toValidationReason(failure) {
+  if (!failure || failure.kind === 'TRANSPORT') {
+    return LIVE_DUBBING_CREDENTIAL_REASONS.NETWORK_ERROR;
+  }
+  if (failure.kind === 'MALFORMED') {
+    return LIVE_DUBBING_CREDENTIAL_REASONS.INVALID_RESPONSE;
+  }
+  if (failure.type === ErrorTypes.API_KEY_INVALID) {
+    return failure.permissionDenied
+      ? LIVE_DUBBING_CREDENTIAL_REASONS.FORBIDDEN
+      : LIVE_DUBBING_CREDENTIAL_REASONS.AUTH_INVALID;
+  }
+  if (failure.status === 403) return LIVE_DUBBING_CREDENTIAL_REASONS.FORBIDDEN;
+  if (failure.type === ErrorTypes.QUOTA_EXCEEDED) {
+    return LIVE_DUBBING_CREDENTIAL_REASONS.QUOTA_EXCEEDED;
+  }
+  if (failure.type === ErrorTypes.RATE_LIMIT_REACHED) {
+    return LIVE_DUBBING_CREDENTIAL_REASONS.RATE_LIMITED;
+  }
+  if (failure.type === ErrorTypes.INSUFFICIENT_BALANCE) {
+    return LIVE_DUBBING_CREDENTIAL_REASONS.INSUFFICIENT_BALANCE;
+  }
+  if (failure.type === ErrorTypes.SERVER_ERROR) {
+    return LIVE_DUBBING_CREDENTIAL_REASONS.SERVER_ERROR;
+  }
+  return LIVE_DUBBING_CREDENTIAL_REASONS.REQUEST_FAILED;
 }
 
 function buildMintBody(targetLanguage) {
@@ -214,11 +252,49 @@ export class GeminiLiveBootstrapService {
   }
 
   /**
+   * Validate one caller-supplied draft key against the Live Dubbing mint
+   * capability. Exactly one `_attemptMint` runs with the draft key only:
+   * no stored-key reads, no failover to other keys, no promotion, and no
+   * session/descriptor side effects. A minted ephemeral token proves the
+   * capability and is immediately discarded; it never enters the result,
+   * storage, or logs.
+   * @param {unknown} draftApiKey
+   * @param {unknown} targetLanguage
+   * @returns {Promise<{ok: boolean, valid: boolean, reason: string}>}
+   */
+  async validateCredential(draftApiKey, targetLanguage) {
+    let normalized;
+    try {
+      normalized = normalizeProviderTargetLanguage(LIVE_DUBBING_PROVIDER_ID, targetLanguage);
+    } catch (error) {
+      return createLiveDubbingCredentialResult(
+        false,
+        error instanceof RangeError
+          ? LIVE_DUBBING_CREDENTIAL_REASONS.UNSUPPORTED_LANGUAGE
+          : LIVE_DUBBING_CREDENTIAL_REASONS.INVALID_REQUEST,
+      );
+    }
+
+    if (typeof draftApiKey !== 'string' || !draftApiKey.trim()) {
+      return createLiveDubbingCredentialResult(
+        false,
+        LIVE_DUBBING_CREDENTIAL_REASONS.MISSING_CREDENTIAL,
+      );
+    }
+
+    const outcome = await this._attemptMint(draftApiKey.trim(), normalized);
+    if (outcome.ok) {
+      return createLiveDubbingCredentialResult(true, LIVE_DUBBING_CREDENTIAL_REASONS.VALID);
+    }
+    return createLiveDubbingCredentialResult(false, toValidationReason(outcome.failure));
+  }
+
+  /**
    * One classified mint attempt. Transport throws, malformed success
    * payloads, and non-key failures resolve to stop; only key/project-plausible
    * failures resolve to try the next key. Never throws and never surfaces
    * keys, tokens, or provider bodies.
-   * @returns {Promise<{ok: boolean, token?: string, tryNext?: boolean}>}
+   * @returns {Promise<{ok: boolean, token?: string, tryNext?: boolean, failure?: object}>}
    */
   async _attemptMint(apiKey, targetLanguage) {
     let response;
@@ -232,34 +308,45 @@ export class GeminiLiveBootstrapService {
         body: JSON.stringify(buildMintBody(targetLanguage)),
       });
     } catch {
-      return { ok: false, tryNext: false };
+      return { ok: false, tryNext: false, failure: { kind: 'TRANSPORT' } };
     }
 
     if (!response || response.ok !== true) {
       const failed = Boolean(response) && response.ok === false;
-      return { ok: false, tryNext: failed ? await this._isKeySpecificFailure(response) : false };
+      if (!failed) return { ok: false, tryNext: false, failure: { kind: 'TRANSPORT' } };
+      const failure = await this._classifyResponseFailure(response);
+      return {
+        ok: false,
+        tryNext: ApiKeyManager.shouldFailover({ type: failure.type }) === true,
+        failure,
+      };
     }
 
     let payload = null;
     try {
       payload = await response.json();
     } catch {
-      return { ok: false, tryNext: false };
+      return { ok: false, tryNext: false, failure: { kind: 'MALFORMED' } };
     }
 
     const token = payload && typeof payload === 'object' && !Array.isArray(payload)
       ? payload.name
       : null;
     if (typeof token !== 'string' || !token) {
-      return { ok: false, tryNext: false };
+      return { ok: false, tryNext: false, failure: { kind: 'MALFORMED' } };
     }
     return { ok: true, token };
   }
 
-  async _isKeySpecificFailure(response) {
+  async _classifyResponseFailure(response) {
     const status = Number.isInteger(response?.status) ? response.status : 0;
     const metadata = await readMintErrorMetadata(response);
-    return ApiKeyManager.shouldFailover({ type: classifyMintFailure(status, metadata) }) === true;
+    return {
+      kind: 'RESPONSE',
+      status,
+      type: classifyMintFailure(status, metadata),
+      permissionDenied: hasPermissionDeniedSignal(metadata) === true,
+    };
   }
 
   /**

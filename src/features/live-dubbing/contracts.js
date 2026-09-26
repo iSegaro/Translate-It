@@ -1095,6 +1095,52 @@ export function parseProviderBootstrapResponse(response, expectedProviderId, exp
   };
 }
 
+/**
+ * Coarse credential-validation outcomes for the background-owned
+ * `LIVE_DUBBING_VALIDATE_CREDENTIAL` check. Transport/serving failures
+ * (NETWORK_ERROR, SERVER_ERROR) and usage blocks (QUOTA_EXCEEDED,
+ * RATE_LIMITED, INSUFFICIENT_BALANCE) are indeterminate and never mean an
+ * invalid key; only AUTH_INVALID and FORBIDDEN definitively reject the
+ * draft key. Raw provider messages never leave background.
+ */
+export const LIVE_DUBBING_CREDENTIAL_REASONS = Object.freeze({
+  VALID: 'VALID',
+  AUTH_INVALID: 'AUTH_INVALID',
+  FORBIDDEN: 'FORBIDDEN',
+  UNSUPPORTED_PROVIDER: 'UNSUPPORTED_PROVIDER',
+  UNSUPPORTED_LANGUAGE: 'UNSUPPORTED_LANGUAGE',
+  MISSING_CREDENTIAL: 'MISSING_CREDENTIAL',
+  INVALID_REQUEST: 'INVALID_REQUEST',
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  SERVER_ERROR: 'SERVER_ERROR',
+  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+  RATE_LIMITED: 'RATE_LIMITED',
+  INSUFFICIENT_BALANCE: 'INSUFFICIENT_BALANCE',
+  INVALID_RESPONSE: 'INVALID_RESPONSE',
+  REQUEST_FAILED: 'REQUEST_FAILED',
+});
+
+const supportedCredentialReasons = new Set(Object.values(LIVE_DUBBING_CREDENTIAL_REASONS));
+
+/**
+ * Build the exact public credential-validation DTO. The shape is fixed to
+ * `{ ok, valid, reason }` so keys, tokens, secrets, headers, and provider
+ * bodies cannot cross the background/UI boundary. `valid` is true only for
+ * `VALID`; unknown reasons fail closed to `REQUEST_FAILED`.
+ * @param {unknown} valid
+ * @param {unknown} reason
+ * @returns {{ok: boolean, valid: boolean, reason: string}}
+ */
+export function createLiveDubbingCredentialResult(valid, reason) {
+  const safeReason = supportedCredentialReasons.has(reason) ? reason : 'REQUEST_FAILED';
+  const isValid = valid === true && safeReason === LIVE_DUBBING_CREDENTIAL_REASONS.VALID;
+  return {
+    ok: true,
+    valid: isValid,
+    reason: isValid ? LIVE_DUBBING_CREDENTIAL_REASONS.VALID : safeReason,
+  };
+}
+
 function isPlainRecord(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   try {
