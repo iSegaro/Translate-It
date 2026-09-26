@@ -35,11 +35,11 @@
 <br>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+  <a href="https://youtu.be/VxgRWlx20wU">
     <b>YouTubeでデモを見る</b>
   </a>
   <br>
-  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+  <a href="https://youtu.be/VxgRWlx20wU">
     <img src="./Images/Windows.png" alt="動画を見る" width="560" />
   </a>
 </p>

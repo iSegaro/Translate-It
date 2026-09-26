@@ -35,11 +35,11 @@
 <br>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+  <a href="https://youtu.be/VxgRWlx20wU">
     <b>Watch Demo on YouTube</b>
   </a>
   <br>
-  <a href="https://www.youtube.com/watch?v=oMw-CbcKPOY">
+  <a href="https://youtu.be/VxgRWlx20wU">
     <img src="./docs/Images/Windows.png" alt="Watch the video" width="560" />
   </a>
 </p>
