@@ -266,6 +266,39 @@ describe('LiveDubbingView', () => {
     expect(wrapper.find('.live-dubbing-change-font-link').exists()).toBe(true)
   })
 
+  it('keeps the full-width disclosure as one semantic button with no nested controls', () => {
+    const wrapper = mountView()
+    const header = transcriptHeader(wrapper)
+
+    expect(wrapper.findAll('button.live-dubbing-transcript-preferences-header')).toHaveLength(1)
+    expect(header.attributes('type')).toBe('button')
+    expect(header.element.tabIndex).toBe(0)
+    expect(header.find('.live-dubbing-card-title').exists()).toBe(true)
+    expect(header.find('.live-dubbing-transcript-preferences-chevron').exists()).toBe(true)
+    expect(header.findAll('button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+      .toHaveLength(0)
+
+    const source = readFileSync(resolve(here, 'LiveDubbingView.vue'), 'utf8')
+    const headerTemplate = source.match(/<button\s+type="button"\s+class="live-dubbing-transcript-preferences-header"[\s\S]*?<\/button>/)?.[0]
+    expect(headerTemplate).toBeTruthy()
+    expect(headerTemplate).not.toMatch(/@key(?:down|up|press)/)
+    expect(header.attributes('onkeydown')).toBeUndefined()
+  })
+
+  it('toggles once from title and chevron clicks, but not from content clicks', async () => {
+    const wrapper = mountView()
+    const header = transcriptHeader(wrapper)
+
+    await header.find('.live-dubbing-card-title').trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('true')
+
+    await header.find('.live-dubbing-transcript-preferences-chevron').trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('false')
+
+    await transcriptContent(wrapper).trigger('click')
+    expect(header.attributes('aria-expanded')).toBe('false')
+  })
+
   it.each([
     ['translated', { LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT: true }],
     ['original', { LIVE_DUBBING_SHOW_ORIGINAL_TRANSCRIPT: true }]
@@ -1123,10 +1156,29 @@ describe('LiveDubbingView', () => {
     // Control alignment is owned by this card, not shared control styles.
     expect(scss).toMatch(/\.live-dubbing-config-field--language \.ti-language-select/)
     expect(scss).toMatch(/\.live-dubbing-config-field--provider \.ti-select/)
-    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-header[\s\S]*?inline-size:\s*100%/)
+    const headerRule = scss.match(
+      /\.live-dubbing-transcript-preferences-header\s*\{[\s\S]*?^\}/m
+    )?.[0]
+    const headerHoverRule = headerRule?.match(/&:hover\s*\{[^}]*\}/)?.[0]
+    const headerFocusRule = scss.match(
+      /\.live-dubbing-transcript-preferences-header:focus-visible\s*\{[^}]*\}/m
+    )?.[0]
+    expect(headerRule).toMatch(/inline-size:\s*100%/)
+    expect(headerRule).toMatch(/cursor:\s*pointer/)
+    expect(headerRule).toMatch(/transition:\s*background-color\s+140ms\s+ease/)
+    expect(headerRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
+    expect(headerHoverRule).toMatch(/background-color:\s*var\(--ti-action-hover-bg\)/)
+    expect(headerHoverRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
+    expect(headerFocusRule).toBeTruthy()
+    expect(headerFocusRule).not.toMatch(/transform\s*:|box-shadow\s*:/)
+    expect(scss.match(/\.live-dubbing-transcript-preferences-header(?::hover)?\s*\{/g))
+      .toEqual(['.live-dubbing-transcript-preferences-header {'])
+    expect(scss.match(/\.live-dubbing-transcript-preferences-header:focus-visible\s*\{/g))
+      .toEqual(['.live-dubbing-transcript-preferences-header:focus-visible {'])
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-inline-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-block-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*transform\s+190ms\s+cubic-bezier\(0\.2,\s*0,\s*0,\s*1\)/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron\s*\{[^}]*margin-inline-start:\s*auto/)
     expect(scss).toMatch(/aria-expanded="true"[\s\S]*?transform:\s*rotate\(225deg\)/)
     expect(scss).not.toMatch(/grid-template-rows/)
     const contentRule = scss.match(

@@ -218,6 +218,11 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition: background-color 140ms ease;
+
+  &:hover {
+    background-color: var(--ti-action-hover-bg);
+  }
 }
 
 .live-dubbing-transcript-preferences-header:focus-visible {
