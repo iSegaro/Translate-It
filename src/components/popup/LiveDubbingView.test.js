@@ -537,39 +537,54 @@ describe('LiveDubbingView', () => {
     expect(button.element.matches(':enabled')).toBe(true)
   })
 
-  it('opens provider settings from Manage API keys and closes only after successful navigation', async () => {
-    harness.store = makeStore({ LIVE_DUBBING_PROVIDER: 'openai' })
+  it.each([
+    ['openai', 'gemini', '/providers?highlight=OPENAI_API_KEY'],
+    ['gemini', 'openai', '/providers?highlight=GEMINI_API_KEY']
+  ])('opens settings for the selected %s provider, independent of global %s setting', async (providerId, globalProvider, path) => {
+    harness.store = makeStore({ LIVE_DUBBING_PROVIDER: providerId, TRANSLATION_API: globalProvider })
     harness.openOptionsPageMock.mockResolvedValue({ success: true })
-    const wrapper = mountView({ providerId: 'openai' })
+    const wrapper = mountView({ providerId })
     const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
     await wrapper.find('button.ti-live-dubbing-manage-keys').trigger('click')
     await settle()
 
     expect(harness.openOptionsPageMock).toHaveBeenCalledOnce()
-    expect(harness.openOptionsPageMock).toHaveBeenCalledWith('providers')
+    expect(harness.openOptionsPageMock).toHaveBeenCalledWith(path)
     expect(closeSpy).toHaveBeenCalledOnce()
-    expect(providerSelect(wrapper).element.value).toBe('openai')
-    expect(harness.store.settings.LIVE_DUBBING_PROVIDER).toBe('openai')
+    expect(providerSelect(wrapper).element.value).toBe(providerId)
+    expect(harness.store.settings.LIVE_DUBBING_PROVIDER).toBe(providerId)
+    expect(harness.store.settings.TRANSLATION_API).toBe(globalProvider)
     expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
     closeSpy.mockRestore()
   })
 
-  it.each([undefined, { success: false }, {}])(
-    'keeps the popup open when provider navigation does not report success (%s)',
-    async (response) => {
+  it.each([
+    ['openai', '/providers?highlight=OPENAI_API_KEY'],
+    ['gemini', '/providers?highlight=GEMINI_API_KEY']
+  ])('uses the selected %s key route without closing when navigation does not report success', async (providerId, path) => {
+    const globalProvider = providerId === 'openai' ? 'gemini' : 'openai'
+    harness.store = makeStore({ LIVE_DUBBING_PROVIDER: providerId, TRANSLATION_API: globalProvider })
+    const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
+    const wrapper = mountView({ providerId })
+
+    for (const response of [undefined, { success: false }]) {
       harness.openOptionsPageMock.mockResolvedValue(response)
-      const wrapper = mountView()
-      const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
       await wrapper.find('button.ti-live-dubbing-manage-keys').trigger('click')
       await settle()
 
-      expect(harness.openOptionsPageMock).toHaveBeenCalledWith('providers')
+      expect(harness.openOptionsPageMock).toHaveBeenLastCalledWith(path)
       expect(closeSpy).not.toHaveBeenCalled()
-      closeSpy.mockRestore()
+      expect(providerSelect(wrapper).element.value).toBe(providerId)
+      expect(harness.store.settings.LIVE_DUBBING_PROVIDER).toBe(providerId)
+      expect(harness.store.settings.TRANSLATION_API).toBe(globalProvider)
+      expect(harness.store.updateSettingAndPersist).not.toHaveBeenCalled()
+      harness.openOptionsPageMock.mockClear()
     }
-  )
+
+    closeSpy.mockRestore()
+  })
 
   it('keeps configuration headers and controls aligned across desktop, narrow, and RTL layouts', () => {
     const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')

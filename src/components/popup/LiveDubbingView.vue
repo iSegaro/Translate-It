@@ -383,7 +383,8 @@ const handleChangeFont = async () => {
 
 const handleManageApiKeys = async () => {
   try {
-    const response = await openOptionsPage('providers')
+    const apiKey = providerModel.value === LIVE_DUBBING_OPENAI_PROVIDER_ID ? 'OPENAI_API_KEY' : 'GEMINI_API_KEY'
+    const response = await openOptionsPage(`/providers?highlight=${apiKey}`)
     if (response?.success) window.close()
   } catch (error) {
     logger.error('Failed to open provider settings for Live Dubbing API keys:', error)
