@@ -1,60 +1,66 @@
-Translate It! - The Ultimate Translation Toolkit
+Translate It! - Translation for Text, Pages, Documents, and Live Dubbing
 
-No more switching tabs. Translate smarter with the most advanced and secure intelligent translation ecosystem.
+Translate whatever you need, right in your browser.
 
-Tired of clunky translators that break page layouts or hit rate limits?
-Translate It! is engineered with a "zero-pressure" philosophy, optimized to run seamlessly without taxing system resources or bloating RAM—even with dozens of tabs active. It brings a high-performance, modular translation engine directly into your workflow, providing a surgical and fluid experience for research, chatting, or browsing.
+Translate It can handle selected text, input fields, page elements, full pages, PDFs, subtitles, and text inside images. It also includes Live Dubbing, which lets you hear audio playing in a browser tab dubbed into your chosen language in real time.
 
----
-
-✓ Why Choose Translate It?
-
-- 10+ AI & Standard Providers: Choose between Gemini, OpenAI, DeepL, Microsoft and more.
-- 70% Token Savings: Use our unique Economy Mode to pack more text into every request, slashing your AI API costs.
-- Zero-Pressure Engineering: Optimized for low-footprint operation. Keep dozens of tabs open without worrying about RAM bloat or system slowdowns.
-- Privacy First OCR: Translate text from images, videos, and PDFs using our Offline OCR engine. Your visual data never leaves your browser.
-- PDF Translator: Open local or online PDF documents with intelligent page translation, bilingual reading, OCR for scanned PDFs, and TXT/Markdown/HTML export.
-- Progressive Streaming: Don't wait! Large paragraphs are rendered in real-time as they arrive, providing a fluid, zero lag experience.
+You can choose the translation service that works best for you, including traditional providers, AI services, and local or offline options where available.
 
 ---
 
-✓ Key Features at Your Fingertips
+✓ What You Can Do
 
-- Instant Selection: Select text and get a clean translation box right where you are.
-- Screen Capture (Visual Translation): Highlight any area on your screen—even inside videos or images to extract and translate text instantly.
-- Element Mode: Click any UI element to translate it inline while keeping the layout intact.
-- Whole Page Translation: Auto-translate entire web-pages with smart lazy-loading and infinite scroll support. Perfect for long articles or social media feeds.
-- PDF Translator: Translate local and online PDF documents with page navigation, text selection, bilingual and translated views, OCR for scanned PDFs, and export to TXT, Markdown, or HTML.
-- Mouse Hover (Instant Glance): Hover over any text while holding a modifier key (like Ctrl) to see an instant translation in a sleek tooltip. Supports Word, Sentence, and Container scopes.
-- Desktop/Mobile FAB: A multipurpose, drag-gable floating hub that gives you instant access to OCR, Page Translation, and Element Mode.
-- Translate While Typing (Ctrl + /): Type in any field and translate your message before hitting send. Perfect for international messaging.
-- Mobile Ergonomics: Enjoy a native-like experience on mobile browsers (Firefox Android/Kiwi) with our thumb-friendly bottom sheet.
-- Turbo vs. Economy Slider: Take full control! Choose Turbo Mode for lightning-fast UI or Economy Mode for maximum stability and cost-efficiency.
+- Instant Selection: Select text on any page and view the translation right next to it.
+- Translate While Typing: Translate text directly inside input fields before sending it.
+- Element Translation: Click a page element to translate it in place while keeping the layout intact.
+- Whole Page Translation: Translate complete pages, including dynamically loaded content and infinite-scroll pages.
+- Mouse Hover Translation: Hold a modifier key and hover over text to translate a word, sentence, or content block.
+- Screen Capture & OCR: Select an area containing text in an image, video, or other non-selectable content and translate it.
+- PDF Translation: Open local or online PDFs, translate pages, use bilingual views, run OCR on scanned documents, and export translated content to TXT, Markdown, or HTML.
+- Live Dubbing: Hear audio from your browser tab dubbed into your chosen language in real time. Use it with YouTube, Netflix, Google Meet, online courses, and other websites that play audio.
+- Subtitle Translation: Translate SRT subtitle files while preserving timestamps and formatting.
+- Bilingual Subtitles: Follow along with subtitles for both the original speech and the dubbed translation.
+- Smart Dictionary: View definitions, synonyms, examples, and pronunciation information.
+- Text to Speech: Listen to translated text using supported voices.
+- History & Export: Keep and export previous translations when needed.
 
 ---
 
-✓ Pro Tools for Power Users
+✓ Providers and Flexibility
 
-- Smart Dictionary: See definitions, synonyms, and usage examples for any word.
-- Text to Speech: Listen to translations in high-quality audio.
-- History & Export: Keep track of your translations and export them whenever you need.
+Translate It supports more than 10 translation providers, including Google, Microsoft, DeepL, OpenAI-compatible, DeepSeek and more.
+
+You are not tied to a single provider. Choose the service that fits your needs, available API keys, cost preferences, or privacy requirements.
+
+For supported AI providers, optimization controls let you choose between larger, more efficient requests and faster parallel processing.
+
+---
+
+
+✓ Built for Everyday Browsing
+
+Translate It is designed for regular browsing as well as long pages, dynamic websites, and continuously loaded content.
+
+Features such as progressive translation, lazy loading, and configurable processing help keep translation responsive without forcing every task through the same workflow.
 
 ---
 
 ✓ Supported Languages
 
-Includes 100+ languages: English, Farsi (Persian), Japanese, French, German, Chinese, Arabic, Hindi, Korean, Russian, Spanish, Turkish, and many more.
+Language support depends on the selected provider.
+
+Major providers support a wide range of languages, including English, Persian, Japanese, French, German, Chinese, Arabic, Hindi, Korean, Russian, Spanish, Turkish, and many more.
 
 ---
 
-✓ Security & Open Source
+✓ Privacy & Open Source
 
-- No Tracking: We don't store or share your data.
-- Direct Connection: Your text goes directly from your browser to the API of your choice.
-- Open Source: Fully transparent development on GitHub.
+* Your Choice: Choose how your translations are processed, with local or offline options available for supported features.
+* Flexible Providers: Use the provider that best fits your needs for privacy, quality, speed, or cost.
+* Open Source: Translate It is fully open source, so anyone can inspect the code, report issues, or contribute on GitHub.
 
-https://github.com/iSegaro/Translate-It
+https://github.com/Translate-It-App/Translate-It/
 
 ---
 
-✨ Level up your browsing experience. Install Translate It! today.
+✨ Translate the way that works for you.
