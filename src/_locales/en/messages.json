@@ -1319,6 +1319,42 @@
   "openai_api_model_placeholder": {
     "message": "Enter OpenAI model"
   },
+  "openai_catalog_search_label": {
+    "message": "Search OpenAI models"
+  },
+  "openai_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "openai_catalog_results_label": {
+    "message": "Available OpenAI models"
+  },
+  "openai_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "openai_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "openai_catalog_compatibility_notice": {
+    "message": "The model catalog does not indicate Chat Completions compatibility; listed models may not all support Chat Completions."
+  },
+  "openai_models_missing_key": {
+    "message": "Add an API key to discover available models."
+  },
+  "openai_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "openai_models_discovery_failed": {
+    "message": "Could not load OpenAI models."
+  },
+  "openai_models_empty": {
+    "message": "No models were returned by OpenAI."
+  },
+  "openai_model_not_listed": {
+    "message": "Saved model was not listed by OpenAI."
+  },
+  "openai_saved_model_label": {
+    "message": "Saved model"
+  },
   "openrouter_api_settings_title": {
     "message": "OpenRouter Settings"
   },

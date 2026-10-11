@@ -1319,6 +1319,42 @@
   "openai_api_model_placeholder": {
     "message": "OpenAIモデルを入力"
   },
+  "openai_catalog_search_label": {
+    "message": "OpenAIモデルを検索"
+  },
+  "openai_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "openai_catalog_results_label": {
+    "message": "利用可能なOpenAIモデル"
+  },
+  "openai_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "openai_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "openai_catalog_compatibility_notice": {
+    "message": "モデルカタログにはChat Completionsの互換性情報がありません。掲載モデルがすべてChat Completionsをサポートするとは限りません。"
+  },
+  "openai_models_missing_key": {
+    "message": "利用可能なモデルを検索するにはAPIキーを追加してください。"
+  },
+  "openai_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "openai_models_discovery_failed": {
+    "message": "OpenAIモデルを読み込めませんでした。"
+  },
+  "openai_models_empty": {
+    "message": "OpenAIからモデルが返されませんでした。"
+  },
+  "openai_model_not_listed": {
+    "message": "保存済みモデルはOpenAIの一覧にありません。"
+  },
+  "openai_saved_model_label": {
+    "message": "保存済みモデル"
+  },
   "openrouter_api_settings_title": {
     "message": "OpenRouter 設定"
   },
