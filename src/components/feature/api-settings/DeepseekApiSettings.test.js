@@ -145,6 +145,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(wrapper.find('.thinking-mode-select').exists()).toBe(false);
 
     await wrapper.get('.model-select').setValue('custom');
+    expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
     expect(wrapper.find('.thinking-mode-select').exists()).toBe(false);
 
     wrapper.unmount();
@@ -210,9 +211,11 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     const catalogSelect = wrapper.get('.catalog-model-select');
     await catalogSelect.setValue('catalog/model');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('catalog/model');
+    expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('catalog');
     expect(catalogSelect.element.value).toBe('catalog/model');
     await curatedSelect.setValue('thinking-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('thinking-model');
+    expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('curated');
     expect(catalogSelect.element.value).toBe('');
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_THINKING_MODE', expect.anything());
@@ -233,6 +236,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(wrapper.find('.model-select').element.value).toBe('custom');
     expect(wrapper.get('[placeholder="deepseek_custom_model_placeholder"]').element.value).toBe('custom/edited-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('custom/edited-model');
+    expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
     wrapper.unmount();
 
@@ -244,6 +248,34 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(legacy.find('.model-select').findAll('option').map(option => option.element.value)).toContain('missing/saved-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('missing/saved-model');
     legacy.unmount();
+  });
+
+  it('preserves Custom selected during the key debounce and still syncs a pre-schedule saved model', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = '';
+    const pending = deferred();
+    mocks.fetchModels.mockReturnValueOnce(pending.promise);
+    const wrapper = mount(DeepseekApiSettings);
+    await wrapper.get('[data-test="api-key"]').setValue('secret-key');
+    await wrapper.get('.model-select').setValue('custom');
+    await vi.advanceTimersByTimeAsync(400);
+    pending.resolve([{ value: 'thinking-model', name: 'Thinking Model' }]);
+    await flushPromises();
+    expect(wrapper.get('.model-select').element.value).toBe('custom');
+    expect(wrapper.get('[placeholder="deepseek_custom_model_placeholder"]').exists()).toBe(true);
+    expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('thinking-model');
+    wrapper.unmount();
+
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'secret-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_MODEL = 'server/saved-model';
+    const saved = deferred();
+    mocks.fetchModels.mockReturnValueOnce(saved.promise);
+    const savedWrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    saved.resolve([{ value: 'server/saved-model', name: 'Saved Model' }]);
+    await flushPromises();
+    expect(savedWrapper.get('.model-select').element.value).toBe('server/saved-model');
+    expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('server/saved-model');
+    savedWrapper.unmount();
   });
 
   it('shows localized discovery failure and empty-result states', async () => {

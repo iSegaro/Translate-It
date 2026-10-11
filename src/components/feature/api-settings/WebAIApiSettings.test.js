@@ -63,16 +63,26 @@ describe('WebAIApiSettings model discovery', () => {
   })
 
   it('keeps the saved model selected, adds discovered ids, and never persists the discovered list', async () => {
-    mocks.fetchModels.mockResolvedValue(['gemini-auto'])
+    mocks.fetchModels.mockResolvedValue(['gemini-3-pro', 'gemini-auto'])
     const wrapper = mount(WebAIApiSettings)
     await flushPromises()
     const select = wrapper.get('select')
     expect(select.element.value).toBe('gemini-3-flash')
     expect(select.findAll('option').map(option => option.element.value)).toEqual([
-      'gemini-auto', 'gemini-3-flash', 'custom',
+      'gemini-3-flash', 'gemini-3-pro', 'gemini-auto', 'custom',
     ])
     expect(wrapper.text()).toContain('Saved model was not listed by the server.')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('WEBAI_MODELS', expect.anything())
+    wrapper.unmount()
+  })
+
+  it('keeps curated options when successful discovery returns no models', async () => {
+    mocks.fetchModels.mockResolvedValue([])
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+    expect(wrapper.get('select').findAll('option').map(option => option.element.value)).toEqual([
+      'gemini-3-flash', 'gemini-3-pro', 'custom',
+    ])
     wrapper.unmount()
   })
 
@@ -138,6 +148,42 @@ describe('WebAIApiSettings model discovery', () => {
     expect(wrapper.get('select').element.value).toBe('custom')
     expect(wrapper.findAll('input').at(-1).element.value).toBe('gemini-3-flash')
     expect(mocks.settingsStore.settings.WEBAI_API_MODEL).toBe('gemini-3-flash')
+    wrapper.unmount()
+  })
+
+  it('preserves a Custom selection made during the URL debounce and leaves the saved model untouched', async () => {
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'gemini-auto'
+    const pending = deferred()
+    mocks.fetchModels.mockResolvedValueOnce(['gemini-auto']).mockReturnValueOnce(pending.promise)
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+
+    mocks.settingsStore.settings.WEBAI_API_URL = 'https://second.test/v1/translate'
+    await nextTick()
+    await wrapper.get('select').setValue('custom')
+    await vi.advanceTimersByTimeAsync(400)
+    expect(mocks.fetchModels).toHaveBeenCalledTimes(2)
+    pending.resolve(['gemini-auto'])
+    await flushPromises()
+
+    expect(wrapper.get('select').element.value).toBe('custom')
+    expect(wrapper.findAll('input').at(-1).exists()).toBe(true)
+    expect(mocks.settingsStore.settings.WEBAI_API_MODEL).toBe('gemini-auto')
+    wrapper.unmount()
+  })
+
+  it('synchronizes a saved selection when no interaction occurs during the URL debounce', async () => {
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'gemini-auto'
+    mocks.fetchModels.mockResolvedValueOnce(['gemini-auto']).mockResolvedValueOnce(['gemini-auto'])
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+
+    mocks.settingsStore.settings.WEBAI_API_URL = 'https://second.test/v1/translate'
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+
+    expect(wrapper.get('select').element.value).toBe('gemini-auto')
     wrapper.unmount()
   })
 

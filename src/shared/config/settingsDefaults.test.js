@@ -50,11 +50,14 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
     expect(defaults).not.toHaveProperty('GEMINI_THINKING_ENABLED');
     expect(defaults.OPENAI_API_MODEL).toBe(CONFIG.OPENAI_API_MODEL);
+    expect(defaults.OPENAI_MODEL_SOURCE).toBe('legacy');
     expect(defaults.OPENAI_MODELS).toEqual(CONFIG.OPENAI_MODELS);
     expect(defaults.DEEPSEEK_API_MODEL).toBe(CONFIG.DEEPSEEK_API_MODEL);
+    expect(defaults.DEEPSEEK_MODEL_SOURCE).toBe('legacy');
     expect(defaults.DEEPSEEK_THINKING_MODE).toBe(CONFIG.DEEPSEEK_THINKING_MODE);
     expect(defaults.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
     expect(defaults.OPENROUTER_API_MODEL).toBe(CONFIG.OPENROUTER_API_MODEL);
+    expect(defaults.OPENROUTER_MODEL_SOURCE).toBe('legacy');
     expect(defaults.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
     expect(defaults).not.toHaveProperty('OPENROUTER_API_URL');
     expect(defaults.REQUESTY_API_MODEL).toBe(CONFIG.REQUESTY_API_MODEL);

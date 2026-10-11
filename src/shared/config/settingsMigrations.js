@@ -476,11 +476,33 @@ function runMainMigration(currentSettings, explicitSettingsKeys = null) {
 
     const newModels = CONFIG[modelListKey];
     const modelIsActive = newModels.some(model => model.value === currentUserModel);
-    const explicitReplacement = modelIsActive
+    const mappedReplacement = modelIsActive
       ? undefined
       : MODEL_VALUE_MIGRATIONS[modelListKey]?.[currentUserModel];
+    const preserveCatalogGeminiModel = modelListKey === 'GEMINI_MODELS'
+      && currentSettings.GEMINI_MODEL_SOURCE === 'catalog'
+      && Boolean(mappedReplacement);
+    const sourceKey = {
+      OPENAI_MODELS: 'OPENAI_MODEL_SOURCE',
+      OPENROUTER_MODELS: 'OPENROUTER_MODEL_SOURCE',
+      DEEPSEEK_MODELS: 'DEEPSEEK_MODEL_SOURCE'
+    }[modelListKey];
+    const providerSource = sourceKey ? currentSettings[sourceKey] : undefined;
+    const preserveCatalogProviderModel = sourceKey
+      && (providerSource === 'catalog' || providerSource === 'custom')
+      && Boolean(mappedReplacement);
+    const explicitReplacement = preserveCatalogGeminiModel || preserveCatalogProviderModel ? undefined : mappedReplacement;
     const modelListChanged = hasStoredModelList
       && JSON.stringify(currentSettings[modelListKey]) !== JSON.stringify(newModels);
+
+    if (preserveCatalogGeminiModel) {
+      migrationLog.push(`Preserved catalog-sourced GEMINI_MODEL: ${currentUserModel}`);
+    }
+    if (preserveCatalogProviderModel) {
+      migrationLog.push(providerSource === 'custom'
+        ? `Preserved custom ${currentModelKey}: ${currentUserModel}`
+        : `Preserved catalog-sourced ${currentModelKey}: ${currentUserModel}`);
+    }
 
     if (explicitReplacement) {
       updates[currentModelKey] = explicitReplacement;

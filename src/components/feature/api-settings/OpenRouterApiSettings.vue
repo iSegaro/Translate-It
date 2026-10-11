@@ -224,6 +224,7 @@ const catalogModelSelection = computed({
     selectedModelOption.value = value
     customModelVisible.value = false
     settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', 'catalog')
   }
 })
 
@@ -258,6 +259,9 @@ const openrouterApiModel = computed({
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
     }
+    const isCurated = (CONFIG.OPENROUTER_MODELS || []).some(model => model.value === value && model.value !== 'custom')
+    const isCatalog = discoveredModels.value.some(model => model.value === value)
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })
@@ -269,6 +273,7 @@ const openrouterCustomModel = computed({
   set: (value) => {
     customModelVisible.value = true
     settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value);
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', 'custom')
   }
 })
 

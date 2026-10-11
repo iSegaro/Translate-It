@@ -200,10 +200,9 @@ const syncSavedSelection = (requestId, key, selectionAtStart) => {
   }
 }
 
-const discoverModels = async (apiKey) => {
+const discoverModels = async (apiKey, selectionAtStart = selectionInteraction) => {
   const requestId = ++discoveryRequestId
   const key = typeof apiKey === 'string' ? apiKey : ''
-  const selectionAtStart = selectionInteraction
   activeController?.abort()
   const controller = new AbortController()
   activeController = controller
@@ -257,8 +256,9 @@ watch(requestyApiKey, (apiKey) => {
   modelDiscoveryFailed.value = false
   modelDiscoveryLoading.value = false
   const requestId = ++discoveryRequestId
+  const scheduledSelection = selectionInteraction
   discoveryTimer = setTimeout(() => {
-    if (requestId === discoveryRequestId) discoverModels(apiKey)
+    if (requestId === discoveryRequestId) discoverModels(apiKey, scheduledSelection)
   }, 400)
 }, { flush: 'sync' })
 

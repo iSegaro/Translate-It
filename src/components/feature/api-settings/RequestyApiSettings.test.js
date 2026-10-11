@@ -170,6 +170,34 @@ describe('RequestyApiSettings model catalog', () => {
     wrapper.unmount()
   })
 
+  it('preserves Custom selected during the key debounce and still syncs a pre-schedule saved model', async () => {
+    mocks.settingsStore.settings.REQUESTY_API_KEY = ''
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise).mockResolvedValue([])
+    const wrapper = mount(RequestyApiSettings)
+    await wrapper.get('[data-test="api-key"]').setValue('secret-key')
+    await wrapper.findAll('select')[0].setValue('custom')
+    await vi.advanceTimersByTimeAsync(400)
+    pending.resolve([{ value: 'curated/model-one', name: 'Curated One' }])
+    await flushPromises()
+    expect(wrapper.findAll('select')[0].element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').exists()).toBe(true)
+    expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('curated/model-one')
+    wrapper.unmount()
+
+    mocks.settingsStore.settings.REQUESTY_API_KEY = 'secret-key'
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'server/saved-model'
+    const saved = deferred()
+    mocks.fetchModels.mockReturnValueOnce(saved.promise)
+    const savedWrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    saved.resolve([{ value: 'server/saved-model', name: 'Saved Model' }])
+    await flushPromises()
+    expect(savedWrapper.findAll('select')[0].element.value).toBe('server/saved-model')
+    expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('server/saved-model')
+    savedWrapper.unmount()
+  })
+
   it('synchronizes saved catalog models without writing the setting and honors user interaction during discovery', async () => {
     mocks.settingsStore.settings.REQUESTY_API_MODEL = 'server/model'
     const pending = deferred()

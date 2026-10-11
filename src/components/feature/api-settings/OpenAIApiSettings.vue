@@ -211,10 +211,9 @@ const syncSavedSelection = (requestId, key, selectionAtStart) => {
   }
 }
 
-const discoverModels = async (apiKey) => {
+const discoverModels = async (apiKey, selectionAtStart = selectionInteraction) => {
   const requestId = ++discoveryRequestId
   const key = typeof apiKey === 'string' ? apiKey : ''
-  const selectionAtStart = selectionInteraction
   activeController?.abort()
   activeController = null
   if (!ApiKeyManager.parseKeys(key).length) {
@@ -268,6 +267,7 @@ const catalogModelSelection = computed({
     selectedModelOption.value = value
     customModelVisible.value = false
     settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', 'catalog')
   }
 })
 
@@ -280,13 +280,14 @@ watch(openaiApiKey, (apiKey) => {
   modelDiscoverySucceeded.value = false
   modelDiscoveryFailed.value = false
   const requestId = ++discoveryRequestId
+  const scheduledSelection = selectionInteraction
   if (!ApiKeyManager.parseKeys(apiKey).length) {
     modelDiscoveryLoading.value = false
     return
   }
   modelDiscoveryLoading.value = true
   discoveryTimer = setTimeout(() => {
-    if (requestId === discoveryRequestId) discoverModels(apiKey)
+    if (requestId === discoveryRequestId) discoverModels(apiKey, scheduledSelection)
   }, 400)
 }, { flush: 'sync' })
 
@@ -307,6 +308,9 @@ const openaiApiModel = computed({
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
     }
+    const isCurated = (CONFIG.OPENAI_MODELS || []).some(model => model.value === value && model.value !== 'custom')
+    const isCatalog = discoveredModels.value.some(model => model.value === value)
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })
@@ -319,6 +323,7 @@ const openaiCustomModel = computed({
     selectionInteraction++
     customModelVisible.value = true
     settingsStore.updateSettingLocally('OPENAI_API_MODEL', value);
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', 'custom')
   }
 })
 

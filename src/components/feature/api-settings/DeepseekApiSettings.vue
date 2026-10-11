@@ -236,10 +236,9 @@ const syncSavedSelection = (requestId, key, selectionAtStart) => {
   }
 }
 
-const discoverModels = async (apiKey) => {
+const discoverModels = async (apiKey, selectionAtStart = selectionInteraction) => {
   const requestId = ++discoveryRequestId
   const key = typeof apiKey === 'string' ? apiKey : ''
-  const selectionAtStart = selectionInteraction
   activeController?.abort()
   activeController = null
   if (!ApiKeyManager.parseKeys(key).length) {
@@ -302,6 +301,7 @@ const catalogModelSelection = computed({
     selectedModelOption.value = value
     customModelVisible.value = false
     settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
+    settingsStore.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', 'catalog')
   }
 })
 
@@ -314,13 +314,14 @@ const scheduleDiscovery = (apiKey) => {
   modelDiscoverySucceeded.value = false
   modelDiscoveryFailed.value = false
   const requestId = ++discoveryRequestId
+  const scheduledSelection = selectionInteraction
   if (!ApiKeyManager.parseKeys(apiKey).length || !usesOfficialDeepSeekEndpoint.value) {
     modelDiscoveryLoading.value = false
     return
   }
   modelDiscoveryLoading.value = true
   discoveryTimer = setTimeout(() => {
-    if (requestId === discoveryRequestId) discoverModels(apiKey)
+    if (requestId === discoveryRequestId) discoverModels(apiKey, scheduledSelection)
   }, 400)
 }
 
@@ -349,6 +350,9 @@ const deepseekApiModel = computed({
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
     }
+    const isCurated = (CONFIG.DEEPSEEK_MODELS || []).some(model => model.value === value && model.value !== 'custom')
+    const isCatalog = discoveredModels.value.some(model => model.value === value)
+    settingsStore.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })
@@ -361,6 +365,7 @@ const deepseekCustomModel = computed({
     selectionInteraction++
     customModelVisible.value = true
     settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value);
+    settingsStore.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', 'custom')
   }
 })
 

@@ -115,7 +115,7 @@ let selectionInteraction = 0
 
 const webAIApiModelOptions = computed(() => {
   const models = CONFIG.WEBAI_MODELS || []
-  const options = (modelDiscoverySucceeded.value ? discoveredModels.value.map(id => ({ value: id, name: id })) : models.filter(model => model.value !== 'custom')).map(model => ({
+  const options = models.filter(model => model.value !== 'custom').map(model => ({
     value: model.value,
     label: model.name || model.value
   }))
@@ -138,10 +138,9 @@ const initializeModelSelection = () => {
   selectedModelOption.value = isPredefined ? currentModel : 'custom'
 }
 
-const discoverModels = async (apiUrl) => {
+const discoverModels = async (apiUrl, selectionAtStart = selectionInteraction) => {
   const requestId = ++discoveryRequestId
   const resolvedUrl = resolveWebAIModelsUrl(apiUrl)
-  const selectionAtStart = selectionInteraction
   activeController?.abort()
   const controller = new AbortController()
   activeController = controller
@@ -200,8 +199,9 @@ watch(webAIApiUrl, (url) => {
   modelDiscoveryFailed.value = false
   const requestId = ++discoveryRequestId
   modelDiscoveryLoading.value = false
+  const selectionAtSchedule = selectionInteraction
   discoveryTimer = setTimeout(() => {
-    if (requestId === discoveryRequestId) discoverModels(url)
+    if (requestId === discoveryRequestId) discoverModels(url, selectionAtSchedule)
   }, 400)
 }, { flush: 'sync' })
 
@@ -238,6 +238,6 @@ onMounted(() => {
   initializeModelSelection()
   // Discovery stays component-local and in memory; never write WEBAI_MODELS,
   // which is synchronized from CONFIG by settings migrations.
-  discoverModels(webAIApiUrl.value)
+  discoverModels(webAIApiUrl.value, selectionInteraction)
 })
 </script>

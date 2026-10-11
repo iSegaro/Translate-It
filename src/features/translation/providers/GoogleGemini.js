@@ -158,8 +158,12 @@ export class GeminiProvider extends BaseAIProvider {
     }
 
     let url = apiUrl || CONFIG.GEMINI_API_URL;
-    if (!url.includes(':generateContent')) url = `${url}:generateContent`;
-    url = `${url}?key=${apiKey}`;
+    const requestUrl = new URL(url);
+    if (!requestUrl.pathname.includes(':generateContent')) {
+      requestUrl.pathname = `${requestUrl.pathname}:generateContent`;
+    }
+    requestUrl.searchParams.set('key', apiKey);
+    url = requestUrl.toString();
 
     const fetchOptions = {
       method: "POST",

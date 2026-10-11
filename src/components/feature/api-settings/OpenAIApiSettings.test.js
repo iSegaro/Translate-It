@@ -136,10 +136,12 @@ describe('OpenAIApiSettings model catalog', () => {
     const [curatedSelect, catalogSelect] = wrapper.findAll('select')
     await catalogSelect.setValue('server/model')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('server/model')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('catalog')
     expect(curatedSelect.element.value).toBe('server/model')
     expect(catalogSelect.element.value).toBe('server/model')
     await curatedSelect.setValue('curated/model-two')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('curated/model-two')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('curated')
     expect(catalogSelect.element.value).toBe('')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODELS', expect.anything())
     wrapper.unmount()
@@ -160,6 +162,34 @@ describe('OpenAIApiSettings model catalog', () => {
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('custom/edited-model')
     expect(wrapper.findAll('select')[1].element.value).toBe('custom/edited-model')
     wrapper.unmount()
+  })
+
+  it('preserves Custom selected during the key debounce and still syncs a pre-schedule saved model', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenAIApiSettings)
+    await wrapper.get('[data-test="api-key"]').setValue('secret-key')
+    await wrapper.findAll('select')[0].setValue('custom')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('custom')
+    await vi.advanceTimersByTimeAsync(400)
+    pending.resolve([{ value: 'curated/model-one', name: 'Curated One' }])
+    await flushPromises()
+    expect(wrapper.findAll('select')[0].element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').exists()).toBe(true)
+    expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('curated/model-one')
+    wrapper.unmount()
+
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'secret-key'
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'server/saved-model'
+    const saved = deferred()
+    mocks.fetchModels.mockReturnValueOnce(saved.promise)
+    const savedWrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    saved.resolve([{ value: 'server/saved-model', name: 'Saved Model' }])
+    await flushPromises()
+    expect(savedWrapper.findAll('select')[0].element.value).toBe('server/saved-model')
+    expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('server/saved-model')
+    savedWrapper.unmount()
   })
 
   it('preserves a missing saved model and shows the localized notice', async () => {
