@@ -1340,6 +1340,36 @@
   "openrouter_api_model_placeholder": {
     "message": "مدل OpenRouter را وارد کنید"
   },
+  "openrouter_catalog_search_label": {
+    "message": "جستجوی مدل‌های OpenRouter"
+  },
+  "openrouter_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "openrouter_catalog_results_label": {
+    "message": "مدل‌های موجود OpenRouter"
+  },
+  "openrouter_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "openrouter_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "openrouter_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "openrouter_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های OpenRouter ممکن نشد."
+  },
+  "openrouter_models_empty": {
+    "message": "OpenRouter هیچ مدلی برنگرداند."
+  },
+  "openrouter_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست OpenRouter نبود."
+  },
+  "openrouter_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
   "deepseek_api_settings_title": {
     "message": "تنظیمات DeepSeek"
   },

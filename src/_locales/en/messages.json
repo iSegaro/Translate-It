@@ -1340,6 +1340,36 @@
   "openrouter_api_model_placeholder": {
     "message": "Enter OpenRouter model"
   },
+  "openrouter_catalog_search_label": {
+    "message": "Search OpenRouter models"
+  },
+  "openrouter_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "openrouter_catalog_results_label": {
+    "message": "Available OpenRouter models"
+  },
+  "openrouter_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "openrouter_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "openrouter_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "openrouter_models_discovery_failed": {
+    "message": "Could not load OpenRouter models."
+  },
+  "openrouter_models_empty": {
+    "message": "No models were returned by OpenRouter."
+  },
+  "openrouter_model_not_listed": {
+    "message": "Saved model was not listed by OpenRouter."
+  },
+  "openrouter_saved_model_label": {
+    "message": "Saved model"
+  },
   "deepseek_api_settings_title": {
     "message": "DeepSeek Settings"
   },

@@ -1340,6 +1340,36 @@
   "openrouter_api_model_placeholder": {
     "message": "OpenRouterモデルを入力"
   },
+  "openrouter_catalog_search_label": {
+    "message": "OpenRouterモデルを検索"
+  },
+  "openrouter_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "openrouter_catalog_results_label": {
+    "message": "利用可能なOpenRouterモデル"
+  },
+  "openrouter_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "openrouter_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "openrouter_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "openrouter_models_discovery_failed": {
+    "message": "OpenRouterモデルを読み込めませんでした。"
+  },
+  "openrouter_models_empty": {
+    "message": "OpenRouterからモデルが返されませんでした。"
+  },
+  "openrouter_model_not_listed": {
+    "message": "保存済みモデルはOpenRouterの一覧にありません。"
+  },
+  "openrouter_saved_model_label": {
+    "message": "保存済みモデル"
+  },
   "deepseek_api_settings_title": {
     "message": "DeepSeek 設定"
   },
