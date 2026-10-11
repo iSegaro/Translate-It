@@ -32,6 +32,10 @@
         class="model-select"
         :style="rtlSelectStyle"
       />
+      <small
+        v-if="savedModelNotAdvertised"
+        class="model-discovery-status"
+      >{{ t('requesty_model_not_listed') || 'Saved model was not listed by Requesty.' }}</small>
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
@@ -44,11 +48,49 @@
         dir="ltr"
       />
     </div>
+    <div class="setting-group vertical">
+      <BaseInput
+        id="requesty-model-search"
+        v-model="searchQuery"
+        type="search"
+        :label="t('requesty_catalog_search_label') || 'Search Requesty models'"
+        :placeholder="t('requesty_catalog_search_placeholder') || 'Search by model ID or name'"
+        dir="ltr"
+      />
+      <small
+        v-if="modelDiscoveryLoading"
+        class="model-discovery-status"
+      >{{ t('requesty_models_loading') || 'Loading model catalog…' }}</small>
+      <small
+        v-else-if="modelDiscoveryFailed"
+        class="model-discovery-status"
+      >{{ t('requesty_models_discovery_failed') || 'Could not load Requesty models.' }}</small>
+      <small
+        v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
+        class="model-discovery-status"
+      >{{ t('requesty_models_empty') || 'No models were returned by Requesty.' }}</small>
+      <template v-else-if="modelDiscoverySucceeded">
+        <BaseSelect
+          v-model="catalogModelSelection"
+          :options="filteredCatalogOptions"
+          :style="rtlSelectStyle"
+          :aria-label="t('requesty_catalog_results_label') || 'Available Requesty models'"
+        />
+        <small
+          v-if="filteredCatalogTotal > filteredCatalogOptions.length"
+          class="model-discovery-status"
+        >{{ t('requesty_catalog_showing_count', { shown: filteredCatalogOptions.length, total: filteredCatalogTotal }) || `Showing ${filteredCatalogOptions.length} of ${filteredCatalogTotal} matching models` }}</small>
+        <small
+          v-if="discoveredModels.length > 0 && filteredCatalogTotal === 0"
+          class="model-discovery-status"
+        >{{ t('requesty_catalog_no_matches') || 'No models match your search.' }}</small>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import "./RequestyApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -60,6 +102,10 @@ import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import {
+  fetchRequestyModels,
+  getCachedRequestyModels,
+} from '@/features/translation/providers/RequestyModelDiscovery.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -71,19 +117,158 @@ const requestyApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('REQUESTY_API_KEY', value)
 })
 
-// Track dropdown selection separately from stored value
 const selectedModelOption = ref(CONFIG.REQUESTY_API_MODEL)
+const discoveredModels = ref([])
+const modelDiscoveryLoading = ref(false)
+const modelDiscoveryFailed = ref(false)
+const modelDiscoverySucceeded = ref(false)
+const searchQuery = ref('')
+const customModelVisible = ref(false)
+let discoveryRequestId = 0
+let discoveryTimer
+let activeController
+let selectionInteraction = 0
+
+const requestyApiModelOptions = computed(() => {
+  const curated = (CONFIG.REQUESTY_MODELS || []).filter(model => model.value !== 'custom')
+  const options = curated.map(model => ({ value: model.value, label: model.name || model.value }))
+  const savedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+  const catalogModel = discoveredModels.value.find(model => model.value === savedModel)
+  if (savedModel && savedModel !== 'custom' && !options.some(option => option.value === savedModel)) {
+    options.push({
+      value: savedModel,
+      label: catalogModel ? catalogModel.name : `${savedModel} — ${t('requesty_saved_model_label') || 'Saved model'}`,
+      legacy: !catalogModel,
+    })
+  }
+  const custom = (CONFIG.REQUESTY_MODELS || []).find(model => model.value === 'custom')
+  options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
+  return options
+})
+
+const filteredCatalogTotal = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  if (!query) return discoveredModels.value.length
+  return discoveredModels.value.filter(({ value, name }) =>
+    value.toLocaleLowerCase().includes(query) || name.toLocaleLowerCase().includes(query)
+  ).length
+})
+
+const filteredCatalogOptions = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  return discoveredModels.value
+    .filter(({ value, name }) => !query
+      || value.toLocaleLowerCase().includes(query)
+      || name.toLocaleLowerCase().includes(query))
+    .slice(0, 50)
+    .map(({ value, name }) => ({ value, label: `${name} (${value})` }))
+})
+
+const savedModelNotAdvertised = computed(() => {
+  const savedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+  return modelDiscoverySucceeded.value
+    && Boolean(savedModel)
+    && savedModel !== 'custom'
+    && !discoveredModels.value.some(model => model.value === savedModel)
+})
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL;
-  const isPredefined = requestyApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  const isPredefined = (CONFIG.REQUESTY_MODELS || []).some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
+  customModelVisible.value = !isPredefined
 }
+
+const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  if (requestId !== discoveryRequestId
+    || key !== requestyApiKey.value
+    || selectionAtStart !== selectionInteraction
+    || selectedModelOption.value !== 'custom') return
+  const savedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+  const isPredefined = (CONFIG.REQUESTY_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
+    || discoveredModels.value.some(model => model.value === savedModel)
+  if (isPredefined) {
+    selectedModelOption.value = savedModel
+    customModelVisible.value = false
+  }
+}
+
+const discoverModels = async (apiKey) => {
+  const requestId = ++discoveryRequestId
+  const key = typeof apiKey === 'string' ? apiKey : ''
+  const selectionAtStart = selectionInteraction
+  activeController?.abort()
+  const controller = new AbortController()
+  activeController = controller
+  modelDiscoveryFailed.value = false
+  const cached = getCachedRequestyModels(key)
+  if (cached !== null) {
+    discoveredModels.value = cached
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryLoading.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+    return
+  }
+  modelDiscoveryLoading.value = true
+  try {
+    const models = await fetchRequestyModels({ apiKey: key, signal: controller.signal })
+    if (requestId !== discoveryRequestId || key !== requestyApiKey.value) return
+    discoveredModels.value = models
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryFailed.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+  } catch {
+    if (requestId !== discoveryRequestId || key !== requestyApiKey.value) return
+    modelDiscoverySucceeded.value = false
+    modelDiscoveryFailed.value = true
+  } finally {
+    if (requestId === discoveryRequestId && key === requestyApiKey.value) modelDiscoveryLoading.value = false
+  }
+}
+
+const catalogModelSelection = computed({
+  get: () => {
+    const savedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+    return filteredCatalogOptions.value.some(option => option.value === savedModel) ? savedModel : ''
+  },
+  set: (value) => {
+    if (!value) return
+    selectionInteraction++
+    selectedModelOption.value = value
+    customModelVisible.value = false
+    settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value)
+  }
+})
+
+watch(requestyApiKey, (apiKey) => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+  discoveredModels.value = []
+  modelDiscoverySucceeded.value = false
+  modelDiscoveryFailed.value = false
+  modelDiscoveryLoading.value = false
+  const requestId = ++discoveryRequestId
+  discoveryTimer = setTimeout(() => {
+    if (requestId === discoveryRequestId) discoverModels(apiKey)
+  }, 400)
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+})
 
 const requestyApiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
+    selectionInteraction++
+    const wasCustom = selectedModelOption.value === 'custom'
+    customModelVisible.value = value === 'custom' && wasCustom ? customModelVisible.value : false
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value)
@@ -93,22 +278,14 @@ const requestyApiModel = computed({
 })
 
 const requestyCustomModel = computed({
-  get: () => {
-    const currentModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL;
-    const isPredefined = requestyApiModelOptions?.value?.some(option => option.value === currentModel && option.value !== 'custom') || false;
-    return isPredefined ? '' : currentModel;
-  },
+  get: () => selectedModelOption.value === 'custom' && customModelVisible.value
+    ? settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+    : '',
   set: (value) => {
+    selectionInteraction++
+    customModelVisible.value = true
     settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value);
   }
-})
-
-const requestyApiModelOptions = computed(() => {
-  const models = settingsStore.settings?.REQUESTY_MODELS || CONFIG.REQUESTY_MODELS || []
-  return models.map(model => ({
-    value: model.value,
-    label: model.name || model.value
-  }))
 })
 
 // Test keys functionality
@@ -156,5 +333,6 @@ const testKeys = async (providerId) => {
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
+  discoverModels(requestyApiKey.value)
 })
 </script>

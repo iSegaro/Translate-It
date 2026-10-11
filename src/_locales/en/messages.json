@@ -1334,6 +1334,36 @@
   "requesty_api_key_placeholder": {
     "message": "Paste your Requesty API key here"
   },
+  "requesty_catalog_search_label": {
+    "message": "Search Requesty models"
+  },
+  "requesty_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "requesty_catalog_results_label": {
+    "message": "Available Requesty models"
+  },
+  "requesty_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "requesty_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "requesty_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "requesty_models_discovery_failed": {
+    "message": "Could not load Requesty models."
+  },
+  "requesty_models_empty": {
+    "message": "No models were returned by Requesty."
+  },
+  "requesty_model_not_listed": {
+    "message": "Saved model was not listed by Requesty."
+  },
+  "requesty_saved_model_label": {
+    "message": "Saved model"
+  },
   "openrouter_api_settings_model_label": {
     "message": "Model"
   },
