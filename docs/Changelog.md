@@ -2,7 +2,7 @@
 
 ##### Added
 
-- Added **Dynamic AI Model Discovery**, allowing users to browse, search, and select available AI models directly from Settings for WebAI, OpenRouter, Requesty, OpenAI, DeepSeek, and Gemini.
+- Added **Dynamic AI Model Discovery**, allowing users to browse, search, and select available AI models directly from Settings for OpenRouter, Requesty, OpenAI, DeepSeek, and Gemini, and to browse server-advertised models in the main Model selector for WebAI.
 
 ---
 
