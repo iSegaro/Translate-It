@@ -256,4 +256,101 @@ describe('RequestyApiSettings model catalog', () => {
     wrapper.unmount()
     expect(secondSignal.aborted).toBe(true)
   })
+
+  it('announces catalog loading, failure, empty, and saved-model warnings to screen readers', async () => {
+    const liveStatusFor = (target, text) => {
+      const status = target.findAll('[role="status"]').find(node => node.text().includes(text))
+      expect(status, `expected a live status announcing "${text}"`).toBeTruthy()
+      expect(status.attributes('aria-live')).toBe('polite')
+      expect(status.attributes('aria-atomic')).toBe('true')
+    }
+
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(RequestyApiSettings)
+    await nextTick()
+    liveStatusFor(wrapper, 'Loading model catalog…')
+    pending.reject(new Error('offline'))
+    await flushPromises()
+    liveStatusFor(wrapper, 'Could not load Requesty models.')
+    wrapper.unmount()
+
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'legacy/missing-model'
+    mocks.fetchModels.mockResolvedValueOnce([])
+    const empty = mount(RequestyApiSettings)
+    await flushPromises()
+    liveStatusFor(empty, 'No models were returned by Requesty.')
+    liveStatusFor(empty, 'Saved model was not listed by Requesty.')
+    empty.unmount()
+  })
+
+  it('keeps catalog search counts and no-match hints outside live regions', async () => {
+    mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({
+      value: `model/${index}`, name: `Model ${index}`,
+    })))
+    const wrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    const countHint = wrapper.findAll('small').find(node => node.text().includes('Showing 50 of 60 matching models'))
+    expect(countHint).toBeTruthy()
+    expect(countHint.element.closest('[role="status"], [aria-live]')).toBeNull()
+    await wrapper.get('#requesty-model-search').setValue('missing-model')
+    const noMatchesHint = wrapper.findAll('small').find(node => node.text().includes('No models match your search.'))
+    expect(noMatchesHint).toBeTruthy()
+    expect(noMatchesHint.element.closest('[role="status"], [aria-live]')).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('keeps the catalog live region mounted while its text moves through loading, failure, empty, and settled states', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(RequestyApiSettings)
+    const catalogRegion = () => wrapper.findAll('[role="status"]')[1]
+    expect(catalogRegion().text()).toBe('')
+    expect(catalogRegion().classes()).toContain('ti-sr-only')
+    const regionElement = catalogRegion().element
+
+    await nextTick()
+    expect(catalogRegion().element).toBe(regionElement)
+    expect(catalogRegion().text()).toBe('Loading model catalog…')
+    expect(catalogRegion().classes()).not.toContain('ti-sr-only')
+
+    pending.reject(new Error('offline'))
+    await flushPromises()
+    expect(catalogRegion().element).toBe(regionElement)
+    expect(catalogRegion().text()).toBe('Could not load Requesty models.')
+
+    mocks.fetchModels.mockResolvedValueOnce([])
+    await wrapper.get('[data-test="api-key"]').setValue('key-two')
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(catalogRegion().element).toBe(regionElement)
+    expect(catalogRegion().text()).toBe('No models were returned by Requesty.')
+
+    mocks.fetchModels.mockResolvedValueOnce([{ value: 'server/model', name: 'Server Model' }])
+    await wrapper.get('[data-test="api-key"]').setValue('key-three')
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(catalogRegion().element).toBe(regionElement)
+    expect(catalogRegion().text()).toBe('')
+    expect(catalogRegion().classes()).toContain('ti-sr-only')
+    wrapper.unmount()
+  })
+
+  it('keeps the saved-model warning live region mounted until the warning clears', async () => {
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'legacy/missing-model'
+    mocks.fetchModels.mockResolvedValue([{ value: 'server/model', name: 'Server Model' }])
+    const wrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    const warningRegion = () => wrapper.findAll('[role="status"]')[0]
+    expect(warningRegion().text()).toBe('Saved model was not listed by Requesty.')
+    expect(warningRegion().classes()).not.toContain('ti-sr-only')
+    const regionElement = warningRegion().element
+
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'server/model'
+    await nextTick()
+    expect(warningRegion().element).toBe(regionElement)
+    expect(warningRegion().text()).toBe('')
+    expect(warningRegion().classes()).toContain('ti-sr-only')
+    wrapper.unmount()
+  })
 })

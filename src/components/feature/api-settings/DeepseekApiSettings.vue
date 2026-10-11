@@ -33,9 +33,12 @@
         :style="rtlSelectStyle"
       />
       <small
-        v-if="savedModelNotAdvertised"
-        class="model-discovery-status"
-      >{{ t('deepseek_model_not_listed') || 'Saved model was not listed by DeepSeek.' }}</small>
+        class="model-discovery-status model-discovery-status-warning"
+        :class="{ 'model-discovery-status--absent': !savedModelWarningMessage }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ savedModelWarningMessage }}</small>
     </div>
     <div
       v-if="showDeepseekThinkingMode"
@@ -81,22 +84,13 @@
         dir="ltr"
       />
       <small
-        v-if="!hasDeepSeekKey"
-        class="model-discovery-status"
-      >{{ t('deepseek_models_missing_key') || 'Add an API key to discover available models.' }}</small>
-      <small
-        v-else-if="modelDiscoveryLoading"
-        class="model-discovery-status"
-      >{{ t('deepseek_models_loading') || 'Loading model catalog…' }}</small>
-      <small
-        v-else-if="modelDiscoveryFailed"
-        class="model-discovery-status"
-      >{{ t('deepseek_models_discovery_failed') || 'Could not load DeepSeek models.' }}</small>
-      <small
-        v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
-        class="model-discovery-status"
-      >{{ t('deepseek_models_empty') || 'No models were returned by DeepSeek.' }}</small>
-      <template v-else-if="modelDiscoverySucceeded">
+        class="model-discovery-status model-discovery-status-live"
+        :class="{ 'model-discovery-status--absent': !discoveryStatusMessage }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ discoveryStatusMessage }}</small>
+      <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
         <BaseSelect
           v-model="catalogModelSelection"
           :options="filteredCatalog.options"
@@ -136,6 +130,7 @@ import {
   getCachedDeepSeekModels,
   MissingDeepSeekKeyError,
 } from '@/features/translation/providers/DeepSeekModelDiscovery.js'
+import { isOfficialDeepSeekEndpoint } from '@/features/translation/providers/modelDiscoveryEndpoints.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -155,6 +150,10 @@ const modelDiscoverySucceeded = ref(false)
 const searchQuery = ref('')
 const customModelVisible = ref(false)
 const hasDeepSeekKey = computed(() => ApiKeyManager.parseKeys(deepseekApiKey.value).length > 0)
+// Discovery must never contact api.deepseek.com for a custom endpoint. The URL
+// input is not rendered here, but a stored override still governs translation.
+const deepseekApiUrl = computed(() => settingsStore.settings?.DEEPSEEK_API_URL || CONFIG.DEEPSEEK_API_URL)
+const usesOfficialDeepSeekEndpoint = computed(() => isOfficialDeepSeekEndpoint(deepseekApiUrl.value))
 let discoveryRequestId = 0
 let discoveryTimer
 let activeController
@@ -185,6 +184,34 @@ const savedModelNotAdvertised = computed(() => {
     && Boolean(savedModel)
     && savedModel !== 'custom'
     && !discoveredModels.value.some(model => model.value === savedModel)
+})
+
+// Persistent live-region copy: the DOM element stays mounted and only this
+// resolved message changes, so screen readers announce real transitions instead
+// of conditional mounts.
+const savedModelWarningMessage = computed(() => (
+  savedModelNotAdvertised.value
+    ? (t('deepseek_model_not_listed') || 'Saved model was not listed by DeepSeek.')
+    : ''
+))
+
+const discoveryStatusMessage = computed(() => {
+  if (!usesOfficialDeepSeekEndpoint.value) {
+    return t('deepseek_custom_endpoint_info') || 'Using a custom API URL — DeepSeek\'s model catalog is not loaded.'
+  }
+  if (!hasDeepSeekKey.value) {
+    return t('deepseek_models_missing_key') || 'Add an API key to discover available models.'
+  }
+  if (modelDiscoveryLoading.value) {
+    return t('deepseek_models_loading') || 'Loading model catalog…'
+  }
+  if (modelDiscoveryFailed.value) {
+    return t('deepseek_models_discovery_failed') || 'Could not load DeepSeek models.'
+  }
+  if (modelDiscoverySucceeded.value && discoveredModels.value.length === 0) {
+    return t('deepseek_models_empty') || 'No models were returned by DeepSeek.'
+  }
+  return ''
 })
 
 // Initialize selectedModelOption based on current stored value
@@ -222,6 +249,15 @@ const discoverModels = async (apiKey) => {
     modelDiscoverySucceeded.value = false
     return
   }
+  // Guard before the cache getter: a warm official cache must never leak into a
+  // custom-endpoint configuration, and the official host must not be contacted.
+  if (!usesOfficialDeepSeekEndpoint.value) {
+    discoveredModels.value = []
+    modelDiscoveryLoading.value = false
+    modelDiscoveryFailed.value = false
+    modelDiscoverySucceeded.value = false
+    return
+  }
   const cached = getCachedDeepSeekModels(key)
   modelDiscoveryFailed.value = false
   if (cached !== null) {
@@ -236,13 +272,13 @@ const discoverModels = async (apiKey) => {
   modelDiscoveryLoading.value = true
   try {
     const models = await fetchDeepSeekModels({ apiKey: key, signal: controller.signal })
-    if (requestId !== discoveryRequestId || key !== deepseekApiKey.value) return
+    if (requestId !== discoveryRequestId || key !== deepseekApiKey.value || !usesOfficialDeepSeekEndpoint.value) return
     discoveredModels.value = models
     modelDiscoverySucceeded.value = true
     modelDiscoveryFailed.value = false
     syncSavedSelection(requestId, key, selectionAtStart)
   } catch (error) {
-    if (requestId !== discoveryRequestId || key !== deepseekApiKey.value) return
+    if (requestId !== discoveryRequestId || key !== deepseekApiKey.value || !usesOfficialDeepSeekEndpoint.value) return
     if (error instanceof MissingDeepSeekKeyError) {
       modelDiscoverySucceeded.value = false
       modelDiscoveryFailed.value = false
@@ -269,7 +305,7 @@ const catalogModelSelection = computed({
   }
 })
 
-watch(deepseekApiKey, (apiKey) => {
+const scheduleDiscovery = (apiKey) => {
   clearTimeout(discoveryTimer)
   discoveryRequestId++
   activeController?.abort()
@@ -278,7 +314,7 @@ watch(deepseekApiKey, (apiKey) => {
   modelDiscoverySucceeded.value = false
   modelDiscoveryFailed.value = false
   const requestId = ++discoveryRequestId
-  if (!ApiKeyManager.parseKeys(apiKey).length) {
+  if (!ApiKeyManager.parseKeys(apiKey).length || !usesOfficialDeepSeekEndpoint.value) {
     modelDiscoveryLoading.value = false
     return
   }
@@ -286,6 +322,14 @@ watch(deepseekApiKey, (apiKey) => {
   discoveryTimer = setTimeout(() => {
     if (requestId === discoveryRequestId) discoverModels(apiKey)
   }, 400)
+}
+
+watch(deepseekApiKey, (apiKey) => {
+  scheduleDiscovery(apiKey)
+}, { flush: 'sync' })
+
+watch(deepseekApiUrl, () => {
+  scheduleDiscovery(deepseekApiKey.value)
 }, { flush: 'sync' })
 
 onBeforeUnmount(() => {
@@ -382,3 +426,10 @@ onMounted(() => {
   discoverModels(deepseekApiKey.value)
 })
 </script>
+
+<style scoped>
+/* Empty persistent live regions stay mounted (a11y tree) but leave no layout gap. */
+.model-discovery-status--absent {
+  position: absolute;
+}
+</style>

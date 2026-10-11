@@ -31,6 +31,7 @@ const translations = {
   deepseek_model_not_listed: 'Saved model was not listed by DeepSeek.',
   deepseek_saved_model_label: 'Saved model',
   deepseek_catalog_showing_count: ({ shown, total }) => `Showing ${shown} of ${total} matching models`,
+  deepseek_custom_endpoint_info: 'Using a custom API URL — DeepSeek\'s model catalog is not loaded.',
 };
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -41,6 +42,7 @@ vi.mock('@/shared/config/config.js', () => ({
   CONFIG: {
     DEEPSEEK_API_MODEL: 'thinking-model',
     DEEPSEEK_API_KEY: '',
+    DEEPSEEK_API_URL: 'https://api.deepseek.com/chat/completions',
     DEEPSEEK_MODELS: mocks.models,
     DEEPSEEK_THINKING_MODE_OPTIONS: [
       { value: 'disabled', name: 'Disabled' },
@@ -300,5 +302,179 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     pending.resolve([{ value: 'late/model', name: 'Late Model' }]);
     await flushPromises();
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', 'late/model');
+  });
+
+  it('never reads the cache or fetches for a custom endpoint even when the cache is warm', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://proxy.example/chat/completions';
+    mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }]);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    expect(mocks.getCachedModels).not.toHaveBeenCalled();
+    expect(mocks.fetchModels).not.toHaveBeenCalled();
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Using a custom API URL — DeepSeek\'s model catalog is not loaded.');
+    expect(wrapper.text()).not.toContain('Add an API key to discover available models.');
+    expect(wrapper.text()).not.toContain('Cached Model');
+    wrapper.unmount();
+  });
+
+  it('aborts a pending official request when the endpoint turns custom and ignores the late result', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    const pending = deferred();
+    mocks.fetchModels.mockReturnValue(pending.promise);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    const signal = mocks.fetchModels.mock.calls[0][0].signal;
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://proxy.example/chat/completions';
+    expect(signal.aborted).toBe(true);
+    pending.resolve([{ value: 'late/model', name: 'Late Model' }]);
+    await flushPromises();
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Using a custom API URL — DeepSeek\'s model catalog is not loaded.');
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', 'late/model');
+    wrapper.unmount();
+  });
+
+  it('resumes official discovery from cache after switching back from a custom endpoint', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://proxy.example/chat/completions';
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    expect(mocks.fetchModels).not.toHaveBeenCalled();
+    mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }]);
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+    await vi.advanceTimersByTimeAsync(400);
+    await flushPromises();
+    expect(mocks.fetchModels).not.toHaveBeenCalled();
+    expect(mocks.getCachedModels).toHaveBeenCalledWith('deepseek-key');
+    expect(wrapper.get('.catalog-model-select').text()).toContain('Cached Model');
+    wrapper.unmount();
+  });
+
+  it('debounces endpoint and key changes so only the latest official combination fetches', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'key-one';
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://proxy.example/chat/completions';
+    mocks.fetchModels.mockResolvedValue([{ value: 'fresh/model', name: 'Fresh Model' }]);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    expect(mocks.fetchModels).not.toHaveBeenCalled();
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+    await wrapper.get('[data-test="api-key"]').setValue('key-two');
+    await wrapper.get('[data-test="api-key"]').setValue('key-three');
+    await vi.advanceTimersByTimeAsync(399);
+    expect(mocks.fetchModels).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    expect(mocks.fetchModels).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchModels.mock.calls[0][0].apiKey).toBe('key-three');
+    expect(wrapper.get('.catalog-model-select').text()).toContain('Fresh Model');
+    wrapper.unmount();
+  });
+
+  it('keeps an empty persistent live region mounted from initial render and updates only its contents', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }]);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    const region = wrapper.get('.model-discovery-status-live');
+    expect(region.attributes('role')).toBe('status');
+    expect(region.attributes('aria-live')).toBe('polite');
+    expect(region.attributes('aria-atomic')).toBe('true');
+    expect(region.text()).toBe('');
+    expect(region.classes()).toContain('model-discovery-status--absent');
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(true);
+    await wrapper.get('[data-test="api-key"]').setValue('');
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
+    expect(region.text()).toBe('Add an API key to discover available models.');
+    expect(region.classes()).not.toContain('model-discovery-status--absent');
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('keeps the live region identity through the loading→failure transition', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    const pending = deferred();
+    mocks.fetchModels.mockReturnValueOnce(pending.promise);
+    const wrapper = mount(DeepseekApiSettings);
+    await nextTick();
+    const region = wrapper.get('.model-discovery-status-live');
+    expect(region.text()).toBe('Loading model catalog…');
+    pending.reject(new Error('offline'));
+    await flushPromises();
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
+    expect(region.text()).toBe('Could not load DeepSeek models.');
+    wrapper.unmount();
+  });
+
+  it('keeps the live region identity across a custom→official endpoint transition', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://proxy.example/chat/completions';
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    const region = wrapper.get('.model-discovery-status-live');
+    expect(region.text()).toBe('Using a custom API URL — DeepSeek\'s model catalog is not loaded.');
+    expect(region.classes()).not.toContain('model-discovery-status--absent');
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
+    await nextTick();
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
+    expect(region.text()).toBe('Add an API key to discover available models.');
+    wrapper.unmount();
+  });
+
+  it('keeps the live region identity through loading to the empty-catalog message', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    const pending = deferred();
+    mocks.fetchModels.mockReturnValueOnce(pending.promise);
+    const wrapper = mount(DeepseekApiSettings);
+    await nextTick();
+    const region = wrapper.get('.model-discovery-status-live');
+    expect(region.text()).toBe('Loading model catalog…');
+    pending.resolve([]);
+    await flushPromises();
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
+    expect(region.text()).toBe('No models were returned by DeepSeek.');
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('keeps the saved-model warning region mounted and updates its contents after discovery', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_MODEL = 'missing/saved-model';
+    const pending = deferred();
+    mocks.fetchModels.mockReturnValueOnce(pending.promise);
+    const wrapper = mount(DeepseekApiSettings);
+    await nextTick();
+    const warning = wrapper.get('.model-discovery-status-warning');
+    expect(warning.attributes('role')).toBe('status');
+    expect(warning.attributes('aria-live')).toBe('polite');
+    expect(warning.attributes('aria-atomic')).toBe('true');
+    expect(warning.text()).toBe('');
+    expect(warning.classes()).toContain('model-discovery-status--absent');
+    pending.resolve([{ value: 'catalog/model', name: 'Catalog Model' }]);
+    await flushPromises();
+    expect(wrapper.get('.model-discovery-status-warning').element).toBe(warning.element);
+    expect(warning.text()).toBe('Saved model was not listed by DeepSeek.');
+    expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('missing/saved-model');
+    wrapper.unmount();
+  });
+
+  it('keeps per-keystroke search feedback outside the live region', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({ value: `model/${index}`, name: `Model ${index}` })));
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    const region = wrapper.get('.model-discovery-status-live');
+    expect(region.text()).toBe('');
+    const showing = wrapper.findAll('.model-discovery-status').find(node => node.text().startsWith('Showing'));
+    expect(showing.attributes('role')).toBeUndefined();
+    expect(showing.attributes('aria-live')).toBeUndefined();
+    expect(region.element.contains(showing.element)).toBe(false);
+    await wrapper.get('#deepseek-model-search').setValue('zzz-no-match');
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
+    expect(region.text()).toBe('');
+    const noMatch = wrapper.findAll('.model-discovery-status').find(node => node.text() === 'No models match your search.');
+    expect(noMatch.attributes('role')).toBeUndefined();
+    expect(region.element.contains(noMatch.element)).toBe(false);
+    wrapper.unmount();
   });
 });

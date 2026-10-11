@@ -1295,6 +1295,12 @@
   "gemini_saved_model_label": {
     "message": "Saved model"
   },
+  "gemini_custom_endpoint_info": {
+    "message": "Using a custom API URL — Google's model catalog is not loaded."
+  },
+  "gemini_catalog_official_info": {
+    "message": "Catalog selection uses Google's official Gemini API."
+  },
   "webai_api_settings_title": {
     "message": "WebAI Settings"
   },
@@ -1516,6 +1522,9 @@
   },
   "deepseek_saved_model_label": {
     "message": "Saved model"
+  },
+  "deepseek_custom_endpoint_info": {
+    "message": "Using a custom API URL — DeepSeek's model catalog is not loaded."
   },
   "deepseek_thinking_mode_label": {
     "message": "Thinking Mode"

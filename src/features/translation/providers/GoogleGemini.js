@@ -21,6 +21,7 @@ import {
   normalizeTermination,
 } from "@/features/translation/ir/CompletionContract.js";
 import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
+import { isOfficialGeminiEndpoint } from './modelDiscoveryEndpoints.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
 
 function buildGeminiCatalogModelUrl(model) {
@@ -146,13 +147,11 @@ export class GeminiProvider extends BaseAIProvider {
 
     let apiUrl = rawApiUrl;
     const curatedModel = CONFIG.GEMINI_MODELS?.find(configuredModel => configuredModel.value === model);
-    const isStandardGoogleUrl = !rawApiUrl || 
-                                rawApiUrl.includes('generativelanguage.googleapis.com') || 
-                                rawApiUrl === CONFIG.GEMINI_API_URL;
+    const isStandardGoogleUrl = isOfficialGeminiEndpoint(rawApiUrl);
 
     // Only explicitly selected catalog models use their ID to build a standard
     // endpoint; legacy/custom URL routing remains governed by the stored source.
-    if (modelSource === 'catalog' && model && model !== 'custom' && !curatedModel) {
+    if (modelSource === 'catalog' && model && model !== 'custom' && !curatedModel && isStandardGoogleUrl) {
       apiUrl = buildGeminiCatalogModelUrl(model);
     } else if (isStandardGoogleUrl && curatedModel?.url) {
       apiUrl = curatedModel.url;

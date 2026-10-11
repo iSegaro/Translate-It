@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { reactive } from 'vue'
+import { nextTick, reactive } from 'vue'
 import WebAIApiSettings from './WebAIApiSettings.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -73,6 +73,15 @@ describe('WebAIApiSettings model discovery', () => {
     ])
     expect(wrapper.text()).toContain('Saved model was not listed by the server.')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('WEBAI_MODELS', expect.anything())
+    wrapper.unmount()
+  })
+
+  it('does not warn when the saved model is the custom sentinel after successful discovery', async () => {
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'custom'
+    mocks.fetchModels.mockResolvedValue(['gemini-auto'])
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('Saved model was not listed by the server.')
     wrapper.unmount()
   })
 
@@ -187,5 +196,78 @@ describe('WebAIApiSettings model discovery', () => {
     wrapper.unmount()
     expect(secondSignal.aborted).toBe(true)
     await flushPromises()
+  })
+
+  it('announces loading, failure, and saved-model warnings without live regions for the custom sentinel', async () => {
+    const liveStatusFor = (target, text) => {
+      const status = target.findAll('[role="status"]').find(node => node.text().includes(text))
+      expect(status, `expected a live status announcing "${text}"`).toBeTruthy()
+      expect(status.attributes('aria-live')).toBe('polite')
+      expect(status.attributes('aria-atomic')).toBe('true')
+      return status
+    }
+
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(WebAIApiSettings)
+    await nextTick()
+    liveStatusFor(wrapper, 'Checking available models…')
+    pending.reject(new Error('offline'))
+    await flushPromises()
+    liveStatusFor(wrapper, 'Could not check available models.')
+    wrapper.unmount()
+
+    mocks.fetchModels.mockResolvedValueOnce(['gemini-auto'])
+    const warned = mount(WebAIApiSettings)
+    await flushPromises()
+    liveStatusFor(warned, 'Saved model was not listed by the server.')
+    warned.unmount()
+
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'custom'
+    mocks.fetchModels.mockResolvedValueOnce(['gemini-auto'])
+    const custom = mount(WebAIApiSettings)
+    await flushPromises()
+    expect(custom.text()).not.toContain('Saved model was not listed by the server.')
+    expect(custom.get('[role="status"]').text()).toBe('')
+    custom.unmount()
+  })
+
+  it('keeps the discovery live region mounted across loading, failure, warning, and empty transitions', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(WebAIApiSettings)
+    const region = () => wrapper.get('[role="status"]')
+    expect(region().text()).toBe('')
+    expect(region().classes()).toContain('ti-sr-only')
+    const regionElement = region().element
+
+    await nextTick()
+    expect(region().element).toBe(regionElement)
+    expect(region().text()).toBe('Checking available models…')
+    expect(region().classes()).not.toContain('ti-sr-only')
+
+    pending.reject(new Error('offline'))
+    await flushPromises()
+    expect(region().element).toBe(regionElement)
+    expect(region().text()).toBe('Could not check available models.')
+
+    mocks.fetchModels.mockResolvedValueOnce(['gemini-auto'])
+    mocks.settingsStore.settings.WEBAI_API_URL = 'https://second.test/v1/translate'
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(region().element).toBe(regionElement)
+    expect(region().text()).toBe('Saved model was not listed by the server.')
+
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'gemini-auto'
+    await nextTick()
+    expect(region().element).toBe(regionElement)
+    expect(region().text()).toBe('')
+    expect(region().classes()).toContain('ti-sr-only')
+
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'custom'
+    await nextTick()
+    expect(region().element).toBe(regionElement)
+    expect(region().text()).toBe('')
+    wrapper.unmount()
   })
 })

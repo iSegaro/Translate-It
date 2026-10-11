@@ -23,6 +23,8 @@ const translations = {
   gemini_model_not_listed: 'Saved model was not listed by Gemini.',
   gemini_saved_model_label: 'Saved model',
   gemini_catalog_showing_count: ({ shown, total }) => `Showing ${shown} of ${total} matching models`,
+  gemini_custom_endpoint_info: 'Using a custom API URL — Google\'s model catalog is not loaded.',
+  gemini_catalog_official_info: 'Catalog selection uses Google\'s official Gemini API.',
 }
 
 vi.mock('@/features/settings/stores/settings.js', () => ({ useSettingsStore: () => mocks.settingsStore }))
@@ -145,6 +147,18 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     wrapper.unmount()
   })
 
+  it('discovers for a saved official models-list URL', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
+    mocks.fetchModels.mockResolvedValue([{ value: 'gemini-new', name: 'New Gemini' }])
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(mocks.fetchModels).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('.catalog-model-select').text()).toContain('New Gemini')
+    expect(wrapper.text()).not.toContain('Using a custom API URL')
+    wrapper.unmount()
+  })
+
   it('selects catalog models with a persistent source marker and clears derived selection after curated pick', async () => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     mocks.fetchModels.mockResolvedValue([{ value: 'gemini-catalog', name: 'Catalog Gemini' }])
@@ -163,14 +177,18 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     wrapper.unmount()
   })
 
-  it('preserves custom API URL and legacy unknown-model routing when discovery completes', async () => {
+  it('preserves custom API URL and legacy routing without discovering against a custom endpoint', async () => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     mocks.settingsStore.settings.GEMINI_MODEL = 'legacy/model-id'
     mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
     mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
-    mocks.fetchModels.mockResolvedValue([{ value: 'legacy/model-id', name: 'Listed Model' }])
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
+    expect(mocks.fetchModels).not.toHaveBeenCalled()
+    expect(mocks.getCachedModels).not.toHaveBeenCalled()
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
+    expect(wrapper.text()).not.toContain('Add an API key to discover available models.')
     expect(mocks.settingsStore.settings.GEMINI_API_URL).toBe('https://custom.example/v1beta/models/custom-path:generateContent')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_API_URL', expect.anything())
     expect(wrapper.get('#GEMINI_API_URL').element.value).toBe('https://custom.example/v1beta/models/custom-path:generateContent')
@@ -187,11 +205,15 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     mocks.fetchModels.mockReturnValue(pending.promise)
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
+    const signal = mocks.fetchModels.mock.calls[0][0].signal
     const editedUrl = 'https://proxy.example/v1beta/models/custom-route:generateContent'
     await wrapper.get('#GEMINI_API_URL').setValue(editedUrl)
+    expect(signal.aborted).toBe(true)
     pending.resolve([{ value: 'catalog/saved-id', name: 'Saved Model' }])
     await flushPromises()
     expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
     expect(wrapper.get('#GEMINI_API_URL').element.value).toBe(editedUrl)
     expect(mocks.settingsStore.settings.GEMINI_API_URL).toBe(editedUrl)
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('custom')
@@ -293,11 +315,10 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_API_URL', expect.anything())
   })
 
-  it('validates catalog selections against the official Gemini endpoint without mutating settings', async () => {
+  it('validates a catalog selection against the official Gemini endpoint when the endpoint is official', async () => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     mocks.settingsStore.settings.GEMINI_MODEL = 'gemini-catalog-model'
     mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
-    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/other:generateContent'
     mocks.fetchModels.mockResolvedValue([{ value: 'gemini-catalog-model', name: 'Catalog Model' }])
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
@@ -307,9 +328,6 @@ describe('GeminiApiSettings dynamic model catalog', () => {
       apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
       apiModel: 'gemini-catalog-model',
     })
-    expect(mocks.settingsStore.settings.GEMINI_API_URL).toBe('https://custom.example/v1beta/models/other:generateContent')
-    expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe('gemini-catalog-model')
-    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('catalog')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_API_URL', expect.anything())
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL_SOURCE', expect.anything())
@@ -320,6 +338,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     ['custom selection', 'custom', 'custom', 'https://custom.example/v1beta/models/other:generateContent'],
     ['legacy selection', 'legacy-unknown-model', 'legacy', 'https://custom.example/v1beta/models/other:generateContent'],
     ['curated selection', 'curated-one', 'curated', 'https://generativelanguage.googleapis.com/v1beta/models/curated-one:generateContent'],
+    ['persisted catalog selection with a custom URL', 'gemini-catalog-model', 'catalog', 'https://custom.example/v1beta/models/other:generateContent'],
   ])('validates %s against the stored URL without mutating settings', async (_, model, source, storedUrl) => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     mocks.settingsStore.settings.GEMINI_MODEL = model
@@ -338,6 +357,203 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     expect(mocks.settingsStore.settings.GEMINI_API_URL).toBe(storedUrl)
     expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe(model)
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe(source)
+    wrapper.unmount()
+  })
+
+  it('never reads the cache or fetches for a custom endpoint even when the cache is warm', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
+    mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }])
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(mocks.getCachedModels).not.toHaveBeenCalled()
+    expect(mocks.fetchModels).not.toHaveBeenCalled()
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
+    expect(wrapper.text()).not.toContain('Cached Model')
+    wrapper.unmount()
+  })
+
+  it('preserves a saved catalog selection and source under a custom endpoint', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/saved-id'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/saved-id')
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe('catalog/saved-id')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('catalog')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL_SOURCE', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_API_URL', expect.anything())
+    wrapper.unmount()
+  })
+
+  it('aborts a pending official request when the endpoint turns custom and ignores the late result', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    const signal = mocks.fetchModels.mock.calls[0][0].signal
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
+    expect(signal.aborted).toBe(true)
+    pending.resolve([{ value: 'late/model', name: 'Late Model' }])
+    await flushPromises()
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', 'late/model')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).not.toBe('catalog')
+    wrapper.unmount()
+  })
+
+  it('resumes official discovery from cache after switching back from a custom endpoint', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(mocks.fetchModels).not.toHaveBeenCalled()
+    mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }])
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/curated-one:generateContent'
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(mocks.fetchModels).not.toHaveBeenCalled()
+    expect(mocks.getCachedModels).toHaveBeenCalledWith('key')
+    expect(wrapper.get('.catalog-model-select').text()).toContain('Cached Model')
+    wrapper.unmount()
+  })
+
+  it('debounces endpoint and key changes so only the latest official combination fetches', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key-one'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
+    mocks.fetchModels.mockResolvedValue([{ value: 'fresh/model', name: 'Fresh Model' }])
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(mocks.fetchModels).not.toHaveBeenCalled()
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/curated-one:generateContent'
+    await wrapper.get('[data-test="api-key"]').setValue('key-two')
+    await wrapper.get('[data-test="api-key"]').setValue('key-three')
+    await vi.advanceTimersByTimeAsync(399)
+    expect(mocks.fetchModels).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    await flushPromises()
+    expect(mocks.fetchModels).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchModels.mock.calls[0][0].apiKey).toBe('key-three')
+    expect(wrapper.get('.catalog-model-select').text()).toContain('Fresh Model')
+    wrapper.unmount()
+  })
+
+  it('keeps an empty persistent live region mounted from initial render and updates only its contents', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }])
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    const region = wrapper.get('.model-discovery-status-live')
+    expect(region.attributes('role')).toBe('status')
+    expect(region.attributes('aria-live')).toBe('polite')
+    expect(region.attributes('aria-atomic')).toBe('true')
+    expect(region.text()).toBe('')
+    expect(region.classes()).toContain('model-discovery-status--absent')
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(true)
+    await wrapper.get('[data-test="api-key"]').setValue('')
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
+    expect(region.text()).toBe('Add an API key to discover available models.')
+    expect(region.classes()).not.toContain('model-discovery-status--absent')
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps the live region identity through the loading→failure transition', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await nextTick()
+    const region = wrapper.get('.model-discovery-status-live')
+    expect(region.text()).toBe('Loading model catalog…')
+    pending.reject(new Error('offline'))
+    await flushPromises()
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
+    expect(region.text()).toBe('Could not load Gemini models.')
+    wrapper.unmount()
+  })
+
+  it('keeps the live region identity across a custom→official endpoint transition', async () => {
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://custom.example/v1beta/models/custom-path:generateContent'
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    const region = wrapper.get('.model-discovery-status-live')
+    expect(region.text()).toBe('Using a custom API URL — Google\'s model catalog is not loaded.')
+    expect(region.classes()).not.toContain('model-discovery-status--absent')
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/curated-one:generateContent'
+    await nextTick()
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
+    expect(region.text()).toBe('Add an API key to discover available models.')
+    wrapper.unmount()
+  })
+
+  it('keeps the live region identity through loading to the empty-catalog message', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await nextTick()
+    const region = wrapper.get('.model-discovery-status-live')
+    expect(region.text()).toBe('Loading model catalog…')
+    pending.resolve([])
+    await flushPromises()
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
+    expect(region.text()).toBe('No models were returned by Gemini.')
+    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps the saved-model warning region mounted and updates its contents after discovery', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'legacy/missing'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValueOnce(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await nextTick()
+    const warning = wrapper.get('.model-discovery-status-warning')
+    expect(warning.attributes('role')).toBe('status')
+    expect(warning.attributes('aria-live')).toBe('polite')
+    expect(warning.attributes('aria-atomic')).toBe('true')
+    expect(warning.text()).toBe('')
+    expect(warning.classes()).toContain('model-discovery-status--absent')
+    pending.resolve([{ value: 'server/model', name: 'Server Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-discovery-status-warning').element).toBe(warning.element)
+    expect(warning.text()).toBe('Saved model was not listed by Gemini.')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe('legacy/missing')
+    wrapper.unmount()
+  })
+
+  it('keeps per-keystroke search feedback and the static official-info note outside the live region', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.fetchModels.mockResolvedValue(Array.from({ length: 600 }, (_, index) => ({ value: `model/${index}`, name: `Model ${index}` })))
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    const region = wrapper.get('.model-discovery-status-live')
+    expect(region.text()).toBe('')
+    const statusNodes = () => wrapper.findAll('.model-discovery-status')
+    const officialInfo = statusNodes().find(node => node.text() === 'Catalog selection uses Google\'s official Gemini API.')
+    expect(officialInfo.attributes('role')).toBeUndefined()
+    expect(officialInfo.attributes('aria-live')).toBeUndefined()
+    expect(region.element.contains(officialInfo.element)).toBe(false)
+    const showing = statusNodes().find(node => node.text().startsWith('Showing'))
+    expect(showing.attributes('role')).toBeUndefined()
+    expect(showing.attributes('aria-live')).toBeUndefined()
+    expect(region.element.contains(showing.element)).toBe(false)
+    await wrapper.get('#gemini-model-search').setValue('zzz-no-match')
+    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
+    expect(region.text()).toBe('')
+    const noMatch = statusNodes().find(node => node.text() === 'No models match your search.')
+    expect(noMatch.attributes('role')).toBeUndefined()
+    expect(region.element.contains(noMatch.element)).toBe(false)
     wrapper.unmount()
   })
 })

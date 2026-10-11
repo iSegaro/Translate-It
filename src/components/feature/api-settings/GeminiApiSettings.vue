@@ -33,9 +33,12 @@
         :style="rtlSelectStyle"
       />
       <small
-        v-if="savedModelNotAdvertised"
-        class="model-discovery-status"
-      >{{ t('gemini_model_not_listed') || 'Saved model was not listed by Gemini.' }}</small>
+        class="model-discovery-status model-discovery-status-warning"
+        :class="{ 'model-discovery-status--absent': !savedModelWarningMessage }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ savedModelWarningMessage }}</small>
     </div>
     <div class="setting-group vertical">
       <label>{{ t('gemini_thinking_mode_label') || 'Thinking Mode' }}</label>
@@ -75,22 +78,14 @@
         dir="ltr"
       />
       <small
-        v-if="!hasGeminiKey"
-        class="model-discovery-status"
-      >{{ t('gemini_models_missing_key') || 'Add an API key to discover available models.' }}</small>
-      <small
-        v-else-if="modelDiscoveryLoading"
-        class="model-discovery-status"
-      >{{ t('gemini_models_loading') || 'Loading model catalog…' }}</small>
-      <small
-        v-else-if="modelDiscoveryFailed"
-        class="model-discovery-status"
-      >{{ t('gemini_models_discovery_failed') || 'Could not load Gemini models.' }}</small>
-      <small
-        v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
-        class="model-discovery-status"
-      >{{ t('gemini_models_empty') || 'No models were returned by Gemini.' }}</small>
-      <template v-else-if="modelDiscoverySucceeded">
+        class="model-discovery-status model-discovery-status-live"
+        :class="{ 'model-discovery-status--absent': !discoveryStatusMessage }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ discoveryStatusMessage }}</small>
+      <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
+        <small class="model-discovery-status">{{ t('gemini_catalog_official_info') || 'Catalog selection uses Google\'s official Gemini API.' }}</small>
         <BaseSelect
           v-model="catalogModelSelection"
           :options="filteredCatalog.options"
@@ -130,6 +125,7 @@ import {
   getCachedGeminiModels,
   MissingGeminiKeyError,
 } from '@/features/translation/providers/GeminiModelDiscovery.js'
+import { isOfficialGeminiEndpoint } from '@/features/translation/providers/modelDiscoveryEndpoints.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -157,6 +153,10 @@ const modelDiscoveryFailed = ref(false)
 const modelDiscoverySucceeded = ref(false)
 const searchQuery = ref('')
 const hasGeminiKey = computed(() => ApiKeyManager.parseKeys(geminiApiKey.value).length > 0)
+// Discovery must never contact Google for a custom endpoint; the shared
+// predicate treats an empty/absent stored URL as the official default.
+const storedGeminiEndpoint = computed(() => settingsStore.settings?.GEMINI_API_URL || '')
+const usesOfficialGeminiEndpoint = computed(() => isOfficialGeminiEndpoint(storedGeminiEndpoint.value))
 let discoveryRequestId = 0
 let discoveryTimer
 let activeController
@@ -187,6 +187,34 @@ const savedModelNotAdvertised = computed(() => {
     && Boolean(savedModel)
     && savedModel !== 'custom'
     && !discoveredModels.value.some(model => model.value === savedModel)
+})
+
+// Persistent live-region copy: the DOM element stays mounted and only this
+// resolved message changes, so screen readers announce real transitions instead
+// of conditional mounts.
+const savedModelWarningMessage = computed(() => (
+  savedModelNotAdvertised.value
+    ? (t('gemini_model_not_listed') || 'Saved model was not listed by Gemini.')
+    : ''
+))
+
+const discoveryStatusMessage = computed(() => {
+  if (!usesOfficialGeminiEndpoint.value) {
+    return t('gemini_custom_endpoint_info') || 'Using a custom API URL — Google\'s model catalog is not loaded.'
+  }
+  if (!hasGeminiKey.value) {
+    return t('gemini_models_missing_key') || 'Add an API key to discover available models.'
+  }
+  if (modelDiscoveryLoading.value) {
+    return t('gemini_models_loading') || 'Loading model catalog…'
+  }
+  if (modelDiscoveryFailed.value) {
+    return t('gemini_models_discovery_failed') || 'Could not load Gemini models.'
+  }
+  if (modelDiscoverySucceeded.value && discoveredModels.value.length === 0) {
+    return t('gemini_models_empty') || 'No models were returned by Gemini.'
+  }
+  return ''
 })
 
 // Initialize selectedModelOption based on current stored value
@@ -235,6 +263,15 @@ const discoverModels = async (apiKey) => {
     modelDiscoverySucceeded.value = false
     return
   }
+  // Guard before the cache getter: a warm official cache must never leak into a
+  // custom-endpoint configuration, and the official host must not be contacted.
+  if (!usesOfficialGeminiEndpoint.value) {
+    discoveredModels.value = []
+    modelDiscoveryLoading.value = false
+    modelDiscoveryFailed.value = false
+    modelDiscoverySucceeded.value = false
+    return
+  }
   const cached = getCachedGeminiModels(key)
   modelDiscoveryFailed.value = false
   if (cached !== null) {
@@ -249,13 +286,13 @@ const discoverModels = async (apiKey) => {
   modelDiscoveryLoading.value = true
   try {
     const models = await fetchGeminiModels({ apiKey: key, signal: controller.signal })
-    if (requestId !== discoveryRequestId || key !== geminiApiKey.value) return
+    if (requestId !== discoveryRequestId || key !== geminiApiKey.value || !usesOfficialGeminiEndpoint.value) return
     discoveredModels.value = models
     modelDiscoverySucceeded.value = true
     modelDiscoveryFailed.value = false
     syncSavedSelection(requestId, key, selectionAtStart)
   } catch (error) {
-    if (requestId !== discoveryRequestId || key !== geminiApiKey.value) return
+    if (requestId !== discoveryRequestId || key !== geminiApiKey.value || !usesOfficialGeminiEndpoint.value) return
     if (error instanceof MissingGeminiKeyError) {
       modelDiscoverySucceeded.value = false
       modelDiscoveryFailed.value = false
@@ -282,7 +319,7 @@ const catalogModelSelection = computed({
   }
 })
 
-watch(geminiApiKey, (apiKey) => {
+const scheduleDiscovery = (apiKey) => {
   clearTimeout(discoveryTimer)
   discoveryRequestId++
   activeController?.abort()
@@ -291,7 +328,7 @@ watch(geminiApiKey, (apiKey) => {
   modelDiscoverySucceeded.value = false
   modelDiscoveryFailed.value = false
   const requestId = ++discoveryRequestId
-  if (!ApiKeyManager.parseKeys(apiKey).length) {
+  if (!ApiKeyManager.parseKeys(apiKey).length || !usesOfficialGeminiEndpoint.value) {
     modelDiscoveryLoading.value = false
     return
   }
@@ -299,6 +336,14 @@ watch(geminiApiKey, (apiKey) => {
   discoveryTimer = setTimeout(() => {
     if (requestId === discoveryRequestId) discoverModels(apiKey)
   }, 400)
+}
+
+watch(geminiApiKey, (apiKey) => {
+  scheduleDiscovery(apiKey)
+}, { flush: 'sync' })
+
+watch(storedGeminiEndpoint, () => {
+  scheduleDiscovery(geminiApiKey.value)
 }, { flush: 'sync' })
 
 onBeforeUnmount(() => {
@@ -319,14 +364,15 @@ const geminiThinkingModeOptions = computed(() => [
 ])
 
 // Test Keys must validate against the same endpoint family translation uses: an
-// explicitly selected catalog model translates via the official Gemini endpoint,
-// so a stale custom URL must not leak into validation. Curated/custom/legacy
-// selections keep the stored URL. Read-only: never writes settings.
+// explicitly selected catalog model translates via the official Gemini endpoint
+// only while the stored endpoint is official, so a custom URL stays authoritative
+// for validation. Curated/custom/legacy selections keep the stored URL. Read-only:
+// never writes settings.
 const geminiTestApiUrl = computed(() => {
   const model = selectedModelOption.value
   const source = settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE
   const isCurated = (CONFIG.GEMINI_MODELS || []).some(option => option.value === model && option.value !== 'custom')
-  if (source === 'catalog' && model && model !== 'custom' && !isCurated) {
+  if (usesOfficialGeminiEndpoint.value && source === 'catalog' && model && model !== 'custom' && !isCurated) {
     return `${CONFIG.GEMINI_API_URL.split('/models/')[0]}/models`
   }
   return geminiApiUrl.value
@@ -379,3 +425,10 @@ onMounted(() => {
   discoverModels(geminiApiKey.value)
 })
 </script>
+
+<style scoped>
+/* Empty persistent live regions stay mounted (a11y tree) but leave no layout gap. */
+.model-discovery-status--absent {
+  position: absolute;
+}
+</style>

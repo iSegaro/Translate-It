@@ -1295,6 +1295,12 @@
   "gemini_saved_model_label": {
     "message": "保存済みモデル"
   },
+  "gemini_custom_endpoint_info": {
+    "message": "カスタムAPI URLを使用しているため、Googleのモデルカタログは読み込まれません。"
+  },
+  "gemini_catalog_official_info": {
+    "message": "カタログからの選択にはGoogleの公式Gemini APIを使用します。"
+  },
   "webai_api_settings_title": {
     "message": "WebAI 設定"
   },
@@ -1516,6 +1522,9 @@
   },
   "deepseek_saved_model_label": {
     "message": "保存済みモデル"
+  },
+  "deepseek_custom_endpoint_info": {
+    "message": "カスタムAPI URLを使用しているため、DeepSeekのモデルカタログは読み込まれません。"
   },
   "deepseek_thinking_mode_label": {
     "message": "思考モード"

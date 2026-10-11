@@ -32,10 +32,18 @@
         class="model-select"
         :style="rtlSelectStyle"
       />
-      <small
-        v-if="savedModelNotAdvertised"
-        class="model-discovery-status"
-      >{{ t('openrouter_model_not_listed') || 'Saved model was not listed by OpenRouter.' }}</small>
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !savedModelNotAdvertised }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="savedModelNotAdvertised"
+          class="model-discovery-status"
+        >{{ t('openrouter_model_not_listed') || 'Saved model was not listed by OpenRouter.' }}</small>
+      </div>
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
@@ -57,19 +65,27 @@
         :placeholder="t('openrouter_catalog_search_placeholder') || 'Search by model ID or name'"
         dir="ltr"
       />
-      <small
-        v-if="modelDiscoveryLoading"
-        class="model-discovery-status"
-      >{{ t('openrouter_models_loading') || 'Loading model catalog…' }}</small>
-      <small
-        v-else-if="modelDiscoveryFailed"
-        class="model-discovery-status"
-      >{{ t('openrouter_models_discovery_failed') || 'Could not load OpenRouter models.' }}</small>
-      <small
-        v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
-        class="model-discovery-status"
-      >{{ t('openrouter_models_empty') || 'No models were returned by OpenRouter.' }}</small>
-      <template v-else-if="modelDiscoverySucceeded">
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !catalogStatusVisible }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="modelDiscoveryLoading"
+          class="model-discovery-status"
+        >{{ t('openrouter_models_loading') || 'Loading model catalog…' }}</small>
+        <small
+          v-else-if="modelDiscoveryFailed"
+          class="model-discovery-status"
+        >{{ t('openrouter_models_discovery_failed') || 'Could not load OpenRouter models.' }}</small>
+        <small
+          v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
+          class="model-discovery-status"
+        >{{ t('openrouter_models_empty') || 'No models were returned by OpenRouter.' }}</small>
+      </div>
+      <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
         <BaseSelect
           v-model="catalogModelSelection"
           :options="filteredCatalog.options"
@@ -154,6 +170,11 @@ const savedModelNotAdvertised = computed(() => {
     && savedModel !== 'custom'
     && !discoveredModels.value.some(model => model.value === savedModel)
 })
+
+// Persistent live region is only placed in flow while it carries a message.
+const catalogStatusVisible = computed(() => modelDiscoveryLoading.value
+  || modelDiscoveryFailed.value
+  || (modelDiscoverySucceeded.value && discoveredModels.value.length === 0))
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {

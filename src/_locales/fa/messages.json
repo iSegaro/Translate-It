@@ -1295,6 +1295,12 @@
   "gemini_saved_model_label": {
     "message": "مدل ذخیره‌شده"
   },
+  "gemini_custom_endpoint_info": {
+    "message": "از URL سفارشی API استفاده می‌شود — کاتالوگ مدل‌های Google بارگذاری نمی‌شود."
+  },
+  "gemini_catalog_official_info": {
+    "message": "انتخاب از کاتالوگ با استفاده از API رسمی Gemini گوگل انجام می‌شود."
+  },
   "webai_api_settings_title": {
     "message": "تنظیمات WebAI"
   },
@@ -1516,6 +1522,9 @@
   },
   "deepseek_saved_model_label": {
     "message": "مدل ذخیره‌شده"
+  },
+  "deepseek_custom_endpoint_info": {
+    "message": "از URL سفارشی API استفاده می‌شود — کاتالوگ مدل‌های DeepSeek بارگذاری نمی‌شود."
   },
   "deepseek_thinking_mode_label": {
     "message": "حالت تفکر"

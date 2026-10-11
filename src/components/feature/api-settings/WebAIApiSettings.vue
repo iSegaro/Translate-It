@@ -32,18 +32,26 @@
         :options="webAIApiModelOptions"
         :style="rtlSelectStyle"
       />
-      <small
-        v-if="modelDiscoveryLoading"
-        class="model-discovery-status"
-      >{{ t('webai_models_loading') || 'Checking available models…' }}</small>
-      <small
-        v-else-if="modelDiscoveryFailed"
-        class="model-discovery-status"
-      >{{ t('webai_models_discovery_failed') || 'Could not check available models.' }}</small>
-      <small
-        v-else-if="savedModelNotAdvertised"
-        class="model-discovery-status"
-      >{{ t('webai_model_not_advertised') || 'Saved model was not listed by the server.' }}</small>
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !modelDiscoveryStatusVisible }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="modelDiscoveryLoading"
+          class="model-discovery-status"
+        >{{ t('webai_models_loading') || 'Checking available models…' }}</small>
+        <small
+          v-else-if="modelDiscoveryFailed"
+          class="model-discovery-status"
+        >{{ t('webai_models_discovery_failed') || 'Could not check available models.' }}</small>
+        <small
+          v-else-if="savedModelNotAdvertised"
+          class="model-discovery-status"
+        >{{ t('webai_model_not_advertised') || 'Saved model was not listed by the server.' }}</small>
+      </div>
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
@@ -92,7 +100,14 @@ const modelDiscoverySucceeded = ref(false)
 const modelDiscoveryLoading = ref(false)
 const modelDiscoveryFailed = ref(false)
 const savedModelNotAdvertised = computed(() => modelDiscoverySucceeded.value
+  && (settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL) !== 'custom'
   && !discoveredModels.value.includes(settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL))
+
+// Persistent live region is only placed in flow while it carries a message.
+const modelDiscoveryStatusVisible = computed(() => modelDiscoveryLoading.value
+  || modelDiscoveryFailed.value
+  || savedModelNotAdvertised.value)
+
 let discoveryRequestId = 0
 let discoveryTimer
 let activeController

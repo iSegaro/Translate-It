@@ -161,6 +161,7 @@ Located in `src/shared/config/settingsMigrations.js`, this system ensures that u
 ## UI/UX Considerations
 
 - **RTL Support**: The Options page fully supports RTL (Right-to-Left) layouts based on the selected UI language.
+- **Model discovery privacy**: Gemini and DeepSeek automatically discover models only when their saved API endpoint is official. A custom endpoint keeps manual model selection without sending its API key to the official catalog. Gemini catalog routing and Test Keys use Google only with an official endpoint; saved custom URLs and model choices are preserved.
 - **Transitions**: Theme and Language changes utilize the `useUITransition` composable for smooth visual effects (View Transitions API).
 - **Responsive Design**: Desktop keeps vertical navigation with conditional up/down controls when links overflow. Tablet and Mobile use a horizontal scrollable row while keeping Save accessible outside its scroll viewport.
 
