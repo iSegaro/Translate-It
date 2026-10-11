@@ -304,13 +304,21 @@ const openaiApiModel = computed({
     selectionInteraction++
     const wasCustom = selectedModelOption.value === 'custom'
     customModelVisible.value = value === 'custom' && wasCustom ? customModelVisible.value : false
+    // Capture before either setting is modified: the write-through store would
+    // otherwise make the "previous" model indistinguishable from the new value.
+    const previousModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+    const previousSource = settingsStore.settings?.OPENAI_MODEL_SOURCE || CONFIG.OPENAI_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
     }
     const isCurated = (CONFIG.OPENAI_MODELS || []).some(model => model.value === value && model.value !== 'custom')
     const isCatalog = discoveredModels.value.some(model => model.value === value)
-    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
+    // Reselecting the already-saved model must not demote explicit catalog/custom
+    // provenance when discovery is unavailable; genuinely new IDs still resolve below.
+    const isReselectedSaved = value !== 'custom' && value === previousModel
+      && (previousSource === 'catalog' || previousSource === 'custom')
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : isReselectedSaved ? previousSource : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })

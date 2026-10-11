@@ -255,13 +255,21 @@ const openrouterApiModel = computed({
   set: (value) => {
     if (value !== 'custom') customModelVisible.value = false
     else customModelVisible.value = true
+    // Capture before either setting is modified: the write-through store would
+    // otherwise make the "previous" model indistinguishable from the new value.
+    const previousModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+    const previousSource = settingsStore.settings?.OPENROUTER_MODEL_SOURCE || CONFIG.OPENROUTER_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
     }
     const isCurated = (CONFIG.OPENROUTER_MODELS || []).some(model => model.value === value && model.value !== 'custom')
     const isCatalog = discoveredModels.value.some(model => model.value === value)
-    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
+    // Reselecting the already-saved model must not demote explicit catalog/custom
+    // provenance when discovery is unavailable; genuinely new IDs still resolve below.
+    const isReselectedSaved = value !== 'custom' && value === previousModel
+      && (previousSource === 'catalog' || previousSource === 'custom')
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : isReselectedSaved ? previousSource : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })

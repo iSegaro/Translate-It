@@ -403,4 +403,43 @@ describe('OpenAIApiSettings model catalog', () => {
     expect(warningRegion().classes()).toContain('ti-sr-only')
     wrapper.unmount()
   })
+
+  it('preserves saved catalog/custom provenance when reselecting the saved model after failed discovery', async () => {
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    mocks.fetchModels.mockRejectedValue(new Error('offline'))
+    for (const [model, source] of [['gpt-4o-mini', 'catalog'], ['my-manual-model', 'custom']]) {
+      mocks.settingsStore.settings.OPENAI_API_MODEL = model
+      mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = source
+      const wrapper = mount(OpenAIApiSettings)
+      await flushPromises()
+      expect(wrapper.text()).toContain('Could not load OpenAI models.')
+      await wrapper.get('.model-select').setValue(model)
+      expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe(model)
+      // This pair matches the migration-safe catalog/custom cases: no silent remap.
+      expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe(source)
+      wrapper.unmount()
+    }
+
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'legacy/unknown-model'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'legacy'
+    const legacy = mount(OpenAIApiSettings)
+    await flushPromises()
+    await legacy.get('.model-select').setValue('legacy/unknown-model')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('legacy')
+    legacy.unmount()
+  })
+
+  it('does not carry saved provenance onto a different unknown model ID', async () => {
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'gpt-4o-mini'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockRejectedValue(new Error('offline'))
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    // No unlisted option exists, so the select coerces to ''; provenance must not carry over.
+    await wrapper.get('.model-select').setValue('unlisted-model-id')
+    expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('legacy')
+    wrapper.unmount()
+  })
 })
