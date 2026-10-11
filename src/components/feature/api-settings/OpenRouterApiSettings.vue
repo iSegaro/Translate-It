@@ -32,6 +32,18 @@
         class="model-select"
         :style="rtlSelectStyle"
       />
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !savedModelNotAdvertised }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="savedModelNotAdvertised"
+          class="model-discovery-status"
+        >{{ t('openrouter_model_not_listed') || 'Saved model was not listed by OpenRouter.' }}</small>
+      </div>
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
@@ -44,11 +56,57 @@
         dir="ltr"
       />
     </div>
+    <div class="setting-group vertical">
+      <BaseInput
+        id="openrouter-model-search"
+        v-model="searchQuery"
+        type="search"
+        :label="t('openrouter_catalog_search_label') || 'Search OpenRouter models'"
+        :placeholder="t('openrouter_catalog_search_placeholder') || 'Search by model ID or name'"
+        dir="ltr"
+      />
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !catalogStatusVisible }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="modelDiscoveryLoading"
+          class="model-discovery-status"
+        >{{ t('openrouter_models_loading') || 'Loading model catalog…' }}</small>
+        <small
+          v-else-if="modelDiscoveryFailed"
+          class="model-discovery-status"
+        >{{ t('openrouter_models_discovery_failed') || 'Could not load OpenRouter models.' }}</small>
+        <small
+          v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
+          class="model-discovery-status"
+        >{{ t('openrouter_models_empty') || 'No models were returned by OpenRouter.' }}</small>
+      </div>
+      <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
+        <BaseSelect
+          v-model="catalogModelSelection"
+          :options="filteredCatalog.options"
+          :style="rtlSelectStyle"
+          :aria-label="t('openrouter_catalog_results_label') || 'Available OpenRouter models'"
+        />
+        <small
+          v-if="filteredCatalog.total > filteredCatalog.options.length"
+          class="model-discovery-status"
+        >{{ t('openrouter_catalog_showing_count', { shown: filteredCatalog.options.length, total: filteredCatalog.total }) || `Showing ${filteredCatalog.options.length} of ${filteredCatalog.total} models` }}</small>
+        <small
+          v-if="discoveredModels.length > 0 && filteredCatalog.total === 0"
+          class="model-discovery-status"
+        >{{ t('openrouter_catalog_no_matches') || 'No models match your search.' }}</small>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import "./OpenRouterApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -60,6 +118,11 @@ import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import { filterModelCatalog } from '@/features/settings/presentation/modelCatalogFilter.js'
+import {
+  fetchOpenRouterModels,
+  getCachedOpenRouterModels,
+} from '@/features/translation/providers/OpenRouterModelDiscovery.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -71,44 +134,155 @@ const openrouterApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('OPENROUTER_API_KEY', value)
 })
 
-// Track dropdown selection separately from stored value
 const selectedModelOption = ref(CONFIG.OPENROUTER_API_MODEL)
+const discoveredModels = ref([])
+const modelDiscoveryLoading = ref(false)
+const modelDiscoveryFailed = ref(false)
+const modelDiscoverySucceeded = ref(false)
+const searchQuery = ref('')
+const customModelVisible = ref(false)
+let discoveryRequestId = 0
+let discoveryTimer
+let activeController
+
+const openrouterApiModelOptions = computed(() => {
+  const curated = (CONFIG.OPENROUTER_MODELS || []).filter(model => model.value !== 'custom')
+  const options = curated.map(model => ({ value: model.value, label: model.name || model.value }))
+  const savedModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+  const catalogModel = discoveredModels.value.find(model => model.value === savedModel)
+  if (savedModel && savedModel !== 'custom' && !options.some(option => option.value === savedModel)) {
+    const label = catalogModel
+      ? catalogModel.name
+      : `${savedModel} — ${t('openrouter_saved_model_label') || 'Saved model'}`
+    options.push({ value: savedModel, label, legacy: !catalogModel })
+  }
+  const custom = (CONFIG.OPENROUTER_MODELS || []).find(model => model.value === 'custom')
+  options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
+  return options
+})
+
+const filteredCatalog = computed(() => filterModelCatalog(discoveredModels.value, searchQuery.value))
+
+const savedModelNotAdvertised = computed(() => {
+  const savedModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+  return modelDiscoverySucceeded.value
+    && Boolean(savedModel)
+    && savedModel !== 'custom'
+    && !discoveredModels.value.some(model => model.value === savedModel)
+})
+
+// Persistent live region is only placed in flow while it carries a message.
+const catalogStatusVisible = computed(() => modelDiscoveryLoading.value
+  || modelDiscoveryFailed.value
+  || (modelDiscoverySucceeded.value && discoveredModels.value.length === 0))
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
-  const isPredefined = openrouterApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  const isPredefined = (CONFIG.OPENROUTER_MODELS || []).some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
+  customModelVisible.value = !isPredefined
 }
+
+const discoverModels = async (apiKey) => {
+  const requestId = ++discoveryRequestId
+  const key = typeof apiKey === 'string' ? apiKey : ''
+  activeController?.abort()
+  const controller = new AbortController()
+  activeController = controller
+  modelDiscoveryFailed.value = false
+  const cached = getCachedOpenRouterModels(key)
+  if (cached !== null) {
+    discoveredModels.value = cached
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryLoading.value = false
+    return
+  }
+  modelDiscoveryLoading.value = true
+  try {
+    const models = await fetchOpenRouterModels({ apiKey: key, signal: controller.signal })
+    if (requestId !== discoveryRequestId || key !== openrouterApiKey.value) return
+    discoveredModels.value = models
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryFailed.value = false
+  } catch {
+    if (requestId !== discoveryRequestId || key !== openrouterApiKey.value) return
+    modelDiscoverySucceeded.value = false
+    modelDiscoveryFailed.value = true
+  } finally {
+    if (requestId === discoveryRequestId && key === openrouterApiKey.value) modelDiscoveryLoading.value = false
+  }
+}
+
+const catalogModelSelection = computed({
+  get: () => {
+    const savedModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+    return filteredCatalog.value.options.some(option => option.value === savedModel) ? savedModel : ''
+  },
+  set: (value) => {
+    if (!value) return
+    selectedModelOption.value = value
+    customModelVisible.value = false
+    settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', 'catalog')
+  }
+})
+
+watch(openrouterApiKey, (apiKey) => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+  discoveredModels.value = []
+  modelDiscoverySucceeded.value = false
+  modelDiscoveryFailed.value = false
+  modelDiscoveryLoading.value = false
+  const requestId = ++discoveryRequestId
+  discoveryTimer = setTimeout(() => {
+    if (requestId === discoveryRequestId) discoverModels(apiKey)
+  }, 400)
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+})
 
 const openrouterApiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
+    if (value !== 'custom') customModelVisible.value = false
+    else customModelVisible.value = true
+    // Capture before either setting is modified: the write-through store would
+    // otherwise make the "previous" model indistinguishable from the new value.
+    const previousModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+    const previousSource = settingsStore.settings?.OPENROUTER_MODEL_SOURCE || CONFIG.OPENROUTER_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
     }
+    const isCurated = (CONFIG.OPENROUTER_MODELS || []).some(model => model.value === value && model.value !== 'custom')
+    const isCatalog = discoveredModels.value.some(model => model.value === value)
+    // Reselecting the already-saved model must not demote explicit catalog/custom
+    // provenance when discovery is unavailable; genuinely new IDs still resolve below.
+    const isReselectedSaved = value !== 'custom' && value === previousModel
+      && (previousSource === 'catalog' || previousSource === 'custom')
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : isReselectedSaved ? previousSource : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })
 
 const openrouterCustomModel = computed({
-  get: () => {
-    const currentModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL;
-    const isPredefined = openrouterApiModelOptions?.value?.some(option => option.value === currentModel && option.value !== 'custom') || false;
-    return isPredefined ? '' : currentModel;
-  },
+  get: () => selectedModelOption.value === 'custom' && customModelVisible.value
+    ? settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+    : '',
   set: (value) => {
+    customModelVisible.value = true
     settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value);
+    settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', 'custom')
   }
-})
-
-const openrouterApiModelOptions = computed(() => {
-  const models = settingsStore.settings?.OPENROUTER_MODELS || CONFIG.OPENROUTER_MODELS || []
-  return models.map(model => ({
-    value: model.value,
-    label: model.name || model.value
-  }))
 })
 
 // Test keys functionality
@@ -156,5 +330,6 @@ const testKeys = async (providerId) => {
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
+  discoverModels(openrouterApiKey.value)
 })
 </script>

@@ -1262,6 +1262,45 @@
   "gemini_custom_api_url_info": {
     "message": "モデル名を含む完全なAPI URLを入力してください"
   },
+  "gemini_catalog_search_label": {
+    "message": "Geminiモデルを検索"
+  },
+  "gemini_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "gemini_catalog_results_label": {
+    "message": "利用可能なGeminiモデル"
+  },
+  "gemini_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "gemini_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "gemini_models_missing_key": {
+    "message": "利用可能なモデルを検索するにはAPIキーを追加してください。"
+  },
+  "gemini_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "gemini_models_discovery_failed": {
+    "message": "Geminiモデルを読み込めませんでした。"
+  },
+  "gemini_models_empty": {
+    "message": "Geminiからモデルが返されませんでした。"
+  },
+  "gemini_model_not_listed": {
+    "message": "保存済みモデルはGeminiの一覧にありません。"
+  },
+  "gemini_saved_model_label": {
+    "message": "保存済みモデル"
+  },
+  "gemini_custom_endpoint_info": {
+    "message": "カスタムAPI URLを使用しているため、Googleのモデルカタログは読み込まれません。"
+  },
+  "gemini_catalog_official_info": {
+    "message": "カタログからの選択にはGoogleの公式Gemini APIを使用します。"
+  },
   "webai_api_settings_title": {
     "message": "WebAI 設定"
   },
@@ -1276,6 +1315,15 @@
   },
   "webai_api_model_placeholder": {
     "message": "WebAI APIモデルを入力"
+  },
+  "webai_models_loading": {
+    "message": "利用可能なモデルを確認しています…"
+  },
+  "webai_models_discovery_failed": {
+    "message": "利用可能なモデルを確認できませんでした。"
+  },
+  "webai_model_not_advertised": {
+    "message": "保存済みのモデルはサーバーの一覧にありませんでした。"
   },
   "lingva_api_settings_title": {
     "message": "Lingva API 設定"
@@ -1310,6 +1358,42 @@
   "openai_api_model_placeholder": {
     "message": "OpenAIモデルを入力"
   },
+  "openai_catalog_search_label": {
+    "message": "OpenAIモデルを検索"
+  },
+  "openai_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "openai_catalog_results_label": {
+    "message": "利用可能なOpenAIモデル"
+  },
+  "openai_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "openai_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "openai_catalog_compatibility_notice": {
+    "message": "モデルカタログにはChat Completionsの互換性情報がありません。掲載モデルがすべてChat Completionsをサポートするとは限りません。"
+  },
+  "openai_models_missing_key": {
+    "message": "利用可能なモデルを検索するにはAPIキーを追加してください。"
+  },
+  "openai_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "openai_models_discovery_failed": {
+    "message": "OpenAIモデルを読み込めませんでした。"
+  },
+  "openai_models_empty": {
+    "message": "OpenAIからモデルが返されませんでした。"
+  },
+  "openai_model_not_listed": {
+    "message": "保存済みモデルはOpenAIの一覧にありません。"
+  },
+  "openai_saved_model_label": {
+    "message": "保存済みモデル"
+  },
   "openrouter_api_settings_title": {
     "message": "OpenRouter 設定"
   },
@@ -1325,11 +1409,71 @@
   "requesty_api_key_placeholder": {
     "message": "Requesty APIキーを貼り付けてください"
   },
+  "requesty_catalog_search_label": {
+    "message": "Requestyモデルを検索"
+  },
+  "requesty_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "requesty_catalog_results_label": {
+    "message": "利用可能なRequestyモデル"
+  },
+  "requesty_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "requesty_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "requesty_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "requesty_models_discovery_failed": {
+    "message": "Requestyモデルを読み込めませんでした。"
+  },
+  "requesty_models_empty": {
+    "message": "Requestyからモデルが返されませんでした。"
+  },
+  "requesty_model_not_listed": {
+    "message": "保存済みモデルはRequestyの一覧にありません。"
+  },
+  "requesty_saved_model_label": {
+    "message": "保存済みモデル"
+  },
   "openrouter_api_settings_model_label": {
     "message": "モデル"
   },
   "openrouter_api_model_placeholder": {
     "message": "OpenRouterモデルを入力"
+  },
+  "openrouter_catalog_search_label": {
+    "message": "OpenRouterモデルを検索"
+  },
+  "openrouter_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "openrouter_catalog_results_label": {
+    "message": "利用可能なOpenRouterモデル"
+  },
+  "openrouter_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "openrouter_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "openrouter_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "openrouter_models_discovery_failed": {
+    "message": "OpenRouterモデルを読み込めませんでした。"
+  },
+  "openrouter_models_empty": {
+    "message": "OpenRouterからモデルが返されませんでした。"
+  },
+  "openrouter_model_not_listed": {
+    "message": "保存済みモデルはOpenRouterの一覧にありません。"
+  },
+  "openrouter_saved_model_label": {
+    "message": "保存済みモデル"
   },
   "deepseek_api_settings_title": {
     "message": "DeepSeek 設定"
@@ -1345,6 +1489,42 @@
   },
   "deepseek_api_model_placeholder": {
     "message": "DeepSeekモデルを入力"
+  },
+  "deepseek_catalog_search_label": {
+    "message": "DeepSeekモデルを検索"
+  },
+  "deepseek_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "deepseek_catalog_results_label": {
+    "message": "利用可能なDeepSeekモデル"
+  },
+  "deepseek_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "deepseek_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "deepseek_models_missing_key": {
+    "message": "利用可能なモデルを検索するにはAPIキーを追加してください。"
+  },
+  "deepseek_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "deepseek_models_discovery_failed": {
+    "message": "DeepSeekモデルを読み込めませんでした。"
+  },
+  "deepseek_models_empty": {
+    "message": "DeepSeekからモデルが返されませんでした。"
+  },
+  "deepseek_model_not_listed": {
+    "message": "保存済みモデルはDeepSeekの一覧にありません。"
+  },
+  "deepseek_saved_model_label": {
+    "message": "保存済みモデル"
+  },
+  "deepseek_custom_endpoint_info": {
+    "message": "カスタムAPI URLを使用しているため、DeepSeekのモデルカタログは読み込まれません。"
   },
   "deepseek_thinking_mode_label": {
     "message": "思考モード"

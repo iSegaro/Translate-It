@@ -5,7 +5,8 @@ import {
   getGeminiApiKeysAsync,
   getGeminiModelAsync,
   getGeminiThinkingModeAsync,
-  getGeminiApiUrlAsync
+  getGeminiApiUrlAsync,
+  getGeminiModelSourceAsync
 } from "@/shared/config/config.js";
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
@@ -20,7 +21,19 @@ import {
   normalizeTermination,
 } from "@/features/translation/ir/CompletionContract.js";
 import { recordProviderCompletion } from "@/features/translation/ir/TranslationOperation.js";
+import { isOfficialGeminiEndpoint } from './modelDiscoveryEndpoints.js';
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'GoogleGemini');
+
+function buildGeminiCatalogModelUrl(model) {
+  const configuredUrl = new URL(CONFIG.GEMINI_API_URL);
+  const modelsPath = '/models';
+  const modelsPathIndex = configuredUrl.pathname.indexOf(`${modelsPath}/`);
+  const basePath = modelsPathIndex >= 0
+    ? configuredUrl.pathname.slice(0, modelsPathIndex + modelsPath.length)
+    : '/v1beta/models';
+  const modelId = model.startsWith('models/') ? model.slice('models/'.length) : model;
+  return `${configuredUrl.origin}${basePath}/${encodeURIComponent(modelId)}:generateContent`;
+}
 
 export class GeminiProvider extends BaseAIProvider {
   static type = "ai";
@@ -69,11 +82,12 @@ export class GeminiProvider extends BaseAIProvider {
       ? participationOverride
       : await AIConversationHelper.getConversationParticipation({ callPurpose, translateMode: mode, sessionId });
 
-    const [apiKeys, model, thinkingMode, rawApiUrl] = await Promise.all([
+    const [apiKeys, model, thinkingMode, rawApiUrl, modelSource] = await Promise.all([
       getGeminiApiKeysAsync(),
       getGeminiModelAsync(),
       getGeminiThinkingModeAsync(),
-      getGeminiApiUrlAsync()
+      getGeminiApiUrlAsync(),
+      getGeminiModelSourceAsync()
     ]);
 
     const apiKey = apiKeys.length > 0 ? apiKeys[0] : '';
@@ -132,20 +146,24 @@ export class GeminiProvider extends BaseAIProvider {
     }
 
     let apiUrl = rawApiUrl;
-    const isStandardGoogleUrl = !rawApiUrl || 
-                                rawApiUrl.includes('generativelanguage.googleapis.com') || 
-                                rawApiUrl === CONFIG.GEMINI_API_URL;
+    const curatedModel = CONFIG.GEMINI_MODELS?.find(configuredModel => configuredModel.value === model);
+    const isStandardGoogleUrl = isOfficialGeminiEndpoint(rawApiUrl);
 
-    if (isStandardGoogleUrl && model && CONFIG.GEMINI_MODELS) {
-      const modelConfig = CONFIG.GEMINI_MODELS.find(m => m.value === model);
-      if (modelConfig?.url) {
-        apiUrl = modelConfig.url;
-      }
+    // Only explicitly selected catalog models use their ID to build a standard
+    // endpoint; legacy/custom URL routing remains governed by the stored source.
+    if (modelSource === 'catalog' && model && model !== 'custom' && !curatedModel && isStandardGoogleUrl) {
+      apiUrl = buildGeminiCatalogModelUrl(model);
+    } else if (isStandardGoogleUrl && curatedModel?.url) {
+      apiUrl = curatedModel.url;
     }
 
     let url = apiUrl || CONFIG.GEMINI_API_URL;
-    if (!url.includes(':generateContent')) url = `${url}:generateContent`;
-    url = `${url}?key=${apiKey}`;
+    const requestUrl = new URL(url);
+    if (!requestUrl.pathname.includes(':generateContent')) {
+      requestUrl.pathname = `${requestUrl.pathname}:generateContent`;
+    }
+    requestUrl.searchParams.set('key', apiKey);
+    url = requestUrl.toString();
 
     const fetchOptions = {
       method: "POST",

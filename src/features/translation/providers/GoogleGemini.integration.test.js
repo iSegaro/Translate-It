@@ -17,6 +17,7 @@ vi.mock('@/shared/config/config.js', () => ({
   getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-pro'),
   getGeminiThinkingModeAsync: vi.fn().mockResolvedValue('default'),
   getGeminiApiUrlAsync: vi.fn().mockResolvedValue(''),
+  getGeminiModelSourceAsync: vi.fn().mockResolvedValue('legacy'),
   getProviderOptimizationLevelAsync: vi.fn(() => Promise.resolve('balanced')),
 }));
 

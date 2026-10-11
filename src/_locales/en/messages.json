@@ -1262,6 +1262,45 @@
   "gemini_custom_api_url_info": {
     "message": "Enter the complete API URL including the model name"
   },
+  "gemini_catalog_search_label": {
+    "message": "Search Gemini models"
+  },
+  "gemini_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "gemini_catalog_results_label": {
+    "message": "Available Gemini models"
+  },
+  "gemini_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "gemini_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "gemini_models_missing_key": {
+    "message": "Add an API key to discover available models."
+  },
+  "gemini_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "gemini_models_discovery_failed": {
+    "message": "Could not load Gemini models."
+  },
+  "gemini_models_empty": {
+    "message": "No models were returned by Gemini."
+  },
+  "gemini_model_not_listed": {
+    "message": "Saved model was not listed by Gemini."
+  },
+  "gemini_saved_model_label": {
+    "message": "Saved model"
+  },
+  "gemini_custom_endpoint_info": {
+    "message": "Using a custom API URL — Google's model catalog is not loaded."
+  },
+  "gemini_catalog_official_info": {
+    "message": "Catalog selection uses Google's official Gemini API."
+  },
   "webai_api_settings_title": {
     "message": "WebAI Settings"
   },
@@ -1276,6 +1315,15 @@
   },
   "webai_api_model_placeholder": {
     "message": "Enter WebAI API model"
+  },
+  "webai_models_loading": {
+    "message": "Checking available models…"
+  },
+  "webai_models_discovery_failed": {
+    "message": "Could not check available models."
+  },
+  "webai_model_not_advertised": {
+    "message": "Saved model was not listed by the server."
   },
   "lingva_api_settings_title": {
     "message": "Lingva API Settings"
@@ -1310,6 +1358,42 @@
   "openai_api_model_placeholder": {
     "message": "Enter OpenAI model"
   },
+  "openai_catalog_search_label": {
+    "message": "Search OpenAI models"
+  },
+  "openai_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "openai_catalog_results_label": {
+    "message": "Available OpenAI models"
+  },
+  "openai_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "openai_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "openai_catalog_compatibility_notice": {
+    "message": "The model catalog does not indicate Chat Completions compatibility; listed models may not all support Chat Completions."
+  },
+  "openai_models_missing_key": {
+    "message": "Add an API key to discover available models."
+  },
+  "openai_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "openai_models_discovery_failed": {
+    "message": "Could not load OpenAI models."
+  },
+  "openai_models_empty": {
+    "message": "No models were returned by OpenAI."
+  },
+  "openai_model_not_listed": {
+    "message": "Saved model was not listed by OpenAI."
+  },
+  "openai_saved_model_label": {
+    "message": "Saved model"
+  },
   "openrouter_api_settings_title": {
     "message": "OpenRouter Settings"
   },
@@ -1325,11 +1409,71 @@
   "requesty_api_key_placeholder": {
     "message": "Paste your Requesty API key here"
   },
+  "requesty_catalog_search_label": {
+    "message": "Search Requesty models"
+  },
+  "requesty_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "requesty_catalog_results_label": {
+    "message": "Available Requesty models"
+  },
+  "requesty_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "requesty_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "requesty_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "requesty_models_discovery_failed": {
+    "message": "Could not load Requesty models."
+  },
+  "requesty_models_empty": {
+    "message": "No models were returned by Requesty."
+  },
+  "requesty_model_not_listed": {
+    "message": "Saved model was not listed by Requesty."
+  },
+  "requesty_saved_model_label": {
+    "message": "Saved model"
+  },
   "openrouter_api_settings_model_label": {
     "message": "Model"
   },
   "openrouter_api_model_placeholder": {
     "message": "Enter OpenRouter model"
+  },
+  "openrouter_catalog_search_label": {
+    "message": "Search OpenRouter models"
+  },
+  "openrouter_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "openrouter_catalog_results_label": {
+    "message": "Available OpenRouter models"
+  },
+  "openrouter_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "openrouter_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "openrouter_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "openrouter_models_discovery_failed": {
+    "message": "Could not load OpenRouter models."
+  },
+  "openrouter_models_empty": {
+    "message": "No models were returned by OpenRouter."
+  },
+  "openrouter_model_not_listed": {
+    "message": "Saved model was not listed by OpenRouter."
+  },
+  "openrouter_saved_model_label": {
+    "message": "Saved model"
   },
   "deepseek_api_settings_title": {
     "message": "DeepSeek Settings"
@@ -1345,6 +1489,42 @@
   },
   "deepseek_api_model_placeholder": {
     "message": "Enter DeepSeek model"
+  },
+  "deepseek_catalog_search_label": {
+    "message": "Search DeepSeek models"
+  },
+  "deepseek_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "deepseek_catalog_results_label": {
+    "message": "Available DeepSeek models"
+  },
+  "deepseek_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "deepseek_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "deepseek_models_missing_key": {
+    "message": "Add an API key to discover available models."
+  },
+  "deepseek_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "deepseek_models_discovery_failed": {
+    "message": "Could not load DeepSeek models."
+  },
+  "deepseek_models_empty": {
+    "message": "No models were returned by DeepSeek."
+  },
+  "deepseek_model_not_listed": {
+    "message": "Saved model was not listed by DeepSeek."
+  },
+  "deepseek_saved_model_label": {
+    "message": "Saved model"
+  },
+  "deepseek_custom_endpoint_info": {
+    "message": "Using a custom API URL — DeepSeek's model catalog is not loaded."
   },
   "deepseek_thinking_mode_label": {
     "message": "Thinking Mode"

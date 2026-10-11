@@ -1,3 +1,11 @@
+#### Unreleased
+
+##### Added
+
+- Added **Dynamic AI Model Discovery**, allowing users to browse, search, and select available AI models directly from Settings for OpenRouter, Requesty, OpenAI, DeepSeek, and Gemini, and to browse server-advertised models in the main Model selector for WebAI.
+
+---
+
 #### v1.22.0 – Released on October 10, 2026
 
 ##### Changed

@@ -17,7 +17,10 @@ import {
   getPromptAsync,
   getPromptBASEFieldAsync,
   getGeminiThinkingModeAsync,
-  getDeepSeekThinkingModeAsync
+  getDeepSeekThinkingModeAsync,
+  getOpenAIModelSourceAsync,
+  getOpenRouterModelSourceAsync,
+  getDeepSeekModelSourceAsync
 } from './config.js';
 import { storageManager } from '../storage/core/StorageCore.js';
 
@@ -106,6 +109,7 @@ describe('Config Module', () => {
     it('should expose approved OpenAI text models in order', () => {
       expect(CONFIG.OPENAI_API_URL).toBe('https://api.openai.com/v1/chat/completions');
       expect(CONFIG.OPENAI_API_MODEL).toBe('gpt-6-luna');
+      expect(CONFIG.OPENAI_MODEL_SOURCE).toBe('legacy');
       expect(CONFIG.OPENAI_MODELS.map(model => model.value)).toEqual([
         'gpt-6-luna',
         'gpt-6-sol',
@@ -126,6 +130,7 @@ describe('Config Module', () => {
 
     it('should expose approved DeepSeek text models in order', () => {
       expect(CONFIG.DEEPSEEK_API_MODEL).toBe('deepseek-flash');
+      expect(CONFIG.DEEPSEEK_MODEL_SOURCE).toBe('legacy');
       expect(CONFIG.DEEPSEEK_API_URL).toBe('https://api.deepseek.com/chat/completions');
       expect(CONFIG.DEEPSEEK_THINKING_MODE).toBe('disabled');
       expect(CONFIG.DEEPSEEK_THINKING_MODE_OPTIONS.map(option => option.value)).toEqual([
@@ -161,6 +166,7 @@ describe('Config Module', () => {
 
     it('should expose the curated OpenRouter models in order', () => {
       expect(CONFIG.OPENROUTER_API_MODEL).toBe('openai/gpt-6-luna');
+      expect(CONFIG.OPENROUTER_MODEL_SOURCE).toBe('legacy');
       expect(CONFIG.OPENROUTER_API_URL).toBe('https://openrouter.ai/api/v1/chat/completions');
       expect(CONFIG.OPENROUTER_MODELS).toEqual([
         { value: 'openai/gpt-6-luna', name: 'OpenAI GPT-6 Luna' },
@@ -204,6 +210,7 @@ describe('Config Module', () => {
 
     it('should expose approved Gemini selector models in order', () => {
       expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.8-flash');
+      expect(CONFIG.GEMINI_MODEL_SOURCE).toBe('legacy');
       expect(CONFIG.GEMINI_API_URL).toBe(
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
       );
@@ -252,6 +259,16 @@ describe('Config Module', () => {
   });
 
   describe('Async Getters', () => {
+    it.each([
+      ['OPENAI_MODEL_SOURCE', getOpenAIModelSourceAsync],
+      ['OPENROUTER_MODEL_SOURCE', getOpenRouterModelSourceAsync],
+      ['DEEPSEEK_MODEL_SOURCE', getDeepSeekModelSourceAsync],
+    ])('%s reads the stored source and uses its CONFIG default', async (key, getter) => {
+      storageManager.get.mockResolvedValue({ [key]: 'catalog' });
+      await expect(getter()).resolves.toBe('catalog');
+      expect(storageManager.get).toHaveBeenCalledWith({ [key]: CONFIG[key] });
+    });
+
     it('getDeepSeekThinkingModeAsync reads stored mode and uses CONFIG default', async () => {
       storageManager.get.mockResolvedValue({ DEEPSEEK_THINKING_MODE: 'high' });
       await expect(getDeepSeekThinkingModeAsync()).resolves.toBe('high');

@@ -33,6 +33,18 @@
         class="model-select"
         :style="rtlSelectStyle"
       />
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !savedModelNotAdvertised }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="savedModelNotAdvertised"
+          class="model-discovery-status"
+        >{{ t('openai_model_not_listed') || 'Saved model was not listed by OpenAI.' }}</small>
+      </div>
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
@@ -45,11 +57,64 @@
         dir="ltr"
       />
     </div>
+    <div class="setting-group vertical">
+      <small class="model-discovery-status">
+        {{ t('openai_catalog_compatibility_notice') || 'The model catalog does not indicate Chat Completions compatibility; listed models may not all support Chat Completions.' }}
+      </small>
+      <BaseInput
+        id="openai-model-search"
+        v-model="searchQuery"
+        type="search"
+        :label="t('openai_catalog_search_label') || 'Search OpenAI models'"
+        :placeholder="t('openai_catalog_search_placeholder') || 'Search by model ID or name'"
+        dir="ltr"
+      />
+      <div
+        class="model-discovery-status-live"
+        :class="{ 'ti-sr-only': !catalogStatusVisible }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <small
+          v-if="!hasOpenAIKey"
+          class="model-discovery-status"
+        >{{ t('openai_models_missing_key') || 'Add an API key to discover available models.' }}</small>
+        <small
+          v-else-if="modelDiscoveryLoading"
+          class="model-discovery-status"
+        >{{ t('openai_models_loading') || 'Loading model catalog…' }}</small>
+        <small
+          v-else-if="modelDiscoveryFailed"
+          class="model-discovery-status"
+        >{{ t('openai_models_discovery_failed') || 'Could not load OpenAI models.' }}</small>
+        <small
+          v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
+          class="model-discovery-status"
+        >{{ t('openai_models_empty') || 'No models were returned by OpenAI.' }}</small>
+      </div>
+      <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
+        <BaseSelect
+          v-model="catalogModelSelection"
+          :options="filteredCatalog.options"
+          :style="rtlSelectStyle"
+          :aria-label="t('openai_catalog_results_label') || 'Available OpenAI models'"
+        />
+        <small
+          v-if="filteredCatalog.total > filteredCatalog.options.length"
+          class="model-discovery-status"
+        >{{ t('openai_catalog_showing_count', { shown: filteredCatalog.options.length, total: filteredCatalog.total }) || `Showing ${filteredCatalog.options.length} of ${filteredCatalog.total} matching models` }}</small>
+        <small
+          v-if="discoveredModels.length > 0 && filteredCatalog.total === 0"
+          class="model-discovery-status"
+        >{{ t('openai_catalog_no_matches') || 'No models match your search.' }}</small>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import "./OpenAIApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -61,6 +126,12 @@ import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import { filterModelCatalog } from '@/features/settings/presentation/modelCatalogFilter.js'
+import {
+  fetchOpenAIModels,
+  getCachedOpenAIModels,
+  MissingOpenAIKeyError,
+} from '@/features/translation/providers/OpenAIModelDiscovery.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -72,44 +143,196 @@ const openaiApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('OPENAI_API_KEY', value)
 })
 
-// Track dropdown selection separately from stored value
 const selectedModelOption = ref(CONFIG.OPENAI_API_MODEL)
+const discoveredModels = ref([])
+const modelDiscoveryLoading = ref(false)
+const modelDiscoveryFailed = ref(false)
+const modelDiscoverySucceeded = ref(false)
+const searchQuery = ref('')
+const customModelVisible = ref(false)
+const hasOpenAIKey = computed(() => ApiKeyManager.parseKeys(openaiApiKey.value).length > 0)
+let discoveryRequestId = 0
+let discoveryTimer
+let activeController
+let selectionInteraction = 0
+
+const openaiApiModelOptions = computed(() => {
+  const curated = (CONFIG.OPENAI_MODELS || []).filter(model => model.value !== 'custom')
+  const options = curated.map(model => ({ value: model.value, label: model.name || model.value }))
+  const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+  const catalogModel = discoveredModels.value.find(model => model.value === savedModel)
+  if (savedModel && savedModel !== 'custom' && !options.some(option => option.value === savedModel)) {
+    options.push({
+      value: savedModel,
+      label: catalogModel ? catalogModel.name : `${savedModel} — ${t('openai_saved_model_label') || 'Saved model'}`,
+      legacy: !catalogModel,
+    })
+  }
+  const custom = (CONFIG.OPENAI_MODELS || []).find(model => model.value === 'custom')
+  options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
+  return options
+})
+
+const filteredCatalog = computed(() => filterModelCatalog(discoveredModels.value, searchQuery.value))
+
+const savedModelNotAdvertised = computed(() => {
+  const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+  return modelDiscoverySucceeded.value
+    && Boolean(savedModel)
+    && savedModel !== 'custom'
+    && !discoveredModels.value.some(model => model.value === savedModel)
+})
+
+// Persistent live region is only placed in flow while it carries a message.
+const catalogStatusVisible = computed(() => !hasOpenAIKey.value
+  || modelDiscoveryLoading.value
+  || modelDiscoveryFailed.value
+  || (modelDiscoverySucceeded.value && discoveredModels.value.length === 0))
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
-  const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  const isPredefined = (CONFIG.OPENAI_MODELS || []).some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
+  customModelVisible.value = !isPredefined
 }
+
+const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  if (requestId !== discoveryRequestId
+    || key !== openaiApiKey.value
+    || selectionAtStart !== selectionInteraction
+    || selectedModelOption.value !== 'custom') return
+  const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+  const isPredefined = (CONFIG.OPENAI_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
+    || discoveredModels.value.some(model => model.value === savedModel)
+  if (isPredefined) {
+    selectedModelOption.value = savedModel
+    customModelVisible.value = false
+  }
+}
+
+const discoverModels = async (apiKey, selectionAtStart = selectionInteraction) => {
+  const requestId = ++discoveryRequestId
+  const key = typeof apiKey === 'string' ? apiKey : ''
+  activeController?.abort()
+  activeController = null
+  if (!ApiKeyManager.parseKeys(key).length) {
+    discoveredModels.value = []
+    modelDiscoveryLoading.value = false
+    modelDiscoveryFailed.value = false
+    modelDiscoverySucceeded.value = false
+    return
+  }
+  const cached = getCachedOpenAIModels(key)
+  modelDiscoveryFailed.value = false
+  if (cached !== null) {
+    discoveredModels.value = cached
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryLoading.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+    return
+  }
+  const controller = new AbortController()
+  activeController = controller
+  modelDiscoveryLoading.value = true
+  try {
+    const models = await fetchOpenAIModels({ apiKey: key, signal: controller.signal })
+    if (requestId !== discoveryRequestId || key !== openaiApiKey.value) return
+    discoveredModels.value = models
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryFailed.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+  } catch (error) {
+    if (requestId !== discoveryRequestId || key !== openaiApiKey.value) return
+    if (error instanceof MissingOpenAIKeyError) {
+      modelDiscoveryFailed.value = false
+      modelDiscoverySucceeded.value = false
+      return
+    }
+    modelDiscoverySucceeded.value = false
+    modelDiscoveryFailed.value = true
+  } finally {
+    if (requestId === discoveryRequestId && key === openaiApiKey.value) modelDiscoveryLoading.value = false
+  }
+}
+
+const catalogModelSelection = computed({
+  get: () => {
+    const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+    return filteredCatalog.value.options.some(option => option.value === savedModel) ? savedModel : ''
+  },
+  set: (value) => {
+    if (!value) return
+    selectionInteraction++
+    selectedModelOption.value = value
+    customModelVisible.value = false
+    settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', 'catalog')
+  }
+})
+
+watch(openaiApiKey, (apiKey) => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+  discoveredModels.value = []
+  modelDiscoverySucceeded.value = false
+  modelDiscoveryFailed.value = false
+  const requestId = ++discoveryRequestId
+  const scheduledSelection = selectionInteraction
+  if (!ApiKeyManager.parseKeys(apiKey).length) {
+    modelDiscoveryLoading.value = false
+    return
+  }
+  modelDiscoveryLoading.value = true
+  discoveryTimer = setTimeout(() => {
+    if (requestId === discoveryRequestId) discoverModels(apiKey, scheduledSelection)
+  }, 400)
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+})
 
 const openaiApiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
+    selectionInteraction++
+    const wasCustom = selectedModelOption.value === 'custom'
+    customModelVisible.value = value === 'custom' && wasCustom ? customModelVisible.value : false
+    // Capture before either setting is modified: the write-through store would
+    // otherwise make the "previous" model indistinguishable from the new value.
+    const previousModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+    const previousSource = settingsStore.settings?.OPENAI_MODEL_SOURCE || CONFIG.OPENAI_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
     }
+    const isCurated = (CONFIG.OPENAI_MODELS || []).some(model => model.value === value && model.value !== 'custom')
+    const isCatalog = discoveredModels.value.some(model => model.value === value)
+    // Reselecting the already-saved model must not demote explicit catalog/custom
+    // provenance when discovery is unavailable; genuinely new IDs still resolve below.
+    const isReselectedSaved = value !== 'custom' && value === previousModel
+      && (previousSource === 'catalog' || previousSource === 'custom')
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : isReselectedSaved ? previousSource : 'legacy')
     // If 'custom' is selected, wait for user input in custom field
   }
 })
 
 const openaiCustomModel = computed({
-  get: () => {
-    const currentModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL;
-    const isPredefined = openaiApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
-    return isPredefined ? '' : currentModel;
-  },
+  get: () => selectedModelOption.value === 'custom' && customModelVisible.value
+    ? settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+    : '',
   set: (value) => {
+    selectionInteraction++
+    customModelVisible.value = true
     settingsStore.updateSettingLocally('OPENAI_API_MODEL', value);
+    settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', 'custom')
   }
-})
-
-const openaiApiModelOptions = computed(() => {
-  const models = settingsStore.settings?.OPENAI_MODELS || CONFIG.OPENAI_MODELS || []
-  return models.map(model => ({
-    value: model.value,
-    label: model.name || model.value
-  }))
 })
 
 // Test keys functionality
@@ -157,5 +380,6 @@ const testKeys = async (providerId) => {
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
+  discoverModels(openaiApiKey.value)
 })
 </script>

@@ -333,6 +333,29 @@ describe('Settings Migrations', () => {
     expect(logs).toContain(`Migrated GEMINI_MODEL from ${oldModel} to ${newModel}`);
   });
 
+  it('preserves catalog-sourced Gemini model selections during import/update while syncing the model list', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'gemini-2.5-flash', label: 'Discovered' }],
+      GEMINI_MODEL: 'gemini-2.5-flash',
+      GEMINI_MODEL_SOURCE: 'catalog'
+    });
+
+    expect(updates.GEMINI_MODEL).toBeUndefined();
+    expect(updates.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
+    expect(logs).toContain('Preserved catalog-sourced GEMINI_MODEL: gemini-2.5-flash');
+  });
+
+  it('continues migrating legacy-sourced Gemini model selections', async () => {
+    const { updates, logs } = await runSettingsMigrations({
+      GEMINI_MODELS: [{ value: 'gemini-2.5-flash', label: 'Legacy' }],
+      GEMINI_MODEL: 'gemini-2.5-flash',
+      GEMINI_MODEL_SOURCE: 'legacy'
+    });
+
+    expect(updates.GEMINI_MODEL).toBe('gemini-3.8-flash');
+    expect(logs).toContain('Migrated GEMINI_MODEL from gemini-2.5-flash to gemini-3.8-flash');
+  });
+
   it.each([
     ['gemini-3.7-flash', 'gemini-3.8-flash'],
     ['gemini-3.6-flash', 'gemini-3.8-flash']
@@ -399,6 +422,35 @@ describe('Settings Migrations', () => {
     expect(logs).toContain(`Migrated OPENAI_API_MODEL from ${oldModel} to ${newModel}`);
   });
 
+  it('preserves catalog-sourced OpenAI overlap while syncing the list, but migrates legacy or absent source', async () => {
+    const catalog = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: 'gpt-4o-mini', label: 'Discovered' }],
+      OPENAI_API_MODEL: 'gpt-4o-mini',
+      OPENAI_MODEL_SOURCE: 'catalog'
+    });
+    expect(catalog.updates.OPENAI_API_MODEL).toBeUndefined();
+    expect(catalog.updates.OPENAI_MODELS).toEqual(CONFIG.OPENAI_MODELS);
+    expect(catalog.logs).toContain('Preserved catalog-sourced OPENAI_API_MODEL: gpt-4o-mini');
+
+    const custom = await runSettingsMigrations({
+      OPENAI_MODELS: [{ value: 'gpt-4o-mini', label: 'Manual' }],
+      OPENAI_API_MODEL: 'gpt-4o-mini',
+      OPENAI_MODEL_SOURCE: 'custom'
+    });
+    expect(custom.updates.OPENAI_API_MODEL).toBeUndefined();
+    expect(custom.updates.OPENAI_MODELS).toEqual(CONFIG.OPENAI_MODELS);
+    expect(custom.logs).toContain('Preserved custom OPENAI_API_MODEL: gpt-4o-mini');
+
+    for (const source of ['legacy', undefined]) {
+      const legacy = await runSettingsMigrations({
+        OPENAI_MODELS: [{ value: 'gpt-4o-mini', label: 'Legacy' }],
+        OPENAI_API_MODEL: 'gpt-4o-mini',
+        ...(source ? { OPENAI_MODEL_SOURCE: source } : {})
+      });
+      expect(legacy.updates.OPENAI_API_MODEL).toBe('gpt-6-luna');
+    }
+  });
+
   it('preserves current OpenAI static and arbitrary custom models', async () => {
     const currentStatic = await runSettingsMigrations({
       OPENAI_MODELS: [{ value: 'legacy-model', label: 'Legacy' }],
@@ -443,6 +495,34 @@ describe('Settings Migrations', () => {
     // An already-valid Thinking Mode is preserved (no update) unless the legacy contract remaps it.
     expect(updates.DEEPSEEK_THINKING_MODE).toBe(expectedThinking);
     expect(logs).toContain(`Migrated DEEPSEEK_API_MODEL from ${oldModel} to ${newModel}`);
+  });
+
+  it('preserves catalog-sourced DeepSeek overlap without applying the legacy thinking remap', async () => {
+    const catalog = await runSettingsMigrations({
+      DEEPSEEK_MODELS: [{ value: 'deepseek-chat', label: 'Discovered' }],
+      DEEPSEEK_API_MODEL: 'deepseek-chat',
+      DEEPSEEK_MODEL_SOURCE: 'catalog',
+      DEEPSEEK_THINKING_MODE: 'max'
+    });
+    expect(catalog.updates.DEEPSEEK_API_MODEL).toBeUndefined();
+    expect(catalog.updates.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
+    expect(catalog.updates.DEEPSEEK_THINKING_MODE).toBeUndefined();
+    expect(catalog.logs).toContain('Preserved catalog-sourced DEEPSEEK_API_MODEL: deepseek-chat');
+
+    const custom = await runSettingsMigrations({
+      DEEPSEEK_MODELS: [{ value: 'deepseek-chat', label: 'Manual' }],
+      DEEPSEEK_API_MODEL: 'deepseek-chat',
+      DEEPSEEK_MODEL_SOURCE: 'custom',
+      DEEPSEEK_THINKING_MODE: 'max'
+    });
+    expect(custom.updates.DEEPSEEK_API_MODEL).toBeUndefined();
+    expect(custom.updates.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
+    expect(custom.updates.DEEPSEEK_THINKING_MODE).toBeUndefined();
+    expect(custom.logs).toContain('Preserved custom DEEPSEEK_API_MODEL: deepseek-chat');
+
+    const absentSource = await runSettingsMigrations({ DEEPSEEK_API_MODEL: 'deepseek-chat' });
+    expect(absentSource.updates.DEEPSEEK_API_MODEL).toBe('deepseek-flash');
+    expect(absentSource.updates.DEEPSEEK_THINKING_MODE).toBe('disabled');
   });
 
   it.each([
@@ -512,6 +592,35 @@ describe('Settings Migrations', () => {
     expect(logs).toContain(`Migrated OPENROUTER_API_MODEL from ${oldModel} to ${newModel}`);
   });
 
+  it('preserves catalog-sourced OpenRouter overlap while syncing the list, but migrates legacy or absent source', async () => {
+    const catalog = await runSettingsMigrations({
+      OPENROUTER_MODELS: [{ value: 'google/gemini-2.5-flash', label: 'Discovered' }],
+      OPENROUTER_API_MODEL: 'google/gemini-2.5-flash',
+      OPENROUTER_MODEL_SOURCE: 'catalog'
+    });
+    expect(catalog.updates.OPENROUTER_API_MODEL).toBeUndefined();
+    expect(catalog.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(catalog.logs).toContain('Preserved catalog-sourced OPENROUTER_API_MODEL: google/gemini-2.5-flash');
+
+    const custom = await runSettingsMigrations({
+      OPENROUTER_MODELS: [{ value: 'google/gemini-2.5-flash', label: 'Manual' }],
+      OPENROUTER_API_MODEL: 'google/gemini-2.5-flash',
+      OPENROUTER_MODEL_SOURCE: 'custom'
+    });
+    expect(custom.updates.OPENROUTER_API_MODEL).toBeUndefined();
+    expect(custom.updates.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);
+    expect(custom.logs).toContain('Preserved custom OPENROUTER_API_MODEL: google/gemini-2.5-flash');
+
+    for (const source of ['legacy', undefined]) {
+      const legacy = await runSettingsMigrations({
+        OPENROUTER_MODELS: [{ value: 'google/gemini-2.5-flash', label: 'Legacy' }],
+        OPENROUTER_API_MODEL: 'google/gemini-2.5-flash',
+        ...(source ? { OPENROUTER_MODEL_SOURCE: source } : {})
+      });
+      expect(legacy.updates.OPENROUTER_API_MODEL).toBe('google/gemini-3.8-flash');
+    }
+  });
+
   it.each(CONFIG.OPENROUTER_MODELS
     .filter(model => model.value !== 'custom')
     .map(model => model.value))('preserves curated OpenRouter model ID %s during list synchronization', async (model) => {
@@ -562,7 +671,7 @@ describe('Settings Migrations', () => {
     expect(logs.some(log => log.includes('Reset OPENROUTER_API_MODEL'))).toBe(true);
   });
 
-  it.each(['gemini-3-flash', 'gemini-3-pro', 'provider/custom-model'])(
+  it.each(['gemini-3-flash', 'gemini-3-pro', 'provider/custom-model', 'gemini-auto'])(
     'preserves WebAI model %s during model-list synchronization',
     async (model) => {
       const { updates } = await runSettingsMigrations({

@@ -128,6 +128,8 @@ export const CONFIG = {
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
   GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-3.8-flash", // Selected Gemini model
+  // Missing from older settings defaults to legacy routing; new catalog picks set this explicitly.
+  GEMINI_MODEL_SOURCE: "legacy",
   GEMINI_THINKING_MODE: "default", // Provider default or minimal thinking when supported
   GEMINI_MODELS: [
     {
@@ -164,6 +166,8 @@ export const CONFIG = {
   OPENAI_API_KEY: "",
   OPENAI_API_URL: "https://api.openai.com/v1/chat/completions",
   OPENAI_API_MODEL: "gpt-6-luna",
+  // Missing from older settings defaults to legacy routing; new catalog picks set this explicitly.
+  OPENAI_MODEL_SOURCE: "legacy",
   OPENAI_MODELS: [
     { value: "gpt-6-luna", name: "GPT-6 Luna" },
     { value: "gpt-6-sol", name: "GPT-6 Sol" },
@@ -172,6 +176,8 @@ export const CONFIG = {
   OPENROUTER_API_KEY: "",
   OPENROUTER_API_URL: "https://openrouter.ai/api/v1/chat/completions",
   OPENROUTER_API_MODEL: "openai/gpt-6-luna",
+  // Missing from older settings defaults to legacy routing; new catalog picks set this explicitly.
+  OPENROUTER_MODEL_SOURCE: "legacy",
   OPENROUTER_MODELS: [
     { value: "openai/gpt-6-luna", name: "OpenAI GPT-6 Luna" },
     { value: "google/gemini-3.5-flash-lite", name: "Google Gemini 3.5 Flash-Lite" },
@@ -204,6 +210,8 @@ export const CONFIG = {
   DEEPSEEK_API_KEY: "",
   DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions",
   DEEPSEEK_API_MODEL: "deepseek-flash",
+  // Missing from older settings defaults to legacy routing; new catalog picks set this explicitly.
+  DEEPSEEK_MODEL_SOURCE: "legacy",
   DEEPSEEK_THINKING_MODE: "disabled",
   DEEPSEEK_THINKING_MODE_OPTIONS: [
     { value: "disabled", name: "Disabled" },
@@ -795,6 +803,22 @@ export const getApiKeyAsync = async () => {
 
 export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
+};
+
+export const getGeminiModelSourceAsync = async () => {
+  return getSettingValueAsync("GEMINI_MODEL_SOURCE", CONFIG.GEMINI_MODEL_SOURCE);
+};
+
+export const getOpenAIModelSourceAsync = async () => {
+  return getSettingValueAsync("OPENAI_MODEL_SOURCE", CONFIG.OPENAI_MODEL_SOURCE);
+};
+
+export const getOpenRouterModelSourceAsync = async () => {
+  return getSettingValueAsync("OPENROUTER_MODEL_SOURCE", CONFIG.OPENROUTER_MODEL_SOURCE);
+};
+
+export const getDeepSeekModelSourceAsync = async () => {
+  return getSettingValueAsync("DEEPSEEK_MODEL_SOURCE", CONFIG.DEEPSEEK_MODEL_SOURCE);
 };
 
 export const getGeminiThinkingModeAsync = async () => {

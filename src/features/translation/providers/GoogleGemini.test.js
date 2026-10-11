@@ -7,7 +7,12 @@ import { AIConversationHelper } from './utils/AIConversationHelper.js';
 import { createTranslationOperation } from '../ir/TranslationOperation.js';
 import { CompletionTermination } from '../ir/CompletionContract.js';
 import { ResponseFormat } from '@/shared/config/translationConstants.js';
-import { CONFIG, TranslationMode } from '@/shared/config/config.js';
+import {
+  CONFIG,
+  TranslationMode,
+  getGeminiApiUrlAsync,
+  getGeminiModelSourceAsync,
+} from '@/shared/config/config.js';
 
 // Mock Dependencies
 vi.mock('@/shared/proxy/ProxyManager.js', () => ({
@@ -26,6 +31,7 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getGeminiModelAsync: vi.fn().mockResolvedValue('gemini-3.8-flash'),
     getGeminiThinkingModeAsync: vi.fn().mockResolvedValue('default'),
     getGeminiApiUrlAsync: vi.fn().mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models'),
+    getGeminiModelSourceAsync: vi.fn().mockResolvedValue('legacy'),
     getPromptAsync: vi.fn().mockResolvedValue('Translate $_{TEXT} from $_{SOURCE} to $_{TARGET}'),
   };
 });
@@ -40,6 +46,8 @@ describe('GeminiProvider Error Handling', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getGeminiApiUrlAsync.mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
     provider = new GeminiProvider();
   });
 
@@ -150,6 +158,190 @@ describe('GeminiProvider Error Handling', () => {
 
     expect(executeRequest.mock.calls[0][0].url).toBe(`${endpoint}?key=test-key`);
     expect(CONFIG.GEMINI_MODELS.find(configuredModel => configuredModel.value === model).url).toBe(endpoint);
+  });
+
+  it('routes an explicitly catalog-selected model to its own generateContent endpoint', async () => {
+    const { getGeminiApiUrlAsync, getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiThinkingModeAsync } = await import('@/shared/config/config.js');
+    const model = 'gemini-catalog-model';
+    getGeminiModelAsync.mockResolvedValue(model);
+    getGeminiModelSourceAsync.mockResolvedValue('catalog');
+    getGeminiThinkingModeAsync.mockResolvedValue('minimal');
+    getGeminiApiUrlAsync.mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const request = executeRequest.mock.calls[0][0];
+    expect(request.url).toBe(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=test-key`);
+    expect(request.url.match(/:generateContent/g)).toHaveLength(1);
+    const payload = JSON.parse(request.fetchOptions.body);
+    expect(request.url).toContain(`/v1beta/models/${model}:generateContent`);
+    expect(payload).not.toHaveProperty('model');
+    expect(payload.generationConfig.temperature).toBe(0.1);
+    expect(payload.generationConfig).not.toHaveProperty('thinkingConfig');
+  });
+
+  it('routes the official models list URL to the configured endpoint for a curated model', async () => {
+    const { getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiApiUrlAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue('gemini-3.8-flash');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    getGeminiApiUrlAsync.mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${CONFIG.GEMINI_MODELS.find(({ value }) => value === 'gemini-3.8-flash').url}?key=test-key`);
+  });
+
+  it.each([
+    ['legacy curated', 'gemini-3.8-flash', 'legacy', CONFIG.GEMINI_MODELS.find(({ value }) => value === 'gemini-3.8-flash').url],
+    ['catalog model', 'gemini-catalog-suffixless', 'catalog', 'https://generativelanguage.googleapis.com/v1beta/models/gemini-catalog-suffixless:generateContent'],
+  ])('routes an official suffixless model URL for %s', async (_case, model, source, endpoint) => {
+    const { getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiApiUrlAsync } = await import('@/shared/config/config.js');
+    getGeminiModelAsync.mockResolvedValue(model);
+    getGeminiModelSourceAsync.mockResolvedValue(source);
+    getGeminiApiUrlAsync.mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models/old-model');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${endpoint}?key=test-key`);
+  });
+
+  it('preserves a custom same-origin path for a curated model', async () => {
+    const { getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiApiUrlAsync } = await import('@/shared/config/config.js');
+    const customUrl = 'https://generativelanguage.googleapis.com/v1beta/custom-route';
+    getGeminiModelAsync.mockResolvedValue('gemini-3.8-flash');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    getGeminiApiUrlAsync.mockResolvedValue(customUrl);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${customUrl}:generateContent?key=test-key`);
+  });
+
+  it('preserves custom and legacy URL routing for unknown model IDs', async () => {
+    const { getGeminiApiUrlAsync, getGeminiModelAsync, getGeminiModelSourceAsync } = await import('@/shared/config/config.js');
+    const customUrl = 'https://custom.example/v1beta/models/legacy-model:generateContent';
+    getGeminiApiUrlAsync.mockResolvedValue(customUrl);
+    getGeminiModelAsync.mockResolvedValue('legacy-unknown-model');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'legacy source');
+
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${customUrl}?key=test-key`);
+  });
+
+  it('preserves query parameters on a saved official URL while adding the API key', async () => {
+    const { getGeminiApiUrlAsync, getGeminiModelAsync, getGeminiModelSourceAsync } = await import('@/shared/config/config.js');
+    getGeminiApiUrlAsync.mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models/saved-model:generateContent?alt=json');
+    getGeminiModelAsync.mockResolvedValue('legacy-unknown-model');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const requestUrl = new URL(executeRequest.mock.calls[0][0].url);
+    expect(requestUrl.searchParams.get('alt')).toBe('json');
+    expect(requestUrl.searchParams.get('key')).toBe('test-key');
+    expect(requestUrl.pathname).toBe('/v1beta/models/saved-model:generateContent');
+  });
+
+  it('appends the endpoint suffix to a suffixless official URL path before its query', async () => {
+    const { getGeminiApiUrlAsync, getGeminiModelAsync, getGeminiModelSourceAsync } = await import('@/shared/config/config.js');
+    getGeminiApiUrlAsync.mockResolvedValue('https://generativelanguage.googleapis.com/v1beta/models/saved-model?alt=json');
+    getGeminiModelAsync.mockResolvedValue('legacy-unknown-model');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const requestUrl = new URL(executeRequest.mock.calls[0][0].url);
+    expect(requestUrl.pathname).toBe('/v1beta/models/saved-model:generateContent');
+    expect(requestUrl.searchParams.get('alt')).toBe('json');
+    expect(requestUrl.searchParams.get('key')).toBe('test-key');
+  });
+
+  it('appends the endpoint suffix to a suffixless custom URL path before its query', async () => {
+    const { getGeminiApiUrlAsync, getGeminiModelAsync, getGeminiModelSourceAsync } = await import('@/shared/config/config.js');
+    getGeminiApiUrlAsync.mockResolvedValue('https://custom.example/v1beta/models/example?alt=json');
+    getGeminiModelAsync.mockResolvedValue('legacy-unknown-model');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const requestUrl = new URL(executeRequest.mock.calls[0][0].url);
+    expect(requestUrl.pathname).toBe('/v1beta/models/example:generateContent');
+    expect(requestUrl.searchParams.get('alt')).toBe('json');
+    expect(requestUrl.searchParams.get('key')).toBe('test-key');
+  });
+
+  it('preserves query parameters on a custom endpoint while adding the API key', async () => {
+    const { getGeminiApiUrlAsync, getGeminiModelAsync, getGeminiModelSourceAsync } = await import('@/shared/config/config.js');
+    getGeminiApiUrlAsync.mockResolvedValue('https://custom.example/v1beta/models/custom-route:generateContent?alt=json&region=us');
+    getGeminiModelAsync.mockResolvedValue('custom/model');
+    getGeminiModelSourceAsync.mockResolvedValue('custom');
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    const requestUrl = new URL(executeRequest.mock.calls[0][0].url);
+    expect([...requestUrl.searchParams.entries()]).toEqual([
+      ['alt', 'json'],
+      ['region', 'us'],
+      ['key', 'test-key']
+    ]);
+    expect(requestUrl.pathname).toBe('/v1beta/models/custom-route:generateContent');
+  });
+
+  it('routes an explicitly catalog-selected model to its own standard endpoint', async () => {
+    const { getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiApiUrlAsync } = await import('@/shared/config/config.js');
+    const model = 'gemini-catalog-17';
+    getGeminiModelAsync.mockResolvedValue(model);
+    getGeminiModelSourceAsync.mockResolvedValue('catalog');
+    getGeminiApiUrlAsync.mockResolvedValue(CONFIG.GEMINI_API_URL);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    expect(executeRequest.mock.calls[0][0].url)
+      .toBe(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=test-key`);
+    expect(executeRequest.mock.calls[0][0].url.match(/:generateContent/g)).toHaveLength(1);
+  });
+
+  it('preserves a saved custom endpoint for a catalog model', async () => {
+    const { getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiApiUrlAsync } = await import('@/shared/config/config.js');
+    const model = 'gemini-catalog-saved';
+    const customUrl = 'https://custom.example/v1beta/models/custom-route:generateContent';
+    getGeminiModelAsync.mockResolvedValue(model);
+    getGeminiModelSourceAsync.mockResolvedValue('catalog');
+    getGeminiApiUrlAsync.mockResolvedValue(customUrl);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    await provider._callAI('system', 'source');
+
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${customUrl}?key=test-key`);
+  });
+
+  it('preserves custom endpoint behavior for legacy unknown and custom models', async () => {
+    const { getGeminiModelAsync, getGeminiModelSourceAsync, getGeminiApiUrlAsync } = await import('@/shared/config/config.js');
+    const customUrl = 'https://custom.example/v1beta/models/legacy-custom:generateContent';
+    getGeminiApiUrlAsync.mockResolvedValue(customUrl);
+    const executeRequest = vi.spyOn(provider, '_executeRequest').mockResolvedValue('translated');
+
+    getGeminiModelAsync.mockResolvedValue('legacy-unknown-model');
+    getGeminiModelSourceAsync.mockResolvedValue('legacy');
+    await provider._callAI('system', 'legacy');
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${customUrl}?key=test-key`);
+
+    executeRequest.mockClear();
+    getGeminiModelAsync.mockResolvedValue('custom/model');
+    getGeminiModelSourceAsync.mockResolvedValue('custom');
+    await provider._callAI('system', 'custom');
+    expect(executeRequest.mock.calls[0][0].url).toBe(`${customUrl}?key=test-key`);
   });
 
   it.each(['gemini-3.8-flash', 'gemini-3.5-flash-lite'])(

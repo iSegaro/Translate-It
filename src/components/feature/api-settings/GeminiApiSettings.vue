@@ -32,6 +32,25 @@
         class="model-select"
         :style="rtlSelectStyle"
       />
+      <small
+        class="model-discovery-status model-discovery-status-warning"
+        :class="{ 'model-discovery-status--absent': !savedModelWarningMessage }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ savedModelWarningMessage }}</small>
+    </div>
+    <div class="setting-group vertical">
+      <label>{{ t('gemini_thinking_mode_label') || 'Thinking Mode' }}</label>
+      <BaseSelect
+        v-model="geminiThinkingMode"
+        :options="geminiThinkingModeOptions"
+        class="thinking-mode-select"
+        :style="rtlSelectStyle"
+      />
+      <p class="setting-description">
+        {{ t('gemini_thinking_mode_description') || 'Provider Default uses provider behavior. Minimal is applied only when the selected model supports it.' }}
+      </p>
     </div>
     <div
       v-if="selectedModelOption === 'custom'"
@@ -50,22 +69,45 @@
       </p>
     </div>
     <div class="setting-group vertical">
-      <label>{{ t('gemini_thinking_mode_label') || 'Thinking Mode' }}</label>
-      <BaseSelect
-        v-model="geminiThinkingMode"
-        :options="geminiThinkingModeOptions"
-        class="thinking-mode-select"
-        :style="rtlSelectStyle"
+      <BaseInput
+        id="gemini-model-search"
+        v-model="searchQuery"
+        type="search"
+        :label="t('gemini_catalog_search_label') || 'Search Gemini models'"
+        :placeholder="t('gemini_catalog_search_placeholder') || 'Search by model ID or name'"
+        dir="ltr"
       />
-      <p class="setting-description">
-        {{ t('gemini_thinking_mode_description') || 'Provider Default uses provider behavior. Minimal is applied only when the selected model supports it.' }}
-      </p>
+      <small
+        class="model-discovery-status model-discovery-status-live"
+        :class="{ 'model-discovery-status--absent': !discoveryStatusMessage }"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ discoveryStatusMessage }}</small>
+      <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
+        <small class="model-discovery-status">{{ t('gemini_catalog_official_info') || 'Catalog selection uses Google\'s official Gemini API.' }}</small>
+        <BaseSelect
+          v-model="catalogModelSelection"
+          :options="filteredCatalog.options"
+          class="catalog-model-select"
+          :style="rtlSelectStyle"
+          :aria-label="t('gemini_catalog_results_label') || 'Available Gemini models'"
+        />
+        <small
+          v-if="filteredCatalog.total > filteredCatalog.options.length"
+          class="model-discovery-status"
+        >{{ t('gemini_catalog_showing_count', { shown: filteredCatalog.options.length, total: filteredCatalog.total }) || `Showing ${filteredCatalog.options.length} of ${filteredCatalog.total} matching models` }}</small>
+        <small
+          v-if="discoveredModels.length > 0 && filteredCatalog.total === 0"
+          class="model-discovery-status"
+        >{{ t('gemini_catalog_no_matches') || 'No models match your search.' }}</small>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import "./GeminiApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -77,6 +119,13 @@ import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import { filterModelCatalog } from '@/features/settings/presentation/modelCatalogFilter.js'
+import {
+  fetchGeminiModels,
+  getCachedGeminiModels,
+  MissingGeminiKeyError,
+} from '@/features/translation/providers/GeminiModelDiscovery.js'
+import { isOfficialGeminiEndpoint } from '@/features/translation/providers/modelDiscoveryEndpoints.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -90,27 +139,218 @@ const geminiApiKey = computed({
 
 const geminiApiUrl = computed({
   get: () => settingsStore.settings?.GEMINI_API_URL || CONFIG.GEMINI_API_URL,
-  set: (value) => settingsStore.updateSettingLocally('GEMINI_API_URL', value)
+  set: (value) => {
+    selectionInteraction++
+    settingsStore.updateSettingLocally('GEMINI_API_URL', value)
+    settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', 'custom')
+  }
 })
 
-// Track dropdown selection separately from stored value
 const selectedModelOption = ref(CONFIG.GEMINI_MODEL)
+const discoveredModels = ref([])
+const modelDiscoveryLoading = ref(false)
+const modelDiscoveryFailed = ref(false)
+const modelDiscoverySucceeded = ref(false)
+const searchQuery = ref('')
+const hasGeminiKey = computed(() => ApiKeyManager.parseKeys(geminiApiKey.value).length > 0)
+// Discovery must never contact Google for a custom endpoint; the shared
+// predicate treats an empty/absent stored URL as the official default.
+const storedGeminiEndpoint = computed(() => settingsStore.settings?.GEMINI_API_URL || '')
+const usesOfficialGeminiEndpoint = computed(() => isOfficialGeminiEndpoint(storedGeminiEndpoint.value))
+let discoveryRequestId = 0
+let discoveryTimer
+let activeController
+let selectionInteraction = 0
+
+const geminiModelOptions = computed(() => {
+  const curated = (CONFIG.GEMINI_MODELS || []).filter(model => model.value !== 'custom')
+  const options = curated.map(model => ({ value: model.value, label: model.name || model.value }))
+  const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
+  const catalogModel = discoveredModels.value.find(model => model.value === savedModel)
+  if (savedModel && savedModel !== 'custom' && !options.some(option => option.value === savedModel)) {
+    options.push({
+      value: savedModel,
+      label: catalogModel ? catalogModel.name : `${savedModel} — ${t('gemini_saved_model_label') || 'Saved model'}`,
+      legacy: !catalogModel,
+    })
+  }
+  const custom = (CONFIG.GEMINI_MODELS || []).find(model => model.value === 'custom')
+  options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
+  return options
+})
+
+const filteredCatalog = computed(() => filterModelCatalog(discoveredModels.value, searchQuery.value))
+
+const savedModelNotAdvertised = computed(() => {
+  const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
+  return modelDiscoverySucceeded.value
+    && Boolean(savedModel)
+    && savedModel !== 'custom'
+    && !discoveredModels.value.some(model => model.value === savedModel)
+})
+
+// Persistent live-region copy: the DOM element stays mounted and only this
+// resolved message changes, so screen readers announce real transitions instead
+// of conditional mounts.
+const savedModelWarningMessage = computed(() => (
+  savedModelNotAdvertised.value
+    ? (t('gemini_model_not_listed') || 'Saved model was not listed by Gemini.')
+    : ''
+))
+
+const discoveryStatusMessage = computed(() => {
+  if (!usesOfficialGeminiEndpoint.value) {
+    return t('gemini_custom_endpoint_info') || 'Using a custom API URL — Google\'s model catalog is not loaded.'
+  }
+  if (!hasGeminiKey.value) {
+    return t('gemini_models_missing_key') || 'Add an API key to discover available models.'
+  }
+  if (modelDiscoveryLoading.value) {
+    return t('gemini_models_loading') || 'Loading model catalog…'
+  }
+  if (modelDiscoveryFailed.value) {
+    return t('gemini_models_discovery_failed') || 'Could not load Gemini models.'
+  }
+  if (modelDiscoverySucceeded.value && discoveredModels.value.length === 0) {
+    return t('gemini_models_empty') || 'No models were returned by Gemini.'
+  }
+  return ''
+})
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL;
-  // If currentModel is 'custom' or not in predefined options, set to 'custom'
-  const isPredefined = geminiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
-  selectedModelOption.value = (currentModel === 'custom' || !isPredefined) ? 'custom' : currentModel;
+  const isPredefined = (CONFIG.GEMINI_MODELS || []).some(option => option.value === currentModel && option.value !== 'custom');
+  const isSavedCatalogModel = (settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE) === 'catalog'
+  selectedModelOption.value = isPredefined || isSavedCatalogModel ? currentModel : 'custom';
 }
 
 const geminiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
+    selectionInteraction++
     selectedModelOption.value = value;
-    // Always save the selected value, including 'custom'
     settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+    // Persist only explicit source intent so legacy/custom URL pairs survive upgrades without migrations.
+    const isCurated = (CONFIG.GEMINI_MODELS || []).some(model => model.value === value && model.value !== 'custom')
+    const isCatalog = discoveredModels.value.some(model => model.value === value)
+    settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
   }
+})
+
+const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  if (requestId !== discoveryRequestId
+    || key !== geminiApiKey.value
+    || selectionAtStart !== selectionInteraction
+    || selectedModelOption.value !== 'custom'
+    || (settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE) !== 'catalog') return
+  const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
+  if (discoveredModels.value.some(model => model.value === savedModel)) {
+    selectedModelOption.value = savedModel
+  }
+}
+
+const discoverModels = async (apiKey) => {
+  const requestId = ++discoveryRequestId
+  const key = typeof apiKey === 'string' ? apiKey : ''
+  const selectionAtStart = selectionInteraction
+  activeController?.abort()
+  activeController = null
+  if (!ApiKeyManager.parseKeys(key).length) {
+    discoveredModels.value = []
+    modelDiscoveryLoading.value = false
+    modelDiscoveryFailed.value = false
+    modelDiscoverySucceeded.value = false
+    return
+  }
+  // Guard before the cache getter: a warm official cache must never leak into a
+  // custom-endpoint configuration, and the official host must not be contacted.
+  if (!usesOfficialGeminiEndpoint.value) {
+    discoveredModels.value = []
+    modelDiscoveryLoading.value = false
+    modelDiscoveryFailed.value = false
+    modelDiscoverySucceeded.value = false
+    return
+  }
+  const cached = getCachedGeminiModels(key)
+  modelDiscoveryFailed.value = false
+  if (cached !== null) {
+    discoveredModels.value = cached
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryLoading.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+    return
+  }
+  const controller = new AbortController()
+  activeController = controller
+  modelDiscoveryLoading.value = true
+  try {
+    const models = await fetchGeminiModels({ apiKey: key, signal: controller.signal })
+    if (requestId !== discoveryRequestId || key !== geminiApiKey.value || !usesOfficialGeminiEndpoint.value) return
+    discoveredModels.value = models
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryFailed.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+  } catch (error) {
+    if (requestId !== discoveryRequestId || key !== geminiApiKey.value || !usesOfficialGeminiEndpoint.value) return
+    if (error instanceof MissingGeminiKeyError) {
+      modelDiscoverySucceeded.value = false
+      modelDiscoveryFailed.value = false
+      return
+    }
+    modelDiscoverySucceeded.value = false
+    modelDiscoveryFailed.value = true
+  } finally {
+    if (requestId === discoveryRequestId && key === geminiApiKey.value) modelDiscoveryLoading.value = false
+  }
+}
+
+const catalogModelSelection = computed({
+  get: () => {
+    const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
+    return filteredCatalog.value.options.some(option => option.value === savedModel) ? savedModel : ''
+  },
+  set: (value) => {
+    if (!value) return
+    selectionInteraction++
+    selectedModelOption.value = value
+    settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+    settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', 'catalog')
+  }
+})
+
+const scheduleDiscovery = (apiKey) => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+  discoveredModels.value = []
+  modelDiscoverySucceeded.value = false
+  modelDiscoveryFailed.value = false
+  const requestId = ++discoveryRequestId
+  if (!ApiKeyManager.parseKeys(apiKey).length || !usesOfficialGeminiEndpoint.value) {
+    modelDiscoveryLoading.value = false
+    return
+  }
+  modelDiscoveryLoading.value = true
+  discoveryTimer = setTimeout(() => {
+    if (requestId === discoveryRequestId) discoverModels(apiKey)
+  }, 400)
+}
+
+watch(geminiApiKey, (apiKey) => {
+  scheduleDiscovery(apiKey)
+}, { flush: 'sync' })
+
+watch(storedGeminiEndpoint, () => {
+  scheduleDiscovery(geminiApiKey.value)
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
 })
 
 const geminiThinkingMode = computed({
@@ -123,13 +363,19 @@ const geminiThinkingModeOptions = computed(() => [
   { value: 'minimal', label: t('gemini_thinking_mode_minimal') || 'Minimal' }
 ])
 
-// Get model options from settingsStore to maintain consistency with migrations
-const geminiModelOptions = computed(() => {
-  const models = settingsStore.settings?.GEMINI_MODELS || CONFIG.GEMINI_MODELS || []
-  return models.map(model => ({
-    value: model.value,
-    label: model.name || model.value
-  }))
+// Test Keys must validate against the same endpoint family translation uses: an
+// explicitly selected catalog model translates via the official Gemini endpoint
+// only while the stored endpoint is official, so a custom URL stays authoritative
+// for validation. Curated/custom/legacy selections keep the stored URL. Read-only:
+// never writes settings.
+const geminiTestApiUrl = computed(() => {
+  const model = selectedModelOption.value
+  const source = settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE
+  const isCurated = (CONFIG.GEMINI_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+  if (usesOfficialGeminiEndpoint.value && source === 'catalog' && model && model !== 'custom' && !isCurated) {
+    return `${CONFIG.GEMINI_API_URL.split('/models/')[0]}/models`
+  }
+  return geminiApiUrl.value
 })
 
 // Test keys functionality
@@ -146,7 +392,7 @@ const testKeys = async (providerId) => {
       geminiApiKey.value, 
       providerId,
       {
-        apiUrl: geminiApiUrl.value,
+        apiUrl: geminiTestApiUrl.value,
         apiModel: geminiModel.value
       }
     )
@@ -176,5 +422,13 @@ const testKeys = async (providerId) => {
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
+  discoverModels(geminiApiKey.value)
 })
 </script>
+
+<style scoped>
+/* Empty persistent live regions stay mounted (a11y tree) but leave no layout gap. */
+.model-discovery-status--absent {
+  position: absolute;
+}
+</style>

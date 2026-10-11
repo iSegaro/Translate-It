@@ -1262,6 +1262,45 @@
   "gemini_custom_api_url_info": {
     "message": "آدرس کامل API به همراه نام مدل را وارد کنید"
   },
+  "gemini_catalog_search_label": {
+    "message": "جستجوی مدل‌های Gemini"
+  },
+  "gemini_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "gemini_catalog_results_label": {
+    "message": "مدل‌های موجود Gemini"
+  },
+  "gemini_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "gemini_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "gemini_models_missing_key": {
+    "message": "برای یافتن مدل‌های موجود، یک کلید API اضافه کنید."
+  },
+  "gemini_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "gemini_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های Gemini ممکن نشد."
+  },
+  "gemini_models_empty": {
+    "message": "Gemini هیچ مدلی برنگرداند."
+  },
+  "gemini_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست Gemini نبود."
+  },
+  "gemini_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
+  "gemini_custom_endpoint_info": {
+    "message": "از URL سفارشی API استفاده می‌شود — کاتالوگ مدل‌های Google بارگذاری نمی‌شود."
+  },
+  "gemini_catalog_official_info": {
+    "message": "انتخاب از کاتالوگ با استفاده از API رسمی Gemini گوگل انجام می‌شود."
+  },
   "webai_api_settings_title": {
     "message": "تنظیمات WebAI"
   },
@@ -1276,6 +1315,15 @@
   },
   "webai_api_model_placeholder": {
     "message": "مدل"
+  },
+  "webai_models_loading": {
+    "message": "در حال بررسی مدل‌های موجود…"
+  },
+  "webai_models_discovery_failed": {
+    "message": "بررسی مدل‌های موجود ممکن نشد."
+  },
+  "webai_model_not_advertised": {
+    "message": "مدل ذخیره‌شده در فهرست سرور نبود."
   },
   "lingva_api_settings_title": {
     "message": "تنظیمات API لینگوا"
@@ -1310,6 +1358,42 @@
   "openai_api_model_placeholder": {
     "message": "مدل OpenAI را وارد کنید"
   },
+  "openai_catalog_search_label": {
+    "message": "جستجوی مدل‌های OpenAI"
+  },
+  "openai_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "openai_catalog_results_label": {
+    "message": "مدل‌های موجود OpenAI"
+  },
+  "openai_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "openai_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "openai_catalog_compatibility_notice": {
+    "message": "فهرست مدل‌ها اطلاعات سازگاری با Chat Completions را ارائه نمی‌کند؛ ممکن است همه مدل‌های فهرست‌شده از Chat Completions پشتیبانی نکنند."
+  },
+  "openai_models_missing_key": {
+    "message": "برای یافتن مدل‌های موجود، یک کلید API اضافه کنید."
+  },
+  "openai_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "openai_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های OpenAI ممکن نشد."
+  },
+  "openai_models_empty": {
+    "message": "OpenAI هیچ مدلی برنگرداند."
+  },
+  "openai_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست OpenAI نبود."
+  },
+  "openai_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
   "openrouter_api_settings_title": {
     "message": "تنظیمات OpenRouter"
   },
@@ -1325,11 +1409,71 @@
   "requesty_api_key_placeholder": {
     "message": "کلید API خود را اینجا وارد کنید"
   },
+  "requesty_catalog_search_label": {
+    "message": "جستجوی مدل‌های Requesty"
+  },
+  "requesty_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "requesty_catalog_results_label": {
+    "message": "مدل‌های موجود Requesty"
+  },
+  "requesty_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "requesty_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "requesty_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "requesty_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های Requesty ممکن نشد."
+  },
+  "requesty_models_empty": {
+    "message": "Requesty هیچ مدلی برنگرداند."
+  },
+  "requesty_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست Requesty نبود."
+  },
+  "requesty_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
   "openrouter_api_settings_model_label": {
     "message": "مدل"
   },
   "openrouter_api_model_placeholder": {
     "message": "مدل OpenRouter را وارد کنید"
+  },
+  "openrouter_catalog_search_label": {
+    "message": "جستجوی مدل‌های OpenRouter"
+  },
+  "openrouter_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "openrouter_catalog_results_label": {
+    "message": "مدل‌های موجود OpenRouter"
+  },
+  "openrouter_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "openrouter_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "openrouter_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "openrouter_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های OpenRouter ممکن نشد."
+  },
+  "openrouter_models_empty": {
+    "message": "OpenRouter هیچ مدلی برنگرداند."
+  },
+  "openrouter_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست OpenRouter نبود."
+  },
+  "openrouter_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
   },
   "deepseek_api_settings_title": {
     "message": "تنظیمات DeepSeek"
@@ -1345,6 +1489,42 @@
   },
   "deepseek_api_model_placeholder": {
     "message": "مدل DeepSeek را وارد کنید"
+  },
+  "deepseek_catalog_search_label": {
+    "message": "جستجوی مدل‌های DeepSeek"
+  },
+  "deepseek_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "deepseek_catalog_results_label": {
+    "message": "مدل‌های موجود DeepSeek"
+  },
+  "deepseek_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "deepseek_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "deepseek_models_missing_key": {
+    "message": "برای یافتن مدل‌های موجود، یک کلید API اضافه کنید."
+  },
+  "deepseek_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "deepseek_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های DeepSeek ممکن نشد."
+  },
+  "deepseek_models_empty": {
+    "message": "DeepSeek هیچ مدلی برنگرداند."
+  },
+  "deepseek_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست DeepSeek نبود."
+  },
+  "deepseek_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
+  "deepseek_custom_endpoint_info": {
+    "message": "از URL سفارشی API استفاده می‌شود — کاتالوگ مدل‌های DeepSeek بارگذاری نمی‌شود."
   },
   "deepseek_thinking_mode_label": {
     "message": "حالت تفکر"
