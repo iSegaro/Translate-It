@@ -62,6 +62,10 @@ export function clearWebAIModelCache() {
   modelCache.clear()
 }
 
+function throwIfAborted(signal) {
+  if (signal.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError')
+}
+
 export async function fetchWebAIModels(apiUrl, {
   fetchFn,
   timeoutMs = 5000,
@@ -84,8 +88,10 @@ export async function fetchWebAIModels(apiUrl, {
       headers: { Accept: 'application/json' },
       signal: controller.signal,
     })
+    throwIfAborted(controller.signal)
     if (!response.ok) throw new Error(`WebAI model discovery failed (${response.status})`)
     const data = await response.json()
+    throwIfAborted(controller.signal)
     if (!isValidModelsPayload(data)) throw new TypeError('Invalid WebAI model list response')
     const models = normalizeWebAIModels(data)
     modelCache.set(url, { models, fetchedAt: Date.now() })

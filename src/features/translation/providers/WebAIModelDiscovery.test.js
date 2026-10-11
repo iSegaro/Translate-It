@@ -98,4 +98,38 @@ describe('WebAI model discovery', () => {
     expect(settings).toEqual({ WEBAI_API_MODEL: 'gemini-3-flash' })
     expect(fetchFn.mock.calls[0]).toHaveLength(2)
   })
+
+  it('does not publish or cache when the transport resolves after cancellation', async () => {
+    const apiUrl = 'https://late-transport.test/v1/translate'
+    await fetchWebAIModels(apiUrl, {
+      fetchFn: vi.fn().mockResolvedValue(response({ data: [{ id: 'cached-model' }] })),
+    })
+    let resolveTransport
+    const transport = new Promise(resolve => { resolveTransport = resolve })
+    const controller = new AbortController()
+    const pending = fetchWebAIModels(apiUrl, {
+      fetchFn: vi.fn().mockReturnValue(transport),
+      signal: controller.signal,
+    })
+    controller.abort()
+    resolveTransport(response({ data: [{ id: 'late-model' }] }))
+    await expect(pending).rejects.toBeDefined()
+    expect(getCachedWebAIModels(apiUrl)).toEqual(['cached-model'])
+  })
+
+  it('does not publish or cache when JSON parsing resolves after cancellation', async () => {
+    const apiUrl = 'https://late-json.test/v1/translate'
+    let resolveJson
+    const json = new Promise(resolve => { resolveJson = resolve })
+    const controller = new AbortController()
+    const pending = fetchWebAIModels(apiUrl, {
+      fetchFn: vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => json }),
+      signal: controller.signal,
+    })
+    await Promise.resolve()
+    controller.abort()
+    resolveJson({ data: [{ id: 'late-model' }] })
+    await expect(pending).rejects.toBeDefined()
+    expect(getCachedWebAIModels(apiUrl)).toBeNull()
+  })
 })
