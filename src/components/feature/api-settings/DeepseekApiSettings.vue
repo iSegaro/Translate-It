@@ -32,6 +32,10 @@
         class="model-select"
         :style="rtlSelectStyle"
       />
+      <small
+        v-if="savedModelNotAdvertised"
+        class="model-discovery-status"
+      >{{ t('deepseek_model_not_listed') || 'Saved model was not listed by DeepSeek.' }}</small>
     </div>
     <div
       v-if="showDeepseekThinkingMode"
@@ -66,11 +70,55 @@
         dir="ltr"
       />
     </div>
+    <div class="setting-group vertical">
+      <!-- Catalog discovery provides IDs only; Thinking eligibility remains exclusively driven by CONFIG.DEEPSEEK_MODELS.supportsThinking. -->
+      <BaseInput
+        id="deepseek-model-search"
+        v-model="searchQuery"
+        type="search"
+        :label="t('deepseek_catalog_search_label') || 'Search DeepSeek models'"
+        :placeholder="t('deepseek_catalog_search_placeholder') || 'Search by model ID or name'"
+        dir="ltr"
+      />
+      <small
+        v-if="!hasDeepSeekKey"
+        class="model-discovery-status"
+      >{{ t('deepseek_models_missing_key') || 'Add an API key to discover available models.' }}</small>
+      <small
+        v-else-if="modelDiscoveryLoading"
+        class="model-discovery-status"
+      >{{ t('deepseek_models_loading') || 'Loading model catalog…' }}</small>
+      <small
+        v-else-if="modelDiscoveryFailed"
+        class="model-discovery-status"
+      >{{ t('deepseek_models_discovery_failed') || 'Could not load DeepSeek models.' }}</small>
+      <small
+        v-else-if="modelDiscoverySucceeded && discoveredModels.length === 0"
+        class="model-discovery-status"
+      >{{ t('deepseek_models_empty') || 'No models were returned by DeepSeek.' }}</small>
+      <template v-else-if="modelDiscoverySucceeded">
+        <BaseSelect
+          v-model="catalogModelSelection"
+          :options="filteredCatalogOptions"
+          class="catalog-model-select"
+          :style="rtlSelectStyle"
+          :aria-label="t('deepseek_catalog_results_label') || 'Available DeepSeek models'"
+        />
+        <small
+          v-if="filteredCatalogTotal > filteredCatalogOptions.length"
+          class="model-discovery-status"
+        >{{ t('deepseek_catalog_showing_count', { shown: filteredCatalogOptions.length, total: filteredCatalogTotal }) || `Showing ${filteredCatalogOptions.length} of ${filteredCatalogTotal} matching models` }}</small>
+        <small
+          v-if="discoveredModels.length > 0 && filteredCatalogTotal === 0"
+          class="model-discovery-status"
+        >{{ t('deepseek_catalog_no_matches') || 'No models match your search.' }}</small>
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import "./DeepseekApiSettings.scss"
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -82,6 +130,11 @@ import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import {
+  fetchDeepSeekModels,
+  getCachedDeepSeekModels,
+  MissingDeepSeekKeyError,
+} from '@/features/translation/providers/DeepSeekModelDiscovery.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -93,19 +146,176 @@ const deepseekApiKey = computed({
   set: (value) => settingsStore.updateSettingLocally('DEEPSEEK_API_KEY', value)
 })
 
-// Track dropdown selection separately from stored value
 const selectedModelOption = ref(CONFIG.DEEPSEEK_API_MODEL)
+const discoveredModels = ref([])
+const modelDiscoveryLoading = ref(false)
+const modelDiscoveryFailed = ref(false)
+const modelDiscoverySucceeded = ref(false)
+const searchQuery = ref('')
+const customModelVisible = ref(false)
+const hasDeepSeekKey = computed(() => ApiKeyManager.parseKeys(deepseekApiKey.value).length > 0)
+let discoveryRequestId = 0
+let discoveryTimer
+let activeController
+let selectionInteraction = 0
+
+const deepseekApiModelOptions = computed(() => {
+  const curated = (CONFIG.DEEPSEEK_MODELS || []).filter(model => model.value !== 'custom')
+  const options = curated.map(model => ({ value: model.value, label: model.name || model.value }))
+  const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+  const catalogModel = discoveredModels.value.find(model => model.value === savedModel)
+  if (savedModel && savedModel !== 'custom' && !options.some(option => option.value === savedModel)) {
+    options.push({
+      value: savedModel,
+      label: catalogModel ? catalogModel.name : `${savedModel} — ${t('deepseek_saved_model_label') || 'Saved model'}`,
+      legacy: !catalogModel,
+    })
+  }
+  const custom = (CONFIG.DEEPSEEK_MODELS || []).find(model => model.value === 'custom')
+  options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
+  return options
+})
+
+const filteredCatalogTotal = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  if (!query) return discoveredModels.value.length
+  return discoveredModels.value.filter(({ value, name }) =>
+    value.toLocaleLowerCase().includes(query) || name.toLocaleLowerCase().includes(query)
+  ).length
+})
+
+const filteredCatalogOptions = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  return discoveredModels.value
+    .filter(({ value, name }) => !query
+      || value.toLocaleLowerCase().includes(query)
+      || name.toLocaleLowerCase().includes(query))
+    .slice(0, 50)
+    .map(({ value, name }) => ({ value, label: `${name} (${value})` }))
+})
+
+const savedModelNotAdvertised = computed(() => {
+  const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+  return modelDiscoverySucceeded.value
+    && Boolean(savedModel)
+    && savedModel !== 'custom'
+    && !discoveredModels.value.some(model => model.value === savedModel)
+})
 
 // Initialize selectedModelOption based on current stored value
 const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
-  const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
+  const isPredefined = (CONFIG.DEEPSEEK_MODELS || []).some(option => option.value === currentModel && option.value !== 'custom');
   selectedModelOption.value = isPredefined ? currentModel : 'custom';
+  customModelVisible.value = !isPredefined
 }
+
+const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  if (requestId !== discoveryRequestId
+    || key !== deepseekApiKey.value
+    || selectionAtStart !== selectionInteraction
+    || selectedModelOption.value !== 'custom') return
+  const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+  const isPredefined = (CONFIG.DEEPSEEK_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
+    || discoveredModels.value.some(model => model.value === savedModel)
+  if (isPredefined) {
+    selectedModelOption.value = savedModel
+    customModelVisible.value = false
+  }
+}
+
+const discoverModels = async (apiKey) => {
+  const requestId = ++discoveryRequestId
+  const key = typeof apiKey === 'string' ? apiKey : ''
+  const selectionAtStart = selectionInteraction
+  activeController?.abort()
+  activeController = null
+  if (!ApiKeyManager.parseKeys(key).length) {
+    discoveredModels.value = []
+    modelDiscoveryLoading.value = false
+    modelDiscoveryFailed.value = false
+    modelDiscoverySucceeded.value = false
+    return
+  }
+  const cached = getCachedDeepSeekModels(key)
+  modelDiscoveryFailed.value = false
+  if (cached !== null) {
+    discoveredModels.value = cached
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryLoading.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+    return
+  }
+  const controller = new AbortController()
+  activeController = controller
+  modelDiscoveryLoading.value = true
+  try {
+    const models = await fetchDeepSeekModels({ apiKey: key, signal: controller.signal })
+    if (requestId !== discoveryRequestId || key !== deepseekApiKey.value) return
+    discoveredModels.value = models
+    modelDiscoverySucceeded.value = true
+    modelDiscoveryFailed.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
+  } catch (error) {
+    if (requestId !== discoveryRequestId || key !== deepseekApiKey.value) return
+    if (error instanceof MissingDeepSeekKeyError) {
+      modelDiscoverySucceeded.value = false
+      modelDiscoveryFailed.value = false
+      return
+    }
+    modelDiscoverySucceeded.value = false
+    modelDiscoveryFailed.value = true
+  } finally {
+    if (requestId === discoveryRequestId && key === deepseekApiKey.value) modelDiscoveryLoading.value = false
+  }
+}
+
+const catalogModelSelection = computed({
+  get: () => {
+    const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+    return filteredCatalogOptions.value.some(option => option.value === savedModel) ? savedModel : ''
+  },
+  set: (value) => {
+    if (!value) return
+    selectionInteraction++
+    selectedModelOption.value = value
+    customModelVisible.value = false
+    settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
+  }
+})
+
+watch(deepseekApiKey, (apiKey) => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+  discoveredModels.value = []
+  modelDiscoverySucceeded.value = false
+  modelDiscoveryFailed.value = false
+  const requestId = ++discoveryRequestId
+  if (!ApiKeyManager.parseKeys(apiKey).length) {
+    modelDiscoveryLoading.value = false
+    return
+  }
+  modelDiscoveryLoading.value = true
+  discoveryTimer = setTimeout(() => {
+    if (requestId === discoveryRequestId) discoverModels(apiKey)
+  }, 400)
+}, { flush: 'sync' })
+
+onBeforeUnmount(() => {
+  clearTimeout(discoveryTimer)
+  discoveryRequestId++
+  activeController?.abort()
+  activeController = null
+})
 
 const deepseekApiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
+    selectionInteraction++
+    const wasCustom = selectedModelOption.value === 'custom'
+    customModelVisible.value = value === 'custom' && wasCustom ? customModelVisible.value : false
     selectedModelOption.value = value;
     if (value !== 'custom') {
       settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
@@ -115,22 +325,14 @@ const deepseekApiModel = computed({
 })
 
 const deepseekCustomModel = computed({
-  get: () => {
-    const currentModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL;
-    const isPredefined = deepseekApiModelOptions.value.some(option => option.value === currentModel && option.value !== 'custom');
-    return isPredefined ? '' : currentModel;
-  },
+  get: () => selectedModelOption.value === 'custom' && customModelVisible.value
+    ? settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+    : '',
   set: (value) => {
+    selectionInteraction++
+    customModelVisible.value = true
     settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value);
   }
-})
-
-const deepseekApiModelOptions = computed(() => {
-  const models = settingsStore.settings?.DEEPSEEK_MODELS || CONFIG.DEEPSEEK_MODELS || []
-  return models.map(model => ({
-    value: model.value,
-    label: model.name || model.value
-  }))
 })
 
 const deepseekThinkingMode = computed({
@@ -192,5 +394,6 @@ const testKeys = async (providerId) => {
 // Initialize model selection on mount
 onMounted(() => {
   initializeModelSelection()
+  discoverModels(deepseekApiKey.value)
 })
 </script>

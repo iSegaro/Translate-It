@@ -1451,6 +1451,39 @@
   "deepseek_api_model_placeholder": {
     "message": "DeepSeekモデルを入力"
   },
+  "deepseek_catalog_search_label": {
+    "message": "DeepSeekモデルを検索"
+  },
+  "deepseek_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "deepseek_catalog_results_label": {
+    "message": "利用可能なDeepSeekモデル"
+  },
+  "deepseek_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "deepseek_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "deepseek_models_missing_key": {
+    "message": "利用可能なモデルを検索するにはAPIキーを追加してください。"
+  },
+  "deepseek_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "deepseek_models_discovery_failed": {
+    "message": "DeepSeekモデルを読み込めませんでした。"
+  },
+  "deepseek_models_empty": {
+    "message": "DeepSeekからモデルが返されませんでした。"
+  },
+  "deepseek_model_not_listed": {
+    "message": "保存済みモデルはDeepSeekの一覧にありません。"
+  },
+  "deepseek_saved_model_label": {
+    "message": "保存済みモデル"
+  },
   "deepseek_thinking_mode_label": {
     "message": "思考モード"
   },

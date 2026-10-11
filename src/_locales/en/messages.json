@@ -1451,6 +1451,39 @@
   "deepseek_api_model_placeholder": {
     "message": "Enter DeepSeek model"
   },
+  "deepseek_catalog_search_label": {
+    "message": "Search DeepSeek models"
+  },
+  "deepseek_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "deepseek_catalog_results_label": {
+    "message": "Available DeepSeek models"
+  },
+  "deepseek_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "deepseek_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "deepseek_models_missing_key": {
+    "message": "Add an API key to discover available models."
+  },
+  "deepseek_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "deepseek_models_discovery_failed": {
+    "message": "Could not load DeepSeek models."
+  },
+  "deepseek_models_empty": {
+    "message": "No models were returned by DeepSeek."
+  },
+  "deepseek_model_not_listed": {
+    "message": "Saved model was not listed by DeepSeek."
+  },
+  "deepseek_saved_model_label": {
+    "message": "Saved model"
+  },
   "deepseek_thinking_mode_label": {
     "message": "Thinking Mode"
   },

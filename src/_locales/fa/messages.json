@@ -1451,6 +1451,39 @@
   "deepseek_api_model_placeholder": {
     "message": "مدل DeepSeek را وارد کنید"
   },
+  "deepseek_catalog_search_label": {
+    "message": "جستجوی مدل‌های DeepSeek"
+  },
+  "deepseek_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "deepseek_catalog_results_label": {
+    "message": "مدل‌های موجود DeepSeek"
+  },
+  "deepseek_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "deepseek_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "deepseek_models_missing_key": {
+    "message": "برای یافتن مدل‌های موجود، یک کلید API اضافه کنید."
+  },
+  "deepseek_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "deepseek_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های DeepSeek ممکن نشد."
+  },
+  "deepseek_models_empty": {
+    "message": "DeepSeek هیچ مدلی برنگرداند."
+  },
+  "deepseek_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست DeepSeek نبود."
+  },
+  "deepseek_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
   "deepseek_thinking_mode_label": {
     "message": "حالت تفکر"
   },
