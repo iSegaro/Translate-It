@@ -1,7 +1,7 @@
 import { proxyManager } from '@/shared/proxy/ProxyManager.js'
 import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js'
+import { createDiscoveryRequestSignal, getCachedEntry, throwIfAborted } from './modelDiscoveryUtils.js'
 
-const CACHE_TTL_MS = 5 * 60 * 1000
 const modelCache = new Map()
 
 /**
@@ -49,21 +49,11 @@ export function isValidModelsPayload(data) {
 
 export function getCachedWebAIModels(apiUrl, now = Date.now()) {
   const key = resolveWebAIModelsUrl(apiUrl)
-  const entry = key && modelCache.get(key)
-  if (!entry) return null
-  if (now - entry.fetchedAt >= CACHE_TTL_MS) {
-    modelCache.delete(key)
-    return null
-  }
-  return [...entry.models]
+  return key ? getCachedEntry(modelCache, key, models => [...models], now) : null
 }
 
 export function clearWebAIModelCache() {
   modelCache.clear()
-}
-
-function throwIfAborted(signal) {
-  if (signal.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError')
 }
 
 export async function fetchWebAIModels(apiUrl, {
@@ -73,11 +63,7 @@ export async function fetchWebAIModels(apiUrl, {
 } = {}) {
   const url = resolveWebAIModelsUrl(apiUrl)
   if (!url) throw new TypeError('Invalid WebAI API URL')
-  const controller = new AbortController()
-  const abortFromOuter = () => controller.abort(signal?.reason)
-  if (signal?.aborted) abortFromOuter()
-  else signal?.addEventListener('abort', abortFromOuter, { once: true })
-  const timeout = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), timeoutMs)
+  const { signal: requestSignal, cleanup } = createDiscoveryRequestSignal(signal, timeoutMs)
   try {
     const transport = fetchFn || (async (requestUrl, options) => {
       const proxyConfig = await resolveProxyConfig()
@@ -86,18 +72,17 @@ export async function fetchWebAIModels(apiUrl, {
     const response = await transport(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
-      signal: controller.signal,
+      signal: requestSignal,
     })
-    throwIfAborted(controller.signal)
+    throwIfAborted(requestSignal)
     if (!response.ok) throw new Error(`WebAI model discovery failed (${response.status})`)
     const data = await response.json()
-    throwIfAborted(controller.signal)
+    throwIfAborted(requestSignal)
     if (!isValidModelsPayload(data)) throw new TypeError('Invalid WebAI model list response')
     const models = normalizeWebAIModels(data)
     modelCache.set(url, { models, fetchedAt: Date.now() })
     return models
   } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', abortFromOuter)
+    cleanup()
   }
 }

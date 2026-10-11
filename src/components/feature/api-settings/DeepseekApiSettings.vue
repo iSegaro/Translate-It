@@ -99,17 +99,17 @@
       <template v-else-if="modelDiscoverySucceeded">
         <BaseSelect
           v-model="catalogModelSelection"
-          :options="filteredCatalogOptions"
+          :options="filteredCatalog.options"
           class="catalog-model-select"
           :style="rtlSelectStyle"
           :aria-label="t('deepseek_catalog_results_label') || 'Available DeepSeek models'"
         />
         <small
-          v-if="filteredCatalogTotal > filteredCatalogOptions.length"
+          v-if="filteredCatalog.total > filteredCatalog.options.length"
           class="model-discovery-status"
-        >{{ t('deepseek_catalog_showing_count', { shown: filteredCatalogOptions.length, total: filteredCatalogTotal }) || `Showing ${filteredCatalogOptions.length} of ${filteredCatalogTotal} matching models` }}</small>
+        >{{ t('deepseek_catalog_showing_count', { shown: filteredCatalog.options.length, total: filteredCatalog.total }) || `Showing ${filteredCatalog.options.length} of ${filteredCatalog.total} matching models` }}</small>
         <small
-          v-if="discoveredModels.length > 0 && filteredCatalogTotal === 0"
+          v-if="discoveredModels.length > 0 && filteredCatalog.total === 0"
           class="model-discovery-status"
         >{{ t('deepseek_catalog_no_matches') || 'No models match your search.' }}</small>
       </template>
@@ -130,6 +130,7 @@ import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import { filterModelCatalog } from '@/features/settings/presentation/modelCatalogFilter.js'
 import {
   fetchDeepSeekModels,
   getCachedDeepSeekModels,
@@ -176,23 +177,7 @@ const deepseekApiModelOptions = computed(() => {
   return options
 })
 
-const filteredCatalogTotal = computed(() => {
-  const query = searchQuery.value.trim().toLocaleLowerCase()
-  if (!query) return discoveredModels.value.length
-  return discoveredModels.value.filter(({ value, name }) =>
-    value.toLocaleLowerCase().includes(query) || name.toLocaleLowerCase().includes(query)
-  ).length
-})
-
-const filteredCatalogOptions = computed(() => {
-  const query = searchQuery.value.trim().toLocaleLowerCase()
-  return discoveredModels.value
-    .filter(({ value, name }) => !query
-      || value.toLocaleLowerCase().includes(query)
-      || name.toLocaleLowerCase().includes(query))
-    .slice(0, 50)
-    .map(({ value, name }) => ({ value, label: `${name} (${value})` }))
-})
+const filteredCatalog = computed(() => filterModelCatalog(discoveredModels.value, searchQuery.value))
 
 const savedModelNotAdvertised = computed(() => {
   const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
@@ -273,7 +258,7 @@ const discoverModels = async (apiKey) => {
 const catalogModelSelection = computed({
   get: () => {
     const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
-    return filteredCatalogOptions.value.some(option => option.value === savedModel) ? savedModel : ''
+    return filteredCatalog.value.options.some(option => option.value === savedModel) ? savedModel : ''
   },
   set: (value) => {
     if (!value) return

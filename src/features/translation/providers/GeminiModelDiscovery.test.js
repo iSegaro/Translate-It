@@ -135,6 +135,34 @@ describe('Gemini model discovery', () => {
     expect(getCachedGeminiModels('partial-key')).toBeNull()
   })
 
+  it('applies one deadline across pages and does not cache partial models', async () => {
+    vi.useFakeTimers()
+    let resolveFirstPage
+    let markSecondPageStarted
+    const secondPageStarted = new Promise(resolve => { markSecondPageStarted = resolve })
+    const secondPage = vi.fn((_url, { signal }) => {
+      markSecondPageStarted()
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+    const fetchFn = vi.fn()
+      .mockImplementationOnce(() => new Promise(resolve => { resolveFirstPage = resolve }))
+      .mockImplementationOnce(secondPage)
+    const pending = fetchGeminiModels({ apiKey: 'page-timeout-key', fetchFn, timeoutMs: 100 })
+    const timeoutRejection = expect(pending).rejects.toMatchObject({ name: 'TimeoutError', message: 'Timed out' })
+
+    expect(resolveFirstPage).toBeTypeOf('function')
+    await vi.advanceTimersByTimeAsync(80)
+    resolveFirstPage(response({ models: [model('models/first-page')], nextPageToken: 'next' }))
+    await secondPageStarted
+    expect(secondPage).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(20)
+
+    await timeoutRejection
+    expect(getCachedGeminiModels('page-timeout-key')).toBeNull()
+  })
+
   it('does not cache transport or JSON responses that complete after abort', async () => {
     let resolveTransport
     const transport = vi.fn(() => new Promise(resolve => { resolveTransport = resolve }))
