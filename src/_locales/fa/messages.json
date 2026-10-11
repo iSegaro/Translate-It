@@ -1262,6 +1262,39 @@
   "gemini_custom_api_url_info": {
     "message": "آدرس کامل API به همراه نام مدل را وارد کنید"
   },
+  "gemini_catalog_search_label": {
+    "message": "جستجوی مدل‌های Gemini"
+  },
+  "gemini_catalog_search_placeholder": {
+    "message": "جستجو بر اساس شناسه یا نام مدل"
+  },
+  "gemini_catalog_results_label": {
+    "message": "مدل‌های موجود Gemini"
+  },
+  "gemini_catalog_showing_count": {
+    "message": "نمایش {shown} از {total} مدل منطبق"
+  },
+  "gemini_catalog_no_matches": {
+    "message": "مدلی با جستجوی شما مطابقت ندارد."
+  },
+  "gemini_models_missing_key": {
+    "message": "برای یافتن مدل‌های موجود، یک کلید API اضافه کنید."
+  },
+  "gemini_models_loading": {
+    "message": "در حال بارگذاری فهرست مدل‌ها…"
+  },
+  "gemini_models_discovery_failed": {
+    "message": "بارگذاری مدل‌های Gemini ممکن نشد."
+  },
+  "gemini_models_empty": {
+    "message": "Gemini هیچ مدلی برنگرداند."
+  },
+  "gemini_model_not_listed": {
+    "message": "مدل ذخیره‌شده در فهرست Gemini نبود."
+  },
+  "gemini_saved_model_label": {
+    "message": "مدل ذخیره‌شده"
+  },
   "webai_api_settings_title": {
     "message": "تنظیمات WebAI"
   },

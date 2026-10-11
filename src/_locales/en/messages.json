@@ -1262,6 +1262,39 @@
   "gemini_custom_api_url_info": {
     "message": "Enter the complete API URL including the model name"
   },
+  "gemini_catalog_search_label": {
+    "message": "Search Gemini models"
+  },
+  "gemini_catalog_search_placeholder": {
+    "message": "Search by model ID or name"
+  },
+  "gemini_catalog_results_label": {
+    "message": "Available Gemini models"
+  },
+  "gemini_catalog_showing_count": {
+    "message": "Showing {shown} of {total} matching models"
+  },
+  "gemini_catalog_no_matches": {
+    "message": "No models match your search."
+  },
+  "gemini_models_missing_key": {
+    "message": "Add an API key to discover available models."
+  },
+  "gemini_models_loading": {
+    "message": "Loading model catalog…"
+  },
+  "gemini_models_discovery_failed": {
+    "message": "Could not load Gemini models."
+  },
+  "gemini_models_empty": {
+    "message": "No models were returned by Gemini."
+  },
+  "gemini_model_not_listed": {
+    "message": "Saved model was not listed by Gemini."
+  },
+  "gemini_saved_model_label": {
+    "message": "Saved model"
+  },
   "webai_api_settings_title": {
     "message": "WebAI Settings"
   },

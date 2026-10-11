@@ -128,6 +128,8 @@ export const CONFIG = {
   GEMINI_API_KEY: "", // Gemini API keys (newline-separated)
   GEMINI_API_URL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent", // Default Gemini API URL
   GEMINI_MODEL: "gemini-3.8-flash", // Selected Gemini model
+  // Missing from older settings defaults to legacy routing; new catalog picks set this explicitly.
+  GEMINI_MODEL_SOURCE: "legacy",
   GEMINI_THINKING_MODE: "default", // Provider default or minimal thinking when supported
   GEMINI_MODELS: [
     {
@@ -795,6 +797,10 @@ export const getApiKeyAsync = async () => {
 
 export const getGeminiModelAsync = async () => {
   return getSettingValueAsync("GEMINI_MODEL", CONFIG.GEMINI_MODEL);
+};
+
+export const getGeminiModelSourceAsync = async () => {
+  return getSettingValueAsync("GEMINI_MODEL_SOURCE", CONFIG.GEMINI_MODEL_SOURCE);
 };
 
 export const getGeminiThinkingModeAsync = async () => {

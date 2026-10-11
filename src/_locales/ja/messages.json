@@ -1262,6 +1262,39 @@
   "gemini_custom_api_url_info": {
     "message": "モデル名を含む完全なAPI URLを入力してください"
   },
+  "gemini_catalog_search_label": {
+    "message": "Geminiモデルを検索"
+  },
+  "gemini_catalog_search_placeholder": {
+    "message": "モデルIDまたは名前で検索"
+  },
+  "gemini_catalog_results_label": {
+    "message": "利用可能なGeminiモデル"
+  },
+  "gemini_catalog_showing_count": {
+    "message": "一致するモデル {total} 件中 {shown} 件を表示"
+  },
+  "gemini_catalog_no_matches": {
+    "message": "検索に一致するモデルはありません。"
+  },
+  "gemini_models_missing_key": {
+    "message": "利用可能なモデルを検索するにはAPIキーを追加してください。"
+  },
+  "gemini_models_loading": {
+    "message": "モデルカタログを読み込み中…"
+  },
+  "gemini_models_discovery_failed": {
+    "message": "Geminiモデルを読み込めませんでした。"
+  },
+  "gemini_models_empty": {
+    "message": "Geminiからモデルが返されませんでした。"
+  },
+  "gemini_model_not_listed": {
+    "message": "保存済みモデルはGeminiの一覧にありません。"
+  },
+  "gemini_saved_model_label": {
+    "message": "保存済みモデル"
+  },
   "webai_api_settings_title": {
     "message": "WebAI 設定"
   },

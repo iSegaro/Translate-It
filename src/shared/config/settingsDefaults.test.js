@@ -45,6 +45,7 @@ describe('getPersistedDefaultSettings', () => {
     expect(CONFIG.LIVE_DUBBING_SUBTITLE_SIZE).toBe('medium');
     expect(defaults.LIVE_DUBBING_SUBTITLE_SIZE).toBe('medium');
     expect(defaults.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+    expect(defaults.GEMINI_MODEL_SOURCE).toBe('legacy');
     expect(defaults.GEMINI_API_URL).toBe(CONFIG.GEMINI_API_URL);
     expect(defaults.GEMINI_MODELS).toEqual(CONFIG.GEMINI_MODELS);
     expect(defaults).not.toHaveProperty('GEMINI_THINKING_ENABLED');

@@ -204,6 +204,7 @@ describe('Config Module', () => {
 
     it('should expose approved Gemini selector models in order', () => {
       expect(CONFIG.GEMINI_MODEL).toBe('gemini-3.8-flash');
+      expect(CONFIG.GEMINI_MODEL_SOURCE).toBe('legacy');
       expect(CONFIG.GEMINI_API_URL).toBe(
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent'
       );
