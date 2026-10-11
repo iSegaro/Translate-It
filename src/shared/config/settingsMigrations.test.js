@@ -562,7 +562,7 @@ describe('Settings Migrations', () => {
     expect(logs.some(log => log.includes('Reset OPENROUTER_API_MODEL'))).toBe(true);
   });
 
-  it.each(['gemini-3-flash', 'gemini-3-pro', 'provider/custom-model'])(
+  it.each(['gemini-3-flash', 'gemini-3-pro', 'provider/custom-model', 'gemini-auto'])(
     'preserves WebAI model %s during model-list synchronization',
     async (model) => {
       const { updates } = await runSettingsMigrations({

@@ -1277,6 +1277,15 @@
   "webai_api_model_placeholder": {
     "message": "Enter WebAI API model"
   },
+  "webai_models_loading": {
+    "message": "Checking available models…"
+  },
+  "webai_models_discovery_failed": {
+    "message": "Could not check available models."
+  },
+  "webai_model_not_advertised": {
+    "message": "Saved model was not listed by the server."
+  },
   "lingva_api_settings_title": {
     "message": "Lingva API Settings"
   },

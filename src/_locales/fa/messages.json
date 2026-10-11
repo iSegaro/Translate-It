@@ -1277,6 +1277,15 @@
   "webai_api_model_placeholder": {
     "message": "مدل"
   },
+  "webai_models_loading": {
+    "message": "در حال بررسی مدل‌های موجود…"
+  },
+  "webai_models_discovery_failed": {
+    "message": "بررسی مدل‌های موجود ممکن نشد."
+  },
+  "webai_model_not_advertised": {
+    "message": "مدل ذخیره‌شده در فهرست سرور نبود."
+  },
   "lingva_api_settings_title": {
     "message": "تنظیمات API لینگوا"
   },

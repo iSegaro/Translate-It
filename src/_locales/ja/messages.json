@@ -1277,6 +1277,15 @@
   "webai_api_model_placeholder": {
     "message": "WebAI APIモデルを入力"
   },
+  "webai_models_loading": {
+    "message": "利用可能なモデルを確認しています…"
+  },
+  "webai_models_discovery_failed": {
+    "message": "利用可能なモデルを確認できませんでした。"
+  },
+  "webai_model_not_advertised": {
+    "message": "保存済みのモデルはサーバーの一覧にありませんでした。"
+  },
   "lingva_api_settings_title": {
     "message": "Lingva API 設定"
   },
