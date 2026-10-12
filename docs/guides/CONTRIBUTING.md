@@ -52,13 +52,19 @@ The `scripts/ci/*.test.js` tests execute the release shell scripts, so they also
 To generate the unpacked extension files for development, run:
 
 ```bash
-# Build both browsers in parallel
+# One-time development build (does not watch for changes)
+pnpm run dev:chrome
+pnpm run dev:firefox
+
+# Production build for both browsers in parallel (optimized, with ZIP packages)
 pnpm run build
 
-# Build for a specific browser
+# Production build for a specific browser
 pnpm run build:chrome
 pnpm run build:firefox
 ```
+
+Development builds preserve console logs and skip production minification; production builds apply optimizations and create ZIP packages.
 
 To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**.
 
@@ -121,7 +127,7 @@ Before submitting your changes, run the comprehensive pre-submission check:
 pnpm run pre-submit
 ```
 
-This command runs linting (JS & Styles) and builds the extension.
+This command runs ESLint, Stylelint, and the production build. It does not run tests or validation: it is a manual pre-submission check, not a replacement for full CI, where tests and validation still run.
 
 #### PR CI Behavior
 
