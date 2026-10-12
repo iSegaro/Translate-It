@@ -94,6 +94,10 @@ Formatting is optional. Running `pnpm run format` without file paths prints usag
 
 Recommended flow: make changes, format only the touched files, run lint and tests, then review `git diff` before committing.
 
+#### Coding Style
+
+ESLint (JS/Vue) and Stylelint (CSS/SCSS) are the linting authorities within their configured scopes; keep their rules passing. Prettier stays optional and manual, formatting only explicitly passed files. Some Prettier-formatted Vue files may still report ESLint warnings (indent/closing-bracket); the lint rules take precedence and are not relaxed. When modifying existing files, follow the nearby established conventions, and always review the formatting diff so unrelated lines are not swept in. Broader formatting adoption happens gradually through separate formatting-only PRs, never mixed into feature or fix work.
+
 #### Extension Validation
 
 Validate the built extensions to ensure they meet browser store requirements:
