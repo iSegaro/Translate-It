@@ -676,4 +676,16 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('custom')
     wrapper.unmount()
   })
+
+  it('associates the main Model label with its native select and keeps selection working', async () => {
+    const wrapper = mount(GeminiApiSettings)
+    const select = wrapper.get('#gemini-model-select')
+    const label = wrapper.get('label[for="gemini-model-select"]')
+    expect(label.element.control).toBe(select.element)
+    await select.setValue('curated-two')
+    expect(select.element.value).toBe('curated-two')
+    const ids = wrapper.findAll('[id]').map(element => element.attributes('id'))
+    expect(ids).toHaveLength(new Set(ids).size)
+    wrapper.unmount()
+  })
 })

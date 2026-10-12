@@ -33,8 +33,9 @@
       {{ t('deepseek_test_endpoint_unsupported') || 'Test Keys is unavailable: use a valid HTTPS chat-completions URL (or a localhost HTTP URL).' }}
     </p>
     <div class="setting-group vertical">
-      <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+      <label for="deepseek-model-select">{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
+        id="deepseek-model-select"
         v-model="deepseekApiModel"
         :options="deepseekApiModelOptions"
         class="model-select"

@@ -40,7 +40,7 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
   default: {
     props: ['modelValue', 'options'],
     emits: ['update:modelValue'],
-    template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+    template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }))
 
@@ -382,6 +382,19 @@ describe('WebAIApiSettings model discovery', () => {
     await flushPromises()
     expect(wrapper.get('select').element.value).toBe('custom')
     expect(wrapper.findAll('input').at(-1).element.value).toBe(model)
+    wrapper.unmount()
+  })
+
+  it('associates the main Model label with its native select and keeps selection working', async () => {
+    mocks.fetchModels.mockResolvedValue([])
+    const wrapper = mount(WebAIApiSettings)
+    const select = wrapper.get('#webai-model-select')
+    const label = wrapper.get('label[for="webai-model-select"]')
+    expect(label.element.control).toBe(select.element)
+    await select.setValue('gemini-3-pro')
+    expect(select.element.value).toBe('gemini-3-pro')
+    const ids = wrapper.findAll('[id]').map(element => element.attributes('id'))
+    expect(ids).toHaveLength(new Set(ids).size)
     wrapper.unmount()
   })
 })

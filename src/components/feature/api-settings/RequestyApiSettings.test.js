@@ -64,7 +64,7 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
   default: {
     props: ['modelValue', 'options'],
     emits: ['update:modelValue'],
-    template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+    template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }))
 vi.mock('@/components/feature/api-settings/ModelCatalogPicker.vue', () => ({
@@ -470,6 +470,19 @@ describe('RequestyApiSettings model catalog', () => {
     await flushPromises()
     expect(wrapper.get('.model-select').element.value).toBe('custom')
     expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').element.value).toBe(model)
+    wrapper.unmount()
+  })
+
+  it('associates the main Model label with its native select and keeps selection working', async () => {
+    mocks.fetchModels.mockResolvedValue([])
+    const wrapper = mount(RequestyApiSettings)
+    const select = wrapper.get('#requesty-model-select')
+    const label = wrapper.get('label[for="requesty-model-select"]')
+    expect(label.element.control).toBe(select.element)
+    await select.setValue('curated/model-two')
+    expect(select.element.value).toBe('curated/model-two')
+    const ids = wrapper.findAll('[id]').map(element => element.attributes('id'))
+    expect(ids).toHaveLength(new Set(ids).size)
     wrapper.unmount()
   })
 })

@@ -25,8 +25,9 @@
       />
     </div>
     <div class="setting-group vertical">
-      <label>{{ t('webai_api_model_label') || 'WebAI API Model' }}</label>
+      <label for="webai-model-select">{{ t('webai_api_model_label') || 'WebAI API Model' }}</label>
       <BaseSelect
+        id="webai-model-select"
         v-model="webAIApiModel"
         class="model-select"
         :options="webAIApiModelOptions"

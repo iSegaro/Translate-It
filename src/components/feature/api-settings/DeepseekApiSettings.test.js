@@ -110,7 +110,7 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
   default: {
     props: ['modelValue', 'options'],
     emits: ['update:modelValue'],
-    template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+    template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }));
 
@@ -697,6 +697,18 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
     expect(wrapper.find('.thinking-mode-select').exists()).toBe(false);
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
+    wrapper.unmount();
+  });
+
+  it('associates the main Model label with its native select and keeps selection working', async () => {
+    const wrapper = mount(DeepseekApiSettings);
+    const select = wrapper.get('#deepseek-model-select');
+    const label = wrapper.get('label[for="deepseek-model-select"]');
+    expect(label.element.control).toBe(select.element);
+    await select.setValue('standard-model');
+    expect(select.element.value).toBe('standard-model');
+    const ids = wrapper.findAll('[id]').map(element => element.attributes('id'));
+    expect(ids).toHaveLength(new Set(ids).size);
     wrapper.unmount();
   });
 });

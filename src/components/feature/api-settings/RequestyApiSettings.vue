@@ -25,8 +25,9 @@
       @test="testKeys"
     />
     <div class="setting-group vertical">
-      <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+      <label for="requesty-model-select">{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
+        id="requesty-model-select"
         v-model="requestyApiModel"
         :options="requestyApiModelOptions"
         class="model-select"

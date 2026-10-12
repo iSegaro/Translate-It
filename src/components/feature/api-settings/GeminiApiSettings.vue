@@ -25,8 +25,9 @@
       @test="testKeys"
     />
     <div class="setting-group vertical">
-      <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+      <label for="gemini-model-select">{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
+        id="gemini-model-select"
         v-model="geminiModel"
         :options="geminiModelOptions"
         class="model-select"

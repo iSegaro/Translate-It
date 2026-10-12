@@ -26,8 +26,9 @@
       @test="testKeys"
     />
     <div class="setting-group vertical">
-      <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+      <label for="openai-model-select">{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
+        id="openai-model-select"
         v-model="openaiApiModel"
         :options="openaiApiModelOptions"
         class="model-select"

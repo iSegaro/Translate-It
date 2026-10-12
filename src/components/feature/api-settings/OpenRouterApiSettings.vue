@@ -25,8 +25,9 @@
       @test="testKeys"
     />
     <div class="setting-group vertical">
-      <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
+      <label for="openrouter-model-select">{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
+        id="openrouter-model-select"
         v-model="openrouterApiModel"
         :options="openrouterApiModelOptions"
         class="model-select"
