@@ -15,7 +15,7 @@ export default [
       "**/src/features/screen-capture/assets/",
       "**/*.mjs",
       "**/scripts/",
-      "**/config/",
+      "config/",
       "**/tests/e2e/",
       "**/*.config.js",
       "**/tests/coverage/",
