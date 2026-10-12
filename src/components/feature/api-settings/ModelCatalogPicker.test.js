@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { resolve } from 'node:path'
@@ -482,7 +482,7 @@ describe('ModelCatalogPicker structure', () => {
     wrapper.unmount()
   })
 
-  it('keeps catalog count and no-match hints outside live regions', async () => {
+  it('keeps visible count and no-match hints outside the live region and renders one announcer', async () => {
     const models = Array.from({ length: 60 }, (_, i) => ({
       value: `m/${String(i).padStart(3, '0')}`,
       name: `Model ${String(i).padStart(3, '0')}`,
@@ -504,9 +504,14 @@ describe('ModelCatalogPicker structure', () => {
     expect(noMatchHint.element.closest('[role="status"]')).toBeNull()
     expect(noMatchHint.element.closest('[aria-live]')).toBeNull()
 
-    // And the picker renders no live region at all.
-    expect(wrapper.find('[role="status"]').exists()).toBe(false)
-    expect(wrapper.find('[aria-live]').exists()).toBe(false)
+    // The picker renders exactly ONE live region: the persistent announcer
+    // (its text is asserted under fake timers in the announcements suite).
+    const regions = wrapper.findAll('[role="status"]')
+    expect(regions).toHaveLength(1)
+    expect(regions[0].attributes('aria-live')).toBe('polite')
+    expect(regions[0].attributes('aria-atomic')).toBe('true')
+    expect(regions[0].classes()).toContain('ti-sr-only')
+    expect(regions[0].element.contains(noMatchHint.element)).toBe(false)
     wrapper.unmount()
   })
 })
@@ -1328,5 +1333,223 @@ describe('ModelCatalogPicker translation fallback (key echo)', () => {
     const none = mountPicker({ models: sortModels, modelValue: '' })
     expect(none.get('.model-catalog-picker__trigger').text()).toContain('Browse models')
     none.unmount()
+  })
+})
+
+describe('ModelCatalogPicker search result announcements', () => {
+  const ANNOUNCE_DEBOUNCE_MS = 300
+
+  afterEach(() => vi.useRealTimers())
+
+  const announcer = wrapper => wrapper.get('[role="status"]')
+  const settle = async () => {
+    vi.advanceTimersByTime(ANNOUNCE_DEBOUNCE_MS)
+    await nextTick()
+  }
+
+  it('renders one persistent polite region while open, silent on open and on sort change', async () => {
+    vi.useFakeTimers()
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const region = announcer(wrapper)
+    expect(region.attributes('role')).toBe('status')
+    expect(region.attributes('aria-live')).toBe('polite')
+    expect(region.attributes('aria-atomic')).toBe('true')
+    expect(region.classes()).toContain('ti-sr-only')
+    expect(region.text()).toBe('')
+
+    // Opening settles without any announcement...
+    await settle()
+    expect(region.text()).toBe('')
+
+    // ...and so does a sort change (match counts are untouched).
+    await clickHeader(wrapper, 0)
+    await settle()
+    expect(region.text()).toBe('')
+    expect(announcer(wrapper).element).toBe(region.element)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
+    // The region lives only while the panel is open.
+    await wrapper.get('.model-catalog-picker__trigger').trigger('click')
+    await nextTick()
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('announces no-match, results available again, and match-count changes; visible hints unchanged', async () => {
+    vi.useFakeTimers()
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const region = announcer(wrapper)
+    const regionElement = region.element
+
+    // Typing stays silent until the debounce settles, then one no-match
+    // announcement...
+    await searchField(wrapper).setValue('nothing-matches')
+    expect(region.text()).toBe('')
+    await settle()
+    expect(region.text()).toBe('No models match your search.')
+    // ...while the visible no-match hint is unchanged and outside the region.
+    const noMatchHint = wrapper.get('.model-catalog-picker__status')
+    expect(noMatchHint.text()).toBe('No models match your search.')
+    expect(noMatchHint.element.closest('[role="status"]')).toBeNull()
+    expect(noMatchHint.element.closest('[aria-live]')).toBeNull()
+
+    // Results available again -> count announcement on the SAME region element
+    // (total is the filtered match count, mirroring the visible hint's copy).
+    await searchField(wrapper).setValue('alpha')
+    await settle()
+    expect(region.text()).toBe('Showing 1 of 1 matching models')
+    expect(announcer(wrapper).element).toBe(regionElement)
+
+    // Clearing the search announces the full match count.
+    await searchField(wrapper).setValue('')
+    await settle()
+    expect(region.text()).toBe('Showing 6 of 6 matching models')
+    expect(announcer(wrapper).element).toBe(regionElement)
+
+    // Sorting after a settled announcement must not re-announce.
+    await clickHeader(wrapper, 0)
+    await settle()
+    expect(region.text()).toBe('Showing 6 of 6 matching models')
+
+    // Announcements never emit a selection.
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('collapses keystroke spam into one settled announcement and skips same-count re-queries', async () => {
+    vi.useFakeTimers()
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const region = announcer(wrapper)
+
+    // A burst of keystrokes stays silent and announces only its settled state.
+    await searchField(wrapper).setValue('a')
+    await searchField(wrapper).setValue('al')
+    await searchField(wrapper).setValue('alp')
+    expect(region.text()).toBe('')
+    await settle()
+    expect(region.text()).toBe('Showing 1 of 1 matching models')
+
+    // From here on, observe DOM mutations of the region (= announcements).
+    const records = []
+    const observer = new MutationObserver(batch => records.push(...batch))
+    observer.observe(region.element, { childList: true, characterData: true, subtree: true })
+    const flushRecords = () => records.push(...observer.takeRecords())
+    try {
+      // Same-count re-query: identical message -> zero mutations, no re-announce.
+      await searchField(wrapper).setValue('alpha')
+      await settle()
+      flushRecords()
+      expect(records).toHaveLength(0)
+      expect(region.text()).toBe('Showing 1 of 1 matching models')
+
+      // Another burst: silent mid-burst, then exactly one settled transition.
+      await searchField(wrapper).setValue('x')
+      await searchField(wrapper).setValue('xx')
+      flushRecords()
+      expect(records).toHaveLength(0)
+      await settle()
+      flushRecords()
+      expect(records).toHaveLength(1)
+      expect(region.text()).toBe('No models match your search.')
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    } finally {
+      observer.disconnect()
+      wrapper.unmount()
+    }
+  })
+
+  it('restarts the debounce on every keystroke while the zero count is unchanged', async () => {
+    vi.useFakeTimers()
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const region = announcer(wrapper)
+
+    // 'x' matches nothing -> no-match announcement scheduled...
+    await searchField(wrapper).setValue('x')
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(region.text()).toBe('')
+
+    // ...but 'xy' keeps the same ZERO count: the window must restart, so at
+    // 400ms after the first keystroke (200ms since the last) nothing is read
+    // aloud yet — the old count-derived watcher announced here, mid-typing.
+    await searchField(wrapper).setValue('xy')
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(region.text()).toBe('')
+
+    // Still silent at 299ms of inactivity; announced exactly at 300ms.
+    await searchField(wrapper).setValue('xyz')
+    vi.advanceTimersByTime(299)
+    await nextTick()
+    expect(region.text()).toBe('')
+    vi.advanceTimersByTime(1)
+    await nextTick()
+    expect(region.text()).toBe('No models match your search.')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('restarts the debounce on count-preserving queries with matches and never re-announces an identical message', async () => {
+    vi.useFakeTimers()
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const region = announcer(wrapper)
+
+    // 'z' narrows to a single match -> count announcement scheduled.
+    await searchField(wrapper).setValue('z')
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(region.text()).toBe('')
+
+    // 'ze' keeps the same single match; the pending window must restart.
+    await searchField(wrapper).setValue('ze')
+    vi.advanceTimersByTime(200)
+    await nextTick()
+    expect(region.text()).toBe('')
+
+    // Announced only after 300ms without typing.
+    await searchField(wrapper).setValue('zet')
+    vi.advanceTimersByTime(299)
+    await nextTick()
+    expect(region.text()).toBe('')
+    vi.advanceTimersByTime(1)
+    await nextTick()
+    expect(region.text()).toBe('Showing 1 of 1 matching models')
+
+    // A settled, identical message: further count-preserving typing restarts
+    // the debounce but must not mutate (re-announce) the region.
+    const records = []
+    const observer = new MutationObserver(batch => records.push(...batch))
+    observer.observe(region.element, { childList: true, characterData: true, subtree: true })
+    try {
+      await searchField(wrapper).setValue('zeta')
+      await settle()
+      records.push(...observer.takeRecords())
+      expect(records).toHaveLength(0)
+      expect(region.text()).toBe('Showing 1 of 1 matching models')
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    } finally {
+      observer.disconnect()
+      wrapper.unmount()
+    }
+  })
+
+  it('drops a pending announcement on close so reopening starts silent', async () => {
+    vi.useFakeTimers()
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    await searchField(wrapper).setValue('nothing-matches')
+    // Close before the debounce fires.
+    await wrapper.get('.model-catalog-picker__trigger').trigger('click')
+    await nextTick()
+    vi.advanceTimersByTime(ANNOUNCE_DEBOUNCE_MS * 2)
+    await nextTick()
+    // Reopen: a fresh empty region, and the closed panel must not replay.
+    await wrapper.get('.model-catalog-picker__trigger').trigger('click')
+    await nextTick()
+    const region = announcer(wrapper)
+    expect(region.text()).toBe('')
+    await settle()
+    expect(region.text()).toBe('')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
   })
 })
