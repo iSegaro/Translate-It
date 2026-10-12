@@ -88,19 +88,20 @@ describe('development setup', () => {
   });
 
   it('parses and compares versions and rejects missing or incompatible prerequisites', () => {
-    expect(parseVersion('v20.19.0')).toEqual([20, 19, 0]);
+    expect(parseVersion('v22.13.0')).toEqual([22, 13, 0]);
     expect(parseVersion('not-a-version')).toBeNull();
-    expect(compareVersions('20.19.0', MIN_NODE_VERSION)).toBe(0);
-    expect(compareVersions('20.18.9', MIN_NODE_VERSION)).toBe(-1);
+    expect(compareVersions('22.13.0', MIN_NODE_VERSION)).toBe(0);
+    expect(compareVersions('22.12.9', MIN_NODE_VERSION)).toBe(-1);
     const minPnpm = getMinPnpm();
     expect(minPnpm).toBe('12.11.2');
 
     const nodeBoundaries = [
-      ['20.18.9', false],
-      ['20.19.0', true],
+      ['20.19.0', false],
       ['21.0.0', false],
       ['22.11.0', false],
-      ['22.12.0', true],
+      ['22.12.9', false],
+      ['22.13.0', true],
+      ['22.13.1', true],
       ['23.0.0', false],
       ['24.0.0', true],
     ];
@@ -110,15 +111,15 @@ describe('development setup', () => {
       expect(injected.status, version).toBe(supported ? 0 : 1);
     }
 
-    const oldNode = runInjectedPrerequisites(['v18.20.0']);
+    const oldNode = runInjectedPrerequisites(['v20.19.0']);
     expect(oldNode.status).toBe(1);
-    expect(oldNode.output).toContain('20.19.0+');
+    expect(oldNode.output).toContain('22.13.0+');
     expect(oldNode.calls).toBe(1);
-    const oldPnpm = runInjectedPrerequisites(['v22.12.0', '11.0.0']);
+    const oldPnpm = runInjectedPrerequisites(['v22.13.0', '11.0.0']);
     expect(oldPnpm.status).toBe(1);
     expect(oldPnpm.output).toContain('major version 12');
     expect(oldPnpm.calls).toBe(2);
-    const missingPnpm = runInjectedPrerequisites(['v22.12.0', new Error('missing')]);
+    const missingPnpm = runInjectedPrerequisites(['v22.13.0', new Error('missing')]);
     expect(missingPnpm.status).toBe(1);
     expect(missingPnpm.output).toContain('pnpm not found');
   });
@@ -127,7 +128,7 @@ describe('development setup', () => {
     const result = runSetup({ failInstall: true });
     expect(result.status).toBe(1);
     expect(result.output).not.toContain('SETUP COMPLETED SUCCESSFULLY');
-    expect(result.output).toContain('Node.js 22');
+    expect(result.output).toContain('Node.js 22.13.0+ or 24+');
     expect(result.output).toContain(`pnpm ${getMinPnpm()}`);
     expect(result.output).toContain('pnpm install --frozen-lockfile');
     expect(result.calls).toContainEqual(['install', '--frozen-lockfile']);

@@ -2,7 +2,7 @@ const { execSync: defaultExecSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const MIN_NODE_VERSION = '20.19.0';
+const MIN_NODE_VERSION = '22.13.0';
 
 function parseVersion(version) {
   const match = String(version).trim().match(/^v?(\d+)\.(\d+)\.(\d+)/);
@@ -23,8 +23,7 @@ function isSupportedNodeVersion(version) {
   const parsed = parseVersion(version);
   if (!parsed) return false;
   const [major] = parsed;
-  if (major === 20) return compareVersions(version, '20.19.0') >= 0;
-  if (major === 22) return compareVersions(version, '22.12.0') >= 0;
+  if (major === 22) return compareVersions(version, MIN_NODE_VERSION) >= 0;
   return major >= 24;
 }
 
@@ -40,7 +39,7 @@ function getMinPnpm() {
 
 function printTroubleshooting(error) {
   error('\n💡 Troubleshooting:');
-  error('   - Use Node.js 22 (minimum 20.19.0 for Vite 8) and pnpm 12.11.2.');
+  error('   - Use Node.js 22.13.0+ or 24+ and pnpm 12.11.2.');
   error('   - Check your internet connection and retry: pnpm install --frozen-lockfile');
   error('   - Do not remove or regenerate pnpm-lock.yaml to resolve setup errors.');
 }
@@ -71,7 +70,7 @@ function setupProject({ execSync = defaultExecSync } = {}) {
     log(`✅ ${requirement.name}: ${version}`);
     if (!parseVersion(version) || !requirement.compatible(version, requirement.minimum)) {
       error(requirement.name === 'Node.js'
-        ? `❌ Node.js ${version} is incompatible; supported versions are 20.19.0+ in 20.x, 22.12.0+, or 24+ (Node 22 recommended).`
+        ? `❌ Node.js ${version} is incompatible; supported versions are 22.13.0+ in 22.x or 24+ (Node 22 recommended).`
         : `❌ ${requirement.name} ${version} is incompatible; required major version ${parseVersion(requirement.minimum)[0]} (packageManager: pnpm@${requirement.minimum}).`);
       printTroubleshooting(error);
       return 1;

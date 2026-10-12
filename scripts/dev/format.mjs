@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const files = process.argv.slice(2);
-if (files.length === 0) {
+if (files.length === 0 || files.some((argument) => argument.startsWith('-'))) {
   console.error('Usage: pnpm run format <file...>');
   process.exitCode = 2;
 } else {
