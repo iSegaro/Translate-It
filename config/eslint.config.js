@@ -62,7 +62,7 @@ export default [
       "vue/attributes-order": ["warn", { order: ["DEFINITION", "LIST_RENDERING", "CONDITIONALS", "RENDER_MODIFIERS", "GLOBAL", "UNIQUE", "TWO_WAY_BINDING", "OTHER_DIRECTIVES", "OTHER_ATTR", "EVENTS", "CONTENT"] }],
       "vue/html-closing-bracket-newline": "warn",
       "vue/html-indent": "warn",
-      "vue/html-self-closing": "warn",
+      "vue/html-self-closing": ["warn", { html: { void: "any" } }],
       "vue/max-attributes-per-line": ["warn", { singleline: 1, multiline: 1 }],
       "vue/singleline-html-element-content-newline": "warn",
     },

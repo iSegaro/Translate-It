@@ -1,0 +1,10 @@
+{
+  "overrides": [
+    {
+      "files": "**/*.vue",
+      "options": {
+        "singleAttributePerLine": true
+      }
+    }
+  ]
+}
