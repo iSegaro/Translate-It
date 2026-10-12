@@ -61,6 +61,16 @@ vi.mock('@/shared/config/config.js', () => ({
 
 vi.mock('@/shared/logging/logConstants.js', () => ({ LOG_COMPONENTS: { UI: 'ui' } }));
 
+vi.mock('@/shared/storage/core/StorageCore.js', () => ({
+  storageManager: { on: vi.fn(), off: vi.fn() },
+}));
+
+vi.mock('@/features/desktop-fab/desktopFabExclusions.js', () => ({
+  DESKTOP_FAB_EXCLUSION_PREFIX: 'desktop-fab-exclusion:v1:',
+  listDesktopFabExclusions: vi.fn(async () => []),
+  removeDesktopFabExclusion: vi.fn(async () => {}),
+}));
+
 describe('ActivationTab highlight reveal', () => {
   let wrapper;
 

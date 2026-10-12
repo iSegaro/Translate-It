@@ -57,50 +57,99 @@
             class="fab-menu-item"
             :class="{ 
               'is-disabled': item.disabled,
-              'is-hovered': hoveredItemIndex === index
+              'is-hovered': hoveredItemIndex === index,
+              'is-disclosure': item.disclosure === 'hide'
             }"
             @click.stop="item.disabled ? null : handleMenuItemClick(item)"
             @mouseenter="hoveredItemIndex = index"
             @mouseleave="hoveredItemIndex = -1"
           >
-            <div class="menu-icon-wrapper">
-              <!-- Circle Progress for Page Translation -->
-              <svg
-                v-if="item.showProgress"
-                class="fab-circle-progress"
-                viewBox="0 0 32 32"
+            <!-- Disclosure rows put icon, label and chevron inside one real
+                 button so the whole row is keyboard-operable; the options
+                 panel stays a sibling because buttons cannot nest. -->
+            <button
+              v-if="item.disclosure === 'hide'"
+              ref="hideTrigger"
+              type="button"
+              class="fab-hide-row-trigger"
+              :title="t('desktop_fab_hide_options_toggle_label', 'Choose how to hide the button')"
+              :aria-expanded="hideMenuOpen"
+              aria-controls="fab-hide-options"
+              @click.stop="toggleHideDisclosure"
+              @keydown.escape.stop="onHideOptionsKeydown"
+            >
+              <div class="menu-icon-wrapper">
+                <MaskIcon
+                  class="fab-hide-menu-icon"
+                  :src="item.icon"
+                  :size="'var(--menu-icon-size)'"
+                />
+              </div>
+              <span class="fab-menu-item-text">
+                {{ item.label }}
+              </span>
+              <span
+                class="fab-hide-disclosure-btn"
+                :class="{ 'is-open': hideMenuOpen }"
+                aria-hidden="true"
               >
-                <circle
-                  class="progress-bg"
-                  cx="16"
-                  cy="16"
-                  r="14"
-                  fill="none"
-                  stroke-width="3"
-                />
-                <circle 
-                  class="progress-fill" 
-                  cx="16" 
-                  cy="16" 
-                  r="14" 
-                  fill="none" 
-                  stroke-width="3" 
-                  stroke-dasharray="88" 
-                  :stroke-dashoffset="88 - (88 * item.percent) / 100" 
-                />
-              </svg>
+                <svg
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                >
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                    d="M6 9l6 6 6-6"
+                  />
+                </svg>
+              </span>
+            </button>
 
-              <img 
-                v-if="item.icon" 
-                :src="item.icon" 
-                :alt="item.label" 
-                class="fab-menu-icon"
-                :class="{ 'is-colored': item.id === 'translate_page' || item.id === 'translate_selection' }"
-              >
-            </div>
-            <span class="fab-menu-item-text">
-              {{ item.label }}
-            </span>
+            <template v-else>
+              <div class="menu-icon-wrapper">
+                <!-- Circle Progress for Page Translation -->
+                <svg
+                  v-if="item.showProgress"
+                  class="fab-circle-progress"
+                  viewBox="0 0 32 32"
+                >
+                  <circle
+                    class="progress-bg"
+                    cx="16"
+                    cy="16"
+                    r="14"
+                    fill="none"
+                    stroke-width="3"
+                  />
+                  <circle 
+                    class="progress-fill" 
+                    cx="16" 
+                    cy="16" 
+                    r="14" 
+                    fill="none" 
+                    stroke-width="3" 
+                    stroke-dasharray="88" 
+                    :stroke-dashoffset="88 - (88 * item.percent) / 100" 
+                  />
+                </svg>
+
+                <img 
+                  v-if="item.icon" 
+                  :src="item.icon" 
+                  :alt="item.label" 
+                  class="fab-menu-icon"
+                  :class="{ 'is-colored': item.id === 'translate_page' || item.id === 'translate_selection' }"
+                >
+              </div>
+              <span class="fab-menu-item-text">
+                {{ item.label }}
+              </span>
+            </template>
 
             <!-- Secondary Action (Auto-Translate Star Toggle) -->
             <button
@@ -166,6 +215,49 @@
                   {{ t('auto_translate_manage_rules', 'Manage Rules') }}
                 </button>
               </template>
+            </div>
+
+            <!-- Hide FAB options (always the last menu entry) -->
+            <div
+              v-if="item.disclosure === 'hide' && hideMenuOpen"
+              id="fab-hide-options"
+              class="fab-hide-options"
+              role="group"
+              :aria-label="t('desktop_fab_hide_options_label', 'Hide button options')"
+              @click.stop
+              @keydown.escape.stop="onHideOptionsKeydown"
+            >
+              <div
+                v-if="showHideFabWarning"
+                class="fab-hide-warning"
+              >
+                {{ t('desktop_fab_hide_onfabclick_warning', 'While hidden, you can’t start selection translation from the Desktop FAB.') }}
+              </div>
+              <button
+                ref="firstHideAction"
+                @click.stop="handleHideSelection('temporary')"
+              >
+                {{ t('desktop_fab_hide_close_for_now', 'Close for Now') }}
+              </button>
+              <button
+                v-if="pageHideScopeSupported"
+                @click.stop="handleHideSelection('page')"
+              >
+                {{ t('desktop_fab_hide_this_page', 'Always Hide on This Page') }}
+              </button>
+              <button
+                v-if="siteHideScopeSupported"
+                @click.stop="handleHideSelection('site')"
+              >
+                {{ t('desktop_fab_hide_this_site', 'Always Hide on This Site') }}
+              </button>
+              <div
+                v-if="hideError"
+                class="fab-hide-error"
+                role="alert"
+              >
+                {{ hideError }}
+              </div>
             </div>
           </div>
         </template>
@@ -331,6 +423,11 @@ import { deviceDetector } from '@/utils/browser/compatibility.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
 import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js';
+import {
+  addDesktopFabExclusion,
+  getDesktopFabExclusionKey
+} from '@/features/desktop-fab/desktopFabExclusions.js';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
 import './DesktopFabMenu.scss';
 
 import IconExtension from '@/icons/extension/extension_icon_64.svg';
@@ -344,6 +441,7 @@ import IconSettings from '@/icons/ui/settings.png';
 import IconTranslateSelection from '@/icons/ui/translate.png';
 import IconMouseHover from '@/icons/ui/mouse-hover.png';
 import IconTTS from '@/icons/ui/speaker.png';
+import IconEyeHide from '@/icons/ui/eye-hide.svg?url';
 
 const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'Menu');
 const mobileStore = useMobileStore();
@@ -354,6 +452,8 @@ const tracker = useResourceTracker('desktop-fab-menu');
 const tts = useTTSSmart();
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle();
 const exclusionChecker = ExclusionChecker.getInstance();
+
+const emit = defineEmits(['dismiss']);
 
 const sendPageCommand = (message) => {
   void sendRegularMessage(message, { returnFailureResponse: true })
@@ -559,9 +659,85 @@ const onScopeGroupKeydown = () => {
   scopeMenuOpen.value = false;
   focusRefTarget(scopeTrigger);
 };
+
+// Hide FAB disclosure — dismisses this FAB via `dismiss` instead of writing settings
+const hideMenuOpen = ref(false);
+const hideTrigger = ref(null);
+const firstHideAction = ref(null);
+const hideError = ref('');
+
 watch(isMenuOpen, (open) => {
-  if (!open) scopeMenuOpen.value = false;
+  if (!open) {
+    scopeMenuOpen.value = false;
+    hideMenuOpen.value = false;
+    hideError.value = '';
+  }
 });
+
+const pageHideScopeSupported = computed(() =>
+  Boolean(getDesktopFabExclusionKey('page', currentUrlStr.value))
+);
+const siteHideScopeSupported = computed(() =>
+  Boolean(getDesktopFabExclusionKey('site', currentUrlStr.value))
+);
+const showHideFabWarning = computed(() =>
+  settingsStore.settings?.selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK
+);
+
+const toggleHideDisclosure = async () => {
+  hideMenuOpen.value = !hideMenuOpen.value;
+  hideError.value = '';
+  if (hideMenuOpen.value) {
+    await nextTick();
+    focusRefTarget(firstHideAction);
+  }
+};
+
+const onHideOptionsKeydown = () => {
+  if (!hideMenuOpen.value) return;
+  hideMenuOpen.value = false;
+  hideError.value = '';
+  focusRefTarget(hideTrigger);
+};
+
+/**
+ * Temporary scope is immediate; persistent scopes are only announced to the
+ * parent after the exclusion is durably stored, so a failed write keeps the
+ * menu open with feedback instead of silently losing the user's choice.
+ */
+const handleHideSelection = async (scope) => {
+  hideError.value = '';
+
+  if (scope === 'temporary') {
+    isMenuOpen.value = false;
+    emit('dismiss', { scope: 'temporary' });
+    return;
+  }
+
+  try {
+    const key = await addDesktopFabExclusion(scope, currentUrlStr.value);
+    if (!key) {
+      hideError.value = t(
+        'desktop_fab_hide_scope_unsupported',
+        'Hiding for this scope is not available on this page.'
+      );
+      return;
+    }
+  } catch (err) {
+    logger.warn('Failed to persist Desktop FAB exclusion:', err);
+    hideError.value = t(
+      'desktop_fab_hide_save_failed',
+      'Could not save this hiding preference. Please try again.'
+    );
+    await handleError(err, {
+      context: `desktop-fab:hide-${scope}`,
+      showToast: true
+    });
+    return;
+  }
+
+  emit('dismiss', { scope });
+};
 
 const menuItems = computed(() => {
   const items = [];
@@ -690,6 +866,16 @@ const menuItems = computed(() => {
       secondaryAction: pageSecondaryAction
     });
   }
+
+  // Hide FAB — always the last entry, separated by a divider from the actions above
+  items.push({
+    id: 'hide_fab',
+    label: t('desktop_fab_hide_fab_label', 'Hide FAB'),
+    icon: IconEyeHide,
+    disclosure: 'hide',
+    closeMenu: false,
+    action: () => toggleHideDisclosure()
+  });
 
   return items;
 });

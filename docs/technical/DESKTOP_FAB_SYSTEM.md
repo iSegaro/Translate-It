@@ -9,6 +9,22 @@ The **Desktop FAB (Floating Action Button)** is a persistent, smart interface el
 
 ---
 
+## Visibility exclusions (Issue #303)
+
+The visibility gate belongs to `ContentApp.vue`, through `useDesktopFabVisibility`; it is separate from the global extension setting and from the other content-app UI. The FAB is rendered only after exclusion state is ready and no applicable dismissal is active. This gate does not change other UI surfaces or modes.
+
+The last menu entry, **Hide FAB**, opens three hide scopes:
+
+- **Close for Now** hides the FAB in the current content-app memory only, until reload or a changed-URL SPA navigation. A same-URL history event does not reset it.
+- **Always Hide on This Page** persists a page exclusion. Page identity ignores query and hash, treats HTTP and HTTPS as equivalent, removes one trailing slash (except at the root), and preserves the host including its port. `file:` pages are supported.
+- **Always Hide on This Site** persists an exact HTTP(S) hostname exclusion; it does not cover subdomains. Site exclusions are unsupported for `file:` URLs.
+
+When selection translation is set to **ON_FAB_CLICK**, the menu warns (in English, Persian, and Japanese) that hiding the FAB prevents starting selection translation from it. Hide actions do not modify selection mode or the global FAB setting. A failed persistent write reports an error and keeps the menu open; successful writes dismiss the FAB.
+
+Persisted entries use feature-owned, per-entry `desktop-fab-exclusion:v1:` keys in `StorageCore`, allowing cross-tab changes without a shared-list write race. They are not settings-schema entries and are not included in settings export/import. Settings reset clears them through the storage clear. Manage exclusions in **Options → Activation → Desktop FAB**: the list supports removal and stays available when the global FAB toggle is off. It refreshes on owned storage changes; overlapping reads are guarded so an older result cannot replace a newer one. The content-side gate also discards stale exclusion reads. Exclusions are independent of automatic-translation rules: no auto-translation rules are reused, and this feature does not monkeypatch browser history.
+
+---
+
 ## File Structure
 
 - **View Layer**: `src/apps/content/components/desktop/DesktopFabMenu.vue`
@@ -126,4 +142,4 @@ The entire FAB system is rendered inside the UI Host Shadow DOM:
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: October 2026

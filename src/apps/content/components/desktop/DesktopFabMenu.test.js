@@ -1,29 +1,44 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { reactive, ref } from 'vue';
 import DesktopFabMenu from './DesktopFabMenu.vue';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
-const mocks = vi.hoisted(() => ({
-  mobileStore: null,
-  settingsStore: null,
-  pageEventBus: {
-    emit: vi.fn(),
-    on: vi.fn(() => vi.fn()),
-  },
-  sendMessage: vi.fn(),
-  sendRegularMessage: vi.fn(),
-  tracker: {
-    clearTimer: vi.fn(),
-    trackTimeout: vi.fn((callback) => setTimeout(callback, 0)),
-    trackResource: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  },
-  autoRules: null,
-  mouseHoverEnabled: null,
-  translations: {},
-}));
+const mocks = vi.hoisted(() => {
+  // The tracker is a no-op for page listeners, but the drag engine needs its
+  // window listeners to actually fire, so route only drag events through.
+  const dragEvents = new Set(['mousemove', 'mouseup', 'touchmove', 'touchend']);
+  return {
+    mobileStore: null,
+    settingsStore: null,
+    pageEventBus: {
+      emit: vi.fn(),
+      on: vi.fn(() => vi.fn()),
+    },
+    sendMessage: vi.fn(),
+    sendRegularMessage: vi.fn(),
+    tracker: {
+      clearTimer: vi.fn(),
+      trackTimeout: vi.fn((callback) => setTimeout(callback, 0)),
+      trackResource: vi.fn(),
+      addEventListener: vi.fn((target, type, handler) => {
+        if (dragEvents.has(type)) target.addEventListener(type, handler);
+      }),
+      removeEventListener: vi.fn((target, type, handler) => {
+        if (dragEvents.has(type)) target.removeEventListener(type, handler);
+      }),
+    },
+    autoRules: null,
+    mouseHoverEnabled: null,
+    translations: {},
+    handleError: vi.fn(),
+    supportedHideScopes: new Set(['page', 'site']),
+    exclusionKey: vi.fn(),
+    addExclusion: vi.fn(),
+    ttsStop: vi.fn().mockResolvedValue(undefined),
+    storageManager: { set: vi.fn() },
+  };
+});
 
 vi.mock('@/store/modules/mobile.js', () => ({
   useMobileStore: () => mocks.mobileStore,
@@ -59,7 +74,7 @@ vi.mock('@/features/tts/composables/useTTSSmart.js', () => ({
     ttsState: { value: 'idle' },
     isPlaying: { value: false },
     isLoading: { value: false },
-    stop: vi.fn().mockResolvedValue(undefined),
+    stop: mocks.ttsStop,
     speak: vi.fn().mockResolvedValue(undefined),
   }),
 }));
@@ -116,7 +131,7 @@ vi.mock('@/shared/config/languageConstants.js', () => ({
 }));
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
-  storageManager: { set: vi.fn() },
+  storageManager: mocks.storageManager,
 }));
 
 vi.mock('@/utils/ui/styleInjector.js', () => ({
@@ -124,7 +139,13 @@ vi.mock('@/utils/ui/styleInjector.js', () => ({
 }));
 
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
-  useErrorHandler: () => ({ handleError: vi.fn() }),
+  useErrorHandler: () => ({ handleError: mocks.handleError }),
+}));
+
+vi.mock('@/features/desktop-fab/desktopFabExclusions.js', () => ({
+  DESKTOP_FAB_EXCLUSION_PREFIX: 'desktop-fab-exclusion:v1:',
+  getDesktopFabExclusionKey: (scope, url) => mocks.exclusionKey(scope, url),
+  addDesktopFabExclusion: (scope, url) => mocks.addExclusion(scope, url),
 }));
 
 vi.mock('@/core/extensionContext.js', () => ({
@@ -143,35 +164,51 @@ vi.mock('@/shared/logging/logger.js', () => ({
   }),
 }));
 
+/** Shared component/store/transport state for every DesktopFabMenu mount. */
+const setupBaseMocks = () => {
+  vi.clearAllMocks();
+  mocks.sendRegularMessage.mockResolvedValue({ success: true });
+  mocks.translations = {};
+  mocks.mouseHoverEnabled = ref(false);
+  mocks.handleError = vi.fn();
+  mocks.mobileStore = reactive({
+    hasElementTranslations: false,
+    isFullscreen: false,
+    pageTranslationData: {
+      status: 'idle',
+      isTranslating: false,
+      isAutoTranslating: false,
+      isTranslated: false,
+      translatedCount: 0,
+      failedCount: 0,
+      totalCount: 0,
+    },
+  });
+  mocks.settingsStore = reactive({
+    isDarkTheme: false,
+    settings: {
+      FAB_IDLE_OPACITY: 20,
+      FAB_SIZE: '1',
+      TRANSLATE_ON_TEXT_SELECTION: true,
+      SHOW_MOUSE_HOVER_IN_FAB: false,
+      SHOW_DESKTOP_FAB: true,
+      selectionTranslationMode: 'immediate',
+    },
+    getEffectiveProvider: () => 'google',
+    updateSettingLocally: vi.fn(),
+  });
+  mocks.supportedHideScopes = new Set(['page', 'site']);
+  mocks.exclusionKey = vi.fn((scope) =>
+    mocks.supportedHideScopes.has(scope) ? `desktop-fab-exclusion:v1:${scope}:key` : '');
+  mocks.addExclusion = vi.fn(async (scope) =>
+    mocks.supportedHideScopes.has(scope) ? `desktop-fab-exclusion:v1:${scope}:key` : '');
+  mocks.storageManager.set.mockReset();
+  mocks.ttsStop.mockReset().mockResolvedValue(undefined);
+};
+
 describe('DesktopFabMenu page command transport', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.sendRegularMessage.mockResolvedValue({ success: true });
-    mocks.translations = {};
-    mocks.mouseHoverEnabled = ref(false);
-    mocks.mobileStore = reactive({
-      hasElementTranslations: false,
-      isFullscreen: false,
-      pageTranslationData: {
-        status: 'idle',
-        isTranslating: false,
-        isAutoTranslating: false,
-        isTranslated: false,
-        translatedCount: 0,
-        failedCount: 0,
-        totalCount: 0,
-      },
-    });
-    mocks.settingsStore = reactive({
-      isDarkTheme: false,
-      settings: {
-        FAB_IDLE_OPACITY: 20,
-        FAB_SIZE: '1',
-        TRANSLATE_ON_TEXT_SELECTION: true,
-        SHOW_MOUSE_HOVER_IN_FAB: false,
-      },
-      getEffectiveProvider: () => 'google',
-    });
+    setupBaseMocks();
     mocks.autoRules = {
       isAutoTranslateToggleVisible: ref(true), isActive: ref(false),
       hasPageRule: ref(false), hasSiteRule: ref(false), siteScopeAvailable: ref(true),
@@ -351,5 +388,274 @@ describe('DesktopFabMenu page command transport', () => {
     expect(Array.from(translateRow.element.children).indexOf(scopePanel.element))
       .toBeGreaterThan(Array.from(translateRow.element.children).indexOf(star.element));
     wrapper.unmount();
+  });
+});
+
+describe('DesktopFabMenu hide FAB disclosure', () => {
+  let wrapper;
+
+  const openMenu = async () => {
+    wrapper = mount(DesktopFabMenu, { attachTo: document.body });
+    wrapper.vm.isReady = true;
+    wrapper.vm.isMenuOpen = true;
+    await wrapper.vm.$nextTick();
+    return wrapper;
+  };
+
+  const hideRow = () => wrapper.findAll('.fab-menu-item').at(-1);
+  const hideTrigger = () => hideRow().get('.fab-hide-row-trigger');
+
+  beforeEach(() => {
+    setupBaseMocks();
+    mocks.autoRules = {
+      isAutoTranslateToggleVisible: ref(false), isActive: ref(false),
+      hasPageRule: ref(false), hasSiteRule: ref(false), siteScopeAvailable: ref(true),
+      showManageRules: ref(false),
+      normalizedPageUrl: ref('https://example.com/page'), siteRule: ref(null),
+      hasBroaderMatchingRule: ref(false), isFileUrl: ref(false),
+      scopeActions: { togglePageScope: vi.fn(), toggleSiteScope: vi.fn() }, openManageRules: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it('keeps Hide FAB as the last item, separated from the actions by a divider', async () => {
+    await openMenu();
+
+    const rows = wrapper.findAll('.fab-menu-item');
+    const lastRow = rows.at(-1);
+    expect(lastRow.get('.fab-menu-item-text').text()).toBe('desktop_fab_hide_fab_label');
+    expect(lastRow.element.previousElementSibling.classList).toContain('fab-menu-divider');
+    expect(wrapper.findAll('.fab-menu-divider').at(-1).element.nextElementSibling)
+      .toBe(lastRow.element);
+    expect(lastRow.classes()).not.toContain('is-disabled');
+
+    // The label is a real button, so Enter/Space reach the same disclosure.
+    const trigger = hideTrigger();
+    expect(trigger.element.tagName).toBe('BUTTON');
+    expect(trigger.attributes('type')).toBe('button');
+    expect(trigger.text()).toBe('desktop_fab_hide_fab_label');
+
+    // Activating the row opens the choices — it never dismisses the FAB.
+    await lastRow.trigger('click');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('#fab-hide-options').exists()).toBe(true);
+    expect(mocks.addExclusion).not.toHaveBeenCalled();
+    expect(wrapper.emitted('dismiss')).toBeUndefined();
+  });
+
+  it('discloses the three hide options with a labelled button and Escape restores focus', async () => {
+    await openMenu();
+
+    const trigger = hideTrigger();
+    expect(trigger.attributes('aria-expanded')).toBe('false');
+    expect(trigger.attributes('aria-controls')).toBe('fab-hide-options');
+    expect(trigger.attributes('title')).toBe('desktop_fab_hide_options_toggle_label');
+    expect(hideRow().find('.fab-hide-options').exists()).toBe(false);
+
+    await trigger.trigger('click');
+    await wrapper.vm.$nextTick();
+
+    const panel = wrapper.get('#fab-hide-options');
+    expect(panel.attributes('role')).toBe('group');
+    expect(panel.attributes('aria-label')).toBe('desktop_fab_hide_options_label');
+    expect(trigger.attributes('aria-expanded')).toBe('true');
+
+    const labels = panel.findAll('button').map((button) => button.text());
+    expect(labels).toEqual([
+      'desktop_fab_hide_close_for_now',
+      'desktop_fab_hide_this_page',
+      'desktop_fab_hide_this_site',
+    ]);
+    expect(document.activeElement).toBe(panel.findAll('button').at(0).element);
+
+    await panel.trigger('keydown', { key: 'Escape' });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('#fab-hide-options').exists()).toBe(false);
+    expect(document.activeElement).toBe(trigger.element);
+    expect(wrapper.vm.isMenuOpen).toBe(true);
+  });
+
+  it('omits persistent scopes the current page cannot express', async () => {
+    // file:// pages can hide a single page but never a whole site
+    mocks.supportedHideScopes = new Set(['page']);
+    await openMenu();
+
+    await hideTrigger().trigger('click');
+    await wrapper.vm.$nextTick();
+
+    const labels = wrapper.findAll('#fab-hide-options button').map((button) => button.text());
+    expect(labels).toEqual([
+      'desktop_fab_hide_close_for_now',
+      'desktop_fab_hide_this_page',
+    ]);
+  });
+
+  it('warns only while selection translation is owned by the FAB', async () => {
+    await openMenu();
+    await hideTrigger().trigger('click');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.fab-hide-warning').exists()).toBe(false);
+
+    mocks.settingsStore.settings.selectionTranslationMode = 'on-fab-click';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.fab-hide-warning').text())
+      .toBe('desktop_fab_hide_onfabclick_warning');
+
+    mocks.settingsStore.settings.selectionTranslationMode = 'on-click';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('.fab-hide-warning').exists()).toBe(false);
+  });
+
+  it('emits temporary immediately and persistent only after a successful write', async () => {
+    await openMenu();
+    await hideTrigger().trigger('click');
+    await wrapper.vm.$nextTick();
+
+    await wrapper.findAll('#fab-hide-options button').at(0).trigger('click');
+    expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
+    expect(mocks.addExclusion).not.toHaveBeenCalled();
+    expect(wrapper.vm.isMenuOpen).toBe(false);
+
+    // Reopen and hold the write open: the parent is told only once it lands.
+    let finishWrite;
+    mocks.addExclusion.mockImplementation(() => new Promise((resolve) => { finishWrite = resolve; }));
+    wrapper.vm.isMenuOpen = true;
+    await wrapper.vm.$nextTick();
+    await hideTrigger().trigger('click');
+    await wrapper.vm.$nextTick();
+
+    await wrapper.findAll('#fab-hide-options button').at(1).trigger('click');
+    await Promise.resolve();
+    expect(mocks.addExclusion).toHaveBeenCalledWith('page', window.location.href);
+    expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
+
+    finishWrite('desktop-fab-exclusion:v1:page:key');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(wrapper.emitted('dismiss')).toEqual([
+      [{ scope: 'temporary' }],
+      [{ scope: 'page' }],
+    ]);
+  });
+
+  it('keeps the menu open and surfaces feedback when the write fails', async () => {
+    mocks.addExclusion = vi.fn().mockRejectedValue(new Error('quota exceeded'));
+    await openMenu();
+    await hideTrigger().trigger('click');
+    await wrapper.vm.$nextTick();
+
+    await wrapper.findAll('#fab-hide-options button').at(2).trigger('click');
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mocks.addExclusion).toHaveBeenCalledWith('site', window.location.href);
+    expect(wrapper.emitted('dismiss')).toBeUndefined();
+    expect(wrapper.vm.isMenuOpen).toBe(true);
+    const alert = wrapper.get('.fab-hide-error');
+    expect(alert.attributes('role')).toBe('alert');
+    expect(alert.text()).toBe('desktop_fab_hide_save_failed');
+    expect(mocks.handleError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'desktop-fab:hide-site', showToast: true }),
+    );
+  });
+
+  it('never writes the mode or the global FAB toggle for a dismissal', async () => {
+    await openMenu();
+    await hideTrigger().trigger('click');
+    await wrapper.vm.$nextTick();
+
+    await wrapper.findAll('#fab-hide-options button').at(1).trigger('click');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled();
+    expect(mocks.settingsStore.settings.selectionTranslationMode).toBe('immediate');
+    expect(mocks.settingsStore.settings.SHOW_DESKTOP_FAB).toBe(true);
+  });
+});
+
+describe('DesktopFabMenu dismissal cleanup and drag persistence', () => {
+  let wrapper;
+
+  const autoRulesOff = () => ({
+    isAutoTranslateToggleVisible: ref(false), isActive: ref(false),
+    hasPageRule: ref(false), hasSiteRule: ref(false), siteScopeAvailable: ref(true),
+    showManageRules: ref(false),
+    normalizedPageUrl: ref('https://example.com/page'), siteRule: ref(null),
+    hasBroaderMatchingRule: ref(false), isFileUrl: ref(false),
+    scopeActions: { togglePageScope: vi.fn(), toggleSiteScope: vi.fn() }, openManageRules: vi.fn(),
+  });
+
+  beforeEach(() => {
+    setupBaseMocks();
+    mocks.autoRules = autoRulesOff();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    vi.useRealTimers();
+  });
+
+  it('stops only this instance\'s TTS when the parent unmounts it after a temporary dismissal', async () => {
+    wrapper = mount(DesktopFabMenu, { attachTo: document.body });
+    wrapper.vm.isReady = true;
+    wrapper.vm.isMenuOpen = true;
+    await wrapper.vm.$nextTick();
+
+    await wrapper.findAll('.fab-menu-item').at(-1).get('.fab-hide-row-trigger').trigger('click');
+    await wrapper.vm.$nextTick();
+    // Opening the disclosure must not tear anything down on its own.
+    expect(mocks.ttsStop).not.toHaveBeenCalled();
+
+    await wrapper.findAll('#fab-hide-options button').at(0).trigger('click');
+    expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
+    expect(mocks.ttsStop).not.toHaveBeenCalled();
+
+    // The parent gate hides the FAB by unmounting this component.
+    wrapper.unmount();
+    wrapper = null;
+
+    expect(mocks.ttsStop).toHaveBeenCalledTimes(1);
+    expect(mocks.ttsStop).toHaveBeenCalledWith({ stopOnlyIfOwner: true });
+  });
+
+  it('persists DESKTOP_FAB_POSITION after a drag without touching any setting', async () => {
+    wrapper = mount(DesktopFabMenu, { attachTo: document.body });
+    wrapper.vm.isReady = true;
+    // Pin the drag origin so the expectation does not depend on jsdom layout.
+    wrapper.vm.verticalPos = 100;
+    await wrapper.vm.$nextTick();
+
+    wrapper.get('.desktop-fab-button').element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, button: 0, clientY: 150, clientX: 900 }),
+    );
+    // The first move clears the 5px threshold, the second repositions the FAB.
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 300, clientX: 900 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 420, clientX: 900 }));
+
+    // Drag end defers the write by 100ms; fake only the clock, not rAF.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    window.dispatchEvent(new MouseEvent('mouseup', { clientY: 420, clientX: 900 }));
+    await vi.advanceTimersByTimeAsync(200);
+    vi.useRealTimers();
+
+    expect(mocks.storageManager.set).toHaveBeenCalledWith({
+      DESKTOP_FAB_POSITION: { side: 'right', y: 220 },
+    });
+    // Geometry only: no other storage key, no setting write, no dismissal.
+    expect(mocks.storageManager.set.mock.calls).toHaveLength(1);
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled();
+    expect(mocks.addExclusion).not.toHaveBeenCalled();
+    expect(wrapper.emitted('dismiss')).toBeUndefined();
+    expect(mocks.settingsStore.settings.SHOW_DESKTOP_FAB).toBe(true);
+    expect(mocks.settingsStore.settings.selectionTranslationMode).toBe('immediate');
+    expect(wrapper.vm.isMenuOpen).toBe(false);
   });
 });

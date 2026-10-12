@@ -9,6 +9,10 @@ import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js';
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js';
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js';
 import ExtensionContextManager from '@/core/extensionContext.js';
+import {
+  addDesktopFabExclusion,
+  listDesktopFabExclusions,
+} from '@/features/desktop-fab/desktopFabExclusions.js';
 
 // Mock Dependencies
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -1004,6 +1008,75 @@ describe('Settings Store', () => {
     expect(storageManager.set).toHaveBeenCalledWith(getPersistedDefaultSettings());
     expect(store.settings.THEME).toBe('auto');
     expect(store.settings.translationHistory).toEqual([]);
+  });
+
+  it('resetSettings clears desktop FAB exclusions while export/import omit them', async () => {
+    const persisted = new Map();
+    const defaultImplementations = {
+      get: async () => ({}),
+      set: async () => true,
+      remove: async () => true,
+      clear: async () => true,
+    };
+    storageManager.get.mockImplementation(async keys => {
+      const values = Object.fromEntries(persisted);
+      if (keys === null || keys === undefined) return values;
+      const requested = Array.isArray(keys) ? keys : [keys];
+      return Object.fromEntries(requested.filter(key => key in values).map(key => [key, values[key]]));
+    });
+    storageManager.set.mockImplementation(async values => {
+      for (const [key, value] of Object.entries(values)) persisted.set(key, value);
+      return true;
+    });
+    storageManager.remove.mockImplementation(async keys => {
+      for (const key of Array.isArray(keys) ? keys : [keys]) persisted.delete(key);
+      return true;
+    });
+    storageManager.clear.mockImplementation(async () => {
+      persisted.clear();
+      return true;
+    });
+
+    try {
+      const pageKey = await addDesktopFabExclusion('page', 'https://example.test/docs');
+      const siteKey = await addDesktopFabExclusion('site', 'https://example.test');
+      const store = useSettingsStore();
+
+      await store.exportSettings();
+      const exportSettings = secureStorage.prepareForExport.mock.calls.at(-1)[0];
+      expect(exportSettings).not.toHaveProperty(pageKey);
+      expect(exportSettings).not.toHaveProperty(siteKey);
+
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        [pageKey]: true,
+        [siteKey]: true,
+      });
+      await store.importSettings({ THEME: 'dark', [pageKey]: true, [siteKey]: true });
+      const importedPayload = storageManager.set.mock.calls.at(-1)[0];
+      expect(importedPayload).not.toHaveProperty(pageKey);
+      expect(importedPayload).not.toHaveProperty(siteKey);
+      expect(persisted.has(pageKey)).toBe(true);
+      expect(persisted.has(siteKey)).toBe(true);
+
+      await store.exportSettings();
+      const reExportSettings = secureStorage.prepareForExport.mock.calls.at(-1)[0];
+      expect(reExportSettings).not.toHaveProperty(pageKey);
+      expect(reExportSettings).not.toHaveProperty(siteKey);
+
+      await store.resetSettings();
+
+      expect(await listDesktopFabExclusions()).toEqual([]);
+      expect(persisted.has(pageKey)).toBe(false);
+      expect(persisted.has(siteKey)).toBe(false);
+      expect(store.settings).toMatchObject(getPersistedDefaultSettings());
+      expect(storageManager.set.mock.calls.at(-1)[0]).toEqual(getPersistedDefaultSettings());
+    } finally {
+      for (const [method, implementation] of Object.entries(defaultImplementations)) {
+        storageManager[method].mockReset();
+        storageManager[method].mockImplementation(implementation);
+      }
+    }
   });
 
   it('exportSettings should call secureStorage', async () => {

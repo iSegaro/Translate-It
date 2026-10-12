@@ -6,6 +6,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import { DESKTOP_FAB_EXCLUSION_PREFIX } from '@/features/desktop-fab/desktopFabExclusions.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
@@ -422,6 +423,9 @@ export const useSettingsStore = defineStore('settings', () => {
       }
 
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
+      Object.keys(processedSettings).forEach(key => {
+        if (key.startsWith(DESKTOP_FAB_EXCLUSION_PREFIX)) delete processedSettings[key];
+      });
       const explicitImportedKeys = new Set(Object.keys(processedSettings));
       const hasImportedThinkingMode = Object.prototype.hasOwnProperty.call(
         processedSettings,

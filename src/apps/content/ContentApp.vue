@@ -74,7 +74,8 @@
 
       <!-- Desktop FAB Menu -->
       <DesktopFabMenu 
-        v-if="!isMobileUI && showDesktopFab && isTopFrame" 
+        v-if="!isMobileUI && showDesktopFab && desktopFabVisibility.isReady.value && !desktopFabVisibility.isDismissed.value && isTopFrame"
+        @dismiss="handleDesktopFabDismiss"
       />
 
       <!-- Mobile Floating Action Button (FAB) -->
@@ -175,6 +176,7 @@ import { useContentAppNotifications } from './composables/useContentAppNotificat
 import { useContentAppTextFieldIcons } from './composables/useContentAppTextFieldIcons.js';
 import { useContentAppPageTranslation } from './composables/useContentAppPageTranslation.js';
 import { useContentAppLifecycle } from './composables/useContentAppLifecycle.js';
+import { useDesktopFabVisibility } from './composables/useDesktopFabVisibility.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'ContentApp');
 
@@ -224,6 +226,8 @@ const {
   showMobileFab,
   isMobileUI
 } = useContentAppUIState(settingsStore, mobileStore, tracker);
+const desktopFabVisibility = useDesktopFabVisibility();
+const handleDesktopFabDismiss = (detail) => desktopFabVisibility.dismiss(detail);
 
 import { watch } from 'vue';
 watch(isScreenCaptureActive, (newVal) => {

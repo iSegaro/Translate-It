@@ -1058,6 +1058,60 @@
   "desktop_fab_tts_stop_tooltip": {
     "message": "توقف"
   },
+  "desktop_fab_hide_fab_label": {
+    "message": "پنهان کردن دکمه"
+  },
+  "desktop_fab_hide_options_toggle_label": {
+    "message": "نحوه پنهان کردن دکمه را انتخاب کنید"
+  },
+  "desktop_fab_hide_options_label": {
+    "message": "گزینه‌های پنهان کردن دکمه"
+  },
+  "desktop_fab_hide_close_for_now": {
+    "message": "بستن برای این بار"
+  },
+  "desktop_fab_hide_this_page": {
+    "message": "همیشه در این صفحه پنهان شود"
+  },
+  "desktop_fab_hide_this_site": {
+    "message": "همیشه در این سایت پنهان شود"
+  },
+  "desktop_fab_hide_onfabclick_warning": {
+    "message": "تا زمانی که دکمه پنهان است، نمی‌توانید ترجمه متن انتخاب‌شده را از دکمه دسکتاپ شروع کنید."
+  },
+  "desktop_fab_hide_save_failed": {
+    "message": "ذخیره این تنظیم پنهان‌سازی ممکن نشد. لطفاً دوباره تلاش کنید."
+  },
+  "desktop_fab_hide_scope_unsupported": {
+    "message": "پنهان‌سازی برای این محدوده در این صفحه در دسترس نیست."
+  },
+  "fab_exclusions_group_label": {
+    "message": "صفحه‌ها و سایت‌های پنهان‌شده"
+  },
+  "fab_exclusions_label": {
+    "message": "صفحه‌ها و سایت‌های پنهان‌شده"
+  },
+  "fab_exclusions_description": {
+    "message": "دکمه دسکتاپ در صفحه‌ها و سایت‌های فهرست‌شده در زیر پنهان است. برای نمایش دوباره، یک مورد را حذف کنید."
+  },
+  "fab_exclusions_empty": {
+    "message": "هنوز هیچ صفحه یا سایتی پنهان نشده است."
+  },
+  "fab_exclusion_scope_page": {
+    "message": "صفحه"
+  },
+  "fab_exclusion_scope_site": {
+    "message": "سایت"
+  },
+  "fab_exclusion_remove_label": {
+    "message": "حذف از فهرست"
+  },
+  "fab_exclusion_remove_error": {
+    "message": "حذف این مورد ممکن نشد. صفحه را دوباره بارگذاری کرده و تلاش کنید."
+  },
+  "fab_exclusions_load_error": {
+    "message": "بارگذاری فهرست صفحه‌ها و سایت‌های پنهان‌شده ممکن نشد. برای تلاش دوباره، صفحه را بارگذاری مجدد کنید."
+  },
   "page_translation_add_auto_translate_tooltip": {
     "message": "افزودن به قوانین ترجمه خودکار"
   },

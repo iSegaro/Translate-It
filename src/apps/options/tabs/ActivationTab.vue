@@ -77,6 +77,71 @@
           </div>
         </div>
       </div>
+
+      <!-- Per-page / per-site FAB exclusions.
+           Deliberately outside the appearance sub-options so the list stays
+           reachable while the global FAB toggle is off. -->
+      <div
+        id="DESKTOP_FAB_EXCLUSIONS"
+        class="setting-group fab-exclusions-group"
+        role="group"
+        :aria-label="t('fab_exclusions_group_label') || 'Hidden pages and sites'"
+      >
+        <div class="setting-info">
+          <span class="setting-label">{{ t('fab_exclusions_label') || 'Hidden pages and sites' }}</span>
+          <span class="setting-description">
+            {{ t('fab_exclusions_description') || 'The Desktop FAB is hidden on the pages and sites listed below. Remove an entry to show it there again.' }}
+          </span>
+        </div>
+
+        <div
+          v-if="fabExclusionsLoaded && fabExclusions.length === 0"
+          class="fab-exclusions-empty"
+          role="status"
+        >
+          {{ t('fab_exclusions_empty') || 'No pages or sites are hidden yet.' }}
+        </div>
+
+        <ul
+          v-else-if="fabExclusions.length"
+          class="fab-exclusions-list"
+        >
+          <li
+            v-for="entry in fabExclusions"
+            :key="entry.key"
+            class="fab-exclusion-item"
+          >
+            <span class="fab-exclusion-scope">
+              {{ fabExclusionScopeLabel(entry.scope) }}
+            </span>
+            <span
+              class="fab-exclusion-value"
+              dir="ltr"
+            >{{ entry.value }}</span>
+            <button
+              type="button"
+              class="fab-exclusion-remove-btn"
+              :title="t('fab_exclusion_remove_label') || 'Remove from list'"
+              :aria-label="`${t('fab_exclusion_remove_label') || 'Remove from list'}: ${entry.value}`"
+              :disabled="removingFabExclusionKey === entry.key"
+              @click="removeFabExclusion(entry)"
+            >
+              <MaskIcon
+                :src="IconTrash"
+                :size="14"
+              />
+            </button>
+          </li>
+        </ul>
+
+        <div
+          v-if="fabExclusionError"
+          class="fab-exclusions-error"
+          role="alert"
+        >
+          {{ fabExclusionError }}
+        </div>
+      </div>
     </BaseFieldset>
 
     <!-- On-Page Selection -->
@@ -858,6 +923,12 @@ import { TranslationMode, SelectionTranslationMode, CONFIG } from '@/shared/conf
 import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
 import { detectOS, OS_PLATFORMS } from '@/utils/browser/compatibility.js'
+import { storageManager } from '@/shared/storage/core/StorageCore.js'
+import {
+  DESKTOP_FAB_EXCLUSION_PREFIX,
+  listDesktopFabExclusions,
+  removeDesktopFabExclusion
+} from '@/features/desktop-fab/desktopFabExclusions.js'
 
 // Components
 import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
@@ -869,6 +940,8 @@ import BaseButton from '@/components/base/BaseButton.vue'
 import ShortcutPicker from '@/components/base/ShortcutPicker.vue'
 import ConfigureShortcutButton from '@/components/feature/ConfigureShortcutButton.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
+import IconTrash from '@/icons/ui/trash-small.svg?url'
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ActivationTab')
 const settingsStore = useSettingsStore()
 const { highlightElement } = useHighlightManager()
@@ -912,6 +985,64 @@ const fabSizeOptions = computed(() => [
   { value: '1.2', label: t('fab_size_large') || 'Large' },
   { value: '1.5', label: t('fab_size_extra_large') || 'Extra Large' }
 ])
+
+// --- Desktop FAB exclusions (per-page / per-site hides) ---
+// The list mirrors storage directly — there is no staged copy to fall out of
+// sync, so removals made from the FAB itself appear here live.
+const fabExclusions = ref([])
+// Only a successful read may show "nothing hidden"; a failed first read must
+// not masquerade as an empty list.
+const fabExclusionsLoaded = ref(false)
+const fabExclusionError = ref('')
+const removingFabExclusionKey = ref('')
+
+// Cross-tab add/remove can trigger overlapping reads; the newest one wins and
+// a stale snapshot is dropped instead of overwriting fresher data.
+let fabExclusionLoadSeq = 0
+let fabExclusionsMounted = false
+
+const fabExclusionScopeLabel = (scope) => {
+  if (scope === 'site') return t('fab_exclusion_scope_site') || 'Site'
+  return t('fab_exclusion_scope_page') || 'Page'
+}
+
+const loadFabExclusions = async () => {
+  const seq = ++fabExclusionLoadSeq
+  let entries
+  try {
+    entries = await listDesktopFabExclusions()
+  } catch (error) {
+    if (!fabExclusionsMounted || seq !== fabExclusionLoadSeq) return
+    logger.error('Failed to load Desktop FAB exclusions:', error)
+    fabExclusionError.value = t('fab_exclusions_load_error')
+      || 'Could not load the hidden pages and sites list. Reload the page to try again.'
+    return
+  }
+  if (!fabExclusionsMounted || seq !== fabExclusionLoadSeq) return
+  fabExclusions.value = entries
+  fabExclusionsLoaded.value = true
+  fabExclusionError.value = ''
+}
+
+const removeFabExclusion = async (entry) => {
+  removingFabExclusionKey.value = entry.key
+  try {
+    await removeDesktopFabExclusion(entry.key)
+    fabExclusions.value = fabExclusions.value.filter((item) => item.key !== entry.key)
+    fabExclusionError.value = ''
+  } catch (error) {
+    logger.error('Failed to remove Desktop FAB exclusion:', error)
+    fabExclusionError.value = t('fab_exclusion_remove_error')
+      || 'Could not remove this entry. Reload the page and try again.'
+  } finally {
+    removingFabExclusionKey.value = ''
+  }
+}
+
+const handleFabExclusionStorageChange = (data) => {
+  if (!data?.key || !String(data.key).startsWith(DESKTOP_FAB_EXCLUSION_PREFIX)) return
+  void loadFabExclusions()
+}
 
 // Text Fields
 const translateOnTextFields = createSetting('TRANSLATE_ON_TEXT_FIELDS', false)
@@ -1127,13 +1258,20 @@ onMounted(async () => {
   window.addEventListener('options-reveal-accordion', handleHighlightReveal);
   window.addEventListener('options-reveal-intent', handleRevealIntent);
   window.addEventListener('keydown', handleKeyDown);
+
+  fabExclusionsMounted = true
+  storageManager.on('change', handleFabExclusionStorageChange);
+  await loadFabExclusions();
 })
 
 onUnmounted(() => {
+  fabExclusionsMounted = false
   window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
   window.removeEventListener('options-reveal-accordion', handleHighlightReveal);
   window.removeEventListener('options-reveal-intent', handleRevealIntent);
   window.removeEventListener('keydown', handleKeyDown);
+
+  storageManager.off('change', handleFabExclusionStorageChange);
 })
 
 </script>

@@ -136,4 +136,66 @@ describe('DesktopFabMenu SCSS layout contract', () => {
     expect(/--menu-icon-box/.test(linkMaxWidth) && /--menu-gap/.test(linkMaxWidth)
       || /var\(--menu-(?:label-)?indent/.test(linkMaxWidth)).toBe(true);
   });
+
+  it('contains the hide options panel in the label column and dims the row divider', () => {
+    const hidePanel = block(/\.fab-hide-options\s*\{/);
+    expect(declaration(hidePanel, 'flex')).toBe('0 0 100% !important');
+    expect(declaration(hidePanel, 'width')).toBe('100% !important');
+    expect(declaration(hidePanel, 'contain')).toBe('inline-size !important');
+    // The disclosure row's 9px side padding moves onto the panel so the
+    // options keep the same indent as the auto-translate scope buttons.
+    expect(declaration(hidePanel, 'padding-inline')).toBe('9px !important');
+
+    const labelColumnIndent = /calc\(var\(--menu-icon-box\)\s*\+\s*var\(--menu-gap\)\)/;
+    const hideButton = block(/\.fab-hide-options\s*\{[\s\S]*?button\s*\{/);
+    expect(declaration(hideButton, 'margin-inline-start')).toMatch(labelColumnIndent);
+    expect(declaration(hideButton, 'width')).toBe('auto !important');
+    expect(declaration(block(/\.fab-hide-options\s*\{[\s\S]*?button\s*\{[\s\S]*?&:focus-visible\s*\{/), 'outline'))
+      .toMatch(/\S/);
+
+    const warning = block(/\.fab-hide-options\s*\{[\s\S]*?\.fab-hide-warning\s*\{/);
+    expect(declaration(warning, 'font-size')).toBe('0.85em !important');
+    expect(declaration(warning, 'overflow-wrap')).toMatch(/anywhere/);
+    expect(declaration(warning, 'margin-inline-start')).toMatch(labelColumnIndent);
+
+    const error = block(/\.fab-hide-options\s*\{[\s\S]*?\.fab-hide-error\s*\{/);
+    expect(declaration(error, 'font-weight')).toBe('600 !important');
+    expect(declaration(error, 'margin-inline-start')).toMatch(labelColumnIndent);
+    const darkError = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-error\s*\{/);
+    expect(declaration(darkError, 'color')).toMatch(/#ff8787\s*!important/);
+
+    // The whole row is one real button: icon + label + chevron share a tab stop
+    const rowTrigger = block(/\.fab-hide-row-trigger\s*\{/);
+    expect(declaration(rowTrigger, 'display')).toBe('flex !important');
+    expect(declaration(rowTrigger, 'flex')).toBe('1 1 auto !important');
+    expect(declaration(rowTrigger, 'background')).toBe('none !important');
+    expect(declaration(rowTrigger, 'border')).toBe('0 !important');
+    expect(declaration(rowTrigger, 'font')).toBe('inherit !important');
+    expect(declaration(rowTrigger, 'text-align')).toBe('start !important');
+    expect(declaration(rowTrigger, 'cursor')).toBe('pointer !important');
+    expect(declaration(block(/\.fab-hide-row-trigger\s*\{[\s\S]*?&:focus-visible\s*\{/), 'outline'))
+      .toMatch(/\S/);
+
+    // Row padding moves onto the trigger so the hover pill keeps its geometry
+    const disclosureRow = block(/\.fab-menu-item\s*\{[\s\S]*?&\.is-disclosure\s*\{/);
+    expect(declaration(disclosureRow, 'padding')).toBe('0 !important');
+
+    // The chevron is a decorative indicator inside that button
+    const disclosure = block(/\.fab-hide-disclosure-btn\s*\{/);
+    expect(declaration(disclosure, 'display')).toBe('flex !important');
+    expect(declaration(disclosure, 'flex-shrink')).toBe('0 !important');
+    const darkDisclosure = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-disclosure-btn\s*\{/);
+    expect(declaration(darkDisclosure, 'color')).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.45\)\s*!important/);
+  });
+
+  it('keeps the hide row icon inside the fixed menu-icon geometry', () => {
+    const hideIcon = block(/\.fab-hide-menu-icon\s*\{/);
+    expect(declaration(hideIcon, 'width')).toBe('var(--menu-icon-size) !important');
+    expect(declaration(hideIcon, 'height')).toBe('var(--menu-icon-size) !important');
+    expect(hideIcon).not.toContain('--fab-size');
+    const lightIcon = block(/&\.theme-light\s*\{[\s\S]*?\.fab-hide-menu-icon\s*\{/);
+    expect(declaration(lightIcon, 'color')).toBe('#1e293b !important');
+    const darkIcon = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-menu-icon\s*\{/);
+    expect(declaration(darkIcon, 'color')).toBe('#f8fafc !important');
+  });
 });

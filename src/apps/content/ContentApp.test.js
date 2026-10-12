@@ -23,3 +23,12 @@ describe('ContentApp transcript preference gate', () => {
     expect(source).not.toContain('TRANSLATION_FONT_SIZE');
   });
 });
+
+describe('ContentApp desktop FAB visibility gate', () => {
+  it('keeps the desktop FAB absent until exclusion state is ready and allowed', () => {
+    const source = readFileSync('src/apps/content/ContentApp.vue', 'utf8');
+
+    expect(source).toContain('desktopFabVisibility.isReady.value && !desktopFabVisibility.isDismissed.value');
+    expect(source).toContain('@dismiss="handleDesktopFabDismiss"');
+  });
+});

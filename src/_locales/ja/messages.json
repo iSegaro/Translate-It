@@ -1058,6 +1058,60 @@
   "desktop_fab_tts_stop_tooltip": {
     "message": "停止"
   },
+  "desktop_fab_hide_fab_label": {
+    "message": "ボタンを隠す"
+  },
+  "desktop_fab_hide_options_toggle_label": {
+    "message": "ボタンの隠し方を選択"
+  },
+  "desktop_fab_hide_options_label": {
+    "message": "ボタンを隠すオプション"
+  },
+  "desktop_fab_hide_close_for_now": {
+    "message": "今回は閉じる"
+  },
+  "desktop_fab_hide_this_page": {
+    "message": "このページでは常に隠す"
+  },
+  "desktop_fab_hide_this_site": {
+    "message": "このサイトでは常に隠す"
+  },
+  "desktop_fab_hide_onfabclick_warning": {
+    "message": "ボタンを隠している間、デスクトップのボタンから選択テキストの翻訳を開始できません。"
+  },
+  "desktop_fab_hide_save_failed": {
+    "message": "隠す設定を保存できませんでした。もう一度お試しください。"
+  },
+  "desktop_fab_hide_scope_unsupported": {
+    "message": "このページでは、この範囲で隠すことはできません。"
+  },
+  "fab_exclusions_group_label": {
+    "message": "隠したページとサイト"
+  },
+  "fab_exclusions_label": {
+    "message": "隠したページとサイト"
+  },
+  "fab_exclusions_description": {
+    "message": "デスクトップのボタンは、以下のページとサイトでは隠されています。項目を削除すると再び表示されます。"
+  },
+  "fab_exclusions_empty": {
+    "message": "まだページやサイトは隠されていません。"
+  },
+  "fab_exclusion_scope_page": {
+    "message": "ページ"
+  },
+  "fab_exclusion_scope_site": {
+    "message": "サイト"
+  },
+  "fab_exclusion_remove_label": {
+    "message": "リストから削除"
+  },
+  "fab_exclusion_remove_error": {
+    "message": "この項目を削除できませんでした。ページを再読み込みして、もう一度お試しください。"
+  },
+  "fab_exclusions_load_error": {
+    "message": "隠したページとサイトのリストを読み込めませんでした。ページを再読み込みして、もう一度お試しください。"
+  },
   "page_translation_add_auto_translate_tooltip": {
     "message": "自動翻訳ルールに追加"
   },
