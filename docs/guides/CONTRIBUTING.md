@@ -76,6 +76,22 @@ pnpm run watch:chrome
 pnpm run watch:firefox
 ```
 
+### Firefox Android Development
+
+Prerequisites: ADB installed, a connected and authorized Android device (USB debugging on), and Firefox Android installed on the device.
+
+```bash
+# One-time Firefox development build, then deploy to the device
+pnpm run dev:android
+
+# Deploy the existing build; web-ext watches the build output for changes
+pnpm run watch:android
+```
+
+For continuous development, run `watch:firefox` and `watch:android` in separate terminals: the first rebuilds on source changes, the second redeploys the build output to the device.
+
+Select a device with `--device=<id>` (for example `pnpm run dev:android -- --device=emulator-5554`) or the `ANDROID_DEVICE` environment variable; otherwise the runner auto-detects a connected device, preferring USB. Without a usable device it exits with an error before deploying.
+
 ### Code Quality and Validation
 
 #### Linting

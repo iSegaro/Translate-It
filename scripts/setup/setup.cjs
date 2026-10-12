@@ -89,13 +89,14 @@ function setupProject({ execSync = defaultExecSync } = {}) {
 
   log('\n SETUP COMPLETED SUCCESSFULLY!');
   log('\nNext steps:');
-  log('  Development builds: pnpm run build:chrome / pnpm run build:firefox');
-  log('  Watch changes:      pnpm run watch:chrome / pnpm run watch:firefox');
-  log('  Tests:              pnpm run test:run');
-  log('  Lint:               pnpm run lint and pnpm run lint:styles');
-  log('  Validate:           pnpm run validate / pnpm run validate:chrome / pnpm run validate:firefox');
-  log('  Chrome unpacked:    chrome://extensions (enable Developer mode, then Load unpacked)');
-  log('  Firefox temporary:  about:debugging (This Firefox, then Load Temporary Add-on)');
+  log('  Production builds:   pnpm run build:chrome / pnpm run build:firefox');
+  log('  One-time dev builds: pnpm run dev:chrome / pnpm run dev:firefox');
+  log('  Watch changes:       pnpm run watch:chrome / pnpm run watch:firefox');
+  log('  Tests:               pnpm run test:run');
+  log('  Lint:                pnpm run lint and pnpm run lint:styles');
+  log('  Validate:            pnpm run validate / pnpm run validate:chrome / pnpm run validate:firefox');
+  log('  Chrome unpacked:     chrome://extensions (enable Developer mode, then Load unpacked)');
+  log('  Firefox temporary:   about:debugging (This Firefox, then Load Temporary Add-on)');
   return 0;
 }
 

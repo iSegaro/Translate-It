@@ -78,12 +78,12 @@ describe('development setup', () => {
     const result = runSetup();
     expect(result.status, result.output).toBe(0);
     expect(result.output).toContain('SETUP COMPLETED SUCCESSFULLY');
-    for (const nextStep of ['build:chrome', 'build:firefox', 'watch:chrome', 'watch:firefox', 'test:run', 'lint:styles', 'validate:chrome', 'validate:firefox', 'chrome://extensions', 'about:debugging']) {
+    for (const nextStep of ['build:chrome', 'build:firefox', 'dev:chrome', 'dev:firefox', 'watch:chrome', 'watch:firefox', 'test:run', 'lint:styles', 'validate:chrome', 'validate:firefox', 'chrome://extensions', 'about:debugging']) {
       expect(result.output).toContain(nextStep);
     }
     expect(result.calls).toContainEqual(['install', '--frozen-lockfile']);
     expect(result.calls.some(args => args.some(arg => /build|validate|web-ext|add/.test(arg)))).toBe(false);
-    const executableSource = source.split('\n').filter(line => !line.includes('log(\'  Development builds:') && !line.includes('log(\'  Validate:')).join('\n');
+    const executableSource = source.split('\n').filter(line => !line.includes('log(\'  Production builds:') && !line.includes('log(\'  Validate:')).join('\n');
     expect(executableSource).not.toMatch(/readline|askQuestion|askMultipleChoice|pnpm add|run build|run validate|execSync\(['"]pnpm run (?:build|validate)/);
   });
 

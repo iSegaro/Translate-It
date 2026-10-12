@@ -13,7 +13,6 @@ export default [
       "**/node_modules/",
       "**/src/public/",
       "**/src/features/screen-capture/assets/",
-      "**/*.mjs",
       "**/scripts/",
       "config/",
       "**/tests/e2e/",
