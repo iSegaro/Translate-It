@@ -12,7 +12,7 @@ const setupPath = join(root, 'scripts/setup/setup.cjs');
 const source = readFileSync(setupPath, 'utf8');
 const { setupProject, parseVersion, compareVersions, isSupportedNodeVersion, MIN_NODE_VERSION, getMinPnpm } = createRequire(import.meta.url)(setupPath);
 
-function runSetup({ failInstall = false, pnpmVersion = '12.8.1' } = {}) {
+function runSetup({ failInstall = false, pnpmVersion = getMinPnpm() } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'setup-test-'));
   const callsFile = join(dir, 'calls.jsonl');
   const mockScript = join(dir, 'mock-pnpm.mjs');
@@ -92,7 +92,8 @@ describe('development setup', () => {
     expect(parseVersion('not-a-version')).toBeNull();
     expect(compareVersions('20.19.0', MIN_NODE_VERSION)).toBe(0);
     expect(compareVersions('20.18.9', MIN_NODE_VERSION)).toBe(-1);
-    expect(getMinPnpm()).toBe('12.8.1');
+    const minPnpm = getMinPnpm();
+    expect(minPnpm).toBe('12.11.2');
 
     const nodeBoundaries = [
       ['20.18.9', false],
@@ -105,7 +106,7 @@ describe('development setup', () => {
     ];
     for (const [version, supported] of nodeBoundaries) {
       expect(isSupportedNodeVersion(version), version).toBe(supported);
-      const injected = runInjectedPrerequisites([`v${version}`, '12.8.1']);
+      const injected = runInjectedPrerequisites([`v${version}`, minPnpm]);
       expect(injected.status, version).toBe(supported ? 0 : 1);
     }
 
@@ -127,7 +128,7 @@ describe('development setup', () => {
     expect(result.status).toBe(1);
     expect(result.output).not.toContain('SETUP COMPLETED SUCCESSFULLY');
     expect(result.output).toContain('Node.js 22');
-    expect(result.output).toContain('pnpm 12.8.1');
+    expect(result.output).toContain(`pnpm ${getMinPnpm()}`);
     expect(result.output).toContain('pnpm install --frozen-lockfile');
     expect(result.calls).toContainEqual(['install', '--frozen-lockfile']);
   });

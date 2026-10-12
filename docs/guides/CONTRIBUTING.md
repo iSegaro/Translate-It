@@ -35,7 +35,7 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Install [**Node.js 22**](https://nodejs.org/) (the CI version; Node.js 20.19.0 is the minimum required by Vite 8) and [**pnpm 12.8.1**](https://pnpm.io/) (the version pinned by the project and CI). Clone the repository and run setup:
+Install [**Node.js 22**](https://nodejs.org/) (the CI version; Node.js 20.19.0 is the minimum required by Vite 8) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone the repository and run setup:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git

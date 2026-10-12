@@ -40,7 +40,7 @@ function getMinPnpm() {
 
 function printTroubleshooting(error) {
   error('\n💡 Troubleshooting:');
-  error('   - Use Node.js 22 (minimum 20.19.0 for Vite 8) and pnpm 12.8.1.');
+  error('   - Use Node.js 22 (minimum 20.19.0 for Vite 8) and pnpm 12.11.2.');
   error('   - Check your internet connection and retry: pnpm install --frozen-lockfile');
   error('   - Do not remove or regenerate pnpm-lock.yaml to resolve setup errors.');
 }
