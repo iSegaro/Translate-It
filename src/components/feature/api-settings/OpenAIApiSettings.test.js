@@ -75,6 +75,14 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
     template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }))
+vi.mock('@/components/feature/api-settings/ModelCatalogPicker.vue', () => ({
+  default: {
+    name: 'ModelCatalogPicker',
+    props: { models: Array, modelValue: String, showPricing: { type: Boolean, default: false } },
+    emits: ['update:modelValue'],
+    template: '<div data-test="model-catalog-picker"><button data-test="open-picker">Open</button><input aria-label="Search models"><select aria-label="Sort models"><option>API order</option><option>Name</option></select><button data-test="close-picker">Close</button><button v-for="model in models" :key="model.value" :data-value="model.value" :aria-checked="model.value === modelValue" @click="$emit(\'update:modelValue\', model.value)">{{ model.name }}</button></div>',
+  },
+}))
 
 const deferred = () => {
   let resolve
@@ -109,7 +117,7 @@ describe('OpenAIApiSettings model catalog', () => {
     wrapper.unmount()
   })
 
-  it('starts discovery after a key is added and searches IDs and names', async () => {
+  it('starts discovery after a key is added and keeps picker browsing non-mutating', async () => {
     mocks.fetchModels.mockResolvedValue([
       { value: 'vendor/claude', name: 'Friendly Sonnet' },
       { value: 'provider/other', name: 'Other Model' },
@@ -120,11 +128,14 @@ describe('OpenAIApiSettings model catalog', () => {
     await vi.advanceTimersByTimeAsync(400)
     await flushPromises()
     expect(mocks.fetchModels).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'secret-key', signal: expect.any(AbortSignal) }))
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude', 'provider/other'])
-    await wrapper.get('#openai-model-search').setValue('vendor/')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude'])
-    await wrapper.get('#openai-model-search').setValue('friendly sonnet')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude'])
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Friendly Sonnet')
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('showPricing')).toBe(false)
+    await wrapper.get('[data-test="open-picker"]').trigger('click')
+    await wrapper.get('[aria-label="Search models"]').setValue('vendor/')
+    await wrapper.get('[aria-label="Sort models"]').setValue('Name')
+    await wrapper.get('[data-test="close-picker"]').trigger('click')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODEL_SOURCE', expect.anything())
     wrapper.unmount()
   })
 
@@ -133,16 +144,17 @@ describe('OpenAIApiSettings model catalog', () => {
     mocks.fetchModels.mockResolvedValue([{ value: 'server/model', name: 'Server Model' }])
     const wrapper = mount(OpenAIApiSettings)
     await flushPromises()
-    const [curatedSelect, catalogSelect] = wrapper.findAll('select')
-    await catalogSelect.setValue('server/model')
+    const curatedSelect = wrapper.find('.model-select')
+    const picker = wrapper.get('[data-test="model-catalog-picker"]')
+    await picker.get('[data-value="server/model"]').trigger('click')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('server/model')
     expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('catalog')
     expect(curatedSelect.element.value).toBe('server/model')
-    expect(catalogSelect.element.value).toBe('server/model')
+    expect(picker.get('[data-value="server/model"]').attributes('aria-checked')).toBe('true')
     await curatedSelect.setValue('curated/model-two')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('curated/model-two')
     expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('curated')
-    expect(catalogSelect.element.value).toBe('')
+    expect(picker.get('[data-value="server/model"]').attributes('aria-checked')).toBe('false')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODELS', expect.anything())
     wrapper.unmount()
   })
@@ -160,7 +172,7 @@ describe('OpenAIApiSettings model catalog', () => {
     expect(wrapper.findAll('select')[0].element.value).toBe('custom')
     expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').element.value).toBe('custom/edited-model')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('custom/edited-model')
-    expect(wrapper.findAll('select')[1].element.value).toBe('custom/edited-model')
+    expect(wrapper.get('[data-value="custom/edited-model"]').attributes('aria-checked')).toBe('true')
     wrapper.unmount()
   })
 
@@ -187,7 +199,7 @@ describe('OpenAIApiSettings model catalog', () => {
     await flushPromises()
     saved.resolve([{ value: 'server/saved-model', name: 'Saved Model' }])
     await flushPromises()
-    expect(savedWrapper.findAll('select')[0].element.value).toBe('server/saved-model')
+    expect(savedWrapper.find('.model-select').element.value).toBe('server/saved-model')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('server/saved-model')
     savedWrapper.unmount()
   })
@@ -200,7 +212,29 @@ describe('OpenAIApiSettings model catalog', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Saved model was not listed by OpenAI.')
     expect(wrapper.findAll('select')[0].findAll('option').map(option => option.element.value)).toContain('legacy/saved-model')
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('modelValue')).toBe('legacy/saved-model')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('legacy/saved-model')
+    wrapper.unmount()
+  })
+
+  it('preserves a saved catalog model and source when a key refresh replaces the catalog', async () => {
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key-one'
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'server/saved-model'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockResolvedValueOnce([{ value: 'server/saved-model', name: 'Saved Model' }])
+      .mockResolvedValueOnce([{ value: 'server/new-model', name: 'New Model' }])
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    await wrapper.get('[data-test="api-key"]').setValue('key-two')
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('New Model')
+    expect(wrapper.find('[data-value="server/saved-model"]').exists()).toBe(false)
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('modelValue')).toBe('server/saved-model')
+    expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('server/saved-model')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('catalog')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODEL_SOURCE', expect.anything())
     wrapper.unmount()
   })
 
@@ -210,8 +244,8 @@ describe('OpenAIApiSettings model catalog', () => {
     mocks.fetchModels.mockResolvedValue([{ value: 'server/saved-model', name: 'Saved Model' }])
     const wrapper = mount(OpenAIApiSettings)
     await flushPromises()
-    expect(wrapper.findAll('select')[0].element.value).toBe('server/saved-model')
-    expect(wrapper.findAll('select')[1].element.value).toBe('server/saved-model')
+    expect(wrapper.find('.model-select').element.value).toBe('server/saved-model')
+    expect(wrapper.get('[data-value="server/saved-model"]').attributes('aria-checked')).toBe('true')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('server/saved-model')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', 'server/saved-model')
     wrapper.unmount()
@@ -231,7 +265,7 @@ describe('OpenAIApiSettings model catalog', () => {
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', 'late/model')
   })
 
-  it('shows localized loading, failure, empty, and rendered-count states', async () => {
+  it('shows localized loading, failure, and empty states and renders the full catalog', async () => {
     mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
     const pending = deferred()
     mocks.fetchModels.mockReturnValueOnce(pending.promise)
@@ -254,21 +288,19 @@ describe('OpenAIApiSettings model catalog', () => {
     })))
     const capped = mount(OpenAIApiSettings)
     await flushPromises()
-    expect(capped.text()).toContain('Showing 50 of 60 matching models')
-    expect(capped.findAll('select')[1].findAll('option')).toHaveLength(50)
+    expect(capped.get('[data-test="model-catalog-picker"]').findAll('button[data-value]').length).toBe(60)
     capped.unmount()
   })
 
-  it('searches the full uncapped catalog, including a late model', async () => {
+  it('does not write a model when discovery provides a catalog entry', async () => {
     mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 600 }, (_, index) => ({
       value: `model/${index}`, name: `Model ${index}`,
     })))
     const wrapper = mount(OpenAIApiSettings)
     await flushPromises()
-    expect(wrapper.findAll('select')[1].findAll('option')).toHaveLength(50)
-    await wrapper.get('#openai-model-search').setValue('model/599')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['model/599'])
+    expect(wrapper.get('[data-test="model-catalog-picker"]').findAll('button[data-value]')).toHaveLength(600)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
     wrapper.unmount()
   })
 
@@ -291,8 +323,8 @@ describe('OpenAIApiSettings model catalog', () => {
     await flushPromises()
     first.resolve([{ value: 'stale/model', name: 'Stale Model' }])
     await flushPromises()
-    expect(wrapper.findAll('select')[1].text()).toContain('latest/model')
-    expect(wrapper.findAll('select')[1].text()).not.toContain('Stale Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Latest Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).not.toContain('Stale Model')
     wrapper.unmount()
     expect(secondSignal.aborted).toBe(true)
   })
@@ -331,20 +363,18 @@ describe('OpenAIApiSettings model catalog', () => {
     empty.unmount()
   })
 
-  it('keeps catalog search counts and no-match hints outside live regions', async () => {
+  it('keeps picker and compatibility information outside discovery live regions', async () => {
     mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({
       value: `model/${index}`, name: `Model ${index}`,
     })))
     const wrapper = mount(OpenAIApiSettings)
     await flushPromises()
-    const countHint = wrapper.findAll('small').find(node => node.text().includes('Showing 50 of 60 matching models'))
-    expect(countHint).toBeTruthy()
-    expect(countHint.element.closest('[role="status"], [aria-live]')).toBeNull()
-    await wrapper.get('#openai-model-search').setValue('missing-model')
-    const noMatchesHint = wrapper.findAll('small').find(node => node.text().includes('No models match your search.'))
-    expect(noMatchesHint).toBeTruthy()
-    expect(noMatchesHint.element.closest('[role="status"], [aria-live]')).toBeNull()
+    const compatibilityWarning = wrapper.findAll('.model-discovery-status').find(node => node.text().includes('Chat Completions compatibility'))
+    expect(compatibilityWarning).toBeTruthy()
+    expect(compatibilityWarning.element.closest('[role="status"], [aria-live]')).toBeNull()
+    const picker = wrapper.get('[data-test="model-catalog-picker"]')
+    expect(picker.element.closest('[role="status"], [aria-live]')).toBeNull()
     wrapper.unmount()
   })
 

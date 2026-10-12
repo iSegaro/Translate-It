@@ -61,14 +61,6 @@
       <small class="model-discovery-status">
         {{ t('openai_catalog_compatibility_notice') || 'The model catalog does not indicate Chat Completions compatibility; listed models may not all support Chat Completions.' }}
       </small>
-      <BaseInput
-        id="openai-model-search"
-        v-model="searchQuery"
-        type="search"
-        :label="t('openai_catalog_search_label') || 'Search OpenAI models'"
-        :placeholder="t('openai_catalog_search_placeholder') || 'Search by model ID or name'"
-        dir="ltr"
-      />
       <div
         class="model-discovery-status-live"
         :class="{ 'ti-sr-only': !catalogStatusVisible }"
@@ -94,20 +86,10 @@
         >{{ t('openai_models_empty') || 'No models were returned by OpenAI.' }}</small>
       </div>
       <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
-        <BaseSelect
+        <ModelCatalogPicker
           v-model="catalogModelSelection"
-          :options="filteredCatalog.options"
-          :style="rtlSelectStyle"
-          :aria-label="t('openai_catalog_results_label') || 'Available OpenAI models'"
+          :models="discoveredModels"
         />
-        <small
-          v-if="filteredCatalog.total > filteredCatalog.options.length"
-          class="model-discovery-status"
-        >{{ t('openai_catalog_showing_count', { shown: filteredCatalog.options.length, total: filteredCatalog.total }) || `Showing ${filteredCatalog.options.length} of ${filteredCatalog.total} matching models` }}</small>
-        <small
-          v-if="discoveredModels.length > 0 && filteredCatalog.total === 0"
-          class="model-discovery-status"
-        >{{ t('openai_catalog_no_matches') || 'No models match your search.' }}</small>
       </template>
     </div>
   </div>
@@ -121,12 +103,12 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import ModelCatalogPicker from '@/components/feature/api-settings/ModelCatalogPicker.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
-import { filterModelCatalog } from '@/features/settings/presentation/modelCatalogFilter.js'
 import {
   fetchOpenAIModels,
   getCachedOpenAIModels,
@@ -148,7 +130,6 @@ const discoveredModels = ref([])
 const modelDiscoveryLoading = ref(false)
 const modelDiscoveryFailed = ref(false)
 const modelDiscoverySucceeded = ref(false)
-const searchQuery = ref('')
 const customModelVisible = ref(false)
 const hasOpenAIKey = computed(() => ApiKeyManager.parseKeys(openaiApiKey.value).length > 0)
 let discoveryRequestId = 0
@@ -172,8 +153,6 @@ const openaiApiModelOptions = computed(() => {
   options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
   return options
 })
-
-const filteredCatalog = computed(() => filterModelCatalog(discoveredModels.value, searchQuery.value))
 
 const savedModelNotAdvertised = computed(() => {
   const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
@@ -258,8 +237,7 @@ const discoverModels = async (apiKey, selectionAtStart = selectionInteraction) =
 
 const catalogModelSelection = computed({
   get: () => {
-    const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
-    return filteredCatalog.value.options.some(option => option.value === savedModel) ? savedModel : ''
+    return settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
   },
   set: (value) => {
     if (!value) return

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick, reactive } from 'vue';
 import DeepseekApiSettings from './DeepseekApiSettings.vue';
+import ApiKeyInput from './ApiKeyInput.vue';
+import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
 
 const mocks = vi.hoisted(() => ({
   settingsStore: null,
@@ -88,6 +90,7 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('./ApiKeyInput.vue', () => ({
   default: {
+    name: 'ApiKeyInput',
     props: ['modelValue'],
     emits: ['update:modelValue', 'test'],
     template: '<input data-test="api-key" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
@@ -107,6 +110,15 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
     props: ['modelValue', 'options'],
     emits: ['update:modelValue'],
     template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
+  },
+}));
+
+vi.mock('@/components/feature/api-settings/ModelCatalogPicker.vue', () => ({
+  default: {
+    name: 'ModelCatalogPicker',
+    props: { models: Array, modelValue: String, showPricing: { type: Boolean, default: false } },
+    emits: ['update:modelValue'],
+    template: '<div data-test="model-catalog-picker"><button data-test="open-picker">Open</button><input aria-label="Search models"><select aria-label="Sort models"><option>API order</option><option>Name</option></select><button data-test="close-picker">Close</button><button v-for="model in models" :key="model.value" :data-value="model.value" :aria-checked="model.value === modelValue" @click="$emit(\'update:modelValue\', model.value)">{{ model.name }}</button></div>',
   },
 }));
 
@@ -134,6 +146,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     };
     mocks.fetchModels.mockReset();
     mocks.getCachedModels.mockReset().mockReturnValue(null);
+    ApiKeyManager.testKeysDirect.mockReset().mockResolvedValue({ allInvalid: true });
   });
 
   it('shows thinking mode only for CONFIG model metadata with supportsThinking true', async () => {
@@ -186,19 +199,22 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     wrapper.unmount();
   });
 
-  it('searches IDs and names and caps the visible catalog at 50 models', async () => {
+  it('discovers catalog models and keeps picker browsing non-mutating', async () => {
     mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({
       value: `model/${index}`, name: index === 59 ? 'Late Friendly Model' : `Model ${index}`,
     })));
     const wrapper = mount(DeepseekApiSettings);
     await flushPromises();
-    expect(wrapper.text()).toContain('Showing 50 of 60 matching models');
-    expect(wrapper.get('.catalog-model-select').findAll('option')).toHaveLength(50);
-    await wrapper.get('#deepseek-model-search').setValue('model/59');
-    expect(wrapper.get('.catalog-model-select').findAll('option').map(option => option.element.value)).toEqual(['model/59']);
-    await wrapper.get('#deepseek-model-search').setValue('late friendly');
-    expect(wrapper.get('.catalog-model-select').findAll('option').map(option => option.element.value)).toEqual(['model/59']);
+    expect(wrapper.get('[data-test="model-catalog-picker"]').findAll('button[data-value]')).toHaveLength(60);
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('showPricing')).toBe(false);
+    await wrapper.get('[data-test="open-picker"]').trigger('click');
+    await wrapper.get('[aria-label="Search models"]').setValue('model/59');
+    await wrapper.get('[aria-label="Sort models"]').setValue('Name');
+    await wrapper.get('[data-test="close-picker"]').trigger('click');
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', expect.anything());
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_MODEL_SOURCE', expect.anything());
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_THINKING_MODE', expect.anything());
     wrapper.unmount();
   });
 
@@ -208,18 +224,36 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     const wrapper = mount(DeepseekApiSettings);
     await flushPromises();
     const curatedSelect = wrapper.get('.model-select');
-    const catalogSelect = wrapper.get('.catalog-model-select');
-    await catalogSelect.setValue('catalog/model');
+    const picker = wrapper.get('[data-test="model-catalog-picker"]');
+    await picker.get('[data-value="catalog/model"]').trigger('click');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('catalog/model');
     expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('catalog');
-    expect(catalogSelect.element.value).toBe('catalog/model');
+    expect(picker.get('[data-value="catalog/model"]').attributes('aria-checked')).toBe('true');
+    expect(wrapper.find('.thinking-mode-select').exists()).toBe(false);
     await curatedSelect.setValue('thinking-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('thinking-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('curated');
-    expect(catalogSelect.element.value).toBe('');
+    expect(picker.get('[data-value="catalog/model"]').attributes('aria-checked')).toBe('false');
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_THINKING_MODE', expect.anything());
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_MODELS', expect.anything());
+    wrapper.unmount();
+  });
+
+  it('keeps Test Keys context and settings isolated from catalog presentation', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.fetchModels.mockResolvedValue([{ value: 'catalog/model', name: 'Catalog Model' }]);
+    ApiKeyManager.testKeysDirect.mockResolvedValue({ allInvalid: true });
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    await wrapper.get('[data-value="catalog/model"]').trigger('click');
+    await wrapper.findComponent(ApiKeyInput).vm.$emit('test', 'deepseek');
+    await flushPromises();
+    expect(ApiKeyManager.testKeysDirect).toHaveBeenCalledWith('deepseek-key', 'deepseek', { apiModel: 'catalog/model' });
+    expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('catalog/model');
+    expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('catalog');
+    expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_THINKING_MODE', expect.anything());
     wrapper.unmount();
   });
 
@@ -231,6 +265,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     const wrapper = mount(DeepseekApiSettings);
     await flushPromises();
     await wrapper.get('[placeholder="deepseek_custom_model_placeholder"]').setValue('custom/edited-model');
+    const writesBeforeDiscoveryResult = mocks.settingsStore.updateSettingLocally.mock.calls.length;
     pending.resolve([{ value: 'custom/edited-model', name: 'Catalog Match' }]);
     await flushPromises();
     expect(wrapper.find('.model-select').element.value).toBe('custom');
@@ -238,6 +273,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('custom/edited-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
+    expect(mocks.settingsStore.updateSettingLocally).toHaveBeenCalledTimes(writesBeforeDiscoveryResult);
     wrapper.unmount();
 
     mocks.settingsStore.settings.DEEPSEEK_API_MODEL = 'missing/saved-model';
@@ -246,6 +282,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     await flushPromises();
     expect(legacy.text()).toContain('Saved model was not listed by DeepSeek.');
     expect(legacy.find('.model-select').findAll('option').map(option => option.element.value)).toContain('missing/saved-model');
+    expect(legacy.getComponent({ name: 'ModelCatalogPicker' }).props('modelValue')).toBe('missing/saved-model');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('missing/saved-model');
     legacy.unmount();
   });
@@ -305,19 +342,21 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     const wrapper = mount(DeepseekApiSettings);
     await flushPromises();
     const firstSignal = mocks.fetchModels.mock.calls[0][0].signal;
+    expect(mocks.getCachedModels).toHaveBeenCalledWith('key-one');
     await wrapper.get('[data-test="api-key"]').setValue('key-two');
     await wrapper.get('[data-test="api-key"]').setValue('key-three');
     expect(firstSignal.aborted).toBe(true);
     await vi.advanceTimersByTimeAsync(400);
     expect(mocks.fetchModels).toHaveBeenCalledTimes(2);
     expect(mocks.fetchModels.mock.calls[1][0].apiKey).toBe('key-three');
+    expect(mocks.getCachedModels).toHaveBeenCalledWith('key-three');
     const secondSignal = mocks.fetchModels.mock.calls[1][0].signal;
     second.resolve([{ value: 'latest/model', name: 'Latest Model' }]);
     await flushPromises();
     first.resolve([{ value: 'stale/model', name: 'Stale Model' }]);
     await flushPromises();
-    expect(wrapper.get('.catalog-model-select').text()).toContain('Latest Model');
-    expect(wrapper.get('.catalog-model-select').text()).not.toContain('Stale Model');
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Latest Model');
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).not.toContain('Stale Model');
     wrapper.unmount();
     expect(secondSignal.aborted).toBe(true);
   });
@@ -344,7 +383,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     await flushPromises();
     expect(mocks.getCachedModels).not.toHaveBeenCalled();
     expect(mocks.fetchModels).not.toHaveBeenCalled();
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Using a custom API URL — DeepSeek\'s model catalog is not loaded.');
     expect(wrapper.text()).not.toContain('Add an API key to discover available models.');
     expect(wrapper.text()).not.toContain('Cached Model');
@@ -362,7 +401,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(signal.aborted).toBe(true);
     pending.resolve([{ value: 'late/model', name: 'Late Model' }]);
     await flushPromises();
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false);
     expect(wrapper.text()).toContain('Using a custom API URL — DeepSeek\'s model catalog is not loaded.');
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', 'late/model');
     wrapper.unmount();
@@ -380,7 +419,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     await flushPromises();
     expect(mocks.fetchModels).not.toHaveBeenCalled();
     expect(mocks.getCachedModels).toHaveBeenCalledWith('deepseek-key');
-    expect(wrapper.get('.catalog-model-select').text()).toContain('Cached Model');
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Cached Model');
     wrapper.unmount();
   });
 
@@ -400,7 +439,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     await flushPromises();
     expect(mocks.fetchModels).toHaveBeenCalledTimes(1);
     expect(mocks.fetchModels.mock.calls[0][0].apiKey).toBe('key-three');
-    expect(wrapper.get('.catalog-model-select').text()).toContain('Fresh Model');
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Fresh Model');
     wrapper.unmount();
   });
 
@@ -415,12 +454,12 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(region.attributes('aria-atomic')).toBe('true');
     expect(region.text()).toBe('');
     expect(region.classes()).toContain('model-discovery-status--absent');
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(true);
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(true);
     await wrapper.get('[data-test="api-key"]').setValue('');
     expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
     expect(region.text()).toBe('Add an API key to discover available models.');
     expect(region.classes()).not.toContain('model-discovery-status--absent');
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -465,7 +504,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     await flushPromises();
     expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
     expect(region.text()).toBe('No models were returned by DeepSeek.');
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false);
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -490,23 +529,15 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     wrapper.unmount();
   });
 
-  it('keeps per-keystroke search feedback outside the live region', async () => {
+  it('keeps the picker outside the discovery live region', async () => {
     mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({ value: `model/${index}`, name: `Model ${index}` })));
     const wrapper = mount(DeepseekApiSettings);
     await flushPromises();
     const region = wrapper.get('.model-discovery-status-live');
     expect(region.text()).toBe('');
-    const showing = wrapper.findAll('.model-discovery-status').find(node => node.text().startsWith('Showing'));
-    expect(showing.attributes('role')).toBeUndefined();
-    expect(showing.attributes('aria-live')).toBeUndefined();
-    expect(region.element.contains(showing.element)).toBe(false);
-    await wrapper.get('#deepseek-model-search').setValue('zzz-no-match');
-    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element);
-    expect(region.text()).toBe('');
-    const noMatch = wrapper.findAll('.model-discovery-status').find(node => node.text() === 'No models match your search.');
-    expect(noMatch.attributes('role')).toBeUndefined();
-    expect(region.element.contains(noMatch.element)).toBe(false);
+    const picker = wrapper.get('[data-test="model-catalog-picker"]');
+    expect(region.element.contains(picker.element)).toBe(false);
     wrapper.unmount();
   });
 

@@ -67,6 +67,14 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
     template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }))
+vi.mock('@/components/feature/api-settings/ModelCatalogPicker.vue', () => ({
+  default: {
+    name: 'ModelCatalogPicker',
+    props: { models: Array, modelValue: String, showPricing: { type: Boolean, default: false } },
+    emits: ['update:modelValue'],
+    template: '<div data-test="model-catalog-picker"><button data-test="open-picker">Open</button><input aria-label="Search models"><select aria-label="Sort models"><option>API order</option><option>Name</option></select><button data-test="close-picker">Close</button><button v-for="model in models" :key="model.value" :data-value="model.value" :aria-checked="model.value === modelValue" @click="$emit(\'update:modelValue\', model.value)">{{ model.name }}</button></div>',
+  },
+}))
 
 const deferred = () => {
   let resolve
@@ -88,22 +96,24 @@ describe('RequestyApiSettings model catalog', () => {
     mocks.getCachedModels.mockReset().mockReturnValue(null)
   })
 
-  it('preserves curated order and searches the full catalog by ID and name', async () => {
+  it('preserves curated order and keeps picker browsing non-mutating', async () => {
     mocks.fetchModels.mockResolvedValue([
       { value: 'vendor/claude', name: 'Friendly Sonnet' },
       { value: 'provider/other', name: 'Other Model' },
     ])
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    const selects = wrapper.findAll('select')
-    expect(selects[0].findAll('option').map(option => option.element.value)).toEqual([
+    const curatedSelect = wrapper.find('.model-select')
+    expect(curatedSelect.findAll('option').map(option => option.element.value)).toEqual([
       'curated/model-one', 'curated/model-two', 'custom',
     ])
-    expect(selects[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude', 'provider/other'])
-    await wrapper.get('#requesty-model-search').setValue('vendor/')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude'])
-    await wrapper.get('#requesty-model-search').setValue('friendly sonnet')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude'])
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Friendly Sonnet')
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('showPricing')).toBe(false)
+    await wrapper.get('[data-test="open-picker"]').trigger('click')
+    await wrapper.get('[aria-label="Search models"]').setValue('vendor/')
+    await wrapper.get('[aria-label="Sort models"]').setValue('Name')
+    await wrapper.get('[data-test="close-picker"]').trigger('click')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_API_MODEL', expect.anything())
     wrapper.unmount()
   })
 
@@ -114,19 +124,41 @@ describe('RequestyApiSettings model catalog', () => {
     ])
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    const [curatedSelect, catalogSelect] = wrapper.findAll('select')
-    await catalogSelect.setValue('server/model')
+    const curatedSelect = wrapper.find('.model-select')
+    const picker = wrapper.get('[data-test="model-catalog-picker"]')
+    await picker.get('[data-value="server/model"]').trigger('click')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('server/model')
+    expect(mocks.settingsStore.settings).not.toHaveProperty('REQUESTY_MODEL_SOURCE')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_MODEL_SOURCE', expect.anything())
     expect(curatedSelect.element.value).toBe('server/model')
-    expect(catalogSelect.element.value).toBe('server/model')
+    expect(picker.get('[data-value="server/model"]').attributes('aria-checked')).toBe('true')
     await curatedSelect.setValue('curated/model-two')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('curated/model-two')
-    expect(catalogSelect.element.value).toBe('')
+    expect(picker.get('[data-value="server/model"]').attributes('aria-checked')).toBe('false')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_MODELS', expect.anything())
     wrapper.unmount()
   })
 
-  it('derives a saved model selection from the filtered catalog and preserves saved models missing from it', async () => {
+  it('discovers the public catalog with or without configured credentials', async () => {
+    mocks.settingsStore.settings.REQUESTY_API_KEY = ''
+    mocks.fetchModels.mockResolvedValue([{ value: 'public/model', name: 'Public Model' }])
+    const publicCatalog = mount(RequestyApiSettings)
+    await flushPromises()
+    expect(mocks.fetchModels).toHaveBeenCalledWith(expect.objectContaining({ apiKey: '' }))
+    expect(publicCatalog.get('[data-test="model-catalog-picker"]').text()).toContain('Public Model')
+    publicCatalog.unmount()
+
+    mocks.settingsStore.settings.REQUESTY_API_KEY = 'key-one'
+    mocks.fetchModels.mockResolvedValueOnce([{ value: 'keyed/model', name: 'Keyed Model' }])
+    const keyedCatalog = mount(RequestyApiSettings)
+    await flushPromises()
+    expect(mocks.fetchModels).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'key-one' }))
+    expect(mocks.getCachedModels).toHaveBeenCalledWith('key-one')
+    expect(keyedCatalog.get('[data-test="model-catalog-picker"]').text()).toContain('Keyed Model')
+    keyedCatalog.unmount()
+  })
+
+  it('keeps the saved model as the picker value and preserves models missing from the catalog', async () => {
     mocks.settingsStore.settings.REQUESTY_API_MODEL = 'server/saved-model'
     mocks.fetchModels.mockResolvedValue([
       { value: 'server/saved-model', name: 'Saved Server Model' },
@@ -134,11 +166,9 @@ describe('RequestyApiSettings model catalog', () => {
     ])
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    expect(wrapper.findAll('select')[0].element.value).toBe('server/saved-model')
-    const catalogSelect = wrapper.findAll('select')[1]
-    expect(catalogSelect.element.value).toBe('server/saved-model')
-    await wrapper.get('#requesty-model-search').setValue('another-model')
-    expect(catalogSelect.element.value).toBe('')
+    expect(wrapper.find('.model-select').element.value).toBe('server/saved-model')
+    expect(wrapper.get('[data-value="server/saved-model"]').attributes('aria-checked')).toBe('true')
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('modelValue')).toBe('server/saved-model')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('server/saved-model')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_API_MODEL', 'server/saved-model')
     wrapper.unmount()
@@ -148,7 +178,8 @@ describe('RequestyApiSettings model catalog', () => {
     const legacy = mount(RequestyApiSettings)
     await flushPromises()
     expect(legacy.text()).toContain('Saved model was not listed by Requesty.')
-    expect(legacy.findAll('select')[0].findAll('option').map(option => option.element.value)).toContain('legacy/provider-model')
+    expect(legacy.find('.model-select').findAll('option').map(option => option.element.value)).toContain('legacy/provider-model')
+    expect(legacy.getComponent({ name: 'ModelCatalogPicker' }).props('modelValue')).toBe('legacy/provider-model')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('legacy/provider-model')
     legacy.unmount()
   })
@@ -158,15 +189,17 @@ describe('RequestyApiSettings model catalog', () => {
     mocks.fetchModels.mockReturnValue(pending.promise)
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    const curatedSelect = wrapper.findAll('select')[0]
+    const curatedSelect = wrapper.find('.model-select')
     await curatedSelect.setValue('custom')
     await wrapper.get('[placeholder="requesty_custom_model_placeholder"]').setValue('custom/model-entered')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('custom/model-entered')
+    const writesBeforeDiscoveryResult = mocks.settingsStore.updateSettingLocally.mock.calls.length
     pending.resolve([{ value: 'server/model', name: 'Server Model' }])
     await flushPromises()
     expect(curatedSelect.element.value).toBe('custom')
     expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').element.value).toBe('custom/model-entered')
-    expect(wrapper.findAll('select')[1].element.value).toBe('')
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('modelValue')).toBe('custom/model-entered')
+    expect(mocks.settingsStore.updateSettingLocally).toHaveBeenCalledTimes(writesBeforeDiscoveryResult)
     wrapper.unmount()
   })
 
@@ -176,11 +209,11 @@ describe('RequestyApiSettings model catalog', () => {
     mocks.fetchModels.mockReturnValueOnce(pending.promise).mockResolvedValue([])
     const wrapper = mount(RequestyApiSettings)
     await wrapper.get('[data-test="api-key"]').setValue('secret-key')
-    await wrapper.findAll('select')[0].setValue('custom')
+    await wrapper.find('.model-select').setValue('custom')
     await vi.advanceTimersByTimeAsync(400)
     pending.resolve([{ value: 'curated/model-one', name: 'Curated One' }])
     await flushPromises()
-    expect(wrapper.findAll('select')[0].element.value).toBe('custom')
+    expect(wrapper.find('.model-select').element.value).toBe('custom')
     expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').exists()).toBe(true)
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('curated/model-one')
     wrapper.unmount()
@@ -193,7 +226,7 @@ describe('RequestyApiSettings model catalog', () => {
     await flushPromises()
     saved.resolve([{ value: 'server/saved-model', name: 'Saved Model' }])
     await flushPromises()
-    expect(savedWrapper.findAll('select')[0].element.value).toBe('server/saved-model')
+    expect(savedWrapper.find('.model-select').element.value).toBe('server/saved-model')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('server/saved-model')
     savedWrapper.unmount()
   })
@@ -204,21 +237,21 @@ describe('RequestyApiSettings model catalog', () => {
     mocks.fetchModels.mockReturnValue(pending.promise)
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    await wrapper.findAll('select')[0].setValue('custom')
+    await wrapper.find('.model-select').setValue('custom')
     pending.resolve([{ value: 'server/model', name: 'Server Model' }])
     await flushPromises()
-    expect(wrapper.findAll('select')[0].element.value).toBe('custom')
+    expect(wrapper.find('.model-select').element.value).toBe('custom')
     expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('server/model')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_API_MODEL', 'server/model')
     wrapper.unmount()
   })
 
-  it('uses cached models and shows localized loading, failure, empty, and 50-result states', async () => {
+  it('uses cached models and shows localized loading, failure, and empty states', async () => {
     mocks.getCachedModels.mockReturnValue([{ value: 'cached/model', name: 'Cached Model' }])
     const cached = mount(RequestyApiSettings)
     await flushPromises()
     expect(mocks.fetchModels).not.toHaveBeenCalled()
-    expect(cached.findAll('select')[1].text()).toContain('Cached Model')
+    expect(cached.get('[data-test="model-catalog-picker"]').text()).toContain('Cached Model')
     cached.unmount()
 
     mocks.getCachedModels.mockReturnValue(null)
@@ -243,20 +276,18 @@ describe('RequestyApiSettings model catalog', () => {
     })))
     const capped = mount(RequestyApiSettings)
     await flushPromises()
-    expect(capped.text()).toContain('Showing 50 of 60 matching models')
-    expect(capped.findAll('select')[1].findAll('option')).toHaveLength(50)
+    expect(capped.get('[data-test="model-catalog-picker"]').findAll('button[data-value]')).toHaveLength(60)
     capped.unmount()
   })
 
-  it('searches the full 600-model catalog including its final entry', async () => {
+  it('does not write a model when discovery adds catalog entries', async () => {
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 600 }, (_, index) => ({
       value: `model/${index}`, name: `Model ${index}`,
     })))
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    expect(wrapper.findAll('select')[1].findAll('option')).toHaveLength(50)
-    await wrapper.get('#requesty-model-search').setValue('model/599')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['model/599'])
+    expect(wrapper.get('[data-test="model-catalog-picker"]').findAll('button[data-value]')).toHaveLength(600)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_API_MODEL', expect.anything())
     wrapper.unmount()
   })
 
@@ -279,8 +310,8 @@ describe('RequestyApiSettings model catalog', () => {
     await flushPromises()
     first.resolve([{ value: 'stale/model', name: 'Stale Model' }])
     await flushPromises()
-    expect(wrapper.findAll('select')[1].text()).toContain('Latest Model')
-    expect(wrapper.findAll('select')[1].text()).not.toContain('Stale Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Latest Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).not.toContain('Stale Model')
     wrapper.unmount()
     expect(secondSignal.aborted).toBe(true)
   })
@@ -312,19 +343,14 @@ describe('RequestyApiSettings model catalog', () => {
     empty.unmount()
   })
 
-  it('keeps catalog search counts and no-match hints outside live regions', async () => {
+  it('keeps the catalog picker outside the discovery live region', async () => {
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({
       value: `model/${index}`, name: `Model ${index}`,
     })))
     const wrapper = mount(RequestyApiSettings)
     await flushPromises()
-    const countHint = wrapper.findAll('small').find(node => node.text().includes('Showing 50 of 60 matching models'))
-    expect(countHint).toBeTruthy()
-    expect(countHint.element.closest('[role="status"], [aria-live]')).toBeNull()
-    await wrapper.get('#requesty-model-search').setValue('missing-model')
-    const noMatchesHint = wrapper.findAll('small').find(node => node.text().includes('No models match your search.'))
-    expect(noMatchesHint).toBeTruthy()
-    expect(noMatchesHint.element.closest('[role="status"], [aria-live]')).toBeNull()
+    const picker = wrapper.get('[data-test="model-catalog-picker"]')
+    expect(picker.element.closest('[role="status"], [aria-live]')).toBeNull()
     wrapper.unmount()
   })
 

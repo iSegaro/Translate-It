@@ -1,0 +1,332 @@
+@use "@/assets/styles/base/variables" as *;
+
+.model-catalog-picker {
+  position: relative;
+  display: block;
+
+  &__trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-sm;
+    width: 100%;
+    min-height: 38px;
+    padding: $spacing-xs $spacing-sm;
+    border: $border-width $border-style var(--color-border);
+    border-radius: $border-radius-base;
+    background: var(--color-background);
+    color: var(--color-text);
+    font: inherit;
+    font-size: $font-size-base;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+
+    &:hover {
+      // Neutral fill feedback (defined in both light and dark themes); the
+      // resting --color-border border stays untouched on hover.
+      background: var(--color-background-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &__trigger-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  &__trigger-name {
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+  }
+
+  &__trigger-id {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-family: monospace;
+    overflow-wrap: anywhere;
+  }
+
+  &__trigger-arrow {
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+    transition: transform 150ms ease;
+  }
+
+  &.is-open &__trigger-arrow {
+    transform: rotate(180deg);
+  }
+
+  &__panel {
+    // Coordinates (top/bottom/left/right/width/max-height) are set inline from
+    // the trigger rect; fixed positioning keeps the panel out of the Options
+    // page's overflow-x: hidden scroll container. In normal viewports the
+    // panel itself never scrolls — only __results does (inline overflow-y) —
+    // so search, header, note and count stay put while the <=50 rows scroll.
+    // When the computed height is insufficient for the fixed column, JS
+    // switches overflow-y inline and one whole-panel scroller reaches
+    // everything (single scroll region, no nesting). min-height: 0 completes
+    // the shrink chain for that fixed-column regime.
+    position: fixed;
+    z-index: var(--ti-z-dropdown, 1000);
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    padding: $spacing-sm;
+    border: $border-width $border-style var(--color-border);
+    border-radius: $border-radius-base;
+    background: var(--color-background);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+    overflow: hidden;
+    overscroll-behavior: contain;
+    min-height: 0;
+  }
+
+  &__search {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  &__grid {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  // Both layouts share this header row: desktop shows three aligned columns,
+  // narrow screens compress it (media query below) — it lives outside the
+  // results scroll area, so sorting stays reachable while rows scroll.
+  &__header,
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px 96px;
+    gap: 0 $spacing-xs;
+  }
+
+  &--no-pricing &__header,
+  &--no-pricing &__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &__header {
+    flex: 0 0 auto;
+    padding: 0 $spacing-xs $spacing-xs;
+    border-block-end: $border-width $border-style var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  &__results {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__header-cell {
+    min-width: 0;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+  }
+
+  // Price headers stack two explicit lines (label, then the per-1M unit);
+  // the wrapper keeps the same two-line height in every sort state.
+  &__header-text {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+
+  &__sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin: 0;
+    padding: $spacing-xs 2px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: start;
+    cursor: pointer;
+    border-radius: $border-radius-xs;
+
+    &:hover {
+      color: var(--color-text);
+      background: var(--color-background-hover, rgb(0 0 0 / 4%));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -1px;
+    }
+  }
+
+  &__sort-icon {
+    // Slot always rendered (muted when inactive) so activating a sort never
+    // shifts header text or height; aria-sort carries the state for AT.
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+
+    &.is-active {
+      color: var(--color-primary);
+    }
+
+    &.is-asc {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__unit {
+    font-weight: $font-weight-normal;
+    color: var(--color-text-secondary);
+  }
+
+  &__row {
+    align-items: center;
+    padding: $spacing-xs;
+    border-block-end: $border-width $border-style var(--color-border);
+    transition: background-color 120ms ease;
+
+    &:hover {
+      background: var(--color-background-hover, rgb(0 0 0 / 4%));
+    }
+
+    &:has(:checked) {
+      background: var(--color-active-background, #e8f0fe);
+    }
+
+    &:last-child {
+      border-block-end: 0;
+    }
+  }
+
+  &__model-cell {
+    min-width: 0;
+  }
+
+  // Cascade defense (see ModelCatalogPicker.test.js for the live check):
+  // global Options rules outrank single-class selectors here —
+  // `.setting-group label` (api-settings-common) sets display:block + margin,
+  // `.setting-group label` (ApiKeyInput.scss) adds nowrap/ellipsis, and
+  // `_options.scss input[type=radio]` sets margin-inline-end:16px. Three
+  // classes beat every one of them without !important (the only !important
+  // globals are width/flex values, inert because this label's parent is not
+  // a flex container). Logical properties keep LTR and RTL symmetric.
+  & .model-catalog-picker__row .model-catalog-picker__row-label {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: $spacing-xs;
+    margin: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    cursor: pointer;
+  }
+
+  & .model-catalog-picker__radio {
+    // Radio keeps the global 18px sizing; only the inherited 16px end margin
+    // is reset — the row label's gap is the single source of spacing.
+    margin-block-start: 3px;
+    margin-inline-end: 0;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  &__name {
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+  }
+
+  &__id {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-family: monospace;
+    overflow-wrap: anywhere;
+  }
+
+  &__variable {
+    font-size: $font-size-xs;
+    color: var(--color-primary);
+    font-weight: $font-weight-medium;
+  }
+
+  &__price {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  // Column headers carry the Input/Output context on desktop; row labels
+  // appear instead once rows stack on narrow screens.
+  &__price-label {
+    display: none;
+  }
+
+  &__note,
+  &__status {
+    // Never shrink: the short-viewport whole-panel-scroll fallback owns tight
+    // spaces, so in the normal results-only layout footers stay fully visible
+    // instead of shrink-clipping (flex: 0 1 auto would clip them).
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  @media (width <= 480px) {
+    // Compress the shared header instead of hiding it, so Model/Input/Output
+    // sorting stays reachable on narrow screens.
+    &__header {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0 $spacing-xs;
+    }
+
+    &__sort-button {
+      justify-content: center;
+      padding: 6px 2px;
+    }
+
+    &__unit {
+      display: none;
+    }
+
+    // Rows stack: prices wrap beneath the name.
+    &__row {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+    }
+
+    &__price {
+      display: block;
+    }
+
+    &__price-label {
+      display: inline;
+      margin-inline-end: 4px;
+      color: var(--color-text-secondary);
+    }
+  }
+}

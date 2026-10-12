@@ -22,13 +22,17 @@ describe('OpenRouter model discovery', () => {
       { id: ' vendor/model ', name: ' Vendor Model ', pricing: { prompt: '0.0000025', completion: 'NaN' } },
       { id: 'vendor/model', name: 'Duplicate' },
       { id: 'free/model', name: '', pricing: { prompt: 'Infinity', completion: '0' } },
-      { id: 'missing/model' },
+      { id: 'sentinel/model', pricing: { prompt: '-1', completion: '-0.25' } },
+      { id: 'variable/model', pricing: { prompt: '-1', completion: 'invalid', overrides: [{}] } },
+      { id: 'missing/model', pricing: { prompt: null, completion: '' } },
       { name: 'No ID' },
     ] }))
     const models = await fetchOpenRouterModels({ apiKey: 'secret-key', fetchFn })
     expect(models).toEqual([
       { value: 'vendor/model', name: 'Vendor Model', pricing: { prompt: 0.0000025, completion: null } },
       { value: 'free/model', name: 'free/model', pricing: { prompt: null, completion: 0 } },
+      { value: 'sentinel/model', name: 'sentinel/model', pricing: null },
+      { value: 'variable/model', name: 'variable/model', pricing: { prompt: null, completion: null, variable: true } },
       { value: 'missing/model', name: 'missing/model', pricing: null },
     ])
     expect(fetchFn).toHaveBeenCalledWith('https://openrouter.ai/api/v1/models', expect.objectContaining({
@@ -91,6 +95,23 @@ describe('OpenRouter model discovery', () => {
     expect(getCachedOpenRouterModels('key-two')).toBeNull()
     vi.advanceTimersByTime(5 * 60 * 1000)
     expect(getCachedOpenRouterModels('key-one')).toBeNull()
+  })
+
+  it('returns defensive cached pricing clones, including variable-pricing metadata', async () => {
+    await fetchOpenRouterModels({
+      apiKey: 'clone-key',
+      fetchFn: vi.fn().mockResolvedValue(response({ data: [{
+        id: 'variable/model',
+        pricing: { prompt: '0', completion: '0.000001', overrides: [{}] },
+      }] })),
+    })
+    const cached = getCachedOpenRouterModels('clone-key')
+    expect(cached[0].pricing).toEqual({ prompt: 0, completion: 0.000001, variable: true })
+    cached[0].pricing.prompt = 42
+    cached[0].pricing.variable = false
+    expect(getCachedOpenRouterModels('clone-key')[0].pricing).toEqual({
+      prompt: 0, completion: 0.000001, variable: true,
+    })
   })
 
   it('rejects HTTP failures, times out, and propagates aborts without exposing keys', async () => {
