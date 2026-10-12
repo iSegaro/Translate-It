@@ -1495,6 +1495,8 @@
   "model_catalog_variable": { "message": "متغیر" },
   "model_catalog_base_rates_note": { "message": "قیمت پایه به دلار آمریکا برای هر یک میلیون توکن است؛ قیمت‌ها ممکن است متفاوت باشند و هزینه‌های اضافی اعمال شوند." },
   "model_catalog_per_million": { "message": "برای هر یک میلیون توکن" },
+  "model_catalog_browse": { "message": "مرور در مدل‌ها" },
+  "model_catalog_column_model": { "message": "مدل" },
   "deepseek_api_settings_title": {
     "message": "تنظیمات DeepSeek"
   },

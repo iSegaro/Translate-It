@@ -1,64 +1,185 @@
 @use "@/assets/styles/base/variables" as *;
 
 .model-catalog-picker {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-sm;
+  position: relative;
+  display: block;
 
-  &__sort {
+  &__trigger {
     display: flex;
-    flex-direction: column;
-    gap: $spacing-xs;
-
-    label {
-      font-size: $font-size-sm;
-      font-weight: $font-weight-medium;
-      color: var(--color-text);
-    }
-  }
-
-  &__note {
-    margin: 0;
-    font-size: $font-size-xs;
-    color: var(--color-text-secondary);
-    line-height: 1.4;
-  }
-
-  &__fieldset {
-    margin: 0;
-    padding: 0;
-    border: 0;
-    min-inline-size: 0;
-
-    legend {
-      padding: 0;
-      margin-block-end: $spacing-xs;
-      font-size: $font-size-sm;
-      font-weight: $font-weight-medium;
-      color: var(--color-text);
-    }
-  }
-
-  &__list {
-    max-height: 320px;
-    overflow-y: auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-sm;
+    width: 100%;
+    min-height: 38px;
+    padding: $spacing-xs $spacing-sm;
     border: $border-width $border-style var(--color-border);
     border-radius: $border-radius-base;
     background: var(--color-background);
+    color: var(--color-text);
+    font: inherit;
+    font-size: $font-size-base;
+    text-align: start;
+    cursor: pointer;
+    transition: border-color 120ms ease;
+
+    &:hover {
+      border-color: var(--color-border-hover, var(--color-primary));
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
   }
 
-  &__option {
+  &__trigger-text {
     display: flex;
+    flex-direction: column;
     align-items: flex-start;
-    gap: $spacing-sm;
-    padding: $spacing-sm $spacing-base;
-    border-block-end: $border-width $border-style var(--color-border);
-    cursor: pointer;
-    transition: background-color 120ms ease;
+    gap: 1px;
+    min-width: 0;
+  }
 
-    &:last-child {
-      border-block-end: 0;
+  &__trigger-name {
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+  }
+
+  &__trigger-id {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-family: monospace;
+    overflow-wrap: anywhere;
+  }
+
+  &__trigger-arrow {
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+    transition: transform 150ms ease;
+  }
+
+  &.is-open &__trigger-arrow {
+    transform: rotate(180deg);
+  }
+
+  &__panel {
+    // Coordinates (top/bottom/left/right/width/max-height) are set inline from
+    // the trigger rect; fixed positioning keeps the panel out of the Options
+    // page's overflow-x: hidden scroll container. In normal viewports the
+    // panel itself never scrolls — only __results does (inline overflow-y) —
+    // so search, header, note and count stay put while the <=50 rows scroll.
+    // When the computed height is insufficient for the fixed column, JS
+    // switches overflow-y inline and one whole-panel scroller reaches
+    // everything (single scroll region, no nesting). min-height: 0 completes
+    // the shrink chain for that fixed-column regime.
+    position: fixed;
+    z-index: var(--ti-z-dropdown, 1000);
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-sm;
+    padding: $spacing-sm;
+    border: $border-width $border-style var(--color-border);
+    border-radius: $border-radius-base;
+    background: var(--color-background);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 15%);
+    overflow: hidden;
+    overscroll-behavior: contain;
+    min-height: 0;
+  }
+
+  &__search {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  &__grid {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  // Both layouts share this header row: desktop shows three aligned columns,
+  // narrow screens compress it (media query below) — it lives outside the
+  // results scroll area, so sorting stays reachable while rows scroll.
+  &__header,
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px 96px;
+    gap: 0 $spacing-xs;
+  }
+
+  &--no-pricing &__header,
+  &--no-pricing &__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &__header {
+    flex: 0 0 auto;
+    padding: 0 $spacing-xs $spacing-xs;
+    border-block-end: $border-width $border-style var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  &__results {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  &__header-cell {
+    min-width: 0;
+    font-size: $font-size-xs;
+    font-weight: $font-weight-medium;
+  }
+
+  &__sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    margin: 0;
+    padding: $spacing-xs 2px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-align: start;
+    cursor: pointer;
+    border-radius: $border-radius-xs;
+
+    &:hover {
+      color: var(--color-text);
+      background: var(--color-background-hover, rgb(0 0 0 / 4%));
     }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: -1px;
+    }
+  }
+
+  &__sort-icon {
+    color: var(--color-primary);
+
+    &.is-asc {
+      transform: rotate(180deg);
+    }
+  }
+
+  &__unit {
+    font-weight: $font-weight-normal;
+    color: var(--color-text-secondary);
+  }
+
+  &__row {
+    align-items: center;
+    padding: $spacing-xs;
+    border-block-end: $border-width $border-style var(--color-border);
+    transition: background-color 120ms ease;
 
     &:hover {
       background: var(--color-background-hover, rgb(0 0 0 / 4%));
@@ -67,10 +188,25 @@
     &:has(:checked) {
       background: var(--color-active-background, #e8f0fe);
     }
+
+    &:last-child {
+      border-block-end: 0;
+    }
+  }
+
+  &__model-cell {
+    min-width: 0;
+  }
+
+  &__row-label {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-xs;
+    cursor: pointer;
   }
 
   &__radio {
-    margin-block-start: 2px;
+    margin-block-start: 3px;
     flex-shrink: 0;
     accent-color: var(--color-primary);
   }
@@ -83,7 +219,6 @@
   }
 
   &__name {
-    font-size: $font-size-base;
     color: var(--color-text);
     overflow-wrap: anywhere;
   }
@@ -95,31 +230,71 @@
     overflow-wrap: anywhere;
   }
 
-  &__pricing {
-    display: flex;
-    flex-wrap: wrap;
-    gap: $spacing-xs $spacing-sm;
-    margin-block-start: 2px;
-    font-size: $font-size-xs;
-    color: var(--color-text-secondary);
-    font-variant-numeric: tabular-nums;
-  }
-
   &__variable {
+    font-size: $font-size-xs;
     color: var(--color-primary);
     font-weight: $font-weight-medium;
   }
 
+  &__price {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  // Column headers carry the Input/Output context on desktop; row labels
+  // appear instead once rows stack on narrow screens.
+  &__price-label {
+    display: none;
+  }
+
+  &__note,
   &__status {
-    min-height: 1.2em;
+    // Last to yield: in tight viewports they clip rather than steal the
+    // space results need to scroll. Normal viewports render them unchanged.
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow: hidden;
     margin: 0;
     font-size: $font-size-xs;
     color: var(--color-text-secondary);
+    line-height: 1.4;
   }
 
   @media (width <= 480px) {
-    &__list {
-      max-height: 50vh;
+    // Compress the shared header instead of hiding it, so Model/Input/Output
+    // sorting stays reachable on narrow screens.
+    &__header {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0 $spacing-xs;
+    }
+
+    &__sort-button {
+      justify-content: center;
+      padding: 6px 2px;
+    }
+
+    &__unit {
+      display: none;
+    }
+
+    // Rows stack: prices wrap beneath the name.
+    &__row {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 2px;
+    }
+
+    &__price {
+      display: block;
+    }
+
+    &__price-label {
+      display: inline;
+      margin-inline-end: 4px;
+      color: var(--color-text-secondary);
     }
   }
 }

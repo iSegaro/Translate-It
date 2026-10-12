@@ -1495,6 +1495,8 @@
   "model_catalog_variable": { "message": "Variable" },
   "model_catalog_base_rates_note": { "message": "Base rates in USD per 1M tokens; pricing may vary and additional fees may apply." },
   "model_catalog_per_million": { "message": "/ 1M tokens" },
+  "model_catalog_browse": { "message": "Browse models" },
+  "model_catalog_column_model": { "message": "Model" },
   "deepseek_api_settings_title": {
     "message": "DeepSeek Settings"
   },

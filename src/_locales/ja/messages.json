@@ -1495,6 +1495,8 @@
   "model_catalog_variable": { "message": "変動" },
   "model_catalog_base_rates_note": { "message": "基本料金は100万トークンあたりの米ドル表示です。料金は変動する場合があり、追加料金が発生することがあります。" },
   "model_catalog_per_million": { "message": "/ 100万トークン" },
+  "model_catalog_browse": { "message": "モデルを探す" },
+  "model_catalog_column_model": { "message": "モデル" },
   "deepseek_api_settings_title": {
     "message": "DeepSeek 設定"
   },
