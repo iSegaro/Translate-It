@@ -10,15 +10,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 
-const args = process.argv.slice(2)
-const shouldBuild = args.includes('--build')
-
 /**
  * Detect connected Android devices via adb
  */
-function detectDevice() {
+export function detectDevice(exec = execSync) {
   try {
-    const output = execSync('adb devices', { encoding: 'utf8' })
+    const output = exec('adb devices', { encoding: 'utf8' })
     const devices = output
       .split('\n')
       .slice(1) // Skip "List of devices attached"
@@ -41,38 +38,23 @@ function detectDevice() {
   }
 }
 
-// 1. Priority: Command line argument (--device=...)
-const deviceArg = args.find(arg => arg.startsWith('--device='))
-let deviceIp = deviceArg ? deviceArg.split('=')[1] : null
-
-// 2. Fallback: Environment variable
-if (!deviceIp) {
-  deviceIp = process.env.ANDROID_DEVICE
-}
-
-// 3. Fallback: Auto-detection via adb
-if (!deviceIp) {
-  const detected = detectDevice()
-  if (detected) {
-    console.log(`Auto-detected device: ${detected}`)
-    deviceIp = detected
+export function resolveDevice({ args = process.argv.slice(2), env = process.env, exec = execSync } = {}) {
+  const deviceArg = args.find(arg => arg.startsWith('--device='))
+  let deviceId = deviceArg ? deviceArg.split('=')[1] : null
+  if (!deviceId) deviceId = env.ANDROID_DEVICE
+  if (!deviceId) {
+    deviceId = detectDevice(exec)
+    if (deviceId) console.log(`Auto-detected device: ${deviceId}`)
   }
+  return deviceId || null
 }
-
-// Final fallback for Waydroid default if everything else fails
-if (!deviceIp) {
-  deviceIp = '192.168.240.112:5555' 
-  console.log(` No device detected. Falling back to default: ${deviceIp}`)
-}
-
-const FIREFOX_BUILD_DIR = `dist/firefox/Translate-It-v${pkg.version}`
 
 /**
  * Detect installed Firefox packages on the device
  */
-function detectFirefoxPackage(deviceId) {
+export function detectFirefoxPackage(deviceId, exec = execSync) {
   try {
-    const output = execSync(`adb -s ${deviceId} shell pm list packages org.mozilla`, { encoding: 'utf8' })
+    const output = exec(`adb -s ${deviceId} shell pm list packages org.mozilla`, { encoding: 'utf8' })
     const packages = output
       .split('\n')
       .map(line => line.replace('package:', '').trim())
@@ -93,25 +75,32 @@ function detectFirefoxPackage(deviceId) {
 /**
  * Run extension on Firefox Android using web-ext
  */
-async function runAndroid() {
+export async function runAndroid({ args = process.argv.slice(2), env = process.env, exec = execSync, root = rootDir, packageInfo = pkg, exists = fs.existsSync } = {}) {
   try {
-    if (shouldBuild) {
+    const deviceId = resolveDevice({ args, env, exec })
+    if (!deviceId) {
+      logError('No Android device found. Connect one via USB, set ANDROID_DEVICE, or pass --device=<id>.')
+      return 1
+    }
+
+    if (args.includes('--build')) {
       logStep('Building Firefox extension for Android...')
-      execSync('pnpm run dev:firefox', { stdio: 'inherit', cwd: rootDir })
+      exec('pnpm run dev:firefox', { stdio: 'inherit', cwd: root })
       logSuccess('Firefox build completed')
     }
 
-    logStep(`Starting Android deployment on device: ${deviceIp}...`)
+    logStep(`Starting Android deployment on device: ${deviceId}...`)
     
-    const buildPath = path.join(rootDir, FIREFOX_BUILD_DIR)
-    if (!fs.existsSync(buildPath)) {
-      logError(`Build directory not found: ${FIREFOX_BUILD_DIR}`)
+    const firefoxBuildDir = `dist/firefox/Translate-It-v${packageInfo.version}`
+    const buildPath = path.join(root, firefoxBuildDir)
+    if (!exists(buildPath)) {
+      logError(`Build directory not found: ${firefoxBuildDir}`)
       console.log('💡 Tip: Run with --build flag to create the build first: pnpm run dev:android')
-      process.exit(1)
+      return 1
     }
 
-    const firefoxPackage = detectFirefoxPackage(deviceIp)
-    let webExtCommand = `web-ext run -t firefox-android --source-dir "${FIREFOX_BUILD_DIR}" --android-device "${deviceIp}"`
+    const firefoxPackage = detectFirefoxPackage(deviceId, exec)
+    let webExtCommand = `web-ext run -t firefox-android --source-dir "${firefoxBuildDir}" --android-device "${deviceId}"`
     
     if (firefoxPackage) {
       logInfo(`Using Firefox package: ${firefoxPackage}`)
@@ -121,17 +110,20 @@ async function runAndroid() {
     logStep('Executing web-ext run...')
     
     // web-ext run is a persistent process that handles its own logging
-    execSync(webExtCommand, { stdio: 'inherit', cwd: rootDir })
-    
+    exec(webExtCommand, { stdio: 'inherit', cwd: root })
+    return 0
   } catch (error) {
     // execSync throws if the process exits with non-zero code or is interrupted (e.g., Ctrl+C)
     if (error.status === null) {
       logInfo('Android runner stopped (SIGINT)')
+      return 0
     } else {
       logError('Android deployment failed:', error.message)
-      process.exit(1)
+      return 1
     }
   }
 }
 
-runAndroid()
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runAndroid().then(code => { process.exitCode = code })
+}

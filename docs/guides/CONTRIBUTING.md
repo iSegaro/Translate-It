@@ -35,38 +35,38 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Make sure [**Node.js**](https://nodejs.org/) and [**pnpm**](https://pnpm.io/) are installed. Then, clone the repository and install the dependencies:
+Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone the repository and run setup:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git
 cd Translate-It
-pnpm install
+pnpm run setup
 ```
 
 The `scripts/ci/*.test.js` tests execute the release shell scripts, so they also require `git`, `bash`, and `jq` on `PATH`. On Windows, install [Git for Windows](https://git-scm.com/download/win) (which provides `git` and `bash`) and a `jq` executable. The preflight tests use the real `git` with temporary local repositories; the release tests mock the GitHub CLI (`gh`) and other relevant commands. None of these tests make real GitHub API calls.
 
-### Initial Setup
-
-After installing dependencies, run the setup command to ensure all development tools are configured:
-
-```bash
-pnpm run setup
-```
-
-This will configure the development environment and install any additional tools needed for validation.
+`pnpm run setup` checks the required tool versions and runs `pnpm install --frozen-lockfile`. It does not build the extensions or run validation.
 
 ### Building for Development
 
 To generate the unpacked extension files for development, run:
 
 ```bash
-# Build for both browsers (Parallel)
+# One-time development build (does not watch for changes)
+pnpm run dev:chrome
+pnpm run dev:firefox
+
+# Production build for both browsers in parallel (optimized, with ZIP packages)
 pnpm run build
 
-# Build for a specific browser
+# Production build for a specific browser
 pnpm run build:chrome
 pnpm run build:firefox
 ```
+
+Development builds preserve console logs and skip production minification; production builds apply optimizations and create ZIP packages.
+
+To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**.
 
 To actively develop and apply changes in real time, use the following commands:
 
@@ -76,6 +76,22 @@ pnpm run watch:chrome
 pnpm run watch:firefox
 ```
 
+### Firefox Android Development
+
+Prerequisites: ADB installed, a connected and authorized Android device (USB debugging on), and Firefox Android installed on the device.
+
+```bash
+# One-time Firefox development build, then deploy to the device
+pnpm run dev:android
+
+# Deploy the existing build; web-ext watches the build output for changes
+pnpm run watch:android
+```
+
+For continuous development, run `watch:firefox` and `watch:android` in separate terminals: the first rebuilds on source changes, the second redeploys the build output to the device.
+
+Select a device with `--device=<id>` (for example `pnpm run dev:android -- --device=emulator-5554`) or the `ANDROID_DEVICE` environment variable; otherwise the runner auto-detects a connected device, preferring USB. Without a usable device it exits with an error before deploying.
+
 ### Code Quality and Validation
 
 #### Linting
@@ -83,15 +99,26 @@ pnpm run watch:firefox
 To ensure code quality and catch potential issues early, you can run ESLint and Stylelint:
 
 ```bash
+# Run tests
+pnpm run test:run
+
 # Lint JS source code
 pnpm run lint
 
 # Lint CSS styles
 pnpm run lint:styles
 
-# Format code with Prettier
-pnpm run format
+# Format only the files you changed (optional; requires explicit paths)
+pnpm run format src/path/to/file.js
 ```
+
+Formatting is optional. Running `pnpm run format` without file paths prints usage and exits without reading stdin or modifying files.
+
+Recommended flow: make changes, format only the touched files, run lint and tests, then review `git diff` before committing.
+
+#### Coding Style
+
+ESLint (JS/Vue) and Stylelint (CSS/SCSS) are the linting authorities within their configured scopes; keep their rules passing. Prettier stays optional and manual, formatting only explicitly passed files. Some Prettier-formatted Vue files may still report ESLint warnings (indent/closing-bracket); the lint rules take precedence and are not relaxed. When modifying existing files, follow the nearby established conventions, and always review the formatting diff so unrelated lines are not swept in. Broader formatting adoption happens gradually through separate formatting-only PRs, never mixed into feature or fix work.
 
 #### Extension Validation
 
@@ -106,11 +133,7 @@ pnpm run validate:firefox
 pnpm run validate:chrome
 ```
 
-**Note:** For Chrome validation, you need `web-ext` installed. If it's not available, install it with:
-
-```bash
-pnpm run setup:chrome-validator
-```
+`web-ext` is included in the project dependencies. `pnpm run setup:chrome-validator` remains available as a legacy fallback if it is missing locally.
 
 #### Pre-submission Workflow
 
@@ -120,7 +143,7 @@ Before submitting your changes, run the comprehensive pre-submission check:
 pnpm run pre-submit
 ```
 
-This command runs linting (JS & Styles) and builds the extension.
+This command runs ESLint, Stylelint, and the production build. It does not run tests or validation: it is a manual pre-submission check, not a replacement for full CI, where tests and validation still run.
 
 #### PR CI Behavior
 

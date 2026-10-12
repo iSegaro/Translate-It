@@ -1,223 +1,104 @@
-const { execSync } = require('child_process');
-const readline = require('readline');
+const { execSync: defaultExecSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-/**
- * Complete Project Setup Script
- * Sets up the entire Translate-It extension project from scratch
- */
+const MIN_NODE_VERSION = '22.13.0';
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-});
-
-function askQuestion(question) {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer.toLowerCase().trim());
-    });
-  });
+function parseVersion(version) {
+  const match = String(version).trim().match(/^v?(\d+)\.(\d+)\.(\d+)/);
+  return match ? match.slice(1).map(Number) : null;
 }
 
-function askMultipleChoice(question, options, defaultChoice) {
-  const optionsText = options.map((opt, i) => `${i + 1}. ${opt.label}`).join('\n     ');
-  const prompt = `${question}\n     ${optionsText}\n   Choice (${defaultChoice}): `;
-  
-  return new Promise((resolve) => {
-    rl.question(prompt, (answer) => {
-      const choice = answer.trim() || defaultChoice;
-      const index = parseInt(choice) - 1;
-      
-      if (index >= 0 && index < options.length) {
-        resolve(options[index]);
-      } else {
-        resolve(options[parseInt(defaultChoice) - 1]);
-      }
-    });
-  });
+function compareVersions(left, right) {
+  const a = parseVersion(left);
+  const b = parseVersion(right);
+  if (!a || !b) return null;
+  for (let i = 0; i < 3; i += 1) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return 0;
 }
 
-async function runCommand(command, description, optional = false, silent = false) {
-  if (!silent) console.log(`📦 ${description}...`);
+function isSupportedNodeVersion(version) {
+  const parsed = parseVersion(version);
+  if (!parsed) return false;
+  const [major] = parsed;
+  if (major === 22) return compareVersions(version, MIN_NODE_VERSION) >= 0;
+  return major >= 24;
+}
+
+function getMinPnpm() {
   try {
-    execSync(command, { stdio: silent ? 'pipe' : 'inherit' });
-    if (!silent) console.log(`✅ ${description} completed`);
-    return true;
-  } catch (error) {
-    if (optional) {
-      if (!silent) console.log(`⚠️  ${description} failed (optional)`);
-      return false;
-    } else {
-      console.error(`❌ ${description} failed: ${error.message}`);
-      throw error;
-    }
+    const { packageManager } = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../package.json'), 'utf8'));
+    const version = packageManager?.match(/^pnpm@(.+)$/)?.[1];
+    return parseVersion(version) ? version : '12.0.0';
+  } catch {
+    return '12.0.0';
   }
 }
 
-function checkPrerequisites() {
-  console.log('🔍 Checking prerequisites...');
-  
+function printTroubleshooting(error) {
+  error('\n💡 Troubleshooting:');
+  error('   - Use Node.js 22.13.0+ or 24+ and pnpm 12.11.2.');
+  error('   - Check your internet connection and retry: pnpm install --frozen-lockfile');
+  error('   - Do not remove or regenerate pnpm-lock.yaml to resolve setup errors.');
+}
+
+function setupProject({ execSync = defaultExecSync } = {}) {
+  const log = console.log;
+  const error = console.error;
+  log('╔═══════════════════════════════════════════════════════════════╗');
+  log('║              🗳️ TRANSLATE-IT PROJECT SETUP                    ║');
+  log('╚═══════════════════════════════════════════════════════════════╝\n');
+  log('Checking prerequisites...');
+
   const requirements = [
-    { cmd: 'node --version', name: 'Node.js', min: 'v18.0.0' },
-    { cmd: 'pnpm --version', name: 'pnpm', min: '8.0.0' }
+    { command: 'node --version', name: 'Node.js', minimum: MIN_NODE_VERSION, compatible: isSupportedNodeVersion },
+    { command: 'pnpm --version', name: 'pnpm', minimum: getMinPnpm(), compatible: (version, minimum) => parseVersion(version)?.[0] === parseVersion(minimum)[0] },
   ];
-  
-  for (const req of requirements) {
+
+  for (const requirement of requirements) {
+    let version;
     try {
-      const version = execSync(req.cmd, { encoding: 'utf8' }).trim();
-      console.log(`✅ ${req.name}: ${version}`);
-    } catch (error) {
-      console.error(`❌ ${req.name} not found or not working`);
-      console.error(`   Please install ${req.name} ${req.min}+ and try again`);
-      process.exit(1);
+      version = execSync(requirement.command, { encoding: 'utf8' }).trim();
+    } catch {
+      error(`❌ ${requirement.name} not found or could not be run.`);
+      error(`   Install ${requirement.name} ${requirement.minimum}+ and run setup again.`);
+      printTroubleshooting(error);
+      return 1;
+    }
+    log(`✅ ${requirement.name}: ${version}`);
+    if (!parseVersion(version) || !requirement.compatible(version, requirement.minimum)) {
+      error(requirement.name === 'Node.js'
+        ? `❌ Node.js ${version} is incompatible; supported versions are 22.13.0+ in 22.x or 24+ (Node 22 recommended).`
+        : `❌ ${requirement.name} ${version} is incompatible; required major version ${parseVersion(requirement.minimum)[0]} (packageManager: pnpm@${requirement.minimum}).`);
+      printTroubleshooting(error);
+      return 1;
     }
   }
-}
 
-async function setupProject() {
-  console.log('╔═══════════════════════════════════════════════════════════════╗');
-  console.log('║              🗳️ TRANSLATE-IT PROJECT SETUP                    ║');
-  console.log('╚═══════════════════════════════════════════════════════════════╝\n');
-  
-  console.log('Welcome to Translate-It Extension setup!');
-  console.log('This script will configure your development environment.\n');
-  
   try {
-    // 1. Prerequisites Check
-    checkPrerequisites();
-    
-    // 2. Install Core Dependencies
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('📦 CORE DEPENDENCIES');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    await runCommand('pnpm install', 'Installing core dependencies', false, true);
-    
-    // 3. Development Tools Setup
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🛠️  DEVELOPMENT TOOLS');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    // Ask about Chrome Validator
-    const chromeValidator = await askQuestion('\nDo you want to install Chrome validator? (y/N): ');
-    
-    if (chromeValidator === 'y' || chromeValidator === 'yes') {
-      await runCommand('pnpm add -D web-ext', 'Installing Chrome validator (web-ext)');
-    } else {
-      console.log('⏭️  Skipping Chrome validator (you can install later with: pnpm run setup:chrome-validator)');
-    }
-    
-    // 4. Build Configuration
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🏗️  BUILD CONFIGURATION');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    const buildOptions = [
-      { label: 'Development build only', value: 'dev' },
-      { label: 'Production build only', value: 'prod' },
-      { label: 'Both builds (recommended)', value: 'both' }
-    ];
-    
-    const buildChoice = await askMultipleChoice(
-      '\nWhich build would you like to create initially?',
-      buildOptions,
-      '3'
-    );
-    
-    switch (buildChoice.value) {
-      case 'dev':
-        await runCommand('pnpm run build:chrome', 'Building Chrome development', false, true);
-        await runCommand('pnpm run build:firefox', 'Building Firefox development', false, true);
-        break;
-      case 'prod':
-        await runCommand('pnpm run build', 'Building production versions', false, true);
-        break;
-      case 'both':
-        await runCommand('pnpm run build:chrome', 'Building Chrome development', false, true);
-        await runCommand('pnpm run build:firefox', 'Building Firefox development', false, true);
-        await runCommand('pnpm run build', 'Building production versions', false, true);
-        break;
-    }
-    
-    // 5. Validation
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('✅ VALIDATION');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    const runValidation = await askQuestion('\nRun validation checks now? (Y/n): ');
-    
-    if (runValidation !== 'n' && runValidation !== 'no') {
-      await runCommand('pnpm run validate:firefox', 'Validating Firefox extension', true);
-      
-      if (chromeValidator === 'y' || chromeValidator === 'yes') {
-        await runCommand('pnpm run validate:chrome', 'Validating Chrome extension', true);
-      }
-    } else {
-      console.log('⏭️  Skipping validation (you can run later with: pnpm run validate)');
-    }
-    
-    // 6. Final Summary
-    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('🎉 SETUP COMPLETED SUCCESSFULLY!');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    
-    console.log('\n📋 Project Information:');
-    console.log('   Name: Translate-It Extension');
-    console.log('   Type: Cross-browser web extension');
-    console.log('   browsers: Chrome & Firefox');
-    
-    console.log('\n🗳️ Available Commands:');
-    console.log('   Development:');
-    console.log('     pnpm run watch:chrome     - Watch Chrome development');
-    console.log('     pnpm run watch:firefox    - Watch Firefox development');
-    console.log('   Building:');
-    console.log('     pnpm run build           - Build production versions');
-    console.log('     pnpm run build:chrome    - Build Chrome only');
-    console.log('     pnpm run build:firefox   - Build Firefox only');
-    console.log('   Quality Assurance:');
-    console.log('     pnpm run lint            - Lint source code');
-    console.log('     pnpm run validate        - Validate extensions');
-    console.log('     pnpm run validate:firefox - Validate Firefox only');
-    if (chromeValidator === 'y' || chromeValidator === 'yes') {
-      console.log('     pnpm run validate:chrome  - Validate Chrome');
-    }
-    console.log('   Publishing:');
-    console.log('     pnpm run source          - Create source archive');
-    console.log('     pnpm run publish         - Full publishing workflow');
-    
-    console.log('\n💡 Next Steps:');
-    console.log('   1. Review the generated builds in dist/ folder');
-    console.log('   2. Load the extension in your browser for testing:');
-    console.log('      - Chrome: chrome://extensions/ (Enable Developer Mode)');
-    console.log('      - Firefox: about:debugging (This Firefox → Load Temporary Add-on)');
-    console.log('   3. Start development with: pnpm run watch:chrome or pnpm run watch:firefox');
-    console.log('   4. Read AGENTS.md for detailed development guidelines');
-    
-    if (chromeValidator !== 'y' && chromeValidator !== 'yes') {
-      console.log('\n⚡ Optional:');
-      console.log('   Install Chrome validator later: pnpm run setup:chrome-validator');
-    }
-    
-    console.log('\n🎯 Happy coding! 🗳️\n');
-    
-  } catch (error) {
-    console.error('\n❌ Setup failed:', error.message);
-    console.error('\n💡 Troubleshooting:');
-    console.error('   - Ensure you have Node.js 18+ and pnpm 8+ installed');
-    console.error('   - Check your internet connection');
-    console.error('   - Try running: pnpm cache clean && pnpm store prune');
-    console.error('   - Run setup again: pnpm run setup');
-    process.exit(1);
-  } finally {
-    rl.close();
+    log('\n📦 Installing dependencies with the frozen lockfile...');
+    execSync('pnpm install --frozen-lockfile', { stdio: 'inherit' });
+  } catch (installError) {
+    error(`\n❌ Dependency installation failed: ${installError.message}`);
+    printTroubleshooting(error);
+    return 1;
   }
+
+  log('\n SETUP COMPLETED SUCCESSFULLY!');
+  log('\nNext steps:');
+  log('  Production builds:   pnpm run build:chrome / pnpm run build:firefox');
+  log('  One-time dev builds: pnpm run dev:chrome / pnpm run dev:firefox');
+  log('  Watch changes:       pnpm run watch:chrome / pnpm run watch:firefox');
+  log('  Tests:               pnpm run test:run');
+  log('  Lint:                pnpm run lint and pnpm run lint:styles');
+  log('  Validate:            pnpm run validate / pnpm run validate:chrome / pnpm run validate:firefox');
+  log('  Chrome unpacked:     chrome://extensions (enable Developer mode, then Load unpacked)');
+  log('  Firefox temporary:   about:debugging (This Firefox, then Load Temporary Add-on)');
+  return 0;
 }
 
-// Only run if called directly (not imported)
-if (require.main === module) {
-  setupProject();
-}
+if (require.main === module) process.exitCode = setupProject();
 
-module.exports = { setupProject };
+module.exports = { setupProject, parseVersion, compareVersions, isSupportedNodeVersion, MIN_NODE_VERSION, getMinPnpm };
