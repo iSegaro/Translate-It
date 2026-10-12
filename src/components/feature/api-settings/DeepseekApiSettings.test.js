@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { nextTick, reactive } from 'vue';
 import DeepseekApiSettings from './DeepseekApiSettings.vue';
-import ApiKeyInput from './ApiKeyInput.vue';
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
 
 const mocks = vi.hoisted(() => ({
@@ -34,6 +33,7 @@ const translations = {
   deepseek_saved_model_label: 'Saved model',
   deepseek_catalog_showing_count: ({ shown, total }) => `Showing ${shown} of ${total} matching models`,
   deepseek_custom_endpoint_info: 'Using a custom API URL — DeepSeek\'s model catalog is not loaded.',
+  deepseek_test_endpoint_unsupported: 'Test Keys requires an HTTPS chat-completions URL or an HTTP chat-completions URL on localhost.',
 };
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -68,6 +68,7 @@ vi.mock('@/composables/ui/useRTLSelect.js', () => ({
 vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
   ApiKeyManager: {
     parseKeys: value => typeof value === 'string' ? value.split('\n').map(key => key.trim()).filter(Boolean) : [],
+    getDeepSeekValidationEndpoint: value => value === 'https://api.deepseek.com/chat/completions' || value === 'https://proxy.example/chat/completions' ? value : null,
     testKeysDirect: vi.fn(),
   },
 }));
@@ -91,9 +92,9 @@ vi.mock('vue-i18n', () => ({
 vi.mock('./ApiKeyInput.vue', () => ({
   default: {
     name: 'ApiKeyInput',
-    props: ['modelValue'],
+    props: ['modelValue', 'testing', 'testDisabled'],
     emits: ['update:modelValue', 'test'],
-    template: '<input data-test="api-key" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+    template: '<div><input data-test="api-key" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)"><button class="test-keys-button" :disabled="testing || testDisabled || !modelValue" @click="$emit(\'test\', \'deepseek\')">{{ testing ? \'Testing...\' : \'Test Keys\' }}</button></div>',
   },
 }));
 
@@ -247,9 +248,12 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     const wrapper = mount(DeepseekApiSettings);
     await flushPromises();
     await wrapper.get('[data-value="catalog/model"]').trigger('click');
-    await wrapper.findComponent(ApiKeyInput).vm.$emit('test', 'deepseek');
+    await wrapper.get('.test-keys-button').trigger('click');
     await flushPromises();
-    expect(ApiKeyManager.testKeysDirect).toHaveBeenCalledWith('deepseek-key', 'deepseek', { apiModel: 'catalog/model' });
+    expect(ApiKeyManager.testKeysDirect).toHaveBeenCalledWith('deepseek-key', 'deepseek', {
+      apiUrl: 'https://api.deepseek.com/chat/completions',
+      apiModel: 'catalog/model'
+    });
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('catalog/model');
     expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('catalog');
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
@@ -387,6 +391,41 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(wrapper.text()).toContain('Using a custom API URL — DeepSeek\'s model catalog is not loaded.');
     expect(wrapper.text()).not.toContain('Add an API key to discover available models.');
     expect(wrapper.text()).not.toContain('Cached Model');
+    wrapper.unmount();
+  });
+
+  it.each([
+    ['official', 'https://api.deepseek.com/chat/completions'],
+    ['custom', 'https://proxy.example/chat/completions'],
+  ])('allows Test Keys for a valid %s endpoint', async (_name, apiUrl) => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = apiUrl;
+    mocks.fetchModels.mockResolvedValue([]);
+    ApiKeyManager.testKeysDirect.mockResolvedValue({ allInvalid: true });
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+
+    const button = wrapper.get('.test-keys-button');
+    expect(button.element.disabled).toBe(false);
+    expect(button.text()).toBe('Test Keys');
+    await button.trigger('click');
+    await flushPromises();
+    expect(ApiKeyManager.testKeysDirect).toHaveBeenCalledWith('deepseek-key', 'deepseek', expect.objectContaining({ apiUrl }));
+    wrapper.unmount();
+  });
+
+  it('disables Test Keys without changing its label for an unsupported endpoint', async () => {
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_URL = 'https://proxy.example/api/generate';
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+
+    const button = wrapper.get('.test-keys-button');
+    expect(button.element.disabled).toBe(true);
+    expect(button.text()).toBe('Test Keys');
+    expect(wrapper.text()).toContain(translations.deepseek_test_endpoint_unsupported);
+    await button.trigger('click');
+    expect(ApiKeyManager.testKeysDirect).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

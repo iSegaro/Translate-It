@@ -16,10 +16,30 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js';
 import { CONFIG, getDeeplApiTierAsync } from '@/shared/config/config.js';
 import { ProviderRegistryIds } from './ProviderConstants.js';
+import { isOfficialDeepSeekEndpoint } from './modelDiscoveryEndpoints.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TRANSLATION, 'ApiKeyManager');
 const DEEPL_FREE_USAGE_URL = 'https://api-free.deepl.com/v2/usage';
 const DEEPL_PRO_USAGE_URL = 'https://api.deepl.com/v2/usage';
+
+function getDeepSeekValidationEndpoint(apiUrl) {
+  const configuredUrl = typeof apiUrl === 'string' && apiUrl.trim()
+    ? apiUrl.trim()
+    : CONFIG.DEEPSEEK_API_URL;
+  if (isOfficialDeepSeekEndpoint(configuredUrl)) return 'https://api.deepseek.com/models';
+
+  try {
+    const url = new URL(configuredUrl);
+    const isLocalHttp = url.protocol === 'http:'
+      && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((!isLocalHttp && url.protocol !== 'https:')
+      || url.username || url.password || url.search || url.hash
+      || !url.pathname.endsWith('/chat/completions')) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 
 function isValidDeepLUsagePayload(payload) {
   return payload !== null
@@ -69,6 +89,10 @@ const FAILOVER_ERROR_TYPES = new Set([
 ]);
 
 class ApiKeyManager {
+  static getDeepSeekValidationEndpoint(apiUrl) {
+    return getDeepSeekValidationEndpoint(apiUrl);
+  }
+
   /**
    * Parse API key string into array of keys
    * @param {string} keyString - Newline-separated keys
@@ -497,12 +521,24 @@ class ApiKeyManager {
    */
   static async _testDeepSeekKey(key, context = {}) {
     try {
-      const apiUrl = context.apiUrl || 'https://api.deepseek.com/models';
-      const response = await this._fetchWithCurrentProxy(apiUrl, {
+      const validationEndpoint = getDeepSeekValidationEndpoint(context.apiUrl);
+      if (!validationEndpoint) return false;
+
+      const isOfficial = isOfficialDeepSeekEndpoint(context.apiUrl || CONFIG.DEEPSEEK_API_URL);
+      const response = await this._fetchWithCurrentProxy(validationEndpoint, isOfficial ? {
         method: 'GET',
+        headers: { 'Authorization': `Bearer ${key}` }
+      } : {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${key}`
-        }
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: context.apiModel || CONFIG.DEEPSEEK_API_MODEL,
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1
+        })
       });
       return response.ok;
     } catch {

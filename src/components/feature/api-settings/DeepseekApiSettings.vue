@@ -21,9 +21,17 @@
       :placeholder="t('deepseek_api_key_placeholder') || 'Enter your API keys (one per line)'"
       :provider-id="ProviderRegistryIds.DEEPSEEK"
       :testing="testingKeys"
+      :test-disabled="!canTestDeepSeekEndpoint"
       :test-result="testResult"
       @test="testKeys"
     />
+    <p
+      v-if="!canTestDeepSeekEndpoint"
+      class="setting-description"
+      role="status"
+    >
+      {{ t('deepseek_test_endpoint_unsupported') || 'Test Keys is unavailable: use a valid HTTPS chat-completions URL (or a localhost HTTP URL).' }}
+    </p>
     <div class="setting-group vertical">
       <label>{{ t('PROVIDER_MODEL_LABEL') || 'Model' }}</label>
       <BaseSelect
@@ -134,6 +142,7 @@ const hasDeepSeekKey = computed(() => ApiKeyManager.parseKeys(deepseekApiKey.val
 // input is not rendered here, but a stored override still governs translation.
 const deepseekApiUrl = computed(() => settingsStore.settings?.DEEPSEEK_API_URL || CONFIG.DEEPSEEK_API_URL)
 const usesOfficialDeepSeekEndpoint = computed(() => isOfficialDeepSeekEndpoint(deepseekApiUrl.value))
+const canTestDeepSeekEndpoint = computed(() => Boolean(ApiKeyManager.getDeepSeekValidationEndpoint(deepseekApiUrl.value)))
 let discoveryRequestId = 0
 let discoveryTimer
 let activeController
@@ -384,6 +393,7 @@ const testKeys = async (providerId) => {
       deepseekApiKey.value, 
       providerId,
       {
+        apiUrl: deepseekApiUrl.value,
         apiModel: deepseekApiModel.value === 'custom' ? deepseekCustomModel.value : deepseekApiModel.value
       }
     )

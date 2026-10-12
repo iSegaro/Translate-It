@@ -423,6 +423,94 @@ describe('ApiKeyManager', () => {
     });
   });
 
+  describe('DeepSeek key testing endpoint safety', () => {
+    it.each([undefined, '', 'https://api.deepseek.com/chat/completions'])(
+      'keeps the official models test for URL %s', async apiUrl => {
+        mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+
+        await expect(ApiKeyManager._testDeepSeekKey('secret-key', { apiUrl })).resolves.toBe(true);
+
+        expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+        expect(mockProxyFetch.mock.calls[0][0]).toBe('https://api.deepseek.com/models');
+        expect(mockProxyFetch.mock.calls[0][1]).toMatchObject({
+          method: 'GET', headers: { Authorization: 'Bearer secret-key' }
+        });
+      }
+    );
+
+    it('tests a supported custom completion URL directly and only sends the credential there', async () => {
+      mockProxyFetch.mockResolvedValue({ ok: true, status: 200 });
+      const url = 'https://self-hosted.example/api/v1/chat/completions';
+
+      await expect(ApiKeyManager._testDeepSeekKey('secret-key', { apiUrl: url, apiModel: 'local-model' }))
+        .resolves.toBe(true);
+
+      expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      expect(mockProxyFetch.mock.calls[0][0]).toBe(url);
+      expect(mockProxyFetch.mock.calls[0][1]).toMatchObject({
+        method: 'POST',
+        headers: { Authorization: 'Bearer secret-key', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'local-model', messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 })
+      });
+      expect(mockProxyFetch.mock.calls[0][0]).not.toContain('api.deepseek.com');
+    });
+
+    it.each([
+      'not a URL',
+      'https://user:password@example.com/v1/chat/completions',
+      'https://example.com/v1/chat/completions?token=value',
+      'https://example.com/v1/completions',
+      'http://example.com/v1/chat/completions'
+    ])('rejects unsafe or unsupported custom URL without a request (%s)', async apiUrl => {
+      await expect(ApiKeyManager._testDeepSeekKey('secret-key', { apiUrl })).resolves.toBe(false);
+      expect(mockProxyFetch).not.toHaveBeenCalled();
+    });
+
+    it('keeps multi-key result ordering and does not leak keys in logs or errors', async () => {
+      const secret = 'secret-key-one';
+      const validator = vi.spyOn(ApiKeyManager, '_testDeepSeekKey').mockImplementation(async key => key === 'secret-key-two');
+
+      const result = await ApiKeyManager.testKeysDirect(
+        `${secret}\nsecret-key-two`,
+        ProviderRegistryIds.DEEPSEEK,
+        { apiUrl: 'https://self-hosted.example/v1/chat/completions', apiModel: 'local-model' }
+      );
+
+      expect(result).toMatchObject({
+        valid: ['secret-key-two'], invalid: [secret], allInvalid: false,
+        reorderedString: 'secret-key-two\nsecret-key-one',
+        messageKey: 'api_test_result_partial', params: { valid: 1, invalid: 1 }
+      });
+      const loggedOutput = JSON.stringify([
+        ...mockLogger.debug.mock.calls,
+        ...mockLogger.info.mock.calls,
+        ...mockLogger.warn.mock.calls,
+        ...mockLogger.error.mock.calls
+      ]);
+      expect(loggedOutput).not.toContain(secret);
+      expect(loggedOutput).not.toContain('secret-key-two');
+      validator.mockRestore();
+    });
+
+    it('does not expose a credential when a network request throws', async () => {
+      const secret = 'never-log-this-key';
+      mockProxyFetch.mockRejectedValue(new Error(`request failed: ${secret}`));
+
+      const result = await ApiKeyManager.testKeysDirect(secret, ProviderRegistryIds.DEEPSEEK, {
+        apiUrl: 'https://self-hosted.example/v1/chat/completions', apiModel: 'local-model'
+      });
+
+      expect(result).toMatchObject({ allInvalid: true, invalid: [secret] });
+      const loggedOutput = JSON.stringify([
+        ...mockLogger.debug.mock.calls,
+        ...mockLogger.info.mock.calls,
+        ...mockLogger.warn.mock.calls,
+        ...mockLogger.error.mock.calls
+      ]);
+      expect(loggedOutput).not.toContain(secret);
+    });
+  });
+
   describe('Custom Provider Testing', () => {
     const context = {
       apiUrl: 'https://example.com/v1/chat/completions',

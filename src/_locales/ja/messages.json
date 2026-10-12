@@ -1548,6 +1548,9 @@
   "deepseek_custom_endpoint_info": {
     "message": "カスタムAPI URLを使用しているため、DeepSeekのモデルカタログは読み込まれません。"
   },
+  "deepseek_test_endpoint_unsupported": {
+    "message": "キーをテストするには、HTTPSのchat-completions URL、またはlocalhost上のHTTP chat-completions URLが必要です。"
+  },
   "deepseek_thinking_mode_label": {
     "message": "思考モード"
   },
