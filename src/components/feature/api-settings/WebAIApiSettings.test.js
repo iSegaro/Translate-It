@@ -56,6 +56,7 @@ describe('WebAIApiSettings model discovery', () => {
     vi.useFakeTimers()
     mocks.settingsStore = {
       settings: reactive({ WEBAI_API_URL: 'https://first.test/v1/translate', WEBAI_API_MODEL: 'gemini-3-flash' }),
+      isSettingDirty: vi.fn(() => false),
       updateSettingLocally: vi.fn(),
     }
     mocks.fetchModels.mockReset()
@@ -314,6 +315,73 @@ describe('WebAIApiSettings model discovery', () => {
     await nextTick()
     expect(region().element).toBe(regionElement)
     expect(region().text()).toBe('')
+    wrapper.unmount()
+  })
+
+  it('reconciles external WebAI models read-only and keeps the Custom draft selected', async () => {
+    mocks.fetchModels.mockResolvedValue([])
+    mocks.settingsStore.updateSettingLocally.mockImplementation((key, value) => {
+      mocks.settingsStore.settings[key] = value
+    })
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'gemini-3-pro'
+    await nextTick()
+    expect(wrapper.get('select').element.value).toBe('gemini-3-pro')
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'custom'
+    await nextTick()
+    expect(wrapper.get('select').element.value).toBe('custom')
+    expect(wrapper.findAll('input').at(-1).exists()).toBe(true)
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'external/unknown'
+    await nextTick()
+    expect(wrapper.get('select').element.value).toBe('custom')
+    expect(wrapper.findAll('input').at(-1).element.value).toBe('external/unknown')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('WEBAI_API_MODEL', expect.anything())
+    await wrapper.findAll('input').at(-1).setValue('local-draft')
+    expect(wrapper.get('select').element.value).toBe('custom')
+    expect(mocks.settingsStore.settings.WEBAI_API_MODEL).toBe('local-draft')
+    wrapper.unmount()
+  })
+
+  it('does not let late discovery restore a stale WebAI selection', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'gemini-3-pro'
+    await nextTick()
+    pending.resolve(['gemini-3-flash'])
+    await flushPromises()
+    expect(wrapper.get('select').element.value).toBe('gemini-3-pro')
+    wrapper.unmount()
+  })
+
+  it('selects the current external model when deferred discovery advertises it', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.WEBAI_API_MODEL = 'external/catalog-model'
+    await nextTick()
+    pending.resolve(['external/catalog-model'])
+    await flushPromises()
+    expect(wrapper.get('select').element.value).toBe('external/catalog-model')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('WEBAI_API_MODEL', 'external/catalog-model')
+    wrapper.unmount()
+  })
+
+  it('keeps a dirty Custom draft selected when discovery returns the same ID', async () => {
+    const model = 'external/custom-draft'
+    mocks.settingsStore.settings.WEBAI_API_MODEL = model
+    mocks.settingsStore.isSettingDirty.mockReturnValue(true)
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(WebAIApiSettings)
+    await flushPromises()
+    pending.resolve([model])
+    await flushPromises()
+    expect(wrapper.get('select').element.value).toBe('custom')
+    expect(wrapper.findAll('input').at(-1).element.value).toBe(model)
     wrapper.unmount()
   })
 })

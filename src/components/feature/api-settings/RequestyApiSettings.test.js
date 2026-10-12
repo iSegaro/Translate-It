@@ -90,6 +90,7 @@ describe('RequestyApiSettings model catalog', () => {
     vi.useFakeTimers()
     mocks.settingsStore = {
       settings: reactive({ REQUESTY_API_KEY: 'key-one', REQUESTY_API_MODEL: 'curated/model-one' }),
+      isSettingDirty: vi.fn(() => false),
       updateSettingLocally: vi.fn((key, value) => { mocks.settingsStore.settings[key] = value }),
     }
     mocks.fetchModels.mockReset()
@@ -405,6 +406,70 @@ describe('RequestyApiSettings model catalog', () => {
     expect(warningRegion().element).toBe(regionElement)
     expect(warningRegion().text()).toBe('')
     expect(warningRegion().classes()).toContain('ti-sr-only')
+    wrapper.unmount()
+  })
+
+  it('reconciles external model changes read-only and protects local Custom drafts', async () => {
+    mocks.fetchModels.mockResolvedValue([])
+    const wrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'curated/model-two'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('curated/model-two')
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'custom'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').exists()).toBe(true)
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'external/unknown'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').element.value).toBe('external/unknown')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_API_MODEL', expect.anything())
+    await wrapper.get('[placeholder="requesty_custom_model_placeholder"]').setValue('local-draft')
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(mocks.settingsStore.settings.REQUESTY_API_MODEL).toBe('local-draft')
+    wrapper.unmount()
+  })
+
+  it('does not let late discovery restore a selection made by an external update', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'curated/model-two'
+    await nextTick()
+    pending.resolve([{ value: 'curated/model-one', name: 'Old Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('curated/model-two')
+    wrapper.unmount()
+  })
+
+  it('selects the current external model when deferred discovery advertises it', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = 'external/catalog-model'
+    await nextTick()
+    pending.resolve([{ value: 'external/catalog-model', name: 'External Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('external/catalog-model')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('REQUESTY_API_MODEL', 'external/catalog-model')
+    wrapper.unmount()
+  })
+
+  it('keeps a dirty Custom draft selected when discovery returns the same ID', async () => {
+    const model = 'vendor/custom-draft'
+    mocks.settingsStore.settings.REQUESTY_API_MODEL = model
+    mocks.settingsStore.isSettingDirty.mockReturnValue(true)
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(RequestyApiSettings)
+    await flushPromises()
+    pending.resolve([{ value: model, name: 'Catalog Match' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="requesty_custom_model_placeholder"]').element.value).toBe(model)
     wrapper.unmount()
   })
 })

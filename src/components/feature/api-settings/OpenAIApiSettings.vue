@@ -136,6 +136,15 @@ let discoveryRequestId = 0
 let discoveryTimer
 let activeController
 let selectionInteraction = 0
+let lastObservedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+let externalSelectionInteraction = -1
+let externalSelectionModel
+let localModelUpdate = false
+const updateModelLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
+  localModelUpdate = false
+}
 
 const openaiApiModelOptions = computed(() => {
   const curated = (CONFIG.OPENAI_MODELS || []).filter(model => model.value !== 'custom')
@@ -176,12 +185,30 @@ const initializeModelSelection = () => {
   customModelVisible.value = !isPredefined
 }
 
+watch(() => settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL, (model) => {
+  if (model === lastObservedModel) return
+  lastObservedModel = model
+  if (localModelUpdate) return
+  selectionInteraction++
+  externalSelectionInteraction = selectionInteraction
+  externalSelectionModel = model
+  const isKnown = (CONFIG.OPENAI_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+    || discoveredModels.value.some(option => option.value === model)
+  selectedModelOption.value = isKnown ? model : 'custom'
+  customModelVisible.value = !isKnown
+}, { flush: 'sync' })
+
 const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
+  const isCurrentExternalSelection = selectionAtStart !== selectionInteraction
+    && externalSelectionInteraction === selectionInteraction
+    && externalSelectionModel === savedModel
+    && (settingsStore.settings?.OPENAI_MODEL_SOURCE || CONFIG.OPENAI_MODEL_SOURCE) !== 'custom'
   if (requestId !== discoveryRequestId
     || key !== openaiApiKey.value
-    || selectionAtStart !== selectionInteraction
+    || settingsStore.isSettingDirty('OPENAI_API_MODEL')
+    || (selectionAtStart !== selectionInteraction && !isCurrentExternalSelection)
     || selectedModelOption.value !== 'custom') return
-  const savedModel = settingsStore.settings?.OPENAI_API_MODEL || CONFIG.OPENAI_API_MODEL
   const isPredefined = (CONFIG.OPENAI_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
     || discoveredModels.value.some(model => model.value === savedModel)
   if (isPredefined) {
@@ -244,7 +271,7 @@ const catalogModelSelection = computed({
     selectionInteraction++
     selectedModelOption.value = value
     customModelVisible.value = false
-    settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
+    updateModelLocally(value)
     settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', 'catalog')
   }
 })
@@ -288,7 +315,7 @@ const openaiApiModel = computed({
     const previousSource = settingsStore.settings?.OPENAI_MODEL_SOURCE || CONFIG.OPENAI_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
-      settingsStore.updateSettingLocally('OPENAI_API_MODEL', value)
+      updateModelLocally(value)
     }
     const isCurated = (CONFIG.OPENAI_MODELS || []).some(model => model.value === value && model.value !== 'custom')
     const isCatalog = discoveredModels.value.some(model => model.value === value)
@@ -308,7 +335,7 @@ const openaiCustomModel = computed({
   set: (value) => {
     selectionInteraction++
     customModelVisible.value = true
-    settingsStore.updateSettingLocally('OPENAI_API_MODEL', value);
+    updateModelLocally(value)
     settingsStore.updateSettingLocally('OPENAI_MODEL_SOURCE', 'custom')
   }
 })

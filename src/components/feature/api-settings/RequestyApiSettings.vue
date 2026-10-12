@@ -126,6 +126,15 @@ let discoveryRequestId = 0
 let discoveryTimer
 let activeController
 let selectionInteraction = 0
+let lastObservedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+let externalSelectionInteraction = -1
+let externalSelectionModel
+let localModelUpdate = false
+const updateModelLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value)
+  localModelUpdate = false
+}
 
 const requestyApiModelOptions = computed(() => {
   const curated = (CONFIG.REQUESTY_MODELS || []).filter(model => model.value !== 'custom')
@@ -165,12 +174,29 @@ const initializeModelSelection = () => {
   customModelVisible.value = !isPredefined
 }
 
+watch(() => settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL, (model) => {
+  if (model === lastObservedModel) return
+  lastObservedModel = model
+  if (localModelUpdate) return
+  selectionInteraction++
+  externalSelectionInteraction = selectionInteraction
+  externalSelectionModel = model
+  const isKnown = (CONFIG.REQUESTY_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+    || discoveredModels.value.some(option => option.value === model)
+  selectedModelOption.value = isKnown ? model : 'custom'
+  customModelVisible.value = !isKnown
+}, { flush: 'sync' })
+
 const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  const savedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
+  const isCurrentExternalSelection = selectionAtStart !== selectionInteraction
+    && externalSelectionInteraction === selectionInteraction
+    && externalSelectionModel === savedModel
   if (requestId !== discoveryRequestId
     || key !== requestyApiKey.value
-    || selectionAtStart !== selectionInteraction
+    || settingsStore.isSettingDirty('REQUESTY_API_MODEL')
+    || (selectionAtStart !== selectionInteraction && !isCurrentExternalSelection)
     || selectedModelOption.value !== 'custom') return
-  const savedModel = settingsStore.settings?.REQUESTY_API_MODEL || CONFIG.REQUESTY_API_MODEL
   const isPredefined = (CONFIG.REQUESTY_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
     || discoveredModels.value.some(model => model.value === savedModel)
   if (isPredefined) {
@@ -220,7 +246,7 @@ const catalogModelSelection = computed({
     selectionInteraction++
     selectedModelOption.value = value
     customModelVisible.value = false
-    settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value)
+    updateModelLocally(value)
   }
 })
 
@@ -255,7 +281,7 @@ const requestyApiModel = computed({
     customModelVisible.value = value === 'custom' && wasCustom ? customModelVisible.value : false
     selectedModelOption.value = value;
     if (value !== 'custom') {
-      settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value)
+      updateModelLocally(value)
     }
     // If 'custom' is selected, wait for user input in custom field
   }
@@ -268,7 +294,7 @@ const requestyCustomModel = computed({
   set: (value) => {
     selectionInteraction++
     customModelVisible.value = true
-    settingsStore.updateSettingLocally('REQUESTY_API_MODEL', value);
+    updateModelLocally(value)
   }
 })
 

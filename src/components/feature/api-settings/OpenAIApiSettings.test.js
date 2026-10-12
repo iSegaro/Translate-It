@@ -98,6 +98,7 @@ describe('OpenAIApiSettings model catalog', () => {
     vi.useFakeTimers()
     mocks.settingsStore = {
       settings: reactive({ OPENAI_API_KEY: '', OPENAI_API_MODEL: 'curated/model-one' }),
+      isSettingDirty: vi.fn(() => false),
       updateSettingLocally: vi.fn((key, value) => { mocks.settingsStore.settings[key] = value }),
     }
     mocks.fetchModels.mockReset()
@@ -470,6 +471,76 @@ describe('OpenAIApiSettings model catalog', () => {
     await wrapper.get('.model-select').setValue('unlisted-model-id')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('')
     expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('legacy')
+    wrapper.unmount()
+  })
+
+  it('reconciles external models read-only and preserves a local Custom draft', async () => {
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'curated/model-two'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('curated/model-two')
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'custom'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').exists()).toBe(true)
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'external/unknown'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').element.value).toBe('external/unknown')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
+    await wrapper.get('[placeholder="openai_custom_model_placeholder"]').setValue('my-draft')
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('my-draft')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('custom')
+    wrapper.unmount()
+  })
+
+  it('does not let a late discovery result replace a newer external selection', async () => {
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'curated/model-two'
+    await nextTick()
+    pending.resolve([{ value: 'curated/model-one', name: 'Old Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('curated/model-two')
+    wrapper.unmount()
+  })
+
+  it('selects the current external catalog model when deferred discovery advertises it', async () => {
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'external/catalog-model'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    pending.resolve([{ value: 'external/catalog-model', name: 'External Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('external/catalog-model')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('catalog')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', 'external/catalog-model')
+    wrapper.unmount()
+  })
+
+  it('keeps a dirty Custom draft selected when discovery returns the same ID', async () => {
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    mocks.settingsStore.settings.OPENAI_API_MODEL = 'draft/custom-model'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'custom'
+    mocks.settingsStore.isSettingDirty.mockReturnValue(true)
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    pending.resolve([{ value: 'draft/custom-model', name: 'Catalog Match' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').element.value).toBe('draft/custom-model')
+    expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('custom')
     wrapper.unmount()
   })
 })

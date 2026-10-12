@@ -126,6 +126,16 @@ const customModelVisible = ref(false)
 let discoveryRequestId = 0
 let discoveryTimer
 let activeController
+let selectionInteraction = 0
+let lastObservedModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+let externalSelectionInteraction = -1
+let externalSelectionModel
+let localModelUpdate = false
+const updateModelLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
+  localModelUpdate = false
+}
 
 const openrouterApiModelOptions = computed(() => {
   const curated = (CONFIG.OPENROUTER_MODELS || []).filter(model => model.value !== 'custom')
@@ -164,7 +174,20 @@ const initializeModelSelection = () => {
   customModelVisible.value = !isPredefined
 }
 
-const discoverModels = async (apiKey) => {
+watch(() => settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL, (model) => {
+  if (model === lastObservedModel) return
+  lastObservedModel = model
+  if (localModelUpdate) return
+  selectionInteraction++
+  externalSelectionInteraction = selectionInteraction
+  externalSelectionModel = model
+  const isKnown = (CONFIG.OPENROUTER_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+    || discoveredModels.value.some(option => option.value === model)
+  selectedModelOption.value = isKnown ? model : 'custom'
+  customModelVisible.value = !isKnown
+}, { flush: 'sync' })
+
+const discoverModels = async (apiKey, selectionAtStart = selectionInteraction) => {
   const requestId = ++discoveryRequestId
   const key = typeof apiKey === 'string' ? apiKey : ''
   activeController?.abort()
@@ -176,6 +199,7 @@ const discoverModels = async (apiKey) => {
     discoveredModels.value = cached
     modelDiscoverySucceeded.value = true
     modelDiscoveryLoading.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
     return
   }
   modelDiscoveryLoading.value = true
@@ -185,6 +209,7 @@ const discoverModels = async (apiKey) => {
     discoveredModels.value = models
     modelDiscoverySucceeded.value = true
     modelDiscoveryFailed.value = false
+    syncSavedSelection(requestId, key, selectionAtStart)
   } catch {
     if (requestId !== discoveryRequestId || key !== openrouterApiKey.value) return
     modelDiscoverySucceeded.value = false
@@ -194,15 +219,36 @@ const discoverModels = async (apiKey) => {
   }
 }
 
+const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  const savedModel = settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
+  const isCurrentExternalSelection = selectionAtStart !== selectionInteraction
+    && externalSelectionInteraction === selectionInteraction
+    && externalSelectionModel === savedModel
+    && (settingsStore.settings?.OPENROUTER_MODEL_SOURCE || CONFIG.OPENROUTER_MODEL_SOURCE) !== 'custom'
+  if (requestId !== discoveryRequestId
+    || key !== openrouterApiKey.value
+    || settingsStore.isSettingDirty('OPENROUTER_API_MODEL')
+    || (selectionAtStart !== selectionInteraction && !isCurrentExternalSelection)
+    || (settingsStore.settings?.OPENROUTER_MODEL_SOURCE || CONFIG.OPENROUTER_MODEL_SOURCE) === 'custom'
+    || selectedModelOption.value !== 'custom') return
+  const isKnown = (CONFIG.OPENROUTER_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
+    || discoveredModels.value.some(model => model.value === savedModel)
+  if (isKnown) {
+    selectedModelOption.value = savedModel
+    customModelVisible.value = false
+  }
+}
+
 const catalogModelSelection = computed({
   get: () => {
     return settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
   },
   set: (value) => {
     if (!value) return
+    selectionInteraction++
     selectedModelOption.value = value
     customModelVisible.value = false
-    settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
+    updateModelLocally(value)
     settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', 'catalog')
   }
 })
@@ -217,8 +263,9 @@ watch(openrouterApiKey, (apiKey) => {
   modelDiscoveryFailed.value = false
   modelDiscoveryLoading.value = false
   const requestId = ++discoveryRequestId
+  const scheduledSelection = selectionInteraction
   discoveryTimer = setTimeout(() => {
-    if (requestId === discoveryRequestId) discoverModels(apiKey)
+    if (requestId === discoveryRequestId) discoverModels(apiKey, scheduledSelection)
   }, 400)
 }, { flush: 'sync' })
 
@@ -232,6 +279,7 @@ onBeforeUnmount(() => {
 const openrouterApiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
+    selectionInteraction++
     if (value !== 'custom') customModelVisible.value = false
     else customModelVisible.value = true
     // Capture before either setting is modified: the write-through store would
@@ -240,7 +288,7 @@ const openrouterApiModel = computed({
     const previousSource = settingsStore.settings?.OPENROUTER_MODEL_SOURCE || CONFIG.OPENROUTER_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
-      settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value)
+      updateModelLocally(value)
     }
     const isCurated = (CONFIG.OPENROUTER_MODELS || []).some(model => model.value === value && model.value !== 'custom')
     const isCatalog = discoveredModels.value.some(model => model.value === value)
@@ -258,8 +306,9 @@ const openrouterCustomModel = computed({
     ? settingsStore.settings?.OPENROUTER_API_MODEL || CONFIG.OPENROUTER_API_MODEL
     : '',
   set: (value) => {
+    selectionInteraction++
     customModelVisible.value = true
-    settingsStore.updateSettingLocally('OPENROUTER_API_MODEL', value);
+    updateModelLocally(value)
     settingsStore.updateSettingLocally('OPENROUTER_MODEL_SOURCE', 'custom')
   }
 })

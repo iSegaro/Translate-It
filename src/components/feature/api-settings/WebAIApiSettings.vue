@@ -112,6 +112,15 @@ let discoveryRequestId = 0
 let discoveryTimer
 let activeController
 let selectionInteraction = 0
+let lastObservedModel = settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL
+let externalSelectionInteraction = -1
+let externalSelectionModel
+let localModelUpdate = false
+const updateModelLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('WEBAI_API_MODEL', value)
+  localModelUpdate = false
+}
 
 const webAIApiModelOptions = computed(() => {
   const models = CONFIG.WEBAI_MODELS || []
@@ -137,6 +146,18 @@ const initializeModelSelection = () => {
     || discoveredModels.value.includes(currentModel)
   selectedModelOption.value = isPredefined ? currentModel : 'custom'
 }
+
+watch(() => settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL, (model) => {
+  if (model === lastObservedModel) return
+  lastObservedModel = model
+  if (localModelUpdate) return
+  selectionInteraction++
+  externalSelectionInteraction = selectionInteraction
+  externalSelectionModel = model
+  const isKnown = (CONFIG.WEBAI_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+    || discoveredModels.value.includes(model)
+  selectedModelOption.value = isKnown ? model : 'custom'
+}, { flush: 'sync' })
 
 const discoverModels = async (apiUrl, selectionAtStart = selectionInteraction) => {
   const requestId = ++discoveryRequestId
@@ -179,11 +200,15 @@ const discoverModels = async (apiUrl, selectionAtStart = selectionInteraction) =
 }
 
 function syncSavedSelection(requestId, resolvedUrl, selectionAtStart) {
+  const savedModel = settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL
+  const isCurrentExternalSelection = selectionAtStart !== selectionInteraction
+    && externalSelectionInteraction === selectionInteraction
+    && externalSelectionModel === savedModel
   if (requestId !== discoveryRequestId
     || resolvedUrl !== resolveWebAIModelsUrl(webAIApiUrl.value)
-    || selectionAtStart !== selectionInteraction
+    || settingsStore.isSettingDirty('WEBAI_API_MODEL')
+    || (selectionAtStart !== selectionInteraction && !isCurrentExternalSelection)
     || selectedModelOption.value !== 'custom') return
-  const savedModel = settingsStore.settings?.WEBAI_API_MODEL || CONFIG.WEBAI_API_MODEL
   const isPredefined = (CONFIG.WEBAI_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
     || discoveredModels.value.includes(savedModel)
   if (isPredefined) selectedModelOption.value = savedModel
@@ -218,7 +243,7 @@ const webAIApiModel = computed({
     selectionInteraction++
     selectedModelOption.value = value
     if (value !== 'custom') {
-      settingsStore.updateSettingLocally('WEBAI_API_MODEL', value)
+      updateModelLocally(value)
     }
   }
 })
@@ -230,7 +255,7 @@ const webAIApiCustomModel = computed({
   },
   set: (value) => {
     selectionInteraction++
-    settingsStore.updateSettingLocally('WEBAI_API_MODEL', value)
+    updateModelLocally(value)
   }
 })
 

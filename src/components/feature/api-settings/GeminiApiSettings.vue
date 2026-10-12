@@ -123,7 +123,7 @@ const geminiApiUrl = computed({
   set: (value) => {
     selectionInteraction++
     settingsStore.updateSettingLocally('GEMINI_API_URL', value)
-    settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', 'custom')
+    updateGeminiSourceLocally('custom')
   }
 })
 
@@ -141,6 +141,21 @@ let discoveryRequestId = 0
 let discoveryTimer
 let activeController
 let selectionInteraction = 0
+let lastObservedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
+let lastObservedSource = settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE
+let externalSelectionInteraction = -1
+let externalSelectionModel
+let localModelUpdate = false
+const updateModelLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+  localModelUpdate = false
+}
+const updateGeminiSourceLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', value)
+  localModelUpdate = false
+}
 
 const geminiModelOptions = computed(() => {
   const curated = (CONFIG.GEMINI_MODELS || []).filter(model => model.value !== 'custom')
@@ -203,23 +218,47 @@ const initializeModelSelection = () => {
   selectedModelOption.value = isPredefined || isSavedCatalogModel ? currentModel : 'custom';
 }
 
+watch(
+  () => [
+    settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL,
+    settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE,
+  ],
+  ([model, source]) => {
+    if (model === lastObservedModel && source === lastObservedSource) return
+    lastObservedModel = model
+    lastObservedSource = source
+    if (localModelUpdate) return
+    selectionInteraction++
+    externalSelectionInteraction = selectionInteraction
+    externalSelectionModel = model
+    const isCurated = (CONFIG.GEMINI_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+    const isDiscovered = discoveredModels.value.some(option => option.value === model)
+    selectedModelOption.value = isCurated || source === 'catalog' || (isDiscovered && source !== 'custom') ? model : 'custom'
+  },
+  { flush: 'sync' }
+)
+
 const geminiModel = computed({
   get: () => selectedModelOption.value,
   set: (value) => {
     selectionInteraction++
+    lastObservedModel = value
     selectedModelOption.value = value;
-    settingsStore.updateSettingLocally('GEMINI_MODEL', value)
+    updateModelLocally(value)
     // Persist only explicit source intent so legacy/custom URL pairs survive upgrades without migrations.
     const isCurated = (CONFIG.GEMINI_MODELS || []).some(model => model.value === value && model.value !== 'custom')
     const isCatalog = discoveredModels.value.some(model => model.value === value)
-    settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
+    updateGeminiSourceLocally(value === 'custom' ? 'custom' : isCurated ? 'curated' : isCatalog ? 'catalog' : 'legacy')
   }
 })
 
 const syncSavedSelection = (requestId, key, selectionAtStart) => {
   if (requestId !== discoveryRequestId
     || key !== geminiApiKey.value
-    || selectionAtStart !== selectionInteraction
+    || settingsStore.isSettingDirty('GEMINI_MODEL')
+    || (selectionAtStart !== selectionInteraction
+      && (externalSelectionInteraction !== selectionInteraction
+        || externalSelectionModel !== (settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL)))
     || selectedModelOption.value !== 'custom'
     || (settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE) !== 'catalog') return
   const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
@@ -290,9 +329,10 @@ const catalogModelSelection = computed({
   set: (value) => {
     if (!value) return
     selectionInteraction++
+    lastObservedModel = value
     selectedModelOption.value = value
-    settingsStore.updateSettingLocally('GEMINI_MODEL', value)
-    settingsStore.updateSettingLocally('GEMINI_MODEL_SOURCE', 'catalog')
+    updateModelLocally(value)
+    updateGeminiSourceLocally('catalog')
   }
 })
 

@@ -147,6 +147,15 @@ let discoveryRequestId = 0
 let discoveryTimer
 let activeController
 let selectionInteraction = 0
+let lastObservedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+let externalSelectionInteraction = -1
+let externalSelectionModel
+let localModelUpdate = false
+const updateModelLocally = (value) => {
+  localModelUpdate = true
+  settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
+  localModelUpdate = false
+}
 
 const deepseekApiModelOptions = computed(() => {
   const curated = (CONFIG.DEEPSEEK_MODELS || []).filter(model => model.value !== 'custom')
@@ -209,12 +218,30 @@ const initializeModelSelection = () => {
   customModelVisible.value = !isPredefined
 }
 
+watch(() => settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL, (model) => {
+  if (model === lastObservedModel) return
+  lastObservedModel = model
+  if (localModelUpdate) return
+  selectionInteraction++
+  externalSelectionInteraction = selectionInteraction
+  externalSelectionModel = model
+  const isKnown = (CONFIG.DEEPSEEK_MODELS || []).some(option => option.value === model && option.value !== 'custom')
+    || discoveredModels.value.some(option => option.value === model)
+  selectedModelOption.value = isKnown ? model : 'custom'
+  customModelVisible.value = !isKnown
+}, { flush: 'sync' })
+
 const syncSavedSelection = (requestId, key, selectionAtStart) => {
+  const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
+  const isCurrentExternalSelection = selectionAtStart !== selectionInteraction
+    && externalSelectionInteraction === selectionInteraction
+    && externalSelectionModel === savedModel
+    && (settingsStore.settings?.DEEPSEEK_MODEL_SOURCE || CONFIG.DEEPSEEK_MODEL_SOURCE) !== 'custom'
   if (requestId !== discoveryRequestId
     || key !== deepseekApiKey.value
-    || selectionAtStart !== selectionInteraction
+    || settingsStore.isSettingDirty('DEEPSEEK_API_MODEL')
+    || (selectionAtStart !== selectionInteraction && !isCurrentExternalSelection)
     || selectedModelOption.value !== 'custom') return
-  const savedModel = settingsStore.settings?.DEEPSEEK_API_MODEL || CONFIG.DEEPSEEK_API_MODEL
   const isPredefined = (CONFIG.DEEPSEEK_MODELS || []).some(model => model.value === savedModel && model.value !== 'custom')
     || discoveredModels.value.some(model => model.value === savedModel)
   if (isPredefined) {
@@ -286,7 +313,7 @@ const catalogModelSelection = computed({
     selectionInteraction++
     selectedModelOption.value = value
     customModelVisible.value = false
-    settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
+    updateModelLocally(value)
     settingsStore.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', 'catalog')
   }
 })
@@ -338,7 +365,7 @@ const deepseekApiModel = computed({
     const previousSource = settingsStore.settings?.DEEPSEEK_MODEL_SOURCE || CONFIG.DEEPSEEK_MODEL_SOURCE
     selectedModelOption.value = value;
     if (value !== 'custom') {
-      settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value)
+      updateModelLocally(value)
     }
     const isCurated = (CONFIG.DEEPSEEK_MODELS || []).some(model => model.value === value && model.value !== 'custom')
     const isCatalog = discoveredModels.value.some(model => model.value === value)
@@ -358,7 +385,7 @@ const deepseekCustomModel = computed({
   set: (value) => {
     selectionInteraction++
     customModelVisible.value = true
-    settingsStore.updateSettingLocally('DEEPSEEK_API_MODEL', value);
+    updateModelLocally(value)
     settingsStore.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', 'custom')
   }
 })

@@ -170,6 +170,101 @@ describe('Settings Store', () => {
     });
   });
 
+  describe('provider model draft reconciliation', () => {
+    it('protects each dirty provider group while clean provider groups sync independently', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      const modelKeys = [
+        'GEMINI_MODEL', 'OPENAI_API_MODEL', 'OPENROUTER_API_MODEL',
+        'REQUESTY_API_MODEL', 'DEEPSEEK_API_MODEL', 'WEBAI_API_MODEL'
+      ];
+
+      store.updateSettingLocally('OPENAI_API_MODEL', 'draft/openai');
+      onChange({ key: 'WEBAI_API_MODEL', newValue: 'clean/webai', oldValue: '' });
+      expect(store.settings.WEBAI_API_MODEL).toBe('clean/webai');
+
+      modelKeys.forEach((key) => store.updateSettingLocally(key, `draft/${key}`));
+      onChange({ key: 'GEMINI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'GEMINI_API_URL', newValue: 'https://external.example/gemini', oldValue: '' });
+      onChange({ key: 'OPENAI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'OPENROUTER_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'DEEPSEEK_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+
+      for (const key of modelKeys) {
+        expect(store.settings[key]).toBe(`draft/${key}`);
+        expect(store.isSettingDirty(key)).toBe(true);
+      }
+      expect(store.settings.GEMINI_MODEL_SOURCE).not.toBe('catalog');
+      expect(store.settings.GEMINI_API_URL).not.toBe('https://external.example/gemini');
+      expect(store.settings.OPENAI_MODEL_SOURCE).not.toBe('catalog');
+      expect(store.settings.OPENROUTER_MODEL_SOURCE).not.toBe('catalog');
+      expect(store.settings.DEEPSEEK_MODEL_SOURCE).not.toBe('catalog');
+    });
+
+    it('syncs clean model settings and resumes external updates after successful Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      onChange({ key: 'WEBAI_API_MODEL', newValue: 'clean/external-model', oldValue: '' });
+      expect(store.settings.WEBAI_API_MODEL).toBe('clean/external-model');
+      expect(store.isSettingDirty('WEBAI_API_MODEL')).toBe(false);
+
+      store.updateSettingLocally('OPENAI_API_MODEL', 'draft/custom-model');
+      store.updateSettingLocally('OPENAI_MODEL_SOURCE', 'custom');
+      onChange({ key: 'OPENAI_API_MODEL', newValue: 'external/before-save', oldValue: '' });
+      onChange({ key: 'OPENAI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      expect(store.settings.OPENAI_API_MODEL).toBe('draft/custom-model');
+      expect(store.settings.OPENAI_MODEL_SOURCE).toBe('custom');
+
+      await store.saveAllSettings();
+      expect(store.isSettingDirty('OPENAI_API_MODEL')).toBe(false);
+      onChange({ key: 'OPENAI_API_MODEL', newValue: 'external/after-save', oldValue: 'draft/custom-model' });
+      onChange({ key: 'OPENAI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      expect(store.settings.OPENAI_API_MODEL).toBe('external/after-save');
+      expect(store.settings.OPENAI_MODEL_SOURCE).toBe('catalog');
+    });
+
+    it('retains model and source drafts after failed Save and newer in-flight edits', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('DEEPSEEK_API_MODEL', 'first/custom-draft');
+      store.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', 'custom');
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+      await expect(store.saveAllSettings()).rejects.toThrow('storage failed');
+      onChange({ key: 'DEEPSEEK_API_MODEL', newValue: 'external/failed-save', oldValue: '' });
+      expect(store.settings.DEEPSEEK_API_MODEL).toBe('first/custom-draft');
+      expect(store.isSettingDirty('DEEPSEEK_MODEL_SOURCE')).toBe(true);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise(resolve => { resolveWrite = resolve; }));
+      const saving = store.saveAllSettings();
+      store.updateSettingLocally('DEEPSEEK_API_MODEL', 'newer/custom-draft');
+      resolveWrite(true);
+      await saving;
+      onChange({ key: 'DEEPSEEK_API_MODEL', newValue: 'external/in-flight', oldValue: '' });
+      onChange({ key: 'DEEPSEEK_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      expect(store.settings.DEEPSEEK_API_MODEL).toBe('newer/custom-draft');
+      expect(store.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
+      expect(store.isSettingDirty('DEEPSEEK_API_MODEL')).toBe(true);
+    });
+
+    it('protects Gemini URL, model, and source together until Save succeeds', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('GEMINI_API_URL', 'https://custom.local/models/draft');
+      store.updateSettingLocally('GEMINI_MODEL_SOURCE', 'custom');
+      onChange({ key: 'GEMINI_MODEL', newValue: 'external/model', oldValue: '' });
+      onChange({ key: 'GEMINI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'GEMINI_API_URL', newValue: 'https://external.example/models', oldValue: '' });
+      expect(store.settings.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+      expect(store.settings.GEMINI_MODEL_SOURCE).toBe('custom');
+      expect(store.settings.GEMINI_API_URL).toBe('https://custom.local/models/draft');
+
+      await store.saveAllSettings();
+      onChange({ key: 'GEMINI_MODEL', newValue: 'external/after-save', oldValue: CONFIG.GEMINI_MODEL });
+      expect(store.settings.GEMINI_MODEL).toBe('external/after-save');
+    });
+  });
+
   it('should initialize with default settings', () => {
     const store = useSettingsStore();
     expect(store.settings.THEME).toBe('auto');

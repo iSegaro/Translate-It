@@ -90,6 +90,7 @@ describe('OpenRouterApiSettings model catalog', () => {
     vi.useFakeTimers()
     mocks.settingsStore = {
       settings: reactive({ OPENROUTER_API_KEY: 'key-one', OPENROUTER_API_MODEL: 'curated/model-one' }),
+      isSettingDirty: vi.fn(() => false),
       updateSettingLocally: vi.fn((key, value) => { mocks.settingsStore.settings[key] = value }),
     }
     mocks.fetchModels.mockReset()
@@ -424,6 +425,96 @@ describe('OpenRouterApiSettings model catalog', () => {
     await wrapper.get('.model-select').setValue('unlisted-model-id')
     expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('')
     expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('legacy')
+    wrapper.unmount()
+  })
+
+  it('reconciles external models read-only and keeps Custom input drafts selected', async () => {
+    mocks.fetchModels.mockResolvedValue([])
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = 'curated/model-two'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('curated/model-two')
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = 'custom'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').exists()).toBe(true)
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = 'external/unknown'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe('external/unknown')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    await wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').setValue('local-draft')
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('local-draft')
+    wrapper.unmount()
+  })
+
+  it('does not let a late discovery result replace a newer external selection', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = 'curated/model-two'
+    await nextTick()
+    pending.resolve([{ value: 'curated/model-one', name: 'Old Model', pricing: null }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('curated/model-two')
+    wrapper.unmount()
+  })
+
+  it('selects the current external catalog model when deferred discovery advertises it', async () => {
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = 'external/catalog-model'
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    pending.resolve([{ value: 'external/catalog-model', name: 'External Model', pricing: null }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('external/catalog-model')
+    expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('catalog')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', 'external/catalog-model')
+    wrapper.unmount()
+  })
+
+  it.each(['fetched', 'cached'])('keeps an explicitly Custom saved model selected when it appears in the %s catalog', async (path) => {
+    const model = 'vendor/custom-model'
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = model
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'custom'
+    if (path === 'cached') {
+      mocks.getCachedModels.mockReturnValue([{ value: model, name: 'Same ID', pricing: null }])
+    } else {
+      mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Same ID', pricing: null }])
+    }
+
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe(model)
+    expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe(model)
+    expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('custom')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_MODEL_SOURCE', 'catalog')
+    wrapper.unmount()
+  })
+
+  it('keeps a dirty Custom draft selected when discovery returns the same ID', async () => {
+    const model = 'vendor/custom-draft'
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = model
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'custom'
+    mocks.settingsStore.isSettingDirty.mockReturnValue(true)
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+    pending.resolve([{ value: model, name: 'Catalog Match', pricing: null }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe(model)
+    expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('custom')
     wrapper.unmount()
   })
 })
