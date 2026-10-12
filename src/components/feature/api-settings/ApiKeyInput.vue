@@ -54,7 +54,7 @@
             {{ translatedTestResult }}
           </div>
           <button
-            :disabled="testing || (!hasKeys && !allowEmptyTest)"
+            :disabled="testing || testDisabled || (!hasKeys && !allowEmptyTest)"
             class="test-keys-button"
             :class="{ 'testing-keys': testing }"
             @click="handleTestKeys"
@@ -107,6 +107,10 @@ const props = defineProps({
     default: false
   },
   testing: {
+    type: Boolean,
+    default: false
+  },
+  testDisabled: {
     type: Boolean,
     default: false
   },

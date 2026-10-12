@@ -1548,6 +1548,9 @@
   "deepseek_custom_endpoint_info": {
     "message": "از URL سفارشی API استفاده می‌شود — کاتالوگ مدل‌های DeepSeek بارگذاری نمی‌شود."
   },
+  "deepseek_test_endpoint_unsupported": {
+    "message": "برای آزمایش کلیدها، نشانی chat-completions باید HTTPS باشد یا از HTTP روی localhost استفاده کند."
+  },
   "deepseek_thinking_mode_label": {
     "message": "حالت تفکر"
   },

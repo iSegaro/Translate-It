@@ -1548,6 +1548,9 @@
   "deepseek_custom_endpoint_info": {
     "message": "Using a custom API URL — DeepSeek's model catalog is not loaded."
   },
+  "deepseek_test_endpoint_unsupported": {
+    "message": "Test Keys requires an HTTPS chat-completions URL or an HTTP chat-completions URL on localhost."
+  },
   "deepseek_thinking_mode_label": {
     "message": "Thinking Mode"
   },

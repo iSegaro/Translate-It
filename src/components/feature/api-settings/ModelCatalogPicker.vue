@@ -210,6 +210,15 @@
         v-else-if="totalMatches > visibleModels.length"
         class="model-catalog-picker__status"
       >{{ showingCountText }}</small>
+      <!-- Persistent announcer: one stable element per open panel whose text
+           mirrors search outcomes for AT (no-match, results back, count
+           changes). The visible hints above stay conditional and unchanged. -->
+      <span
+        class="ti-sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{{ announcementText }}</span>
     </div>
   </div>
 </template>
@@ -358,6 +367,44 @@ const showingCountText = computed(() => tr(
   { shown: visibleModels.value.length, total: totalMatches.value },
 ))
 
+// ------------------------------------------------------- search announcements ---
+// Persistent polite live region (see template): announces settled search
+// outcomes only — no-match, results available again, and match-count changes.
+// The message derives from match counts alone, so opening the panel or
+// re-sorting never changes it and never announces.
+const SEARCH_ANNOUNCE_DEBOUNCE_MS = 300
+const announcementText = ref('')
+let announceTimer
+
+const announcementMessage = computed(() => {
+  if (totalMatches.value === 0) {
+    return props.models.length > 0
+      ? tr('model_catalog_no_matches', 'No models match your search.')
+      : ''
+  }
+  return showingCountText.value
+})
+
+function scheduleAnnouncement() {
+  // Close resets searchQuery; that change must never schedule an announcement.
+  if (!isOpen.value) return
+  // Debounce restarts on EVERY trigger: the announcement fires only after
+  // SEARCH_ANNOUNCE_DEBOUNCE_MS without one. The message is read at fire time,
+  // and an identical message never mutates the region (no duplicates).
+  clearTimeout(announceTimer)
+  announceTimer = setTimeout(() => {
+    announceTimer = null
+    const message = announcementMessage.value
+    if (!isOpen.value || message === announcementText.value) return
+    announcementText.value = message
+  }, SEARCH_ANNOUNCE_DEBOUNCE_MS)
+}
+// Every keystroke resets the window — including count-preserving queries that
+// leave announcementMessage untouched — so typing can never announce mid-burst.
+watch(searchQuery, scheduleAnnouncement)
+// Count changes without typing (models arriving/refreshing) also schedule.
+watch(announcementMessage, scheduleAnnouncement)
+
 watch(() => props.showPricing, (showPricing) => {
   if (!showPricing && activeField.value && activeField.value !== 'name') sortKey.value = 'api'
 })
@@ -479,6 +526,11 @@ function closePanel(restoreFocus) {
   if (!isOpen.value) return
   isOpen.value = false
   searchQuery.value = ''
+  // A pending announcement must not outlive the panel; reopening starts
+  // silent (no announcement on open).
+  clearTimeout(announceTimer)
+  announceTimer = null
+  announcementText.value = ''
   // A pending arrow flag must not outlive the panel (keydown without a
   // follow-up change, then Escape/outside close before keyup).
   arrowNavPending = false
@@ -510,6 +562,7 @@ watch(isOpen, (open) => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(announceTimer)
   document.removeEventListener('click', handleDocumentClick)
   window.removeEventListener('scroll', positionPanel, true)
   window.removeEventListener('resize', positionPanel)

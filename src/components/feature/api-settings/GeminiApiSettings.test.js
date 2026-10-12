@@ -118,6 +118,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
           { value: 'custom', name: 'Custom Model' },
         ],
       }),
+      isSettingDirty: vi.fn(() => false),
       updateSettingLocally: vi.fn((key, value) => { mocks.settingsStore.settings[key] = value }),
     }
     mocks.fetchModels.mockReset()
@@ -552,6 +553,202 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     expect(region.element.contains(officialInfo.element)).toBe(false)
     const picker = wrapper.get('[data-test="model-catalog-picker"]')
     expect(region.element.contains(picker.element)).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('reconciles external model changes without writing settings and keeps local Custom edits selected', async () => {
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.GEMINI_MODEL = 'curated-two'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('curated-two')
+    mocks.settingsStore.settings.GEMINI_MODEL = 'external/unknown'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').exists()).toBe(true)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL_SOURCE', expect.anything())
+    await wrapper.get('.model-select').setValue('custom')
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    wrapper.unmount()
+  })
+
+  it('keeps an external selection current when an older discovery request resolves late', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.GEMINI_MODEL = 'curated-two'
+    await nextTick()
+    pending.resolve([{ value: 'curated-one', name: 'Old Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('curated-two')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('legacy')
+    wrapper.unmount()
+  })
+
+  it('reconciles Gemini model and source changes regardless of their write order', async () => {
+    mocks.settingsStore.settings.GEMINI_MODEL = 'legacy/saved'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/model-first'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/model-first')
+
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/source-first'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/source-first')
+
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'custom'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL_SOURCE', expect.anything())
+    wrapper.unmount()
+  })
+
+  it('keeps a discovered legacy model Custom with its effective URL, while explicit catalog provenance selects it', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/listed-id'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/legacy-route:generateContent'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+
+    pending.resolve([{ value: 'catalog/listed-id', name: 'Listed Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').element.value).toBe('https://generativelanguage.googleapis.com/v1beta/models/legacy-route:generateContent')
+    expect(wrapper.get('.model-select').findAll('option').map(option => option.element.value)).toContain('catalog/listed-id')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/listed-id')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('reconciles source-only and external URL changes without persisting or replacing the legacy URL', async () => {
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/listed-id'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://proxy.example/first:generateContent'
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/listed-id')
+
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    const externalUrl = 'https://proxy.example/updated:generateContent'
+    mocks.settingsStore.settings.GEMINI_API_URL = externalUrl
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').element.value).toBe(externalUrl)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['legacy', 'legacy/deferred-match'],
+    ['custom', 'custom/deferred-match'],
+  ])('does not let deferred discovery promote a %s selection', async (source, model) => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = model
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = source
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    pending.resolve([{ value: model, name: 'Catalog Match' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').exists()).toBe(true)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('represents the current external catalog model when deferred discovery advertises it', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/external'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    pending.resolve([{ value: 'catalog/external', name: 'External Catalog Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/external')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', 'catalog/external')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('catalog')
+    wrapper.unmount()
+  })
+
+  it('keeps local curated, catalog, Custom, and saved-legacy selections consistent with their sources', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'legacy/saved'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    mocks.getCachedModels.mockReturnValue([{ value: 'catalog/local', name: 'Local Catalog Model' }])
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+
+    await wrapper.get('.model-select').setValue('curated-two')
+    expect(wrapper.get('.model-select').element.value).toBe('curated-two')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('curated')
+
+    await wrapper.get('[data-value="catalog/local"]').trigger('click')
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/local')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('catalog')
+
+    await wrapper.get('.model-select').setValue('custom')
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('custom')
+
+    mocks.settingsStore.settings.GEMINI_MODEL = 'legacy/saved'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    await nextTick()
+    await wrapper.get('.model-select').setValue('legacy/saved')
+    expect(wrapper.get('.model-select').element.value).toBe('legacy/saved')
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('legacy')
+    wrapper.unmount()
+  })
+
+  it('does not let discovery replace a dirty Custom model draft', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'draft/custom-model'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'custom'
+    mocks.settingsStore.isSettingDirty.mockReturnValue(true)
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    pending.resolve([{ value: 'draft/custom-model', name: 'Catalog Match' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').exists()).toBe(true)
+    expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('custom')
+    wrapper.unmount()
+  })
+
+  it('associates the main Model label with its native select and keeps selection working', async () => {
+    const wrapper = mount(GeminiApiSettings)
+    const select = wrapper.get('#gemini-model-select')
+    const label = wrapper.get('label[for="gemini-model-select"]')
+    expect(label.element.control).toBe(select.element)
+    await select.setValue('curated-two')
+    expect(select.element.value).toBe('curated-two')
+    const ids = wrapper.findAll('[id]').map(element => element.attributes('id'))
+    expect(ids).toHaveLength(new Set(ids).size)
     wrapper.unmount()
   })
 })

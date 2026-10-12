@@ -57,6 +57,214 @@ describe('Settings Store', () => {
     vi.clearAllMocks();
   });
 
+  const getStorageChangeListener = async (store) => {
+    await store.loadSettings();
+    return storageManager.on.mock.calls.at(-1)?.[1];
+  };
+
+  describe('API-key promotion reconciliation', () => {
+    it('protects a dirty API-key draft while syncing clean API keys', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-key', oldValue: 'stored-key' });
+      onChange({ key: 'GEMINI_API_KEY', newValue: 'clean-promotion', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+      expect(store.settings.GEMINI_API_KEY).toBe('clean-promotion');
+    });
+
+    it('persists a dirty key and clears its dirty state only after successful Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'intentional-key');
+
+      await store.saveAllSettings();
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'later-promotion', oldValue: 'intentional-key' });
+
+      expect(storageManager.set.mock.calls.at(-1)[0].OPENAI_API_KEY).toBe('intentional-key');
+      expect(store.settings.OPENAI_API_KEY).toBe('later-promotion');
+    });
+
+    it('retains a dirty draft after a failed Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.saveAllSettings()).rejects.toThrow('storage failed');
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-key', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+    });
+
+    it('does not clear a newer edit made while Save is in flight', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'first-draft');
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise(resolve => { resolveWrite = resolve; }));
+
+      const saving = store.saveAllSettings();
+      store.updateSettingLocally('OPENAI_API_KEY', 'newer-draft');
+      resolveWrite(true);
+      await saving;
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promotion', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('newer-draft');
+    });
+
+    it('tracks dirty state independently for each provider key', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'openai-draft');
+
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'openai-promotion', oldValue: '' });
+      onChange({ key: 'GEMINI_API_KEY', newValue: 'gemini-promotion', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('openai-draft');
+      expect(store.settings.GEMINI_API_KEY).toBe('gemini-promotion');
+    });
+
+    it('continues syncing unrelated settings while an API key is dirty', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+
+      onChange({ key: 'THEME', newValue: 'dark', oldValue: 'auto' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+      expect(store.settings.THEME).toBe('dark');
+    });
+
+    it('clears draft tracking after reset and reload', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+      await store.resetSettings();
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'external-key', oldValue: '' });
+      expect(store.settings.OPENAI_API_KEY).toBe('external-key');
+
+      store.updateSettingLocally('OPENAI_API_KEY', 'another-draft');
+      store.isInitialized = false;
+      storageManager.get.mockResolvedValueOnce({ OPENAI_API_KEY: 'loaded-key' });
+      await store.loadSettings();
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'reloaded-promotion', oldValue: '' });
+      expect(store.settings.OPENAI_API_KEY).toBe('reloaded-promotion');
+    });
+
+    it('clears prior draft tracking when importing settings', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        OPENAI_API_KEY: 'imported-key'
+      });
+
+      await store.importSettings({ THEME: 'dark', _exported: true });
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-after-import', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('promoted-after-import');
+    });
+  });
+
+  describe('provider model draft reconciliation', () => {
+    it('protects each dirty provider group while clean provider groups sync independently', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      const modelKeys = [
+        'GEMINI_MODEL', 'OPENAI_API_MODEL', 'OPENROUTER_API_MODEL',
+        'REQUESTY_API_MODEL', 'DEEPSEEK_API_MODEL', 'WEBAI_API_MODEL'
+      ];
+
+      store.updateSettingLocally('OPENAI_API_MODEL', 'draft/openai');
+      onChange({ key: 'WEBAI_API_MODEL', newValue: 'clean/webai', oldValue: '' });
+      expect(store.settings.WEBAI_API_MODEL).toBe('clean/webai');
+
+      modelKeys.forEach((key) => store.updateSettingLocally(key, `draft/${key}`));
+      onChange({ key: 'GEMINI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'GEMINI_API_URL', newValue: 'https://external.example/gemini', oldValue: '' });
+      onChange({ key: 'OPENAI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'OPENROUTER_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'DEEPSEEK_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+
+      for (const key of modelKeys) {
+        expect(store.settings[key]).toBe(`draft/${key}`);
+        expect(store.isSettingDirty(key)).toBe(true);
+      }
+      expect(store.settings.GEMINI_MODEL_SOURCE).not.toBe('catalog');
+      expect(store.settings.GEMINI_API_URL).not.toBe('https://external.example/gemini');
+      expect(store.settings.OPENAI_MODEL_SOURCE).not.toBe('catalog');
+      expect(store.settings.OPENROUTER_MODEL_SOURCE).not.toBe('catalog');
+      expect(store.settings.DEEPSEEK_MODEL_SOURCE).not.toBe('catalog');
+    });
+
+    it('syncs clean model settings and resumes external updates after successful Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      onChange({ key: 'WEBAI_API_MODEL', newValue: 'clean/external-model', oldValue: '' });
+      expect(store.settings.WEBAI_API_MODEL).toBe('clean/external-model');
+      expect(store.isSettingDirty('WEBAI_API_MODEL')).toBe(false);
+
+      store.updateSettingLocally('OPENAI_API_MODEL', 'draft/custom-model');
+      store.updateSettingLocally('OPENAI_MODEL_SOURCE', 'custom');
+      onChange({ key: 'OPENAI_API_MODEL', newValue: 'external/before-save', oldValue: '' });
+      onChange({ key: 'OPENAI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      expect(store.settings.OPENAI_API_MODEL).toBe('draft/custom-model');
+      expect(store.settings.OPENAI_MODEL_SOURCE).toBe('custom');
+
+      await store.saveAllSettings();
+      expect(store.isSettingDirty('OPENAI_API_MODEL')).toBe(false);
+      onChange({ key: 'OPENAI_API_MODEL', newValue: 'external/after-save', oldValue: 'draft/custom-model' });
+      onChange({ key: 'OPENAI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      expect(store.settings.OPENAI_API_MODEL).toBe('external/after-save');
+      expect(store.settings.OPENAI_MODEL_SOURCE).toBe('catalog');
+    });
+
+    it('retains model and source drafts after failed Save and newer in-flight edits', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('DEEPSEEK_API_MODEL', 'first/custom-draft');
+      store.updateSettingLocally('DEEPSEEK_MODEL_SOURCE', 'custom');
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+      await expect(store.saveAllSettings()).rejects.toThrow('storage failed');
+      onChange({ key: 'DEEPSEEK_API_MODEL', newValue: 'external/failed-save', oldValue: '' });
+      expect(store.settings.DEEPSEEK_API_MODEL).toBe('first/custom-draft');
+      expect(store.isSettingDirty('DEEPSEEK_MODEL_SOURCE')).toBe(true);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise(resolve => { resolveWrite = resolve; }));
+      const saving = store.saveAllSettings();
+      store.updateSettingLocally('DEEPSEEK_API_MODEL', 'newer/custom-draft');
+      resolveWrite(true);
+      await saving;
+      onChange({ key: 'DEEPSEEK_API_MODEL', newValue: 'external/in-flight', oldValue: '' });
+      onChange({ key: 'DEEPSEEK_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      expect(store.settings.DEEPSEEK_API_MODEL).toBe('newer/custom-draft');
+      expect(store.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
+      expect(store.isSettingDirty('DEEPSEEK_API_MODEL')).toBe(true);
+    });
+
+    it('protects Gemini URL, model, and source together until Save succeeds', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('GEMINI_API_URL', 'https://custom.local/models/draft');
+      store.updateSettingLocally('GEMINI_MODEL_SOURCE', 'custom');
+      onChange({ key: 'GEMINI_MODEL', newValue: 'external/model', oldValue: '' });
+      onChange({ key: 'GEMINI_MODEL_SOURCE', newValue: 'catalog', oldValue: 'custom' });
+      onChange({ key: 'GEMINI_API_URL', newValue: 'https://external.example/models', oldValue: '' });
+      expect(store.settings.GEMINI_MODEL).toBe(CONFIG.GEMINI_MODEL);
+      expect(store.settings.GEMINI_MODEL_SOURCE).toBe('custom');
+      expect(store.settings.GEMINI_API_URL).toBe('https://custom.local/models/draft');
+
+      await store.saveAllSettings();
+      onChange({ key: 'GEMINI_MODEL', newValue: 'external/after-save', oldValue: CONFIG.GEMINI_MODEL });
+      expect(store.settings.GEMINI_MODEL).toBe('external/after-save');
+    });
+  });
+
   it('should initialize with default settings', () => {
     const store = useSettingsStore();
     expect(store.settings.THEME).toBe('auto');
