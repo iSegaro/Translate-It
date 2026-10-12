@@ -35,38 +35,32 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Make sure [**Node.js**](https://nodejs.org/) and [**pnpm**](https://pnpm.io/) are installed. Then, clone the repository and install the dependencies:
+Install [**Node.js 22**](https://nodejs.org/) (the CI version; Node.js 20.19.0 is the minimum required by Vite 8) and [**pnpm 12.8.1**](https://pnpm.io/) (the version pinned by the project and CI). Clone the repository and run setup:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git
 cd Translate-It
-pnpm install
+pnpm run setup
 ```
 
 The `scripts/ci/*.test.js` tests execute the release shell scripts, so they also require `git`, `bash`, and `jq` on `PATH`. On Windows, install [Git for Windows](https://git-scm.com/download/win) (which provides `git` and `bash`) and a `jq` executable. The preflight tests use the real `git` with temporary local repositories; the release tests mock the GitHub CLI (`gh`) and other relevant commands. None of these tests make real GitHub API calls.
 
-### Initial Setup
-
-After installing dependencies, run the setup command to ensure all development tools are configured:
-
-```bash
-pnpm run setup
-```
-
-This will configure the development environment and install any additional tools needed for validation.
+`pnpm run setup` checks the required tool versions and runs `pnpm install --frozen-lockfile`. It does not build the extensions or run validation.
 
 ### Building for Development
 
 To generate the unpacked extension files for development, run:
 
 ```bash
-# Build for both browsers (Parallel)
+# Build both browsers in parallel
 pnpm run build
 
 # Build for a specific browser
 pnpm run build:chrome
 pnpm run build:firefox
 ```
+
+To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**.
 
 To actively develop and apply changes in real time, use the following commands:
 
@@ -83,6 +77,9 @@ pnpm run watch:firefox
 To ensure code quality and catch potential issues early, you can run ESLint and Stylelint:
 
 ```bash
+# Run tests
+pnpm run test:run
+
 # Lint JS source code
 pnpm run lint
 
@@ -106,11 +103,7 @@ pnpm run validate:firefox
 pnpm run validate:chrome
 ```
 
-**Note:** For Chrome validation, you need `web-ext` installed. If it's not available, install it with:
-
-```bash
-pnpm run setup:chrome-validator
-```
+`web-ext` is included in the project dependencies. `pnpm run setup:chrome-validator` remains available as a legacy fallback if it is missing locally.
 
 #### Pre-submission Workflow
 
