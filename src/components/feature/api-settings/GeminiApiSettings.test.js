@@ -614,6 +614,69 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     wrapper.unmount()
   })
 
+  it('keeps a discovered legacy model Custom with its effective URL, while explicit catalog provenance selects it', async () => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/listed-id'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/legacy-route:generateContent'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+
+    pending.resolve([{ value: 'catalog/listed-id', name: 'Listed Model' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').element.value).toBe('https://generativelanguage.googleapis.com/v1beta/models/legacy-route:generateContent')
+    expect(wrapper.get('.model-select').findAll('option').map(option => option.element.value)).toContain('catalog/listed-id')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/listed-id')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('reconciles source-only and external URL changes without persisting or replacing the legacy URL', async () => {
+    mocks.settingsStore.settings.GEMINI_MODEL = 'catalog/listed-id'
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'catalog'
+    mocks.settingsStore.settings.GEMINI_API_URL = 'https://proxy.example/first:generateContent'
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('catalog/listed-id')
+
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = 'legacy'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    const externalUrl = 'https://proxy.example/updated:generateContent'
+    mocks.settingsStore.settings.GEMINI_API_URL = externalUrl
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').element.value).toBe(externalUrl)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it.each([
+    ['legacy', 'legacy/deferred-match'],
+    ['custom', 'custom/deferred-match'],
+  ])('does not let deferred discovery promote a %s selection', async (source, model) => {
+    mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
+    mocks.settingsStore.settings.GEMINI_MODEL = model
+    mocks.settingsStore.settings.GEMINI_MODEL_SOURCE = source
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(GeminiApiSettings)
+    await flushPromises()
+    pending.resolve([{ value: model, name: 'Catalog Match' }])
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('#GEMINI_API_URL').exists()).toBe(true)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
   it('represents the current external catalog model when deferred discovery advertises it', async () => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     const pending = deferred()

@@ -194,6 +194,7 @@ describe('OpenAIApiSettings model catalog', () => {
 
     mocks.settingsStore.settings.OPENAI_API_KEY = 'secret-key'
     mocks.settingsStore.settings.OPENAI_API_MODEL = 'server/saved-model'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'legacy'
     const saved = deferred()
     mocks.fetchModels.mockReturnValueOnce(saved.promise)
     const savedWrapper = mount(OpenAIApiSettings)
@@ -493,6 +494,75 @@ describe('OpenAIApiSettings model catalog', () => {
     expect(wrapper.get('.model-select').element.value).toBe('custom')
     expect(mocks.settingsStore.settings.OPENAI_API_MODEL).toBe('my-draft')
     expect(mocks.settingsStore.settings.OPENAI_MODEL_SOURCE).toBe('custom')
+    wrapper.unmount()
+  })
+
+  it('uses external source-only changes to distinguish a catalog ID from Custom without writing', async () => {
+    const model = 'vendor/listed-model'
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    mocks.settingsStore.settings.OPENAI_API_MODEL = model
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Listed Model' }])
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe(model)
+
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'custom'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').element.value).toBe(model)
+
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe(model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODEL_SOURCE', expect.anything())
+    wrapper.unmount()
+  })
+
+  it.each(['model-first', 'source-first'])('keeps an externally selected catalog-listed ID Custom when source arrives %s', async (order) => {
+    const model = 'vendor/listed-model'
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Listed Model' }])
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+
+    if (order === 'model-first') {
+      mocks.settingsStore.settings.OPENAI_API_MODEL = model
+      await nextTick()
+      mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'custom'
+    } else {
+      mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'custom'
+      await nextTick()
+      mocks.settingsStore.settings.OPENAI_API_MODEL = model
+    }
+    await nextTick()
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').element.value).toBe(model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODEL_SOURCE', expect.anything())
+    wrapper.unmount()
+  })
+
+  it('does not promote a current external Custom model when deferred discovery later lists it', async () => {
+    const model = 'vendor/external-custom'
+    mocks.settingsStore.settings.OPENAI_API_KEY = 'key'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenAIApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENAI_API_MODEL = model
+    mocks.settingsStore.settings.OPENAI_MODEL_SOURCE = 'custom'
+    await nextTick()
+    pending.resolve([{ value: model, name: 'Catalog Match' }])
+    await flushPromises()
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openai_custom_model_placeholder"]').element.value).toBe(model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENAI_MODEL_SOURCE', expect.anything())
     wrapper.unmount()
   })
 

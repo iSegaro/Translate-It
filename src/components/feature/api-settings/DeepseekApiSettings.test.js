@@ -309,6 +309,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
 
     mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'secret-key';
     mocks.settingsStore.settings.DEEPSEEK_API_MODEL = 'server/saved-model';
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'legacy';
     const saved = deferred();
     mocks.fetchModels.mockReturnValueOnce(saved.promise);
     const savedWrapper = mount(DeepseekApiSettings);
@@ -642,6 +643,7 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(wrapper.get('.model-select').element.value).toBe('custom');
     expect(mocks.settingsStore.settings.DEEPSEEK_API_MODEL).toBe('local-draft');
     mocks.settingsStore.settings.DEEPSEEK_API_MODEL = 'thinking-model';
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'curated';
     await nextTick();
     expect(wrapper.get('.model-select').element.value).toBe('thinking-model');
     expect(wrapper.find('.thinking-mode-select').exists()).toBe(true);
@@ -697,6 +699,75 @@ describe('DeepseekApiSettings thinking mode eligibility', () => {
     expect(mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE).toBe('custom');
     expect(wrapper.find('.thinking-mode-select').exists()).toBe(false);
     expect(mocks.settingsStore.settings.DEEPSEEK_THINKING_MODE).toBe('high');
+    wrapper.unmount();
+  });
+
+  it('uses external source-only changes to distinguish a catalog ID from Custom without writing', async () => {
+    const model = 'vendor/listed-model';
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_API_MODEL = model;
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'catalog';
+    mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Listed Model' }]);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    expect(wrapper.get('.model-select').element.value).toBe(model);
+
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'custom';
+    await nextTick();
+    expect(wrapper.get('.model-select').element.value).toBe('custom');
+    expect(wrapper.get('[placeholder="deepseek_custom_model_placeholder"]').element.value).toBe(model);
+
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'catalog';
+    await nextTick();
+    expect(wrapper.get('.model-select').element.value).toBe(model);
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', expect.anything());
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_MODEL_SOURCE', expect.anything());
+    wrapper.unmount();
+  });
+
+  it.each(['model-first', 'source-first'])('keeps an externally selected catalog-listed ID Custom when source arrives %s', async (order) => {
+    const model = 'vendor/listed-model';
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'catalog';
+    mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Listed Model' }]);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+
+    if (order === 'model-first') {
+      mocks.settingsStore.settings.DEEPSEEK_API_MODEL = model;
+      await nextTick();
+      mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'custom';
+    } else {
+      mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'custom';
+      await nextTick();
+      mocks.settingsStore.settings.DEEPSEEK_API_MODEL = model;
+    }
+    await nextTick();
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom');
+    expect(wrapper.get('[placeholder="deepseek_custom_model_placeholder"]').element.value).toBe(model);
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', expect.anything());
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_MODEL_SOURCE', expect.anything());
+    wrapper.unmount();
+  });
+
+  it('does not promote a current external Custom model when deferred discovery later lists it', async () => {
+    const model = 'vendor/external-custom';
+    mocks.settingsStore.settings.DEEPSEEK_API_KEY = 'deepseek-key';
+    const pending = deferred();
+    mocks.fetchModels.mockReturnValue(pending.promise);
+    const wrapper = mount(DeepseekApiSettings);
+    await flushPromises();
+    mocks.settingsStore.settings.DEEPSEEK_API_MODEL = model;
+    mocks.settingsStore.settings.DEEPSEEK_MODEL_SOURCE = 'custom';
+    await nextTick();
+    pending.resolve([{ value: model, name: 'Catalog Match' }]);
+    await flushPromises();
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom');
+    expect(wrapper.get('[placeholder="deepseek_custom_model_placeholder"]').element.value).toBe(model);
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_API_MODEL', expect.anything());
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('DEEPSEEK_MODEL_SOURCE', expect.anything());
     wrapper.unmount();
   });
 

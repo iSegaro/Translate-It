@@ -518,6 +518,72 @@ describe('OpenRouterApiSettings model catalog', () => {
     wrapper.unmount()
   })
 
+  it('uses external source-only changes to distinguish a catalog ID from Custom without writing', async () => {
+    const model = 'vendor/listed-model'
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = model
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Listed Model', pricing: null }])
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+    expect(wrapper.get('.model-select').element.value).toBe(model)
+
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'custom'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe(model)
+
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'catalog'
+    await nextTick()
+    expect(wrapper.get('.model-select').element.value).toBe(model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_MODEL_SOURCE', expect.anything())
+    wrapper.unmount()
+  })
+
+  it.each(['model-first', 'source-first'])('keeps an externally selected catalog-listed ID Custom when source arrives %s', async (order) => {
+    const model = 'vendor/listed-model'
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockResolvedValue([{ value: model, name: 'Listed Model', pricing: null }])
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+
+    if (order === 'model-first') {
+      mocks.settingsStore.settings.OPENROUTER_API_MODEL = model
+      await nextTick()
+      mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'custom'
+    } else {
+      mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'custom'
+      await nextTick()
+      mocks.settingsStore.settings.OPENROUTER_API_MODEL = model
+    }
+    await nextTick()
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe(model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_MODEL_SOURCE', expect.anything())
+    wrapper.unmount()
+  })
+
+  it('does not promote a current external Custom model when deferred discovery later lists it', async () => {
+    const model = 'vendor/external-custom'
+    const pending = deferred()
+    mocks.fetchModels.mockReturnValue(pending.promise)
+    const wrapper = mount(OpenRouterApiSettings)
+    await flushPromises()
+    mocks.settingsStore.settings.OPENROUTER_API_MODEL = model
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'custom'
+    await nextTick()
+    pending.resolve([{ value: model, name: 'Catalog Match', pricing: null }])
+    await flushPromises()
+
+    expect(wrapper.get('.model-select').element.value).toBe('custom')
+    expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe(model)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_MODEL_SOURCE', expect.anything())
+    wrapper.unmount()
+  })
+
   it('associates the main Model label with its native select and keeps selection working', async () => {
     mocks.fetchModels.mockResolvedValue([])
     const wrapper = mount(OpenRouterApiSettings)

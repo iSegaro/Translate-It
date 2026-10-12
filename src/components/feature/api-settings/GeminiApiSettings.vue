@@ -144,6 +144,7 @@ let activeController
 let selectionInteraction = 0
 let lastObservedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
 let lastObservedSource = settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE
+let lastObservedUrl = settingsStore.settings?.GEMINI_API_URL || CONFIG.GEMINI_API_URL
 let externalSelectionInteraction = -1
 let externalSelectionModel
 let localModelUpdate = false
@@ -216,6 +217,7 @@ const initializeModelSelection = () => {
   const currentModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL;
   const isPredefined = (CONFIG.GEMINI_MODELS || []).some(option => option.value === currentModel && option.value !== 'custom');
   const isSavedCatalogModel = (settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE) === 'catalog'
+    && currentModel !== 'custom'
   selectedModelOption.value = isPredefined || isSavedCatalogModel ? currentModel : 'custom';
 }
 
@@ -223,18 +225,22 @@ watch(
   () => [
     settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL,
     settingsStore.settings?.GEMINI_MODEL_SOURCE || CONFIG.GEMINI_MODEL_SOURCE,
+    settingsStore.settings?.GEMINI_API_URL || CONFIG.GEMINI_API_URL,
   ],
-  ([model, source]) => {
-    if (model === lastObservedModel && source === lastObservedSource) return
+  ([model, source, url]) => {
+    const modelOrSourceChanged = model !== lastObservedModel || source !== lastObservedSource
+    if (!modelOrSourceChanged && url === lastObservedUrl) return
     lastObservedModel = model
     lastObservedSource = source
+    lastObservedUrl = url
+    if (!modelOrSourceChanged) return
     if (localModelUpdate) return
     selectionInteraction++
     externalSelectionInteraction = selectionInteraction
     externalSelectionModel = model
     const isCurated = (CONFIG.GEMINI_MODELS || []).some(option => option.value === model && option.value !== 'custom')
-    const isDiscovered = discoveredModels.value.some(option => option.value === model)
-    selectedModelOption.value = isCurated || source === 'catalog' || (isDiscovered && source !== 'custom') ? model : 'custom'
+    const isCatalog = source === 'catalog' && model !== 'custom'
+    selectedModelOption.value = isCurated || isCatalog ? model : 'custom'
   },
   { flush: 'sync' }
 )
