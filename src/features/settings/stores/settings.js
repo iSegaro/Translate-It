@@ -60,6 +60,12 @@ function buildPersistedSnapshot(source) {
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
   const settings = ref(getDefaultSettings())
+  const dirtyApiKeyVersions = new Map()
+  let nextApiKeyEditVersion = 0
+  const apiKeySettingKeys = new Set([
+    'API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'REQUESTY_API_KEY',
+    'DEEPSEEK_API_KEY', 'GEMINI_API_KEY', 'CUSTOM_API_KEY', 'DEEPL_API_KEY'
+  ])
   
   // Loading states
   const isLoading = ref(false)
@@ -141,6 +147,10 @@ export const useSettingsStore = defineStore('settings', () => {
         const stored = await storageManager.get(null);
         const current = settings.value;
 
+        // Storage is authoritative during load; discard draft tracking from any
+        // earlier, uninitialized state before applying the persisted snapshot.
+        dirtyApiKeyVersions.clear()
+
   
         // Merge settings from storage (after potential migrations)
         Object.keys(current).forEach(key => {
@@ -208,7 +218,11 @@ export const useSettingsStore = defineStore('settings', () => {
       sanitizeSettings();
 
       // Write-boundary: persist canonical schema keys only, with live values.
+      const savedApiKeyVersions = new Map(dirtyApiKeyVersions)
       await storageManager.set(buildPersistedSnapshot(settings.value));
+      for (const [key, version] of savedApiKeyVersions) {
+        if (dirtyApiKeyVersions.get(key) === version) dirtyApiKeyVersions.delete(key)
+      }
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -225,6 +239,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // Action to update a single setting in the local store state (without immediate persistence)
   const updateSettingLocally = (key, value) => {
     settings.value[key] = value
+    if (apiKeySettingKeys.has(key)) dirtyApiKeyVersions.set(key, ++nextApiKeyEditVersion)
   }
 
   // Action to update a single setting and immediately persist it to storage
@@ -314,6 +329,7 @@ export const useSettingsStore = defineStore('settings', () => {
       // Preserve reference to reactive object
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, defaults);
+      dirtyApiKeyVersions.clear()
       // Persist canonical settings only; translation history is store-owned
       // feature data and is already cleared with storage above.
       await storageManager.set(getPersistedDefaultSettings());
@@ -456,6 +472,7 @@ export const useSettingsStore = defineStore('settings', () => {
       // We replace the entire settings object to ensure no stale old keys remain
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, mergedSettings);
+      dirtyApiKeyVersions.clear()
 
       await saveAllSettings();
       if (removals.length > 0) {
@@ -649,6 +666,7 @@ export const useSettingsStore = defineStore('settings', () => {
    */
   function $reset() {
     settings.value = getDefaultSettings()
+    dirtyApiKeyVersions.clear()
     isInitialized.value = false
     isLoading.value = false
     isSaving.value = false
@@ -659,6 +677,10 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Handle storage changes from other parts of extension
   const handleStorageChange = ({ key, newValue, oldValue }) => {
+    // Provider key promotion is runtime ordering state. Keep a local API-key
+    // draft until its Save succeeds, while allowing all clean keys to sync.
+    if (apiKeySettingKeys.has(key) && dirtyApiKeyVersions.has(key)) return
+
     // Update the reactive settings ref
     if (settings.value[key] !== newValue) {
       settings.value[key] = newValue

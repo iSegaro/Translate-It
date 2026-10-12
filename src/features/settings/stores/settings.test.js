@@ -57,6 +57,119 @@ describe('Settings Store', () => {
     vi.clearAllMocks();
   });
 
+  const getStorageChangeListener = async (store) => {
+    await store.loadSettings();
+    return storageManager.on.mock.calls.at(-1)?.[1];
+  };
+
+  describe('API-key promotion reconciliation', () => {
+    it('protects a dirty API-key draft while syncing clean API keys', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-key', oldValue: 'stored-key' });
+      onChange({ key: 'GEMINI_API_KEY', newValue: 'clean-promotion', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+      expect(store.settings.GEMINI_API_KEY).toBe('clean-promotion');
+    });
+
+    it('persists a dirty key and clears its dirty state only after successful Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'intentional-key');
+
+      await store.saveAllSettings();
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'later-promotion', oldValue: 'intentional-key' });
+
+      expect(storageManager.set.mock.calls.at(-1)[0].OPENAI_API_KEY).toBe('intentional-key');
+      expect(store.settings.OPENAI_API_KEY).toBe('later-promotion');
+    });
+
+    it('retains a dirty draft after a failed Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.saveAllSettings()).rejects.toThrow('storage failed');
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-key', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+    });
+
+    it('does not clear a newer edit made while Save is in flight', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'first-draft');
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise(resolve => { resolveWrite = resolve; }));
+
+      const saving = store.saveAllSettings();
+      store.updateSettingLocally('OPENAI_API_KEY', 'newer-draft');
+      resolveWrite(true);
+      await saving;
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promotion', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('newer-draft');
+    });
+
+    it('tracks dirty state independently for each provider key', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'openai-draft');
+
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'openai-promotion', oldValue: '' });
+      onChange({ key: 'GEMINI_API_KEY', newValue: 'gemini-promotion', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('openai-draft');
+      expect(store.settings.GEMINI_API_KEY).toBe('gemini-promotion');
+    });
+
+    it('continues syncing unrelated settings while an API key is dirty', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+
+      onChange({ key: 'THEME', newValue: 'dark', oldValue: 'auto' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+      expect(store.settings.THEME).toBe('dark');
+    });
+
+    it('clears draft tracking after reset and reload', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+      await store.resetSettings();
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'external-key', oldValue: '' });
+      expect(store.settings.OPENAI_API_KEY).toBe('external-key');
+
+      store.updateSettingLocally('OPENAI_API_KEY', 'another-draft');
+      store.isInitialized = false;
+      storageManager.get.mockResolvedValueOnce({ OPENAI_API_KEY: 'loaded-key' });
+      await store.loadSettings();
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'reloaded-promotion', oldValue: '' });
+      expect(store.settings.OPENAI_API_KEY).toBe('reloaded-promotion');
+    });
+
+    it('clears prior draft tracking when importing settings', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        OPENAI_API_KEY: 'imported-key'
+      });
+
+      await store.importSettings({ THEME: 'dark', _exported: true });
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-after-import', oldValue: '' });
+
+      expect(store.settings.OPENAI_API_KEY).toBe('promoted-after-import');
+    });
+  });
+
   it('should initialize with default settings', () => {
     const store = useSettingsStore();
     expect(store.settings.THEME).toBe('auto');
