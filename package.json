@@ -17,7 +17,7 @@
     "lint": "eslint --config config/eslint.config.js",
     "lint:styles": "stylelint \"src/assets/styles/**/*.{css,scss}\" --config config/.stylelintrc.json",
     "lint:styles:fix": "stylelint \"src/assets/styles/**/*.{css,scss}\" --fix --config config/.stylelintrc.json",
-    "format": "prettier --write src/**/*.js",
+    "format": "node scripts/dev/format.mjs",
     "validate": "node scripts/validate/validate-all.mjs",
     "validate:chrome": "node scripts/validate/validate-chrome.mjs",
     "validate:firefox": "node scripts/validate/validate-firefox.mjs",

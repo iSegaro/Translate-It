@@ -86,9 +86,13 @@ pnpm run lint
 # Lint CSS styles
 pnpm run lint:styles
 
-# Format code with Prettier
-pnpm run format
+# Format only the files you changed (optional; requires explicit paths)
+pnpm run format src/path/to/file.js
 ```
+
+Formatting is optional. Running `pnpm run format` without file paths prints usage and exits without reading stdin or modifying files.
+
+Recommended flow: make changes, format only the touched files, run lint and tests, then review `git diff` before committing.
 
 #### Extension Validation
 
