@@ -69,14 +69,6 @@
       </p>
     </div>
     <div class="setting-group vertical">
-      <BaseInput
-        id="gemini-model-search"
-        v-model="searchQuery"
-        type="search"
-        :label="t('gemini_catalog_search_label') || 'Search Gemini models'"
-        :placeholder="t('gemini_catalog_search_placeholder') || 'Search by model ID or name'"
-        dir="ltr"
-      />
       <small
         class="model-discovery-status model-discovery-status-live"
         :class="{ 'model-discovery-status--absent': !discoveryStatusMessage }"
@@ -86,21 +78,10 @@
       >{{ discoveryStatusMessage }}</small>
       <template v-if="modelDiscoverySucceeded && discoveredModels.length > 0">
         <small class="model-discovery-status">{{ t('gemini_catalog_official_info') || 'Catalog selection uses Google\'s official Gemini API.' }}</small>
-        <BaseSelect
+        <ModelCatalogPicker
           v-model="catalogModelSelection"
-          :options="filteredCatalog.options"
-          class="catalog-model-select"
-          :style="rtlSelectStyle"
-          :aria-label="t('gemini_catalog_results_label') || 'Available Gemini models'"
+          :models="discoveredModels"
         />
-        <small
-          v-if="filteredCatalog.total > filteredCatalog.options.length"
-          class="model-discovery-status"
-        >{{ t('gemini_catalog_showing_count', { shown: filteredCatalog.options.length, total: filteredCatalog.total }) || `Showing ${filteredCatalog.options.length} of ${filteredCatalog.total} matching models` }}</small>
-        <small
-          v-if="discoveredModels.length > 0 && filteredCatalog.total === 0"
-          class="model-discovery-status"
-        >{{ t('gemini_catalog_no_matches') || 'No models match your search.' }}</small>
       </template>
     </div>
   </div>
@@ -114,12 +95,12 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
 import BaseInput from '@/components/base/BaseInput.vue'
 import BaseSelect from '@/components/base/BaseSelect.vue'
+import ModelCatalogPicker from '@/components/feature/api-settings/ModelCatalogPicker.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
-import { filterModelCatalog } from '@/features/settings/presentation/modelCatalogFilter.js'
 import {
   fetchGeminiModels,
   getCachedGeminiModels,
@@ -151,7 +132,6 @@ const discoveredModels = ref([])
 const modelDiscoveryLoading = ref(false)
 const modelDiscoveryFailed = ref(false)
 const modelDiscoverySucceeded = ref(false)
-const searchQuery = ref('')
 const hasGeminiKey = computed(() => ApiKeyManager.parseKeys(geminiApiKey.value).length > 0)
 // Discovery must never contact Google for a custom endpoint; the shared
 // predicate treats an empty/absent stored URL as the official default.
@@ -178,8 +158,6 @@ const geminiModelOptions = computed(() => {
   options.push({ value: 'custom', label: custom?.name || 'Custom Model' })
   return options
 })
-
-const filteredCatalog = computed(() => filterModelCatalog(discoveredModels.value, searchQuery.value))
 
 const savedModelNotAdvertised = computed(() => {
   const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
@@ -307,8 +285,7 @@ const discoverModels = async (apiKey) => {
 
 const catalogModelSelection = computed({
   get: () => {
-    const savedModel = settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
-    return filteredCatalog.value.options.some(option => option.value === savedModel) ? savedModel : ''
+    return settingsStore.settings?.GEMINI_MODEL || CONFIG.GEMINI_MODEL
   },
   set: (value) => {
     if (!value) return

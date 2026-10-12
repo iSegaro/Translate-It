@@ -84,6 +84,14 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
     template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }))
+vi.mock('@/components/feature/api-settings/ModelCatalogPicker.vue', () => ({
+  default: {
+    name: 'ModelCatalogPicker',
+    props: { models: Array, modelValue: String, showPricing: { type: Boolean, default: false } },
+    emits: ['update:modelValue'],
+    template: '<div data-test="model-catalog-picker"><input aria-label="Search models"><select aria-label="Sort models"><option>API order</option><option>Name</option></select><button v-for="model in models" :key="model.value" :data-value="model.value" :aria-checked="model.value === modelValue" @click="$emit(\'update:modelValue\', model.value)">{{ model.name }}</button></div>',
+  },
+}))
 
 const deferred = () => {
   let resolve
@@ -128,7 +136,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     wrapper.unmount()
   })
 
-  it('discovers after key entry and searches the catalog by ID and display name', async () => {
+  it('discovers after key entry and does not write on picker search or sort', async () => {
     mocks.fetchModels.mockResolvedValue([
       { value: 'gemini-new', name: 'New Gemini' },
       { value: 'gemini-other', name: 'Other Model' },
@@ -139,11 +147,12 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await vi.advanceTimersByTimeAsync(400)
     await flushPromises()
     expect(mocks.fetchModels).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'key-one', signal: expect.any(AbortSignal) }))
-    expect(wrapper.get('.catalog-model-select').findAll('option').map(option => option.element.value)).toEqual(['gemini-new', 'gemini-other'])
-    await wrapper.get('#gemini-model-search').setValue('gemini-new')
-    expect(wrapper.get('.catalog-model-select').findAll('option').map(option => option.element.value)).toEqual(['gemini-new'])
-    await wrapper.get('#gemini-model-search').setValue('new gemini')
-    expect(wrapper.get('.catalog-model-select').findAll('option').map(option => option.element.value)).toEqual(['gemini-new'])
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('New Gemini')
+    expect(wrapper.getComponent({ name: 'ModelCatalogPicker' }).props('showPricing')).toBe(false)
+    await wrapper.get('[aria-label="Search models"]').setValue('gemini-new')
+    await wrapper.get('[aria-label="Sort models"]').setValue('Name')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL_SOURCE', expect.anything())
     wrapper.unmount()
   })
 
@@ -154,7 +163,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
     expect(mocks.fetchModels).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('.catalog-model-select').text()).toContain('New Gemini')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('New Gemini')
     expect(wrapper.text()).not.toContain('Using a custom API URL')
     wrapper.unmount()
   })
@@ -164,7 +173,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     mocks.fetchModels.mockResolvedValue([{ value: 'gemini-catalog', name: 'Catalog Gemini' }])
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
-    await wrapper.get('.catalog-model-select').setValue('gemini-catalog')
+    await wrapper.get('[data-value="gemini-catalog"]').trigger('click')
     expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe('gemini-catalog')
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('catalog')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_API_URL', expect.anything())
@@ -173,7 +182,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await wrapper.get('.model-select').setValue('curated-two')
     expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe('curated-two')
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('curated')
-    expect(wrapper.get('.catalog-model-select').element.value).toBe('')
+    expect(wrapper.get('[data-value="gemini-catalog"]').attributes('aria-checked')).toBe('false')
     wrapper.unmount()
   })
 
@@ -186,7 +195,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await flushPromises()
     expect(mocks.fetchModels).not.toHaveBeenCalled()
     expect(mocks.getCachedModels).not.toHaveBeenCalled()
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
     expect(wrapper.text()).not.toContain('Add an API key to discover available models.')
     expect(mocks.settingsStore.settings.GEMINI_API_URL).toBe('https://custom.example/v1beta/models/custom-path:generateContent')
@@ -212,7 +221,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     pending.resolve([{ value: 'catalog/saved-id', name: 'Saved Model' }])
     await flushPromises()
     expect(wrapper.get('.model-select').element.value).toBe('custom')
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
     expect(wrapper.get('#GEMINI_API_URL').element.value).toBe(editedUrl)
     expect(mocks.settingsStore.settings.GEMINI_API_URL).toBe(editedUrl)
@@ -228,7 +237,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
     expect(wrapper.get('.model-select').element.value).toBe('catalog/saved-id')
-    expect(wrapper.get('.catalog-model-select').element.value).toBe('catalog/saved-id')
+    expect(wrapper.get('[data-value="catalog/saved-id"]').attributes('aria-checked')).toBe('true')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', 'catalog/saved-id')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_API_URL', expect.anything())
     wrapper.unmount()
@@ -247,7 +256,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     wrapper.unmount()
   })
 
-  it('shows localized loading, failure, empty, and 50-result states; full catalog remains searchable', async () => {
+  it('shows localized loading, failure, and empty states and renders the full catalog', async () => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     const pending = deferred()
     mocks.fetchModels.mockReturnValueOnce(pending.promise)
@@ -268,10 +277,8 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     mocks.fetchModels.mockResolvedValueOnce(Array.from({ length: 600 }, (_, index) => ({ value: `model/${index}`, name: `Model ${index}` })))
     const catalog = mount(GeminiApiSettings)
     await flushPromises()
-    expect(catalog.text()).toContain('Showing 50 of 600 matching models')
-    expect(catalog.get('.catalog-model-select').findAll('option')).toHaveLength(50)
-    await catalog.get('#gemini-model-search').setValue('model/599')
-    expect(catalog.get('.catalog-model-select').findAll('option').map(option => option.element.value)).toEqual(['model/599'])
+    expect(catalog.get('[data-test="model-catalog-picker"]').findAll('button')).toHaveLength(600)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
     catalog.unmount()
   })
 
@@ -294,8 +301,8 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await flushPromises()
     first.resolve([{ value: 'stale/model', name: 'Stale Model' }])
     await flushPromises()
-    expect(wrapper.get('.catalog-model-select').text()).toContain('Latest Model')
-    expect(wrapper.get('.catalog-model-select').text()).not.toContain('Stale Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Latest Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).not.toContain('Stale Model')
     wrapper.unmount()
     expect(secondSignal.aborted).toBe(true)
   })
@@ -368,7 +375,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await flushPromises()
     expect(mocks.getCachedModels).not.toHaveBeenCalled()
     expect(mocks.fetchModels).not.toHaveBeenCalled()
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
     expect(wrapper.text()).not.toContain('Cached Model')
     wrapper.unmount()
@@ -382,7 +389,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
     expect(wrapper.get('.model-select').element.value).toBe('catalog/saved-id')
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     expect(mocks.settingsStore.settings.GEMINI_MODEL).toBe('catalog/saved-id')
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).toBe('catalog')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', expect.anything())
@@ -402,7 +409,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     expect(signal.aborted).toBe(true)
     pending.resolve([{ value: 'late/model', name: 'Late Model' }])
     await flushPromises()
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Using a custom API URL — Google\'s model catalog is not loaded.')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('GEMINI_MODEL', 'late/model')
     expect(mocks.settingsStore.settings.GEMINI_MODEL_SOURCE).not.toBe('catalog')
@@ -421,7 +428,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await flushPromises()
     expect(mocks.fetchModels).not.toHaveBeenCalled()
     expect(mocks.getCachedModels).toHaveBeenCalledWith('key')
-    expect(wrapper.get('.catalog-model-select').text()).toContain('Cached Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Cached Model')
     wrapper.unmount()
   })
 
@@ -441,7 +448,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await flushPromises()
     expect(mocks.fetchModels).toHaveBeenCalledTimes(1)
     expect(mocks.fetchModels.mock.calls[0][0].apiKey).toBe('key-three')
-    expect(wrapper.get('.catalog-model-select').text()).toContain('Fresh Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Fresh Model')
     wrapper.unmount()
   })
 
@@ -456,12 +463,12 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     expect(region.attributes('aria-atomic')).toBe('true')
     expect(region.text()).toBe('')
     expect(region.classes()).toContain('model-discovery-status--absent')
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(true)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(true)
     await wrapper.get('[data-test="api-key"]').setValue('')
     expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
     expect(region.text()).toBe('Add an API key to discover available models.')
     expect(region.classes()).not.toContain('model-discovery-status--absent')
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -506,7 +513,7 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     await flushPromises()
     expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
     expect(region.text()).toBe('No models were returned by Gemini.')
-    expect(wrapper.find('.catalog-model-select').exists()).toBe(false)
+    expect(wrapper.find('[data-test="model-catalog-picker"]').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -532,28 +539,19 @@ describe('GeminiApiSettings dynamic model catalog', () => {
     wrapper.unmount()
   })
 
-  it('keeps per-keystroke search feedback and the static official-info note outside the live region', async () => {
+  it('keeps picker and official-endpoint information outside the discovery live region', async () => {
     mocks.settingsStore.settings.GEMINI_API_KEY = 'key'
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 600 }, (_, index) => ({ value: `model/${index}`, name: `Model ${index}` })))
     const wrapper = mount(GeminiApiSettings)
     await flushPromises()
     const region = wrapper.get('.model-discovery-status-live')
     expect(region.text()).toBe('')
-    const statusNodes = () => wrapper.findAll('.model-discovery-status')
-    const officialInfo = statusNodes().find(node => node.text() === 'Catalog selection uses Google\'s official Gemini API.')
+    const officialInfo = wrapper.findAll('.model-discovery-status').find(node => node.text() === 'Catalog selection uses Google\'s official Gemini API.')
     expect(officialInfo.attributes('role')).toBeUndefined()
     expect(officialInfo.attributes('aria-live')).toBeUndefined()
     expect(region.element.contains(officialInfo.element)).toBe(false)
-    const showing = statusNodes().find(node => node.text().startsWith('Showing'))
-    expect(showing.attributes('role')).toBeUndefined()
-    expect(showing.attributes('aria-live')).toBeUndefined()
-    expect(region.element.contains(showing.element)).toBe(false)
-    await wrapper.get('#gemini-model-search').setValue('zzz-no-match')
-    expect(wrapper.get('.model-discovery-status-live').element).toBe(region.element)
-    expect(region.text()).toBe('')
-    const noMatch = statusNodes().find(node => node.text() === 'No models match your search.')
-    expect(noMatch.attributes('role')).toBeUndefined()
-    expect(region.element.contains(noMatch.element)).toBe(false)
+    const picker = wrapper.get('[data-test="model-catalog-picker"]')
+    expect(region.element.contains(picker.element)).toBe(false)
     wrapper.unmount()
   })
 })
