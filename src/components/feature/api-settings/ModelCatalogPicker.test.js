@@ -1,7 +1,25 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import * as sass from 'sass'
 import ModelCatalogPicker from './ModelCatalogPicker.vue'
+
+// Compiled once for the cascade tests below (the component SCSS uses the `@/`
+// alias, so it needs a small importer; same sass usage as the repo's
+// LiveDubbingControlScss.test.js convention).
+const compiledPickerCss = sass.compile(
+  resolve(process.cwd(), 'src/components/feature/api-settings/ModelCatalogPicker.scss'),
+  {
+    importers: [{
+      findFileUrl(url) {
+        if (!url.startsWith('@/')) return null
+        return pathToFileURL(resolve(process.cwd(), 'src', url.slice(2)))
+      },
+    }],
+  },
+).css
 
 const translations = {
   model_catalog_search_label: 'Search models',
@@ -24,17 +42,18 @@ vi.mock('vue-i18n', () => ({
   }),
 }))
 
-const mountPicker = (props = {}) => mount(ModelCatalogPicker, {
+const mountPicker = (props = {}, options = {}) => mount(ModelCatalogPicker, {
   props: {
     models: [],
     modelValue: '',
     ...props,
   },
   attachTo: document.body,
+  ...options,
 })
 
-const openPicker = async (props = {}) => {
-  const wrapper = mountPicker(props)
+const openPicker = async (props = {}, options = {}) => {
+  const wrapper = mountPicker(props, options)
   await wrapper.get('.model-catalog-picker__trigger').trigger('click')
   await nextTick()
   return wrapper
@@ -917,6 +936,91 @@ describe('ModelCatalogPicker sort-header stability', () => {
     expect(headerShape(wrapper)).toEqual(initial)
     expect(icons().every(icon => !icon.classes().includes('is-active'))).toBe(true)
     expect(headerCells(wrapper)[1].attributes('aria-sort')).toBe('none')
+    wrapper.unmount()
+  })
+})
+
+describe('ModelCatalogPicker row cascade under global Options styles', () => {
+  // vitest runs css: false (no stylesheet pipeline), so the real cascade is
+  // reproduced manually: the compiled picker SCSS is injected FIRST and
+  // faithful excerpts of the global sources LAST — worst-case source order,
+  // so only specificity can make the picker win (jsdom honors specificity
+  // over order; verified). Excerpts of the four rules that hit picker rows
+  // inside `.options-tab-content > .setting-group`:
+  const GLOBAL_ROW_FIXTURE = `
+.setting-group label { display: block; font-size: 12px; font-weight: 500; color: #111; margin-bottom: 4px; }
+.setting-group label { width: auto !important; flex: 1 !important; max-width: none !important; margin-bottom: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.options-tab-content .setting-group label { font-size: 14px; font-weight: 500; color: #111; }
+input[type="radio"] { width: 18px; height: 18px; margin-inline-end: 16px; cursor: pointer; vertical-align: middle; }
+`
+
+  const injectCascade = () => {
+    const style = document.createElement('style')
+    style.textContent = `${compiledPickerCss}\n${GLOBAL_ROW_FIXTURE}`
+    document.head.appendChild(style)
+    const container = document.createElement('div')
+    container.className = 'options-tab-content'
+    const group = document.createElement('div')
+    group.className = 'setting-group'
+    container.appendChild(group)
+    document.body.appendChild(container)
+    return {
+      group,
+      cleanup: () => {
+        style.remove()
+        container.remove()
+      },
+    }
+  }
+
+  it('row label and radio out-specify the global label/radio rules at worst-case source order', async () => {
+    const { group, cleanup } = injectCascade()
+    try {
+      const wrapper = await openPicker(
+        { models: sortModels, modelValue: 'm/alpha' },
+        { attachTo: group },
+      )
+
+      const label = getComputedStyle(wrapper.get('.model-catalog-picker__row-label').element)
+      // Without the picker's (0,3,0) rule the fixture would yield block +
+      // nowrap + ellipsis (radio above the name, no wrapping).
+      expect(label.display).toBe('flex')
+      expect(label.flexDirection).toBe('row')
+      expect(label.whiteSpace).toBe('normal')
+      expect(label.overflow).toBe('visible')
+      expect(label.textOverflow).toBe('clip')
+      expect(label.marginBottom).toBe('0px')
+
+      const radio = getComputedStyle(wrapper.get('.model-catalog-picker__radio').element)
+      // The global 16px end-margin is reset; the row label's gap supplies
+      // the single spacing between radio and metadata in both directions.
+      expect(radio.marginInlineEnd).toBe('0px')
+      // Control: the fixture still sizes the radio, proving the global
+      // stylesheet was live and only the claimed properties were overridden.
+      expect(radio.width).toBe('18px')
+      wrapper.unmount()
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('keeps the radio-first row structure and class hooks the layout relies on', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha', showPricing: true })
+    const rows = wrapper.findAll('.model-catalog-picker__row')
+    expect(rows).toHaveLength(sortModels.length)
+    rows.forEach((row) => {
+      const label = row.get('.model-catalog-picker__row-label')
+      expect(label.classes()).toContain('model-catalog-picker__row-label')
+      // DOM order is direction-independent: radio first, metadata second —
+      // flex-direction: row plus logical spacing flip it for RTL.
+      const children = [...label.element.children]
+      expect(children).toHaveLength(2)
+      expect(children[0].classList.contains('model-catalog-picker__radio')).toBe(true)
+      expect(children[1].classList.contains('model-catalog-picker__meta')).toBe(true)
+      // Long names/IDs keep their wrap hooks next to the radio.
+      expect(children[1].querySelector('.model-catalog-picker__name').getAttribute('dir')).toBe('auto')
+      expect(children[1].querySelector('.model-catalog-picker__id').getAttribute('dir')).toBe('ltr')
+    })
     wrapper.unmount()
   })
 })

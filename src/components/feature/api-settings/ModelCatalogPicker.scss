@@ -215,15 +215,31 @@
     min-width: 0;
   }
 
-  &__row-label {
+  // Cascade defense (see ModelCatalogPicker.test.js for the live check):
+  // global Options rules outrank single-class selectors here —
+  // `.setting-group label` (api-settings-common) sets display:block + margin,
+  // `.setting-group label` (ApiKeyInput.scss) adds nowrap/ellipsis, and
+  // `_options.scss input[type=radio]` sets margin-inline-end:16px. Three
+  // classes beat every one of them without !important (the only !important
+  // globals are width/flex values, inert because this label's parent is not
+  // a flex container). Logical properties keep LTR and RTL symmetric.
+  & .model-catalog-picker__row .model-catalog-picker__row-label {
     display: flex;
+    flex-direction: row;
     align-items: flex-start;
     gap: $spacing-xs;
+    margin: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
     cursor: pointer;
   }
 
-  &__radio {
+  & .model-catalog-picker__radio {
+    // Radio keeps the global 18px sizing; only the inherited 16px end margin
+    // is reset — the row label's gap is the single source of spacing.
     margin-block-start: 3px;
+    margin-inline-end: 0;
     flex-shrink: 0;
     accent-color: var(--color-primary);
   }
