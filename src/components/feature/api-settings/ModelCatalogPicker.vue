@@ -3,6 +3,7 @@
     ref="rootRef"
     class="model-catalog-picker"
     :class="{ 'is-open': isOpen, 'model-catalog-picker--no-pricing': !showPricing }"
+    @focusout="handleRootFocusout"
   >
     <button
       ref="triggerRef"
@@ -46,6 +47,8 @@
       ref="panelRef"
       class="model-catalog-picker__panel"
       :style="panelStyle"
+      @keydown="handlePanelKeydown"
+      @keyup="handlePanelKeyup"
       @keydown.esc.stop.prevent="closePanel(true)"
     >
       <BaseInput
@@ -196,19 +199,16 @@
       <p
         v-if="showPricing"
         class="model-catalog-picker__note"
-        :style="footerStyle"
       >
         {{ tr('model_catalog_base_rates_note', 'Base rates in USD per 1M tokens; pricing may vary and additional fees may apply.') }}
       </p>
       <small
         v-if="totalMatches === 0 && models.length > 0"
         class="model-catalog-picker__status"
-        :style="footerStyle"
       >{{ tr('model_catalog_no_matches', 'No models match your search.') }}</small>
       <small
         v-else-if="totalMatches > visibleModels.length"
         class="model-catalog-picker__status"
-        :style="footerStyle"
       >{{ showingCountText }}</small>
     </div>
   </div>
@@ -240,7 +240,12 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const { t, locale } = useI18n()
-const tr = (key, fallback, params) => t(key, params) || fallback
+// Mirrors useUnifiedI18n's fallback: vue-i18n echoes the key when a message
+// is missing, so a key-echo (or empty) result counts as missing here too.
+const tr = (key, fallback, params) => {
+  const translated = t(key, params)
+  return translated && translated !== key ? translated : fallback
+}
 
 const rootRef = ref(null)
 const triggerRef = ref(null)
@@ -358,11 +363,17 @@ watch(() => props.showPricing, (showPricing) => {
 })
 
 // --------------------------------------------------------------- positioning ---
-// Pure math over a trigger rect and viewport dims so positioning is testable
+// Pure math over a trigger rect, VISUAL viewport dims and (optionally) LAYOUT
+// viewport dims plus the visual viewport's layout offsets, so it is testable
 // without layout (jsdom getBoundingClientRect always returns zeros).
-// Opens on whichever side of the trigger has more room, sizes max-height to
-// that side's real available space (no floor — a panel that fits a 40px gap
-// beats one that overflows it), and clamps the inline edge for both directions.
+// getBoundingClientRect and fixed-position offsets are layout-viewport
+// coordinates; the visual viewport is a sub-rectangle of it (offsetX/offsetY,
+// exposed by pinch-zoom). Reproduced Greptile bug: with layout height 800 /
+// visible 400 / trigger top 300, computing `bottom` from the VISIBLE height
+// gave 104px — fixed positioning measures from the LAYOUT edge, so the panel
+// landed at 696 instead of 296. Therefore `top`/`left` map straight from the
+// rect, while `bottom`/`right` convert back through layoutWidth/layoutHeight;
+// side choice and bounds use the visual viewport only.
 function computePanelPosition(triggerRect, viewport, options = {}) {
   const {
     isRtl = false,
@@ -370,45 +381,58 @@ function computePanelPosition(triggerRect, viewport, options = {}) {
     padding = 8,
     maxWidth = 560,
     maxHeight: preferredMaxHeight = 460,
+    layoutWidth = viewport.width,
+    layoutHeight = viewport.height,
+    offsetX = 0,
+    offsetY = 0,
   } = options
   const width = Math.min(Math.max(triggerRect.width, 300), maxWidth, viewport.width - padding * 2)
-  const spaceBelow = viewport.height - triggerRect.bottom - gap - padding
-  const spaceAbove = triggerRect.top - gap - padding
+  // Available space, measured inside the visual viewport only.
+  const spaceBelow = offsetY + viewport.height - triggerRect.bottom - gap - padding
+  const spaceAbove = triggerRect.top - offsetY - gap - padding
   const openDown = spaceBelow >= spaceAbove
   const available = openDown ? spaceBelow : spaceAbove
   const style = {
     width: `${width}px`,
     maxHeight: `${Math.max(0, Math.min(available, preferredMaxHeight))}px`,
   }
-  // Keep [edge, edge + width] inside the viewport, padding aside.
-  const edgeMax = viewport.width - width - padding
   if (isRtl) {
-    style.right = `${Math.min(Math.max(viewport.width - triggerRect.right, padding), edgeMax)}px`
+    // `right` is measured from the LAYOUT edge: clamp the panel's right edge
+    // inside the visual viewport first, then convert.
+    const rightEdge = Math.min(
+      Math.max(triggerRect.right, offsetX + width + padding),
+      offsetX + viewport.width - padding,
+    )
+    style.right = `${layoutWidth - rightEdge}px`
   } else {
-    style.left = `${Math.min(Math.max(triggerRect.left, padding), edgeMax)}px`
+    style.left = `${Math.min(Math.max(triggerRect.left, offsetX + padding), offsetX + viewport.width - width - padding)}px`
   }
+  // `top` comes straight from the layout-coordinate rect; `bottom` converts
+  // the layout-space top edge through the layout height.
   if (openDown) style.top = `${triggerRect.bottom + gap}px`
-  else style.bottom = `${viewport.height - triggerRect.top + gap}px`
+  else style.bottom = `${layoutHeight - triggerRect.top + gap}px`
   return style
 }
 
 defineExpose({ computePanelPosition })
 
-// Fixed-column chrome needs ~112px (search ~60 + gaps 16 + header ~36); keep
-// ~48px more for at least one visible, focusable row. Below that total, the
-// clipped column would hide sort controls/results, so the panel switches to a
-// single whole-panel scroller (see region/footer styles below).
-const PANEL_SCROLL_FALLBACK_BELOW = 160
+// Fixed-column chrome (panel padding 16 + search ~60 + gaps ~24 + header ~36
+// + note ~32 + count ~18 — footers no longer shrink) needs ~186px; keep ~48px
+// more for at least one visible, focusable row. Below that total the clipped
+// column would hide footers/sort controls/results, so the panel switches to a
+// single whole-panel scroller — the fallback owns every height where the
+// non-shrinking layout would clip (see region styles below).
+const PANEL_SCROLL_FALLBACK_BELOW = 240
 
 // Whole-panel scroll fallback: children keep natural size and stop being
 // scroll containers themselves, so one scroller reaches search, headers,
-// rows, note and count alike — no nested scroll regions.
+// rows, note and count alike — no nested scroll regions. Footers need no
+// regime override: they are non-shrinking (flex: 0 0 auto) in both regimes.
 const naturalSizeStyle = { flex: '0 0 auto', overflow: 'visible' }
 const gridStyle = computed(() => (panelScroll.value ? naturalSizeStyle : { flex: '1 1 auto' }))
 const resultsStyle = computed(() => (panelScroll.value
   ? naturalSizeStyle
   : { flex: '1 1 auto', overflowY: 'auto' }))
-const footerStyle = computed(() => (panelScroll.value ? naturalSizeStyle : null))
 
 // The Options page scrolls inside .tab-content-container (overflow-x: hidden),
 // which would clip an absolutely positioned panel. No ancestor of this picker
@@ -425,7 +449,15 @@ function positionPanel() {
       width: visualViewport?.width ?? window.innerWidth,
       height: visualViewport?.height ?? window.innerHeight,
     },
-    { isRtl: getComputedStyle(trigger).direction === 'rtl' },
+    {
+      isRtl: getComputedStyle(trigger).direction === 'rtl',
+      // Fixed positioning lives in layout coordinates; without visualViewport
+      // the layouts coincide (offsets 0) and behavior is unchanged.
+      layoutWidth: window.innerWidth,
+      layoutHeight: window.innerHeight,
+      offsetX: visualViewport?.offsetLeft ?? 0,
+      offsetY: visualViewport?.offsetTop ?? 0,
+    },
   )
   panelScroll.value = parseFloat(style.maxHeight) < PANEL_SCROLL_FALLBACK_BELOW
   panelStyle.value = { ...style, overflowY: panelScroll.value ? 'auto' : 'hidden' }
@@ -447,6 +479,9 @@ function closePanel(restoreFocus) {
   if (!isOpen.value) return
   isOpen.value = false
   searchQuery.value = ''
+  // A pending arrow flag must not outlive the panel (keydown without a
+  // follow-up change, then Escape/outside close before keyup).
+  arrowNavPending = false
   if (restoreFocus) triggerRef.value?.focus()
 }
 
@@ -460,14 +495,17 @@ watch(isOpen, (open) => {
     document.addEventListener('click', handleDocumentClick)
     window.addEventListener('scroll', positionPanel, true)
     window.addEventListener('resize', positionPanel)
-    // Only width/height are read (no offsets), so resize alone re-positions.
-    // Optional chaining keeps SSR/older test envs without visualViewport working.
+    // positionPanel reads visualViewport width/height AND offsets, so both
+    // resize and scroll re-position. Optional chaining keeps SSR/older test
+    // envs without visualViewport working.
     window.visualViewport?.addEventListener('resize', positionPanel)
+    window.visualViewport?.addEventListener('scroll', positionPanel)
   } else {
     document.removeEventListener('click', handleDocumentClick)
     window.removeEventListener('scroll', positionPanel, true)
     window.removeEventListener('resize', positionPanel)
     window.visualViewport?.removeEventListener('resize', positionPanel)
+    window.visualViewport?.removeEventListener('scroll', positionPanel)
   }
 })
 
@@ -476,12 +514,53 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', positionPanel, true)
   window.removeEventListener('resize', positionPanel)
   window.visualViewport?.removeEventListener('resize', positionPanel)
+  window.visualViewport?.removeEventListener('scroll', positionPanel)
 })
+
+// ---------------------------------------------------------------- keyboard ---
+// Product semantics (deliberate): EVERY radio change still emits — any checked
+// radio IS the selection, so persistence guarantees are untouched. Only the
+// close trigger differs by input: arrow-driven changes keep the panel open
+// (continuous browsing, focus stays on the radio); pointer changes close as
+// before. Alternatives considered: deferring the emit pending a highlight —
+// rejected as new product semantics that fights native radio behavior.
+const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
+let arrowNavPending = false
+
+function handlePanelKeydown(event) {
+  const target = event.target
+  if (!target || target.type !== 'radio') return
+  if (NAV_KEYS.has(event.key)) {
+    // Native arrow navigation fires change right after keydown; the pending
+    // flag tells handleSelect to keep the panel open for that change.
+    arrowNavPending = true
+  } else if ((event.key === 'Enter' || event.key === ' ') && target.checked) {
+    // Confirmation affordance after browsing: close without any new writes.
+    closePanel(true)
+  }
+}
+
+function handlePanelKeyup(event) {
+  // An arrow pressed at the group edge fires keydown but no change; clear the
+  // flag on keyup so the next pointer selection still closes normally.
+  if (NAV_KEYS.has(event.key)) arrowNavPending = false
+}
+
+function handleRootFocusout(event) {
+  // Tabbing out of the picker closes it silently — never steal focus back.
+  const next = event.relatedTarget
+  if (next && rootRef.value && !rootRef.value.contains(next)) closePanel(false)
+}
 
 // ---------------------------------------------------------------- selection ---
 function handleSelect(event) {
-  // Explicit radio change only: emit once, then close and hand focus back.
+  // Explicit radio change only: always emit once (the checked radio is the
+  // selection). Arrow-driven changes stay open; everything else closes.
   emit('update:modelValue', event.target.value)
+  if (arrowNavPending) {
+    arrowNavPending = false
+    return
+  }
   closePanel(true)
 }
 </script>

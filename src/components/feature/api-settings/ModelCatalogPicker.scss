@@ -284,11 +284,10 @@
 
   &__note,
   &__status {
-    // Last to yield: in tight viewports they clip rather than steal the
-    // space results need to scroll. Normal viewports render them unchanged.
-    flex: 0 1 auto;
-    min-height: 0;
-    overflow: hidden;
+    // Never shrink: the short-viewport whole-panel-scroll fallback owns tight
+    // spaces, so in the normal results-only layout footers stay fully visible
+    // instead of shrink-clipping (flex: 0 1 auto would clip them).
+    flex: 0 0 auto;
     margin: 0;
     font-size: $font-size-xs;
     color: var(--color-text-secondary);

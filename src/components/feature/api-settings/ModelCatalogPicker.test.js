@@ -28,15 +28,18 @@ const translations = {
   model_catalog_showing_count: ({ shown, total }) => `Showing ${shown} of ${total} matching models`,
   // model_catalog_browse, model_catalog_column_model, model_catalog_no_matches,
   // model_catalog_free, model_catalog_unavailable, model_catalog_variable,
-  // model_catalog_base_rates_note and model_catalog_per_million are intentionally
-  // untranslated to exercise the `t(key) || fallback` path.
+  // model_catalog_input_price, model_catalog_output_price,
+  // model_catalog_base_rates_note and model_catalog_per_million are
+  // intentionally untranslated: the mock echoes the key for them (exactly
+  // like real vue-i18n), so the component's key-echo fallback branch runs.
 }
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
     t: (key, params) => {
       const value = translations[key]
-      if (value === undefined) return undefined
+      // Real vue-i18n echoes the key when a message is missing.
+      if (value === undefined) return key
       return typeof value === 'function' ? value(params) : value
     },
   }),
@@ -739,29 +742,75 @@ describe('ModelCatalogPicker visualViewport listeners', () => {
     }
   }
 
-  it('attaches visualViewport resize while open and removes it on close and unmount', async () => {
+  it('attaches visualViewport resize+scroll while open and removes both on close and unmount', async () => {
     const stub = stubVisualViewport()
     try {
       const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
-      expect(stub.addEventListener).toHaveBeenCalledTimes(1)
-      expect(stub.addEventListener.mock.calls[0][0]).toBe('resize')
-      expect(typeof stub.addEventListener.mock.calls[0][1]).toBe('function')
-
-      // Closing removes the exact handler that was added.
-      await wrapper.get('.model-catalog-picker__trigger').trigger('click')
-      await nextTick()
-      expect(stub.removeEventListener).toHaveBeenCalledTimes(1)
-      expect(stub.removeEventListener.mock.calls[0]).toEqual(stub.addEventListener.mock.calls[0])
-
-      // Reopening re-attaches; unmount removes it again.
-      await wrapper.get('.model-catalog-picker__trigger').trigger('click')
-      await nextTick()
       expect(stub.addEventListener).toHaveBeenCalledTimes(2)
-      wrapper.unmount()
+      const attached = Object.fromEntries(stub.addEventListener.mock.calls.map(call => [call[0], call[1]]))
+      expect(Object.keys(attached).sort()).toEqual(['resize', 'scroll'])
+      expect(typeof attached.resize).toBe('function')
+      expect(typeof attached.scroll).toBe('function')
+
+      // Closing removes the exact handlers that were added.
+      await wrapper.get('.model-catalog-picker__trigger').trigger('click')
+      await nextTick()
       expect(stub.removeEventListener).toHaveBeenCalledTimes(2)
-      expect(stub.removeEventListener.mock.calls[1]).toEqual(stub.addEventListener.mock.calls[1])
+      const removed = stub.removeEventListener.mock.calls.map(call => [call[0], call[1]])
+      expect(removed).toEqual([
+        ['resize', attached.resize],
+        ['scroll', attached.scroll],
+      ])
+
+      // Reopening re-attaches; unmount removes both again.
+      await wrapper.get('.model-catalog-picker__trigger').trigger('click')
+      await nextTick()
+      expect(stub.addEventListener).toHaveBeenCalledTimes(4)
+      wrapper.unmount()
+      expect(stub.removeEventListener).toHaveBeenCalledTimes(4)
+      expect(stub.removeEventListener.mock.calls.slice(2)).toEqual([
+        ['resize', attached.resize],
+        ['scroll', attached.scroll],
+      ])
     } finally {
       stub.restore()
+    }
+  })
+
+  it('repositions on visualViewport scroll alone when offsets change (no resize)', async () => {
+    const addEventListener = vi.fn()
+    const removeEventListener = vi.fn()
+    const original = window.visualViewport
+    window.visualViewport = {
+      width: 1024,
+      height: 400,
+      offsetLeft: 0,
+      offsetTop: 0,
+      addEventListener,
+      removeEventListener,
+    }
+    try {
+      const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+      const panel = wrapper.get('.model-catalog-picker__panel')
+      // Visible space below (offsets 0): 400 - 4 - 8 = 388.
+      expect(panel.attributes('style')).toContain('max-height: 388px')
+
+      const scrollHandler = addEventListener.mock.calls.find(call => call[0] === 'scroll')?.[1]
+      expect(typeof scrollHandler).toBe('function')
+
+      // Offsets change WITHOUT any resize event...
+      window.visualViewport.offsetTop = 150
+      scrollHandler()
+      await nextTick()
+
+      // ...and the panel repositions from the new offsets:
+      // (150 + 400) - 4 - 8 = 538, capped at the preferred 460.
+      expect(panel.attributes('style')).toContain('max-height: 460px')
+      expect(panel.attributes('style')).not.toContain('max-height: 388px')
+      wrapper.unmount()
+    } finally {
+      if (original === undefined) delete window.visualViewport
+      else window.visualViewport = original
     }
   })
 
@@ -809,7 +858,8 @@ describe('ModelCatalogPicker whole-panel scroll fallback', () => {
     expect(getComputedStyle(panel.element).overflowY).toBe('hidden')
     expect(getComputedStyle(grid.element).flex).toBe('1 1 auto')
     expect(getComputedStyle(results.element).overflowY).toBe('auto')
-    // Footer keeps its yielding (shrink-to-clip) rules: no natural-size override.
+    // Footers are non-shrinking via SCSS in both regimes (proven against the
+    // compiled stylesheet in the cascade test) — no inline regime override.
     expect(wrapper.get('.model-catalog-picker__note').attributes('style')).toBeUndefined()
     wrapper.unmount()
   })
@@ -824,7 +874,7 @@ describe('ModelCatalogPicker whole-panel scroll fallback', () => {
     try {
       const wrapper = await openPicker({ models, modelValue: 'm/000', showPricing: true })
       const panel = wrapper.get('.model-catalog-picker__panel')
-      // max-height = 100 - gap 4 - padding 8 = 88 < the 160px fixed-column
+      // max-height = 100 - gap 4 - padding 8 = 88 < the 240px fixed-column
       // need -> fallback engages (computePanelPosition bounds unchanged).
       expect(panel.attributes('style')).toContain('max-height: 88px')
       expect(getComputedStyle(panel.element).overflowY).toBe('auto')
@@ -837,12 +887,13 @@ describe('ModelCatalogPicker whole-panel scroll fallback', () => {
       expect(getComputedStyle(results.element).flex).toBe('0 0 auto')
       expect(getComputedStyle(results.element).overflowY).toBe('visible')
 
-      // ...and footer chrome keeps natural size so it stays reachable.
+      // ...and footers stay reachable as direct children of the panel scroller
+      // (their non-shrinking flex rule is stylesheet-owned — jsdom loads no
+      // stylesheet, so the computed rule is asserted in the cascade test).
       const note = wrapper.get('.model-catalog-picker__note')
       const status = wrapper.get('.model-catalog-picker__status')
-      expect(getComputedStyle(note.element).flex).toBe('0 0 auto')
-      expect(getComputedStyle(note.element).overflowY).toBe('visible')
-      expect(getComputedStyle(status.element).flex).toBe('0 0 auto')
+      expect(note.element.parentElement).toBe(panel.element)
+      expect(status.element.parentElement).toBe(panel.element)
       expect(note.text()).toContain('Base rates in USD per 1M tokens')
       expect(status.text()).toBe('Showing 50 of 60 matching models')
 
@@ -977,7 +1028,7 @@ input[type="radio"] { width: 18px; height: 18px; margin-inline-end: 16px; cursor
     const { group, cleanup } = injectCascade()
     try {
       const wrapper = await openPicker(
-        { models: sortModels, modelValue: 'm/alpha' },
+        { models: sortModels, modelValue: 'm/alpha', showPricing: true },
         { attachTo: group },
       )
 
@@ -990,6 +1041,10 @@ input[type="radio"] { width: 18px; height: 18px; margin-inline-end: 16px; cursor
       expect(label.overflow).toBe('visible')
       expect(label.textOverflow).toBe('clip')
       expect(label.marginBottom).toBe('0px')
+
+      // Footer chrome is non-shrinking in the normal results-only layout
+      // (stylesheet-owned — proven here where the compiled CSS is live).
+      expect(getComputedStyle(wrapper.get('.model-catalog-picker__note').element).flex).toBe('0 0 auto')
 
       const radio = getComputedStyle(wrapper.get('.model-catalog-picker__radio').element)
       // The global 16px end-margin is reset; the row label's gap supplies
@@ -1022,5 +1077,256 @@ input[type="radio"] { width: 18px; height: 18px; margin-inline-end: 16px; cursor
       expect(children[1].querySelector('.model-catalog-picker__id').getAttribute('dir')).toBe('ltr')
     })
     wrapper.unmount()
+  })
+})
+
+describe('ModelCatalogPicker keyboard browsing vs pointer selection', () => {
+  // Semantics under test: EVERY change emits (checked radio = selection);
+  // only the close trigger differs — arrow-driven changes stay open with
+  // focus on the radio, pointer changes close as before.
+  it('keeps the panel open with focus on the radio for arrow-driven changes (still emitting)', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const radio = wrapper.get('input[value="m/beta"]')
+    radio.element.focus()
+    await radio.trigger('keydown', { key: 'ArrowDown' })
+    // jsdom has no native radio arrow navigation; setValue() stands in for
+    // the native change browsers fire right after the arrow keydown.
+    await radio.setValue()
+
+    expect(wrapper.emitted('update:modelValue')).toHaveLength(1)
+    expect(wrapper.emitted('update:modelValue')[0]).toEqual(['m/beta'])
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(true)
+    expect(document.activeElement).toBe(radio.element)
+    wrapper.unmount()
+  })
+
+  it('still emits once and closes for pointer-driven changes', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    await wrapper.get('input[value="m/beta"]').setValue()
+    expect(wrapper.emitted('update:modelValue')).toHaveLength(1)
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('.model-catalog-picker__trigger').element)
+    wrapper.unmount()
+  })
+
+  it('clears the pending arrow flag on keyup so a no-change arrow cannot strand later selections open', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const radio = wrapper.get('input[value="m/beta"]')
+    // Edge-of-group arrow: keydown fires, but no native change follows.
+    await radio.trigger('keydown', { key: 'ArrowDown' })
+    await radio.trigger('keyup', { key: 'ArrowDown' })
+    await radio.setValue()
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('does not carry a stale arrow flag across close and reopen (Escape before keyup)', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    // Arrow keydown on a radio with NO follow-up change...
+    await wrapper.get('input[value="m/beta"]').trigger('keydown', { key: 'ArrowDown' })
+    // ...then the panel closes via Escape before any keyup.
+    await wrapper.get('.model-catalog-picker__panel').trigger('keydown', { key: 'Escape' })
+    await nextTick()
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+
+    // Reopen: the stale flag must be gone, so a pointer selection closes again.
+    await wrapper.get('.model-catalog-picker__trigger').trigger('click')
+    await nextTick()
+    await wrapper.get('input[value="m/beta"]').setValue()
+    expect(wrapper.emitted('update:modelValue')).toHaveLength(1)
+    expect(wrapper.emitted('update:modelValue')[0]).toEqual(['m/beta'])
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('.model-catalog-picker__trigger').element)
+    wrapper.unmount()
+  })
+
+  it('ignores arrow keydown outside radios so search-cursor arrows never block a pointer close', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const search = searchField(wrapper)
+    search.element.focus()
+    await search.trigger('keydown', { key: 'ArrowDown' })
+    await wrapper.get('input[value="m/beta"]').setValue()
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('Enter confirms on the checked radio: closes and restores focus, without new writes', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const checked = wrapper.get('input[value="m/alpha"]')
+    checked.element.focus()
+    await checked.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('.model-catalog-picker__trigger').element)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('Space closes on the checked radio but never from search or a sort button', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha', showPricing: true })
+    // Space typed into search must keep the panel open (queries contain spaces).
+    const search = searchField(wrapper)
+    search.element.focus()
+    await search.trigger('keydown', { key: ' ' })
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(true)
+    // Enter on a sort button must keep the panel open (it cycles instead).
+    await sortButtons(wrapper)[0].trigger('keydown', { key: 'Enter' })
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(true)
+
+    const checked = wrapper.get('input[value="m/alpha"]')
+    checked.element.focus()
+    await checked.trigger('keydown', { key: ' ' })
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('Enter on an unchecked radio does not close (nothing confirmed yet)', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const unchecked = wrapper.get('input[value="m/beta"]')
+    unchecked.element.focus()
+    await unchecked.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(true)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
+  })
+})
+
+describe('ModelCatalogPicker focus leaving the picker', () => {
+  const focusOut = (root, relatedTarget) => root.dispatchEvent(
+    new FocusEvent('focusout', { bubbles: true, relatedTarget }),
+  )
+
+  it('closes silently when focus moves outside, without stealing focus back', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      expect(document.activeElement).toBe(searchField(wrapper).element)
+      focusOut(wrapper.get('.model-catalog-picker').element, outside)
+      await nextTick()
+      expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(false)
+      expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+      // No focus steal: the close did not move focus to the trigger.
+      expect(document.activeElement).not.toBe(wrapper.get('.model-catalog-picker__trigger').element)
+    } finally {
+      outside.remove()
+      wrapper.unmount()
+    }
+  })
+
+  it('stays open when focus moves within the picker or focusout carries no related target', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const root = wrapper.get('.model-catalog-picker').element
+
+    focusOut(root, wrapper.get('input[value="m/alpha"]').element)
+    await nextTick()
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(true)
+
+    focusOut(root, null)
+    await nextTick()
+    expect(wrapper.find('.model-catalog-picker__panel').exists()).toBe(true)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
+  })
+})
+
+describe('ModelCatalogPicker zoom/visual-viewport positioning', () => {
+  const triggerRect = over => ({ top: 300, bottom: 340, left: 400, right: 700, width: 300, ...over })
+
+  it('places an upward panel against the LAYOUT edge under pinch zoom (Greptile repro)', () => {
+    const wrapper = mountPicker()
+    // Reproduced pre-fix: bottom = 400 - 300 + 4 = 104 -> fixed positioning
+    // measures from the layout edge: 800 - 104 = 696 instead of top - gap = 296.
+    const style = wrapper.vm.computePanelPosition(
+      triggerRect({}),
+      { width: 1024, height: 400 }, // visible viewport
+      { layoutWidth: 1024, layoutHeight: 800 },
+    )
+    expect(style.bottom).toBe('504px') // 800 - 300 + 4
+    expect(800 - parseFloat(style.bottom)).toBe(296) // lower edge lands above the trigger
+    expect(style.maxHeight).toBe('288px') // fits the visible space above
+    expect(style.top).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('keeps a downward panel on its direct layout rect under zoom', () => {
+    const wrapper = mountPicker()
+    // Visual viewport scrolled to offsetY 200 -> more room below than above.
+    const style = wrapper.vm.computePanelPosition(
+      triggerRect({}),
+      { width: 1024, height: 400 },
+      { layoutWidth: 1024, layoutHeight: 800, offsetY: 200 },
+    )
+    expect(style.top).toBe('344px') // rect.bottom + gap, no conversion
+    expect(style.maxHeight).toBe('248px') // (200 + 400) - 340 - 4 - 8
+    expect(style.bottom).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('measures available space inside an offset visual viewport', () => {
+    const wrapper = mountPicker()
+    const style = wrapper.vm.computePanelPosition(
+      triggerRect({}),
+      { width: 1024, height: 400 },
+      { layoutWidth: 1024, layoutHeight: 800, offsetY: 100 },
+    )
+    // Above = 300 - 100 - 4 - 8 = 188 (not 288): the offset narrows the fit.
+    expect(style.maxHeight).toBe('188px')
+    expect(style.bottom).toBe('504px') // layout conversion is offset-independent
+    wrapper.unmount()
+  })
+
+  it('clamps RTL panels inside the zoomed visual viewport, then converts right to layout coords', () => {
+    const wrapper = mountPicker()
+    // Visual viewport spans layout [100, 500]; layout width 1024.
+    const inRange = wrapper.vm.computePanelPosition(
+      triggerRect({ right: 450, left: 150 }),
+      { width: 400, height: 768 },
+      { isRtl: true, layoutWidth: 1024, offsetX: 100 },
+    )
+    expect(inRange.right).toBe('574px') // 1024 - 450
+    expect(inRange.left).toBeUndefined()
+
+    // Trigger at the visual left edge: the panel is pushed inside the visual
+    // viewport (rightEdge >= 100 + 300 + 8 = 408) before conversion.
+    const clamped = wrapper.vm.computePanelPosition(
+      triggerRect({ right: 300, left: 0 }),
+      { width: 400, height: 768 },
+      { isRtl: true, layoutWidth: 1024, offsetX: 100 },
+    )
+    expect(clamped.right).toBe('616px') // 1024 - 408
+    wrapper.unmount()
+  })
+
+  it('keeps prior behavior when no visual-viewport context is provided', () => {
+    const wrapper = mountPicker()
+    const implicit = wrapper.vm.computePanelPosition(triggerRect({}), { width: 1024, height: 768 })
+    const explicit = wrapper.vm.computePanelPosition(
+      triggerRect({}),
+      { width: 1024, height: 768 },
+      { layoutWidth: 1024, layoutHeight: 768, offsetX: 0, offsetY: 0 },
+    )
+    expect(implicit).toEqual(explicit)
+    wrapper.unmount()
+  })
+})
+
+describe('ModelCatalogPicker translation fallback (key echo)', () => {
+  it('uses real translations when present and the fallback when vue-i18n echoes the key', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha', showPricing: true })
+    // Present in the translations map -> the real translation wins.
+    expect(searchField(wrapper).attributes('placeholder')).toBe('Search by model name or ID')
+    expect(wrapper.text()).toContain('Search models')
+    expect(wrapper.get('[role="table"]').attributes('aria-label')).toBe('Available models')
+    // Absent from the map -> the mock echoes the key; tr() must fall back.
+    expect(wrapper.text()).toContain('/ 1M tokens')
+    expect(wrapper.text()).toContain('Base rates in USD per 1M tokens; pricing may vary and additional fees may apply.')
+    expect(rowText(wrapper, 'm/gamma')).toContain('N/A')
+    expect(wrapper.text()).toContain('Model')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    wrapper.unmount()
+
+    const none = mountPicker({ models: sortModels, modelValue: '' })
+    expect(none.get('.model-catalog-picker__trigger').text()).toContain('Browse models')
+    none.unmount()
   })
 })
