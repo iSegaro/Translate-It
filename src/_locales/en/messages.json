@@ -1475,6 +1475,26 @@
   "openrouter_saved_model_label": {
     "message": "Saved model"
   },
+  "model_catalog_search_label": { "message": "Search models" },
+  "model_catalog_search_placeholder": { "message": "Search by model ID or name" },
+  "model_catalog_sort_label": { "message": "Sort by" },
+  "model_catalog_sort_api": { "message": "API order" },
+  "model_catalog_sort_name_asc": { "message": "Name (A–Z)" },
+  "model_catalog_sort_name_desc": { "message": "Name (Z–A)" },
+  "model_catalog_sort_input_asc": { "message": "Input price (low to high)" },
+  "model_catalog_sort_input_desc": { "message": "Input price (high to low)" },
+  "model_catalog_sort_output_asc": { "message": "Output price (low to high)" },
+  "model_catalog_sort_output_desc": { "message": "Output price (high to low)" },
+  "model_catalog_results_label": { "message": "Available models" },
+  "model_catalog_showing_count": { "message": "Showing {shown} of {total} models" },
+  "model_catalog_no_matches": { "message": "No models match your search." },
+  "model_catalog_input_price": { "message": "Input" },
+  "model_catalog_output_price": { "message": "Output" },
+  "model_catalog_free": { "message": "Free" },
+  "model_catalog_unavailable": { "message": "N/A" },
+  "model_catalog_variable": { "message": "Variable" },
+  "model_catalog_base_rates_note": { "message": "Base rates in USD per 1M tokens; pricing may vary and additional fees may apply." },
+  "model_catalog_per_million": { "message": "/ 1M tokens" },
   "deepseek_api_settings_title": {
     "message": "DeepSeek Settings"
   },

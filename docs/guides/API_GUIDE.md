@@ -54,7 +54,9 @@ For **Google Gemini**, **OpenAI**, **OpenRouter**, **Requesty**, and **DeepSeek*
 1. Enter the required credentials: an API key is required for Gemini, OpenAI, and DeepSeek, while OpenRouter and Requesty can also browse public catalogs without one.
 2. Wait for the model catalog to load — the panel shows loading, failure, and empty states.
 3. Use the search field to filter by model ID or name. Up to 50 matching models are displayed at a time; when more results are available, the panel shows how many matches were found.
-4. Pick a model from the catalog dropdown, or keep a curated or saved model from the main Model selector.
+4. Pick a model from the catalog dropdown — or, for OpenRouter, from its searchable radio list with per-model pricing — or keep a curated or saved model from the main Model selector.
+
+OpenRouter catalog prices are base USD rates per million tokens; rates may vary by tier, and additional fees may apply.
 
 **WebAI to API** works differently: after entering the server URL, the models advertised by your server are added directly to the main Model selector. There is no separate searchable catalog.
 

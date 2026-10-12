@@ -9,7 +9,7 @@ const modelCache = new Map()
 function finitePrice(value) {
   if (typeof value !== 'string' || !value.trim()) return null
   const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : null
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
 }
 
 export function normalizeOpenRouterModels(data) {
@@ -22,10 +22,11 @@ export function normalizeOpenRouterModels(data) {
     seen.add(value)
     const prompt = finitePrice(item?.pricing?.prompt)
     const completion = finitePrice(item?.pricing?.completion)
+    const variable = Array.isArray(item?.pricing?.overrides) && item.pricing.overrides.length > 0
     models.push({
       value,
       name: typeof item?.name === 'string' && item.name.trim() ? item.name.trim() : value,
-      pricing: prompt !== null || completion !== null ? { prompt, completion } : null,
+      pricing: prompt !== null || completion !== null || variable ? { prompt, completion, ...(variable ? { variable: true } : {}) } : null,
     })
   }
   return models

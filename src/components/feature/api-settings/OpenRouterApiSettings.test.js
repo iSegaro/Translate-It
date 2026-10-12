@@ -67,6 +67,14 @@ vi.mock('@/components/base/BaseSelect.vue', () => ({
     template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select>',
   },
 }))
+vi.mock('@/components/feature/api-settings/ModelCatalogPicker.vue', () => ({
+  default: {
+    name: 'ModelCatalogPicker',
+    props: ['models', 'modelValue', 'showPricing'],
+    emits: ['update:modelValue'],
+    template: '<div data-test="model-catalog-picker"><input aria-label="Search models"><select aria-label="Sort models"><option>API order</option><option>Name</option></select><button v-for="model in models" :key="model.value" :data-value="model.value" :aria-checked="model.value === modelValue" @click="$emit(\'update:modelValue\', model.value)">{{ model.name }}</button></div>',
+  },
+}))
 
 const deferred = () => {
   let resolve
@@ -88,25 +96,23 @@ describe('OpenRouterApiSettings model catalog', () => {
     mocks.getCachedModels.mockReset().mockReturnValue(null)
   })
 
-  it('keeps curated models first and searches catalog ids and names before explicit selection writes the model', async () => {
+  it('keeps curated models first and writes a catalog choice only after explicit picker selection', async () => {
     mocks.fetchModels.mockResolvedValue([
       { value: 'vendor/claude', name: 'Friendly Sonnet', pricing: null },
       { value: 'provider/other', name: 'Other Model', pricing: null },
     ])
     const wrapper = mount(OpenRouterApiSettings)
     await flushPromises()
-    const selects = wrapper.findAll('select')
-    expect(selects[0].findAll('option').map(option => option.element.value)).toEqual([
+    const curatedSelect = wrapper.find('select')
+    expect(curatedSelect.findAll('option').map(option => option.element.value)).toEqual([
       'curated/model-one', 'curated/model-two', 'custom',
     ])
-    expect(selects[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude', 'provider/other'])
-
-    await wrapper.get('#openrouter-model-search').setValue('vendor/')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude'])
-    await wrapper.get('#openrouter-model-search').setValue('friendly sonnet')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['vendor/claude'])
-    await wrapper.get('#openrouter-model-search').setValue('')
-    await wrapper.findAll('select')[1].setValue('provider/other')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Friendly Sonnet')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    await wrapper.get('[aria-label="Search models"]').setValue('something')
+    await wrapper.get('[aria-label="Sort models"]').setValue('Name')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    await wrapper.get('[data-value="provider/other"]').trigger('click')
     expect(mocks.settingsStore.updateSettingLocally).toHaveBeenCalledWith('OPENROUTER_API_MODEL', 'provider/other')
     expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('catalog')
     expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_MODELS', expect.anything())
@@ -120,20 +126,20 @@ describe('OpenRouterApiSettings model catalog', () => {
     ])
     const wrapper = mount(OpenRouterApiSettings)
     await flushPromises()
-    const [curatedSelect, catalogSelect] = wrapper.findAll('select')
-    expect(catalogSelect.element.value).toBe('')
+    const curatedSelect = wrapper.find('select')
+    const picker = wrapper.get('[data-test="model-catalog-picker"]')
 
-    await catalogSelect.setValue('server/model')
+    await picker.get('[data-value="server/model"]').trigger('click')
     expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('server/model')
     expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('catalog')
-    expect(catalogSelect.element.value).toBe('server/model')
+    expect(picker.get('[data-value="server/model"]').attributes('aria-checked')).toBe('true')
     expect(curatedSelect.element.value).toBe('server/model')
 
     await curatedSelect.setValue('curated/model-two')
     expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('curated/model-two')
     expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('curated')
     expect(curatedSelect.element.value).toBe('curated/model-two')
-    expect(catalogSelect.element.value).toBe('')
+    expect(picker.get('[data-value="server/model"]').attributes('aria-checked')).toBe('false')
     wrapper.unmount()
   })
 
@@ -141,30 +147,39 @@ describe('OpenRouterApiSettings model catalog', () => {
     mocks.fetchModels.mockResolvedValue([{ value: 'server/model', name: 'Server Model', pricing: null }])
     const wrapper = mount(OpenRouterApiSettings)
     await flushPromises()
-    const [curatedSelect, catalogSelect] = wrapper.findAll('select')
+    const curatedSelect = wrapper.find('select')
     await curatedSelect.setValue('custom')
     expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('custom')
-    expect(catalogSelect.element.value).toBe('')
+    expect(wrapper.get('[data-value="server/model"]').attributes('aria-checked')).toBe('false')
     await wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').setValue('custom/model-id')
     expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('custom/model-id')
     expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('custom')
-    expect(catalogSelect.element.value).toBe('')
+    expect(wrapper.get('[data-value="server/model"]').attributes('aria-checked')).toBe('false')
     wrapper.unmount()
   })
 
-  it('derives catalog selection for a saved discovered model and clears it when filtered out', async () => {
+  it('preserves saved selection and provenance when a new catalog replaces the current one', async () => {
     mocks.settingsStore.settings.OPENROUTER_API_MODEL = 'server/saved-model'
-    mocks.fetchModels.mockResolvedValue([
+    mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE = 'catalog'
+    mocks.fetchModels.mockResolvedValueOnce([
       { value: 'server/saved-model', name: 'Saved Catalog Model', pricing: null },
       { value: 'server/another-model', name: 'Another Catalog Model', pricing: null },
+    ]).mockResolvedValueOnce([
+      { value: 'server/new-model', name: 'New Catalog Model', pricing: null },
     ])
     const wrapper = mount(OpenRouterApiSettings)
     await flushPromises()
-    const catalogSelect = wrapper.findAll('select')[1]
-    expect(catalogSelect.element.value).toBe('server/saved-model')
-    await wrapper.get('#openrouter-model-search').setValue('another-model')
-    expect(catalogSelect.element.value).toBe('')
+    expect(wrapper.get('[data-value="server/saved-model"]').attributes('aria-checked')).toBe('true')
+    await wrapper.get('[data-test="api-key"]').setValue('key-two')
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(mocks.fetchModels).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('New Catalog Model')
+    expect(wrapper.find('[data-value="server/saved-model"]').exists()).toBe(false)
     expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('server/saved-model')
+    expect(mocks.settingsStore.settings.OPENROUTER_MODEL_SOURCE).toBe('catalog')
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_MODEL_SOURCE', expect.anything())
     wrapper.unmount()
   })
 
@@ -202,7 +217,7 @@ describe('OpenRouterApiSettings model catalog', () => {
     const wrapper = mount(OpenRouterApiSettings)
     await flushPromises()
     expect(mocks.fetchModels).not.toHaveBeenCalled()
-    expect(wrapper.findAll('select')[1].text()).toContain('Cached Model')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Cached Model')
     wrapper.unmount()
   })
 
@@ -215,13 +230,13 @@ describe('OpenRouterApiSettings model catalog', () => {
     await wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').setValue('vendor/custom-in-catalog')
     pending.resolve([{ value: 'vendor/custom-in-catalog', name: 'Listed Model', pricing: null }])
     await flushPromises()
-    expect(wrapper.findAll('select')[0].element.value).toBe('custom')
+    expect(wrapper.find('select').element.value).toBe('custom')
     expect(wrapper.get('[placeholder="openrouter_custom_model_placeholder"]').element.value).toBe('vendor/custom-in-catalog')
     expect(mocks.settingsStore.settings.OPENROUTER_API_MODEL).toBe('vendor/custom-in-catalog')
     wrapper.unmount()
   })
 
-  it('shows localized loading, failure, empty, and result-limit states', async () => {
+  it('shows localized loading, failure, and empty states while rendering discovered results', async () => {
     const pending = deferred()
     mocks.fetchModels.mockReturnValueOnce(pending.promise)
     const loading = mount(OpenRouterApiSettings)
@@ -243,20 +258,18 @@ describe('OpenRouterApiSettings model catalog', () => {
     })))
     const capped = mount(OpenRouterApiSettings)
     await flushPromises()
-    expect(capped.text()).toContain('Showing 50 of 60 matching models')
-    expect(capped.findAll('select')[1].findAll('option')).toHaveLength(50)
+    expect(capped.get('[data-test="model-catalog-picker"]').findAll('button')).toHaveLength(60)
     capped.unmount()
   })
 
-  it('searches the full catalog including the final item beyond the rendered-results cap', async () => {
+  it('does not write a model when a response adds a catalog entry', async () => {
     mocks.fetchModels.mockResolvedValue(Array.from({ length: 600 }, (_, index) => ({
       value: `model/${index}`, name: `Model ${index}`, pricing: null,
     })))
     const wrapper = mount(OpenRouterApiSettings)
     await flushPromises()
-    expect(wrapper.findAll('select')[1].findAll('option')).toHaveLength(50)
-    await wrapper.get('#openrouter-model-search').setValue('model/599')
-    expect(wrapper.findAll('select')[1].findAll('option').map(option => option.element.value)).toEqual(['model/599'])
+    expect(wrapper.get('[data-test="model-catalog-picker"]').findAll('button')).toHaveLength(600)
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalledWith('OPENROUTER_API_MODEL', expect.anything())
     wrapper.unmount()
   })
 
@@ -277,8 +290,8 @@ describe('OpenRouterApiSettings model catalog', () => {
     await flushPromises()
     first.resolve([{ value: 'stale/key-one-model', name: 'Stale', pricing: null }])
     await flushPromises()
-    expect(wrapper.findAll('select')[1].text()).toContain('Latest')
-    expect(wrapper.findAll('select')[1].text()).not.toContain('Stale')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).toContain('Latest')
+    expect(wrapper.get('[data-test="model-catalog-picker"]').text()).not.toContain('Stale')
     wrapper.unmount()
     expect(secondSignal.aborted).toBe(true)
   })
@@ -321,22 +334,6 @@ describe('OpenRouterApiSettings model catalog', () => {
     liveStatusFor(empty, 'No models were returned by OpenRouter.')
     liveStatusFor(empty, 'Saved model was not listed by OpenRouter.')
     empty.unmount()
-  })
-
-  it('keeps catalog search counts and no-match hints outside live regions', async () => {
-    mocks.fetchModels.mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({
-      value: `model/${index}`, name: `Model ${index}`, pricing: null,
-    })))
-    const wrapper = mount(OpenRouterApiSettings)
-    await flushPromises()
-    const countHint = wrapper.findAll('small').find(node => node.text().includes('Showing 50 of 60 matching models'))
-    expect(countHint).toBeTruthy()
-    expect(countHint.element.closest('[role="status"], [aria-live]')).toBeNull()
-    await wrapper.get('#openrouter-model-search').setValue('missing-model')
-    const noMatchesHint = wrapper.findAll('small').find(node => node.text().includes('No models match your search.'))
-    expect(noMatchesHint).toBeTruthy()
-    expect(noMatchesHint.element.closest('[role="status"], [aria-live]')).toBeNull()
-    wrapper.unmount()
   })
 
   it('keeps the catalog live region mounted while its text moves through loading, failure, empty, and settled states', async () => {

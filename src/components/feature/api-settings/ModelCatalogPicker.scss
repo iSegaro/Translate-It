@@ -1,0 +1,125 @@
+@use "@/assets/styles/base/variables" as *;
+
+.model-catalog-picker {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+
+  &__sort {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    label {
+      font-size: $font-size-sm;
+      font-weight: $font-weight-medium;
+      color: var(--color-text);
+    }
+  }
+
+  &__note {
+    margin: 0;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  &__fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-inline-size: 0;
+
+    legend {
+      padding: 0;
+      margin-block-end: $spacing-xs;
+      font-size: $font-size-sm;
+      font-weight: $font-weight-medium;
+      color: var(--color-text);
+    }
+  }
+
+  &__list {
+    max-height: 320px;
+    overflow-y: auto;
+    border: $border-width $border-style var(--color-border);
+    border-radius: $border-radius-base;
+    background: var(--color-background);
+  }
+
+  &__option {
+    display: flex;
+    align-items: flex-start;
+    gap: $spacing-sm;
+    padding: $spacing-sm $spacing-base;
+    border-block-end: $border-width $border-style var(--color-border);
+    cursor: pointer;
+    transition: background-color 120ms ease;
+
+    &:last-child {
+      border-block-end: 0;
+    }
+
+    &:hover {
+      background: var(--color-background-hover, rgb(0 0 0 / 4%));
+    }
+
+    &:has(:checked) {
+      background: var(--color-active-background, #e8f0fe);
+    }
+  }
+
+  &__radio {
+    margin-block-start: 2px;
+    flex-shrink: 0;
+    accent-color: var(--color-primary);
+  }
+
+  &__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+
+  &__name {
+    font-size: $font-size-base;
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+  }
+
+  &__id {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-family: monospace;
+    overflow-wrap: anywhere;
+  }
+
+  &__pricing {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-xs $spacing-sm;
+    margin-block-start: 2px;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__variable {
+    color: var(--color-primary);
+    font-weight: $font-weight-medium;
+  }
+
+  &__status {
+    min-height: 1.2em;
+    margin: 0;
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+  }
+
+  @media (width <= 480px) {
+    &__list {
+      max-height: 50vh;
+    }
+  }
+}
