@@ -501,10 +501,15 @@ describe('ModelCatalogPicker shared header (narrow-screen sorting)', () => {
 
     const buttons = header.findAll('button')
     expect(buttons).toHaveLength(3)
-    expect(buttons.map(button => button.text().replace(/\s+/g, ' '))).toEqual([
-      'Model',
-      'Input / 1M tokens',
-      'Output / 1M tokens',
+    // Price headers render two explicit lines in order: label, then the unit
+    // (both exercised through the `t(key) || fallback` path).
+    const headerLines = buttons.map(button => button
+      .findAll('.model-catalog-picker__header-text > span')
+      .map(span => span.text()))
+    expect(headerLines).toEqual([
+      ['Model'],
+      ['Input', '/ 1M tokens'],
+      ['Output', '/ 1M tokens'],
     ])
 
     // The three-state cycle backing both layouts: asc -> desc -> API order.
@@ -837,5 +842,81 @@ describe('ModelCatalogPicker whole-panel scroll fallback', () => {
     } finally {
       restore()
     }
+  })
+})
+
+describe('ModelCatalogPicker trigger hover styling', () => {
+  it('keeps the trigger on the neutral theme styling hook with no inline border/background override', async () => {
+    const wrapper = mountPicker({ models: sortModels, modelValue: 'm/alpha' })
+    const trigger = wrapper.get('.model-catalog-picker__trigger')
+    // The class is the hook where the stylesheet applies the resting
+    // --color-border border and the --color-background-hover fill.
+    expect(trigger.classes()).toContain('model-catalog-picker__trigger')
+    expect(trigger.element.tagName).toBe('BUTTON')
+    // Nothing inline fights the theme: the normal border and the subtle hover
+    // fill both come from the stylesheet. (jsdom has no stylesheet or hover
+    // state, so the painted :hover itself cannot be observed here — browser
+    // verification only; see the verification note in the report.)
+    expect(trigger.attributes('style')).toBeUndefined()
+    expect(trigger.element.style.borderColor).toBe('')
+    expect(trigger.element.style.backgroundColor).toBe('')
+    wrapper.unmount()
+  })
+})
+
+describe('ModelCatalogPicker sort-header stability', () => {
+  const headerShape = wrapper => sortButtons(wrapper).map(button => ({
+    text: button.text().replace(/\s+/g, ' '),
+    nodes: button.element.children.length,
+    icons: button.findAll('.model-catalog-picker__sort-icon').length,
+    // Number of explicit text lines inside the header text wrapper.
+    lines: button.findAll('.model-catalog-picker__header-text > span').length,
+  }))
+
+  it('keeps an identical icon slot, line structure and text across inactive, ascending and descending states', async () => {
+    const wrapper = await openPicker({ models: sortModels, modelValue: 'm/alpha', showPricing: true })
+    const icons = () => wrapper.findAll('.model-catalog-picker__sort-icon')
+
+    // Inactive: every header already reserves one icon slot, and price
+    // headers already render both text lines (label + unit).
+    const initial = headerShape(wrapper)
+    expect(initial.map(header => header.icons)).toEqual([1, 1, 1])
+    expect(initial.map(header => header.nodes)).toEqual([2, 2, 2])
+    expect(initial.map(header => header.lines)).toEqual([1, 2, 2])
+    icons().forEach((icon) => {
+      expect(icon.classes()).not.toContain('is-active')
+      // Decorative: aria-sort on the columnheader carries the state.
+      expect(icon.attributes('aria-hidden')).toBe('true')
+    })
+
+    // Activating sorts changes nothing structural — same text, node count,
+    // line count and icon-slot count; only state classes and aria-sort differ.
+    await clickHeader(wrapper, 0) // name ascending
+    expect(headerShape(wrapper)).toEqual(initial)
+    expect(icons()[0].classes()).toEqual(expect.arrayContaining(['is-active', 'is-asc']))
+    expect(icons()[1].classes()).not.toContain('is-active')
+    expect(headerCells(wrapper)[0].attributes('aria-sort')).toBe('ascending')
+
+    await clickHeader(wrapper, 0) // name descending
+    expect(headerShape(wrapper)).toEqual(initial)
+    expect(icons()[0].classes()).toEqual(expect.arrayContaining(['is-active']))
+    expect(icons()[0].classes()).not.toContain('is-asc')
+    expect(headerCells(wrapper)[0].attributes('aria-sort')).toBe('descending')
+
+    await clickHeader(wrapper, 1) // input ascending (name back to inactive)
+    expect(headerShape(wrapper)).toEqual(initial)
+    expect(icons()[0].classes()).not.toContain('is-active')
+    expect(icons()[1].classes()).toEqual(expect.arrayContaining(['is-active', 'is-asc']))
+    expect(headerCells(wrapper)[1].attributes('aria-sort')).toBe('ascending')
+
+    await clickHeader(wrapper, 1) // input descending
+    expect(headerShape(wrapper)).toEqual(initial)
+    expect(icons()[1].classes()).not.toContain('is-asc')
+
+    await clickHeader(wrapper, 1) // third click -> API order, icons all muted
+    expect(headerShape(wrapper)).toEqual(initial)
+    expect(icons().every(icon => !icon.classes().includes('is-active'))).toBe(true)
+    expect(headerCells(wrapper)[1].attributes('aria-sort')).toBe('none')
+    wrapper.unmount()
   })
 })

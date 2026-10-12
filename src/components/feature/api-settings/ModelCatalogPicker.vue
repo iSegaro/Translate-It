@@ -76,11 +76,12 @@
               class="model-catalog-picker__sort-button"
               @click="cycleSort('name')"
             >
-              <span>{{ tr('model_catalog_column_model', 'Model') }}</span>
+              <span class="model-catalog-picker__header-text">
+                <span>{{ tr('model_catalog_column_model', 'Model') }}</span>
+              </span>
               <MaskIcon
-                v-if="activeField === 'name'"
                 class="model-catalog-picker__sort-icon"
-                :class="{ 'is-asc': sortKey.endsWith('_asc') }"
+                :class="{ 'is-active': activeField === 'name', 'is-asc': sortKey === 'name_asc' }"
                 :src="dropdownArrowIcon"
                 :size="8"
               />
@@ -97,11 +98,13 @@
               class="model-catalog-picker__sort-button"
               @click="cycleSort('input')"
             >
-              <span>{{ tr('model_catalog_input_price', 'Input') }} <span class="model-catalog-picker__unit">{{ tr('model_catalog_per_million', '/ 1M tokens') }}</span></span>
+              <span class="model-catalog-picker__header-text">
+                <span>{{ tr('model_catalog_input_price', 'Input') }}</span>
+                <span class="model-catalog-picker__unit">{{ tr('model_catalog_per_million', '/ 1M tokens') }}</span>
+              </span>
               <MaskIcon
-                v-if="activeField === 'input'"
                 class="model-catalog-picker__sort-icon"
-                :class="{ 'is-asc': sortKey.endsWith('_asc') }"
+                :class="{ 'is-active': activeField === 'input', 'is-asc': sortKey === 'input_asc' }"
                 :src="dropdownArrowIcon"
                 :size="8"
               />
@@ -118,11 +121,13 @@
               class="model-catalog-picker__sort-button"
               @click="cycleSort('output')"
             >
-              <span>{{ tr('model_catalog_output_price', 'Output') }} <span class="model-catalog-picker__unit">{{ tr('model_catalog_per_million', '/ 1M tokens') }}</span></span>
+              <span class="model-catalog-picker__header-text">
+                <span>{{ tr('model_catalog_output_price', 'Output') }}</span>
+                <span class="model-catalog-picker__unit">{{ tr('model_catalog_per_million', '/ 1M tokens') }}</span>
+              </span>
               <MaskIcon
-                v-if="activeField === 'output'"
                 class="model-catalog-picker__sort-icon"
-                :class="{ 'is-asc': sortKey.endsWith('_asc') }"
+                :class="{ 'is-active': activeField === 'output', 'is-asc': sortKey === 'output_asc' }"
                 :src="dropdownArrowIcon"
                 :size="8"
               />
