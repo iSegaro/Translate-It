@@ -1119,7 +1119,7 @@
     "message": "隠したページとサイト"
   },
   "fab_exclusions_description": {
-    "message": "デスクトップのボタンは、以下のページとサイトでは隠されています。項目を削除すると再び表示されます。"
+    "message": "デスクトップのボタンが非表示になるページとサイトを管理します。"
   },
   "fab_exclusions_empty": {
     "message": "まだページやサイトは隠されていません。"
@@ -1138,6 +1138,12 @@
   },
   "fab_exclusions_load_error": {
     "message": "隠したページとサイトのリストを読み込めませんでした。ページを再読み込みして、もう一度お試しください。"
+  },
+  "fab_exclusions_manage_btn": {
+    "message": "リストの管理"
+  },
+  "fab_exclusions_done_btn": {
+    "message": "完了"
   },
   "page_translation_add_auto_translate_tooltip": {
     "message": "自動翻訳ルールに追加"

@@ -17,6 +17,12 @@
       margin-top: $spacing-lg !important;
     }
 
+    // FAB exclusions row follows the appearance sub-options block (not a
+    // .setting-group), so the sibling rule can't fire; it always needs the gap.
+    &.fab-exclusions-row {
+      margin-top: $spacing-lg !important;
+    }
+
     // Special spacing for the main toggle at the top
     &.extension-enabled-group {
       margin-bottom: $spacing-xl !important;
@@ -610,36 +616,16 @@
   }
 }
 
-/* 
+/*
   Rules Drawer & Animations
 */
-/* Desktop FAB per-page / per-site exclusions */
+/* Desktop FAB per-page / per-site exclusions (rendered inside the drawer body) */
 .fab-exclusions-group {
-  margin-top: $spacing-lg !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
   display: flex !important;
   flex-direction: column !important;
   gap: $spacing-sm !important;
-
-  .setting-info {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 2px !important;
-    min-width: 0 !important;
-  }
-
-  .setting-label {
-    font-weight: 600 !important;
-    color: var(--color-text) !important;
-  }
-
-  /* The list lives at the group's own start edge — no 32px indent reserved
-     for the checkbox column above, so it reads as its own block. */
-  .setting-description {
-    padding-inline-start: 0 !important;
-    margin-top: 0 !important;
-  }
+  width: 100% !important;
+  box-sizing: border-box !important;
 
   .fab-exclusions-empty {
     padding: $spacing-md !important;
@@ -1078,6 +1064,12 @@
     align-items: center !important;
     gap: $spacing-md !important;
   }
+}
+
+/* FAB exclusions drawer footer: single action aligned to the action end
+   (right in LTR, left in RTL), like the Auto Page rules footer. */
+.fab-drawer-footer {
+  justify-content: flex-end !important;
 }
 
 /* Transitions classes for Vue */

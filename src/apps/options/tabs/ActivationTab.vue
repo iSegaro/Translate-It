@@ -79,67 +79,28 @@
       </div>
 
       <!-- Per-page / per-site FAB exclusions.
-           Deliberately outside the appearance sub-options so the list stays
-           reachable while the global FAB toggle is off. -->
+           Deliberately outside the appearance sub-options so the Manage List
+           row stays reachable while the global FAB toggle is off. -->
       <div
         id="DESKTOP_FAB_EXCLUSIONS"
-        class="setting-group fab-exclusions-group"
-        role="group"
-        :aria-label="t('fab_exclusions_group_label') || 'Hidden pages and sites'"
+        class="setting-group sub-setting-group fab-exclusions-row"
       >
-        <div class="setting-info">
-          <span class="setting-label">{{ t('fab_exclusions_label') || 'Hidden pages and sites' }}</span>
-          <span class="setting-description">
-            {{ t('fab_exclusions_description') || 'The Desktop FAB is hidden on the pages and sites listed below. Remove an entry to show it there again.' }}
-          </span>
-        </div>
-
-        <div
-          v-if="fabExclusionsLoaded && fabExclusions.length === 0"
-          class="fab-exclusions-empty"
-          role="status"
-        >
-          {{ t('fab_exclusions_empty') || 'No pages or sites are hidden yet.' }}
-        </div>
-
-        <ul
-          v-else-if="fabExclusions.length"
-          class="fab-exclusions-list"
-        >
-          <li
-            v-for="entry in fabExclusions"
-            :key="entry.key"
-            class="fab-exclusion-item"
-          >
-            <span class="fab-exclusion-scope">
-              {{ fabExclusionScopeLabel(entry.scope) }}
+        <div class="setting-row">
+          <div class="setting-info">
+            <label class="setting-label">{{ t('fab_exclusions_label') || 'Hidden pages and sites' }}</label>
+            <span class="setting-description">
+              {{ t('fab_exclusions_description') || 'Manage pages and sites where the Desktop FAB is hidden.' }}
             </span>
-            <span
-              class="fab-exclusion-value"
-              dir="ltr"
-            >{{ entry.value }}</span>
-            <button
-              type="button"
-              class="fab-exclusion-remove-btn"
-              :title="t('fab_exclusion_remove_label') || 'Remove from list'"
-              :aria-label="`${t('fab_exclusion_remove_label') || 'Remove from list'}: ${entry.value}`"
-              :disabled="removingFabExclusionKey === entry.key"
-              @click="removeFabExclusion(entry)"
+          </div>
+          <div class="setting-control">
+            <BaseButton
+              id="DESKTOP_FAB_MANAGE_LIST_BTN"
+              class="manage-rules-button"
+              @click="openFabExclusionsDrawer"
             >
-              <MaskIcon
-                :src="IconTrash"
-                :size="14"
-              />
-            </button>
-          </li>
-        </ul>
-
-        <div
-          v-if="fabExclusionError"
-          class="fab-exclusions-error"
-          role="alert"
-        >
-          {{ fabExclusionError }}
+              {{ t('fab_exclusions_manage_btn') || 'Manage List' }}
+            </BaseButton>
+          </div>
         </div>
       </div>
     </BaseFieldset>
@@ -908,12 +869,106 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Desktop FAB Hidden Pages and Sites slide-out Drawer -->
+    <Transition name="drawer-fade">
+      <div
+        v-if="isFabExclusionsDrawerOpen"
+        class="drawer-overlay"
+        @click="closeFabExclusionsDrawer"
+      />
+    </Transition>
+    <Transition name="drawer-slide">
+      <div
+        v-if="isFabExclusionsDrawerOpen"
+        id="DESKTOP_FAB_EXCLUSIONS_DRAWER"
+        ref="fabExclusionsDrawerRef"
+        class="drawer-container"
+        :class="{ 'rtl': isRTL }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t('fab_exclusions_group_label') || 'Hidden pages and sites'"
+        @keydown="handleFabDrawerKeydown"
+      >
+        <div class="drawer-header">
+          <h3>{{ t('fab_exclusions_label') || 'Hidden pages and sites' }}</h3>
+          <button
+            type="button"
+            class="drawer-close-btn"
+            :aria-label="t('window_close') || 'Close'"
+            @click="closeFabExclusionsDrawer"
+          >
+            ✕
+          </button>
+        </div>
+        <div class="drawer-body">
+          <div class="fab-exclusions-group">
+            <div
+              v-if="fabExclusionsLoaded && fabExclusions.length === 0"
+              class="fab-exclusions-empty"
+              role="status"
+            >
+              {{ t('fab_exclusions_empty') || 'No pages or sites are hidden yet.' }}
+            </div>
+            <ul
+              v-else-if="fabExclusions.length"
+              class="fab-exclusions-list"
+            >
+              <li
+                v-for="entry in fabExclusions"
+                :key="entry.key"
+                class="fab-exclusion-item"
+              >
+                <span class="fab-exclusion-scope">
+                  {{ fabExclusionScopeLabel(entry.scope) }}
+                </span>
+                <span
+                  class="fab-exclusion-value"
+                  dir="ltr"
+                >{{ entry.value }}</span>
+                <button
+                  type="button"
+                  class="fab-exclusion-remove-btn"
+                  :title="t('fab_exclusion_remove_label') || 'Remove from list'"
+                  :aria-label="`${t('fab_exclusion_remove_label') || 'Remove from list'}: ${entry.value}`"
+                  :disabled="removingFabExclusionKey === entry.key"
+                  @click="removeFabExclusion(entry)"
+                >
+                  <MaskIcon
+                    :src="IconTrash"
+                    :size="14"
+                  />
+                </button>
+              </li>
+            </ul>
+            <div
+              v-if="fabExclusionError"
+              class="fab-exclusions-error"
+              role="alert"
+            >
+              {{ fabExclusionError }}
+            </div>
+          </div>
+        </div>
+        <div class="drawer-footer fab-drawer-footer">
+          <div class="drawer-footer-actions">
+            <BaseButton
+              variant="primary"
+              size="sm"
+              @click="closeFabExclusionsDrawer"
+            >
+              {{ t('fab_exclusions_done_btn') || 'Done' }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </section>
 </template>
 
 <script setup>
 import './ActivationTab.scss'
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useTabSettings } from '../composables/useTabSettings.js'
@@ -1028,8 +1083,25 @@ const removeFabExclusion = async (entry) => {
   removingFabExclusionKey.value = entry.key
   try {
     await removeDesktopFabExclusion(entry.key)
+    // Keep focus on the row that replaces the removed one so keyboard users
+    // don't fall back to <body> when the row disappears.
+    const removedIndex = fabExclusions.value.findIndex((item) => item.key === entry.key)
     fabExclusions.value = fabExclusions.value.filter((item) => item.key !== entry.key)
     fabExclusionError.value = ''
+    nextTick(() => {
+      const container = fabExclusionsDrawerRef.value
+      if (!container) return
+      // Respect a deliberate focus move: if focus is now on a connected control
+      // (inside or outside the drawer), do not steal it back.
+      const active = document.activeElement
+      if (active && active.isConnected && active !== document.body && active !== document.documentElement) {
+        return
+      }
+      const removeButtons = container.querySelectorAll('.fab-exclusion-remove-btn')
+      const target = removeButtons[removedIndex] || removeButtons[removeButtons.length - 1]
+        || container.querySelector('.drawer-footer button')
+      target?.focus()
+    })
   } catch (error) {
     logger.error('Failed to remove Desktop FAB exclusion:', error)
     fabExclusionError.value = t('fab_exclusion_remove_error')
@@ -1042,6 +1114,51 @@ const removeFabExclusion = async (entry) => {
 const handleFabExclusionStorageChange = (data) => {
   if (!data?.key || !String(data.key).startsWith(DESKTOP_FAB_EXCLUSION_PREFIX)) return
   void loadFabExclusions()
+}
+
+// Exclusions drawer (mirrors the Auto Page rules drawer conventions)
+const isFabExclusionsDrawerOpen = ref(false)
+const fabExclusionsDrawerRef = ref(null)
+
+const openFabExclusionsDrawer = () => {
+  isRulesDrawerOpen.value = false // mutual exclusion
+  isFabExclusionsDrawerOpen.value = true
+  nextTick(() => {
+    fabExclusionsDrawerRef.value?.querySelector('.drawer-close-btn')?.focus()
+  })
+}
+
+const closeFabExclusionsDrawer = () => {
+  if (!isFabExclusionsDrawerOpen.value) return
+  isFabExclusionsDrawerOpen.value = false
+  nextTick(() => {
+    document.getElementById('DESKTOP_FAB_MANAGE_LIST_BTN')?.focus()
+  })
+}
+
+// Keep Tab cycling inside this drawer (close button ⇄ list rows ⇄ Done).
+// Escape bypasses the trap and is handled by the window handler below.
+const handleFabDrawerKeydown = (e) => {
+  if (e.key !== 'Tab') return
+  const container = fabExclusionsDrawerRef.value
+  if (!container) return
+  const focusable = Array.from(container.querySelectorAll(
+    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  ))
+  if (focusable.length === 0) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+  const isOutside = !active || !container.contains(active)
+  if (e.shiftKey) {
+    if (active === first || isOutside) {
+      e.preventDefault()
+      last.focus()
+    }
+  } else if (active === last || isOutside) {
+    e.preventDefault()
+    first.focus()
+  }
 }
 
 // Text Fields
@@ -1113,6 +1230,7 @@ const ruleErrorMsg = ref('')
 const tempRules = ref([])
 
 const openRulesDrawer = () => {
+  isFabExclusionsDrawerOpen.value = false // mutual exclusion
   newRuleInput.value = ''
   ruleErrorMsg.value = ''
   const currentRules = settingsStore.settings?.WHOLE_PAGE_AUTO_TRANSLATE_RULES || []
@@ -1162,9 +1280,9 @@ const rulesInstructionsText = computed(() => {
 })
 
 const handleKeyDown = (e) => {
-  if (e.key === 'Escape' && isRulesDrawerOpen.value) {
-    closeRulesDrawer()
-  }
+  if (e.key !== 'Escape') return
+  if (isRulesDrawerOpen.value) closeRulesDrawer()
+  else if (isFabExclusionsDrawerOpen.value) closeFabExclusionsDrawer()
 }
 
 // Mouse on Hover

@@ -1119,7 +1119,7 @@
     "message": "صفحه‌ها و سایت‌های پنهان‌شده"
   },
   "fab_exclusions_description": {
-    "message": "دکمه دسکتاپ در صفحه‌ها و سایت‌های فهرست‌شده در زیر پنهان است. برای نمایش دوباره، یک مورد را حذف کنید."
+    "message": "صفحه‌ها و سایت‌هایی را که دکمه دسکتاپ در آن‌ها پنهان است مدیریت کنید."
   },
   "fab_exclusions_empty": {
     "message": "هنوز هیچ صفحه یا سایتی پنهان نشده است."
@@ -1138,6 +1138,12 @@
   },
   "fab_exclusions_load_error": {
     "message": "بارگذاری فهرست صفحه‌ها و سایت‌های پنهان‌شده ممکن نشد. برای تلاش دوباره، صفحه را بارگذاری مجدد کنید."
+  },
+  "fab_exclusions_manage_btn": {
+    "message": "مدیریت فهرست"
+  },
+  "fab_exclusions_done_btn": {
+    "message": "تمام"
   },
   "page_translation_add_auto_translate_tooltip": {
     "message": "افزودن به قوانین ترجمه خودکار"

@@ -23,7 +23,7 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 }));
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
-  useUnifiedI18n: () => ({ t: (key) => key }),
+  useUnifiedI18n: () => ({ t: (key) => (key === 'IsRTL' ? 'true' : key) }),
 }));
 
 vi.mock('../composables/useTabSettings.js', async () => {
@@ -95,6 +95,11 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     },
   });
 
+  const openDrawer = async () => {
+    await wrapper.find('#DESKTOP_FAB_MANAGE_LIST_BTN').trigger('click');
+    await nextTick();
+  };
+
   const entriesOf = () => wrapper.findAll('.fab-exclusion-item');
 
   beforeEach(() => {
@@ -118,11 +123,312 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = null;
   });
 
-  it('lists stored exclusions with a scope label and the value, even with the global toggle off', async () => {
-    // The global FAB toggle stays off — the list must remain reachable.
+  it('renders the compact row without the Manage button disabled, even with FAB off and extension disabled', async () => {
+    // Both global toggles stay off — the row must stay reachable.
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+
+    expect(mocks.settingRefs.SHOW_DESKTOP_FAB.value).toBe(false);
+
+    const group = wrapper.get('#DESKTOP_FAB_EXCLUSIONS');
+    expect(group.findAll('.setting-row')).toHaveLength(1);
+    expect(group.get('.setting-label').text()).toBe('fab_exclusions_label');
+    expect(group.get('.setting-description').exists()).toBe(true);
+    const btn = group.get('#DESKTOP_FAB_MANAGE_LIST_BTN');
+    expect(btn.attributes('disabled')).toBeUndefined();
+    // Unlike the Auto Page button, it stays usable while the FAB is off.
+    expect(btn.element.disabled).toBe(false);
+
+    // And it must remain usable when the whole extension is disabled.
+    mocks.settingRefs.EXTENSION_ENABLED.value = false;
+    await nextTick();
+    expect(wrapper.get('#DESKTOP_FAB_MANAGE_LIST_BTN').element.disabled).toBe(false);
+
+    // Nothing renders before the drawer opens.
+    expect(group.find('.fab-exclusion-item').exists()).toBe(false);
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(false);
+  });
+
+  it('opens the drawer on Manage List with dialog semantics and moves focus inside', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+
+    await openDrawer();
+
+    const drawer = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER');
+    expect(drawer.attributes('role')).toBe('dialog');
+    expect(drawer.attributes('aria-modal')).toBe('true');
+    expect(drawer.attributes('aria-label')).toBe('fab_exclusions_group_label');
+    expect(document.activeElement).toBe(drawer.get('.drawer-close-btn').element);
+  });
+
+  it.each`
+    action
+    ${'header close button'}
+    ${'overlay click'}
+    ${'Escape key'}
+    ${'footer Done button'}
+  `('closes the drawer via $action and restores focus to the Manage List button', async ({ action }) => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(true);
+
+    if (action === 'header close button') {
+      await wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-close-btn').trigger('click');
+    } else if (action === 'overlay click') {
+      await wrapper.get('.drawer-overlay').trigger('click');
+    } else if (action === 'Escape key') {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await nextTick();
+    } else {
+      await wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').trigger('click');
+    }
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(false);
+    expect(document.activeElement).toBe(wrapper.get('#DESKTOP_FAB_MANAGE_LIST_BTN').element);
+  });
+
+  it('traps Tab and Shift+Tab at the drawer edges', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const drawer = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER');
+    const closeBtn = drawer.get('.drawer-close-btn').element;
+    const doneBtn = drawer.get('.drawer-footer button').element;
+
+    // Tab from the last control wraps to the first (the close button).
+    doneBtn.focus();
+    drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    await nextTick();
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Shift+Tab from the first wraps to the last (the Done button).
+    closeBtn.focus();
+    drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
+    await nextTick();
+    expect(document.activeElement).toBe(doneBtn);
+  });
+
+  it('traps focus between the close button and Done when the list is empty', async () => {
+    mocks.entries = [];
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const drawer = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER');
+    const closeBtn = drawer.get('.drawer-close-btn').element;
+    const doneBtn = drawer.get('.drawer-footer button').element;
+
+    // Tab from the last control wraps to the first.
+    doneBtn.focus();
+    drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    await nextTick();
+    expect(document.activeElement).toBe(closeBtn);
+
+    // Shift+Tab from the first wraps to the last.
+    closeBtn.focus();
+    drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
+    await nextTick();
+    expect(document.activeElement).toBe(doneBtn);
+  });
+
+  it('restores focus to a remaining remove button after a successful removal', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const firstBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    firstBtn.element.focus();
+    mocks.entries = [mocks.entries[1]];
+    await firstBtn.trigger('click');
+    await nextTick();
+    await nextTick();
+
+    expect(entriesOf()).toHaveLength(1);
+    expect(document.activeElement).toBe(
+      entriesOf().at(0).get('.fab-exclusion-remove-btn').element,
+    );
+  });
+
+  it('moves focus to the footer Done button when the last entry is removed', async () => {
+    mocks.entries = [mocks.entries[0]];
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const removeBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    removeBtn.element.focus();
+    mocks.entries = [];
+    await removeBtn.trigger('click');
+    await nextTick();
+    await nextTick();
+
+    expect(entriesOf()).toHaveLength(0);
+    expect(document.activeElement).toBe(
+      wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element,
+    );
+    expect(document.activeElement.closest('#DESKTOP_FAB_EXCLUSIONS_DRAWER')).toBeTruthy();
+  });
+
+  it('restores focus to the replacement remove button after the deferred write resolves', async () => {
+    let resolveWrite;
+    mocks.removeExclusion.mockImplementation(() => new Promise((resolve) => { resolveWrite = resolve; }));
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const firstBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    firstBtn.element.focus();
+    await firstBtn.trigger('click');
+    await nextTick();
+    expect(entriesOf()).toHaveLength(2); // row stays while the write is pending
+
+    resolveWrite();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(entriesOf()).toHaveLength(1);
+    expect(document.activeElement).toBe(
+      entriesOf().at(0).get('.fab-exclusion-remove-btn').element,
+    );
+  });
+
+  it('focuses the footer Done button after the deferred final-entry write resolves', async () => {
+    mocks.entries = [mocks.entries[0]];
+    let resolveWrite;
+    mocks.removeExclusion.mockImplementation(() => new Promise((resolve) => { resolveWrite = resolve; }));
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const removeBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    removeBtn.element.focus();
+    await removeBtn.trigger('click');
+    await nextTick();
+
+    resolveWrite();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(entriesOf()).toHaveLength(0);
+    const doneBtn = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button');
+    expect(document.activeElement).toBe(doneBtn.element);
+    expect(document.activeElement.closest('#DESKTOP_FAB_EXCLUSIONS_DRAWER')).toBeTruthy();
+  });
+
+  it('respects a deliberate focus move onto a surviving control while the write is pending', async () => {
+    let resolveWrite;
+    mocks.removeExclusion.mockImplementation(() => new Promise((resolve) => { resolveWrite = resolve; }));
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const firstBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    firstBtn.element.focus();
+    await firstBtn.trigger('click');
+    await nextTick();
+
+    // The user moves focus while the write is in flight — that choice wins.
+    const doneBtn = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button');
+    doneBtn.element.focus();
+    resolveWrite();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(entriesOf()).toHaveLength(1);
+    expect(document.activeElement).toBe(
+      wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element,
+    );
+  });
+
+  it('does not steal focus when the deferred write rejects', async () => {
+    let rejectWrite;
+    mocks.removeExclusion.mockImplementation(() => new Promise((_resolve, reject) => { rejectWrite = reject; }));
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const firstBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    firstBtn.element.focus();
+    await firstBtn.trigger('click');
+    await nextTick();
+
+    const doneBtn = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button');
+    doneBtn.element.focus();
+    rejectWrite(new Error('write blocked'));
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    // The entry stays, the alert shows, and focus is untouched.
+    expect(entriesOf()).toHaveLength(2);
+    expect(wrapper.find('.fab-exclusions-error').exists()).toBe(true);
+    expect(document.activeElement).toBe(
+      wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element,
+    );
+  });
+
+  it('aligns the single-action footer to the action end in LTR and RTL', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const footer = wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer');
+    expect(footer.classes()).toContain('fab-drawer-footer');
+
+    // With IsRTL true the drawer is mirrored; the modifier class stays.
+    expect(wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER').classes()).toContain('rtl');
+    expect(wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer').classes())
+      .toContain('fab-drawer-footer');
+  });
+
+  it('keeps only one drawer open: opening the rules drawer closes the FAB drawer and vice versa', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+
+    // FAB drawer first, then the rules drawer takes over.
+    await openDrawer();
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(true);
+    await wrapper.get('#WHOLE_PAGE_MANAGE_RULES_BTN').trigger('click');
+    await nextTick();
+    await nextTick();
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(false);
+    expect(wrapper.find('#WHOLE_PAGE_AUTO_TRANSLATE_RULES_DRAWER').exists()).toBe(true);
+
+    // And back again.
+    await wrapper.get('#WHOLE_PAGE_AUTO_TRANSLATE_RULES_DRAWER .drawer-close-btn').trigger('click');
+    await nextTick();
+    expect(wrapper.find('#WHOLE_PAGE_AUTO_TRANSLATE_RULES_DRAWER').exists()).toBe(false);
+    await openDrawer();
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(true);
+    expect(wrapper.find('#WHOLE_PAGE_AUTO_TRANSLATE_RULES_DRAWER').exists()).toBe(false);
+  });
+
+  it('lists stored exclusions with a scope label and the value inside the drawer', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
 
     expect(mocks.settingRefs.SHOW_DESKTOP_FAB.value).toBe(false);
     const rows = entriesOf();
@@ -144,6 +450,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
 
     expect(entriesOf()).toHaveLength(0);
     expect(wrapper.get('.fab-exclusions-empty').text()).toBe('fab_exclusions_empty');
@@ -154,6 +461,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
 
     const removedKey = mocks.entries[1].key;
     mocks.entries = [mocks.entries[0]];
@@ -165,6 +473,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     expect(entriesOf()).toHaveLength(1);
     expect(entriesOf().at(0).get('.fab-exclusion-value').text()).toBe('https://example.com/docs');
     expect(wrapper.find('.fab-exclusions-error').exists()).toBe(false);
+    expect(mocks.settingsStore.updateSettingLocally).not.toHaveBeenCalled();
   });
 
   it('keeps the entry and surfaces a descriptive alert when removal fails', async () => {
@@ -172,6 +481,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
 
     await entriesOf().at(0).get('.fab-exclusion-remove-btn').trigger('click');
     await nextTick();
@@ -190,6 +500,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
 
     expect(entriesOf()).toHaveLength(0);
     // A failed read must not be rendered as "nothing is hidden".
@@ -203,6 +514,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     mocks.listExclusions.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
 
     wrapper = mountTab();
+    await openDrawer();
     await nextTick();
     expect(mocks.listExclusions).toHaveBeenCalledTimes(1);
 
@@ -231,6 +543,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
     expect(entriesOf()).toHaveLength(2);
 
     mocks.listExclusions.mockRejectedValue(new Error('storage unavailable'));
@@ -250,6 +563,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
 
     const listener = mocks.storageManager.on.mock.calls.find(([event]) => event === 'change')?.[1];
     expect(listener).toBeTypeOf('function');
@@ -274,10 +588,20 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     expect(mocks.storageManager.off).toHaveBeenCalledWith('change', listener);
   });
 
+  it('renders an open drawer with the rtl class when the locale is RTL', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    expect(wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER').classes()).toContain('rtl');
+  });
+
   it('does not write any FAB setting while managing exclusions', async () => {
     wrapper = mountTab();
     await nextTick();
     await nextTick();
+    await openDrawer();
 
     await entriesOf().at(0).get('.fab-exclusion-remove-btn').trigger('click');
     await nextTick();

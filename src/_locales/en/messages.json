@@ -1119,7 +1119,7 @@
     "message": "Hidden pages and sites"
   },
   "fab_exclusions_description": {
-    "message": "The Desktop FAB is hidden on the pages and sites listed below. Remove an entry to show it there again."
+    "message": "Manage pages and sites where the Desktop FAB is hidden."
   },
   "fab_exclusions_empty": {
     "message": "No pages or sites are hidden yet."
@@ -1138,6 +1138,12 @@
   },
   "fab_exclusions_load_error": {
     "message": "Could not load the hidden pages and sites list. Reload the page to try again."
+  },
+  "fab_exclusions_manage_btn": {
+    "message": "Manage List"
+  },
+  "fab_exclusions_done_btn": {
+    "message": "Done"
   },
   "page_translation_add_auto_translate_tooltip": {
     "message": "Add to auto-translate rules"
