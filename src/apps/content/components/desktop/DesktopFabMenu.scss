@@ -216,6 +216,52 @@
       opacity: 0.06 !important;
     }
 
+    /* Compact toolbar strip: trailing-edge Hide FAB eye only — keeps the
+       menu width while staying visually independent of the action rows. */
+    .fab-menu-toolbar {
+      display: flex !important;
+      justify-content: flex-end !important;
+      align-items: center !important;
+      min-height: 30px !important;
+      padding: 2px 4px !important;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+    }
+
+    .fab-toolbar-hide-btn {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: var(--menu-icon-box) !important;
+      height: var(--menu-icon-box) !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: 0 !important;
+      background: none !important;
+      color: inherit !important;
+      cursor: pointer !important;
+      border-radius: 7px !important;
+      pointer-events: auto !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.05) !important;
+      }
+
+      &:focus-visible {
+        outline: 2px solid #1a5fb4 !important;
+        outline-offset: 1px !important;
+      }
+    }
+
+    /* Mask-based icon for the toolbar Hide FAB button — inherits
+       currentColor so both themes recolor it without a filter. */
+    .fab-hide-menu-icon {
+      width: var(--menu-icon-size) !important;
+      height: var(--menu-icon-size) !important;
+      flex-shrink: 0 !important;
+    }
+
     .fab-menu-item {
       display: flex !important;
       flex-wrap: wrap !important;
@@ -415,6 +461,92 @@
           }
         }
       }
+
+    }
+  }
+
+  // Detached Hide FAB popover — a sibling of the menu, never a descendant
+  // (the menu is bottom-anchored with overflow hidden, so in-flow content
+  // would grow and shift it). Positioned via inline left/top against this
+  // container; width mirrors the menu tokens.
+  .fab-hide-popover {
+    position: absolute !important;
+
+    /* Same content-driven width contract as the menu. */
+    --menu-avail-width: max(0px, calc(100vw - var(--fab-size) - 40px));
+
+    width: max-content !important;
+    min-width: min(var(--menu-min-width), var(--menu-avail-width)) !important;
+    max-width: min(var(--menu-max-width), var(--menu-avail-width)) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 5px !important;
+    border-radius: 14px !important;
+    margin: 0 !important;
+    z-index: 2147483647 !important;
+    pointer-events: auto !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+
+    /* Panel contents must never inflate the max-content width. */
+    contain: inline-size !important;
+    box-sizing: border-box !important;
+
+    /* Cap the height to the viewport (minus the 8px positioning margin on
+       both sides) and scroll internally on short viewports; the capped
+       offsetHeight is what positionHidePopover flips and clamps against. */
+    max-height: calc(100vh - 16px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain !important;
+
+    button {
+      display: flex !important;
+      align-items: center !important;
+      padding: 7px 9px !important;
+      border: 0 !important;
+      background: transparent !important;
+      color: inherit !important;
+      font-size: var(--menu-font-size) !important;
+      font-weight: 600 !important;
+      font-family: sans-serif !important;
+      line-height: 1.2 !important;
+      text-align: start !important;
+      cursor: pointer !important;
+      border-radius: 9px !important;
+      min-width: 0 !important;
+      overflow-wrap: anywhere !important;
+      box-sizing: border-box !important;
+
+      &:focus-visible {
+        outline: 2px solid #1a5fb4 !important;
+        outline-offset: 1px !important;
+      }
+    }
+
+    /* Hairline separators between rendered actions only: the adjacent
+       selector skips unrendered scopes, so a lone Close for Now shows no
+       separator. border-box above keeps the 1px inside the compact rows. */
+    button + button {
+      border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+    }
+
+    .fab-hide-warning {
+      padding: 7px 9px !important;
+      font-size: 0.85em !important;
+      line-height: 1.3 !important;
+      overflow-wrap: anywhere !important;
+      border-inline-start: 2px solid #b45309 !important;
+      padding-inline-start: 6px !important;
+      margin: 2px 4px !important;
+    }
+
+    .fab-hide-error {
+      padding: 7px 9px !important;
+      font-size: 0.85em !important;
+      line-height: 1.3 !important;
+      overflow-wrap: anywhere !important;
+      font-weight: 600 !important;
+      color: #c92a2a !important;
     }
   }
 
@@ -424,6 +556,8 @@
       background-color: rgba(255, 255, 255, 0.92) !important;
       border: 1px solid rgba(0, 0, 0, 0.08) !important;
       box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.18), 0 12px 20px -8px rgba(0, 0, 0, 0.1) !important;
+
+      .fab-hide-menu-icon { color: #1e293b !important; }
     }
     .fab-menu-divider { background-color: #000 !important; }
       .fab-menu-item {
@@ -456,6 +590,29 @@
           }
         }
       }
+
+    }
+    .fab-hide-popover {
+      background-color: rgba(255, 255, 255, 0.92) !important;
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.18), 0 12px 20px -8px rgba(0, 0, 0, 0.1) !important;
+      color: #1e293b !important;
+
+      button {
+        color: #1e293b !important;
+
+        &:hover,
+        &:focus-visible {
+          background-color: rgba(74, 144, 226, 0.18) !important;
+        }
+      }
+
+      .fab-hide-warning {
+        color: #7c4a03 !important;
+        border-inline-start-color: #b45309 !important;
+      }
+
+      .fab-hide-error { color: #c92a2a !important; }
     }
     .fab-settings-badge, .fab-tts-badge {
       background-color: rgba(255, 255, 255, 0.9) !important;
@@ -469,6 +626,8 @@
       background-color: rgba(40, 40, 40, 0.95) !important;
       border: 1px solid rgba(255, 255, 255, 0.12) !important;
       box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 12px 20px -10px rgba(0, 0, 0, 0.4) !important;
+
+      .fab-hide-menu-icon { color: #f8fafc !important; }
     }
     .fab-menu-divider { background-color: #fff !important; }
     .fab-menu-item {
@@ -479,6 +638,41 @@
       .menu-icon-wrapper { background-color: rgba(255, 255, 255, 0.05) !important; }
       .fab-menu-item-text { color: #f8fafc !important; }
       .fab-menu-icon:not(.is-colored) { filter: brightness(0) invert(1) !important; }
+
+    }
+    .fab-menu-toolbar { border-bottom-color: rgba(255, 255, 255, 0.12) !important; }
+    .fab-toolbar-hide-btn {
+      &:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+      &:focus-visible { outline-color: #60a5fa !important; }
+    }
+    .fab-hide-popover {
+      background-color: rgba(40, 40, 40, 0.95) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.6), 0 12px 20px -10px rgba(0, 0, 0, 0.4) !important;
+      color: #f8fafc !important;
+
+      button {
+        color: #f8fafc !important;
+
+        &:hover,
+        &:focus-visible {
+          background-color: rgba(255, 255, 255, 0.16) !important;
+        }
+
+        &:focus-visible { outline-color: #60a5fa !important; }
+      }
+
+      button + button {
+        border-top-color: rgba(255, 255, 255, 0.1) !important;
+      }
+
+      .fab-hide-warning {
+        color: rgba(255, 255, 255, 0.75) !important;
+        border-inline-start-color: #f59e0b !important;
+      }
+
+      .fab-hide-error { color: #ff8787 !important; }
+    }
       .fab-auto-translate-scopes {
         color: #f8fafc !important;
 
@@ -539,7 +733,6 @@
           }
         }
       }
-    }
     .fab-settings-badge, .fab-tts-badge {
       background-color: rgba(50, 50, 50, 0.9) !important;
       border: 1px solid rgba(255, 255, 255, 0.1) !important;

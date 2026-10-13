@@ -23,3 +23,16 @@ describe('ContentApp transcript preference gate', () => {
     expect(source).not.toContain('TRANSLATION_FONT_SIZE');
   });
 });
+
+describe('ContentApp desktop FAB visibility gate', () => {
+  it('keeps the desktop FAB absent until exclusion state is ready and allowed', () => {
+    const source = readFileSync('src/apps/content/ContentApp.vue', 'utf8');
+
+    expect(source).toContain('settingsStore.isInitialized && isExtensionEnabled && !isMobileUI && showDesktopFab && desktopFabVisibility.isReady.value && !desktopFabVisibility.isDismissed.value && isTopFrame');
+    expect(source).not.toContain('!isMobileUI && !isFullscreen && showDesktopFab');
+    expect(source).toContain('@dismiss="handleDesktopFabDismiss"');
+    expect(source).toContain('@presence="desktopFabVisibility.setChildPresence"');
+    expect(source).toContain('core.desktopFabController = desktopFabController');
+    expect(source).toContain('registeredDesktopFabCore?.desktopFabController === desktopFabController');
+  });
+});

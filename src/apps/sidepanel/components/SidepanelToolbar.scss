@@ -128,6 +128,59 @@
     filter: none !important;
     opacity: 1 !important;
   }
+
+  /* Desktop FAB toggle glyph: a MaskIcon (ADR-001) driven by currentColor.
+     Deliberately NOT .toolbar-icon — that rule carries --icon-filter, which
+     inverts a light dark-mode glyph back to dark. It only borrows the rail's
+     icon opacity so it sits at the same weight as its neighbours. */
+  .fab-toggle-icon {
+    opacity: var(--icon-opacity);
+    transition: opacity 0.2s ease;
+  }
+
+  /* Chrome paints button text with a UA colour (black in BOTH themes), so a
+     currentColor mask inside a button would go dark-on-dark. Let this row
+     inherit the rail's text colour so the glyph follows the theme. Scoped to
+     the new button only: every other row renders an <img>, not a glyph. */
+  #fabVisibilityBtn {
+    color: inherit;
+  }
+
+  /* Short-height compaction. The rail is a full-height column of fixed 34px
+     rows; content is ~495px today and ~543px with the FAB toggle (+48px),
+     with no overflow handling on .side-toolbar — below that height the column
+     would spill past the panel edge. Tighten only the row gap (never the
+     34px geometry) so every button stays visible without a scrollbar. */
+  @media (max-height: 620px) {
+    .toolbar-group,
+    .toolbar-group-bottom {
+      gap: 8px;
+    }
+  }
+
+  /* Extreme short heights. The compacted column still needs ~483px of rail;
+     measured in a real browser, a 480px rail clips Settings by 7px and a
+     400px rail drops PDF/Subtitle/Settings entirely with no way to reach
+     them. Only below 500px — strictly under the 520px fit and the 620px
+     compaction — does the rail become its own scroll container, so normal
+     and 520px heights keep the exact same no-scrollbar feel. The thumb is
+     slimmed for a 44–50px column; token colours keep it correct in light
+     and dark, and RTL places it on the leading edge automatically. */
+  @media (max-height: 500px) {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-text-secondary) transparent;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background-color: var(--color-text-secondary);
+      border-radius: 3px;
+    }
+  }
 }
 
 /*

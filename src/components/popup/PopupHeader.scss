@@ -395,6 +395,19 @@
   }
 }
 
+/* Disabled menu rows (the Desktop FAB action while its status is unknown,
+   and the History action before its tab resolves): dimmed and inert, but
+   still hoverable so the title tooltip can explain WHY. Logical-only
+   declarations — no physical offsets — so RTL needs no override here. */
+.ti-header-menu-item:disabled {
+  opacity: 0.6 !important;
+  cursor: default !important;
+
+  &:hover {
+    background-color: transparent !important;
+  }
+}
+
 /* Grouping divider between the feature actions and the final site-scope
    action. Always rendered immediately before the site action (responsive
    duplicates sit ABOVE it in the DOM, so it stays adjacent at every

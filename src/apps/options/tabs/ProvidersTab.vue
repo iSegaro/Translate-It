@@ -4,7 +4,10 @@
       <h2>{{ t('providers_tab_title') || 'Service Settings' }}</h2>
 
       <!-- Service Selection -->
-      <div class="setting-group primary-service-selection">
+      <div
+        id="PROVIDERS_CONFIGURE_SECTION"
+        class="setting-group primary-service-selection"
+      >
         <label>{{ t('providers_configure_label') || 'Provider to configure' }}</label>
         <div class="selector-wrapper">
           <ProviderSelector 

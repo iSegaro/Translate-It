@@ -17,6 +17,12 @@
       margin-top: $spacing-lg !important;
     }
 
+    // FAB exclusions row follows the appearance sub-options block (not a
+    // .setting-group), so the sibling rule can't fire; it always needs the gap.
+    &.fab-exclusions-row {
+      margin-top: $spacing-lg !important;
+    }
+
     // Special spacing for the main toggle at the top
     &.extension-enabled-group {
       margin-bottom: $spacing-xl !important;
@@ -610,9 +616,120 @@
   }
 }
 
-/* 
+/*
   Rules Drawer & Animations
 */
+/* Desktop FAB per-page / per-site exclusions (rendered inside the drawer body) */
+.fab-exclusions-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: $spacing-sm !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+
+  .fab-exclusions-empty {
+    padding: $spacing-md !important;
+    border: 1px dashed var(--color-border) !important;
+    border-radius: $border-radius-sm !important;
+    color: var(--color-text-secondary) !important;
+    font-size: $font-size-sm !important;
+    text-align: start !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .fab-exclusions-list {
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .fab-exclusion-item {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    padding: 6px 12px !important;
+    border-radius: $border-radius-sm !important;
+    background-color: var(--color-background-alt, var(--color-surface)) !important;
+    border: 1px solid var(--color-border) !important;
+    transition: all $transition-fast !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+
+    &:hover {
+      border-color: var(--color-text-secondary) !important;
+      box-shadow: $shadow-sm !important;
+    }
+  }
+
+  /* Scope chip: fixed track so Page/Site stay aligned across en/fa/ja and RTL */
+  .fab-exclusion-scope {
+    flex: 0 0 auto !important;
+    font-size: $font-size-xs !important;
+    font-weight: 600 !important;
+    color: var(--color-text-secondary) !important;
+    background-color: var(--color-background, var(--color-surface)) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: $border-radius-full !important;
+    padding: 2px 10px !important;
+    white-space: nowrap !important;
+  }
+
+  .fab-exclusion-value {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    font-family: var(--font-family-mono, monospace) !important;
+    font-size: 13px !important;
+    color: var(--color-text) !important;
+    overflow-wrap: anywhere !important;
+    user-select: all !important;
+    text-align: start !important;
+  }
+
+  .fab-exclusion-remove-btn {
+    background: none !important;
+    border: none !important;
+    color: var(--color-text-secondary) !important;
+    cursor: pointer !important;
+    width: 28px !important;
+    height: 28px !important;
+    flex-shrink: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: $border-radius-full !important;
+    transition: all $transition-fast !important;
+
+    &:hover:not(:disabled) {
+      background-color: var(--color-error-alpha, rgba(211, 47, 47, 0.1)) !important;
+      color: var(--color-error, #d32f2f) !important;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary, #1a5fb4) !important;
+      outline-offset: 1px !important;
+    }
+
+    &:disabled {
+      opacity: 0.5 !important;
+      cursor: progress !important;
+    }
+  }
+
+  .fab-exclusions-error {
+    font-size: $font-size-xs !important;
+    color: var(--color-error, #d32f2f) !important;
+    font-weight: 500 !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
 .manage-rules-button {
   width: 100% !important;
   min-width: 100% !important;
@@ -947,6 +1064,12 @@
     align-items: center !important;
     gap: $spacing-md !important;
   }
+}
+
+/* FAB exclusions drawer footer: single action aligned to the action end
+   (right in LTR, left in RTL), like the Auto Page rules footer. */
+.fab-drawer-footer {
+  justify-content: flex-end !important;
 }
 
 /* Transitions classes for Vue */

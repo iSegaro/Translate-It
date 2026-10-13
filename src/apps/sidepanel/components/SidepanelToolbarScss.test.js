@@ -174,3 +174,92 @@ describe('SidepanelToolbar.scss icon behavior (migrated from _sidepanel.scss)', 
     expect(withoutComments).not.toMatch(/body\.sidepanel-context\s/)
   })
 })
+
+/**
+ * Desktop FAB toggle additions. The glyph is a MaskIcon (ADR-001) that must
+ * never pick up the rail's img filter, and the rail gains ~48px of content it
+ * has no overflow handling for — both changes are pinned here.
+ */
+describe('SidepanelToolbar.scss Desktop FAB toggle contract', () => {
+  const compileCss = () => compile().css
+
+  it('styles the mask glyph with the rail opacity and NO filter (no dark double-invert)', () => {
+    const { css } = compile()
+    const rule = css.match(/\.side-toolbar\s+\.fab-toggle-icon\s*\{[^}]*\}/)
+    expect(rule).not.toBeNull()
+    expect(rule[0]).toContain('opacity: var(--icon-opacity)')
+    // A mask is already currentColor; inverting it in dark would flip it back.
+    expect(rule[0]).not.toMatch(/filter\s*:/)
+    // It is not the .toolbar-icon rule, whose filter is what we are avoiding.
+    expect(css).not.toMatch(/\.fab-toggle-icon[^{}]*\{[^}]*--icon-filter/)
+  })
+
+  it('makes the FAB row inherit the rail colour (button UA colour would hide the mask in dark)', () => {
+    const { css } = compile()
+    const rule = css.match(/\.side-toolbar\s+#fabVisibilityBtn\s*\{[^}]*\}/)
+    expect(rule).not.toBeNull()
+    expect(rule[0]).toContain('color: inherit')
+    // Scoped to the new row only: existing rows keep their current styling.
+    expect(css.match(/#fabVisibilityBtn/g)).toHaveLength(1)
+  })
+
+  it('compacts row gaps at short heights without touching the 34×34 geometry', () => {
+    const css = compileCss()
+    const media = css.match(/@media \(max-height:\s*620px\)\s*\{[\s\S]*?\n\}/)
+    expect(media).not.toBeNull()
+    expect(media[0]).toContain('.side-toolbar .toolbar-group')
+    expect(media[0]).toContain('.side-toolbar .toolbar-group-bottom')
+    expect(media[0]).toContain('gap: 8px')
+    // Compaction is gap-only (the `max-height` condition itself excluded):
+    // the button box contract stays exactly 34×34.
+    const mediaBody = media[0].replace(/@media[^{]+/, '')
+    expect(mediaBody).not.toMatch(/\b(?:width|height)\s*:/)
+    expect(css).toContain('width: 34px !important')
+    expect(css).toContain('height: 34px !important')
+    // Both group rules stay scoped under .side-toolbar (ownership contract).
+    expect(css).toContain('.side-toolbar .toolbar-group')
+    expect(css).toContain('.side-toolbar .toolbar-group-bottom')
+  })
+
+  it('makes only the rail scrollable below the measured content floor', () => {
+    const css = compileCss()
+    const media = css.match(/@media \(max-height:\s*500px\)\s*\{[\s\S]*?\n\}/)
+    expect(media).not.toBeNull()
+
+    // Measured floor: the compacted column needs ~483px, a 520px rail fits
+    // and a 480px rail clips — so the scroll rule must stay strictly below
+    // 520px, leaving both the normal view and the 520px view untouched.
+    const threshold = Number(media[0].match(/max-height:\s*(\d+)px/)[1])
+    expect(threshold).toBeLessThan(520)
+
+    expect(media[0]).toContain('.side-toolbar')
+    expect(media[0]).toContain('overflow-y: auto')
+    // Scrollbar stays usable in a 44–50px column: thin standard property,
+    // token colours (light/dark + RTL leading edge), slim WebKit thumb.
+    expect(media[0]).toContain('scrollbar-width: thin')
+    expect(media[0]).toContain('scrollbar-color: var(--color-text-secondary) transparent')
+    expect(media[0]).toContain('::-webkit-scrollbar')
+    expect(media[0]).toContain('width: 6px')
+    expect(media[0]).toContain('overscroll-behavior: contain')
+
+    // The block may only declare scroll behaviour / scrollbar chrome — the
+    // 34×34 geometry and layout are unreachable from here.
+    const allowed = new Set([
+      'max-height', 'overflow-y', 'overscroll-behavior', 'scrollbar-width',
+      'scrollbar-color', 'width', 'background-color', 'border-radius'
+    ])
+    // `(?!:)` keeps pseudo-elements (`.side-toolbar::-webkit-scrollbar`)
+    // out of the declaration scan — only real `property: value` pairs count.
+    const declared = [...media[0].matchAll(/([a-z-]+)\s*:\s*(?!:)[^;{}]+/g)]
+      .map((match) => match[1])
+      .filter((name) => !allowed.has(name))
+    expect(declared).toEqual([])
+
+    // At normal heights the rail itself is still a plain non-scrolling box.
+    const base = css.match(/\.side-toolbar\s*\{[^}]*\}/)
+    expect(base).not.toBeNull()
+    expect(base[0]).not.toMatch(/overflow/)
+    expect(css).toContain('width: 34px !important')
+    expect(css).toContain('height: 34px !important')
+  })
+})

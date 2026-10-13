@@ -134,11 +134,12 @@ For example, `options.html#/activation?highlight=WHOLE_PAGE_AUTO_TRANSLATE_RULES
 
 The extension provides a robust way to backup and restore settings via the **Import/Export** tab. This process is not a simple JSON dump; it involves security and integrity checks:
 
--   **Exporting**: When `exportSettings()` is called, it uses `SecureStorage` to encrypt sensitive data (like API keys) and excludes large, non-essential data (like translation history).
+-   **Exporting**: When `exportSettings()` is called, it uses `SecureStorage` to encrypt sensitive data (like API keys) and excludes large, non-essential data (like translation history). Saved Desktop FAB page/site exclusions are included in a dedicated `_desktopFabExclusions` section as **plain-text URLs and hostnames**, even when a password encrypts API keys.
 -   **Importing**: When a user uploads a settings file, `importSettings()` performs:
     1.  **Decryption**: Validates and decrypts API keys.
     2.  **Merging**: Combines imported values with current defaults to prevent missing keys.
     3.  **Migration**: Automatically runs the migration system to ensure the imported file is compatible with the current version of the extension.
+    4.  **Desktop FAB exclusions**: When the `_desktopFabExclusions` section is present, it is validated with the feature-owned key rules and replaces the saved exclusions (an explicitly empty list clears them); malformed data is rejected before storage is touched, and backups without the section leave existing exclusions untouched.
 
 ## Settings Migration System
 

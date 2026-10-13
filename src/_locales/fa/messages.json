@@ -404,6 +404,33 @@
   "popup_exclude_disable_label": {
     "message": "غیرفعال‌سازی در این سایت"
   },
+  "popup_fab_show_label": {
+    "message": "نمایش دکمه دسترسی سریع (FAB) برای همین حالا"
+  },
+  "popup_fab_hide_label": {
+    "message": "پنهان کردن دکمه دسترسی سریع (FAB) برای همین حالا"
+  },
+  "popup_fab_unknown_label": {
+    "message": "دکمه دسترسی سریع (FAB)"
+  },
+  "popup_fab_loading_reason": {
+    "message": "در حال خواندن وضعیت دکمه دسترسی سریع…"
+  },
+  "popup_fab_unavailable_reason": {
+    "message": "وضعیت دکمه دسترسی سریع در این صفحه در دسترس نیست."
+  },
+  "popup_fab_disabled_reason": {
+    "message": "وقتی افزونه غیرفعال است، دکمه دسترسی سریع در دسترس نیست."
+  },
+  "popup_fab_reason_disabled_by_setting": {
+    "message": "تنظیم دکمه دسترسی سریع دسکتاپ، این دکمه را اینجا پنهان می‌کند."
+  },
+  "popup_fab_reason_fullscreen": {
+    "message": "وقتی این صفحه تمام‌صفحه است، دکمه دسترسی سریع پنهان می‌شود."
+  },
+  "popup_fab_reason_ui_absent": {
+    "message": "دکمه دسترسی سریع در این صفحه در دسترس نیست."
+  },
   "page_translation_auto_translate_enable_label": {
     "message": "فعال‌سازی ترجمه خودکار صفحه"
   },
@@ -1057,6 +1084,66 @@
   },
   "desktop_fab_tts_stop_tooltip": {
     "message": "توقف"
+  },
+  "desktop_fab_hide_fab_label": {
+    "message": "پنهان کردن دکمه"
+  },
+  "desktop_fab_hide_options_toggle_label": {
+    "message": "نحوه پنهان کردن دکمه را انتخاب کنید"
+  },
+  "desktop_fab_hide_options_label": {
+    "message": "گزینه‌های پنهان کردن دکمه"
+  },
+  "desktop_fab_hide_close_for_now": {
+    "message": "بستن برای این بار"
+  },
+  "desktop_fab_hide_this_page": {
+    "message": "در این صفحه پنهان شود"
+  },
+  "desktop_fab_hide_this_site": {
+    "message": "در این سایت پنهان شود"
+  },
+  "desktop_fab_hide_onfabclick_warning": {
+    "message": "تا زمانی که دکمه پنهان است، نمی‌توانید ترجمه متن انتخاب‌شده را از دکمه دسکتاپ شروع کنید."
+  },
+  "desktop_fab_hide_save_failed": {
+    "message": "ذخیره این تنظیم پنهان‌سازی ممکن نشد. لطفاً دوباره تلاش کنید."
+  },
+  "desktop_fab_hide_scope_unsupported": {
+    "message": "پنهان‌سازی برای این محدوده در این صفحه در دسترس نیست."
+  },
+  "fab_exclusions_group_label": {
+    "message": "صفحه‌ها و سایت‌های پنهان‌شده"
+  },
+  "fab_exclusions_label": {
+    "message": "صفحه‌ها و سایت‌های پنهان‌شده"
+  },
+  "fab_exclusions_description": {
+    "message": "صفحه‌ها و سایت‌هایی را که دکمه دسکتاپ در آن‌ها پنهان است مدیریت کنید."
+  },
+  "fab_exclusions_empty": {
+    "message": "هنوز هیچ صفحه یا سایتی پنهان نشده است."
+  },
+  "fab_exclusion_scope_page": {
+    "message": "صفحه"
+  },
+  "fab_exclusion_scope_site": {
+    "message": "سایت"
+  },
+  "fab_exclusion_remove_label": {
+    "message": "حذف از فهرست"
+  },
+  "fab_exclusion_remove_error": {
+    "message": "حذف این مورد ممکن نشد. صفحه را دوباره بارگذاری کرده و تلاش کنید."
+  },
+  "fab_exclusions_load_error": {
+    "message": "بارگذاری فهرست صفحه‌ها و سایت‌های پنهان‌شده ممکن نشد. برای تلاش دوباره، صفحه را بارگذاری مجدد کنید."
+  },
+  "fab_exclusions_manage_btn": {
+    "message": "مدیریت فهرست"
+  },
+  "fab_exclusions_done_btn": {
+    "message": "تمام"
   },
   "page_translation_add_auto_translate_tooltip": {
     "message": "افزودن به قوانین ترجمه خودکار"

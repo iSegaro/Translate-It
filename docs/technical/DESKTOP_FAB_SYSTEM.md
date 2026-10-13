@@ -9,6 +9,34 @@ The **Desktop FAB (Floating Action Button)** is a persistent, smart interface el
 
 ---
 
+## Visibility exclusions (Issue #303)
+
+The visibility gate belongs to `ContentApp.vue`, through `useDesktopFabVisibility`; it is separate from the global extension setting and from the other content-app UI. The FAB is rendered only after exclusion state is ready and no applicable dismissal is active. This gate does not change other UI surfaces or modes.
+
+A compact top toolbar above the primary items holds a single eye-hide button. It opens a detached floating popover (a sibling/overlay of the menu, not in layout flow) with three hide scopes:
+
+The popover is anchored to the eye button, flips for viewport/dock-side/RTL, and leaves menu dimensions unchanged.
+
+- **Close for Now** hides the FAB in the current content-app memory only, until reload or a changed-URL SPA navigation. A same-URL history event does not reset it.
+- **Hide on This Page** persists a page exclusion. Page identity ignores query and hash, treats HTTP and HTTPS as equivalent, removes one trailing slash (except at the root), and preserves the host including its port; listing and removal accept identities from that normalization. `file:` pages are supported.
+- **Hide on This Site** persists an exact HTTP(S) hostname exclusion; it does not cover subdomains. Site exclusions are unsupported for `file:` URLs.
+
+When selection translation is set to **ON_FAB_CLICK**, the menu warns (in English, Persian, and Japanese) that hiding the FAB prevents starting selection translation from it. Hide actions do not modify selection mode or the global FAB setting. A failed persistent write reports an error and keeps the menu open; successful writes dismiss the FAB.
+
+Persisted entries use feature-owned, per-entry `desktop-fab-exclusion:v1:` keys in `StorageCore`, allowing cross-tab changes without a shared-list write race. They are not settings-schema entries, but settings export carries them in a dedicated `_desktopFabExclusions` section (plain-text `{ scope, value }` entries), and settings import restores that section: when it is present the saved list is replaced (an explicitly empty list clears it), and backups without the section preserve existing exclusions. Additions are applied before removals. If an addition fails, all started additions settle and the successful imported additions are rolled back with removals only — recovery never restores old entries, so a failed import cannot recreate an exclusion that another context removed. A failed removal is left in place (a conservative superset) and reported; a failed rollback is surfaced as an error, so import never reports success. Cross-context writes concurrent with an import remain last-writer-wins: a same-identity concurrent change cannot be distinguished and is not reconciled. Excluded URLs and hostnames are exported as plain text even when a password encrypts API keys. Temporary FAB visibility overrides are in-memory and are never exported. Settings reset clears the persisted entries through the storage clear. Manage exclusions in **Options → Activation → Desktop FAB** via the **Hidden pages and sites** row's **Manage List** button, which opens a slide-out drawer; the list supports per-entry removal and stays available when the global FAB toggle is off. It refreshes on owned storage changes; overlapping reads are guarded so an older result cannot replace a newer one. The content-side gate also discards stale exclusion reads. Exclusions are independent of automatic-translation rules: no auto-translation rules are reused, and this feature does not monkeypatch browser history.
+
+## Popup and Sidepanel visibility override
+
+The desktop Popup **More** menu offers one state-dependent action: **Hide FAB for Now** or **Show FAB for Now**. Status is queried whenever More opens; the content script is authoritative. The override is tab-local, in memory, and has three states: `none`, `hide`, and `show`. `hide` suppresses the FAB; `show` takes precedence over page/site exclusions only. Neither changes exclusions, selection mode, or global settings.
+
+Show does not bypass extension/FAB disablement, mobile UI, fullscreen, restricted or non-top frames, settings/exclusion readiness, pending navigation, or FAB mount readiness. ContentApp registers the status/override controller in the top frame and receives the FAB's mounted-presence event; without that UI/controller, status is unavailable.
+
+An accepted navigation with a different full URL resets the override to `none` and refreshes exclusions. A same-URL history event does not reset it. The Popup pins reads and writes to the active tab ID and URL, sends them to frame 0 with the expected URL, re-queries before writing, and reads status again after a successful change rather than flipping optimistically. Unavailable or loading states disable the action; the Popup stays open and settings remain untouched.
+
+The Sidepanel toolbar has its own Show/Hide FAB button at the top of the lower group, above PDF. It uses the same content actions and frame-0, expected-URL checks without sharing Popup UI or persisting an override. Because Sidepanel stays open, its toolbar refreshes status on tab changes, full-page and SPA/fragment navigation, and panel focus or visibility restoration. Late replies are fenced against the active tab and URL; transient loading gets only bounded retries. Unknown or unavailable status leaves the localized button disabled, and completed or failed commands are followed by an authoritative status read.
+
+---
+
 ## File Structure
 
 - **View Layer**: `src/apps/content/components/desktop/DesktopFabMenu.vue`
@@ -126,4 +154,4 @@ The entire FAB system is rendered inside the UI Host Shadow DOM:
 
 ---
 
-**Last Updated**: April 2026
+**Last Updated**: October 2026

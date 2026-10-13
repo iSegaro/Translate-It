@@ -404,6 +404,33 @@
   "popup_exclude_disable_label": {
     "message": "Disable on this site"
   },
+  "popup_fab_show_label": {
+    "message": "Show FAB for Now"
+  },
+  "popup_fab_hide_label": {
+    "message": "Hide FAB for Now"
+  },
+  "popup_fab_unknown_label": {
+    "message": "Floating button"
+  },
+  "popup_fab_loading_reason": {
+    "message": "Reading the floating button’s status…"
+  },
+  "popup_fab_unavailable_reason": {
+    "message": "The floating button’s status is unavailable on this page."
+  },
+  "popup_fab_disabled_reason": {
+    "message": "The floating button is unavailable while the extension is disabled."
+  },
+  "popup_fab_reason_disabled_by_setting": {
+    "message": "The Desktop FAB setting hides the floating button here."
+  },
+  "popup_fab_reason_fullscreen": {
+    "message": "The floating button is hidden while this page is fullscreen."
+  },
+  "popup_fab_reason_ui_absent": {
+    "message": "The floating button is not available on this page."
+  },
   "page_translation_auto_translate_enable_label": {
     "message": "Enable automatic page translation"
   },
@@ -1057,6 +1084,66 @@
   },
   "desktop_fab_tts_stop_tooltip": {
     "message": "Stop"
+  },
+  "desktop_fab_hide_fab_label": {
+    "message": "Hide FAB"
+  },
+  "desktop_fab_hide_options_toggle_label": {
+    "message": "Choose how to hide the button"
+  },
+  "desktop_fab_hide_options_label": {
+    "message": "Hide button options"
+  },
+  "desktop_fab_hide_close_for_now": {
+    "message": "Close for Now"
+  },
+  "desktop_fab_hide_this_page": {
+    "message": "Hide on This Page"
+  },
+  "desktop_fab_hide_this_site": {
+    "message": "Hide on This Site"
+  },
+  "desktop_fab_hide_onfabclick_warning": {
+    "message": "While hidden, you can’t start selection translation from the Desktop FAB."
+  },
+  "desktop_fab_hide_save_failed": {
+    "message": "Could not save this hiding preference. Please try again."
+  },
+  "desktop_fab_hide_scope_unsupported": {
+    "message": "Hiding for this scope is not available on this page."
+  },
+  "fab_exclusions_group_label": {
+    "message": "Hidden pages and sites"
+  },
+  "fab_exclusions_label": {
+    "message": "Hidden pages and sites"
+  },
+  "fab_exclusions_description": {
+    "message": "Manage pages and sites where the Desktop FAB is hidden."
+  },
+  "fab_exclusions_empty": {
+    "message": "No pages or sites are hidden yet."
+  },
+  "fab_exclusion_scope_page": {
+    "message": "Page"
+  },
+  "fab_exclusion_scope_site": {
+    "message": "Site"
+  },
+  "fab_exclusion_remove_label": {
+    "message": "Remove from list"
+  },
+  "fab_exclusion_remove_error": {
+    "message": "Could not remove this entry. Reload the page and try again."
+  },
+  "fab_exclusions_load_error": {
+    "message": "Could not load the hidden pages and sites list. Reload the page to try again."
+  },
+  "fab_exclusions_manage_btn": {
+    "message": "Manage List"
+  },
+  "fab_exclusions_done_btn": {
+    "message": "Done"
   },
   "page_translation_add_auto_translate_tooltip": {
     "message": "Add to auto-translate rules"
