@@ -37,6 +37,31 @@ export function ContentScriptCore() {
       return { success: true };
     });
 
+    this.messageHandler.registerHandler(MessageActions.DESKTOP_FAB_GET_STATUS, async () => {
+      const controller = this.desktopFabController;
+      if (!controller) return this.getUnavailableDesktopFabStatus('ui-absent');
+      try {
+        return await controller.getStatus();
+      } catch {
+        return this.getUnavailableDesktopFabStatus('runtime-unavailable');
+      }
+    });
+
+    this.messageHandler.registerHandler(MessageActions.DESKTOP_FAB_SET_OVERRIDE, async (message) => {
+      const expectedUrl = message?.data?.expectedUrl;
+      if (expectedUrl !== window.location.href) {
+        return { ...this.getUnavailableDesktopFabStatus('stale-url'), success: false };
+      }
+
+      const controller = this.desktopFabController;
+      if (!controller) return { ...this.getUnavailableDesktopFabStatus('ui-absent'), success: false };
+      try {
+        return await controller.setOverride(message?.data);
+      } catch {
+        return { ...this.getUnavailableDesktopFabStatus('runtime-unavailable'), success: false };
+      }
+    });
+
     this.messageHandler.registerHandler(MessageActions.SPA_NAVIGATION, async (message) => {
       const { FeatureManager } = await import('@/core/managers/content/FeatureManager.js');
       const featureManager = FeatureManager.getInstance();
@@ -47,6 +72,15 @@ export function ContentScriptCore() {
       });
       return { success: true };
     });
+  };
+
+  core.getUnavailableDesktopFabStatus = function(reason) {
+    return {
+      success: true,
+      status: 'unavailable',
+      url: window.location.href,
+      reason,
+    };
   };
 
   // Allowed-runtime idempotent state (Phase B) — owned permanent composition

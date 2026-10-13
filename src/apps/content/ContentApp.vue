@@ -74,8 +74,9 @@
 
       <!-- Desktop FAB Menu -->
       <DesktopFabMenu 
-        v-if="!isMobileUI && showDesktopFab && desktopFabVisibility.isReady.value && !desktopFabVisibility.isDismissed.value && isTopFrame"
+        v-if="settingsStore.isInitialized && isExtensionEnabled && !isMobileUI && showDesktopFab && desktopFabVisibility.isReady.value && !desktopFabVisibility.isDismissed.value && isTopFrame"
         @dismiss="handleDesktopFabDismiss"
+        @presence="desktopFabVisibility.setChildPresence"
       />
 
       <!-- Mobile Floating Action Button (FAB) -->
@@ -128,7 +129,7 @@
 
 <script setup>
 import './ContentApp.scss'
-import { computed, onUnmounted, defineAsyncComponent, ref } from 'vue';
+import { computed, onMounted, onUnmounted, defineAsyncComponent, ref } from 'vue';
 import { Toaster } from 'vue-sonner';
 import { useWindowsManager } from '@/features/windows/composables/useWindowsManager.js';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
@@ -226,8 +227,34 @@ const {
   showMobileFab,
   isMobileUI
 } = useContentAppUIState(settingsStore, mobileStore, tracker);
-const desktopFabVisibility = useDesktopFabVisibility();
+const desktopFabVisibility = useDesktopFabVisibility({
+  getEnvironment: () => ({
+    isInitialized: settingsStore.isInitialized,
+    extensionEnabled: isExtensionEnabled.value,
+    showDesktopFab: showDesktopFab.value,
+    isMobileUI: isMobileUI.value,
+    isFullscreen: isFullscreen.value,
+    isTopFrame,
+    isRestricted: window.location.protocol.endsWith('-extension:')
+      || document.documentElement.classList.contains('translate-it-ui-frame'),
+  }),
+});
 const handleDesktopFabDismiss = (detail) => desktopFabVisibility.dismiss(detail);
+
+let registeredDesktopFabCore = null;
+let desktopFabController = null;
+onMounted(() => {
+  if (!isTopFrame) return;
+  const core = window.translateItContentCore;
+  if (!core || typeof core.registerCoreHandlers !== 'function') return;
+
+  desktopFabController = {
+    getStatus: desktopFabVisibility.getStatus,
+    setOverride: desktopFabVisibility.setOverride,
+  };
+  core.desktopFabController = desktopFabController;
+  registeredDesktopFabCore = core;
+});
 
 import { watch } from 'vue';
 watch(isScreenCaptureActive, (newVal) => {
@@ -312,6 +339,10 @@ useContentAppLifecycle({
 });
 
 onUnmounted(() => {
+  if (window.translateItContentCore === registeredDesktopFabCore
+      && registeredDesktopFabCore?.desktopFabController === desktopFabController) {
+    delete registeredDesktopFabCore.desktopFabController;
+  }
   unsubscribeLiveDubbingTranscript();
   cleanupEventListeners();
   logger.debug('ContentApp unmounted, cleaned up WindowsManager listeners.');

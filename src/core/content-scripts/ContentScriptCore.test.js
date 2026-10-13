@@ -11,6 +11,7 @@ vi.mock('@/core/managers/content/FeatureManager.js', () => ({
 
 import { ContentScriptCore } from './ContentScriptCore.js';
 import { IFrameContentScriptCore } from './IFrameContentScriptCore.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 
 describe('Vue infrastructure frame contract', () => {
   beforeEach(() => {
@@ -47,6 +48,44 @@ describe('Vue infrastructure frame contract', () => {
     expect(featureManagerMock.checkForUrlChange).toHaveBeenCalledExactlyOnceWith({
       navigationCursor, navigationUnavailable: undefined,
     });
+  });
+
+  it('registers Desktop FAB status and override handlers only on the main-frame core', async () => {
+    const core = ContentScriptCore();
+    const messageHandler = { registerHandler: vi.fn() };
+    core.messageHandler = messageHandler;
+    await core.registerCoreHandlers();
+
+    const handlers = new Map(messageHandler.registerHandler.mock.calls);
+    const getStatus = handlers.get(MessageActions.DESKTOP_FAB_GET_STATUS);
+    const setOverride = handlers.get(MessageActions.DESKTOP_FAB_SET_OVERRIDE);
+    expect(getStatus).toBeTypeOf('function');
+    expect(setOverride).toBeTypeOf('function');
+    expect(await getStatus()).toEqual({
+      success: true, status: 'unavailable', url: window.location.href, reason: 'ui-absent',
+    });
+
+    const controller = {
+      getStatus: vi.fn().mockResolvedValue({ success: true, status: 'visible', url: window.location.href }),
+      setOverride: vi.fn().mockResolvedValue({ success: true, status: 'hidden', url: window.location.href }),
+    };
+    core.desktopFabController = controller;
+    expect(await getStatus()).toMatchObject({ status: 'visible' });
+    const data = { expectedUrl: window.location.href, override: 'hide' };
+    expect(await setOverride({ data })).toMatchObject({ status: 'hidden' });
+    expect(controller.setOverride).toHaveBeenCalledWith(data);
+    expect(await setOverride({ data: { ...data, expectedUrl: 'https://stale.example/' } }))
+      .toEqual({
+        success: false, status: 'unavailable', url: window.location.href, reason: 'stale-url',
+      });
+    expect(controller.setOverride).toHaveBeenCalledOnce();
+
+    const iframe = IFrameContentScriptCore();
+    const iframeHandler = { registerHandler: vi.fn() };
+    iframe.messageHandler = iframeHandler;
+    iframe.registerCoreHandlers();
+    expect(iframeHandler.registerHandler).not.toHaveBeenCalledWith(MessageActions.DESKTOP_FAB_GET_STATUS, expect.any(Function));
+    expect(iframeHandler.registerHandler).not.toHaveBeenCalledWith(MessageActions.DESKTOP_FAB_SET_OVERRIDE, expect.any(Function));
   });
 
   it('iframe content core does not expose Vue loading', () => {

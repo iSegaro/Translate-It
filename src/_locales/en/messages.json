@@ -404,6 +404,33 @@
   "popup_exclude_disable_label": {
     "message": "Disable on this site"
   },
+  "popup_fab_show_label": {
+    "message": "Show FAB for Now"
+  },
+  "popup_fab_hide_label": {
+    "message": "Hide FAB for Now"
+  },
+  "popup_fab_unknown_label": {
+    "message": "Floating button"
+  },
+  "popup_fab_loading_reason": {
+    "message": "Reading the floating button’s status…"
+  },
+  "popup_fab_unavailable_reason": {
+    "message": "The floating button’s status is unavailable on this page."
+  },
+  "popup_fab_disabled_reason": {
+    "message": "The floating button is unavailable while the extension is disabled."
+  },
+  "popup_fab_reason_disabled_by_setting": {
+    "message": "The Desktop FAB setting hides the floating button here."
+  },
+  "popup_fab_reason_fullscreen": {
+    "message": "The floating button is hidden while this page is fullscreen."
+  },
+  "popup_fab_reason_ui_absent": {
+    "message": "The floating button is not available on this page."
+  },
   "page_translation_auto_translate_enable_label": {
     "message": "Enable automatic page translation"
   },

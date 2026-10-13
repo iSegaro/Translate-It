@@ -404,6 +404,33 @@
   "popup_exclude_disable_label": {
     "message": "このサイトで無効にする"
   },
+  "popup_fab_show_label": {
+    "message": "クイックアクションボタン (FAB) を今回だけ表示"
+  },
+  "popup_fab_hide_label": {
+    "message": "クイックアクションボタン (FAB) を今回だけ隠す"
+  },
+  "popup_fab_unknown_label": {
+    "message": "クイックアクションボタン (FAB)"
+  },
+  "popup_fab_loading_reason": {
+    "message": "クイックアクションボタンの状態を確認中…"
+  },
+  "popup_fab_unavailable_reason": {
+    "message": "このページではクイックアクションボタンの状態を取得できません。"
+  },
+  "popup_fab_disabled_reason": {
+    "message": "拡張機能が無効の間、クイックアクションボタンは利用できません。"
+  },
+  "popup_fab_reason_disabled_by_setting": {
+    "message": "デスクトップのFAB設定により、このページではクイックアクションボタンは非表示です。"
+  },
+  "popup_fab_reason_fullscreen": {
+    "message": "このページが全画面表示の間、クイックアクションボタンは非表示です。"
+  },
+  "popup_fab_reason_ui_absent": {
+    "message": "このページではクイックアクションボタンは利用できません。"
+  },
   "page_translation_auto_translate_enable_label": {
     "message": "ページの自動翻訳を有効にする"
   },

@@ -453,7 +453,7 @@ const tts = useTTSSmart();
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle();
 const exclusionChecker = ExclusionChecker.getInstance();
 
-const emit = defineEmits(['dismiss']);
+const emit = defineEmits(['dismiss', 'presence']);
 
 const sendPageCommand = (message) => {
   void sendRegularMessage(message, { returnFailureResponse: true })
@@ -527,6 +527,9 @@ const detectedLanguage = computed(() => {
 });
 
 const isFullscreen = computed(() => mobileStore.isFullscreen);
+watch([isReady, isFullscreen], () => {
+  emit('presence', Boolean(fabContainerRef.value));
+}, { flush: 'post' });
 const isTextSelectionEnabled = computed(() => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false);
 
 const fabContainerRef = ref(null);
@@ -1232,6 +1235,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  emit('presence', false);
   logger.debug('[DesktopFabMenu] Unmounting - performing owner-aware TTS cleanup');
   tts.stop({ stopOnlyIfOwner: true }).catch(() => {});
 });

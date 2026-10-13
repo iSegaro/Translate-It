@@ -938,6 +938,26 @@ describe('PopupHeader.scss More menu modernization', () => {
     expect(source).not.toMatch(/\.ti-btn-more\.(is-open|is-expanded|ti-active-open)/)
   })
 
+  it('styles disabled menu rows dimmed and inert while keeping them hoverable for the title', () => {
+    // The Desktop FAB action is disabled whenever its status is unknown, and
+    // History is disabled until its tab resolves — both share this row.
+    const disabled = bare.match(/\.ti-header-menu-item:disabled\s*\{([^}]*)/)
+    expect(disabled).toBeTruthy()
+    expect(disabled[1]).toContain('opacity: 0.6')
+    expect(disabled[1]).toContain('cursor: default')
+    // Logical-only declarations: no physical offsets, so RTL needs no override.
+    expect(disabled[0]).not.toMatch(/(?:^|[\s;])(?:margin|padding|inset)-(?:left|right)\s*:/)
+    expect(disabled[0]).not.toMatch(/(?:^|[\s;])(left|right)\s*:/)
+    // No pointer-events kill switch: the row must stay hoverable so the
+    // title tooltip can still explain WHY it is disabled.
+    expect(disabled[0]).not.toContain('pointer-events')
+    expect(bare).toMatch(
+      /\.ti-header-menu-item:disabled\s*\{[\s\S]*?&:hover\s*\{[^}]*background-color:\s*transparent/
+    )
+    // Reachable in the compiled sheet (plain selector, no :global).
+    expect(css).toContain('.ti-header-menu-item:disabled')
+  })
+
   it('styles the separator and the CSS site indicator (legacy check class gone)', () => {
     const separator = bare.match(/\.ti-header-menu-separator\s*\{([^}]*)/)
     expect(separator).toBeTruthy()

@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { ref, onMounted, onUnmounted } from 'vue'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import PopupHeader from './PopupHeader.vue'
 import MaskIcon from '@/components/shared/MaskIcon.vue'
 import { openExtensionApp } from '@/core/ExtensionAppLauncher.js'
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
+
+const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 let settings
 let closePopup
@@ -14,17 +19,18 @@ let sessionSet
 let sessionRemove
 let isMobile
 
-const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, mockSendMessage, mockFindProviderById } = vi.hoisted(() => ({
+const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, mockSendMessage, mockFindProviderById, mockUpdateSetting } = vi.hoisted(() => ({
   mockSelectModeHolder: { ref: null },
   mockToggleSelectElement: vi.fn(),
   mockToggleMouseHover: vi.fn(),
   mockSendMessage: vi.fn(),
-  mockFindProviderById: vi.fn(() => ({ features: ['bulk'] }))
+  mockFindProviderById: vi.fn(() => ({ features: ['bulk'] })),
+  mockUpdateSetting: vi.fn()
 }))
 const mockT = vi.hoisted(() => vi.fn((key, fallback) => fallback || key))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
-  useSettingsStore: () => ({ settings })
+  useSettingsStore: () => ({ settings, updateSettingLocally: mockUpdateSetting })
 }))
 
 vi.mock('@/features/translation/stores/translation.js', () => ({
@@ -111,18 +117,20 @@ vi.mock('@/components/base/ToolbarMenu/ToolbarMenu.vue', () => ({
         default: false
       }
     },
-    setup() {
+    emits: ['open', 'close'],
+    setup(props, { emit }) {
       const open = ref(false)
-      const toggle = () => { open.value = !open.value }
-      const close = () => { open.value = false }
+      const openMenu = () => { open.value = true; emit('open') }
+      const toggle = () => { if (open.value) closeMenu(); else openMenu() }
+      const closeMenu = () => { open.value = false; emit('close') }
       const noopRef = () => {}
       const onKeydown = (event) => {
-        if (event.key === 'Escape') close()
+        if (event.key === 'Escape') closeMenu()
       }
       const onPointerDown = (event) => {
         if (!open.value) return
         if (event.target?.closest?.('.toolbar-menu-stub')) return
-        close()
+        closeMenu()
       }
       onMounted(() => {
         document.addEventListener('keydown', onKeydown)
@@ -132,7 +140,7 @@ vi.mock('@/components/base/ToolbarMenu/ToolbarMenu.vue', () => ({
         document.removeEventListener('keydown', onKeydown)
         document.removeEventListener('pointerdown', onPointerDown)
       })
-      return { open, toggle, close, noopRef }
+      return { open, toggle, close: closeMenu, noopRef }
     },
     template: `
       <div class="toolbar-menu-stub">
@@ -166,6 +174,9 @@ describe('PopupHeader', () => {
     vi.mocked(openExtensionApp).mockResolvedValue({ success: true })
     closePopup = vi.spyOn(window, 'close').mockImplementation(() => {})
     globalThis.browser.tabs.query.mockResolvedValue([{ id: 1, windowId: 7, url: 'https://example.com/' }])
+    globalThis.browser.tabs.sendMessage.mockReset()
+    globalThis.browser.tabs.sendMessage.mockResolvedValue(undefined)
+    mockUpdateSetting.mockReset()
     sessionSet = vi.fn().mockResolvedValue(undefined)
     sessionRemove = vi.fn().mockResolvedValue(undefined)
     globalThis.browser.storage.session = { set: sessionSet, remove: sessionRemove }
@@ -443,10 +454,11 @@ describe('PopupHeader', () => {
     expect(panel.exists()).toBe(true)
 
     const items = panel.findAll('[role="menuitem"]')
-    // Structurally seven: the four always-visible items plus the narrow-only
+    // Structurally eight: the four always-visible items plus the narrow-only
     // duplicates (CSS-hidden at normal widths — see PopupHeader.scss
-    // breakpoint ownership). JSDOM does not apply CSS, so assert existence.
-    expect(items).toHaveLength(7)
+    // breakpoint ownership) plus the Desktop FAB action. JSDOM does not apply
+    // CSS, so assert existence.
+    expect(items).toHaveLength(8)
     const icons = panel.findAll('.ti-header-menu-item img').map((img) => img.attributes('src'))
     expect(icons.some((src) => src?.includes('subtitle.svg'))).toBe(true)
     expect(icons.some((src) => src?.includes('pdf.png'))).toBe(true)
@@ -583,9 +595,11 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
     await flushMicrotasks(wrapper)
-    const queryCountBeforeClick = globalThis.browser.tabs.query.mock.calls.length
 
     const panel = await openMoreMenu(wrapper)
+    // Snapshot AFTER opening: opening also refreshes the FAB status, which
+    // queries the active tab once.
+    const queryCountBeforeClick = globalThis.browser.tabs.query.mock.calls.length
     await panel.findAll('[role="menuitem"]')[2].trigger('click')
     await flushMicrotasks(wrapper)
 
@@ -652,9 +666,11 @@ describe('PopupHeader', () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
     await flushMicrotasks(wrapper)
-    const queryCountBeforeClick = globalThis.browser.tabs.query.mock.calls.length
 
     const panel = await openMoreMenu(wrapper)
+    // Snapshot AFTER opening: opening also refreshes the FAB status (one
+    // extra active-tab query, already settled by the flush above).
+    const queryCountBeforeClick = globalThis.browser.tabs.query.mock.calls.length
     await panel.findAll('[role="menuitem"]')[2].trigger('click')
 
     expect(globalThis.browser.tabs.query).toHaveBeenCalledTimes(queryCountBeforeClick)
@@ -903,8 +919,9 @@ describe('PopupHeader', () => {
 
     const panel = await openMoreMenu(wrapper)
     // Capture duplicate follows its setting (v-if); hover + sidepanel
-    // duplicates stay structural: subtitle, pdf, history, hover, sidepanel, exclude.
-    expect(panel.findAll('[role="menuitem"]')).toHaveLength(6)
+    // duplicates stay structural: subtitle, pdf, history, hover, sidepanel,
+    // fab, exclude.
+    expect(panel.findAll('[role="menuitem"]')).toHaveLength(7)
     expect(panel.find('.ti-header-menu-item--very-narrow-only').exists()).toBe(true)
     expect(panel.findAll('.ti-header-menu-item--narrow-only')).toHaveLength(1)
   })
@@ -957,13 +974,13 @@ describe('PopupHeader', () => {
 
   // ── More menu modernization ─────────────────────────────────────────
 
-  it('orders the menu: Subtitle, PDF, History, responsive duplicates, then the site action last', async () => {
+  it('orders the menu: Subtitle, PDF, History, responsive duplicates, the FAB action, then the site action last', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()
 
     const panel = await openMoreMenu(wrapper)
     const items = panel.findAll('[role="menuitem"]')
-    expect(items).toHaveLength(7)
+    expect(items).toHaveLength(8)
 
     // 1: subtitle is a multicolor <img> (ADR-001, same as PDF); 2: PDF stays a branded <img>.
     const subtitleImg = items[0].find('img')
@@ -987,11 +1004,17 @@ describe('PopupHeader', () => {
     expect(items[5].classes()).toContain('ti-header-menu-item--narrow-only')
     expect(items[5].findComponent(MaskIcon).props('src')).toContain('side-panel.png')
 
-    // 6: site action is the FINAL menu action and never breakpoint-gated —
-    // final at every viewport width.
-    expect(items[6].text()).toContain('Disable on this site')
+    // 7: the FAB action sits directly above the divider, never
+    // breakpoint-gated (it replaces no direct toolbar button).
+    expect(items[6].classes()).toContain('ti-header-menu-item--fab')
     expect(items[6].classes()).not.toContain('ti-header-menu-item--narrow-only')
     expect(items[6].classes()).not.toContain('ti-header-menu-item--very-narrow-only')
+
+    // 8: site action is the FINAL menu action and never breakpoint-gated —
+    // final at every viewport width.
+    expect(items[7].text()).toContain('Disable on this site')
+    expect(items[7].classes()).not.toContain('ti-header-menu-item--narrow-only')
+    expect(items[7].classes()).not.toContain('ti-header-menu-item--very-narrow-only')
   })
 
   it('renders a separator immediately before the final site action', async () => {
@@ -1004,11 +1027,12 @@ describe('PopupHeader', () => {
     expect(separator.attributes('role')).toBe('separator')
 
     const items = panel.findAll('[role="menuitem"]')
-    // Immediately after the last responsive duplicate (sidepanel)…
-    expect(separator.element.previousElementSibling).toBe(items[5].element)
+    // Immediately after the FAB action…
+    expect(separator.element.previousElementSibling).toBe(items[6].element)
+    expect(items[6].classes()).toContain('ti-header-menu-item--fab')
     // …and immediately before the site action.
-    expect(separator.element.nextElementSibling).toBe(items[6].element)
-    expect(items[6].text()).toContain('Disable on this site')
+    expect(separator.element.nextElementSibling).toBe(items[7].element)
+    expect(items[7].text()).toContain('Disable on this site')
   })
 
   it('replaces the Unicode checkbox with a decorative, non-interactive CSS indicator', async () => {
@@ -1047,5 +1071,858 @@ describe('PopupHeader', () => {
     await more.trigger('click')
     expect(more.attributes('aria-expanded')).toBe('true')
     expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(true)
+  })
+
+  // ── Desktop FAB per-tab visibility action ────────────────────────────
+
+  describe('Desktop FAB visibility action', () => {
+    const TAB = { id: 1, windowId: 7, url: 'https://example.com/' }
+    const GET = MessageActions.DESKTOP_FAB_GET_STATUS
+    const SET = MessageActions.DESKTOP_FAB_SET_OVERRIDE
+
+    const statusSnapshot = (status, extra = {}) => ({
+      success: true,
+      status,
+      url: TAB.url,
+      ...extra
+    })
+
+    beforeEach(() => {
+      globalThis.browser.tabs.query.mockReset()
+      globalThis.browser.tabs.query.mockResolvedValue([TAB])
+      globalThis.browser.tabs.sendMessage.mockReset()
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(undefined)
+      mockUpdateSetting.mockReset()
+    })
+
+    afterEach(() => {
+      // The settling-retry test drives the clock; never leak fake timers.
+      vi.useRealTimers()
+    })
+
+    const fabItem = (panel) => panel.find('.ti-header-menu-item--fab')
+
+    it('refreshes from the top frame on open and takes its label from the authoritative status', async () => {
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('hidden'))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      let panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      // Frame 0, the captured tab id, and the read action.
+      expect(globalThis.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        TAB.id,
+        { action: GET },
+        { frameId: 0 }
+      )
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+      expect(fabItem(panel).attributes('disabled')).toBeUndefined()
+
+      // Reopen: the status is re-read, never cached from the previous open.
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('visible'))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      expect(globalThis.browser.tabs.sendMessage).toHaveBeenCalledTimes(2)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+    })
+
+    it('renders exactly one FAB action and keeps the site action final after the divider', async () => {
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('visible'))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      expect(panel.findAll('.ti-header-menu-item--fab')).toHaveLength(1)
+      const items = panel.findAll('[role="menuitem"]')
+      expect(items[6].classes()).toContain('ti-header-menu-item--fab')
+      expect(items[7].text()).toContain('Disable on this site')
+
+      const separator = panel.find('.ti-header-menu-separator')
+      expect(separator.element.previousElementSibling).toBe(items[6].element)
+      expect(separator.element.nextElementSibling).toBe(items[7].element)
+    })
+
+    it('stays disabled with a neutral label and the loading explanation until the status lands', async () => {
+      let resolveStatus
+      globalThis.browser.tabs.sendMessage.mockImplementation(() =>
+        new Promise((resolve) => { resolveStatus = resolve }))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await wrapper.vm.$nextTick()
+
+      let item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeDefined()
+      expect(item.text()).toBe('Floating button')
+      expect(item.attributes('title')).toBe('Reading the floating button’s status…')
+      expect(item.attributes('aria-label')).toBe('Reading the floating button’s status…')
+
+      resolveStatus(statusSnapshot('hidden'))
+      await flushMicrotasks(wrapper)
+      item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeUndefined()
+      expect(item.text()).toBe('Show FAB for Now')
+    })
+
+    it('disables without any wire traffic while the extension is globally disabled', async () => {
+      settings.EXTENSION_ENABLED = false
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      expect(globalThis.browser.tabs.sendMessage).not.toHaveBeenCalled()
+      const item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeDefined()
+      expect(item.text()).toBe('Floating button')
+      const explanation = 'The floating button is unavailable while the extension is disabled.'
+      expect(item.attributes('title')).toBe(explanation)
+      expect(item.attributes('aria-label')).toBe(explanation)
+      expect(mockT).toHaveBeenCalledWith('popup_fab_disabled_reason', explanation)
+    })
+
+    it('reports a restricted page or missing receiver without leaking raw transport text', async () => {
+      globalThis.browser.tabs.sendMessage.mockRejectedValue(
+        new Error('Could not establish connection. Receiving end does not exist.')
+      )
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      const item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeDefined()
+      expect(item.text()).toBe('Floating button')
+      const generic = 'The floating button’s status is unavailable on this page.'
+      expect(item.attributes('title')).toBe(generic)
+      expect(item.attributes('aria-label')).toBe(generic)
+      expect(mockT).toHaveBeenCalledWith('popup_fab_unavailable_reason', generic)
+      // The browser's error message stays internal — never in the a11y tree.
+      expect(item.attributes('title')).not.toContain('Could not establish connection')
+      expect(item.attributes('aria-label')).not.toContain('Receiving end does not exist')
+      // Never claims a state it does not have.
+      expect(item.text()).not.toContain('Show FAB')
+      expect(item.text()).not.toContain('Hide FAB')
+    })
+
+    it('maps recognized content reason codes to localized text and hides unknown ones', async () => {
+      const generic = 'The floating button’s status is unavailable on this page.'
+      const cases = [
+        ['global-disabled', 'The Desktop FAB setting hides the floating button here.', 'popup_fab_reason_disabled_by_setting'],
+        ['fullscreen', 'The floating button is hidden while this page is fullscreen.', 'popup_fab_reason_fullscreen'],
+        ['ui-absent', 'The floating button is not available on this page.', 'popup_fab_reason_ui_absent'],
+        ['mobile-ui', 'The floating button is not available on this page.', 'popup_fab_reason_ui_absent'],
+        // Unknown codes (and raw transport detail) never surface verbatim.
+        ['write-refused', generic, 'popup_fab_unavailable_reason'],
+        ['Could not establish connection. Receiving end does not exist.', generic, 'popup_fab_unavailable_reason']
+      ]
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      for (const [reason, expected, key] of cases) {
+        globalThis.browser.tabs.sendMessage.mockResolvedValue(
+          statusSnapshot('unavailable', { reason })
+        )
+        const panel = await openMoreMenu(wrapper)
+        await flushMicrotasks(wrapper)
+
+        const item = fabItem(panel)
+        expect(item.attributes('disabled')).toBeDefined()
+        expect(item.text()).toBe('Floating button')
+        expect(item.attributes('title')).toBe(expected)
+        expect(item.attributes('aria-label')).toBe(expected)
+        expect(mockT).toHaveBeenCalledWith(key, expected)
+        // Raw code/message must never appear in the accessible explanation.
+        if (expected.indexOf(reason) === -1) {
+          expect(item.attributes('title')).not.toContain(reason)
+          expect(item.attributes('aria-label')).not.toContain(reason)
+        }
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        await wrapper.vm.$nextTick()
+      }
+    })
+
+    it('fails closed on replies that are not a successful exact-addressed read', async () => {
+      const payloads = [
+        { status: 'visible' },
+        { success: false, status: 'visible', url: TAB.url },
+        { success: true, status: 'visible' },
+        { success: true, status: 'visible', url: 'https://other.example/' }
+      ]
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      for (const payload of payloads) {
+        globalThis.browser.tabs.sendMessage.mockResolvedValue(payload)
+        const panel = await openMoreMenu(wrapper)
+        await flushMicrotasks(wrapper)
+
+        const item = fabItem(panel)
+        expect(item.attributes('disabled')).toBeDefined()
+        expect(item.text()).toBe('Floating button')
+        expect(item.text()).not.toContain('Hide FAB for Now')
+        expect(item.text()).not.toContain('Show FAB for Now')
+
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        await wrapper.vm.$nextTick()
+      }
+    })
+
+    it('disables when the active tab changes under an in-flight read, even with the same URL', async () => {
+      let resolveStatus
+      globalThis.browser.tabs.sendMessage.mockImplementation(() =>
+        new Promise((resolve) => { resolveStatus = resolve }))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await wrapper.vm.$nextTick()
+
+      // Same URL, different tab id: the sequence token alone cannot see this.
+      globalThis.browser.tabs.query.mockResolvedValue([
+        { id: 42, windowId: 7, url: TAB.url }
+      ])
+      resolveStatus(statusSnapshot('visible'))
+      await flushMicrotasks(wrapper)
+
+      const item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeDefined()
+      expect(item.text()).toBe('Floating button')
+      expect(item.text()).not.toContain('Hide FAB for Now')
+      expect(wrapper.vm.isFabActionDisabled).toBe(true)
+    })
+
+    it('fences a stale active-tab confirmation after reopening', async () => {
+      const pendingStatus = []
+      let heldConfirm = null
+      let queries = 0
+      globalThis.browser.tabs.sendMessage.mockImplementation(() =>
+        new Promise((resolve) => { pendingStatus.push(resolve) }))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+      await flushMicrotasks(wrapper)
+
+      globalThis.browser.tabs.query.mockImplementation(() => {
+        queries += 1
+        // Second query is read#1's post-reply confirmation.
+        if (queries === 2) return new Promise((resolve) => { heldConfirm = resolve })
+        return Promise.resolve([TAB])
+      })
+
+      await openMoreMenu(wrapper)
+      await wrapper.vm.$nextTick()
+      pendingStatus[0](statusSnapshot('visible'))
+      await flushMicrotasks(wrapper)
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      pendingStatus[1](statusSnapshot('hidden'))
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+
+      // The first read's confirmation resolves late: it must not apply.
+      heldConfirm([TAB])
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+      expect(wrapper.vm.fabState.status).toBe('hidden')
+    })
+
+    it('fences a status reply that belongs to another document', async () => {
+      globalThis.browser.tabs.sendMessage.mockResolvedValue({
+        success: true,
+        status: 'visible',
+        url: 'https://other.example/'
+      })
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      const item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeDefined()
+      expect(item.text()).toBe('Floating button')
+      const generic = 'The floating button’s status is unavailable on this page.'
+      expect(item.attributes('title')).toBe(generic)
+      expect(mockT).toHaveBeenCalledWith('popup_fab_unavailable_reason', generic)
+    })
+
+    it('discards a stale status reply from a previous open', async () => {
+      const pending = []
+      globalThis.browser.tabs.sendMessage.mockImplementation(() =>
+        new Promise((resolve) => { pending.push(resolve) }))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      await openMoreMenu(wrapper)
+      await wrapper.vm.$nextTick()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+
+      // Second open answers first…
+      const panel = await openMoreMenu(wrapper)
+      pending[1](statusSnapshot('hidden'))
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+
+      // …then the first open's late reply arrives and must be dropped.
+      pending[0](statusSnapshot('visible'))
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+    })
+
+    it('sends the hide override with expectedUrl and re-reads instead of flipping optimistically', async () => {
+      let status = 'visible'
+      let holdVerify = false
+      let verifyResolve
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) => {
+        if (message.action === SET) {
+          status = 'hidden'
+          return Promise.resolve({ success: true })
+        }
+        if (holdVerify) return new Promise((resolve) => { verifyResolve = resolve })
+        return Promise.resolve(statusSnapshot(status))
+      })
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      let panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+
+      holdVerify = true // from now on, the authoritative GET stays pending
+      await fabItem(panel).trigger('click')
+      await wrapper.vm.$nextTick()
+
+      expect(globalThis.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        TAB.id,
+        { action: SET, data: { expectedUrl: TAB.url, override: 'hide' } },
+        { frameId: 0 }
+      )
+      // No optimistic flip while the authoritative re-read is in flight: the
+      // row is pending — disabled with the neutral label, never a guessed
+      // action — and the override itself owns that pending state.
+      expect(wrapper.vm.fabState.status).toBe('loading')
+      expect(wrapper.vm.isFabActionDisabled).toBe(true)
+      expect(wrapper.vm.fabActionLabel).toBe('Floating button')
+
+      holdVerify = false
+      verifyResolve(statusSnapshot('hidden'))
+      await flushMicrotasks(wrapper)
+      expect(wrapper.vm.fabState.status).toBe('hidden')
+
+      panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+    })
+
+    it('sends the show override when the FAB is hidden', async () => {
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) =>
+        message.action === SET
+          ? Promise.resolve({ success: true })
+          : Promise.resolve(statusSnapshot('hidden')))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      await fabItem(panel).trigger('click')
+      await flushPromises()
+
+      expect(globalThis.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        TAB.id,
+        { action: SET, data: { expectedUrl: TAB.url, override: 'show' } },
+        { frameId: 0 }
+      )
+    })
+
+    it('never controls a tab other than the one the status came from', async () => {
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('visible'))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      globalThis.browser.tabs.sendMessage.mockClear()
+
+      // The user switched tabs while the menu was open.
+      globalThis.browser.tabs.query.mockResolvedValue([
+        { id: 42, windowId: 7, url: 'https://other.example/' }
+      ])
+      await fabItem(panel).trigger('click')
+      await flushPromises()
+
+      const overrides = globalThis.browser.tabs.sendMessage.mock.calls
+        .filter(([, message]) => message.action === SET)
+      expect(overrides).toHaveLength(0)
+      // Instead the row re-reads the newly active tab.
+      expect(globalThis.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        42,
+        { action: GET },
+        { frameId: 0 }
+      )
+    })
+
+    it('never claims success when the setter reports failure', async () => {
+      let writeRefused = false
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) =>
+        message.action === SET
+          ? Promise.resolve(writeRefused
+            ? { success: false, status: 'unavailable', url: TAB.url, reason: 'write refused' }
+            : { success: true })
+          : Promise.resolve(statusSnapshot('visible')))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      let panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      writeRefused = true
+      await fabItem(panel).trigger('click')
+      await flushPromises()
+
+      // The failed write is reported, never optimistically applied: the row
+      // goes neutral/disabled with the content script's own reason and the
+      // label never becomes "Show FAB for Now" (which would claim a hide).
+      expect(wrapper.vm.fabState.status).toBe('unavailable')
+      expect(wrapper.vm.fabState.reason).toBe('write refused')
+      expect(wrapper.vm.isFabActionDisabled).toBe(true)
+      expect(wrapper.vm.fabActionLabel).toBe('Floating button')
+      // The raw reason stays internal: the explanation is localized.
+      expect(wrapper.vm.fabActionExplanation)
+        .toBe('The floating button’s status is unavailable on this page.')
+      expect(wrapper.vm.fabActionExplanation).not.toContain('write refused')
+      expect(closePopup).not.toHaveBeenCalled()
+
+      // Reopening re-reads the truth: the FAB is still visible there, so the
+      // row offers the hide action again instead of a phantom "show".
+      panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      const item = fabItem(panel)
+      expect(item.attributes('disabled')).toBeUndefined()
+      expect(item.text()).toBe('Hide FAB for Now')
+      // The popup stays open, like the other toggle-style actions.
+      expect(closePopup).not.toHaveBeenCalled()
+    })
+
+    it('keeps global settings untouched and the popup open after a successful override', async () => {
+      const settingsBefore = JSON.parse(JSON.stringify(settings))
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) =>
+        message.action === SET
+          ? Promise.resolve({ success: true })
+          : Promise.resolve(statusSnapshot('visible')))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      await fabItem(panel).trigger('click')
+      await flushPromises()
+
+      expect(closePopup).not.toHaveBeenCalled()
+      expect(mockUpdateSetting).not.toHaveBeenCalled()
+      expect(settings).toEqual(settingsBefore)
+      // No popup-routed (background) message ever carries the FAB actions.
+      expect(mockSendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: SET })
+      )
+      expect(mockSendMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: GET })
+      )
+    })
+
+    it('exposes an accessible menuitem with a decorative ADR-001 mask icon and localized fallbacks', async () => {
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('hidden'))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      const item = fabItem(panel)
+      expect(item.element.tagName).toBe('BUTTON')
+      expect(item.attributes('type')).toBe('button')
+      expect(item.attributes('role')).toBe('menuitem')
+      // Enabled: the visible label stays the accessible name.
+      expect(item.attributes('aria-label')).toBeUndefined()
+      expect(item.attributes('title')).toBe('Show FAB for Now')
+
+      const icon = item.findComponent(MaskIcon)
+      expect(icon.props('src')).toContain('eye-open.svg')
+      expect(icon.props('size')).toBe(18)
+      expect(icon.attributes('aria-hidden')).toBe('true')
+
+      // English fallbacks are passed as the second t() argument. Both the
+      // in-flight label and the resolved label are requested during the
+      // open→answer cycle; the hide label belongs to the visible state.
+      expect(mockT).toHaveBeenCalledWith('popup_fab_show_label', 'Show FAB for Now')
+      expect(mockT).toHaveBeenCalledWith('popup_fab_unknown_label', 'Floating button')
+      expect(mockT).toHaveBeenCalledWith('popup_fab_loading_reason', 'Reading the floating button’s status…')
+    })
+
+    it('uses the hide-state icon and label while the FAB is visible', async () => {
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('visible'))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      const item = fabItem(panel)
+      expect(item.findComponent(MaskIcon).props('src')).toContain('eye-hide.svg')
+      expect(item.text()).toBe('Hide FAB for Now')
+      expect(item.attributes('title')).toBe('Hide FAB for Now')
+      expect(mockT).toHaveBeenCalledWith('popup_fab_hide_label', 'Hide FAB for Now')
+    })
+
+    it('omits the FAB action on mobile while the site action stays final', async () => {
+      isMobile = true
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('visible'))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+
+      expect(panel.findAll('.ti-header-menu-item--fab')).toHaveLength(0)
+      expect(panel.findAll('[role="menuitem"]')).toHaveLength(5)
+      const separator = panel.find('.ti-header-menu-separator')
+      expect(separator.element.nextElementSibling.textContent).toContain('Disable on this site')
+    })
+
+    it('keeps the row disabled across a reopen while the SET is outstanding, then refreshes authoritatively', async () => {
+      const pendingSet = []
+      let status = 'visible'
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) => {
+        if (message.action === SET) return new Promise((resolve) => { pendingSet.push(resolve) })
+        return Promise.resolve(statusSnapshot(status))
+      })
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      let panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+
+      // The command goes out and stays outstanding.
+      await fabItem(panel).trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(pendingSet).toHaveLength(1)
+      expect(globalThis.browser.tabs.sendMessage).toHaveBeenCalledWith(
+        TAB.id,
+        { action: SET, data: { expectedUrl: TAB.url, override: 'hide' } },
+        { frameId: 0 }
+      )
+      expect(wrapper.vm.isFabActionDisabled).toBe(true)
+
+      // Reopen while the write is in flight: the read answers with the
+      // PRE-write status, which must not re-enable the row with a stale action.
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).attributes('disabled')).toBeDefined()
+      expect(fabItem(panel).text()).toBe('Floating button')
+      expect(fabItem(panel).text()).not.toContain('Hide FAB for Now')
+
+      // The write lands (the child now hides the FAB): the authoritative
+      // refresh that follows wins over the pre-write reply.
+      pendingSet[0]({ success: true })
+      status = 'hidden'
+      await flushPromises()
+      expect(wrapper.vm.isFabActionDisabled).toBe(false)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+    })
+
+    it.each([
+      ['reports failure', (complete) => complete({ success: false, reason: 'write refused' })],
+      ['rejects', (complete) => complete(new Error('transport failed'))]
+    ])('re-reads after a reopened menu when the outstanding SET %s', async (_description, completeSet) => {
+      let resolveSet
+      let getCount = 0
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) => {
+        if (message.action === SET) {
+          return new Promise((resolve, reject) => {
+            resolveSet = (result) => result instanceof Error ? reject(result) : resolve(result)
+          })
+        }
+        getCount += 1
+        // Reopen gets the pre-write status; the recovery read gets current truth.
+        return Promise.resolve(statusSnapshot(getCount < 3 ? 'visible' : 'hidden'))
+      })
+
+      const settingsBefore = JSON.parse(JSON.stringify(settings))
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      let panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      await fabItem(panel).trigger('click')
+      await flushMicrotasks(wrapper)
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Floating button')
+      expect(fabItem(panel).attributes('disabled')).toBeDefined()
+
+      completeSet(resolveSet)
+      await flushPromises()
+
+      expect(getCount).toBe(3)
+      expect(globalThis.browser.tabs.sendMessage.mock.calls.filter(([, message]) => message.action === SET))
+        .toHaveLength(1)
+      expect(globalThis.browser.tabs.sendMessage.mock.calls
+        .filter(([, message]) => message.action === GET))
+        .toEqual(Array.from({ length: 3 }, () => [TAB.id, { action: GET }, { frameId: 0 }]))
+      expect(wrapper.vm.fabState.status).toBe('hidden')
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+      expect(fabItem(panel).attributes('disabled')).toBeUndefined()
+      expect(mockUpdateSetting).not.toHaveBeenCalled()
+      expect(settings).toEqual(settingsBefore)
+    })
+
+    it('retries a transient post-write loading status until the child is present, without open-ended polling', async () => {
+      vi.useFakeTimers()
+      // 'hidden' → the show command mounts the child, which reports loading
+      // for exactly one read, then 'visible'.
+      let phase = 'hidden'
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) => {
+        if (message.action === SET) {
+          phase = 'mounting'
+          return Promise.resolve({ success: true })
+        }
+        if (phase === 'mounting') {
+          phase = 'visible'
+          return Promise.resolve(statusSnapshot('loading', { reason: 'fab-settling' }))
+        }
+        return Promise.resolve(statusSnapshot(phase))
+      })
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+
+      // Drive the command directly so the menu — and the row — stay open.
+      await wrapper.vm.handleFabVisibilityOverride()
+      await flushMicrotasks(wrapper)
+
+      // Transient loading: disabled with the neutral label, never the
+      // optimistic post-write action.
+      expect(fabItem(panel).attributes('disabled')).toBeDefined()
+      expect(fabItem(panel).text()).toBe('Floating button')
+      expect(fabItem(panel).text()).not.toContain('Hide FAB for Now')
+
+      const getStatusReads = () => globalThis.browser.tabs.sendMessage.mock.calls
+        .filter(([, message]) => message.action === GET).length
+      const readsWhileLoading = getStatusReads()
+
+      // The bounded retry picks the status up once the child is present.
+      await vi.advanceTimersByTimeAsync(150)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+      expect(fabItem(panel).attributes('disabled')).toBeUndefined()
+      const readsAfterSettle = getStatusReads()
+      expect(readsAfterSettle).toBeGreaterThan(readsWhileLoading)
+
+      // Settled: no further polling, however long the menu stays open.
+      await vi.advanceTimersByTimeAsync(150 * 20)
+      await flushMicrotasks(wrapper)
+      expect(getStatusReads()).toBe(readsAfterSettle)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+    })
+
+    it('bounds the settling retry when the child never leaves loading', async () => {
+      vi.useFakeTimers()
+      let reads = 0
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) => {
+        if (message.action === SET) return Promise.resolve({ success: true })
+        reads += 1
+        // The first read is settled; every read after the write is loading.
+        return Promise.resolve(reads === 1
+          ? statusSnapshot('hidden')
+          : statusSnapshot('loading', { reason: 'fab-settling' }))
+      })
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+
+      await wrapper.vm.handleFabVisibilityOverride()
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).attributes('disabled')).toBeDefined()
+      const readsAfterWrite = reads
+
+      // A never-settling child drains the retry budget instead of polling.
+      await vi.advanceTimersByTimeAsync(150 * 20)
+      await flushMicrotasks(wrapper)
+      expect(reads - readsAfterWrite).toBeLessThanOrEqual(8)
+      const boundedTotal = reads
+      await vi.advanceTimersByTimeAsync(150 * 20)
+      await flushMicrotasks(wrapper)
+      expect(reads).toBe(boundedTotal)
+    })
+
+    it('recovers with one fresh read when a command is superseded before it is sent', async () => {
+      let holdNextQuery = false
+      let heldQuery = null
+      globalThis.browser.tabs.query.mockImplementation(() => {
+        if (holdNextQuery) {
+          holdNextQuery = false
+          return new Promise((resolve) => { heldQuery = resolve })
+        }
+        return Promise.resolve([TAB])
+      })
+      // No write ever happens; every read reports the pre-command truth.
+      globalThis.browser.tabs.sendMessage.mockResolvedValue(statusSnapshot('visible'))
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      let panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+
+      // The command's pre-send tab query hangs…
+      holdNextQuery = true
+      await fabItem(panel).trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.isFabActionDisabled).toBe(true)
+
+      // …the user reopens, and that read's reply is dropped because the
+      // abandoned command still owns the row.
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Floating button')
+
+      // The hung query resolves: the command aborts unsent, and exactly one
+      // fresh authoritative read replaces the swallowed one.
+      heldQuery([TAB])
+      await flushPromises()
+
+      const calls = globalThis.browser.tabs.sendMessage.mock.calls
+      expect(calls.filter(([, message]) => message.action === SET)).toHaveLength(0)
+      expect(calls.filter(([, message]) => message.action === GET)).toHaveLength(3)
+      expect(fabItem(panel).text()).toBe('Hide FAB for Now')
+      expect(fabItem(panel).attributes('disabled')).toBeUndefined()
+    })
+
+    it('stops the settling retry once the menu closes, even for a late loading reply', async () => {
+      vi.useFakeTimers()
+      let phase = 'hidden'
+      let holdLoadingReply = false
+      let heldLoadingReply = null
+      globalThis.browser.tabs.sendMessage.mockImplementation((tabId, message) => {
+        if (message.action === SET) {
+          phase = 'loading'
+          return Promise.resolve({ success: true })
+        }
+        if (phase === 'loading') {
+          if (holdLoadingReply) return new Promise((resolve) => { heldLoadingReply = resolve })
+          return Promise.resolve(statusSnapshot('loading', { reason: 'fab-settling' }))
+        }
+        return Promise.resolve(statusSnapshot(phase))
+      })
+
+      const wrapper = mount(PopupHeader)
+      await wrapper.vm.$nextTick()
+
+      const panel = await openMoreMenu(wrapper)
+      await flushMicrotasks(wrapper)
+      expect(fabItem(panel).text()).toBe('Show FAB for Now')
+
+      // The post-write read stays in flight while the menu is open.
+      holdLoadingReply = true
+      await wrapper.vm.handleFabVisibilityOverride()
+      await flushMicrotasks(wrapper)
+      const readsBeforeClose = globalThis.browser.tabs.sendMessage.mock.calls
+        .filter(([, message]) => message.action === GET).length
+
+      // Menu closes before the reply lands.
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
+
+      // A late transient-loading reply must not re-arm the retry leash.
+      holdLoadingReply = false
+      heldLoadingReply(statusSnapshot('loading', { reason: 'fab-settling' }))
+      await flushMicrotasks(wrapper)
+      expect(wrapper.vm.fabState.status).toBe('loading')
+
+      await vi.advanceTimersByTimeAsync(150 * 10)
+      await flushMicrotasks(wrapper)
+      expect(globalThis.browser.tabs.sendMessage.mock.calls
+        .filter(([, message]) => message.action === GET).length).toBe(readsBeforeClose)
+    })
+
+    it('ships every FAB key in the en, fa and ja dictionaries', () => {
+      const localesDir = resolve(srcDir, '_locales')
+      const keys = [
+        'popup_fab_show_label',
+        'popup_fab_hide_label',
+        'popup_fab_unknown_label',
+        'popup_fab_loading_reason',
+        'popup_fab_unavailable_reason',
+        'popup_fab_disabled_reason',
+        'popup_fab_reason_disabled_by_setting',
+        'popup_fab_reason_fullscreen',
+        'popup_fab_reason_ui_absent'
+      ]
+      const read = (locale) =>
+        JSON.parse(readFileSync(resolve(localesDir, `${locale}/messages.json`), 'utf8'))
+
+      for (const locale of ['en', 'fa', 'ja']) {
+        const messages = read(locale)
+        for (const key of keys) {
+          expect(messages[key], `${locale} is missing ${key}`).toBeTruthy()
+          expect(typeof messages[key].message).toBe('string')
+          expect(messages[key].message.trim()).not.toBe('')
+        }
+      }
+      // The fa strings are RTL copy: they must not be English passthroughs.
+      const fa = read('fa')
+      expect(fa.popup_fab_show_label.message).not.toBe('Show FAB for Now')
+      expect(fa.popup_fab_hide_label.message).not.toBe('Hide FAB for Now')
+      expect(fa.popup_fab_reason_fullscreen.message)
+        .not.toBe('The floating button is hidden while this page is fullscreen.')
+      expect(fa.popup_fab_reason_disabled_by_setting.message)
+        .not.toBe('The Desktop FAB setting hides the floating button here.')
+      const ja = read('ja')
+      expect(ja.popup_fab_show_label.message).not.toBe('Show FAB for Now')
+      expect(ja.popup_fab_reason_ui_absent.message)
+        .not.toBe('The floating button is not available on this page.')
+    })
   })
 })

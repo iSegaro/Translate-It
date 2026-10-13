@@ -49,14 +49,18 @@ vi.mock('@/shared/logging/logConstants.js', () => ({
 describe('useDesktopFabVisibility', () => {
   let wrapper;
   let visibility;
+  let environment;
+  let beforeMountNavigation;
+
+  const Harness = defineComponent({
+    setup() {
+      visibility = useDesktopFabVisibility({ getEnvironment: () => environment });
+      onBeforeMount(() => beforeMountNavigation?.());
+      return () => null;
+    },
+  });
 
   const mountComposable = () => {
-    const Harness = defineComponent({
-      setup() {
-        visibility = useDesktopFabVisibility();
-        return () => null;
-      },
-    });
     wrapper = mount(Harness);
   };
 
@@ -76,7 +80,9 @@ describe('useDesktopFabVisibility', () => {
     vi.clearAllMocks();
     mocks.storageChanged.clear();
     mocks.eventListeners.clear();
+    beforeMountNavigation = null;
     window.history.replaceState({}, '', '/desktop-fab-test');
+    environment = { isTopFrame: true, extensionEnabled: true, showDesktopFab: true };
     mocks.getFresh.mockImplementation(async keys => Object.fromEntries(keys.map(key => [key, false])));
   });
 
@@ -98,14 +104,8 @@ describe('useDesktopFabVisibility', () => {
   });
 
   it('uses the current href when navigation occurs between setup and mount', async () => {
-    const Harness = defineComponent({
-      setup() {
-        visibility = useDesktopFabVisibility();
-        onBeforeMount(() => window.history.replaceState({}, '', '/changed-before-mount'));
-        return () => null;
-      },
-    });
-    wrapper = mount(Harness);
+    beforeMountNavigation = () => window.history.replaceState({}, '', '/changed-before-mount');
+    mountComposable();
     await flushPromises();
 
     expect(mocks.getFresh.mock.calls[0][0]).toEqual([
@@ -171,6 +171,227 @@ describe('useDesktopFabVisibility', () => {
     await flushPromises();
     expect(mocks.getFresh).toHaveBeenCalledTimes(2);
     expect(visibility.isDismissed.value).toBe(false);
+  });
+
+  it.each(['page', 'site'])('reconciles a successful %s dismissal with its durable exclusion', async (scope) => {
+    const [pageKey, siteKey] = currentKeys();
+    const exclusionKey = scope === 'page' ? pageKey : siteKey;
+    mocks.getFresh.mockResolvedValue({ [exclusionKey]: true });
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'excluded' });
+
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: true, status: 'visible' });
+
+    let finishRead;
+    mocks.getFresh.mockReturnValueOnce(new Promise(resolve => { finishRead = resolve; }));
+    visibility.dismiss({ scope });
+    expect(visibility.isDismissed.value).toBe(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'override-hide' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: false, reason: 'exclusion-reconciling' });
+
+    finishRead({ [exclusionKey]: true });
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'excluded' });
+
+    mocks.getFresh.mockResolvedValue({ [pageKey]: false, [siteKey]: false });
+    emitStorageChange(exclusionKey, undefined);
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+  });
+
+  it('does not apply a persistent hide override when no successful dismiss event arrives', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    visibility.setOverride({ expectedUrl: window.location.href, override: 'show' });
+
+    // A failed persistent write emits no dismiss event, so the parent does not call dismiss().
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+    expect(mocks.getFresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pin persistent hide after reconciliation fails and a later read succeeds', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    visibility.setOverride({ expectedUrl: window.location.href, override: 'show' });
+
+    mocks.getFresh.mockRejectedValueOnce(new Error('storage unavailable'));
+    visibility.dismiss({ scope: 'site' });
+    expect(visibility.isDismissed.value).toBe(true);
+    await flushPromises();
+    expect(visibility.isReady.value).toBe(false);
+    expect(visibility.isDismissed.value).toBe(true);
+
+    const [pageKey, siteKey] = currentKeys();
+    mocks.getFresh.mockResolvedValue({ [pageKey]: false, [siteKey]: false });
+    emitStorageChange(siteKey, undefined);
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+  });
+
+  it('does not let a stale persistent-dismiss read affect the accepted next URL', async () => {
+    let finishOldRead;
+    mocks.getFresh
+      .mockImplementationOnce(async keys => Object.fromEntries(keys.map(key => [key, false])))
+      .mockReturnValueOnce(new Promise(resolve => { finishOldRead = resolve; }))
+      .mockImplementation(async keys => Object.fromEntries(keys.map(key => [key, false])));
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    visibility.dismiss({ scope: 'page' });
+    expect(visibility.isDismissed.value).toBe(true);
+
+    const oldPageKey = currentKeys()[0];
+    window.history.pushState({}, '', '/accepted-next-route');
+    emitFeatureChange();
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+
+    finishOldRead({ [oldPageKey]: true });
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+  });
+
+  it('enforces override precedence without writing exclusions or settings', async () => {
+    const [pageKey, siteKey] = currentKeys();
+    mocks.getFresh.mockResolvedValue({ [pageKey]: true, [siteKey]: false });
+    mountComposable();
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'excluded' });
+
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: true, status: 'loading' });
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'hide' }))
+      .toMatchObject({ success: true, status: 'hidden', reason: 'override-hide' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: true, status: 'visible' });
+    visibility.dismiss({ scope: 'temporary' });
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'override-hide' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: true, status: 'visible' });
+    expect(mocks.getFresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects stale/global-disabled override and reports child readiness/fullscreen', async () => {
+    mountComposable();
+    await flushPromises();
+    expect(visibility.setOverride({ expectedUrl: 'https://old.example/', override: 'show' }))
+      .toMatchObject({ success: false, reason: 'stale-url' });
+
+    environment.extensionEnabled = false;
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: false, reason: 'global-disabled' });
+    environment.extensionEnabled = true;
+    expect(visibility.getStatus()).toMatchObject({ status: 'loading', reason: 'fab-settling' });
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+    environment.isFullscreen = true;
+    expect(visibility.getStatus()).toMatchObject({ status: 'unavailable', reason: 'fullscreen' });
+    visibility.setChildPresence(false);
+  });
+
+  it.each([
+    ['mobile UI', { isMobileUI: true }, 'mobile-ui'],
+    ['fullscreen', { isFullscreen: true }, 'fullscreen'],
+    ['restricted frame', { isRestricted: true }, 'restricted-context'],
+    ['non-top frame', { isTopFrame: false }, 'restricted-context'],
+    ['settings loading', { isInitialized: false }, 'settings-loading'],
+    ['extension disabled', { extensionEnabled: false }, 'global-disabled'],
+    ['global FAB disabled', { showDesktopFab: false }, 'global-disabled'],
+  ])('does not accept either override while %s', async (_label, unavailableEnvironment, reason) => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    Object.assign(environment, unavailableEnvironment);
+    expect(visibility.getStatus()).toMatchObject({ status: expect.any(String), reason });
+
+    for (const nextOverride of ['show', 'hide']) {
+      expect(visibility.setOverride({ expectedUrl: window.location.href, override: nextOverride }))
+        .toMatchObject({ success: false, status: 'unavailable', reason });
+    }
+
+    Object.assign(environment, {
+      isMobileUI: false,
+      isFullscreen: false,
+      isRestricted: false,
+      isTopFrame: true,
+      isInitialized: true,
+      extensionEnabled: true,
+      showDesktopFab: true,
+    });
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+  });
+
+  it('rejects overrides while exclusion state is loading without retaining them', async () => {
+    let finishRead;
+    mocks.getFresh.mockReturnValueOnce(new Promise(resolve => { finishRead = resolve; }));
+    mountComposable();
+    for (const nextOverride of ['show', 'hide']) {
+      expect(visibility.setOverride({ expectedUrl: window.location.href, override: nextOverride }))
+        .toMatchObject({ success: false, status: 'unavailable', reason: 'exclusions-loading' });
+    }
+
+    const [pageKey] = currentKeys();
+    finishRead({ [pageKey]: true });
+    await flushPromises();
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'excluded' });
+  });
+
+  it('fails closed after an exclusion refresh read fails, including against a show override', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }).success).toBe(true);
+
+    mocks.getFresh.mockRejectedValueOnce(new Error('storage unavailable'));
+    emitStorageChange(currentKeys()[0], true);
+    await flushPromises();
+    expect(visibility.isReady.value).toBe(false);
+    expect(visibility.isDismissed.value).toBe(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'loading', reason: 'exclusions-loading' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: false, status: 'unavailable', reason: 'exclusions-loading' });
+    expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  it('keeps the same-url exclusion refresh from unmounting an already visible child', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus().status).toBe('visible');
+
+    let finishRefresh;
+    mocks.getFresh.mockReturnValueOnce(new Promise(resolve => { finishRefresh = resolve; }));
+    emitStorageChange(currentKeys()[0], true);
+    expect(visibility.isReady.value).toBe(true);
+    expect(visibility.getStatus().status).toBe('visible');
+
+    finishRefresh({});
+    await flushPromises();
+    expect(visibility.getStatus().status).toBe('visible');
+  });
+
+  it('does not report or mutate visibility for a URL before accepted navigation arrives', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    window.history.pushState({}, '', '/pending-route');
+
+    expect(visibility.getStatus()).toMatchObject({ status: 'loading', reason: 'navigation-pending' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'show' }))
+      .toMatchObject({ success: false, reason: 'stale-url' });
+
+    emitFeatureChange();
+    await flushPromises();
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
   });
 
   it('cleans up listeners and ignores late reads after unmount', async () => {

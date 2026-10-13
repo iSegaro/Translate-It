@@ -626,6 +626,22 @@ describe('DesktopFabMenu dismissal cleanup and drag persistence', () => {
     expect(mocks.ttsStop).toHaveBeenCalledWith({ stopOnlyIfOwner: true });
   });
 
+  it('reports actual root presence across readiness, fullscreen and unmount', async () => {
+    wrapper = mount(DesktopFabMenu);
+    wrapper.vm.isReady = true;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('presence')?.at(-1)).toEqual([true]);
+    expect(wrapper.find('.desktop-fab-container').exists()).toBe(true);
+
+    mocks.mobileStore.isFullscreen = true;
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('presence')?.at(-1)).toEqual([false]);
+    expect(wrapper.find('.desktop-fab-container').exists()).toBe(false);
+
+    wrapper.unmount();
+    expect(wrapper.emitted('presence')?.at(-1)).toEqual([false]);
+  });
+
   it('persists DESKTOP_FAB_POSITION after a drag without touching any setting', async () => {
     wrapper = mount(DesktopFabMenu, { attachTo: document.body });
     wrapper.vm.isReady = true;

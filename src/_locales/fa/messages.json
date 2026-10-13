@@ -404,6 +404,33 @@
   "popup_exclude_disable_label": {
     "message": "غیرفعال‌سازی در این سایت"
   },
+  "popup_fab_show_label": {
+    "message": "نمایش دکمه دسترسی سریع (FAB) برای همین حالا"
+  },
+  "popup_fab_hide_label": {
+    "message": "پنهان کردن دکمه دسترسی سریع (FAB) برای همین حالا"
+  },
+  "popup_fab_unknown_label": {
+    "message": "دکمه دسترسی سریع (FAB)"
+  },
+  "popup_fab_loading_reason": {
+    "message": "در حال خواندن وضعیت دکمه دسترسی سریع…"
+  },
+  "popup_fab_unavailable_reason": {
+    "message": "وضعیت دکمه دسترسی سریع در این صفحه در دسترس نیست."
+  },
+  "popup_fab_disabled_reason": {
+    "message": "وقتی افزونه غیرفعال است، دکمه دسترسی سریع در دسترس نیست."
+  },
+  "popup_fab_reason_disabled_by_setting": {
+    "message": "تنظیم دکمه دسترسی سریع دسکتاپ، این دکمه را اینجا پنهان می‌کند."
+  },
+  "popup_fab_reason_fullscreen": {
+    "message": "وقتی این صفحه تمام‌صفحه است، دکمه دسترسی سریع پنهان می‌شود."
+  },
+  "popup_fab_reason_ui_absent": {
+    "message": "دکمه دسترسی سریع در این صفحه در دسترس نیست."
+  },
   "page_translation_auto_translate_enable_label": {
     "message": "فعال‌سازی ترجمه خودکار صفحه"
   },

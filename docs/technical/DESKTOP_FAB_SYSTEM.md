@@ -23,6 +23,14 @@ When selection translation is set to **ON_FAB_CLICK**, the menu warns (in Englis
 
 Persisted entries use feature-owned, per-entry `desktop-fab-exclusion:v1:` keys in `StorageCore`, allowing cross-tab changes without a shared-list write race. They are not settings-schema entries and are not included in settings export/import. Settings reset clears them through the storage clear. Manage exclusions in **Options → Activation → Desktop FAB**: the list supports removal and stays available when the global FAB toggle is off. It refreshes on owned storage changes; overlapping reads are guarded so an older result cannot replace a newer one. The content-side gate also discards stale exclusion reads. Exclusions are independent of automatic-translation rules: no auto-translation rules are reused, and this feature does not monkeypatch browser history.
 
+## Popup visibility override
+
+The desktop Popup **More** menu offers one state-dependent action: **Hide FAB for Now** or **Show FAB for Now**. Status is queried whenever More opens; the content script is authoritative. The override is tab-local, in memory, and has three states: `none`, `hide`, and `show`. `hide` suppresses the FAB; `show` takes precedence over page/site exclusions only. Neither changes exclusions, selection mode, or global settings.
+
+Show does not bypass extension/FAB disablement, mobile UI, fullscreen, restricted or non-top frames, settings/exclusion readiness, pending navigation, or FAB mount readiness. ContentApp registers the status/override controller in the top frame and receives the FAB's mounted-presence event; without that UI/controller, status is unavailable.
+
+An accepted navigation with a different full URL resets the override to `none` and refreshes exclusions. A same-URL history event does not reset it. The Popup pins reads and writes to the active tab ID and URL, sends them to frame 0 with the expected URL, re-queries before writing, and reads status again after a successful change rather than flipping optimistically. Unavailable or loading states disable the action; the Popup stays open and settings remain untouched. The same content-script behavior could be used by a Sidepanel, but no Sidepanel visibility control exists now.
+
 ---
 
 ## File Structure
