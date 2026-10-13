@@ -1100,7 +1100,7 @@ const removeFabExclusion = async (entry) => {
       const removeButtons = container.querySelectorAll('.fab-exclusion-remove-btn')
       const target = removeButtons[removedIndex] || removeButtons[removeButtons.length - 1]
         || container.querySelector('.drawer-footer button')
-      target?.focus()
+      target?.focus({ preventScroll: true })
     })
   } catch (error) {
     logger.error('Failed to remove Desktop FAB exclusion:', error)
@@ -1124,7 +1124,7 @@ const openFabExclusionsDrawer = () => {
   isRulesDrawerOpen.value = false // mutual exclusion
   isFabExclusionsDrawerOpen.value = true
   nextTick(() => {
-    fabExclusionsDrawerRef.value?.querySelector('.drawer-close-btn')?.focus()
+    fabExclusionsDrawerRef.value?.querySelector('.drawer-close-btn')?.focus({ preventScroll: true })
   })
 }
 
@@ -1132,7 +1132,7 @@ const closeFabExclusionsDrawer = () => {
   if (!isFabExclusionsDrawerOpen.value) return
   isFabExclusionsDrawerOpen.value = false
   nextTick(() => {
-    document.getElementById('DESKTOP_FAB_MANAGE_LIST_BTN')?.focus()
+    document.getElementById('DESKTOP_FAB_MANAGE_LIST_BTN')?.focus({ preventScroll: true })
   })
 }
 
@@ -1153,11 +1153,11 @@ const handleFabDrawerKeydown = (e) => {
   if (e.shiftKey) {
     if (active === first || isOutside) {
       e.preventDefault()
-      last.focus()
+      last.focus({ preventScroll: true })
     }
   } else if (active === last || isOutside) {
     e.preventDefault()
-    first.focus()
+    first.focus({ preventScroll: true })
   }
 }
 

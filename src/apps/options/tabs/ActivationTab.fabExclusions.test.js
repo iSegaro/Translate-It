@@ -72,6 +72,7 @@ vi.mock('@/features/desktop-fab/desktopFabExclusions.js', () => ({
 
 describe('ActivationTab Desktop FAB exclusions', () => {
   let wrapper;
+  let focusSpy;
 
   const mountTab = () => shallowMount(ActivationTab, {
     attachTo: document.body,
@@ -116,9 +117,13 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     mocks.listExclusions.mockImplementation(async () => mocks.entries);
     mocks.removeExclusion.mockReset();
     mocks.removeExclusion.mockResolvedValue(undefined);
+    // Spy through so focus() still works, but its options are observable.
+    focusSpy = vi.spyOn(HTMLElement.prototype, 'focus');
   });
 
   afterEach(() => {
+    focusSpy?.mockRestore();
+    focusSpy = null;
     wrapper?.unmount();
     wrapper = null;
   });
@@ -162,6 +167,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     expect(drawer.attributes('aria-modal')).toBe('true');
     expect(drawer.attributes('aria-label')).toBe('fab_exclusions_group_label');
     expect(document.activeElement).toBe(drawer.get('.drawer-close-btn').element);
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it.each`
@@ -192,6 +198,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
 
     expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(false);
     expect(document.activeElement).toBe(wrapper.get('#DESKTOP_FAB_MANAGE_LIST_BTN').element);
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it('traps Tab and Shift+Tab at the drawer edges', async () => {
@@ -209,12 +216,14 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
     await nextTick();
     expect(document.activeElement).toBe(closeBtn);
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
 
     // Shift+Tab from the first wraps to the last (the Done button).
     closeBtn.focus();
     drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
     await nextTick();
     expect(document.activeElement).toBe(doneBtn);
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it('traps focus between the close button and Done when the list is empty', async () => {
@@ -233,12 +242,14 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
     await nextTick();
     expect(document.activeElement).toBe(closeBtn);
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
 
     // Shift+Tab from the first wraps to the last.
     closeBtn.focus();
     drawer.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
     await nextTick();
     expect(document.activeElement).toBe(doneBtn);
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it('restores focus to a remaining remove button after a successful removal', async () => {
@@ -258,6 +269,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     expect(document.activeElement).toBe(
       entriesOf().at(0).get('.fab-exclusion-remove-btn').element,
     );
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it('moves focus to the footer Done button when the last entry is removed', async () => {
@@ -279,6 +291,7 @@ describe('ActivationTab Desktop FAB exclusions', () => {
       wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element,
     );
     expect(document.activeElement.closest('#DESKTOP_FAB_EXCLUSIONS_DRAWER')).toBeTruthy();
+    expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
   it('restores focus to the replacement remove button after the deferred write resolves', async () => {
