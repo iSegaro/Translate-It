@@ -180,7 +180,7 @@ Translate a word, sentence, or container directly while browsing, without openin
 
 We follow a **Feature-Based Architecture** using Vue 3, Pinia, and Vite.
 - **Architecture:** Explore [ARCHITECTURE.md](./docs/technical/ARCHITECTURE.md) to understand the modular system.
-- **Contributing:** Read [CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md) for local setup instructions.
+- **Contributing:** Read [CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md) for contribution guidelines, coordination, and local development setup.
 - **Localization:** Help us reach more people by following the [Localization Guide](./docs/guides/LOCALIZATION_GUIDE.md).
 
 ---

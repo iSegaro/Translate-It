@@ -180,7 +180,7 @@ Gemini または OpenAI でアクティブなタブの音声をリアルタイ�
 
 Vue 3、Pinia、Vite を使った **Feature-Based Architecture** を採用しています。
 - **アーキテクチャ:** モジュール構成については [ARCHITECTURE.md](./technical/ARCHITECTURE.md) をご覧ください。
-- **貢献:** 開発環境の準備については [CONTRIBUTING.md](./guides/CONTRIBUTING.md) をご覧ください。
+- **貢献:** 貢献のガイドライン、調整、開発環境の準備については [CONTRIBUTING.md](./guides/CONTRIBUTING.md) をご覧ください。
 - **ローカライズ:** [ローカライズガイド](./guides/LOCALIZATION_GUIDE.md)に沿って、より多くの人に届けるための翻訳にご協力ください。
 
 ---
