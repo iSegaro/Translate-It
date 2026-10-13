@@ -1098,10 +1098,10 @@
     "message": "今回は閉じる"
   },
   "desktop_fab_hide_this_page": {
-    "message": "このページでは常に隠す"
+    "message": "このページでは非表示"
   },
   "desktop_fab_hide_this_site": {
-    "message": "このサイトでは常に隠す"
+    "message": "このサイトでは非表示"
   },
   "desktop_fab_hide_onfabclick_warning": {
     "message": "ボタンを隠している間、デスクトップのボタンから選択テキストの翻訳を開始できません。"

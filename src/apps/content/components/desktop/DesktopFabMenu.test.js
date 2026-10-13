@@ -3,6 +3,9 @@ import { mount } from '@vue/test-utils';
 import { reactive, ref } from 'vue';
 import DesktopFabMenu from './DesktopFabMenu.vue';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
+import enMessages from '@/_locales/en/messages.json';
+import faMessages from '@/_locales/fa/messages.json';
+import jaMessages from '@/_locales/ja/messages.json';
 
 const mocks = vi.hoisted(() => {
   // The tracker is a no-op for page listeners, but the drag engine needs its
@@ -923,6 +926,54 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     expect(wrapper.vm.isMenuOpen).toBe(false);
   });
 
+  it('renders actions as adjacent siblings so separators track visibility', async () => {
+    const openWithScopes = async (scopes) => {
+      mocks.supportedHideScopes = new Set(scopes);
+      await openMenu();
+      await openPopover();
+      return wrapper.findAll('#fab-hide-popover button');
+    };
+
+    // Only Close for Now: a single action, no adjacent pair for a separator.
+    let actions = await openWithScopes([]);
+    expect(actions).toHaveLength(1);
+    expect(actions.at(0).text()).toBe('desktop_fab_hide_close_for_now');
+    wrapper.unmount();
+    wrapper = null;
+
+    // Page + Close: the two actions are adjacent siblings.
+    actions = await openWithScopes(['page']);
+    expect(actions).toHaveLength(2);
+    expect(actions.at(0).element.nextElementSibling).toBe(actions.at(1).element);
+    wrapper.unmount();
+    wrapper = null;
+
+    // All three: chained adjacent siblings in order.
+    actions = await openWithScopes(['page', 'site']);
+    expect(actions).toHaveLength(3);
+    expect(actions.at(0).element.nextElementSibling).toBe(actions.at(1).element);
+    expect(actions.at(1).element.nextElementSibling).toBe(actions.at(2).element);
+    expect(actions.at(-1).text()).toBe('desktop_fab_hide_close_for_now');
+  });
+
+  it('lets long hide labels wrap instead of forcing nowrap', async () => {
+    mocks.translations.desktop_fab_hide_close_for_now = 'Close for now with a deliberately long localized label that must wrap';
+    await openMenu();
+    await openPopover();
+
+    // DOM side of wrapping: no inline or class nowrap anywhere on the actions,
+    // and the full label text renders (not truncated). The wrap itself is
+    // covered by the SCSS contract (overflow-wrap: anywhere, no nowrap).
+    const actions = wrapper.findAll('#fab-hide-popover button');
+    expect(actions.length).toBeGreaterThan(0);
+    actions.forEach((action) => {
+      expect(action.attributes('style') ?? '').not.toMatch(/white-space/);
+      expect(action.classes().join(' ')).not.toMatch(/nowrap/);
+    });
+    const closeForNow = actions.find((action) => action.text().startsWith('Close for now'));
+    expect(closeForNow.text()).toContain('deliberately long');
+  });
+
   it('moves focus into the popover on open and restores it to the eye on Escape', async () => {
     await openMenu();
     await openPopover();
@@ -1112,6 +1163,26 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     wrapper.unmount();
     expect(wrapper.emitted('presence')?.at(-1)).toEqual([false]);
     wrapper = null;
+  });
+});
+
+describe('DesktopFabMenu hide action localization', () => {
+  const messageOf = (messages, key) => messages[key]?.message;
+
+  it.each([
+    ['en', enMessages],
+    ['fa', faMessages],
+    ['ja', jaMessages],
+  ])('provides non-empty hide scope labels in %s', (_locale, messages) => {
+    expect(messageOf(messages, 'desktop_fab_hide_this_site')).toMatch(/\S/);
+    expect(messageOf(messages, 'desktop_fab_hide_this_page')).toMatch(/\S/);
+    expect(messageOf(messages, 'desktop_fab_hide_close_for_now')).toMatch(/\S/);
+  });
+
+  it('keeps the English hide scope labels unchanged', () => {
+    expect(messageOf(enMessages, 'desktop_fab_hide_this_site')).toBe('Hide on This Site');
+    expect(messageOf(enMessages, 'desktop_fab_hide_this_page')).toBe('Hide on This Page');
+    expect(messageOf(enMessages, 'desktop_fab_hide_close_for_now')).toBe('Close for Now');
   });
 });
 

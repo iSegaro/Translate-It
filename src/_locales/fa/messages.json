@@ -1098,10 +1098,10 @@
     "message": "بستن برای این بار"
   },
   "desktop_fab_hide_this_page": {
-    "message": "همیشه در این صفحه پنهان شود"
+    "message": "در این صفحه پنهان شود"
   },
   "desktop_fab_hide_this_site": {
-    "message": "همیشه در این سایت پنهان شود"
+    "message": "در این سایت پنهان شود"
   },
   "desktop_fab_hide_onfabclick_warning": {
     "message": "تا زمانی که دکمه پنهان است، نمی‌توانید ترجمه متن انتخاب‌شده را از دکمه دسکتاپ شروع کنید."

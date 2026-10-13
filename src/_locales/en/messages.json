@@ -1098,10 +1098,10 @@
     "message": "Close for Now"
   },
   "desktop_fab_hide_this_page": {
-    "message": "Always Hide on This Page"
+    "message": "Hide on This Page"
   },
   "desktop_fab_hide_this_site": {
-    "message": "Always Hide on This Site"
+    "message": "Hide on This Site"
   },
   "desktop_fab_hide_onfabclick_warning": {
     "message": "While hidden, you can’t start selection translation from the Desktop FAB."

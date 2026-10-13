@@ -194,9 +194,17 @@ describe('DesktopFabMenu SCSS layout contract', () => {
     expect(declaration(popover, 'overflow-x')).toBe('hidden !important');
     expect(declaration(popover, 'overscroll-behavior')).toBe('contain !important');
 
+    // Hairline separators between rendered actions only: the adjacent
+    // selector skips unrendered scopes, and border-box keeps the 1px
+    // inside the compact rows.
+    const separator = block(/\.fab-hide-popover\s*\{[\s\S]*?button\s*\+\s*button\s*\{/);
+    expect(declaration(separator, 'border-top')).toBe('1px solid rgba(0, 0, 0, 0.06) !important');
+    expect(source).not.toMatch(/white-space\s*:\s*nowrap/);
+
     // Long localized labels wrap inside the panel instead of widening it.
     const action = block(/\.fab-hide-popover\s*\{[\s\S]*?button\s*\{/);
     expect(declaration(action, 'display')).toBe('flex !important');
+    expect(declaration(action, 'box-sizing')).toBe('border-box !important');
     expect(declaration(action, 'min-width')).toBe('0 !important');
     expect(declaration(action, 'overflow-wrap')).toBe('anywhere !important');
     expect(declaration(action, 'text-align')).toBe('start !important');
@@ -231,6 +239,8 @@ describe('DesktopFabMenu SCSS layout contract', () => {
       .toBe('rgba(40, 40, 40, 0.95) !important');
     expect(declaration(darkPopover, 'color')).toBe('#f8fafc !important');
     expect(darkPopover).toMatch(/outline-color:\s*#60a5fa\s*!important/);
+    const darkSeparator = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-popover\s*\{[\s\S]*?button\s*\+\s*button\s*\{/);
+    expect(declaration(darkSeparator, 'border-top-color')).toBe('rgba(255, 255, 255, 0.1) !important');
     const darkWarning = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-warning\s*\{/);
     expect(declaration(darkWarning, 'color')).toBe('rgba(255, 255, 255, 0.75) !important');
     const darkError = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-error\s*\{/);

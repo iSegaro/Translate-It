@@ -18,8 +18,8 @@ A compact top toolbar above the primary items holds a single eye-hide button. It
 The popover is anchored to the eye button, flips for viewport/dock-side/RTL, and leaves menu dimensions unchanged.
 
 - **Close for Now** hides the FAB in the current content-app memory only, until reload or a changed-URL SPA navigation. A same-URL history event does not reset it.
-- **Always Hide on This Page** persists a page exclusion. Page identity ignores query and hash, treats HTTP and HTTPS as equivalent, removes one trailing slash (except at the root), and preserves the host including its port. `file:` pages are supported.
-- **Always Hide on This Site** persists an exact HTTP(S) hostname exclusion; it does not cover subdomains. Site exclusions are unsupported for `file:` URLs.
+- **Hide on This Page** persists a page exclusion. Page identity ignores query and hash, treats HTTP and HTTPS as equivalent, removes one trailing slash (except at the root), and preserves the host including its port. `file:` pages are supported.
+- **Hide on This Site** persists an exact HTTP(S) hostname exclusion; it does not cover subdomains. Site exclusions are unsupported for `file:` URLs.
 
 When selection translation is set to **ON_FAB_CLICK**, the menu warns (in English, Persian, and Japanese) that hiding the FAB prevents starting selection translation from it. Hide actions do not modify selection mode or the global FAB setting. A failed persistent write reports an error and keeps the menu open; successful writes dismiss the FAB.
 

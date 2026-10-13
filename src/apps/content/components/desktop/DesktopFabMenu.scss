@@ -515,11 +515,19 @@
       border-radius: 9px !important;
       min-width: 0 !important;
       overflow-wrap: anywhere !important;
+      box-sizing: border-box !important;
 
       &:focus-visible {
         outline: 2px solid #1a5fb4 !important;
         outline-offset: 1px !important;
       }
+    }
+
+    /* Hairline separators between rendered actions only: the adjacent
+       selector skips unrendered scopes, so a lone Close for Now shows no
+       separator. border-box above keeps the 1px inside the compact rows. */
+    button + button {
+      border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
     }
 
     .fab-hide-warning {
@@ -652,6 +660,10 @@
         }
 
         &:focus-visible { outline-color: #60a5fa !important; }
+      }
+
+      button + button {
+        border-top-color: rgba(255, 255, 255, 0.1) !important;
       }
 
       .fab-hide-warning {

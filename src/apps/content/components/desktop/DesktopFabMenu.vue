@@ -228,14 +228,14 @@
         type="button"
         @click.stop="handleHideSelection('site')"
       >
-        {{ t('desktop_fab_hide_this_site', 'Always Hide on This Site') }}
+        {{ t('desktop_fab_hide_this_site', 'Hide on This Site') }}
       </button>
       <button
         v-if="pageHideScopeSupported"
         type="button"
         @click.stop="handleHideSelection('page')"
       >
-        {{ t('desktop_fab_hide_this_page', 'Always Hide on This Page') }}
+        {{ t('desktop_fab_hide_this_page', 'Hide on This Page') }}
       </button>
       <button
         ref="firstHideAction"
