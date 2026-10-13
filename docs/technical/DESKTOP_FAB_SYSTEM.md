@@ -13,7 +13,9 @@ The **Desktop FAB (Floating Action Button)** is a persistent, smart interface el
 
 The visibility gate belongs to `ContentApp.vue`, through `useDesktopFabVisibility`; it is separate from the global extension setting and from the other content-app UI. The FAB is rendered only after exclusion state is ready and no applicable dismissal is active. This gate does not change other UI surfaces or modes.
 
-The last menu entry, **Hide FAB**, opens three hide scopes:
+A compact top toolbar above the primary items holds a single eye-hide button. It opens a detached floating popover (a sibling/overlay of the menu, not in layout flow) with three hide scopes:
+
+The popover is anchored to the eye button, flips for viewport/dock-side/RTL, and leaves menu dimensions unchanged.
 
 - **Close for Now** hides the FAB in the current content-app memory only, until reload or a changed-URL SPA navigation. A same-URL history event does not reset it.
 - **Always Hide on This Page** persists a page exclusion. Page identity ignores query and hash, treats HTTP and HTTPS as equivalent, removes one trailing slash (except at the root), and preserves the host including its port. `file:` pages are supported.

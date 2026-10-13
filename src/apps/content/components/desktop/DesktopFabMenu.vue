@@ -42,7 +42,29 @@
       <div
         v-if="isMenuOpen"
         class="desktop-fab-menu"
+        @click="closeHidePopover"
       >
+        <!-- Compact toolbar: trailing-edge Hide FAB eye only, visually
+          independent of the action rows below. -->
+        <div class="fab-menu-toolbar">
+          <button
+            ref="hideTrigger"
+            type="button"
+            class="fab-toolbar-hide-btn"
+            :title="t('desktop_fab_hide_options_toggle_label')"
+            :aria-label="t('desktop_fab_hide_options_toggle_label')"
+            :aria-expanded="hideMenuOpen"
+            aria-controls="fab-hide-popover"
+            @click.stop="toggleHideDisclosure"
+            @keydown.escape.stop="onHideOptionsKeydown"
+          >
+            <MaskIcon
+              class="fab-hide-menu-icon"
+              :src="IconEyeHide"
+              :size="'var(--menu-icon-size)'"
+            />
+          </button>
+        </div>
         <template
           v-for="(item, index) in menuItems"
           :key="item.id"
@@ -53,65 +75,17 @@
             class="fab-menu-divider"
           />
 
-          <div 
+          <div
             class="fab-menu-item"
-            :class="{ 
+            :class="{
               'is-disabled': item.disabled,
-              'is-hovered': hoveredItemIndex === index,
-              'is-disclosure': item.disclosure === 'hide'
+              'is-hovered': hoveredItemIndex === index
             }"
             @click.stop="item.disabled ? null : handleMenuItemClick(item)"
             @mouseenter="hoveredItemIndex = index"
             @mouseleave="hoveredItemIndex = -1"
           >
-            <!-- Disclosure rows put icon, label and chevron inside one real
-                 button so the whole row is keyboard-operable; the options
-                 panel stays a sibling because buttons cannot nest. -->
-            <button
-              v-if="item.disclosure === 'hide'"
-              ref="hideTrigger"
-              type="button"
-              class="fab-hide-row-trigger"
-              :title="t('desktop_fab_hide_options_toggle_label', 'Choose how to hide the button')"
-              :aria-expanded="hideMenuOpen"
-              aria-controls="fab-hide-options"
-              @click.stop="toggleHideDisclosure"
-              @keydown.escape.stop="onHideOptionsKeydown"
-            >
-              <div class="menu-icon-wrapper">
-                <MaskIcon
-                  class="fab-hide-menu-icon"
-                  :src="item.icon"
-                  :size="'var(--menu-icon-size)'"
-                />
-              </div>
-              <span class="fab-menu-item-text">
-                {{ item.label }}
-              </span>
-              <span
-                class="fab-hide-disclosure-btn"
-                :class="{ 'is-open': hideMenuOpen }"
-                aria-hidden="true"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  width="15"
-                  height="15"
-                >
-                  <path
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linejoin="round"
-                    stroke-linecap="round"
-                    d="M6 9l6 6 6-6"
-                  />
-                </svg>
-              </span>
-            </button>
-
-            <template v-else>
-              <div class="menu-icon-wrapper">
+            <div class="menu-icon-wrapper">
                 <!-- Circle Progress for Page Translation -->
                 <svg
                   v-if="item.showProgress"
@@ -149,7 +123,6 @@
               <span class="fab-menu-item-text">
                 {{ item.label }}
               </span>
-            </template>
 
             <!-- Secondary Action (Auto-Translate Star Toggle) -->
             <button
@@ -217,52 +190,61 @@
               </template>
             </div>
 
-            <!-- Hide FAB options (always the last menu entry) -->
-            <div
-              v-if="item.disclosure === 'hide' && hideMenuOpen"
-              id="fab-hide-options"
-              class="fab-hide-options"
-              role="group"
-              :aria-label="t('desktop_fab_hide_options_label', 'Hide button options')"
-              @click.stop
-              @keydown.escape.stop="onHideOptionsKeydown"
-            >
-              <div
-                v-if="showHideFabWarning"
-                class="fab-hide-warning"
-              >
-                {{ t('desktop_fab_hide_onfabclick_warning', 'While hidden, you can’t start selection translation from the Desktop FAB.') }}
-              </div>
-              <button
-                ref="firstHideAction"
-                @click.stop="handleHideSelection('temporary')"
-              >
-                {{ t('desktop_fab_hide_close_for_now', 'Close for Now') }}
-              </button>
-              <button
-                v-if="pageHideScopeSupported"
-                @click.stop="handleHideSelection('page')"
-              >
-                {{ t('desktop_fab_hide_this_page', 'Always Hide on This Page') }}
-              </button>
-              <button
-                v-if="siteHideScopeSupported"
-                @click.stop="handleHideSelection('site')"
-              >
-                {{ t('desktop_fab_hide_this_site', 'Always Hide on This Site') }}
-              </button>
-              <div
-                v-if="hideError"
-                class="fab-hide-error"
-                role="alert"
-              >
-                {{ hideError }}
-              </div>
-            </div>
           </div>
         </template>
       </div>
     </Transition>
+
+    <!-- Detached Hide FAB popover: a SIBLING of the menu, never a descendant —
+      the menu is bottom-anchored with overflow hidden, so in-flow content
+      would grow and shift it. Positioned against the fixed container by
+      positionHidePopover (inline left/top). -->
+    <div
+      v-if="isMenuOpen && hideMenuOpen"
+      id="fab-hide-popover"
+      ref="hidePopover"
+      class="fab-hide-popover"
+      role="group"
+      :aria-label="t('desktop_fab_hide_options_label')"
+      :style="hidePopoverStyle"
+      @click.stop
+      @keydown.escape.stop="onHideOptionsKeydown"
+    >
+      <div
+        v-if="showHideFabWarning"
+        class="fab-hide-warning"
+      >
+        {{ t('desktop_fab_hide_onfabclick_warning', 'While hidden, you can’t start selection translation from the Desktop FAB.') }}
+      </div>
+      <button
+        ref="firstHideAction"
+        type="button"
+        @click.stop="handleHideSelection('temporary')"
+      >
+        {{ t('desktop_fab_hide_close_for_now', 'Close for Now') }}
+      </button>
+      <button
+        v-if="pageHideScopeSupported"
+        type="button"
+        @click.stop="handleHideSelection('page')"
+      >
+        {{ t('desktop_fab_hide_this_page', 'Always Hide on This Page') }}
+      </button>
+      <button
+        v-if="siteHideScopeSupported"
+        type="button"
+        @click.stop="handleHideSelection('site')"
+      >
+        {{ t('desktop_fab_hide_this_site', 'Always Hide on This Site') }}
+      </button>
+      <div
+        v-if="hideError"
+        class="fab-hide-error"
+        role="alert"
+      >
+        {{ hideError }}
+      </div>
+    </div>
 
     <!-- Main Button -->
     <div
@@ -667,6 +649,8 @@ const onScopeGroupKeydown = () => {
 const hideMenuOpen = ref(false);
 const hideTrigger = ref(null);
 const firstHideAction = ref(null);
+const hidePopover = ref(null);
+const hidePopoverStyle = ref({});
 const hideError = ref('');
 
 watch(isMenuOpen, (open) => {
@@ -691,10 +675,99 @@ const toggleHideDisclosure = async () => {
   hideMenuOpen.value = !hideMenuOpen.value;
   hideError.value = '';
   if (hideMenuOpen.value) {
-    await nextTick();
+    await positionHidePopover();
     focusRefTarget(firstHideAction);
   }
 };
+
+const closeHidePopover = () => {
+  if (!hideMenuOpen.value) return;
+  hideMenuOpen.value = false;
+  hideError.value = '';
+};
+
+/**
+ * Detached popover positioning, local to this component (one anchor, one
+ * panel — no shared util). getBoundingClientRect is viewport-relative so the
+ * Shadow DOM needs no special handling; offsets are computed against the
+ * fixed container, the popover's offset parent. Preferred placement hugs the
+ * toolbar button's trailing edge and sits above it (outward, away from the
+ * FAB below); horizontal flip + vertical flip + 8px clamp keep it inside the
+ * viewport for either dock side and both directions.
+ */
+const positionHidePopover = async () => {
+  await nextTick();
+  const anchor = Array.isArray(hideTrigger.value) ? hideTrigger.value[0] : hideTrigger.value;
+  const pop = Array.isArray(hidePopover.value) ? hidePopover.value[0] : hidePopover.value;
+  const container = fabContainerRef.value;
+  if (!anchor || !pop || !container || !hideMenuOpen.value || !isMenuOpen.value) return;
+  const MARGIN = 8;
+  const GAP = 6;
+  const anchorRect = anchor.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  const popWidth = pop.offsetWidth || pop.getBoundingClientRect().width;
+  const popHeight = pop.offsetHeight || pop.getBoundingClientRect().height;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const direction = (container && typeof getComputedStyle !== 'undefined'
+    ? getComputedStyle(container).direction
+    : document.dir) || 'ltr';
+  // Dock-aware trailing edge: the right dock hugs the right (edge) side, the
+  // left dock hugs the left; mirrored in RTL.
+  const hugRight = (side.value === 'right') !== (direction === 'rtl');
+
+  const anchorLeft = anchorRect.left - containerRect.left;
+  const anchorTop = anchorRect.top - containerRect.top;
+  let left = hugRight ? anchorLeft + anchorRect.width - popWidth : anchorLeft;
+  const viewportLeft = containerRect.left + left;
+  if (viewportLeft < MARGIN || viewportLeft + popWidth > vw - MARGIN) {
+    const flipped = hugRight ? anchorLeft : anchorLeft + anchorRect.width - popWidth;
+    const flippedViewportLeft = containerRect.left + flipped;
+    if (flippedViewportLeft >= MARGIN && flippedViewportLeft + popWidth <= vw - MARGIN) {
+      left = flipped;
+    } else {
+      left = Math.min(
+        Math.max(MARGIN - containerRect.left, left),
+        vw - MARGIN - popWidth - containerRect.left
+      );
+    }
+  }
+
+  let top = anchorTop - popHeight - GAP;
+  if (containerRect.top + top < MARGIN) {
+    const below = anchorTop + anchorRect.height + GAP;
+    if (containerRect.top + below + popHeight <= vh - MARGIN) {
+      top = below;
+    } else {
+      top = Math.max(MARGIN - containerRect.top, vh - MARGIN - popHeight - containerRect.top);
+    }
+  }
+  if (containerRect.top + top + popHeight > vh - MARGIN) {
+    top = Math.max(MARGIN - containerRect.top, vh - MARGIN - popHeight - containerRect.top);
+  }
+
+  hidePopoverStyle.value = { left: `${Math.round(left)}px`, top: `${Math.round(top)}px` };
+};
+
+// Re-anchor the detached popover when its content changes while open — the
+// warning, the error feedback, the supported scopes and the localized labels
+// all change its size without moving the toolbar anchor, so the stored
+// placement can overflow the viewport until something repositions it.
+const hidePopoverTextSignature = computed(() => [
+  t('desktop_fab_hide_close_for_now'),
+  t('desktop_fab_hide_this_page'),
+  t('desktop_fab_hide_this_site'),
+  t('desktop_fab_hide_options_label'),
+  t('desktop_fab_hide_onfabclick_warning'),
+].join('|'));
+
+watch(
+  [showHideFabWarning, hideError, pageHideScopeSupported, siteHideScopeSupported, hidePopoverTextSignature],
+  () => {
+    if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
+  },
+  { flush: 'post' },
+);
 
 const onHideOptionsKeydown = () => {
   if (!hideMenuOpen.value) return;
@@ -870,16 +943,6 @@ const menuItems = computed(() => {
     });
   }
 
-  // Hide FAB — always the last entry, separated by a divider from the actions above
-  items.push({
-    id: 'hide_fab',
-    label: t('desktop_fab_hide_fab_label', 'Hide FAB'),
-    icon: IconEyeHide,
-    disclosure: 'hide',
-    closeMenu: false,
-    action: () => toggleHideDisclosure()
-  });
-
   return items;
 });
 
@@ -931,6 +994,22 @@ const checkBounds = () => {
   const maxY = window.innerHeight - 80;
   verticalPos.value = Math.max(10, Math.min(userPreferredY.value, maxY));
 };
+
+// Re-anchor the detached hide popover when the dock side flips mid-session.
+watch(side, () => {
+  if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
+});
+
+// The menu is bottom-anchored and the toolbar is its top child, so main-menu
+// layout changes move the toolbar anchor under an open popover: the scope
+// disclosure expanding/collapsing, or rows being added/removed.
+watch(
+  [scopeMenuOpen, menuItems],
+  () => {
+    if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
+  },
+  { flush: 'post' },
+);
 
 const containerStyle = computed(() => {
   let opacityValue = ANIMATION_CONFIG.OPACITY_FULL;
@@ -1019,6 +1098,7 @@ const toggleMenu = () => {
 };
 const handleMenuItemClick = async (item) => {
   logger.info('Desktop FAB menu item clicked', { id: item.id });
+  closeHidePopover();
   if (item.closeMenu) isMenuOpen.value = false;
   if (typeof item.action === 'function') await item.action();
 };
@@ -1201,6 +1281,14 @@ onMounted(async () => {
 
   tracker.addEventListener(window, 'resize', updateViewport);
   tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
+
+  // Keep the detached hide popover anchored while it is open; the tracker
+  // owns cleanup on unmount, the guard covers menu close.
+  const repositionHidePopover = () => {
+    if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
+  };
+  tracker.addEventListener(window, 'resize', repositionHidePopover);
+  tracker.addEventListener(window, 'scroll', repositionHidePopover, { passive: true });
   
   // Settle position before showing to prevent jumps
   setTimeout(() => {

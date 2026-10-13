@@ -137,55 +137,118 @@ describe('DesktopFabMenu SCSS layout contract', () => {
       || /var\(--menu-(?:label-)?indent/.test(linkMaxWidth)).toBe(true);
   });
 
-  it('contains the hide options panel in the label column and dims the row divider', () => {
-    const hidePanel = block(/\.fab-hide-options\s*\{/);
-    expect(declaration(hidePanel, 'flex')).toBe('0 0 100% !important');
-    expect(declaration(hidePanel, 'width')).toBe('100% !important');
-    expect(declaration(hidePanel, 'contain')).toBe('inline-size !important');
-    // The disclosure row's 9px side padding moves onto the panel so the
-    // options keep the same indent as the auto-translate scope buttons.
-    expect(declaration(hidePanel, 'padding-inline')).toBe('9px !important');
+  it('renders the hide trigger as a compact trailing-edge toolbar strip', () => {
+    const toolbar = block(/\.fab-menu-toolbar\s*\{/);
+    expect(declaration(toolbar, 'display')).toBe('flex !important');
+    expect(declaration(toolbar, 'justify-content')).toBe('flex-end !important');
+    expect(declaration(toolbar, 'align-items')).toBe('center !important');
+    expect(declaration(toolbar, 'min-height')).toBe('30px !important');
+    expect(declaration(toolbar, 'padding')).toBe('2px 4px !important');
+    expect(declaration(toolbar, 'border-bottom')).toMatch(/1px solid/);
 
-    const labelColumnIndent = /calc\(var\(--menu-icon-box\)\s*\+\s*var\(--menu-gap\)\)/;
-    const hideButton = block(/\.fab-hide-options\s*\{[\s\S]*?button\s*\{/);
-    expect(declaration(hideButton, 'margin-inline-start')).toMatch(labelColumnIndent);
-    expect(declaration(hideButton, 'width')).toBe('auto !important');
-    expect(declaration(block(/\.fab-hide-options\s*\{[\s\S]*?button\s*\{[\s\S]*?&:focus-visible\s*\{/), 'outline'))
-      .toMatch(/\S/);
+    const trigger = block(/\.fab-toolbar-hide-btn\s*\{/);
+    expect(declaration(trigger, 'display')).toBe('flex !important');
+    expect(declaration(trigger, 'align-items')).toBe('center !important');
+    expect(declaration(trigger, 'justify-content')).toBe('center !important');
+    expect(declaration(trigger, 'width')).toBe('var(--menu-icon-box) !important');
+    expect(declaration(trigger, 'height')).toBe('var(--menu-icon-box) !important');
+    expect(declaration(trigger, 'padding')).toBe('0 !important');
+    expect(declaration(trigger, 'border')).toBe('0 !important');
+    expect(declaration(trigger, 'background')).toBe('none !important');
+    expect(declaration(trigger, 'cursor')).toBe('pointer !important');
+    expect(declaration(trigger, 'border-radius')).toBe('7px !important');
+    expect(declaration(block(/\.fab-toolbar-hide-btn\s*\{[\s\S]*?&:focus-visible\s*\{/), 'outline'))
+      .toBe('2px solid #1a5fb4 !important');
 
-    const warning = block(/\.fab-hide-options\s*\{[\s\S]*?\.fab-hide-warning\s*\{/);
+    const darkToolbar = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-menu-toolbar\s*\{/);
+    expect(declaration(darkToolbar, 'border-bottom-color'))
+      .toBe('rgba(255, 255, 255, 0.12) !important');
+    const darkTrigger = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-toolbar-hide-btn\s*\{/);
+    expect(declaration(darkTrigger, 'outline-color')).toBe('#60a5fa !important');
+  });
+
+  it('detaches the hide popover as a width-capped sibling panel', () => {
+    const popover = block(/\.fab-hide-popover\s*\{/);
+    expect(declaration(popover, 'position')).toBe('absolute !important');
+
+    // Same content-driven width contract as the menu.
+    expect(declaration(popover, 'width')).toBe('max-content !important');
+    expect(declaration(popover, 'min-width'))
+      .toBe('min(var(--menu-min-width), var(--menu-avail-width)) !important');
+    expect(declaration(popover, 'max-width'))
+      .toBe('min(var(--menu-max-width), var(--menu-avail-width)) !important');
+    expect(declaration(popover, '--menu-avail-width')).toMatch(/100vw/);
+
+    expect(declaration(popover, 'display')).toBe('flex !important');
+    expect(declaration(popover, 'flex-direction')).toBe('column !important');
+    expect(declaration(popover, 'border-radius')).toBe('14px !important');
+    expect(declaration(popover, 'backdrop-filter')).toBe('blur(16px) saturate(180%) !important');
+    expect(declaration(popover, 'contain')).toBe('inline-size !important');
+    expect(declaration(popover, 'box-sizing')).toBe('border-box !important');
+
+    // Short viewports: cap to the viewport (minus the 8px margin on both
+    // sides) and scroll internally; the capped height is what the
+    // positioner flips and clamps against.
+    expect(declaration(popover, 'max-height')).toBe('calc(100vh - 16px) !important');
+    expect(declaration(popover, 'overflow-y')).toBe('auto !important');
+    expect(declaration(popover, 'overflow-x')).toBe('hidden !important');
+    expect(declaration(popover, 'overscroll-behavior')).toBe('contain !important');
+
+    // Long localized labels wrap inside the panel instead of widening it.
+    const action = block(/\.fab-hide-popover\s*\{[\s\S]*?button\s*\{/);
+    expect(declaration(action, 'display')).toBe('flex !important');
+    expect(declaration(action, 'min-width')).toBe('0 !important');
+    expect(declaration(action, 'overflow-wrap')).toBe('anywhere !important');
+    expect(declaration(action, 'text-align')).toBe('start !important');
+    expect(declaration(action, 'font-weight')).toBe('600 !important');
+    expect(declaration(block(/\.fab-hide-popover\s*\{[\s\S]*?button\s*\{[\s\S]*?&:focus-visible\s*\{/), 'outline'))
+      .toBe('2px solid #1a5fb4 !important');
+
+    // Logical props keep the warning readable in both directions.
+    const warning = block(/\.fab-hide-popover\s*\{[\s\S]*?\.fab-hide-warning\s*\{/);
     expect(declaration(warning, 'font-size')).toBe('0.85em !important');
     expect(declaration(warning, 'overflow-wrap')).toMatch(/anywhere/);
-    expect(declaration(warning, 'margin-inline-start')).toMatch(labelColumnIndent);
+    expect(declaration(warning, 'border-inline-start')).toBe('2px solid #b45309 !important');
+    expect(declaration(warning, 'padding-inline-start')).toBe('6px !important');
 
-    const error = block(/\.fab-hide-options\s*\{[\s\S]*?\.fab-hide-error\s*\{/);
+    const error = block(/\.fab-hide-popover\s*\{[\s\S]*?\.fab-hide-error\s*\{/);
     expect(declaration(error, 'font-weight')).toBe('600 !important');
-    expect(declaration(error, 'margin-inline-start')).toMatch(labelColumnIndent);
+    expect(declaration(error, 'overflow-wrap')).toMatch(/anywhere/);
+  });
+
+  it('keeps the popover readable in light and dark themes', () => {
+    const lightPopover = block(/&\.theme-light\s*\{[\s\S]*?\.fab-hide-popover\s*\{/);
+    expect(declaration(lightPopover, 'background-color'))
+      .toBe('rgba(255, 255, 255, 0.92) !important');
+    expect(declaration(lightPopover, 'color')).toBe('#1e293b !important');
+    const lightWarning = block(/&\.theme-light\s*\{[\s\S]*?\.fab-hide-warning\s*\{/);
+    expect(declaration(lightWarning, 'color')).toBe('#7c4a03 !important');
+    const lightError = block(/&\.theme-light\s*\{[\s\S]*?\.fab-hide-error\s*\{/);
+    expect(declaration(lightError, 'color')).toBe('#c92a2a !important');
+
+    const darkPopover = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-popover\s*\{/);
+    expect(declaration(darkPopover, 'background-color'))
+      .toBe('rgba(40, 40, 40, 0.95) !important');
+    expect(declaration(darkPopover, 'color')).toBe('#f8fafc !important');
+    expect(darkPopover).toMatch(/outline-color:\s*#60a5fa\s*!important/);
+    const darkWarning = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-warning\s*\{/);
+    expect(declaration(darkWarning, 'color')).toBe('rgba(255, 255, 255, 0.75) !important');
     const darkError = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-error\s*\{/);
-    expect(declaration(darkError, 'color')).toMatch(/#ff8787\s*!important/);
+    expect(declaration(darkError, 'color')).toBe('#ff8787 !important');
 
-    // The whole row is one real button: icon + label + chevron share a tab stop
-    const rowTrigger = block(/\.fab-hide-row-trigger\s*\{/);
-    expect(declaration(rowTrigger, 'display')).toBe('flex !important');
-    expect(declaration(rowTrigger, 'flex')).toBe('1 1 auto !important');
-    expect(declaration(rowTrigger, 'background')).toBe('none !important');
-    expect(declaration(rowTrigger, 'border')).toBe('0 !important');
-    expect(declaration(rowTrigger, 'font')).toBe('inherit !important');
-    expect(declaration(rowTrigger, 'text-align')).toBe('start !important');
-    expect(declaration(rowTrigger, 'cursor')).toBe('pointer !important');
-    expect(declaration(block(/\.fab-hide-row-trigger\s*\{[\s\S]*?&:focus-visible\s*\{/), 'outline'))
-      .toMatch(/\S/);
+    // Theme overrides recolor only — no conflicting overflow or height caps.
+    expect(lightPopover).not.toMatch(/overflow/);
+    expect(lightPopover).not.toMatch(/max-height/);
+    expect(darkPopover).not.toMatch(/overflow/);
+    expect(darkPopover).not.toMatch(/max-height/);
+  });
 
-    // Row padding moves onto the trigger so the hover pill keeps its geometry
-    const disclosureRow = block(/\.fab-menu-item\s*\{[\s\S]*?&\.is-disclosure\s*\{/);
-    expect(declaration(disclosureRow, 'padding')).toBe('0 !important');
-
-    // The chevron is a decorative indicator inside that button
-    const disclosure = block(/\.fab-hide-disclosure-btn\s*\{/);
-    expect(declaration(disclosure, 'display')).toBe('flex !important');
-    expect(declaration(disclosure, 'flex-shrink')).toBe('0 !important');
-    const darkDisclosure = block(/&\.theme-dark\s*\{[\s\S]*?\.fab-hide-disclosure-btn\s*\{/);
-    expect(declaration(darkDisclosure, 'color')).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.45\)\s*!important/);
+  it('removes the in-flow hide disclosure selectors', () => {
+    expect(source).not.toMatch(/\.fab-hide-row-trigger/);
+    expect(source).not.toMatch(/\.fab-hide-options/);
+    expect(source).not.toMatch(/\.fab-hide-disclosure-btn/);
+    expect(source).not.toMatch(/is-disclosure/);
+    expect(source).not.toMatch(/#fab-hide-options/);
   });
 
   it('keeps the hide row icon inside the fixed menu-icon geometry', () => {
