@@ -39,14 +39,19 @@ export function getDesktopFabExclusionKey(scope, url) {
 }
 
 const pendingWrites = new Map();
+// Monotonic counter bumped whenever a feature write is queued. Used to detect a
+// write that starts during a snapshot read so the read can be retried.
+let writeSeq = 0;
 
 function serializeKeyOperation(key, operation) {
   const previous = pendingWrites.get(key) || Promise.resolve();
   const current = previous.catch(() => {}).then(operation);
-  pendingWrites.set(key, current);
-  return current.finally(() => {
-    if (pendingWrites.get(key) === current) pendingWrites.delete(key);
+  const settled = current.finally(() => {
+    if (pendingWrites.get(key) === settled) pendingWrites.delete(key);
   });
+  pendingWrites.set(key, settled);
+  writeSeq += 1;
+  return settled;
 }
 
 /** Persist an exclusion as its own key, avoiding cross-entry read/modify/write races. */
@@ -164,31 +169,71 @@ export function parseDesktopFabExclusionsSection(data) {
 }
 
 /**
- * Replace persisted exclusions with the given canonical entries. Diffs against
- * the committed snapshot while overlaying in-flight feature-owned writes, so a
- * pending add or removal for a key cannot contradict the replacement once it
- * settles. Keys already in the requested state with no pending operation are
- * skipped; every other affected key gets one authoritative operation enqueued
- * on its own per-key serializer (independent keys stay concurrent). Storage
- * failures propagate to the caller.
+ * Replace persisted exclusions with the given canonical entries. First lets all
+ * in-flight feature writes settle and reads a stable snapshot (retrying if a
+ * write starts during the read), so the baseline reflects the actual outcome of
+ * settled operations rather than stale intents. Keys already in the requested
+ * state are skipped; every other affected key gets one authoritative operation
+ * enqueued on its own per-key serializer (independent keys stay concurrent).
+ *
+ * If any operation fails, every started operation is allowed to settle first,
+ * then the pre-replacement snapshot is restored (recovery ops are enqueued last
+ * per key, so they win over late writes). The original failure is rethrown; if
+ * recovery itself fails, a distinct error is thrown so callers never report
+ * success. Storage failures therefore cannot silently drop saved exclusions.
  */
 export async function replaceDesktopFabExclusions(entries) {
   const nextKeys = new Set(entries.map((entry) => entry.key));
-  // Capture pending keys BEFORE reading storage: a pending operation that
-  // settles during the snapshot read must still force an authoritative write.
-  const pendingBefore = new Set(pendingWrites.keys());
-  const existing = await listDesktopFabExclusions();
-  const pendingKeys = new Set([...pendingBefore, ...pendingWrites.keys()]);
-  const existingKeys = new Set(existing.map((entry) => entry.key));
-  const candidateKeys = new Set([...existingKeys, ...pendingKeys, ...nextKeys]);
 
-  await Promise.all(
-    [...candidateKeys].map((key) => {
-      const shouldExist = nextKeys.has(key);
-      if (!pendingKeys.has(key) && shouldExist === existingKeys.has(key)) return null;
-      return serializeKeyOperation(key, () =>
+  // Settle in-flight writes and read a snapshot only while no write is pending,
+  // retrying if a write starts during the read. The snapshot is the actual
+  // settled state and therefore a reliable rollback baseline.
+  let existing;
+  for (;;) {
+    if (pendingWrites.size > 0) {
+      await Promise.allSettled([...pendingWrites.values()]);
+      continue;
+    }
+    const seq = writeSeq;
+    existing = await listDesktopFabExclusions();
+    if (writeSeq === seq) break;
+  }
+
+  const existingKeys = new Set(existing.map((entry) => entry.key));
+  const candidateKeys = new Set([...existingKeys, ...nextKeys]);
+
+  const plan = [...candidateKeys].map((key) => {
+    const shouldExist = nextKeys.has(key);
+    if (shouldExist === existingKeys.has(key)) return { key, operation: null };
+    return {
+      key,
+      operation: serializeKeyOperation(key, () =>
         shouldExist ? storageManager.set({ [key]: true }) : storageManager.remove(key)
+      ),
+    };
+  });
+
+  // Settle every started operation before deciding: a late write must not be
+  // able to undo the recovery performed below.
+  const results = await Promise.allSettled(plan.map((entry) => entry.operation));
+  const failedIndex = results.findIndex((result) => result.status === 'rejected');
+  if (failedIndex === -1) return;
+
+  // Restore the pre-replacement snapshot for every key we attempted to change.
+  const recovery = plan
+    .filter((entry) => entry.operation !== null)
+    .map((entry) => {
+      const shouldExist = existingKeys.has(entry.key);
+      return serializeKeyOperation(entry.key, () =>
+        shouldExist ? storageManager.set({ [entry.key]: true }) : storageManager.remove(entry.key)
       );
-    })
-  );
+    });
+  const recoveryResults = await Promise.allSettled(recovery);
+  if (recoveryResults.some((result) => result.status === 'rejected')) {
+    const error = new Error('desktop_fab_exclusions_recovery_failed');
+    error.cause = results[failedIndex].reason;
+    throw error;
+  }
+
+  throw results[failedIndex].reason;
 }
