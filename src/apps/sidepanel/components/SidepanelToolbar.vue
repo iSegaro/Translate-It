@@ -517,6 +517,12 @@ const handleFabToggle = async () => {
   const generation = ++fabGeneration
   const commandKey = fabTargetKey(target)
   fabCancelRetry()
+  // Each independent hide/show command gets a fresh bounded budget for the
+  // transient `loading` its settling read may report. The shared budget is
+  // otherwise only re-armed on target change, so without this repeated
+  // same-target toggles would drain one budget and later operations could no
+  // longer retry. Still count-based (FAB_RETRY_MAX) — never polling.
+  fabRetriesLeft = FAB_RETRY_MAX
   fabCommandsInFlight.add(commandKey)
   fabState.value = { status: FAB_STATUS.LOADING, reason: '' }
 

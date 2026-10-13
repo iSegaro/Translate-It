@@ -780,6 +780,81 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     expect(getCallCount()).toBe(firstBRead + 1)
   })
 
+  it('restores the retry budget for each same-target hide/show operation', async () => {
+    vi.useFakeTimers()
+    let settledStatus = 'hidden'
+    let needLoading = false
+    globalThis.browser.tabs.sendMessage.mockImplementation(async (tabId, message) => {
+      if (message.action === SET) {
+        settledStatus = settledStatus === 'hidden' ? 'visible' : 'hidden'
+        needLoading = true
+        return { success: true }
+      }
+      if (needLoading) {
+        needLoading = false
+        return reply('loading', { reason: 'fab-settling' })
+      }
+      return reply(settledStatus)
+    })
+
+    wrapper = mount(SidepanelToolbar, { attachTo: document.body })
+    await drain()
+
+    // FAB_RETRY_MAX + N same-target toggles: every operation must still get
+    // its settling retry instead of sticking on a drained shared budget.
+    const operations = 8 + 2
+    for (let i = 0; i < operations; i += 1) {
+      const expectedTitle = settledStatus === 'hidden' ? 'Show FAB for Now' : 'Hide FAB for Now'
+      expect(fabButton().attributes('title')).toBe(expectedTitle)
+
+      await fabButton().trigger('click')
+      await drain()
+      const readsAfterCommand = getCallCount()
+      expect(fabButton().attributes('title')).toBe('Reading the floating button’s status…')
+
+      // The transient loading settles on this operation's own retry.
+      await vi.advanceTimersByTimeAsync(150)
+      await drain()
+      expect(getCallCount()).toBeGreaterThan(readsAfterCommand)
+      const settledTitle = settledStatus === 'hidden' ? 'Show FAB for Now' : 'Hide FAB for Now'
+      expect(fabButton().attributes('title')).toBe(settledTitle)
+      expect(fabButton().attributes('disabled')).toBeUndefined()
+    }
+  })
+
+  it('bounds the restored budget within a single operation that never settles', async () => {
+    vi.useFakeTimers()
+    let afterSet = false
+    globalThis.browser.tabs.sendMessage.mockImplementation(async (tabId, message) => {
+      if (message.action === SET) {
+        afterSet = true
+        return { success: true }
+      }
+      if (afterSet) return reply('loading', { reason: 'fab-settling' })
+      return reply('hidden')
+    })
+
+    wrapper = mount(SidepanelToolbar, { attachTo: document.body })
+    await drain()
+
+    await fabButton().trigger('click')
+    await drain()
+    const readsAfterWrite = getCallCount()
+
+    // One retry per tick, at most FAB_RETRY_MAX scheduled retries.
+    for (let i = 0; i < 8; i += 1) {
+      await vi.advanceTimersByTimeAsync(150)
+      await drain()
+      expect(getCallCount()).toBe(readsAfterWrite + i + 1)
+    }
+
+    // Budget drained: no unbounded polling afterwards.
+    await vi.advanceTimersByTimeAsync(150 * 20)
+    await drain()
+    expect(getCallCount()).toBe(readsAfterWrite + 8)
+    expect(fabButton().attributes('title')).not.toContain('FAB for Now')
+  })
+
   it('never retries an unavailable status', async () => {
     vi.useFakeTimers()
     globalThis.browser.tabs.sendMessage.mockImplementation(async (tabId, message) =>

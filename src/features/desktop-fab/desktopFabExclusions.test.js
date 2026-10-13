@@ -45,6 +45,89 @@ describe('desktop FAB exclusions', () => {
       .not.toBe(getDesktopFabExclusionKey('page', 'https://example.com/docs'));
   });
 
+  it('lists and removes original page keys with repeated slashes or explicit default port', async () => {
+    // Hardcoded keys produced by the original getIdentity (single trailing-slash
+    // strip, host as parsed, forced https://): from 'https://example.com/docs//'
+    // and 'http://example.com:443/docs'. Must stay listable/removable.
+    const slashKey = 'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs%2F';
+    const portKey = 'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%3A443%2Fdocs';
+    for (const [key, value] of [
+      [slashKey, 'https://example.com/docs/'],
+      [portKey, 'https://example.com:443/docs'],
+    ]) {
+      storage.clear();
+      storage.set(key, true);
+      expect(await listDesktopFabExclusions()).toEqual([{ key, scope: 'page', value }]);
+      await removeDesktopFabExclusion(key);
+      expect(storage.has(key)).toBe(false);
+      expect(await listDesktopFabExclusions()).toEqual([]);
+    }
+  });
+
+  it('lists original page and site keys and rejects malformed page keys', async () => {
+    const validKeys = [
+      ['desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs', 'https://example.com/docs'],
+      ['desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2F', 'https://example.com/'],
+      ['desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%3A8080%2Fx', 'https://example.com:8080/x'],
+      ['desktop-fab-exclusion:v1:page:file%3A%2F%2F%2Fhome%2Fuser%2Fpage.html', 'file:///home/user/page.html'],
+    ];
+    for (const [key, value] of validKeys) {
+      storage.clear();
+      storage.set(key, true);
+      expect(await listDesktopFabExclusions()).toEqual([{ key, scope: 'page', value }]);
+    }
+    storage.clear();
+    const siteKey = 'desktop-fab-exclusion:v1:site:example.org';
+    storage.set(siteKey, true);
+    expect(await listDesktopFabExclusions()).toEqual([{ key: siteKey, scope: 'site', value: 'example.org' }]);
+
+    storage.clear();
+    storage.set('desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs%3Fq%3D1', true);
+    storage.set('desktop-fab-exclusion:v1:page:not-a-url', true);
+    storage.set('desktop-fab-exclusion:v1:page:ftp%3A%2F%2Fexample.com%2F', true);
+    storage.set('desktop-fab-exclusion:v1:page:https%3A%2F%2F', true);
+    storage.set('other-prefix:v1:page:https%3A%2F%2Fexample.com%2Fdocs', true);
+    expect(await listDesktopFabExclusions()).toEqual([]);
+    for (const key of [...storage.keys()]) {
+      await removeDesktopFabExclusion(key);
+    }
+    expect(storage.has('other-prefix:v1:page:https%3A%2F%2Fexample.com%2Fdocs')).toBe(true);
+    expect([...storage.keys()]).toHaveLength(5);
+  });
+  it('rejects noncanonical page identities in list and remove', async () => {
+    // Hardcoded noncanonical values: must be omitted from listing and removal
+    // must be a safe no-op (keys remain untouched).
+    const badKeys = [
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2FExAmple.com%2Fdocs',
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fa%2F..%2Fb',
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs%3F',
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs%23',
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs%3Fq%3D1',
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2Fuser%3Apass%40example.com%2Fx',
+      'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%3A08443%2Fx',
+    ];
+    for (const key of badKeys) storage.set(key, true);
+    expect(await listDesktopFabExclusions()).toEqual([]);
+    for (const key of badKeys) {
+      await removeDesktopFabExclusion(key);
+      expect(storage.has(key)).toBe(true);
+    }
+    expect([...storage.keys()]).toHaveLength(badKeys.length);
+  });
+
+  it('lists preserved file page identities', async () => {
+    const fileKeys = [
+      ['desktop-fab-exclusion:v1:page:file%3A%2F%2F%2Fhome%2Fuser%2Fpage.html', 'file:///home/user/page.html'],
+      ['desktop-fab-exclusion:v1:page:file%3A%2F%2Fhost%2Fa%2F', 'file://host/a/'],
+    ];
+    for (const [key, value] of fileKeys) {
+      storage.clear();
+      storage.set(key, true);
+      expect(await listDesktopFabExclusions()).toEqual([{ key, scope: 'page', value }]);
+      await removeDesktopFabExclusion(key);
+      expect(await listDesktopFabExclusions()).toEqual([]);
+    }
+  });
   it('supports file hosts and paths while excluding query and hash', () => {
     expect(getDesktopFabExclusionKey('page', 'file://server/share/docs/?q=1#x'))
       .toBe(getDesktopFabExclusionKey('page', 'file://server/share/docs'));

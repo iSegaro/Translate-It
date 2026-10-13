@@ -399,6 +399,138 @@ describe('ActivationTab Desktop FAB exclusions', () => {
     );
   });
 
+  it('keeps concurrent removals isolated per key and never re-submits a pending key', async () => {
+    const resolvers = [];
+    mocks.removeExclusion.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)));
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const removeButtons = () => entriesOf().map((row) => row.get('.fab-exclusion-remove-btn'));
+
+    await removeButtons()[0].trigger('click');
+    await nextTick();
+    expect(mocks.removeExclusion).toHaveBeenCalledTimes(1);
+    expect(removeButtons()[0].element.disabled).toBe(true);
+    expect(removeButtons()[1].element.disabled).toBe(false);
+
+    // The handler guard keeps the same key from submitting twice, even when
+    // the disabled attribute is bypassed with a raw event.
+    removeButtons()[0].element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+    expect(mocks.removeExclusion).toHaveBeenCalledTimes(1);
+
+    // B starts its own removal while A's write is still in flight.
+    await removeButtons()[1].trigger('click');
+    await nextTick();
+    expect(mocks.removeExclusion).toHaveBeenCalledTimes(2);
+    expect(removeButtons()[0].element.disabled).toBe(true);
+    expect(removeButtons()[1].element.disabled).toBe(true);
+
+    // A settles: only A's row goes; B stays pending and disabled.
+    resolvers[0]();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    expect(entriesOf()).toHaveLength(1);
+    expect(entriesOf().at(0).get('.fab-exclusion-value').text()).toBe('example.org');
+    expect(entriesOf().at(0).get('.fab-exclusion-remove-btn').element.disabled).toBe(true);
+
+    // B settles: even the disabled (unfocusable) row's clean-up works.
+    resolvers[1]();
+    await nextTick();
+    await nextTick();
+    await nextTick();
+    expect(entriesOf()).toHaveLength(0);
+  });
+
+  it('recovers drawer focus when a cross-tab refresh drops the focused entry', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const firstBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    firstBtn.element.focus();
+    expect(document.activeElement).toBe(firstBtn.element);
+
+    mocks.entries = [mocks.entries[1]];
+    const listener = mocks.storageManager.on.mock.calls.find(([event]) => event === 'change')?.[1];
+    listener({ key: 'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs' });
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(mocks.listExclusions).toHaveBeenCalledTimes(2);
+    expect(entriesOf()).toHaveLength(1);
+    expect(document.activeElement).toBe(
+      entriesOf().at(0).get('.fab-exclusion-remove-btn').element,
+    );
+  });
+
+  it('focuses the footer Done button when a cross-tab refresh drops the last focused entry', async () => {
+    mocks.entries = [mocks.entries[0]];
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    const removeBtn = entriesOf().at(0).get('.fab-exclusion-remove-btn');
+    removeBtn.element.focus();
+    mocks.entries = [];
+    const listener = mocks.storageManager.on.mock.calls.find(([event]) => event === 'change')?.[1];
+    listener({ key: 'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs' });
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(entriesOf()).toHaveLength(0);
+    expect(document.activeElement).toBe(
+      wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element,
+    );
+  });
+
+  it('does not steal focus from a surviving control across a cross-tab refresh', async () => {
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+    await openDrawer();
+
+    wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element.focus();
+    mocks.entries = [mocks.entries[1]];
+    const listener = mocks.storageManager.on.mock.calls.find(([event]) => event === 'change')?.[1];
+    listener({ key: 'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs' });
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(mocks.listExclusions).toHaveBeenCalledTimes(2);
+    expect(entriesOf()).toHaveLength(1);
+    expect(document.activeElement).toBe(
+      wrapper.get('#DESKTOP_FAB_EXCLUSIONS_DRAWER .drawer-footer button').element,
+    );
+  });
+
+  it('leaves focus alone when a cross-tab refresh lands with the drawer closed', async () => {
+    mocks.entries = [];
+    wrapper = mountTab();
+    await nextTick();
+    await nextTick();
+
+    const manageBtn = wrapper.get('#DESKTOP_FAB_MANAGE_LIST_BTN');
+    manageBtn.element.focus();
+    const listener = mocks.storageManager.on.mock.calls.find(([event]) => event === 'change')?.[1];
+    listener({ key: 'desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs' });
+    await nextTick();
+    await nextTick();
+    await nextTick();
+
+    expect(mocks.listExclusions).toHaveBeenCalledTimes(2);
+    expect(document.activeElement).toBe(manageBtn.element);
+    expect(wrapper.find('#DESKTOP_FAB_EXCLUSIONS_DRAWER').exists()).toBe(false);
+  });
+
   it('aligns the single-action footer to the action end in LTR and RTL', async () => {
     wrapper = mountTab();
     await nextTick();

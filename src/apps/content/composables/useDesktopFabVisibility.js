@@ -1,8 +1,10 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import browser from 'webextension-polyfill';
 import { pageEventBus } from '@/core/PageEventBus.js';
 import { getDesktopFabExclusionKey } from '@/features/desktop-fab/desktopFabExclusions.js';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import { storageCore } from '@/shared/storage/core/StorageCore.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT_APP, 'useDesktopFabVisibility');
@@ -63,13 +65,30 @@ export function useDesktopFabVisibility({ getEnvironment = () => ({}) } = {}) {
     }
   };
 
-  const handleFeatureStatusChanged = () => {
+  // Single accepted-navigation entry point for every URL signal: the
+  // page-translation FEATURE_STATUS_CHANGED event, the always-forwarded
+  // background SPA_NAVIGATION message (the only signal that fires for
+  // pushState/replaceState navigations), plus native popstate/hashchange as a
+  // last-resort fallback. Only a real full-href change is accepted, so
+  // duplicate signals for one navigation collapse into a single fail-closed
+  // re-read.
+  const handleUrlChange = () => {
     const url = window.location.href;
     if (url === currentUrl.value) return;
     currentUrl.value = url;
     override.value = 'none';
     pendingPersistentDismissUrl = null;
     void readExclusions({ failClosed: true });
+  };
+
+  // Mirrors PageTranslationEventManager's sender checks: only accept navigation
+  // messages from our own background script, ignoring extension-page senders.
+  const handleSpaNavigationMessage = (message, sender) => {
+    if (message?.action !== MessageActions.SPA_NAVIGATION
+      || !browser.runtime?.id
+      || sender?.id !== browser.runtime.id
+      || sender?.tab) return;
+    handleUrlChange();
   };
 
   const dismiss = (detail) => {
@@ -139,7 +158,10 @@ export function useDesktopFabVisibility({ getEnvironment = () => ({}) } = {}) {
     mounted = true;
     currentUrl.value = window.location.href;
     storageCore.on('change', handleStorageChanged);
-    pageEventBus.on('FEATURE_STATUS_CHANGED', handleFeatureStatusChanged);
+    pageEventBus.on('FEATURE_STATUS_CHANGED', handleUrlChange);
+    browser.runtime?.onMessage?.addListener(handleSpaNavigationMessage);
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
     void readExclusions({ failClosed: true });
   });
 
@@ -147,7 +169,10 @@ export function useDesktopFabVisibility({ getEnvironment = () => ({}) } = {}) {
     mounted = false;
     readVersion++;
     storageCore.off('change', handleStorageChanged);
-    pageEventBus.off('FEATURE_STATUS_CHANGED', handleFeatureStatusChanged);
+    pageEventBus.off('FEATURE_STATUS_CHANGED', handleUrlChange);
+    browser.runtime?.onMessage?.removeListener(handleSpaNavigationMessage);
+    window.removeEventListener('popstate', handleUrlChange);
+    window.removeEventListener('hashchange', handleUrlChange);
   });
 
   return { isReady, isDismissed, dismiss, getStatus, setOverride, setChildPresence };

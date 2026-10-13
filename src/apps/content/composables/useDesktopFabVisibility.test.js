@@ -7,14 +7,25 @@ const mocks = vi.hoisted(() => ({
   storageChanged: new Set(),
   getFresh: vi.fn(),
   eventListeners: new Map(),
+  runtimeMessageListeners: new Set(),
+  runtimeId: 'test-runtime-id',
   logger: { error: vi.fn() },
 }));
 
 vi.mock('webextension-polyfill', () => ({
-  default: { storage: { onChanged: {
-    addListener: callback => mocks.storageChanged.add(callback),
-    removeListener: callback => mocks.storageChanged.delete(callback),
-  } } },
+  default: {
+    storage: { onChanged: {
+      addListener: callback => mocks.storageChanged.add(callback),
+      removeListener: callback => mocks.storageChanged.delete(callback),
+    } },
+    runtime: {
+      id: mocks.runtimeId,
+      onMessage: {
+        addListener: callback => mocks.runtimeMessageListeners.add(callback),
+        removeListener: callback => mocks.runtimeMessageListeners.delete(callback),
+      },
+    },
+  },
 }));
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -75,11 +86,17 @@ describe('useDesktopFabVisibility', () => {
       if (event === 'FEATURE_STATUS_CHANGED') callback();
     }
   };
+  const emitSpaNavigation = (data = {}, sender = { id: mocks.runtimeId }) => {
+    for (const listener of mocks.runtimeMessageListeners) {
+      listener({ action: 'SPA_NAVIGATION', data }, sender);
+    }
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.storageChanged.clear();
     mocks.eventListeners.clear();
+    mocks.runtimeMessageListeners.clear();
     beforeMountNavigation = null;
     window.history.replaceState({}, '', '/desktop-fab-test');
     environment = { isTopFrame: true, extensionEnabled: true, showDesktopFab: true };
@@ -404,6 +421,139 @@ describe('useDesktopFabVisibility', () => {
     expect(mocks.eventListeners.size).toBe(0);
     resolveRead({});
     await nextTick();
+    expect(visibility.isReady.value).toBe(false);
+  });
+
+  it('follows SPA URL changes via history/hash signals when FEATURE_STATUS_CHANGED never fires', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+
+    visibility.dismiss({ scope: 'temporary' });
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'override-hide' });
+
+    const readsBefore = mocks.getFresh.mock.calls.length;
+    window.history.pushState({}, '', '/fallback-route');
+    expect(visibility.getStatus()).toMatchObject({ status: 'loading', reason: 'navigation-pending' });
+
+    // No FEATURE_STATUS_CHANGED emitted: the native fallback must accept the navigation.
+    window.dispatchEvent(new Event('popstate'));
+    await flushPromises();
+
+    expect(mocks.getFresh.mock.calls.length).toBe(readsBefore + 1);
+    expect(mocks.getFresh.mock.calls[readsBefore][0]).toEqual([
+      `page:${window.location.href}`,
+      `site:${window.location.href}`,
+    ]);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'hide' }))
+      .toMatchObject({ success: true, status: 'hidden', reason: 'override-hide' });
+  });
+
+  it('ignores same-href history events and dedupes dual navigation signals', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    const readsBefore = mocks.getFresh.mock.calls.length;
+
+    window.dispatchEvent(new Event('popstate'));
+    window.dispatchEvent(new Event('hashchange'));
+    await flushPromises();
+    expect(mocks.getFresh).toHaveBeenCalledTimes(readsBefore);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+
+    // Native signal and FEATURE_STATUS_CHANGED fire for one navigation:
+    // only a single fail-closed re-read happens.
+    window.history.pushState({}, '', '/deduped-route');
+    window.dispatchEvent(new Event('hashchange'));
+    emitFeatureChange();
+    await flushPromises();
+    expect(mocks.getFresh).toHaveBeenCalledTimes(readsBefore + 1);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+  });
+
+  it('removes window navigation listeners on unmount and ignores late fallback reads', async () => {    const removeSpy = vi.spyOn(window, 'removeEventListener');
+    let resolveRead;
+    mocks.getFresh.mockReturnValueOnce(new Promise(resolve => { resolveRead = resolve; }));
+    mountComposable();
+    const readsBefore = mocks.getFresh.mock.calls.length;
+    wrapper.unmount();
+
+    expect(removeSpy).toHaveBeenCalledWith('popstate', expect.any(Function));
+    expect(removeSpy).toHaveBeenCalledWith('hashchange', expect.any(Function));
+    removeSpy.mockRestore();
+
+    window.history.pushState({}, '', '/late-route');
+    window.dispatchEvent(new Event('popstate'));
+    resolveRead({});
+    await flushPromises();
+    expect(mocks.getFresh).toHaveBeenCalledTimes(readsBefore);
+    expect(visibility.isReady.value).toBe(false);
+  });
+
+  it('follows pushState navigation via SPA_NAVIGATION message when tracking is unavailable', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+    expect(mocks.runtimeMessageListeners.size).toBe(1);
+
+    visibility.dismiss({ scope: 'temporary' });
+    expect(visibility.getStatus()).toMatchObject({ status: 'hidden', reason: 'override-hide' });
+
+    const readsBefore = mocks.getFresh.mock.calls.length;
+    window.history.pushState({}, '', '/spa-push-route');
+    expect(visibility.getStatus()).toMatchObject({ status: 'loading', reason: 'navigation-pending' });
+
+    // pushState fires no popstate/hashchange and FEATURE_STATUS_CHANGED never
+    // fires; the background always forwards SPA_NAVIGATION (here with
+    // navigationUnavailable, which page-translation tracking drops).
+    emitSpaNavigation({ navigationUnavailable: true });
+    await flushPromises();
+
+    expect(mocks.getFresh.mock.calls.length).toBe(readsBefore + 1);
+    expect(mocks.getFresh.mock.calls[readsBefore][0]).toEqual([
+      `page:${window.location.href}`,
+      `site:${window.location.href}`,
+    ]);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+    expect(visibility.setOverride({ expectedUrl: window.location.href, override: 'hide' }))
+      .toMatchObject({ success: true, status: 'hidden', reason: 'override-hide' });
+  });
+
+  it('ignores untrusted and same-href SPA_NAVIGATION messages', async () => {
+    mountComposable();
+    await flushPromises();
+    visibility.setChildPresence(true);
+    const readsBefore = mocks.getFresh.mock.calls.length;
+
+    emitSpaNavigation({ navigationUnavailable: true }, { id: 'other-extension' });
+    emitSpaNavigation({ navigationUnavailable: true }, { id: mocks.runtimeId, tab: { id: 7 } });
+    emitSpaNavigation({ navigationUnavailable: true }, undefined);
+    for (const listener of mocks.runtimeMessageListeners) {
+      listener({ action: 'SOMETHING_ELSE' }, { id: mocks.runtimeId });
+    }
+    emitSpaNavigation({ navigationUnavailable: true });
+    await flushPromises();
+
+    expect(mocks.getFresh).toHaveBeenCalledTimes(readsBefore);
+    expect(visibility.getStatus()).toMatchObject({ status: 'visible' });
+  });
+
+  it('removes the runtime message listener on unmount and ignores late navigation messages', async () => {
+    let resolveRead;
+    mocks.getFresh.mockReturnValueOnce(new Promise(resolve => { resolveRead = resolve; }));
+    mountComposable();
+    const readsBefore = mocks.getFresh.mock.calls.length;
+    wrapper.unmount();
+
+    expect(mocks.runtimeMessageListeners.size).toBe(0);
+    window.history.pushState({}, '', '/late-spa-route');
+    emitSpaNavigation({ navigationUnavailable: true });
+    resolveRead({});
+    await flushPromises();
+    expect(mocks.getFresh).toHaveBeenCalledTimes(readsBefore);
     expect(visibility.isReady.value).toBe(false);
   });
 });

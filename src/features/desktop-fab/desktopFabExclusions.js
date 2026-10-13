@@ -65,6 +65,35 @@ export async function removeDesktopFabExclusion(key) {
   await serializeKeyOperation(key, () => storageManager.remove(key));
 }
 
+function isNormalizedPageIdentity(value) {
+  if (/[?#]/.test(value)) return false;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'file:') return false;
+  if (url.username || url.password) return false;
+  const prefix = `${url.protocol}//`;
+  if (!value.startsWith(prefix)) return false;
+  const rest = value.slice(prefix.length);
+  const slash = rest.indexOf('/');
+  const authority = slash === -1 ? rest : rest.slice(0, slash);
+  const path = slash === -1 ? '' : rest.slice(slash);
+  // Canonical host casing, no credentials.
+  if (authority !== authority.toLowerCase() || authority.includes('@')) return false;
+  // The parsed host, allowing an explicit default https port (from original http:443).
+  const authorityOk = url.protocol === 'https:'
+    ? (authority === url.host || authority === `${url.hostname}:443`)
+    : authority === url.host;
+  if (!authorityOk) return false;
+  // Parser-normalized path: rejects dot-segments and, with the guard above, raw ?/#.
+  if (path !== url.pathname) return false;
+  if (url.protocol === 'https:' && url.hostname === '') return false;
+  return true;
+}
+
 function parseKey(key) {
   const match = key.match(/^desktop-fab-exclusion:v1:(page|site):(.+)$/);
   if (!match) return null;
@@ -74,7 +103,7 @@ function parseKey(key) {
     if (match[1] === 'site') {
       const url = new URL(`https://${value}`);
       if (url.hostname !== value || url.host !== value || url.pathname !== '/') return null;
-    } else if (getIdentity('page', value) !== value) {
+    } else if (!isNormalizedPageIdentity(value)) {
       return null;
     }
     return { scope: match[1], value };

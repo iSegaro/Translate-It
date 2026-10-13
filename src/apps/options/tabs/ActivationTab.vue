@@ -931,7 +931,7 @@
                   class="fab-exclusion-remove-btn"
                   :title="t('fab_exclusion_remove_label') || 'Remove from list'"
                   :aria-label="`${t('fab_exclusion_remove_label') || 'Remove from list'}: ${entry.value}`"
-                  :disabled="removingFabExclusionKey === entry.key"
+                  :disabled="removingFabExclusionKeys.has(entry.key)"
                   @click="removeFabExclusion(entry)"
                 >
                   <MaskIcon
@@ -1049,7 +1049,7 @@ const fabExclusions = ref([])
 // not masquerade as an empty list.
 const fabExclusionsLoaded = ref(false)
 const fabExclusionError = ref('')
-const removingFabExclusionKey = ref('')
+const removingFabExclusionKeys = ref(new Set())
 
 // Cross-tab add/remove can trigger overlapping reads; the newest one wins and
 // a stale snapshot is dropped instead of overwriting fresher data.
@@ -1074,13 +1074,35 @@ const loadFabExclusions = async () => {
     return
   }
   if (!fabExclusionsMounted || seq !== fabExclusionLoadSeq) return
+  // A cross-tab refresh may drop the very entry whose remove button holds
+  // focus; note it now so focus can be recovered inside the drawer below.
+  let lostFocusedIndex = -1
+  const drawer = fabExclusionsDrawerRef.value
+  if (isFabExclusionsDrawerOpen.value && drawer) {
+    const focused = document.activeElement
+    if (focused && focused.isConnected
+      && focused !== document.body && focused !== document.documentElement) {
+      const focusedIndex = Array.from(drawer.querySelectorAll('.fab-exclusion-remove-btn')).indexOf(focused)
+      if (focusedIndex >= 0) {
+        const focusedKey = fabExclusions.value[focusedIndex]?.key
+        if (focusedKey !== undefined && !entries.some((item) => item.key === focusedKey)) {
+          lostFocusedIndex = focusedIndex
+        }
+      }
+    }
+  }
   fabExclusions.value = entries
   fabExclusionsLoaded.value = true
   fabExclusionError.value = ''
+  if (lostFocusedIndex >= 0) {
+    restoreFabDrawerFocus(lostFocusedIndex)
+  }
 }
 
 const removeFabExclusion = async (entry) => {
-  removingFabExclusionKey.value = entry.key
+  // Guard concurrent submissions even if the disabled attribute is bypassed.
+  if (removingFabExclusionKeys.value.has(entry.key)) return
+  removingFabExclusionKeys.value.add(entry.key)
   try {
     await removeDesktopFabExclusion(entry.key)
     // Keep focus on the row that replaces the removed one so keyboard users
@@ -1088,26 +1110,13 @@ const removeFabExclusion = async (entry) => {
     const removedIndex = fabExclusions.value.findIndex((item) => item.key === entry.key)
     fabExclusions.value = fabExclusions.value.filter((item) => item.key !== entry.key)
     fabExclusionError.value = ''
-    nextTick(() => {
-      const container = fabExclusionsDrawerRef.value
-      if (!container) return
-      // Respect a deliberate focus move: if focus is now on a connected control
-      // (inside or outside the drawer), do not steal it back.
-      const active = document.activeElement
-      if (active && active.isConnected && active !== document.body && active !== document.documentElement) {
-        return
-      }
-      const removeButtons = container.querySelectorAll('.fab-exclusion-remove-btn')
-      const target = removeButtons[removedIndex] || removeButtons[removeButtons.length - 1]
-        || container.querySelector('.drawer-footer button')
-      target?.focus({ preventScroll: true })
-    })
+    restoreFabDrawerFocus(removedIndex)
   } catch (error) {
     logger.error('Failed to remove Desktop FAB exclusion:', error)
     fabExclusionError.value = t('fab_exclusion_remove_error')
       || 'Could not remove this entry. Reload the page and try again.'
   } finally {
-    removingFabExclusionKey.value = ''
+    removingFabExclusionKeys.value.delete(entry.key)
   }
 }
 
@@ -1119,6 +1128,26 @@ const handleFabExclusionStorageChange = (data) => {
 // Exclusions drawer (mirrors the Auto Page rules drawer conventions)
 const isFabExclusionsDrawerOpen = ref(false)
 const fabExclusionsDrawerRef = ref(null)
+
+// Shared focus recovery: after a row disappears (single removal or a
+// cross-tab refresh), put focus back on the row replacing it — or on the
+// footer Done when the list emptied — unless a live control still holds focus.
+const restoreFabDrawerFocus = (removedIndex) => {
+  nextTick(() => {
+    const container = fabExclusionsDrawerRef.value
+    if (!container) return
+    // Respect a deliberate focus move: if focus is now on a connected control
+    // (inside or outside the drawer), do not steal it back.
+    const active = document.activeElement
+    if (active && active.isConnected && active !== document.body && active !== document.documentElement) {
+      return
+    }
+    const removeButtons = container.querySelectorAll('.fab-exclusion-remove-btn')
+    const target = removeButtons[removedIndex] || removeButtons[removeButtons.length - 1]
+      || container.querySelector('.drawer-footer button')
+    target?.focus({ preventScroll: true })
+  })
+}
 
 const openFabExclusionsDrawer = () => {
   isRulesDrawerOpen.value = false // mutual exclusion
