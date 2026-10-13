@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
 import useSettingsStore from './settings.js';
@@ -12,6 +12,7 @@ import ExtensionContextManager from '@/core/extensionContext.js';
 import {
   addDesktopFabExclusion,
   listDesktopFabExclusions,
+  DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY,
 } from '@/features/desktop-fab/desktopFabExclusions.js';
 
 // Mock Dependencies
@@ -1010,59 +1011,91 @@ describe('Settings Store', () => {
     expect(store.settings.translationHistory).toEqual([]);
   });
 
-  it('resetSettings clears desktop FAB exclusions while export/import omit them', async () => {
-    const persisted = new Map();
-    const defaultImplementations = {
-      get: async () => ({}),
-      set: async () => true,
-      remove: async () => true,
-      clear: async () => true,
+  describe('desktop FAB exclusions import/export', () => {
+    const installPersistedMap = (persisted) => {
+      storageManager.get.mockImplementation(async keys => {
+        const values = Object.fromEntries(persisted);
+        if (keys === null || keys === undefined) return values;
+        const requested = Array.isArray(keys) ? keys : [keys];
+        return Object.fromEntries(requested.filter(key => key in values).map(key => [key, values[key]]));
+      });
+      storageManager.set.mockImplementation(async values => {
+        for (const [key, value] of Object.entries(values)) persisted.set(key, value);
+        return true;
+      });
+      storageManager.remove.mockImplementation(async keys => {
+        for (const key of Array.isArray(keys) ? keys : [keys]) persisted.delete(key);
+        return true;
+      });
+      storageManager.clear.mockImplementation(async () => {
+        persisted.clear();
+        return true;
+      });
     };
-    storageManager.get.mockImplementation(async keys => {
-      const values = Object.fromEntries(persisted);
-      if (keys === null || keys === undefined) return values;
-      const requested = Array.isArray(keys) ? keys : [keys];
-      return Object.fromEntries(requested.filter(key => key in values).map(key => [key, values[key]]));
+    const resetStorageMocksToDefaults = () => {
+      storageManager.get.mockReset();
+      storageManager.get.mockResolvedValue({});
+      storageManager.set.mockReset();
+      storageManager.set.mockResolvedValue(true);
+      storageManager.remove.mockReset();
+      storageManager.remove.mockResolvedValue(true);
+      storageManager.clear.mockReset();
+      storageManager.clear.mockResolvedValue(true);
+    };
+    afterEach(() => {
+      resetStorageMocksToDefaults();
     });
-    storageManager.set.mockImplementation(async values => {
-      for (const [key, value] of Object.entries(values)) persisted.set(key, value);
-      return true;
-    });
-    storageManager.remove.mockImplementation(async keys => {
-      for (const key of Array.isArray(keys) ? keys : [keys]) persisted.delete(key);
-      return true;
-    });
-    storageManager.clear.mockImplementation(async () => {
-      persisted.clear();
-      return true;
-    });
+    const exclusionKeyWrites = () =>
+      [
+        ...storageManager.set.mock.calls.flatMap(([values]) => Object.keys(values || {})),
+        ...storageManager.remove.mock.calls.flatMap(([keys]) =>
+          Array.isArray(keys) ? keys : [keys],
+        ),
+      ].filter(key => typeof key === 'string' && key.startsWith('desktop-fab-exclusion:v1:'));
 
-    try {
+    it('resetSettings clears desktop FAB exclusions while export/import carry them', async () => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+
       const pageKey = await addDesktopFabExclusion('page', 'https://example.test/docs');
       const siteKey = await addDesktopFabExclusion('site', 'https://example.test');
       const store = useSettingsStore();
 
-      await store.exportSettings();
-      const exportSettings = secureStorage.prepareForExport.mock.calls.at(-1)[0];
-      expect(exportSettings).not.toHaveProperty(pageKey);
-      expect(exportSettings).not.toHaveProperty(siteKey);
+      const exported = await store.exportSettings();
+      expect(exported[DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]).toEqual(
+        expect.arrayContaining([
+          { scope: 'page', value: 'https://example.test/docs' },
+          { scope: 'site', value: 'example.test' },
+        ]),
+      );
+      const exportArg = secureStorage.prepareForExport.mock.calls.at(-1)[0];
+      expect(exportArg).not.toHaveProperty(pageKey);
+      expect(exportArg).not.toHaveProperty(siteKey);
+      expect(exportArg).not.toHaveProperty(DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY);
 
       secureStorage.processImportedSettings.mockResolvedValueOnce({
         THEME: 'dark',
         [pageKey]: true,
         [siteKey]: true,
       });
-      await store.importSettings({ THEME: 'dark', [pageKey]: true, [siteKey]: true });
-      const importedPayload = storageManager.set.mock.calls.at(-1)[0];
-      expect(importedPayload).not.toHaveProperty(pageKey);
-      expect(importedPayload).not.toHaveProperty(siteKey);
+      storageManager.set.mockClear();
+      storageManager.remove.mockClear();
+      await store.importSettings({
+        THEME: 'dark',
+        [pageKey]: true,
+        [siteKey]: true,
+        [DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]: [
+          { scope: 'page', value: 'https://example.test/docs' },
+          { scope: 'site', value: 'example.test' },
+        ],
+      });
+      for (const call of storageManager.set.mock.calls) {
+        expect(call[0]).not.toHaveProperty(pageKey);
+        expect(call[0]).not.toHaveProperty(siteKey);
+        expect(call[0]).not.toHaveProperty(DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY);
+      }
       expect(persisted.has(pageKey)).toBe(true);
       expect(persisted.has(siteKey)).toBe(true);
-
-      await store.exportSettings();
-      const reExportSettings = secureStorage.prepareForExport.mock.calls.at(-1)[0];
-      expect(reExportSettings).not.toHaveProperty(pageKey);
-      expect(reExportSettings).not.toHaveProperty(siteKey);
 
       await store.resetSettings();
 
@@ -1071,12 +1104,123 @@ describe('Settings Store', () => {
       expect(persisted.has(siteKey)).toBe(false);
       expect(store.settings).toMatchObject(getPersistedDefaultSettings());
       expect(storageManager.set.mock.calls.at(-1)[0]).toEqual(getPersistedDefaultSettings());
-    } finally {
-      for (const [method, implementation] of Object.entries(defaultImplementations)) {
-        storageManager[method].mockReset();
-        storageManager[method].mockImplementation(implementation);
+    });
+
+    it('round-trips exclusions through export and import', async () => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+      await addDesktopFabExclusion('page', 'https://example.test/docs');
+      await addDesktopFabExclusion('site', 'https://example.test');
+      const store = useSettingsStore();
+
+      const exported = await store.exportSettings();
+      const section = exported[DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY];
+      expect(section).toEqual(
+        expect.arrayContaining([
+          { scope: 'page', value: 'https://example.test/docs' },
+          { scope: 'site', value: 'example.test' },
+        ]),
+      );
+      for (const entry of section) {
+        expect(Object.keys(entry).sort()).toEqual(['scope', 'value']);
       }
-    }
+      expect(Object.keys(exported).some(key => key.startsWith('desktop-fab-exclusion:v1:'))).toBe(false);
+
+      const beforeKeys = (await listDesktopFabExclusions()).map(entry => entry.key).sort();
+      await storageManager.remove(beforeKeys);
+      expect(await listDesktopFabExclusions()).toEqual([]);
+
+      await store.importSettings({ _exported: true, THEME: 'dark', [DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]: section });
+
+      const afterKeys = (await listDesktopFabExclusions()).map(entry => entry.key).sort();
+      expect(afterKeys).toEqual(beforeKeys);
+    });
+
+    it('keeps exclusions plain text on password export', async () => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+      await addDesktopFabExclusion('page', 'https://example.test/docs');
+      secureStorage.prepareForExport.mockResolvedValueOnce({ _hasEncryptedKeys: true, _secureKeys: 'enc' });
+      const store = useSettingsStore();
+
+      const exported = await store.exportSettings('pw');
+
+      expect(secureStorage.prepareForExport).toHaveBeenCalledWith(expect.anything(), 'pw');
+      const exportArg = secureStorage.prepareForExport.mock.calls.at(-1)[0];
+      expect(exportArg).not.toHaveProperty(DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY);
+      expect(exported._hasEncryptedKeys).toBe(true);
+      expect(exported._secureKeys).toBe('enc');
+      expect(exported[DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]).toEqual([
+        { scope: 'page', value: 'https://example.test/docs' },
+      ]);
+    });
+
+    it('preserves existing exclusions when the backup has no section', async () => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+      const pageKey = await addDesktopFabExclusion('page', 'https://example.test/docs');
+      const store = useSettingsStore();
+
+      await store.importSettings({ _exported: true, THEME: 'dark' });
+
+      expect(persisted.has(pageKey)).toBe(true);
+      expect(await listDesktopFabExclusions()).toEqual([
+        { key: pageKey, scope: 'page', value: 'https://example.test/docs' },
+      ]);
+    });
+
+    it('clears existing exclusions when the section is empty', async () => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+      const pageKey = await addDesktopFabExclusion('page', 'https://example.test/docs');
+      const siteKey = await addDesktopFabExclusion('site', 'https://example.test');
+      const store = useSettingsStore();
+
+      await store.importSettings({ _exported: true, THEME: 'dark', [DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]: [] });
+
+      expect(await listDesktopFabExclusions()).toEqual([]);
+      expect(persisted.has(pageKey)).toBe(false);
+      expect(persisted.has(siteKey)).toBe(false);
+    });
+
+    it.each([
+      ['non-array section', 'not-an-array'],
+      ['bad scope', [{ scope: 'nope', value: 'https://example.test/docs' }]],
+      ['non-canonical casing', [{ scope: 'page', value: 'https://ExAmple.com/x' }]],
+    ])('rejects malformed exclusions (%s) without touching storage', async (_label, section) => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+      const pageKey = await addDesktopFabExclusion('page', 'https://example.test/docs');
+      const store = useSettingsStore();
+      storageManager.set.mockClear();
+      storageManager.remove.mockClear();
+
+      await expect(
+        store.importSettings({ _exported: true, THEME: 'dark', [DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]: section }),
+      ).rejects.toThrow('invalid_desktop_fab_exclusions');
+
+      expect(exclusionKeyWrites()).toEqual([]);
+      expect(persisted.has(pageKey)).toBe(true);
+      expect(await listDesktopFabExclusions()).toEqual([
+        { key: pageKey, scope: 'page', value: 'https://example.test/docs' },
+      ]);
+    });
+
+    it('rejects import when exclusion replace fails', async () => {
+      const persisted = new Map();
+      installPersistedMap(persisted);
+      await addDesktopFabExclusion('page', 'https://example.test/docs');
+      storageManager.remove.mockRejectedValueOnce(new Error('exclusion remove failed'));
+      const store = useSettingsStore();
+
+      await expect(
+        store.importSettings({
+          _exported: true,
+          THEME: 'dark',
+          [DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]: [{ scope: 'site', value: 'example.test' }],
+        }),
+      ).rejects.toThrow('exclusion remove failed');
+    });
   });
 
   it('exportSettings should call secureStorage', async () => {

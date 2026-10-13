@@ -22,10 +22,14 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({ storageManager }));
 
 const {
   DESKTOP_FAB_EXCLUSION_PREFIX,
+  DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY,
   addDesktopFabExclusion,
   getDesktopFabExclusionKey,
   listDesktopFabExclusions,
+  parseDesktopFabExclusionsSection,
   removeDesktopFabExclusion,
+  replaceDesktopFabExclusions,
+  serializeDesktopFabExclusions,
 } = await import('./desktopFabExclusions.js');
 
 describe('desktop FAB exclusions', () => {
@@ -245,5 +249,166 @@ describe('desktop FAB exclusions', () => {
   it('propagates storage failures while listing entries', async () => {
     storageManager.get.mockRejectedValueOnce(new Error('list failed'));
     await expect(listDesktopFabExclusions()).rejects.toThrow('list failed');
+  });
+
+  it('serializes saved exclusions as plain scope/value pairs', async () => {
+    expect(DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY).toBe('_desktopFabExclusions');
+    storage.set('desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%2Fdocs%2F', true);
+    storage.set('desktop-fab-exclusion:v1:page:https%3A%2F%2Fexample.com%3A443%2Fdocs', true);
+    storage.set('desktop-fab-exclusion:v1:site:example.org', true);
+    storage.set('unrelated', true);
+    storage.set('desktop-fab-exclusion:v1:page:https%3A%2F%2Foff.test%2F', false);
+    expect(await serializeDesktopFabExclusions()).toEqual([
+      { scope: 'page', value: 'https://example.com/docs/' },
+      { scope: 'page', value: 'https://example.com:443/docs' },
+      { scope: 'site', value: 'example.org' },
+    ]);
+  });
+
+  it('parses a valid exclusions section and dedupes by key', async () => {
+    const entries = parseDesktopFabExclusionsSection([
+      { scope: 'page', value: 'https://example.com/docs' },
+      { scope: 'site', value: 'example.org' },
+      { scope: 'page', value: 'https://example.com/docs' },
+    ]);
+    expect(entries).toHaveLength(2);
+    for (const { key } of entries) {
+      expect(key.startsWith(DESKTOP_FAB_EXCLUSION_PREFIX)).toBe(true);
+    }
+    expect(entries[0].key).toBe(getDesktopFabExclusionKey('page', 'https://example.com/docs'));
+    expect(entries[1].key).toBe(getDesktopFabExclusionKey('site', 'https://example.org'));
+    expect(storageManager.set).not.toHaveBeenCalled();
+    expect(storageManager.remove).not.toHaveBeenCalled();
+    await replaceDesktopFabExclusions(entries);
+    expect(await listDesktopFabExclusions()).toEqual(entries);
+  });
+
+  it('rejects invalid exclusions sections without touching storage', () => {
+    const invalid = [
+      undefined,
+      {},
+      'x',
+      [null],
+      [{ scope: 'other', value: 'x' }],
+      [{ scope: 'page', value: 'https://ExAmple.com/x' }],
+      [{ scope: 'site', value: 'https://example.com/x' }],
+    ];
+    for (const data of invalid) {
+      expect(() => parseDesktopFabExclusionsSection(data)).toThrow('invalid_desktop_fab_exclusions');
+    }
+    expect(storageManager.set).not.toHaveBeenCalled();
+    expect(storageManager.remove).not.toHaveBeenCalled();
+    expect(storage.size).toBe(0);
+  });
+
+  it('replaces exclusions by diff, preserving unchanged keys', async () => {
+    const kept = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://example.com/docs' }])[0];
+    const droppedKey = getDesktopFabExclusionKey('site', 'https://example.org');
+    storage.set(kept.key, true);
+    storage.set(droppedKey, true);
+    const added = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://example.com:8080/x' }])[0];
+    await replaceDesktopFabExclusions([kept, added]);
+    const setKeys = storageManager.set.mock.calls.flatMap(([data]) => Object.keys(data));
+    expect(setKeys).not.toContain(kept.key);
+    expect(setKeys).toContain(added.key);
+    expect(storageManager.remove).toHaveBeenCalledWith(droppedKey);
+    expect(await listDesktopFabExclusions()).toEqual([kept, added]);
+  });
+
+  it('clears feature keys on empty replace while leaving unrelated keys', async () => {
+    const first = getDesktopFabExclusionKey('page', 'https://example.com/docs');
+    const second = getDesktopFabExclusionKey('site', 'https://example.org');
+    storage.set(first, true);
+    storage.set(second, true);
+    storage.set('unrelated', true);
+    await replaceDesktopFabExclusions([]);
+    expect(await listDesktopFabExclusions()).toEqual([]);
+    expect(storage.has('unrelated')).toBe(true);
+  });
+
+  it('propagates storage failures from replace', async () => {
+    const added = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://example.com/docs' }])[0];
+    storageManager.set.mockRejectedValueOnce(new Error('write failed'));
+    await expect(replaceDesktopFabExclusions([added])).rejects.toThrow('write failed');
+
+    const existing = getDesktopFabExclusionKey('site', 'https://example.org');
+    storage.set(existing, true);
+    storageManager.remove.mockRejectedValueOnce(new Error('remove failed'));
+    await expect(replaceDesktopFabExclusions([])).rejects.toThrow('remove failed');
+  });
+
+  it('restores a key after a pending removal when replace keeps it', async () => {
+    const [entry] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://keep.test/a' }]);
+    storage.set(entry.key, true);
+    const removeStarted = deferred();
+    const allowRemove = deferred();
+    storageManager.remove.mockImplementationOnce(async key => {
+      removeStarted.resolve();
+      await allowRemove.promise;
+      storage.delete(key);
+    });
+
+    const removing = removeDesktopFabExclusion(entry.key);
+    await removeStarted.promise;
+    const replacing = replaceDesktopFabExclusions([entry]);
+    allowRemove.resolve();
+    await Promise.all([removing, replacing]);
+    expect(storage.get(entry.key)).toBe(true);
+    expect(storageManager.set.mock.invocationCallOrder[0])
+      .toBeGreaterThan(storageManager.remove.mock.invocationCallOrder[0]);
+  });
+
+  it('clears a pending addition when an empty replace runs before it settles', async () => {
+    const key = getDesktopFabExclusionKey('page', 'https://pending.test/a');
+    const setStarted = deferred();
+    const allowSet = deferred();
+    storageManager.set.mockImplementationOnce(async data => {
+      setStarted.resolve();
+      await allowSet.promise;
+      for (const [entryKey, value] of Object.entries(data)) storage.set(entryKey, value);
+    });
+
+    const adding = addDesktopFabExclusion('page', 'https://pending.test/a');
+    await setStarted.promise;
+    const replacing = replaceDesktopFabExclusions([]);
+    allowSet.resolve();
+    await Promise.all([adding, replacing]);
+    expect(storage.has(key)).toBe(false);
+    expect(await listDesktopFabExclusions()).toEqual([]);
+  });
+
+  it('does not rewrite unchanged keys when replacing with the same list', async () => {
+    const entries = parseDesktopFabExclusionsSection([
+      { scope: 'page', value: 'https://example.com/docs' },
+      { scope: 'site', value: 'example.org' },
+    ]);
+    for (const { key } of entries) storage.set(key, true);
+    await replaceDesktopFabExclusions(entries);
+    expect(storageManager.set).not.toHaveBeenCalled();
+    expect(storageManager.remove).not.toHaveBeenCalled();
+    expect(await listDesktopFabExclusions()).toEqual(entries);
+  });
+
+  it('keeps per-key replace operations concurrent across independent keys', async () => {
+    const droppedKey = getDesktopFabExclusionKey('page', 'https://drop.test/a');
+    const [added] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://added.test/b' }]);
+    storage.set(droppedKey, true);
+    const removeStarted = deferred();
+    const allowRemove = deferred();
+    storageManager.remove.mockImplementationOnce(async key => {
+      removeStarted.resolve();
+      await allowRemove.promise;
+      storage.delete(key);
+    });
+
+    const replacing = replaceDesktopFabExclusions([added]);
+    await removeStarted.promise;
+    expect(storageManager.remove).toHaveBeenCalledWith(droppedKey);
+    expect(storageManager.set).toHaveBeenCalledWith({ [added.key]: true });
+    expect(storage.get(added.key)).toBe(true);
+    allowRemove.resolve();
+    await replacing;
+    expect(storage.has(droppedKey)).toBe(false);
+    expect(await listDesktopFabExclusions()).toEqual([added]);
   });
 });

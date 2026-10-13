@@ -121,3 +121,74 @@ export async function listDesktopFabExclusions() {
     return entry ? [{ key, ...entry }] : [];
   });
 }
+
+/** Dedicated, feature-owned section key in the exported settings JSON. */
+export const DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY = '_desktopFabExclusions';
+
+/**
+ * Plain-text snapshot of saved exclusions for settings export.
+ * Reads persisted entries only; temporary FAB visibility overrides are in-memory
+ * and therefore never included.
+ */
+export async function serializeDesktopFabExclusions() {
+  const entries = await listDesktopFabExclusions();
+  return entries.map(({ scope, value }) => ({ scope, value }));
+}
+
+/**
+ * Validate an imported exclusions section with the same feature-owned key rules
+ * used for stored entries. Pure: returns canonical entries (with their original
+ * storage keys reconstructed) or throws; it never touches storage, so callers can
+ * reject invalid data before modifying anything.
+ */
+export function parseDesktopFabExclusionsSection(data) {
+  if (!Array.isArray(data)) throw new Error('invalid_desktop_fab_exclusions');
+  const seen = new Set();
+  const entries = [];
+  for (const item of data) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('invalid_desktop_fab_exclusions');
+    }
+    const { scope, value } = item;
+    if (typeof scope !== 'string' || typeof value !== 'string') {
+      throw new Error('invalid_desktop_fab_exclusions');
+    }
+    const key = encodeKey(scope, value);
+    if (!parseKey(key)) throw new Error('invalid_desktop_fab_exclusions');
+    if (!seen.has(key)) {
+      seen.add(key);
+      entries.push({ key, scope, value });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Replace persisted exclusions with the given canonical entries. Diffs against
+ * the committed snapshot while overlaying in-flight feature-owned writes, so a
+ * pending add or removal for a key cannot contradict the replacement once it
+ * settles. Keys already in the requested state with no pending operation are
+ * skipped; every other affected key gets one authoritative operation enqueued
+ * on its own per-key serializer (independent keys stay concurrent). Storage
+ * failures propagate to the caller.
+ */
+export async function replaceDesktopFabExclusions(entries) {
+  const nextKeys = new Set(entries.map((entry) => entry.key));
+  // Capture pending keys BEFORE reading storage: a pending operation that
+  // settles during the snapshot read must still force an authoritative write.
+  const pendingBefore = new Set(pendingWrites.keys());
+  const existing = await listDesktopFabExclusions();
+  const pendingKeys = new Set([...pendingBefore, ...pendingWrites.keys()]);
+  const existingKeys = new Set(existing.map((entry) => entry.key));
+  const candidateKeys = new Set([...existingKeys, ...pendingKeys, ...nextKeys]);
+
+  await Promise.all(
+    [...candidateKeys].map((key) => {
+      const shouldExist = nextKeys.has(key);
+      if (!pendingKeys.has(key) && shouldExist === existingKeys.has(key)) return null;
+      return serializeKeyOperation(key, () =>
+        shouldExist ? storageManager.set({ [key]: true }) : storageManager.remove(key)
+      );
+    })
+  );
+}

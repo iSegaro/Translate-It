@@ -6,7 +6,7 @@ import { ProviderRegistryIds } from '@/features/translation/providers/ProviderCo
 import { getPersistedDefaultSettings } from '@/shared/config/settingsDefaults.js'
 import secureStorage from '@/shared/storage/core/SecureStorage.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
-import { DESKTOP_FAB_EXCLUSION_PREFIX } from '@/features/desktop-fab/desktopFabExclusions.js'
+import { DESKTOP_FAB_EXCLUSION_PREFIX, DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY, serializeDesktopFabExclusions, parseDesktopFabExclusionsSection, replaceDesktopFabExclusions } from '@/features/desktop-fab/desktopFabExclusions.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
@@ -381,8 +381,11 @@ export const useSettingsStore = defineStore('settings', () => {
         // Browser runtime not available, use undefined
       }
 
+      const fabExclusions = await serializeDesktopFabExclusions();
+
       return {
         ...exportData,
+        [DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY]: fabExclusions,
         _exported: true,
         _timestamp: new Date().toISOString(),
         _version: version
@@ -422,10 +425,17 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error('invalid_settings_format');
       }
 
+      const hasFabExclusionsSection = Object.prototype.hasOwnProperty.call(importData, DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY);
+      // Validate before any storage mutation; throws on malformed data.
+      const importedFabExclusions = hasFabExclusionsSection
+        ? parseDesktopFabExclusionsSection(importData[DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY])
+        : null;
+
       const processedSettings = await secureStorage.processImportedSettings(importData, password);
       Object.keys(processedSettings).forEach(key => {
         if (key.startsWith(DESKTOP_FAB_EXCLUSION_PREFIX)) delete processedSettings[key];
       });
+      delete processedSettings[DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY];
       const explicitImportedKeys = new Set(Object.keys(processedSettings));
       const hasImportedThinkingMode = Object.prototype.hasOwnProperty.call(
         processedSettings,
@@ -503,6 +513,10 @@ export const useSettingsStore = defineStore('settings', () => {
           if (ExtensionContextManager.isContextError(error)) throw error;
           logger.warn('[Import] Obsolete settings cleanup failed');
         }
+      }
+
+      if (importedFabExclusions !== null) {
+        await replaceDesktopFabExclusions(importedFabExclusions);
       }
 
       // Re-setup storage listener after import is complete
