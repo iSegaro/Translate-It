@@ -2,7 +2,8 @@
 
 ##### Added
 
-- Added **Dynamic AI Model Discovery**, allowing users to browse, search, and select available AI models directly from Settings for OpenRouter, Requesty, OpenAI, DeepSeek, and Gemini, and to browse server-advertised models in the main Model selector for WebAI.
+- You can now easily browse, search, and choose AI models in [Settings](#/providers?highlight=PROVIDERS_CONFIGURE_SECTION) for OpenRouter, Requesty, OpenAI, DeepSeek, Gemini, and WebAI.
+- You can now hide the Desktop FAB temporarily or on specific pages and websites. You can also view and remove hidden pages and sites through [Manage List](#/activation?highlight=DESKTOP_FAB_EXCLUSIONS) in Settings.
 
 ---
 

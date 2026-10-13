@@ -104,7 +104,11 @@ describe('ProvidersTab.vue - Config-panel selector labeling', () => {
   it('renders the ProvidersTab-specific label key, not the shared global key', () => {
     const wrapper = mountTab();
 
-    const label = wrapper.find('.primary-service-selection label');
+    const section = wrapper.find('#PROVIDERS_CONFIGURE_SECTION');
+    expect(section.exists()).toBe(true);
+    expect(section.classes()).toContain('primary-service-selection');
+
+    const label = wrapper.find('#PROVIDERS_CONFIGURE_SECTION label');
     expect(label.exists()).toBe(true);
     expect(label.text()).toBe('providers_configure_label');
     expect(label.text()).not.toBe('translation_api_label');
