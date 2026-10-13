@@ -11,7 +11,7 @@ Translate It's active backlog is tracked in GitHub rather than in repository-loc
 ## Tracking Rules
 
 - Use an **Issue** for actionable bugs, enhancements, security work, documentation work, and technical debt.
-- Add actionable Issues to the **Translate It Roadmap** project with Status and Priority.
+- Add actionable Issues to the **Translate It Roadmap** project with Project **Status**, and set **Priority** using the Organization Issue Field. **Effort** is also an Organization Issue Field, but is not required.
 - Use a **Discussion** for ideas, research, or product/architecture decisions that are not ready for implementation.
 - Use a **Tracking Issue** only when an initiative has multiple independently actionable child issues.
 - Keep architecture and behavioral source-of-truth documents under `docs/adr/`, `docs/technical/`, and `docs/roadmap/`.
