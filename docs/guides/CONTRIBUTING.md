@@ -1,6 +1,65 @@
 # Contributing to Translate It!
 
-This document provides instructions for setting up the project locally and the workflow for making changes.
+Thank you for your interest in Translate It! This document explains how to find existing work, propose and coordinate changes, submit pull requests, communicate with maintainers, and set up the project locally.
+
+## Before You Start
+
+Before proposing or implementing a change, take a moment to look for existing work:
+
+- Review the public [Translate It Roadmap](https://github.com/orgs/Translate-It-App/projects/2) to see what is planned and in progress. The Roadmap is public — you do not need permission or edit access to browse it.
+- Search [GitHub Issues](https://github.com/Translate-It-App/Translate-It/issues) and [Discussions](https://github.com/Translate-It-App/Translate-It/discussions) for a related report, proposal, or conversation.
+- If something similar already exists, add your context there instead of opening a duplicate or starting an overlapping implementation.
+- To contribute to existing work, comment on the relevant Issue to express your interest.
+- Before starting work on an assigned or already in-progress Issue, coordinate with the maintainer so effort is not duplicated.
+- Expressing interest does not automatically assign ownership of an Issue, and it does not guarantee that a proposal or implementation will be accepted.
+
+This is about reducing duplicated effort and keeping changes aligned — not about gatekeeping. Questions are always welcome.
+
+## Choosing the Right Workflow
+
+Use the channel that matches the stage of your idea.
+
+**GitHub Issues** — for actionable work: bug reports, feature requests (which can be submitted without prior approval), enhancements, documentation work, and technical debt. See the [Project Backlog](../Backlog.md) for the detailed tracking rules rather than duplicating them here. For substantial changes, discuss the implementation scope on the Issue before starting, so the approach is agreed on before significant work is done.
+
+**GitHub Discussions** — for work that is not yet ready to implement: early-stage ideas, research, architecture or product discussions, and general questions. When a proposal becomes actionable, turn it into a new Issue or link it to an existing one so it can be tracked.
+
+**Pull Requests** — for implementations and concrete changes ready for review.
+
+- Small, independent fixes such as typos, minor documentation corrections, and straightforward bug fixes may be submitted directly without a prior Issue.
+- New features, major UI/UX changes, architectural changes, and substantial refactors should be coordinated before implementation so the direction is agreed on first.
+
+These guidelines exist to keep work coordinated, not to add bureaucracy. When in doubt, open a Discussion or comment on an Issue and ask.
+
+## Coordination and Issue Ownership
+
+- You can volunteer to work on available Issues by commenting on them.
+- The maintainer coordinates scope, priorities, and assignments.
+- An Issue being unassigned does not necessarily mean implementation is approved.
+- Do not independently reimplement an assigned or in-progress Issue without coordinating first.
+- Use Issue comments for coordination rather than private messages, so the discussion stays visible and traceable for everyone.
+- Design suggestions and feedback are welcome on existing Issues, even when implementation is assigned to someone else.
+
+We cannot promise a particular assignment, timeline, or review turnaround, but every contribution is appreciated.
+
+## Communication Channels
+
+- **Issue comments:** coordination on specific, actionable work.
+- **Discussions → Ideas:** early-stage proposals and design or product ideas.
+- **Discussions → Q&A:** questions about development and contributing.
+- **Pull Requests:** implementation review and technical feedback.
+- **Commercial partnerships:** see [PARTNERSHIPS.md](../../PARTNERSHIPS.md) or email [partnerships@translate-it.app](mailto:partnerships@translate-it.app).
+
+Where practical, keep ordinary open-source collaboration public and traceable in these channels.
+
+## Maintainer Responsibilities and Review
+
+Maintainers review proposals, set priorities, coordinate implementation scope, and review Pull Requests. To help a PR move smoothly:
+
+- Provide a clear description of the change.
+- Link relevant Issues when applicable.
+- Report the validation you ran.
+
+Review feedback may ask for revisions. A passing CI run does not automatically mean a PR will be merged, and prior discussion or approval of an idea does not guarantee that a particular implementation will be accepted. Final acceptance and merge decisions remain with the project maintainers.
 
 ## How to Contribute
 
