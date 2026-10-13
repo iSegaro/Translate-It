@@ -171,23 +171,24 @@ export function parseDesktopFabExclusionsSection(data) {
 /**
  * Replace persisted exclusions with the given canonical entries. First lets all
  * in-flight feature writes settle and reads a stable snapshot (retrying if a
- * write starts during the read), so the baseline reflects the actual outcome of
- * settled operations rather than stale intents. Keys already in the requested
- * state are skipped; every other affected key gets one authoritative operation
- * enqueued on its own per-key serializer (independent keys stay concurrent).
+ * write starts during the read), so it reflects the actual settled state. Keys
+ * already in the requested state are skipped.
  *
- * If any operation fails, every started operation is allowed to settle first,
- * then the pre-replacement snapshot is restored (recovery ops are enqueued last
- * per key, so they win over late writes). The original failure is rethrown; if
- * recovery itself fails, a distinct error is thrown so callers never report
- * success. Storage failures therefore cannot silently drop saved exclusions.
+ * Additions run first; removals start only after every addition succeeds. On an
+ * addition failure the successful imported additions are rolled back with
+ * removals only — recovery never calls set(), so a failed import can never
+ * recreate an exclusion that another context removed. A removal failure is not
+ * rolled back (re-adding would risk resurrection): the remaining exclusions are
+ * kept and the failure is propagated. The original failure is rethrown, or a
+ * distinct recovery error if the addition rollback itself fails, so callers
+ * never report success.
  */
 export async function replaceDesktopFabExclusions(entries) {
   const nextKeys = new Set(entries.map((entry) => entry.key));
 
   // Settle in-flight writes and read a snapshot only while no write is pending,
   // retrying if a write starts during the read. The snapshot is the actual
-  // settled state and therefore a reliable rollback baseline.
+  // settled state and therefore a reliable baseline.
   let existing;
   for (;;) {
     if (pendingWrites.size > 0) {
@@ -200,40 +201,36 @@ export async function replaceDesktopFabExclusions(entries) {
   }
 
   const existingKeys = new Set(existing.map((entry) => entry.key));
-  const candidateKeys = new Set([...existingKeys, ...nextKeys]);
+  const additions = [...nextKeys].filter((key) => !existingKeys.has(key));
+  const removals = [...existingKeys].filter((key) => !nextKeys.has(key));
 
-  const plan = [...candidateKeys].map((key) => {
-    const shouldExist = nextKeys.has(key);
-    if (shouldExist === existingKeys.has(key)) return { key, operation: null };
-    return {
-      key,
-      operation: serializeKeyOperation(key, () =>
-        shouldExist ? storageManager.set({ [key]: true }) : storageManager.remove(key)
-      ),
-    };
-  });
-
-  // Settle every started operation before deciding: a late write must not be
-  // able to undo the recovery performed below.
-  const results = await Promise.allSettled(plan.map((entry) => entry.operation));
-  const failedIndex = results.findIndex((result) => result.status === 'rejected');
-  if (failedIndex === -1) return;
-
-  // Restore the pre-replacement snapshot for every key we attempted to change.
-  const recovery = plan
-    .filter((entry) => entry.operation !== null)
-    .map((entry) => {
-      const shouldExist = existingKeys.has(entry.key);
-      return serializeKeyOperation(entry.key, () =>
-        shouldExist ? storageManager.set({ [entry.key]: true }) : storageManager.remove(entry.key)
-      );
-    });
-  const recoveryResults = await Promise.allSettled(recovery);
-  if (recoveryResults.some((result) => result.status === 'rejected')) {
-    const error = new Error('desktop_fab_exclusions_recovery_failed');
-    error.cause = results[failedIndex].reason;
-    throw error;
+  // Phase 1: additions. Rollback is removal-only, so a failed import can never
+  // recreate an exclusion that another context removed.
+  const addResults = await Promise.allSettled(
+    additions.map((key) => serializeKeyOperation(key, () => storageManager.set({ [key]: true })))
+  );
+  const failedAdd = addResults.find((result) => result.status === 'rejected');
+  if (failedAdd) {
+    // All started additions have settled (allSettled). Undo the ones that
+    // succeeded using removal only; never restore old entries with set().
+    const rollback = additions
+      .filter((key, index) => addResults[index].status === 'fulfilled')
+      .map((key) => serializeKeyOperation(key, () => storageManager.remove(key)));
+    const rollbackResults = await Promise.allSettled(rollback);
+    if (rollbackResults.some((result) => result.status === 'rejected')) {
+      const error = new Error('desktop_fab_exclusions_recovery_failed');
+      error.cause = failedAdd.reason;
+      throw error;
+    }
+    throw failedAdd.reason;
   }
 
-  throw results[failedIndex].reason;
+  // Phase 2: removals, only once every addition succeeded. A failed removal is
+  // not rolled back (re-adding risks resurrecting a removed exclusion); the
+  // remaining exclusions are kept and the failure is propagated.
+  const removeResults = await Promise.allSettled(
+    removals.map((key) => serializeKeyOperation(key, () => storageManager.remove(key)))
+  );
+  const failedRemove = removeResults.find((result) => result.status === 'rejected');
+  if (failedRemove) throw failedRemove.reason;
 }

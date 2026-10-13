@@ -447,34 +447,31 @@ describe('desktop FAB exclusions', () => {
     expect(storage.has(added.key)).toBe(false);
   });
 
-  it('recovery wins over a late write from a failed replace', async () => {
+  it('rolls back a successful addition when a later addition fails', async () => {
     resetStorageMocks();
-    const existingKey = getDesktopFabExclusionKey('page', 'https://restore.test/a');
-    const [added] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://added.test/b' }]);
-    storage.set(existingKey, true);
-    const removeStarted = deferred();
-    const allowRemove = deferred();
-    storageManager.remove.mockImplementation(async keys => {
-      const key = Array.isArray(keys) ? keys[0] : keys;
-      if (key === existingKey) {
-        removeStarted.resolve();
-        await allowRemove.promise;
-      }
-      storage.delete(key);
-    });
+    const [k1] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://one.test/a' }]);
+    const [k2] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://two.test/b' }]);
+    const setStarted = deferred();
+    const allowSet = deferred();
     storageManager.set.mockImplementation(async data => {
       const key = Object.keys(data)[0];
-      if (key === added.key) throw new Error('set boom');
-      for (const [k, v] of Object.entries(data)) storage.set(k, v);
+      if (key === k1.key) {
+        setStarted.resolve();
+        await allowSet.promise;
+        storage.set(key, true);
+        return;
+      }
+      if (key === k2.key) throw new Error('set boom');
+      storage.set(key, true);
     });
-    const replacing = replaceDesktopFabExclusions([added]);
-    await removeStarted.promise;
-    allowRemove.resolve();
+    const replacing = replaceDesktopFabExclusions([k1, k2]);
+    await setStarted.promise;
+    allowSet.resolve();
     await expect(replacing).rejects.toThrow('set boom');
-    expect(storage.get(existingKey)).toBe(true);
-    expect(storage.has(added.key)).toBe(false);
-    expect(storageManager.set.mock.invocationCallOrder[1])
-      .toBeGreaterThan(storageManager.remove.mock.invocationCallOrder[0]);
+    expect(storage.has(k1.key)).toBe(false);      // successful add rolled back
+    expect(storage.has(k2.key)).toBe(false);
+    expect(storageManager.remove.mock.invocationCallOrder[0])
+      .toBeGreaterThan(storageManager.set.mock.invocationCallOrder[0]);
   });
 
   it('preserves a successful pending removal on a failed replace', async () => {
@@ -533,8 +530,7 @@ describe('desktop FAB exclusions', () => {
     expect(storage.get(pendingKey)).toBe(true);
     expect(storage.get(existingKey)).toBe(true);
     expect(storage.has(added.key)).toBe(false);
-    expect(storageManager.set.mock.invocationCallOrder[3])
-      .toBeGreaterThan(storageManager.remove.mock.invocationCallOrder[1]);
+    expect(storageManager.remove).not.toHaveBeenCalled();
   });
 
   it('does not restore a pending addition whose write failed during a failed replace', async () => {
@@ -610,14 +606,78 @@ describe('desktop FAB exclusions', () => {
 
   it('reports recovery failure distinctly when restore also fails', async () => {
     resetStorageMocks();
-    const existingKey = getDesktopFabExclusionKey('page', 'https://restore.test/a');
-    const [added] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://added.test/b' }]);
-    storage.set(existingKey, true);
-    storageManager.set.mockImplementation(async () => {
-      throw new Error('set boom');
+    const [k1] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://one.test/a' }]);
+    const [k2] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://two.test/b' }]);
+    storageManager.set.mockImplementation(async data => {
+      const key = Object.keys(data)[0];
+      if (key === k2.key) throw new Error('set boom');
+      storage.set(key, true);
     });
-    const error = await replaceDesktopFabExclusions([added]).catch(e => e);
+    storageManager.remove.mockImplementation(async () => { throw new Error('remove boom'); });
+    const error = await replaceDesktopFabExclusions([k1, k2]).catch(e => e);
     expect(error.message).toBe('desktop_fab_exclusions_recovery_failed');
     expect(error.cause.message).toBe('set boom');
+  });
+
+  it('rolls back only successful additions and never restores old entries', async () => {
+    resetStorageMocks();
+    const Akey = getDesktopFabExclusionKey('page', 'https://keep.test/a');
+    const [k1] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://one.test/a' }]);
+    const [k2] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://two.test/b' }]);
+    storage.set(Akey, true);
+    storageManager.set.mockImplementation(async data => {
+      const key = Object.keys(data)[0];
+      if (key === k2.key) throw new Error('set boom');
+      storage.set(key, true);
+    });
+    await expect(replaceDesktopFabExclusions([k1, k2])).rejects.toThrow('set boom');
+    expect(storage.get(Akey)).toBe(true);       // removals never ran
+    expect(storage.has(k1.key)).toBe(false);    // successful add rolled back
+    expect(storage.has(k2.key)).toBe(false);
+    expect(storageManager.set.mock.calls.some(([data]) => Akey in data)).toBe(false);
+  });
+
+  it('preserves a cross-context removal during a failed import', async () => {
+    resetStorageMocks();
+    const Akey = getDesktopFabExclusionKey('page', 'https://keep.test/a');
+    const [B] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://added.test/b' }]);
+    storage.set(Akey, true);
+    const setStarted = deferred();
+    const allowSet = deferred();
+    storageManager.set.mockImplementation(async data => {
+      const key = Object.keys(data)[0];
+      if (key === B.key) {
+        setStarted.resolve();
+        await allowSet.promise;
+        throw new Error('set boom');
+      }
+      storage.set(key, true);
+    });
+    const replacing = replaceDesktopFabExclusions([B]);
+    await setStarted.promise;
+    storage.delete(Akey);           // independent context removes A during the import
+    allowSet.resolve();
+    await expect(replacing).rejects.toThrow('set boom');
+    expect(storage.has(Akey)).toBe(false);
+    expect(storage.has(B.key)).toBe(false);
+    expect(storageManager.set.mock.calls.some(([data]) => Akey in data)).toBe(false);
+  });
+
+  it('does not roll back a failed removal phase', async () => {
+    resetStorageMocks();
+    const Akey = getDesktopFabExclusionKey('page', 'https://keep.test/a');
+    const Bkey = getDesktopFabExclusionKey('page', 'https://drop.test/b');
+    storage.set(Akey, true);
+    storage.set(Bkey, true);
+    storageManager.remove.mockImplementation(async keys => {
+      const key = Array.isArray(keys) ? keys[0] : keys;
+      if (key === Bkey) throw new Error('remove boom');
+      storage.delete(key);
+    });
+    const [A] = parseDesktopFabExclusionsSection([{ scope: 'page', value: 'https://keep.test/a' }]);
+    await expect(replaceDesktopFabExclusions([A])).rejects.toThrow('remove boom');
+    expect(storage.get(Akey)).toBe(true);
+    expect(storage.get(Bkey)).toBe(true);
+    expect(storageManager.set).not.toHaveBeenCalled();
   });
 });
