@@ -105,6 +105,27 @@
       </button>
     </div>
     <div class="toolbar-group-bottom">
+      <!-- Desktop FAB visibility: first entry of the lower group, so the
+           order stays FAB → PDF → Subtitle → Settings. The status comes
+           from the content script only — never from settings or storage. -->
+      <button
+        id="fabVisibilityBtn"
+        type="button"
+        class="toolbar-button"
+        :disabled="isFabToggleDisabled"
+        :title="fabToggleTitle"
+        :aria-label="fabToggleTitle"
+        @click="handleFabToggle"
+      >
+        <!-- MaskIcon (ADR-001): currentColor glyph. Deliberately NOT given
+             .toolbar-icon, whose dark-theme filter would invert a mask. -->
+        <MaskIcon
+          class="fab-toggle-icon"
+          :src="fabToggleIcon"
+          :size="22"
+        />
+      </button>
+
       <button
         id="pdfBtn"
         class="toolbar-button"
@@ -156,7 +177,7 @@
 
 <script setup>
 import './SidepanelToolbar.scss'
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useSelectElementTranslation, useSidepanelActions } from '@/features/translation/composables/useTranslationModes.js';
 import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouseHoverToggle.js';
 import { useTranslationStore } from '@/features/translation/stores/translation.js';
@@ -184,6 +205,7 @@ const getLogger = () => {
 
 import ProviderSelector from '@/components/shared/ProviderSelector.vue';
 import PageTranslationButton from '@/features/page-translation/components/PageTranslationButton.vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 
@@ -274,6 +296,352 @@ const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 const captureIcon = browser.runtime.getURL('icons/ui/capture.svg')
 const subtitleIcon = browser.runtime.getURL('icons/ui/subtitle.svg')
 const pdfIcon = browser.runtime.getURL('icons/ui/pdf_viewer/pdf.png')
+
+// ── Desktop FAB visibility ─────────────────────────────────────────────────
+// Toolbar-owned state only: the tab this status belongs to, whether a show /
+// hide command is outstanding, and a generation token that fences every async
+// read/write. Status comes from the content script alone; nothing is inferred
+// from settings or storage and nothing is ever written back to them.
+const FAB_STATUS = {
+  VISIBLE: 'visible',
+  HIDDEN: 'hidden',
+  LOADING: 'loading',
+  UNAVAILABLE: 'unavailable'
+}
+const FAB_STATUS_VALUES = Object.values(FAB_STATUS)
+
+// Recognized content reason codes → localized explanation. Anything else
+// (unknown codes, transport errors) falls back to a generic localized
+// sentence: raw error text never reaches title/aria-label.
+const FAB_REASON_KEYS = {
+  'global-disabled': 'popup_fab_reason_disabled_by_setting',
+  fullscreen: 'popup_fab_reason_fullscreen',
+  'ui-absent': 'popup_fab_reason_ui_absent',
+  'mobile-ui': 'popup_fab_reason_ui_absent'
+}
+const FAB_REASON_FALLBACKS = {
+  popup_fab_reason_disabled_by_setting: 'The Desktop FAB setting hides the floating button here.',
+  popup_fab_reason_fullscreen: 'The floating button is hidden while this page is fullscreen.',
+  popup_fab_reason_ui_absent: 'The floating button is not available on this page.'
+}
+
+// Bounded retry for the transient `loading` a freshly shown FAB reports while
+// its content UI mounts. Count-based (not wall-clock) so it can never become
+// polling; only `loading` ever schedules it, never `unavailable`.
+const FAB_RETRY_DELAY = 150
+const FAB_RETRY_MAX = 8
+
+const fabState = ref({ status: FAB_STATUS.LOADING, reason: '' })
+const fabCommandsInFlight = reactive(new Set())
+// The exact tab the current status was read from, plus the window it lives in
+// (used to filter tab events from other side-panel windows).
+let fabTarget = null
+let fabWindowId = null
+let fabGeneration = 0
+let fabMounted = false
+let fabRetryTimer = null
+let fabRetriesLeft = FAB_RETRY_MAX
+let fabRetryTargetKey = null
+
+const fabTargetKey = (target) => target
+  ? JSON.stringify([target.windowId ?? null, target.tabId, target.url ?? null])
+  : null
+
+const fabAdoptTarget = (target) => {
+  const key = fabTargetKey(target)
+  fabTarget = target
+  if (target?.windowId != null) fabWindowId = target.windowId
+  if (key !== fabRetryTargetKey) {
+    fabRetryTargetKey = key
+    fabRetriesLeft = FAB_RETRY_MAX
+    fabCancelRetry()
+  }
+}
+
+const fabIsCurrentTarget = (target) => fabTargetKey(fabTarget) === fabTargetKey(target)
+
+const isFabToggleDisabled = computed(() => {
+  const commandPending = Boolean(fabTarget && fabCommandsInFlight.has(fabTargetKey(fabTarget)))
+  const statusUnavailable = fabState.value.status !== FAB_STATUS.VISIBLE
+    && fabState.value.status !== FAB_STATUS.HIDDEN
+  return commandPending || statusUnavailable
+})
+
+/** The enabled label names the ACTION; disabled rows explain themselves. */
+const fabActionLabel = computed(() => {
+  if (fabState.value.status === FAB_STATUS.VISIBLE) return t('popup_fab_hide_label', 'Hide FAB for Now')
+  if (fabState.value.status === FAB_STATUS.HIDDEN) return t('popup_fab_show_label', 'Show FAB for Now')
+  return ''
+})
+
+const fabExplanation = computed(() => {
+  if (fabState.value.status === FAB_STATUS.LOADING) {
+    return t('popup_fab_loading_reason', 'Reading the floating button’s status…')
+  }
+  const reasonKey = FAB_REASON_KEYS[fabState.value.reason]
+  if (reasonKey) return t(reasonKey, FAB_REASON_FALLBACKS[reasonKey])
+  return t(
+    'popup_fab_unavailable_reason',
+    'The floating button’s status is unavailable on this page.'
+  )
+})
+
+const fabToggleTitle = computed(() =>
+  isFabToggleDisabled.value ? fabExplanation.value : fabActionLabel.value
+)
+
+// Eye state mirrors the ACTION: the visible FAB offers "hide", the hidden one
+// offers "show" (same mapping as the popup's FAB action).
+const fabToggleIcon = computed(() => browser.runtime.getURL(
+  fabState.value.status === FAB_STATUS.VISIBLE ? 'icons/ui/eye-hide.svg' : 'icons/ui/eye-open.svg'
+))
+
+const fabCancelRetry = () => {
+  if (fabRetryTimer !== null) {
+    clearTimeout(fabRetryTimer)
+    fabRetryTimer = null
+  }
+}
+
+const fabRetryAllowed = () => fabMounted && document.visibilityState === 'visible'
+
+const fabScheduleRetry = (target) => {
+  if (!fabRetryAllowed() || fabRetriesLeft <= 0 || fabRetryTimer !== null) return
+  const targetKey = fabTargetKey(target)
+  if (!targetKey || targetKey !== fabRetryTargetKey) return
+  fabRetriesLeft -= 1
+  fabRetryTimer = setTimeout(() => {
+    fabRetryTimer = null
+    if (!fabRetryAllowed() || targetKey !== fabTargetKey(fabTarget)) return
+    void refreshFabStatus()
+  }, FAB_RETRY_DELAY)
+}
+
+const fabMarkUnavailable = (generation, reason) => {
+  if (generation !== fabGeneration) return
+  fabState.value = {
+    status: FAB_STATUS.UNAVAILABLE,
+    reason: typeof reason === 'string' ? reason : ''
+  }
+}
+
+const fabApply = (generation, target, status, reason) => {
+  if (generation !== fabGeneration) return
+  // A pending command owns only its target; another active tab remains usable.
+  if (fabCommandsInFlight.has(fabTargetKey(target))) return
+  fabState.value = { status, reason: typeof reason === 'string' ? reason : '' }
+  if (status === FAB_STATUS.LOADING) {
+    fabScheduleRetry(target)
+  } else {
+    fabCancelRetry()
+  }
+}
+
+/**
+ * Read the authoritative status for the active tab of the current window.
+ * `keepExistingState` leaves the current row (and its reason) visible while
+ * the read runs — used after a failed command so the failure stays readable.
+ */
+const refreshFabStatus = async ({ keepExistingState = false } = {}) => {
+  if (!fabMounted) return
+  const generation = ++fabGeneration
+  fabCancelRetry()
+  if (!keepExistingState) {
+    fabState.value = { status: FAB_STATUS.LOADING, reason: '' }
+  }
+
+  let tab
+  try {
+    ;[tab] = await browser.tabs.query({ active: true, currentWindow: true })
+  } catch (error) {
+    fabMarkUnavailable(generation, error?.message)
+    return
+  }
+  if (generation !== fabGeneration) return
+  if (!tab?.id || !tab?.url) {
+    fabMarkUnavailable(generation, '')
+    return
+  }
+
+  const target = { tabId: tab.id, url: tab.url, windowId: tab.windowId }
+  fabAdoptTarget(target)
+
+  let reply
+  try {
+    reply = await browser.tabs.sendMessage(
+      target.tabId,
+      { action: MessageActions.DESKTOP_FAB_GET_STATUS },
+      { frameId: 0 }
+    )
+  } catch (error) {
+    // Restricted page, missing receiver, transport failure → unavailable.
+    fabMarkUnavailable(generation, error?.message)
+    return
+  }
+  if (generation !== fabGeneration) return
+  // Fail closed: success flag AND exact URL echo…
+  if (reply?.success !== true || reply.url !== target.url) {
+    fabMarkUnavailable(generation, '')
+    return
+  }
+  // …then re-confirm the target is still the active tab, because a switch to
+  // a different tab with the SAME url defeats the sequence token alone.
+  let current
+  try {
+    ;[current] = await browser.tabs.query({ active: true, currentWindow: true })
+  } catch (error) {
+    fabMarkUnavailable(generation, error?.message)
+    return
+  }
+  if (generation !== fabGeneration) return
+  if (!current || current.id !== target.tabId || current.url !== target.url) {
+    fabMarkUnavailable(generation, '')
+    return
+  }
+
+  const status = FAB_STATUS_VALUES.includes(reply.status) ? reply.status : FAB_STATUS.UNAVAILABLE
+  fabApply(generation, target, status, reply.reason)
+}
+
+/**
+ * Show/hide the FAB for the tab the status was read from. The active tab is
+ * re-queried first and must match that tab exactly, so a stale row can never
+ * drive another tab; whatever the command replies, the visible status comes
+ * from a fresh read — never optimistically from the reply.
+ */
+const handleFabToggle = async () => {
+  if (isFabToggleDisabled.value || !fabMounted) return
+  const target = fabTarget
+  if (!target) return
+  const override = fabState.value.status === FAB_STATUS.VISIBLE ? 'hide' : 'show'
+  const generation = ++fabGeneration
+  const commandKey = fabTargetKey(target)
+  fabCancelRetry()
+  fabCommandsInFlight.add(commandKey)
+  fabState.value = { status: FAB_STATUS.LOADING, reason: '' }
+
+  try {
+    let tab
+    try {
+      ;[tab] = await browser.tabs.query({ active: true, currentWindow: true })
+    } catch (error) {
+      fabMarkUnavailable(generation, error?.message)
+      return
+    }
+    // A newer read (tab switch, navigation) supersedes an unsent command.
+    if (generation !== fabGeneration) {
+      return
+    }
+    if (!tab || tab.id !== target.tabId || tab.url !== target.url) {
+      // Never control a tab other than the one the status came from.
+      return
+    }
+
+    let result = null
+    let failureReason = ''
+    try {
+      result = await browser.tabs.sendMessage(
+        tab.id,
+        {
+          action: MessageActions.DESKTOP_FAB_SET_OVERRIDE,
+          data: { expectedUrl: target.url, override }
+        },
+        { frameId: 0 }
+      )
+    } catch (error) {
+      failureReason = error?.message || ''
+    }
+    const settled = result?.success === true
+    if (!settled) {
+      // Keep the failure readable while the authoritative re-read runs.
+      fabMarkUnavailable(generation, failureReason || result?.reason || '')
+    }
+  } finally {
+    fabCommandsInFlight.delete(commandKey)
+    if (fabMounted && fabIsCurrentTarget(target)) {
+      void refreshFabStatus({ keepExistingState: true })
+    }
+  }
+}
+
+// ── Tab / panel listeners (side panel persists between uses) ───────────────
+const handleTabsActivated = (activeInfo) => {
+  if (!fabMounted) return
+  if (fabWindowId !== null && activeInfo?.windowId !== fabWindowId) return
+  if (fabWindowId !== null && Number.isInteger(activeInfo?.tabId)) {
+    const existingUrl = fabTarget?.tabId === activeInfo.tabId ? fabTarget.url : null
+    fabAdoptTarget({ tabId: activeInfo.tabId, url: existingUrl, windowId: fabWindowId })
+  }
+  void refreshFabStatus()
+}
+
+const handleTabsUpdated = (tabId, changeInfo, tab) => {
+  if (!fabMounted) return
+  if (!fabTarget || tabId !== fabTarget.tabId) return
+  if (fabWindowId !== null && tab && tab.windowId !== fabWindowId) return
+  // Only full navigations change what the FAB means; progress/title noise
+  // would otherwise turn every load into extra reads.
+  const fullNavigation = typeof changeInfo?.url === 'string' || changeInfo?.status === 'complete'
+  if (!fullNavigation) return
+  const url = typeof changeInfo?.url === 'string' ? changeInfo.url : tab?.url
+  if (typeof url === 'string' && url !== fabTarget.url) {
+    fabAdoptTarget({ ...fabTarget, url })
+  }
+  void refreshFabStatus()
+}
+
+// SPA URL changes and hash changes do not reliably reach tabs.onUpdated.
+// Registered WITHOUT a filter argument (an empty filter object is rejected
+// by Firefox), so both tabId and frameId are checked in the handler.
+const handleWebNavigationUpdate = (details) => {
+  if (!fabMounted) return
+  if (!details || details.frameId !== 0) return
+  if (!fabTarget || details.tabId !== fabTarget.tabId) return
+  if (fabWindowId !== null && details.windowId != null && details.windowId !== fabWindowId) return
+  if (typeof details.url === 'string' && details.url !== fabTarget.url) {
+    fabAdoptTarget({ ...fabTarget, url: details.url })
+  }
+  void refreshFabStatus()
+}
+
+const handleVisibilityChange = () => {
+  if (!fabMounted) return
+  if (document.visibilityState === 'visible') {
+    void refreshFabStatus()
+  } else {
+    // Hidden panel: nobody can see the row, so the retry leash stops.
+    fabCancelRetry()
+  }
+}
+
+const handleWindowFocus = () => {
+  if (!fabMounted) return
+  if (document.visibilityState === 'visible') void refreshFabStatus()
+}
+
+onMounted(() => {
+  fabMounted = true
+  browser.tabs?.onActivated?.addListener?.(handleTabsActivated)
+  browser.tabs?.onUpdated?.addListener?.(handleTabsUpdated)
+  browser.webNavigation?.onHistoryStateUpdated?.addListener?.(handleWebNavigationUpdate)
+  browser.webNavigation?.onReferenceFragmentUpdated?.addListener?.(handleWebNavigationUpdate)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('focus', handleWindowFocus)
+  void refreshFabStatus()
+})
+
+onUnmounted(() => {
+  fabMounted = false
+  // Fences every in-flight read and the retry timer at once.
+  fabGeneration += 1
+  fabCancelRetry()
+  browser.tabs?.onActivated?.removeListener?.(handleTabsActivated)
+  browser.tabs?.onUpdated?.removeListener?.(handleTabsUpdated)
+  browser.webNavigation?.onHistoryStateUpdated?.removeListener?.(handleWebNavigationUpdate)
+  browser.webNavigation?.onReferenceFragmentUpdated?.removeListener?.(handleWebNavigationUpdate)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('focus', handleWindowFocus)
+})
 
 const handleSelectElement = async () => {
   if (!isSelectElementSupported.value) return
