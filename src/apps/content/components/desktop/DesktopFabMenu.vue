@@ -216,12 +216,19 @@
       >
         {{ t('desktop_fab_hide_onfabclick_warning', 'While hidden, you can’t start selection translation from the Desktop FAB.') }}
       </div>
-      <button
-        ref="firstHideAction"
-        type="button"
-        @click.stop="handleHideSelection('temporary')"
+      <div
+        v-if="hideError"
+        class="fab-hide-error"
+        role="alert"
       >
-        {{ t('desktop_fab_hide_close_for_now', 'Close for Now') }}
+        {{ hideError }}
+      </div>
+      <button
+        v-if="siteHideScopeSupported"
+        type="button"
+        @click.stop="handleHideSelection('site')"
+      >
+        {{ t('desktop_fab_hide_this_site', 'Always Hide on This Site') }}
       </button>
       <button
         v-if="pageHideScopeSupported"
@@ -231,19 +238,13 @@
         {{ t('desktop_fab_hide_this_page', 'Always Hide on This Page') }}
       </button>
       <button
-        v-if="siteHideScopeSupported"
+        ref="firstHideAction"
         type="button"
-        @click.stop="handleHideSelection('site')"
+        class="fab-hide-close-now"
+        @click.stop="handleHideSelection('temporary')"
       >
-        {{ t('desktop_fab_hide_this_site', 'Always Hide on This Site') }}
+        {{ t('desktop_fab_hide_close_for_now', 'Close for Now') }}
       </button>
-      <div
-        v-if="hideError"
-        class="fab-hide-error"
-        role="alert"
-      >
-        {{ hideError }}
-      </div>
     </div>
 
     <!-- Main Button -->
@@ -691,9 +692,14 @@ const closeHidePopover = () => {
  * panel — no shared util). getBoundingClientRect is viewport-relative so the
  * Shadow DOM needs no special handling; offsets are computed against the
  * fixed container, the popover's offset parent. Preferred placement hugs the
- * toolbar button's trailing edge and sits above it (outward, away from the
- * FAB below); horizontal flip + vertical flip + 8px clamp keep it inside the
- * viewport for either dock side and both directions.
+ * toolbar button's trailing edge with bottom edges aligned, so the bottom
+ * action (Close for Now) overlaps the eye button's clickable area and the
+ * opening click needs no pointer travel; the button's insets inside the
+ * padded container are measured and added to the preferred offsets (and the
+ * horizontal flip candidate) so the BUTTON covers the anchor band, falling
+ * back to zero insets when its rect is unavailable; horizontal flip +
+ * vertical flip + 8px clamp keep it inside the viewport for either dock
+ * side and both directions.
  */
 const positionHidePopover = async () => {
   await nextTick();
@@ -705,8 +711,23 @@ const positionHidePopover = async () => {
   const GAP = 6;
   const anchorRect = anchor.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
-  const popWidth = pop.offsetWidth || pop.getBoundingClientRect().width;
-  const popHeight = pop.offsetHeight || pop.getBoundingClientRect().height;
+  const popRect = pop.getBoundingClientRect();
+  const popWidth = pop.offsetWidth || popRect.width;
+  const popHeight = pop.offsetHeight || popRect.height;
+  // Align the Close-for-Now BUTTON (not just the padded container) with the
+  // anchor: measure its insets inside the popover and shift the preferred
+  // placement by them. A missing or degenerate button rect falls back to
+  // zero insets (the previous container-aligned formulas).
+  const closeBtn = Array.isArray(firstHideAction.value) ? firstHideAction.value[0] : firstHideAction.value;
+  const btnRect = closeBtn?.getBoundingClientRect?.();
+  let bottomInset = 0;
+  let leftInset = 0;
+  let rightInset = 0;
+  if (btnRect && btnRect.width > 0 && btnRect.height > 0) {
+    bottomInset = popRect.bottom - btnRect.bottom;
+    leftInset = btnRect.left - popRect.left;
+    rightInset = popRect.right - btnRect.right;
+  }
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const direction = (container && typeof getComputedStyle !== 'undefined'
@@ -718,10 +739,10 @@ const positionHidePopover = async () => {
 
   const anchorLeft = anchorRect.left - containerRect.left;
   const anchorTop = anchorRect.top - containerRect.top;
-  let left = hugRight ? anchorLeft + anchorRect.width - popWidth : anchorLeft;
+  let left = hugRight ? anchorLeft + anchorRect.width - popWidth + rightInset : anchorLeft - leftInset;
   const viewportLeft = containerRect.left + left;
   if (viewportLeft < MARGIN || viewportLeft + popWidth > vw - MARGIN) {
-    const flipped = hugRight ? anchorLeft : anchorLeft + anchorRect.width - popWidth;
+    const flipped = hugRight ? anchorLeft - leftInset : anchorLeft + anchorRect.width - popWidth + rightInset;
     const flippedViewportLeft = containerRect.left + flipped;
     if (flippedViewportLeft >= MARGIN && flippedViewportLeft + popWidth <= vw - MARGIN) {
       left = flipped;
@@ -733,7 +754,7 @@ const positionHidePopover = async () => {
     }
   }
 
-  let top = anchorTop - popHeight - GAP;
+  let top = anchorTop + anchorRect.height - popHeight + bottomInset;
   if (containerRect.top + top < MARGIN) {
     const below = anchorTop + anchorRect.height + GAP;
     if (containerRect.top + below + popHeight <= vh - MARGIN) {

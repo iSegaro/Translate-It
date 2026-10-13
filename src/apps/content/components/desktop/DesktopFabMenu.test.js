@@ -444,11 +444,18 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
 
   // jsdom has no layout: drive positionHidePopover with mocked rects and
   // viewport sizes, so these tests cover the positioning CALCULATIONS.
-  const mockGeometry = ({ anchor, container, pop, vw = 1280, vh = 800, direction = null }) => {
+  const mockGeometry = ({ anchor, container, pop, vw = 1280, vh = 800, direction = null, button } = {}) => {
     const anchorRect = mockRect(anchor);
     const containerRect = mockRect(container);
     const popRect = mockRect(pop);
+    // Default: the Close-for-Now button inset 6px inside the popover (5px
+    // padding + 1px border). Explicit null simulates an unavailable rect
+    // (zero size → the positioner falls back to zero insets).
+    const buttonRect = mockRect(button === undefined
+      ? { left: pop.left + 6, top: pop.top + 6, width: pop.width - 12, height: pop.height - 12 }
+      : button ?? { left: 0, top: 0, width: 0, height: 0 });
     const rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this.classList?.contains('fab-hide-close-now')) return { ...buttonRect };
       if (this.id === 'fab-hide-popover') return { ...popRect };
       if (this.classList?.contains('fab-toolbar-hide-btn')) return { ...anchorRect };
       if (this.classList?.contains('desktop-fab-container')) return { ...containerRect };
@@ -565,9 +572,9 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     expect(menuClasses()).toEqual(before);
 
     expect(popoverLabels()).toEqual([
-      'desktop_fab_hide_close_for_now',
-      'desktop_fab_hide_this_page',
       'desktop_fab_hide_this_site',
+      'desktop_fab_hide_this_page',
+      'desktop_fab_hide_close_for_now',
     ]);
 
     // Toggling the eye collapses the popover but leaves the menu open — and
@@ -588,8 +595,18 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openPopover();
 
     expect(popoverLabels()).toEqual([
-      'desktop_fab_hide_close_for_now',
       'desktop_fab_hide_this_page',
+      'desktop_fab_hide_close_for_now',
+    ]);
+  });
+
+  it('offers only Close for Now where no scope can be expressed', async () => {
+    mocks.supportedHideScopes = new Set();
+    await openMenu();
+    await openPopover();
+
+    expect(popoverLabels()).toEqual([
+      'desktop_fab_hide_close_for_now',
     ]);
   });
 
@@ -598,7 +615,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-106px' });
   });
 
   it('anchors the popover to the leading edge on the left dock', async () => {
@@ -611,7 +628,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     wrapper.vm.side = 'left';
     await openPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '10px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '4px', top: '-106px' });
   });
 
   it('flips horizontally when the preferred edge would leave the viewport', async () => {
@@ -624,7 +641,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '5px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-1px', top: '-106px' });
   });
 
   it('clamps inside the 8px viewport margin when neither horizontal edge fits', async () => {
@@ -632,7 +649,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-258px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-258px', top: '-106px' });
   });
 
   it('flips below the toolbar when there is no room above it', async () => {
@@ -643,7 +660,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '39px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '39px' });
   });
 
   it('clamps vertically when neither above nor below the toolbar fits', async () => {
@@ -655,7 +672,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '22px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '22px' });
   });
 
   it('mirrors the dock anchoring in RTL', async () => {
@@ -670,14 +687,14 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
 
     // Same geometry in LTR anchors to the trailing edge (-132px); in RTL the
     // right dock hugs the leading edge instead.
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '40px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '34px', top: '-106px' });
   });
 
   it('recomputes the popover position on resize', async () => {
     const restore = mockGeometry(rightDockGeometry());
     await openMenu();
     await openPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-106px' });
 
     // Widen the popover: the trailing-edge anchor must move with it.
     restore();
@@ -686,7 +703,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     resizeHandlers().forEach((handler) => handler());
     await flushPopover();
 
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-172px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-166px', top: '-106px' });
   });
 
   it('re-anchors the popover when the dock side flips mid-session', async () => {
@@ -697,11 +714,11 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     });
     await openMenu();
     await openPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-106px' });
 
     wrapper.vm.side = 'left';
     await flushPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '40px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '34px', top: '-106px' });
   });
 
   it('repositions the popover when the warning grows it while open', async () => {
@@ -712,19 +729,19 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     const restore = mockGeometry({ ...nearBottom, pop: { left: 0, top: 0, width: 200, height: 150 } });
     await openMenu();
     await openPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '44px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '44px' });
 
     // The panel grows (taller content) with no anchor movement: placement must
     // not move until content actually changes.
     restore();
     mockGeometry({ ...nearBottom, pop: { left: 0, top: 0, width: 200, height: 700 } });
     await flushPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '44px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '44px' });
 
     mocks.settingsStore.settings.selectionTranslationMode = 'on-fab-click';
     await flushPopover();
     expect(wrapper.find('.fab-hide-warning').exists()).toBe(true);
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-8px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-8px' });
   });
 
   it('repositions the popover when error feedback grows it while open', async () => {
@@ -736,21 +753,21 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     const restore = mockGeometry({ ...nearBottom, pop: { left: 0, top: 0, width: 200, height: 150 } });
     await openMenu();
     await openPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '44px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '44px' });
 
     restore();
     mockGeometry({ ...nearBottom, pop: { left: 0, top: 0, width: 200, height: 700 } });
     await flushPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '44px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '44px' });
 
-    await wrapper.findAll('#fab-hide-popover button').at(2).trigger('click');
+    await wrapper.findAll('#fab-hide-popover button').at(0).trigger('click');
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
     await flushPopover();
 
     expect(wrapper.find('.fab-hide-error').exists()).toBe(true);
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-8px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-8px' });
     expect(wrapper.vm.isMenuOpen).toBe(true);
   });
 
@@ -764,21 +781,21 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     let restore = mockGeometry(toolbarAt(310));
     await openMenu();
     await openPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-106px' });
 
     // The disclosure grows the bottom-anchored menu, moving the toolbar anchor
     // up; geometry alone must not move placement until the menu change lands.
     restore();
     restore = mockGeometry(toolbarAt(210));
     await flushPopover();
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-106px' });
 
     await wrapper.get('.fab-menu-item-secondary-btn').trigger('click');
     await flushPopover();
     expect(wrapper.find('.fab-auto-translate-scopes').exists()).toBe(true);
     expect(wrapper.find('#fab-hide-popover').exists()).toBe(true);
     expect(wrapper.vm.isMenuOpen).toBe(true);
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-246px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-206px' });
 
     // Collapse moves the anchor back; the popover follows.
     restore();
@@ -787,7 +804,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await flushPopover();
     expect(wrapper.find('.fab-auto-translate-scopes').exists()).toBe(false);
     expect(wrapper.find('#fab-hide-popover').exists()).toBe(true);
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-146px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-106px' });
   });
 
   it('keeps the capped popover inside a short viewport', async () => {
@@ -803,18 +820,127 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
 
     // 584px = 600px viewport minus the 8px positioning margin on both sides
     // (mirrors max-height: calc(100vh - 16px)): clamped exactly to the margins.
-    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-92px' });
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-126px', top: '-92px' });
     const viewportTop = 100 + Number.parseFloat(wrapper.vm.hidePopoverStyle.top);
     const viewportBottom = viewportTop + 584;
     expect(viewportTop).toBeGreaterThanOrEqual(8);
     expect(viewportBottom).toBeLessThanOrEqual(600 - 8);
   });
 
+  it('covers the eye band with the Close-for-Now button, not just the container', async () => {
+    // Mocked button rect: Close for Now inset 6px inside the popover
+    // (5px padding + 1px border). Geometry assertions on mocked rects only —
+    // this is not a real-browser hit test.
+    const anchorBox = { left: 1190, top: 310, width: 28, height: 28 };
+    const containerBox = { left: 1150, top: 300, width: 130, height: 120 };
+    const popBox = { left: 0, top: 0, width: 200, height: 150 };
+    const btnBox = { left: 6, top: 6, width: 188, height: 138 };
+    mockGeometry({ anchor: anchorBox, container: containerBox, pop: popBox, button: btnBox });
+    await openMenu();
+    await openPopover();
+
+    // Insets shift the preferred placement off the container alignment.
+    const style = wrapper.vm.hidePopoverStyle;
+    expect(style).toEqual({ left: '-126px', top: '-106px' });
+
+    const popViewportLeft = containerBox.left + Number.parseFloat(style.left);
+    const popViewportTop = containerBox.top + Number.parseFloat(style.top);
+    const btnViewport = {
+      left: popViewportLeft + btnBox.left,
+      top: popViewportTop + btnBox.top,
+      right: popViewportLeft + btnBox.left + btnBox.width,
+      bottom: popViewportTop + btnBox.top + btnBox.height,
+    };
+    const anchorViewport = {
+      left: anchorBox.left,
+      top: anchorBox.top,
+      right: anchorBox.left + anchorBox.width,
+      bottom: anchorBox.top + anchorBox.height,
+    };
+    expect(btnViewport.left).toBeLessThanOrEqual(anchorViewport.left);
+    expect(btnViewport.right).toBeGreaterThanOrEqual(anchorViewport.right);
+    expect(btnViewport.top).toBeLessThanOrEqual(anchorViewport.top);
+    expect(btnViewport.bottom).toBeGreaterThanOrEqual(anchorViewport.bottom);
+    // Center and bottom-right edge sample points of the anchor lie inside
+    // the button rect.
+    const points = [
+      [anchorBox.left + 14, anchorBox.top + 14],
+      [anchorViewport.right, anchorViewport.bottom],
+    ];
+    points.forEach(([x, y]) => {
+      expect(x).toBeGreaterThanOrEqual(btnViewport.left);
+      expect(x).toBeLessThanOrEqual(btnViewport.right);
+      expect(y).toBeGreaterThanOrEqual(btnViewport.top);
+      expect(y).toBeLessThanOrEqual(btnViewport.bottom);
+    });
+    // …and the covering bottom action is Close for Now.
+    expect(popover().element.lastElementChild.textContent).toBe('desktop_fab_hide_close_for_now');
+  });
+
+  it('falls back to container alignment when the button rect is unavailable', async () => {
+    mockGeometry({
+      anchor: { left: 1190, top: 310, width: 28, height: 28 },
+      container: { left: 1150, top: 300, width: 130, height: 120 },
+      pop: { left: 0, top: 0, width: 200, height: 150 },
+      button: null,
+    });
+    await openMenu();
+    await openPopover();
+
+    // Zero insets: the previous container-aligned formulas apply, and the
+    // popover still opens visibly.
+    expect(wrapper.vm.hidePopoverStyle).toEqual({ left: '-132px', top: '-112px' });
+    expect(wrapper.find('#fab-hide-popover').exists()).toBe(true);
+    expect(wrapper.vm.isMenuOpen).toBe(true);
+  });
+
+  it('keeps Close for Now last with feedback above the actions', async () => {
+    mocks.addExclusion = vi.fn().mockRejectedValue(new Error('quota exceeded'));
+    mocks.settingsStore.settings.selectionTranslationMode = 'on-fab-click';
+    await openMenu();
+    await openPopover();
+
+    await wrapper.findAll('#fab-hide-popover button').at(0).trigger('click');
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await flushPopover();
+
+    // Warning and error render above the actions; Close for Now stays last.
+    const children = Array.from(popover().element.children);
+    const firstButtonAt = children.findIndex((el) => el.tagName === 'BUTTON');
+    expect(children.findIndex((el) => el.classList.contains('fab-hide-warning')))
+      .toBeLessThan(firstButtonAt);
+    expect(children.findIndex((el) => el.classList.contains('fab-hide-error')))
+      .toBeLessThan(firstButtonAt);
+    const actions = wrapper.findAll('#fab-hide-popover button');
+    expect(actions.at(-1).text()).toBe('desktop_fab_hide_close_for_now');
+
+    // The bottom button still dismisses temporarily and closes the menu.
+    await actions.at(-1).trigger('click');
+    await flushPopover();
+    expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
+    expect(wrapper.vm.isMenuOpen).toBe(false);
+  });
+
   it('moves focus into the popover on open and restores it to the eye on Escape', async () => {
     await openMenu();
     await openPopover();
 
-    expect(document.activeElement).toBe(wrapper.findAll('#fab-hide-popover button').at(0).element);
+    // Initial focus lands on Close for Now (the bottom action).
+    const closeForNow = () => wrapper.findAll('#fab-hide-popover button')
+      .find((button) => button.text() === 'desktop_fab_hide_close_for_now');
+    expect(document.activeElement).toBe(closeForNow().element);
+
+    // Native buttons: Enter/Space activation comes from the platform, and all
+    // actions stay Tab/Shift+Tab reachable (no roving tabindex, no focus trap).
+    const actions = wrapper.findAll('#fab-hide-popover button');
+    expect(actions).toHaveLength(3);
+    actions.forEach((action) => {
+      expect(action.element.tagName).toBe('BUTTON');
+      expect(action.attributes('type')).toBe('button');
+      expect(action.attributes('tabindex')).toBeUndefined();
+    });
 
     await popover().trigger('keydown', { key: 'Escape' });
     await flushPopover();
@@ -887,7 +1013,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    await wrapper.findAll('#fab-hide-popover button').at(0).trigger('click');
+    await wrapper.findAll('#fab-hide-popover button').at(2).trigger('click');
     await flushPopover();
     expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
     expect(mocks.addExclusion).not.toHaveBeenCalled();
@@ -899,7 +1025,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    await wrapper.findAll('#fab-hide-popover button').at(0).trigger('click');
+    await wrapper.findAll('#fab-hide-popover button').at(2).trigger('click');
     expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
 
     // Reopen and hold the write open: the parent is told only once it lands.
@@ -928,7 +1054,7 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     await openMenu();
     await openPopover();
 
-    await wrapper.findAll('#fab-hide-popover button').at(2).trigger('click');
+    await wrapper.findAll('#fab-hide-popover button').at(0).trigger('click');
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -1024,7 +1150,7 @@ describe('DesktopFabMenu dismissal cleanup and drag persistence', () => {
     // Opening the popover must not tear anything down on its own.
     expect(mocks.ttsStop).not.toHaveBeenCalled();
 
-    await wrapper.findAll('#fab-hide-popover button').at(0).trigger('click');
+    await wrapper.findAll('#fab-hide-popover button').at(2).trigger('click');
     expect(wrapper.emitted('dismiss')).toEqual([[{ scope: 'temporary' }]]);
     expect(mocks.ttsStop).not.toHaveBeenCalled();
 
