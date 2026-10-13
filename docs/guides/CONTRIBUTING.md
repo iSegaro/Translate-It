@@ -15,6 +15,21 @@ Before proposing or implementing a change, take a moment to look for existing wo
 
 This is about reducing duplicated effort and keeping changes aligned — not about gatekeeping. Questions are always welcome.
 
+## Finding Work
+
+The public [Translate It Roadmap](https://github.com/orgs/Translate-It-App/projects/2) is the best place to see what is planned and in progress. A `Ready` Status means the work has been prepared for implementation — it does not guarantee the Issue is unassigned or available to claim.
+
+- Use [GitHub Issues](https://github.com/Translate-It-App/Translate-It/issues) to inspect scope, acceptance criteria, and any existing discussion.
+- Look for the `good first issue` and `help wanted` labels when available; they mark work the maintainer considers approachable or wants help with.
+- Comment on the Issue to express interest before starting substantial work.
+
+Issues also carry Organization Issue Fields that describe relative urgency and complexity:
+
+- **Priority:** `Urgent`, `High`, `Medium`, `Low`.
+- **Effort:** `Small`, `Medium`, `Large`.
+
+These are set on the Issue itself and complement the Roadmap's `Status`, helping you gauge what a task involves before you start.
+
 ## Choosing the Right Workflow
 
 Use the channel that matches the stage of your idea.
