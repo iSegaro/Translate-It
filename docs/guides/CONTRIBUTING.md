@@ -62,6 +62,7 @@ We cannot promise a particular assignment, timeline, or review turnaround, but e
 - **Discussions → Ideas:** early-stage proposals and design or product ideas.
 - **Discussions → Q&A:** questions about development and contributing.
 - **Pull Requests:** implementation review and technical feedback.
+- **Security reports:** report sensitive vulnerabilities privately through GitHub Private Vulnerability Reporting, as described in [SECURITY.md](../../SECURITY.md). Do not post exploitable vulnerability details in public Issues, Discussions, or PRs — ordinary bugs belong in Issues.
 - **Commercial partnerships:** see [PARTNERSHIPS.md](../../PARTNERSHIPS.md) or email [partnerships@translate-it.app](mailto:partnerships@translate-it.app).
 
 Where practical, keep ordinary open-source collaboration public and traceable in these channels.
