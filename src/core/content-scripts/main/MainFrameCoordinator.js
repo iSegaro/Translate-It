@@ -146,11 +146,12 @@ export class MainFrameCoordinator {
   _rememberHoverPositionHint(event) {
     const hoverId = event.data?.hoverId;
     if (typeof hoverId !== 'string' || !hoverId || hoverId.length > 160 || !event.source) return;
+    if (this._isHoverIdTombstoned(hoverId)) return;
     const iframe = this._getIframeElement(event.source);
     if (!iframe) return;
-    const rect = iframe.getBoundingClientRect();
     this.hoverPositionHints.delete(hoverId);
-    this.hoverPositionHints.set(hoverId, { iframe, left: rect.left, top: rect.top, expires: Date.now() + 60_000 });
+    // Keep the source association until its hover lifecycle ends; READY may arrive well after translation starts.
+    this.hoverPositionHints.set(hoverId, { iframe });
     while (this.hoverPositionHints.size > 32) this.hoverPositionHints.delete(this.hoverPositionHints.keys().next().value);
     const pending = this.pendingHoverReady.get(hoverId);
     if (pending) {
@@ -167,19 +168,27 @@ export class MainFrameCoordinator {
 
   _isHoverTombstoned(frameId, hoverId) {
     const key = this._hoverTokenKey(frameId, hoverId);
-    const expires = this.hoverTombstones.get(key);
-    if (expires === undefined) return false;
-    if (expires < Date.now()) {
-      this.hoverTombstones.delete(key);
-      return false;
-    }
+    if (!this.hoverTombstones.has(key)) return false;
+    this.hoverTombstones.delete(key);
+    this.hoverTombstones.set(key, true);
     return true;
+  }
+
+  _isHoverIdTombstoned(hoverId) {
+    for (const key of this.hoverTombstones.keys()) {
+      if (key.slice(key.indexOf(':') + 1) === hoverId) {
+        this.hoverTombstones.delete(key);
+        this.hoverTombstones.set(key, true);
+        return true;
+      }
+    }
+    return false;
   }
 
   _tombstoneHover(frameId, hoverId) {
     const key = this._hoverTokenKey(frameId, hoverId);
     this.hoverTombstones.delete(key);
-    this.hoverTombstones.set(key, Date.now() + 60_000);
+    this.hoverTombstones.set(key, true);
     while (this.hoverTombstones.size > 32) this.hoverTombstones.delete(this.hoverTombstones.keys().next().value);
   }
 
@@ -208,8 +217,7 @@ export class MainFrameCoordinator {
       const hint = this.hoverPositionHints.get(detail.hoverId);
       const position = detail.position;
       if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y) || typeof detail.translatedText !== 'string') return { success: false, error: 'Malformed hover tooltip' };
-      if (hint?.expires >= Date.now()) return this._admitHoverReady(frameId, detail, hint);
-      if (hint) this.hoverPositionHints.delete(detail.hoverId);
+      if (hint) return this._admitHoverReady(frameId, detail, hint);
       if (this.hoverOwner?.held && (this.hoverOwner.frameId !== frameId || this.hoverOwner.hoverId !== detail.hoverId)) {
         return { success: true, ignored: true, reason: 'tooltip-held-by-other-hover' };
       }
@@ -263,6 +271,7 @@ export class MainFrameCoordinator {
     if (state === 'enter') owner.held = true;
     if (state === 'leave') owner.held = false;
     if (state === 'hidden') {
+      this._tombstoneHover(owner.frameId, owner.hoverId);
       this.pendingHoverReady.delete(owner.hoverId);
       this.hoverPositionHints.delete(owner.hoverId);
       this.hoverOwner = null;
@@ -273,6 +282,7 @@ export class MainFrameCoordinator {
   _retireHoverOwner(owner) {
     if (!owner || this.hoverOwner !== owner) return;
     this._sendHoverFeedback(owner, 'hidden');
+    this._tombstoneHover(owner.frameId, owner.hoverId);
     if (this.hoverOwner === owner) this.hoverOwner = null;
     this.pendingHoverReady.delete(owner.hoverId);
     this.hoverPositionHints.delete(owner.hoverId);

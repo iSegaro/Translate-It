@@ -11,10 +11,11 @@ import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTr
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
 import browser from 'webextension-polyfill';
 
-const { mockErrorHandler } = vi.hoisted(() => ({
+const { mockErrorHandler, mockIsUIElement } = vi.hoisted(() => ({
   mockErrorHandler: {
     handle: vi.fn().mockResolvedValue(undefined)
-  }
+  },
+  mockIsUIElement: vi.fn(() => false)
 }));
 
 // Mock dependencies
@@ -56,7 +57,7 @@ vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
 vi.mock('@/shared/services/ElementDetectionService.js', () => ({
   ElementDetectionService: {
     getInstance: vi.fn(() => ({
-      isUIElement: vi.fn(() => false)
+      isUIElement: mockIsUIElement
     }))
   }
 }));
@@ -83,6 +84,7 @@ describe('HoverTranslationManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockErrorHandler.handle.mockClear();
+    mockIsUIElement.mockReset().mockReturnValue(false);
     isEditable.mockReset();
     isEditable.mockReturnValue(false);
     vi.useFakeTimers();
@@ -296,6 +298,33 @@ describe('HoverTranslationManager', () => {
       vi.advanceTimersByTime(600);
 
       expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it('preserves modifier-release detection across valid movement with an active hover', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => key === 'MOUSE_HOVER_TRIGGER' ? 'primary' : def);
+      manager.currentText = 'old text';
+      manager.activeHoverId = 'old-hover';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.lastMouseEvent = { clientX: 100, clientY: 100, target: document.body };
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'new text', rect: { top: 100, left: 100, bottom: 120, right: 120 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ translatedText: 'new translation' });
+
+      manager.handleKeyDown(keyEvent('Control', { ctrlKey: true }));
+      manager.handleKeyUp(keyEvent('Control'));
+      const modifierTimer = manager.hoverTimer;
+      expect(modifierTimer).not.toBeNull();
+      manager.handleMouseMove({ clientX: 120, clientY: 120, target: document.body });
+
+      expect(manager.hoverTimer).toBe(modifierTimer);
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+      expect(manager.currentText).toBe('new text');
     });
 
     it('keeps latest mouse event for modifier release', async () => {
@@ -581,6 +610,45 @@ describe('HoverTranslationManager', () => {
       expect(manager.currentMessageId).toBe('request-tooltip');
       expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
       expect(manager.currentText).toBe('active');
+    });
+
+    it.each(['editable', 'extension UI'])('cancels only pending detection when next target is %s', async (targetKind) => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return 100;
+        return def;
+      });
+      manager.currentText = 'active';
+      manager.activeHoverId = 'active-hover';
+      manager.currentMessageId = 'active-request';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      const blockedTarget = targetKind === 'editable'
+        ? document.createElement('input')
+        : document.createElement('div');
+      if (targetKind === 'editable') {
+        isEditable.mockImplementation(target => target === blockedTarget);
+      } else {
+        mockIsUIElement.mockImplementation(target => target === blockedTarget);
+      }
+
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      expect(manager.hoverTimer).not.toBeNull();
+      // Under the movement threshold, but still must invalidate the pending target.
+      manager.handleMouseMove({ clientX: 101, clientY: 101, target: blockedTarget });
+      expect(manager.hoverTimer).toBeNull();
+      expect(manager.exitTimer).not.toBeNull();
+
+      vi.advanceTimersByTime(200);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+      expect(manager.currentMessageId).toBe('active-request');
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(149);
+      expect(manager.currentMessageId).toBe('active-request');
+      vi.advanceTimersByTime(1);
+      expect(manager.currentMessageId).toBeNull();
+      expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledTimes(1);
+      expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledWith('active-request', expect.any(String));
     });
 
     it('cleans manager state on timer-mode source leave without hiding the tooltip', async () => {

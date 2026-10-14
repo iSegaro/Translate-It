@@ -154,6 +154,15 @@ export class HoverTranslationManager extends ResourceTracker {
       return;
     }
 
+    const activeTrigger = this.activeHoverId
+      ? settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER)
+      : null;
+    const activeTargetBlocked = Boolean(this.activeHoverId && (
+      ElementDetectionService.getInstance().isUIElement(event.target)
+      || isEditable(event.target)
+    ));
+    if (activeTargetBlocked) this._cancelPendingDetection();
+
     // Check if mouse actually moved significantly to avoid noise
     const dist = Math.hypot(event.clientX - this.lastPosition.x, event.clientY - this.lastPosition.y);
     if (dist < MOUSE_MOVEMENT_THRESHOLD) {
@@ -161,7 +170,7 @@ export class HoverTranslationManager extends ResourceTracker {
         this.sourceInside = true;
         this.tooltipHeldHoverId = null;
         this._cancelExitGrace();
-        this._cancelPendingDetection();
+        if (activeTrigger === 'hover' || !this.activeHoverId) this._cancelPendingDetection();
       }
       return;
     }
@@ -181,15 +190,14 @@ export class HoverTranslationManager extends ResourceTracker {
         this.sourceInside = true;
         this.tooltipHeldHoverId = null;
         this._cancelExitGrace();
-        this._cancelPendingDetection();
+        if (activeTrigger === 'hover' || !this.activeHoverId) this._cancelPendingDetection();
         // Optimization: If we are still inside the active area, skip new detection
         return;
       }
     }
 
     if (this.activeHoverId) {
-      const trigger = settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER);
-      if (trigger === 'hover' && !ElementDetectionService.getInstance().isUIElement(event.target) && !isEditable(event.target)) {
+      if (activeTrigger === 'hover' && !activeTargetBlocked) {
         this._scheduleHoverDetection(event);
       }
       return;

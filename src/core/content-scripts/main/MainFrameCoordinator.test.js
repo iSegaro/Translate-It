@@ -151,6 +151,7 @@ describe('MainFrameCoordinator trusted hover relay', () => {
 
     coordinator.handleHoverFrameEvent({ frameId: 11, type: 'MOUSE_HOVER_HIDE_TOOLTIP', detail: { hoverId: 'hide-before' } });
     hint('hide-before');
+    expect(coordinator.hoverPositionHints.has('hide-before')).toBe(false);
     expect(ready('hide-before')).toMatchObject({ ignored: true, reason: 'retired-hover-token' });
     expect(coordinator.hoverOwner).toBeNull();
     iframe.remove();
@@ -227,6 +228,56 @@ describe('MainFrameCoordinator trusted hover relay', () => {
     vi.useRealTimers();
   });
 
+  it('keeps the validated source iframe association for a first READY after 60 seconds', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    vi.spyOn(iframe, 'getBoundingClientRect').mockReturnValue({ left: 70, top: 80 });
+    window.dispatchEvent(new MessageEvent('message', { source: iframe.contentWindow, data: { source: 'translate-it-iframe', type: 'MOUSE_HOVER_POSITION_HINT', hoverId: 'slow-first-ready' } }));
+    vi.advanceTimersByTime(61_000);
+
+    const result = coordinator.handleHoverFrameEvent({ frameId: 24, type: 'MOUSE_HOVER_TRANSLATION_READY', detail: { hoverId: 'slow-first-ready', translatedText: 'late result', position: { x: 4, y: 5 } } });
+
+    expect(result).toEqual({ success: true });
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_READY', expect.objectContaining({ frameId: 24, position: expect.objectContaining({ x: 74, y: 85 }) }));
+    expect(coordinator.hoverOwner).toMatchObject({ frameId: 24, hoverId: 'slow-first-ready', iframe });
+    iframe.remove();
+    vi.useRealTimers();
+  });
+
+  it('keeps HIDE and replacement fences beyond 60 seconds despite stale hints and READY events', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+    const iframe = document.createElement('iframe');
+    document.body.appendChild(iframe);
+    vi.spyOn(iframe, 'getBoundingClientRect').mockReturnValue({ left: 10, top: 20 });
+    const hint = hoverId => window.dispatchEvent(new MessageEvent('message', { source: iframe.contentWindow, data: { source: 'translate-it-iframe', type: 'MOUSE_HOVER_POSITION_HINT', hoverId } }));
+    const ready = (frameId, hoverId) => coordinator.handleHoverFrameEvent({ frameId, type: 'MOUSE_HOVER_TRANSLATION_READY', detail: { hoverId, translatedText: hoverId, position: { x: 1, y: 1 } } });
+
+    hint('cancel-long');
+    ready(25, 'cancel-long');
+    coordinator.handleHoverFrameEvent({ frameId: 25, type: 'MOUSE_HOVER_HIDE_TOOLTIP', detail: { hoverId: 'cancel-long' } });
+    coordinator._handleHoverFeedback('MOUSE_HOVER_TOOLTIP_HIDDEN', 'hidden', { frameId: 25, hoverId: 'cancel-long' });
+
+    hint('replace-long-a');
+    ready(26, 'replace-long-a');
+    hint('replace-long-b');
+    ready(27, 'replace-long-b');
+    expect(coordinator.hoverOwner).toMatchObject({ frameId: 27, hoverId: 'replace-long-b' });
+
+    vi.advanceTimersByTime(61_000);
+    hint('cancel-long');
+    hint('replace-long-a');
+    expect(coordinator.hoverPositionHints.has('cancel-long')).toBe(false);
+    expect(coordinator.hoverPositionHints.has('replace-long-a')).toBe(false);
+    expect(ready(25, 'cancel-long')).toMatchObject({ ignored: true, reason: 'retired-hover-token' });
+    expect(ready(26, 'replace-long-a')).toMatchObject({ ignored: true, reason: 'retired-hover-token' });
+    expect(coordinator.hoverOwner).toMatchObject({ frameId: 27, hoverId: 'replace-long-b' });
+    iframe.remove();
+    vi.useRealTimers();
+  });
+
   it('clears a held child owner when the local top tooltip takes over', () => {
     const iframe = document.createElement('iframe');
     document.body.appendChild(iframe);
@@ -276,8 +327,12 @@ describe('MainFrameCoordinator trusted hover relay', () => {
     const retiringCalls = browser.runtime.sendMessage.mock.calls.filter(([message]) => message.data?.targetFrameId === 22 && message.data?.hoverId === 'replace-a' && message.data?.state === 'hidden');
     expect(retiringCalls).toHaveLength(1);
     expect(coordinator.hoverOwner).toMatchObject({ frameId: 23, hoverId: 'replace-b' });
+    expect(coordinator.hoverPositionHints.has('replace-a')).toBe(false);
 
     browser.runtime.sendMessage.mockClear();
+    hint('replace-a');
+    expect(coordinator.hoverPositionHints.has('replace-a')).toBe(false);
+    expect(coordinator.handleHoverFrameEvent({ frameId: 22, type: 'MOUSE_HOVER_TRANSLATION_READY', detail: { hoverId: 'replace-a', translatedText: 'stale', position: { x: 0, y: 0 } } })).toMatchObject({ ignored: true, reason: 'retired-hover-token' });
     expect(coordinator.handleHoverFrameEvent({ frameId: 22, type: 'MOUSE_HOVER_HIDE_TOOLTIP', detail: { hoverId: 'replace-a' } })).toMatchObject({ ignored: true });
     coordinator._handleHoverFeedback('MOUSE_HOVER_TOOLTIP_HIDDEN', 'hidden', { frameId: 22, hoverId: 'replace-a' });
     expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
