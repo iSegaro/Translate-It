@@ -1,9 +1,9 @@
-#### Unreleased
+#### v1.23.0 – Released on October 14, 2026
 
 ##### Added
 
-- You can now easily browse, search, and choose AI models in [Settings](#/providers?highlight=PROVIDERS_CONFIGURE_SECTION) for OpenRouter, Requesty, OpenAI, DeepSeek, Gemini, and WebAI.
-- You can now hide the Desktop FAB temporarily or on specific pages and websites. You can also view and remove hidden pages and sites through [Manage List](#/activation?highlight=DESKTOP_FAB_EXCLUSIONS) in Settings.
+- Added AI model browsing, search, and selection for OpenRouter, Requesty, OpenAI, DeepSeek, Gemini, and WebAI in [Settings](#/providers?highlight=PROVIDERS_CONFIGURE_SECTION).
+- Added options to temporarily hide the Desktop FAB or exclude specific pages and websites, with a [Manage List](#/activation?highlight=DESKTOP_FAB_EXCLUSIONS) option in Settings.
 
 ---
 
