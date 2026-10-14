@@ -360,6 +360,8 @@ export class ContentMessageHandler extends ResourceTracker {
     this.registerHandler(MessageActions.PAGE_TRANSLATE_GET_STATUS, this.handlePageGetStatus.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATE_STOP_AUTO, this.handlePageStopAuto.bind(this));
     this.registerHandler(MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE, this.handlePageTranslationLifecycle.bind(this));
+    this.registerHandler(MessageActions.MOUSE_HOVER_FRAME_EVENT, this.handleMouseHoverFrameEvent.bind(this));
+    this.registerHandler(MessageActions.MOUSE_HOVER_FRAME_FEEDBACK, this.handleMouseHoverFrameFeedback.bind(this));
 
     // Live dubbing transcript is a display-only, session-fenced bridge. The
     // translated and original (source) transcript actions share one accept
@@ -1133,6 +1135,27 @@ export class ContentMessageHandler extends ResourceTracker {
     }
 
     return coordinator.handleTrustedPageLifecycle(message.data || {});
+  }
+
+  async handleMouseHoverFrameEvent(message) {
+    if (window !== window.top) return { success: false, error: 'Hover relay requires top frame' };
+    const coordinator = window.translateItContentCore?.mainFrameCoordinator;
+    if (!coordinator?.handleHoverFrameEvent) return { success: false, error: 'Main frame coordinator unavailable' };
+    return coordinator.handleHoverFrameEvent(message?.data || {});
+  }
+
+  handleMouseHoverFrameFeedback(message) {
+    if (window === window.top) return { success: false, error: 'Hover feedback requires child frame' };
+    const { hoverId, state } = message?.data || {};
+    if (typeof hoverId !== 'string' || hoverId.length === 0 || hoverId.length > 160) return { success: false, error: 'Invalid hover feedback' };
+    const eventType = state === 'enter'
+      ? 'MOUSE_HOVER_TOOLTIP_POINTER_ENTER'
+      : state === 'leave'
+        ? 'MOUSE_HOVER_TOOLTIP_POINTER_LEAVE'
+        : state === 'hidden' ? 'MOUSE_HOVER_TOOLTIP_HIDDEN' : null;
+    if (!eventType) return { success: false, error: 'Invalid hover feedback' };
+    pageEventBus.emit(eventType, { hoverId });
+    return { success: true };
   }
 
   /**

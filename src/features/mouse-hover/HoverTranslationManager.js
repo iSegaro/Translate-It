@@ -1,4 +1,5 @@
 import ResourceTracker from '@/core/memory/ResourceTracker.js';
+import browser from 'webextension-polyfill';
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 import { HoverTextDetector } from './HoverTextDetector.js';
@@ -27,6 +28,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.ON_HOVER, 'HoverTranslationManager
 const MOUSE_MOVEMENT_THRESHOLD = 2; // pixels
 const MODIFIER_TRIGGER_DELAY = 50; // ms
 const COORDINATE_TOLERANCE = 10; // pixels - buffer to handle line-height gaps and jitter
+const EXIT_GRACE_MS = 350;
 
 /**
  * HoverTranslationManager - Manages "Mouse on Hover" translation logic
@@ -53,6 +55,14 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentRect = null; // Rectangle Cache for performance optimization
     this.borderedElement = null; // Tracking element with active border
     this.currentMessageId = null; // Tracking active translation request
+    this.activeHoverId = null;
+    this.displayedHoverId = null;
+    this.displayedFrameId = 0;
+    this.exitTimer = null;
+    this.tooltipHeldHoverId = null;
+    this.sourceInside = false;
+    this.sourceLeaveElement = null;
+    this.sourceLeaveHandler = null;
     this.modifierTriggerController = new ModifierTriggerController();
     
     // Bind handlers
@@ -66,6 +76,8 @@ export class HoverTranslationManager extends ResourceTracker {
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
     this.handleTooltipHidden = this.handleTooltipHidden.bind(this);
     this.handleTranslationHide = this.handleTranslationHide.bind(this);
+    this.handleTooltipPointerEnter = this.handleTooltipPointerEnter.bind(this);
+    this.handleTooltipPointerLeave = this.handleTooltipPointerLeave.bind(this);
   }
 
   /**
@@ -97,6 +109,8 @@ export class HoverTranslationManager extends ResourceTracker {
       
       // Listen for when tooltip is hidden (could be via timer or other means)
       this.addEventListener(pageEventBus, 'MOUSE_HOVER_TOOLTIP_HIDDEN', this.handleTooltipHidden);
+      this.addEventListener(pageEventBus, 'MOUSE_HOVER_TOOLTIP_POINTER_ENTER', this.handleTooltipPointerEnter);
+      this.addEventListener(pageEventBus, 'MOUSE_HOVER_TOOLTIP_POINTER_LEAVE', this.handleTooltipPointerLeave);
       this.addEventListener(pageEventBus, 'hide-translation', this.handleTranslationHide);
 
       return true;
@@ -111,11 +125,14 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   async deactivate() {
     const wasActive = this.isActive;
+    const hoverIds = this._getHoverHideTargets();
     this.cleanup(); // Clean up all listeners and timers
     this.isActive = false;
 
-    // Notify UI to hide tooltip only when this lifecycle was active.
-    if (wasActive) this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+    // Hide both an in-flight source and any different display it replaced.
+    if (wasActive) this._emitHoverHideFor(hoverIds);
+    this.displayedHoverId = null;
+    this.displayedFrameId = 0;
     
     logger.debug('Hover translation manager deactivated');
     return true;
@@ -128,30 +145,62 @@ export class HoverTranslationManager extends ResourceTracker {
     // Store last mouse event for modifier release trigger
     this.lastMouseEvent = event;
 
+    const isTooltipTarget = this._isTooltipEvent(event);
+    if (isTooltipTarget) {
+      this.tooltipHeldHoverId = this.activeHoverId;
+      this.sourceInside = false;
+      this._cancelExitGrace();
+      this._cancelPendingDetection();
+      return;
+    }
+
+    const activeTrigger = this.activeHoverId
+      ? settingsManager.get('MOUSE_HOVER_TRIGGER', CONFIG.MOUSE_HOVER_TRIGGER)
+      : null;
+    const activeTargetBlocked = Boolean(this.activeHoverId && (
+      ElementDetectionService.getInstance().isUIElement(event.target)
+      || isEditable(event.target)
+    ));
+    if (activeTargetBlocked) this._cancelPendingDetection();
+
     // Check if mouse actually moved significantly to avoid noise
     const dist = Math.hypot(event.clientX - this.lastPosition.x, event.clientY - this.lastPosition.y);
-    if (dist < MOUSE_MOVEMENT_THRESHOLD) return;
+    if (dist < MOUSE_MOVEMENT_THRESHOLD) {
+      if (this.currentRect && this._isInsideCurrentRect(event)) {
+        this.sourceInside = true;
+        this.tooltipHeldHoverId = null;
+        this._cancelExitGrace();
+        if (activeTrigger === 'hover' || !this.activeHoverId) this._cancelPendingDetection();
+      }
+      return;
+    }
     
     this.lastPosition = { x: event.clientX, y: event.clientY };
-
     // 1. PROACTIVE CHECK: If we have an active rectangle, check if we've left it.
     // This MUST run before any modifier or editable checks to ensure the tooltip
     // closes correctly when moving away, even if the trigger key is released.
     if (this.currentRect && settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave') === 'mouseleave') {
-      const tolerance = COORDINATE_TOLERANCE;
-      const isStillInside = (
-        event.clientX >= this.currentRect.left - tolerance &&
-        event.clientX <= this.currentRect.right + tolerance &&
-        event.clientY >= this.currentRect.top - tolerance &&
-        event.clientY <= this.currentRect.bottom + tolerance
-      );
+      const isStillInside = this._isInsideCurrentRect(event);
 
       if (!isStillInside) {
-        this._handleMouseOut();
+        this.tooltipHeldHoverId = null;
+        this.sourceInside = false;
+        this._scheduleExit();
       } else {
+        this.sourceInside = true;
+        this.tooltipHeldHoverId = null;
+        this._cancelExitGrace();
+        if (activeTrigger === 'hover' || !this.activeHoverId) this._cancelPendingDetection();
         // Optimization: If we are still inside the active area, skip new detection
         return;
       }
+    }
+
+    if (this.activeHoverId) {
+      if (activeTrigger === 'hover' && !activeTargetBlocked) {
+        this._scheduleHoverDetection(event);
+      }
+      return;
     }
 
     // Skip if mouse is over extension UI elements (like the tooltip itself)
@@ -271,8 +320,29 @@ export class HoverTranslationManager extends ResourceTracker {
    * Reset hover state after the UI confirms that its tooltip is hidden.
    * @private
    */
-  handleTooltipHidden() {
+  handleTooltipHidden(detail) {
+    if (!detail?.hoverId) return;
+    if (detail.hoverId === this.displayedHoverId) {
+      this.displayedHoverId = null;
+      this.displayedFrameId = 0;
+    }
+    if (detail.hoverId !== this.activeHoverId) return;
     this._resetHoverState();
+  }
+
+  handleTooltipPointerEnter(detail) {
+    if (detail?.hoverId !== this.activeHoverId) return;
+    this.tooltipHeldHoverId = detail.hoverId;
+    this.sourceInside = false;
+    this._cancelExitGrace();
+    this._cancelPendingDetection();
+  }
+
+  handleTooltipPointerLeave(detail) {
+    if (detail?.hoverId !== this.activeHoverId) return;
+    this.tooltipHeldHoverId = null;
+    if (this.sourceInside) return;
+    this._scheduleExit();
   }
 
   /**
@@ -281,7 +351,8 @@ export class HoverTranslationManager extends ResourceTracker {
    * @private
    */
   handleTranslationHide(detail) {
-    if (!this._hasHoverState()) return;
+    if (!this._hasHoverState() && !this.displayedHoverId) return;
+    const hoverIds = this._getHoverHideTargets();
 
     const element = detail?.element;
     if (
@@ -293,14 +364,79 @@ export class HoverTranslationManager extends ResourceTracker {
     ) return;
 
     this._resetHoverState();
-    this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+    this._emitHoverHideFor(hoverIds);
   }
 
   /**
    * Handle mouse leave to hide tooltip or cancel pending hover
    */
   handleMouseLeave() {
-    this._handleMouseOut();
+    if (this.activeHoverId && this.tooltipHeldHoverId === this.activeHoverId) return;
+    this.sourceInside = false;
+    if (this.activeHoverId && settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave') === 'mouseleave') {
+      this._scheduleExit();
+    } else {
+      this._handleMouseOut();
+    }
+  }
+
+  _handleSourceElementLeave() {
+    if (this.activeHoverId && this.tooltipHeldHoverId === this.activeHoverId) return;
+    this.sourceInside = false;
+    this._scheduleExit();
+  }
+
+  _isTooltipEvent(event) {
+    const path = event.composedPath?.() || [];
+    return path.some((node) => node?.classList?.contains('ti-mouse-hover-tooltip'))
+      || Boolean(event.target?.closest?.('.ti-mouse-hover-tooltip'));
+  }
+
+  _isInsideCurrentRect(event) {
+    const tolerance = COORDINATE_TOLERANCE;
+    return event.clientX >= this.currentRect.left - tolerance
+      && event.clientX <= this.currentRect.right + tolerance
+      && event.clientY >= this.currentRect.top - tolerance
+      && event.clientY <= this.currentRect.bottom + tolerance;
+  }
+
+  _cancelExitGrace() {
+    if (this.exitTimer) this.clearTimer(this.exitTimer);
+    this.exitTimer = null;
+  }
+
+  _scheduleExit() {
+    if (!this.activeHoverId) {
+      this._cancelPendingHover();
+      return;
+    }
+    if (settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave') !== 'mouseleave') {
+      this._handleMouseOut();
+      return;
+    }
+    if (this.exitTimer) return;
+    this.exitTimer = this.setTimeout(() => {
+      this.exitTimer = null;
+      const pendingHoverTimer = this.hoverTimer;
+      this.hoverTimer = null;
+      this._handleMouseOut();
+      if (pendingHoverTimer) this.hoverTimer = pendingHoverTimer;
+    }, EXIT_GRACE_MS);
+  }
+
+  _cancelPendingDetection() {
+    if (!this.hoverTimer) return;
+    this.clearTimer(this.hoverTimer);
+    this.hoverTimer = null;
+  }
+
+  _scheduleHoverDetection(event) {
+    this._cancelPendingDetection();
+    const delay = settingsManager.get('MOUSE_HOVER_DELAY', 500);
+    this.hoverTimer = this.setTimeout(() => {
+      this.hoverTimer = null;
+      this._processHover(event);
+    }, delay);
   }
 
   /**
@@ -308,6 +444,7 @@ export class HoverTranslationManager extends ResourceTracker {
    * @private
    */
   _resetHoverState({ cancelRequest = true } = {}) {
+    this._cancelExitGrace();
     if (cancelRequest) {
       this._cancelPendingHover();
     } else {
@@ -322,6 +459,14 @@ export class HoverTranslationManager extends ResourceTracker {
     this.currentRect = null;
     this.currentElement = null;
     this._removeBorder();
+    this.activeHoverId = null;
+    this.tooltipHeldHoverId = null;
+    this.sourceInside = false;
+    if (this.sourceLeaveElement && this.sourceLeaveHandler) {
+      this.removeEventListener(this.sourceLeaveElement, 'mouseleave', this.sourceLeaveHandler, { once: true });
+      this.sourceLeaveElement = null;
+      this.sourceLeaveHandler = null;
+    }
   }
 
   _hasHoverState() {
@@ -340,11 +485,28 @@ export class HoverTranslationManager extends ResourceTracker {
    * @private
    */
   _handleMouseOut() {
+    const hoverIds = this._getHoverHideTargets();
+    const hadHoverState = this._hasHoverState();
     this._resetHoverState();
 
     const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
     if (autoClose === 'mouseleave') {
-      this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+      this._emitHoverHideFor(hoverIds);
+    } else if (!hadHoverState) {
+      this._cancelPendingHover();
+    }
+  }
+
+  _getHoverHideTargets() {
+    const targets = new Map();
+    if (this.activeHoverId) targets.set(this.activeHoverId, 0);
+    if (this.displayedHoverId) targets.set(this.displayedHoverId, this.displayedFrameId);
+    return [...targets].map(([hoverId, frameId]) => ({ hoverId, frameId }));
+  }
+
+  _emitHoverHideFor(targets) {
+    for (const { hoverId, frameId } of targets) {
+      this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId, frameId });
     }
   }
 
@@ -354,11 +516,12 @@ export class HoverTranslationManager extends ResourceTracker {
    */
   _cleanupActiveHoverRequest(messageId) {
     if (this.currentMessageId === messageId) {
+      const hoverIds = this._getHoverHideTargets();
       this._resetHoverState({ cancelRequest: false });
 
       const autoClose = settingsManager.get('MOUSE_HOVER_AUTO_CLOSE', 'mouseleave');
       if (autoClose === 'mouseleave') {
-        this._emitPageEvent('MOUSE_HOVER_HIDE_TOOLTIP');
+        this._emitHoverHideFor(hoverIds);
       }
     }
   }
@@ -383,6 +546,7 @@ export class HoverTranslationManager extends ResourceTracker {
     const detection = HoverTextDetector.detect(event.clientX, event.clientY, scope);
 
     if (!detection || !detection.text) {
+      if (this.activeHoverId && this.exitTimer) return;
       // If we are over a "dead zone", we only close if we are actually outside the tolerance 
       // of our last valid rectangle. This prevents flickering in gaps.
       if (this.currentRect) {
@@ -399,6 +563,10 @@ export class HoverTranslationManager extends ResourceTracker {
       this._handleMouseOut();
       return;
     }
+
+    this.sourceInside = true;
+    this.currentElement = detection.element;
+    this._cancelExitGrace();
 
     if (detection.text === this.currentText) {
       // Refresh rectangle cache based on scope
@@ -420,6 +588,8 @@ export class HoverTranslationManager extends ResourceTracker {
 
     const element = detection.element;
 
+    this._cancelExitGrace();
+
     // Clean up any previous border before applying new one
     this._removeBorder();
 
@@ -429,16 +599,9 @@ export class HoverTranslationManager extends ResourceTracker {
       element.classList.add('ti-hover-container-highlight');
     }
 
-    // Use ResourceTracker to manage the element's mouseleave listener
-    // This ensures cleanup if multiple hovers happen quickly or if the feature is deactivated
+    // Replace the previous source listener so rapid hover changes do not accumulate handlers.
     const leaveHandler = (leaveEvent) => {
       const relatedTarget = leaveEvent.relatedTarget;
-      const elementDetection = ElementDetectionService.getInstance();
-
-      // 1. If we're moving into a UI element (like the tooltip), don't close
-      if (relatedTarget && elementDetection.isUIElement(relatedTarget)) {
-        return;
-      }
 
       // 2. If we are leaving the element but moving into another part of the same container
       // (e.g. moving between nested spans), keep it open.
@@ -448,11 +611,15 @@ export class HoverTranslationManager extends ResourceTracker {
 
       // 3. Since 'element' is now always a stable block container (from HoverTextDetector),
       // we can trust its 'mouseleave' event to signal a clear exit from the text block.
-      this._removeBorder();
-      this.handleMouseLeave();
+      this._handleSourceElementLeave();
     };
     
     // Track listener on specific element; ResourceTracker handles removal of the old one if re-added
+    if (this.sourceLeaveElement && this.sourceLeaveHandler) {
+      this.removeEventListener(this.sourceLeaveElement, 'mouseleave', this.sourceLeaveHandler, { once: true });
+    }
+    this.sourceLeaveElement = element;
+    this.sourceLeaveHandler = leaveHandler;
     this.addEventListener(element, 'mouseleave', leaveHandler, { once: true });
 
     // Cancel any previous active request
@@ -462,6 +629,16 @@ export class HoverTranslationManager extends ResourceTracker {
 
     const messageId = `hover-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     this.currentMessageId = messageId;
+    const hoverId = `hover-display-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    this.activeHoverId = hoverId;
+    this.tooltipHeldHoverId = null;
+    if (window !== window.top) {
+      try {
+        window.top.postMessage({ source: 'translate-it-iframe', type: 'MOUSE_HOVER_POSITION_HINT', hoverId }, '*');
+      } catch (error) {
+        logger.debug('Failed to send hover position hint:', error);
+      }
+    }
     const accumulatedResults = new Map();
 
     try {
@@ -486,8 +663,12 @@ export class HoverTranslationManager extends ResourceTracker {
               translatedText: partialText,
               position: { x: event.clientX, y: event.clientY },
               direction: data.direction || 'ltr',
-              isStreaming: true
+              isStreaming: true,
+              hoverId,
+              frameId: 0
             });
+            this.displayedHoverId = hoverId;
+            this.displayedFrameId = 0;
           }
         }
       });
@@ -524,12 +705,17 @@ export class HoverTranslationManager extends ResourceTracker {
           translatedText: translatedText,
           position: { x: event.clientX, y: event.clientY },
           direction: direction,
-          isStreaming: false
+          isStreaming: false,
+          hoverId,
+          frameId: 0
         });
+        this.displayedHoverId = hoverId;
+        this.displayedFrameId = 0;
 
         this.currentMessageId = null;
       }
     } catch (error) {
+      if (this.currentMessageId !== messageId) return;
       if (ExtensionContextManager.isContextError(error)
         || [ErrorTypes.CONTEXT, ErrorTypes.EXTENSION_CONTEXT_INVALIDATED].includes(error?.type)) {
         logger.debug('Hover translation skipped: Extension context invalidated');
@@ -547,13 +733,18 @@ export class HoverTranslationManager extends ResourceTracker {
 
       const publicError = mapCanonicalTranslationError(error);
       const displayError = await createLegacyDisplayError(error, publicError);
+      if (this.currentMessageId !== messageId) return;
       if (displayError) {
         // Keep canonical action available through legacy display error cause.
         ErrorHandler.getInstance().handle(displayError, {
           context: 'hover',
           showToast: false
         }).catch(() => {});
-        this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
+        if (this.currentMessageId === messageId) {
+          this._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError, hoverId, frameId: 0 });
+          this.displayedHoverId = hoverId;
+          this.displayedFrameId = 0;
+        }
       }
       this._cleanupActiveHoverRequest(messageId);
     }
@@ -571,7 +762,7 @@ export class HoverTranslationManager extends ResourceTracker {
       pageEventBus.emit(type);
     }
 
-    // 2. If in an iframe, notify the top frame
+    // 2. If in an iframe, send hover UI events through runtime messaging only.
     if (window !== window.top) {
       try {
         const transportData = type === 'MOUSE_HOVER_TRANSLATION_ERROR' && data?.error
@@ -581,12 +772,13 @@ export class HoverTranslationManager extends ResourceTracker {
               errorDetails: MessageFormat.serializeTranslationError(data.error)
             }
           : data;
-        window.top.postMessage({
-          source: 'translate-it-iframe',
-          type: type,
-          data: transportData,
-          timestamp: Date.now()
-        }, '*');
+        if (type.startsWith('MOUSE_HOVER_')) {
+          browser.runtime.sendMessage({
+            action: MessageActions.MOUSE_HOVER_FRAME_EVENT,
+            data: { type, detail: transportData },
+            context: 'mouse-hover-frame-event'
+          }).catch((error) => logger.debug('Failed to send hover event to top frame:', error));
+        }
       } catch (error) {
         logger.debug('Failed to send hover event to top frame:', error);
       }
@@ -624,6 +816,7 @@ export class HoverTranslationManager extends ResourceTracker {
    * Clean up resources
    */
   cleanup() {
+    this._cancelExitGrace();
     this._resetHoverState();
     this.modifierTriggerController.reset();
     this.lastPosition = { x: 0, y: 0 };

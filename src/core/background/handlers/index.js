@@ -33,6 +33,7 @@ export * from "./page-exclusion/handleSetExcludeCurrentPage.js";
 
 // Page translation handlers
 export * from "./page-translation/handlePageTranslation.js";
+export * from "./mouse-hover/handleMouseHoverFrameEvent.js";
 
 // Sidepanel handlers
 export * from "./sidepanel/handleOpenSidePanel.js";

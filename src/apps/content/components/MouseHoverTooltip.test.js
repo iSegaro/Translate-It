@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import MouseHoverTooltip from './MouseHoverTooltip.vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { useSettingsStore } from '@/features/settings/stores/settings.js';
 
 // Mock dependencies
 vi.mock('@/core/PageEventBus.js', () => ({
@@ -137,6 +138,86 @@ describe('MouseHoverTooltip', () => {
     wrapper.vm.hideTooltip();
     
     expect(wrapper.vm.isVisible).toBe(false);
-    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_TOOLTIP_HIDDEN');
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_TOOLTIP_HIDDEN', { hoverId: null, frameId: 0 });
+  });
+
+  it('emits tokenized pointer events only while visible and returns token on hide', async () => {
+    const wrapper = mount(MouseHoverTooltip);
+    const ready = pageEventBus.on.mock.calls.find(([type]) => type === 'MOUSE_HOVER_TRANSLATION_READY')[1];
+    await ready({ translatedText: 'translated', hoverId: 'hover-1', frameId: 7, position: { x: 10, y: 10 } });
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    await wrapper.find('.ti-mouse-hover-tooltip').trigger('pointerenter');
+    expect(pageEventBus.emit).toHaveBeenCalledWith('MOUSE_HOVER_TOOLTIP_POINTER_ENTER', { hoverId: 'hover-1', frameId: 7 });
+    wrapper.vm.hideTooltip({ hoverId: 'old-hover' });
+    expect(wrapper.vm.isVisible).toBe(true);
+    wrapper.vm.hideTooltip({ hoverId: 'hover-1' });
+    expect(pageEventBus.emit).toHaveBeenCalledWith('MOUSE_HOVER_TOOLTIP_HIDDEN', { hoverId: 'hover-1', frameId: 7 });
+  });
+
+  it('does not reopen after a pending show is hidden before nextTick completes', async () => {
+    const wrapper = mount(MouseHoverTooltip);
+    const showing = wrapper.vm.showTooltip({
+      translatedText: 'translated', hoverId: 'hover-pending', frameId: 0,
+      position: { x: 10, y: 10 }
+    });
+    wrapper.vm.hideTooltip({ hoverId: 'hover-pending' });
+    await showing;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.isVisible).toBe(false);
+    expect(wrapper.find('.ti-mouse-hover-tooltip').exists()).toBe(false);
+  });
+
+  it('acknowledges a replaced display once while streaming updates retain the new token', async () => {
+    const wrapper = mount(MouseHoverTooltip);
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+    await wrapper.vm.showTooltip({
+      translatedText: 'translation A', hoverId: 'hover-a', frameId: 0,
+      position: { x: 10, y: 10 }, isStreaming: true
+    });
+    await wrapper.vm.showTooltip({
+      translatedText: 'translation B', hoverId: 'hover-b', frameId: 4,
+      position: { x: 20, y: 20 }, isStreaming: true
+    });
+    await wrapper.vm.showTooltip({
+      translatedText: 'translation B continued', hoverId: 'hover-b', frameId: 4,
+      position: { x: 20, y: 20 }, isStreaming: true
+    });
+
+    expect(emitSpy.mock.calls.filter(([type]) => type === 'MOUSE_HOVER_TOOLTIP_HIDDEN')).toEqual([
+      ['MOUSE_HOVER_TOOLTIP_HIDDEN', { hoverId: 'hover-a', frameId: 0 }]
+    ]);
+    expect(wrapper.vm.isVisible).toBe(true);
+    expect(wrapper.vm.hoverId).toBe('hover-b');
+    expect(wrapper.vm.translatedText).toBe('translation B continued');
+  });
+
+  it('does not let timer A hide replacement B or extend B timer', async () => {
+    vi.useFakeTimers();
+    try {
+      const settings = useSettingsStore();
+      settings.settings.MOUSE_HOVER_AUTO_CLOSE = 'timer';
+      settings.settings.MOUSE_HOVER_TIMER_DURATION = 3000;
+      const wrapper = mount(MouseHoverTooltip);
+      await wrapper.vm.showTooltip({
+        translatedText: 'translation A', hoverId: 'timer-a', frameId: 0,
+        position: { x: 10, y: 10 }, isStreaming: false
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      await wrapper.vm.showTooltip({
+        translatedText: 'translation B', hoverId: 'timer-b', frameId: 0,
+        position: { x: 20, y: 20 }, isStreaming: false
+      });
+
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(wrapper.vm.isVisible).toBe(true);
+      expect(wrapper.vm.hoverId).toBe('timer-b');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(wrapper.vm.isVisible).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
