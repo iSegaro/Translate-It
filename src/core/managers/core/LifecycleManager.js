@@ -293,6 +293,8 @@ class LifecycleManager {
       [MessageActions.PAGE_TRANSLATE_CANCELLED]: Handlers.handlePageTranslation,
       [MessageActions.PAGE_TRANSLATE_STOP_AUTO]: Handlers.handlePageTranslation, // NEW
       [MessageActions.PAGE_TRANSLATION_FRAME_LIFECYCLE]: Handlers.handlePageTranslation,
+      [MessageActions.MOUSE_HOVER_FRAME_EVENT]: Handlers.handleMouseHoverFrameEvent,
+      [MessageActions.MOUSE_HOVER_FRAME_FEEDBACK]: Handlers.handleMouseHoverFrameFeedback,
 
       // Sidepanel handlers
       'openSidePanel': Handlers.handleOpenSidePanel,

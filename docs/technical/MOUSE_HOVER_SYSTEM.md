@@ -36,6 +36,7 @@ The **Central Coordinator** managing the feature lifecycle and interaction logic
 - **Request Management**: Automatically cancels previous translation requests when a new hover is triggered to prevent race conditions.
 - **Streaming Coordination**: Registers handlers for streaming updates via `ContentScriptIntegration`.
 - Optimization: Implements a "Rectangle Cache" to skip expensive DOM lookups when the mouse stays within the same text block.
+- **On Mouse Leave**: Coordinates source and tooltip pointer interaction with a short, cancellable exit delay; dismissal and request cancellation occur only after the pointer leaves both areas.
 
 **Key Methods:**
 | Method | Description |
@@ -67,13 +68,16 @@ The **UI Component** rendered inside the extension's Shadow DOM host.
 - **Component Reuse**: Wraps `TranslationDisplay.vue` to leverage standardized Markdown rendering, RTL/LTR detection, and user-configured font styles.
 - **Intelligent Positioning**: Automatically calculates space; shows the tooltip above the cursor by default and "flips" to the bottom if there isn't enough space at the top of the viewport.
 - **Interactive Scrolling**: Uses `pointer-events: auto` and `max-height` constraints to allow users to scroll through long translations (especially in 'Container' mode) without covering the whole screen.
+- **Pointer Interaction**: Reports entry and exit on the tooltip itself so selection, copying, and scrolling do not dismiss it. In `After Time` mode, pointer movement does not restart the completion timer.
 
 ### 4. Rectangle Cache (Optimization Layer)
 To maintain 60fps performance on complex pages:
 1. When text is detected, its bounding box (`rect`) is cached in `HoverTranslationManager`.
-2. On subsequent `mousemove` events, the manager first checks if the cursor is still within this `rect`.
+2. On subsequent `mousemove` events outside the tooltip, the manager checks whether the cursor is still within this `rect`.
 3. If it is, all expensive detection logic and timers are skipped (CPU cost: near zero).
-4. The cache is invalidated immediately when moving to empty space or when the tooltip closes.
+4. In `On Mouse Leave` mode, leaving the source starts a short exit decision. Entering either the source or its tooltip cancels it; otherwise dismissal invalidates the cache, cancels an active request, and removes the highlight. Closing the tooltip also invalidates the cache.
+
+For direct iframes, the source-frame manager sends hover events through the extension runtime to the top-frame tooltip. The background verifies the originating frame, and tooltip pointer feedback is delivered only to that frame. A page-visible message supplies an iframe positioning hint without translation text or dismissal authority. Nested-iframe positioning remains outside this path.
 
 ## Modifier Trigger Semantics
 

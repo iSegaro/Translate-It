@@ -4,6 +4,8 @@
     ref="tooltipRef"
     class="ti-mouse-hover-tooltip"
     :style="{ '--tooltip-transform': `translate3d(${position.x}px, ${position.y}px, 0)` }"
+    @pointerenter="emitPointer('MOUSE_HOVER_TOOLTIP_POINTER_ENTER')"
+    @pointerleave="emitPointer('MOUSE_HOVER_TOOLTIP_POINTER_LEAVE')"
   >
     <TranslationDisplay
       :content="translatedText"
@@ -39,19 +41,32 @@ const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
 const isError = ref(false);
 const isStreaming = ref(false);
+const hoverId = ref(null);
+const frameId = ref(0);
+let displayGeneration = 0;
 
 const tracker = useResourceTracker('mouse-hover-tooltip');
 
 // Reactive target language
 const targetLanguage = computed(() => settingsStore.targetLanguage || 'fa');
 
+const acknowledgeReplacedDisplay = (nextHoverId) => {
+  if (!isVisible.value || !hoverId.value || !nextHoverId || hoverId.value === nextHoverId) return;
+  pageEventBus.emit('MOUSE_HOVER_TOOLTIP_HIDDEN', { hoverId: hoverId.value, frameId: frameId.value });
+};
+
 const showTooltip = async (detail) => {
   if (!detail.translatedText) return;
+  acknowledgeReplacedDisplay(detail.hoverId);
+  const generation = ++displayGeneration;
+  const token = detail.hoverId;
   
   // Clear any existing timer
   tracker.clearAllTimers();
 
   const wasVisible = isVisible.value;
+  hoverId.value = token ?? hoverId.value;
+  frameId.value = detail.frameId ?? 0;
   isStreaming.value = !!detail.isStreaming;
 
   // Only hide and reset if it wasn't already visible (new hover)
@@ -67,11 +82,13 @@ const showTooltip = async (detail) => {
   
   // Wait for content update and DOM reset
   await nextTick();
+  if (generation !== displayGeneration || (token !== undefined && token !== hoverId.value)) return;
   
   if (!wasVisible) {
     isVisible.value = true;
     // Wait for new dimensions to be calculated by the browser
     await nextTick();
+    if (generation !== displayGeneration || (token !== undefined && token !== hoverId.value)) return;
     calculatePosition(detail.position);
   } else {
     // If already visible, just update position in case content changed significantly
@@ -84,13 +101,17 @@ const showTooltip = async (detail) => {
     if (autoClose === 'timer') {
       const duration = settingsStore.settings?.MOUSE_HOVER_TIMER_DURATION || 3000;
       tracker.setTimeout(() => {
-        hideTooltip();
+        hideTooltip({ hoverId: token });
       }, duration);
     }
   }
 };
 
 const showError = (detail) => {
+  acknowledgeReplacedDisplay(detail.hoverId);
+  displayGeneration += 1;
+  hoverId.value = detail.hoverId ?? hoverId.value;
+  frameId.value = detail.frameId ?? 0;
   isVisible.value = true;
   isError.value = true;
   errorMessage.value = detail.error?.message || 'Translation failed';
@@ -98,21 +119,32 @@ const showError = (detail) => {
   translatedText.value = '';
   
   tracker.clearAllTimers();
+  const token = hoverId.value;
   tracker.setTimeout(() => {
-    hideTooltip();
+    hideTooltip({ hoverId: token });
   }, 3000);
 };
 
-const hideTooltip = () => {
+const hideTooltip = (detail) => {
+  if (detail?.hoverId && detail.hoverId !== hoverId.value) return;
+  if (!detail && hoverId.value !== null) return;
+  displayGeneration += 1;
+  const hiddenDetail = { hoverId: hoverId.value, frameId: frameId.value };
   isVisible.value = false;
   isError.value = false;
   errorMessage.value = '';
   errorType.value = null;
+  hoverId.value = null;
+  frameId.value = 0;
   
   // Notify manager that tooltip is hidden so it can reset its cache
-  pageEventBus.emit('MOUSE_HOVER_TOOLTIP_HIDDEN');
+  pageEventBus.emit('MOUSE_HOVER_TOOLTIP_HIDDEN', hiddenDetail);
   
   tracker.clearAllTimers();
+};
+
+const emitPointer = (type) => {
+  if (isVisible.value) pageEventBus.emit(type, { hoverId: hoverId.value, frameId: frameId.value });
 };
 
 const calculatePosition = (pos) => {

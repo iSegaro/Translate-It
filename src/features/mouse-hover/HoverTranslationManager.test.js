@@ -9,6 +9,7 @@ import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
 import { getErrorMessage } from '@/shared/error-management/ErrorMessages.js';
 import { mapCanonicalTranslationError } from '@/shared/error-management/PublicTranslationErrorPolicy.js';
 import { createLegacyDisplayError } from '@/shared/error-management/PublicTranslationErrorAdapter.js';
+import browser from 'webextension-polyfill';
 
 const { mockErrorHandler } = vi.hoisted(() => ({
   mockErrorHandler: {
@@ -112,6 +113,7 @@ describe('HoverTranslationManager', () => {
 
   it('should deactivate and cleanup', async () => {
     await manager.activate();
+    manager.displayedHoverId = 'displayed-id';
     const cleanupSpy = vi.spyOn(manager, 'cleanup');
     const emitSpy = vi.spyOn(pageEventBus, 'emit');
     
@@ -119,7 +121,7 @@ describe('HoverTranslationManager', () => {
     
     expect(manager.isActive).toBe(false);
     expect(cleanupSpy).toHaveBeenCalled();
-    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP');
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'displayed-id', frameId: 0 });
   });
 
   it('clears transient hover state before deactivation and allows a fresh hover after reactivation', async () => {
@@ -157,6 +159,81 @@ describe('HoverTranslationManager', () => {
     vi.advanceTimersByTime(300);
 
     expect(HoverTextDetector.detect).toHaveBeenCalledWith(100, 100, 'sentence');
+  });
+
+  it('hides both a pending replacement source and its previously displayed tooltip on exit', async () => {
+    await manager.activate();
+    manager.currentText = 'source B';
+    manager.activeHoverId = 'hover-b';
+    manager.currentMessageId = 'request-b';
+    manager.displayedHoverId = 'hover-a';
+    manager.displayedFrameId = 0;
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+    manager.handleMouseLeave();
+    vi.advanceTimersByTime(350);
+
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'hover-b', frameId: 0 });
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'hover-a', frameId: 0 });
+    expect(emitSpy.mock.calls.filter(([type]) => type === 'MOUSE_HOVER_HIDE_TOOLTIP')).toHaveLength(2);
+    expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledWith('request-b', expect.any(String));
+  });
+
+  it.each([false, true])('deactivation hides distinct active and displayed ids (iframe=%s)', async (iframe) => {
+    const originalTop = Object.getOwnPropertyDescriptor(window, 'top');
+    const sendMessage = vi.spyOn(browser.runtime, 'sendMessage').mockResolvedValue(undefined);
+    if (iframe) Object.defineProperty(window, 'top', { configurable: true, value: {} });
+    await manager.activate();
+    manager.activeHoverId = 'pending-b';
+    manager.displayedHoverId = 'displayed-a';
+    manager.displayedFrameId = 0;
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+    await manager.deactivate();
+
+    const hides = emitSpy.mock.calls.filter(([type]) => type === 'MOUSE_HOVER_HIDE_TOOLTIP');
+    expect(hides).toEqual([
+      ['MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'pending-b', frameId: 0 }],
+      ['MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'displayed-a', frameId: 0 }]
+    ]);
+    if (iframe) {
+      expect(sendMessage.mock.calls.map(([message]) => message.data)).toEqual([
+        { type: 'MOUSE_HOVER_HIDE_TOOLTIP', detail: { hoverId: 'pending-b', frameId: 0 } },
+        { type: 'MOUSE_HOVER_HIDE_TOOLTIP', detail: { hoverId: 'displayed-a', frameId: 0 } }
+      ]);
+    }
+    if (iframe) Object.defineProperty(window, 'top', originalTop);
+    sendMessage.mockRestore();
+  });
+
+  it('keeps source ownership until a new hover detection accepts its element', async () => {
+    manager.activeHoverId = 'hover-a';
+    const sourceElement = document.createElement('p');
+    manager.currentElement = sourceElement;
+    manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+    settingsManager.get.mockImplementation((key, def) => key === 'MOUSE_HOVER_TRIGGER' ? 'hover' : def);
+
+    manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+
+    expect(manager.currentElement).toBe(sourceElement);
+  });
+
+  it('applies translation-hide ownership filtering and hides both associated tokens', () => {
+    const sourceElement = document.createElement('p');
+    const unrelatedElement = document.createElement('p');
+    manager.currentText = 'source B';
+    manager.currentElement = sourceElement;
+    manager.activeHoverId = 'hover-b';
+    manager.displayedHoverId = 'hover-a';
+    const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+    manager.handleTranslationHide({ element: unrelatedElement });
+    expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', expect.anything());
+    expect(manager.currentElement).toBe(sourceElement);
+
+    manager.handleTranslationHide({ element: sourceElement });
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'hover-b', frameId: 0 });
+    expect(emitSpy).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'hover-a', frameId: 0 });
   });
 
   describe('handleMouseMove', () => {
@@ -438,9 +515,345 @@ describe('HoverTranslationManager', () => {
       manager.currentMessageId = 'test-id-123';
 
       manager.handleMouseLeave();
+      vi.advanceTimersByTime(350);
 
       expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledWith('test-id-123', expect.any(String));
       expect(manager.currentMessageId).toBeNull();
+    });
+
+    it('keeps a tooltip hover through the grace period and dismisses once after pointer exit', async () => {
+      await manager.activate();
+      manager.currentText = 'text';
+      manager.activeHoverId = 'hover-a';
+      manager.currentMessageId = 'request-a';
+
+      manager.handleMouseLeave();
+      pageEventBus.emit('MOUSE_HOVER_TOOLTIP_POINTER_ENTER', { hoverId: 'hover-a', frameId: 0 });
+      vi.advanceTimersByTime(400);
+      expect(manager.currentText).toBe('text');
+
+      pageEventBus.emit('MOUSE_HOVER_TOOLTIP_POINTER_LEAVE', { hoverId: 'hover-a', frameId: 0 });
+      vi.advanceTimersByTime(349);
+      expect(manager.currentText).toBe('text');
+      vi.advanceTimersByTime(1);
+      expect(manager.currentText).toBeNull();
+      expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledWith('request-a', expect.any(String));
+    });
+
+    it('ignores pointer signals and hidden acknowledgements for another hover token', async () => {
+      await manager.activate();
+      manager.currentText = 'current';
+      manager.activeHoverId = 'current-token';
+      manager.handleTooltipPointerLeave({ hoverId: 'stale-token' });
+      manager.handleTooltipHidden({ hoverId: 'stale-token' });
+      vi.advanceTimersByTime(500);
+      expect(manager.currentText).toBe('current');
+    });
+
+    it('closes after continuous movement over unrelated content without extending the grace', async () => {
+      await manager.activate();
+      manager.currentText = 'active';
+      manager.activeHoverId = 'hover-continuous';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      vi.advanceTimersByTime(200);
+      manager.handleMouseMove({ clientX: 120, clientY: 120, target: document.body });
+      vi.advanceTimersByTime(150);
+
+      expect(manager.currentText).toBeNull();
+      expect(pageEventBus.emit).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', {
+        hoverId: 'hover-continuous', frameId: 0
+      });
+    });
+
+    it('does not cancel an in-flight request when document mousemove is over the tooltip', async () => {
+      await manager.activate();
+      manager.currentText = 'active';
+      manager.activeHoverId = 'hover-tooltip';
+      manager.currentMessageId = 'request-tooltip';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      const tooltip = document.createElement('div');
+      tooltip.className = 'ti-mouse-hover-tooltip';
+
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: tooltip, composedPath: () => [tooltip] });
+      vi.advanceTimersByTime(500);
+
+      expect(manager.currentMessageId).toBe('request-tooltip');
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+      expect(manager.currentText).toBe('active');
+    });
+
+    it('cleans manager state on timer-mode source leave without hiding the tooltip', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => key === 'MOUSE_HOVER_AUTO_CLOSE' ? 'timer' : def);
+      manager.currentText = 'active';
+      manager.activeHoverId = 'hover-timer';
+      manager.currentMessageId = 'request-timer';
+      const emitSpy = vi.spyOn(pageEventBus, 'emit');
+
+      manager.handleMouseLeave();
+
+      expect(manager.currentMessageId).toBeNull();
+      expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledWith('request-timer', expect.any(String));
+      expect(emitSpy).not.toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', expect.anything());
+    });
+
+    it('cancels tooltip grace on source reentry after tooltip pointer exit', async () => {
+      await manager.activate();
+      manager.currentText = 'active';
+      manager.activeHoverId = 'hover-return';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleTooltipPointerLeave({ hoverId: 'hover-return' });
+      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body });
+      vi.advanceTimersByTime(400);
+
+      expect(manager.currentText).toBe('active');
+    });
+
+    it.each([['hover', 'word'], ['primary', 'container']])(
+      'applies bounded exits for %s trigger in %s scope', async (trigger, scope) => {
+        await manager.activate();
+        settingsManager.get.mockImplementation((key, def) => {
+          if (key === 'MOUSE_HOVER_TRIGGER') return trigger;
+          if (key === 'MOUSE_HOVER_SCOPE') return scope;
+          return def;
+        });
+        manager.currentText = 'active';
+        manager.activeHoverId = `hover-${trigger}-${scope}`;
+
+        manager.handleMouseLeave();
+        vi.advanceTimersByTime(350);
+
+        expect(manager.currentText).toBeNull();
+      }
+    );
+
+    it('ignores delayed tooltip-leave feedback after source reentry', async () => {
+      await manager.activate();
+      manager.currentText = 'active';
+      manager.activeHoverId = 'hover-reentry-feedback';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleTooltipPointerEnter({ hoverId: manager.activeHoverId });
+      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body });
+      manager.handleTooltipPointerLeave({ hoverId: manager.activeHoverId });
+      vi.advanceTimersByTime(400);
+
+      expect(manager.currentText).toBe('active');
+    });
+
+    it('treats tooltip-to-unrelated mousemove as an exit despite cached pointer state', async () => {
+      await manager.activate();
+      manager.currentText = 'active';
+      manager.activeHoverId = 'hover-tooltip-to-page';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleTooltipPointerEnter({ hoverId: manager.activeHoverId });
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      expect(manager.exitTimer).not.toBeNull();
+      vi.advanceTimersByTime(350);
+      expect(manager.currentText).toBeNull();
+    });
+
+    it.each([100, 200])('preserves active request when empty gap detection fires at %sms', async (delay) => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return delay;
+        return def;
+      });
+      manager.currentText = 'original';
+      manager.activeHoverId = 'gap-hover';
+      manager.currentMessageId = 'gap-request';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      HoverTextDetector.detect.mockReturnValue(null);
+
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      await vi.advanceTimersByTimeAsync(delay);
+      expect(manager.currentText).toBe('original');
+      expect(manager.currentMessageId).toBe('gap-request');
+      expect(contentScriptIntegration.cancelTranslationRequest).not.toHaveBeenCalled();
+
+      manager.handleTooltipPointerEnter({ hoverId: 'gap-hover' });
+      vi.advanceTimersByTime(500);
+      expect(manager.currentText).toBe('original');
+      expect(manager.currentMessageId).toBe('gap-request');
+    });
+
+    it('dismisses once at original grace expiry after empty gap detection', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return 100;
+        return def;
+      });
+      manager.currentText = 'original';
+      manager.activeHoverId = 'gap-expiry';
+      manager.currentMessageId = 'gap-request-expiry';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      HoverTextDetector.detect.mockReturnValue(null);
+
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      await vi.advanceTimersByTimeAsync(100);
+      vi.advanceTimersByTime(249);
+      expect(manager.currentText).toBe('original');
+      vi.advanceTimersByTime(1);
+
+      expect(manager.currentText).toBeNull();
+      expect(manager.currentMessageId).toBeNull();
+      expect(contentScriptIntegration.cancelTranslationRequest).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores late source leaves while tooltip holds the matching hover, then exits on tooltip leave', async () => {
+      await manager.activate();
+      const source = document.createElement('p');
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'held', rect: { top: 0, left: 0, bottom: 20, right: 20 }, element: source
+      });
+      await manager._processHover({ clientX: 10, clientY: 10 });
+      const hoverId = manager.activeHoverId;
+      manager.handleTooltipPointerEnter({ hoverId });
+
+      manager.handleMouseLeave();
+      source.dispatchEvent(new MouseEvent('mouseleave'));
+      vi.advanceTimersByTime(400);
+      expect(manager.currentText).toBe('held');
+
+      manager.handleTooltipPointerLeave({ hoverId });
+      vi.advanceTimersByTime(350);
+      expect(manager.currentText).toBeNull();
+    });
+
+    it('clears the tooltip hold on source reentry and closes after the later real source leave', async () => {
+      await manager.activate();
+      manager.currentText = 'source';
+      manager.activeHoverId = 'source-reentry';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleTooltipPointerEnter({ hoverId: 'source-reentry' });
+      manager.handleMouseMove({ clientX: 10, clientY: 10, target: document.body });
+      expect(manager.tooltipHeldHoverId).toBeNull();
+      expect(manager.sourceInside).toBe(true);
+
+      manager.handleTooltipPointerLeave({ hoverId: 'source-reentry' });
+      expect(manager.exitTimer).toBeNull();
+      manager.handleMouseLeave();
+      vi.advanceTimersByTime(349);
+      expect(manager.currentText).toBe('source');
+      vi.advanceTimersByTime(1);
+
+      expect(manager.currentText).toBeNull();
+    });
+
+    it('does not let stale tooltip pointer signals hold or dismiss a newer hover', async () => {
+      await manager.activate();
+      manager.currentText = 'new';
+      manager.activeHoverId = 'new-hover';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleTooltipPointerEnter({ hoverId: 'old-hover' });
+      manager.handleTooltipPointerLeave({ hoverId: 'old-hover' });
+      expect(manager.tooltipHeldHoverId).toBeNull();
+
+      manager.handleTooltipPointerEnter({ hoverId: 'new-hover' });
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      vi.advanceTimersByTime(350);
+      expect(manager.currentText).toBeNull();
+    });
+
+    it.each([200, 500])('detects one new hover after %sms even if old exit grace expires first', async (delay) => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return delay;
+        return def;
+      });
+      manager.currentText = 'old text';
+      manager.currentElement = document.body;
+      manager.activeHoverId = 'old-hover';
+      manager.currentMessageId = 'old-request';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'new text', rect: { top: 100, left: 100, bottom: 120, right: 120 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ translatedText: 'new translation' });
+
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      await vi.advanceTimersByTimeAsync(delay);
+
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+      expect(manager.currentText).toBe('new text');
+    });
+
+    it('restarts the pending detection on rapid movement and does not schedule it in modifier mode', async () => {
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => {
+        if (key === 'MOUSE_HOVER_TRIGGER') return 'hover';
+        if (key === 'MOUSE_HOVER_DELAY') return 300;
+        return def;
+      });
+      manager.currentText = 'old';
+      manager.activeHoverId = 'old-hover';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      HoverTextDetector.detect.mockReturnValue({
+        text: 'rapid destination', rect: { top: 120, left: 120, bottom: 140, right: 140 },
+        element: document.createElement('p')
+      });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ translatedText: 'destination' });
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      vi.advanceTimersByTime(200);
+      manager.handleMouseMove({ clientX: 130, clientY: 130, target: document.body });
+      vi.advanceTimersByTime(200);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(HoverTextDetector.detect).toHaveBeenCalledTimes(1);
+      expect(HoverTextDetector.detect).toHaveBeenCalledWith(130, 130, 'sentence');
+
+      manager.cleanup();
+      manager = new HoverTranslationManager();
+      HoverTextDetector.detect.mockClear();
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => key === 'MOUSE_HOVER_TRIGGER' ? 'primary' : def);
+      manager.currentText = 'old';
+      manager.activeHoverId = 'modifier-hover';
+      manager.currentRect = { top: 0, left: 0, bottom: 20, right: 20 };
+      manager.handleMouseMove({ clientX: 100, clientY: 100, target: document.body });
+      expect(manager.hoverTimer).toBeNull();
+      vi.advanceTimersByTime(400);
+      expect(HoverTextDetector.detect).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])('deactivates a timer-mode display after source leave (iframe=%s)', async (iframe) => {
+      const originalTop = Object.getOwnPropertyDescriptor(window, 'top');
+      const sendMessage = vi.spyOn(browser.runtime, 'sendMessage').mockResolvedValue(undefined);
+      if (iframe) Object.defineProperty(window, 'top', { configurable: true, value: {} });
+      await manager.activate();
+      settingsManager.get.mockImplementation((key, def) => key === 'MOUSE_HOVER_AUTO_CLOSE' ? 'timer' : def);
+      manager.currentText = 'displayed';
+      manager.activeHoverId = 'source-token';
+      manager.displayedHoverId = 'display-token';
+      manager.displayedFrameId = 12;
+      manager.handleMouseLeave();
+      expect(manager.activeHoverId).toBeNull();
+      expect(manager.displayedHoverId).toBe('display-token');
+
+      const emitted = vi.spyOn(pageEventBus, 'emit');
+      await manager.deactivate();
+
+      expect(emitted).toHaveBeenCalledWith('MOUSE_HOVER_HIDE_TOOLTIP', { hoverId: 'display-token', frameId: 12 });
+      if (iframe) {
+        expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+          data: { type: 'MOUSE_HOVER_HIDE_TOOLTIP', detail: { hoverId: 'display-token', frameId: 12 } }
+        }));
+      }
+      if (iframe) Object.defineProperty(window, 'top', originalTop);
+      sendMessage.mockRestore();
+    });
+
+    it('does not let a late hidden acknowledgement clear a newer display token', async () => {
+      manager.activeHoverId = 'new-active';
+      manager.displayedHoverId = 'new-display';
+      manager.displayedFrameId = 0;
+      manager.handleTooltipHidden({ hoverId: 'old-display' });
+      expect(manager.displayedHoverId).toBe('new-display');
+      expect(manager.activeHoverId).toBe('new-active');
     });
   });
 
@@ -620,10 +1033,11 @@ describe('HoverTranslationManager', () => {
       emitSpy.mockRestore();
     });
 
-    it('transports only adapted error identity through iframe events', async () => {
+    it('does not transport hover UI events through window messages from iframes', async () => {
       const originalTop = Object.getOwnPropertyDescriptor(window, 'top');
       const postMessage = vi.fn();
       Object.defineProperty(window, 'top', { configurable: true, value: { postMessage } });
+      const sendMessage = vi.spyOn(browser.runtime, 'sendMessage').mockResolvedValue(undefined);
 
       try {
         const canonicalError = new Error('raw provider HTTP body secret');
@@ -647,25 +1061,30 @@ describe('HoverTranslationManager', () => {
         manager._emitPageEvent('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
 
         expect(localEmit).toHaveBeenCalledWith('MOUSE_HOVER_TRANSLATION_ERROR', { error: displayError });
-        expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
-          source: 'translate-it-iframe',
-          type: 'MOUSE_HOVER_TRANSLATION_ERROR',
+        expect(postMessage).not.toHaveBeenCalled();
+        expect(sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+          action: expect.anything(),
+          context: 'mouse-hover-frame-event',
           data: {
+            type: 'MOUSE_HOVER_TRANSLATION_ERROR',
+            detail: {
             error: displayError.message,
             errorDetails: {
               message: displayError.message,
               type: ErrorTypes.HTTP_ERROR
             }
+            }
           }
-        }), '*');
-        expect(postMessage.mock.calls[0][0].data.error).not.toContain('raw provider HTTP body secret');
-        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('cause');
-        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('providerName');
-        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('statusCode');
-        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('originalType');
-        expect(postMessage.mock.calls[0][0].data.errorDetails).not.toHaveProperty('arbitrary');
+        }));
+        expect(sendMessage.mock.calls[0][0].data.detail.error).not.toContain('raw provider HTTP body secret');
+        expect(sendMessage.mock.calls[0][0].data.detail.errorDetails).not.toHaveProperty('cause');
+        expect(sendMessage.mock.calls[0][0].data.detail.errorDetails).not.toHaveProperty('providerName');
+        expect(sendMessage.mock.calls[0][0].data.detail.errorDetails).not.toHaveProperty('statusCode');
+        expect(sendMessage.mock.calls[0][0].data.detail.errorDetails).not.toHaveProperty('originalType');
+        expect(sendMessage.mock.calls[0][0].data.detail.errorDetails).not.toHaveProperty('arbitrary');
       } finally {
         Object.defineProperty(window, 'top', originalTop);
+        sendMessage.mockRestore();
       }
     });
 
