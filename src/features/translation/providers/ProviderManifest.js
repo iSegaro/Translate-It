@@ -228,7 +228,7 @@ const getRawManifest = () => [
     name: ProviderNames.VAJEHYAB,
     displayName: "Vajehyab Dictionary",
     type: ProviderTypes.TRANSLATE,
-    category: ProviderCategories.FREE,
+    category: ProviderCategories.LOCAL,
     icon: "vajehyab.png",
     importFunction: () => import("./VajehyabProvider.js").then(m => ({ default: m.VajehyabProvider })),
     features: ["translation", "text", "autoDetect", "dictionary", "autoLanguage"],

@@ -266,7 +266,7 @@
       <div
         ref="dropdownMenuRef"
         class="ti-provider-dropdown-list"
-        @mouseleave="focusedIndex = -1"
+        @mouseleave="handleMenuPointerLeave"
       >
         <div
           v-for="group in visibleGroups"
@@ -287,6 +287,7 @@
             :class="{ 'is-collapsed': group.collapsed }"
             :aria-expanded="!group.collapsed"
             :aria-controls="group.rowsId"
+            @mouseenter="handleCategoryPointerEnter"
             @click="toggleCategoryCollapse(group)"
           >
             <span class="ti-dropdown-group-title">{{ group.header }}</span>
@@ -314,10 +315,10 @@
                 class="ti-dropdown-item"
                 :class="{
                   'ti-active': currentProvider === item.id,
-                  'is-focused': focusedIndex === item.index
+                  'is-focused': !isCategoryHeaderHovered && focusedIndex === item.index
                 }"
                 @click="selectProvider(item)"
-                @mouseenter="focusedIndex = item.index"
+                @mouseenter="handleRowPointerEnter(item)"
               >
                 <!-- Semantic selection button: owns the full selectable rectangle
                      (padding lives on it) and keyboard activation. The sibling star
@@ -592,6 +593,7 @@ const dropdownMenuElRef = ref(null)
 const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const focusedIndex = ref(-1)
+const isCategoryHeaderHovered = ref(false)
 // Identity of the row that last received REAL focus (recorded at the focus
 // event, before any reactive reshaping) — external collapse reconciliation
 // re-anchors by this id.
@@ -755,8 +757,40 @@ const handleKeydown = (event) => {
  * plus its stable provider id for the external-collapse reconciliation.
  */
 const handleRowFocus = (item) => {
+  isCategoryHeaderHovered.value = false
   focusedIndex.value = item.index
   rowFocusProviderId.value = item.id
+}
+
+const handleRowPointerEnter = (item) => {
+  isCategoryHeaderHovered.value = false
+  focusedIndex.value = item.index
+}
+
+const handleMenuPointerLeave = () => {
+  isCategoryHeaderHovered.value = false
+  focusedIndex.value = -1
+}
+
+/**
+ * A pointer can visit other rows before crossing a category header. Clear that
+ * transient row highlight, but keep keyboard navigation anchored to a provider
+ * row that still has real focus (root-scoped for ShadowRoot menus).
+ */
+const handleCategoryPointerEnter = () => {
+  isCategoryHeaderHovered.value = true
+  const menuRoot = dropdownMenuElRef.value
+  const focusRoot = menuRoot?.getRootNode?.() ?? document
+  const activeElement = focusRoot.activeElement
+  const focusedRow = activeElement?.closest?.('.ti-dropdown-item-btn')
+  if (!menuRoot?.contains(focusedRow)) {
+    focusedIndex.value = -1
+    return
+  }
+
+  const rows = dropdownMenuRef.value?.querySelectorAll('.ti-dropdown-item-btn') ?? []
+  const realFocusIndex = Array.prototype.indexOf.call(rows, focusedRow)
+  focusedIndex.value = realFocusIndex
 }
 
 /**
@@ -986,8 +1020,7 @@ const availableProviders = computed(() => {
 //   bucketed (no category, no cost implication).
 // - FREE category means Traditional translation services, not free-of-cost.
 // - Category buckets keep stable manifest order inside them, so Vajehyab
-//   (traditional per FREE category, trailing after the LOCAL providers in the
-//   manifest) trails inside the Traditional bucket.
+//   trails the other LOCAL providers in the Other bucket.
 const CATEGORY_LABEL_KEYS = {
   free: 'provider_category_free',
   ai: 'provider_category_ai',

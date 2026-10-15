@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
+import { readFileSync } from 'node:fs'
+import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 
 const settingsStore = vi.hoisted(() => ({
   settings: null,
@@ -154,6 +157,8 @@ vi.mock('@/composables/core/useResourceTracker.js', async () => {
 })
 
 import ProviderSelector from './ProviderSelector.vue'
+
+const providerSelectorScss = readFileSync('src/components/shared/ProviderSelector.scss', 'utf8')
 
 afterEach(() => {
   trackedListeners.splice(0).forEach(({ target, event, listener, options }) => {
@@ -462,6 +467,36 @@ describe('ProviderSelector provider list contract', () => {
       expect(selected.attributes('aria-current')).toBe('true')
       expect(sibling.attributes('aria-current')).not.toBe('true')
       expect(selected.find('img').attributes('alt')).toBe('')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('groups Vajehyab under Other rather than Traditional using its manifest category', async () => {
+    const vajehyab = findProviderById(ProviderRegistryIds.VAJEHYAB)
+    registry.providers.push({
+      id: vajehyab.id,
+      name: vajehyab.displayName,
+      icon: `providers/${vajehyab.icon}`,
+      supported: vajehyab.supported,
+      features: vajehyab.features,
+      category: vajehyab.category,
+    })
+
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const groups = wrapper.findAll('.ti-dropdown-group')
+      const vajehyabGroup = groups.find((group) =>
+        group.find('.ti-dropdown-group-header').text().trim() === 'Other')
+      const traditionalGroup = groups.find((group) =>
+        group.find('.ti-dropdown-group-header').text().trim() === 'Traditional')
+
+      expect(vajehyabGroup.findAll('.ti-dropdown-item').map((item) => item.text().trim()))
+        .toContain('Vajehyab Dictionary')
+      expect(traditionalGroup.findAll('.ti-dropdown-item').map((item) => item.text().trim()))
+        .not.toContain('Vajehyab Dictionary')
     } finally {
       wrapper.unmount()
       container.remove()
@@ -2037,6 +2072,178 @@ describe('ProviderSelector collapsible category groups', () => {
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
   }
+
+  it.each([
+    { label: 'pointer from above', focused: 'OpenAI', focusedIndex: 3, pointer: 'Google', next: 'Gemini' },
+    { label: 'pointer from below', focused: 'Google', focusedIndex: 0, pointer: 'Browser', next: 'DeepL' },
+    { label: 'pointer between categories', focused: 'DeepL', focusedIndex: 1, pointer: 'Gemini', next: 'Unconfigured' },
+  ])('header pointer entry clears stale row hover and preserves keyboard focus ($label)', async ({ focused, focusedIndex, pointer, next }) => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      const providerButton = (name) => Array.from(document.body.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((button) => button.textContent.trim() === name)
+      const focusedButton = providerButton(focused)
+      const pointerRow = providerButton(pointer).closest('.ti-dropdown-item')
+      focusedButton.focus()
+      pointerRow.dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(
+        ['Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser'].indexOf(pointer),
+      )
+      expect(pointerRow.classList.contains('is-focused')).toBe(true)
+
+      const header = document.body.querySelector('.ti-dropdown-group-header')
+      header.dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(focusedButton)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(focusedIndex)
+      expect(document.body.querySelectorAll('.ti-dropdown-item.is-focused')).toHaveLength(0)
+      expect(pointerRow.classList.contains('is-focused')).toBe(false)
+      const selectedRow = providerButton('Google').closest('.ti-dropdown-item')
+      expect(selectedRow.classList.contains('ti-active')).toBe(true)
+
+      await arrowDown(wrapper)
+      expect(document.activeElement.textContent.trim()).toBe(next)
+      expect(document.activeElement.closest('.ti-dropdown-item').classList.contains('is-focused')).toBe(true)
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')?.at(-1)).toEqual([next.toLowerCase() === 'google' ? 'googlev2' : next.toLowerCase()])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it.each([
+    { direction: 'above', pointer: 'Google' },
+    { direction: 'below', pointer: 'Browser' },
+  ])('header pointer entry clears row-only highlight when real focus is on the header (from $direction)', async ({ pointer }) => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      const aiHeader = Array.from(menu.querySelectorAll('.ti-dropdown-group-header'))
+        .find((header) => header.textContent.trim() === 'AI')
+      aiHeader.focus()
+      expect(document.activeElement).toBe(aiHeader)
+
+      const pointerRow = Array.from(menu.querySelectorAll('.ti-dropdown-item'))
+        .find((row) => row.textContent.trim().includes(pointer))
+      pointerRow.dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.$.setupState.focusedIndex).toBeGreaterThanOrEqual(0)
+      expect(pointerRow.classList.contains('is-focused')).toBe(true)
+
+      aiHeader.dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(aiHeader)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(-1)
+      expect(menu.querySelectorAll('.ti-dropdown-item.is-focused')).toHaveLength(0)
+
+      // From header focus with no pointer-highlighted row, ArrowDown still
+      // starts at the first visible provider and moves real focus into the list.
+      aiHeader.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement.classList.contains('ti-dropdown-item-btn')).toBe(true)
+      expect(document.activeElement.textContent.trim()).toBe('Google')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('header hover hides the auto-focused row highlight without clearing selected state or keyboard origin', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      const selectedButton = document.activeElement
+      expect(selectedButton.textContent.trim()).toBe('Google')
+      expect(selectedButton.closest('.ti-dropdown-item').classList.contains('ti-active')).toBe(true)
+
+      const browserRow = Array.from(document.body.querySelectorAll('.ti-dropdown-item'))
+        .find((row) => row.textContent.trim() === 'Browser')
+      browserRow.dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(5)
+
+      document.body.querySelector('.ti-dropdown-group-header')
+        .dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(selectedButton)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(0)
+      expect(document.body.querySelectorAll('.ti-dropdown-item.is-focused')).toHaveLength(0)
+      expect(selectedButton.closest('.ti-dropdown-item').classList.contains('ti-active')).toBe(true)
+
+      await arrowDown(wrapper)
+      expect(document.activeElement.textContent.trim()).toBe('DeepL')
+      expect(document.activeElement.closest('.ti-dropdown-item').classList.contains('is-focused')).toBe(true)
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement.textContent.trim()).toBe('Google')
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(0)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('header pointer entry restores the real focused row inside a ShadowRoot menu', async () => {
+    const { wrapper, container, shadowRoot } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true, shadow: true },
+    )
+    try {
+      await openRealMenu(wrapper)
+      const providerButton = (name) => Array.from(shadowRoot.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((button) => button.textContent.trim() === name)
+      const openAiButton = providerButton('OpenAI')
+      openAiButton.focus()
+      providerButton('Browser').closest('.ti-dropdown-item').dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(5)
+
+      shadowRoot.querySelector('.ti-dropdown-group-header').dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+      expect(shadowRoot.activeElement).toBe(openAiButton)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(3)
+      expect(shadowRoot.querySelectorAll('.ti-dropdown-item.is-focused')).toHaveLength(0)
+      expect(providerButton('Browser').closest('.ti-dropdown-item').classList.contains('is-focused')).toBe(false)
+
+      await shadowArrowDown(wrapper, shadowRoot)
+      expect(shadowRoot.activeElement?.textContent.trim()).toBe('Gemini')
+      shadowRoot.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(shadowRoot.activeElement?.textContent.trim()).toBe('OpenAI')
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(3)
+      await shadowArrowDown(wrapper, shadowRoot)
+      expect(shadowRoot.activeElement?.textContent.trim()).toBe('Gemini')
+      expect(shadowRoot.activeElement.closest('.ti-dropdown-item').classList.contains('is-focused')).toBe(true)
+      shadowRoot.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')).toEqual([['gemini']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('category header styles keep hover transparent and reveal a subtle chevron only for interaction/touch', () => {
+    const headerRule = providerSelectorScss.match(/\.ti-dropdown-group-header\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
+    const chevronRule = providerSelectorScss.match(/^\.ti-provider-chevron\s*\{([\s\S]*?)\n\}/m)?.[1] ?? ''
+    expect(headerRule).toContain('background: transparent !important;')
+    expect(headerRule.match(/background: transparent !important;/g)).toHaveLength(2)
+    expect(headerRule).toContain('&:hover')
+    expect(headerRule).toContain('color: var(--color-text-secondary);')
+    expect(headerRule).toContain('outline: 2px solid var(--color-primary) !important;')
+    expect(chevronRule).toContain('opacity: 0;')
+    expect(chevronRule).toContain('transform: rotate(180deg);')
+    expect(providerSelectorScss).toMatch(/&:hover \.ti-provider-chevron,[\s\S]*?&:focus-visible \.ti-provider-chevron\s*\{\s*opacity:\s*1;/)
+    expect(providerSelectorScss).toMatch(/@media \(hover: none\)[\s\S]*?\.ti-provider-chevron\s*\{\s*opacity:\s*1;/)
+    expect(providerSelectorScss).toMatch(/@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.ti-provider-chevron\s*\{\s*transition:\s*none;/)
+  })
 
   it('renders accessible disclosure headers with unique IDs, expand state, and chevron', async () => {
     const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })

@@ -334,8 +334,7 @@ img.ti-dropdown-arrow,
    non-interactive label). Collapsed/expanded arrow mirrors the trigger
    dropdown arrow: chevron-down rest → rotated 180° when expanded; rotation
    is RTL-direction-neutral, color follows the header text in dark themes.
-   No !important here: nothing else targets these classes, so plain
-   specificity keeps the stylelint declaration baseline untouched. */
+   Background alone uses !important to beat inherited global button hovers. */
 .ti-dropdown-group-header {
   display: flex;
   align-items: center;
@@ -348,7 +347,10 @@ img.ti-dropdown-arrow,
   font-size: 11px;
   font-weight: 600;
   color: var(--color-text-muted);
-  background: transparent;
+
+  /* Override inherited application-wide button backgrounds. */
+  /* stylelint-disable-next-line declaration-no-important */
+  background: transparent !important;
   border: none;
   margin: 0;
   cursor: pointer;
@@ -356,8 +358,21 @@ img.ti-dropdown-arrow,
   text-align: start;
 
   &:hover,
+  &:active,
+  &:focus,
   &:focus-visible {
-    color: var(--color-text);
+    // Keep inherited/global button hover backgrounds transparent in all states.
+    /* stylelint-disable-next-line declaration-no-important */
+    background: transparent !important;
+  }
+
+  &:hover {
+    color: var(--color-text-secondary);
+  }
+
+  &:hover .ti-provider-chevron,
+  &:focus-visible .ti-provider-chevron {
+    opacity: 1;
   }
 
   &:focus-visible {
@@ -392,7 +407,8 @@ img.ti-dropdown-arrow,
   height: 10px;
   flex-shrink: 0;
   color: var(--color-text-muted);
-  transition: transform 0.2s ease;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 
   &.is-expanded {
     transform: rotate(180deg);
@@ -402,6 +418,19 @@ img.ti-dropdown-arrow,
   .theme-dark &,
   .is-dark & {
     color: var(--color-text-secondary);
+  }
+}
+
+/* Touch users have no hover state; keep the disclosure affordance visible. */
+@media (hover: none) {
+  .ti-dropdown-group-header .ti-provider-chevron {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ti-provider-chevron {
+    transition: none;
   }
 }
 

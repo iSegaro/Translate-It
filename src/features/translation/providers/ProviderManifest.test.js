@@ -20,6 +20,12 @@ describe('provider manifest categories', () => {
     expect(getProviderById(ProviderRegistryIds.MOCK).category).toBe(ProviderCategories.LOCAL);
   });
 
+  it('categorizes Vajehyab as local in the manifest and provider registry', () => {
+    expect(findProviderById(ProviderRegistryIds.VAJEHYAB).category).toBe(ProviderCategories.LOCAL);
+    expect(getProviderById(ProviderRegistryIds.VAJEHYAB).category).toBe(ProviderCategories.LOCAL);
+    expect(findProviderById(ProviderRegistryIds.VAJEHYAB).category).not.toBe(ProviderCategories.FREE);
+  });
+
   it('localizes the existing local category key as Other in supported locales', () => {
     expect(enMessages.provider_category_local.message).toBe('Other');
     expect(faMessages.provider_category_local.message).toBe('سایر');
