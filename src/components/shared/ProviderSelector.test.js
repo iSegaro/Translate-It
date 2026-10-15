@@ -93,16 +93,31 @@ vi.mock('@/shared/logging/logger.js', () => ({
   getScopedLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }))
 
-vi.mock('@/composables/core/useResourceTracker.js', () => ({
-  useResourceTracker: () => ({
-    addEventListener: (target, event, listener, options) => {
-      if (typeof event === 'string' && typeof listener === 'function') {
-        target.addEventListener(event, listener, options)
-        trackedListeners.push({ target, event, listener, options })
+vi.mock('@/composables/core/useResourceTracker.js', async () => {
+  const { onUnmounted } = await import('vue')
+  return {
+    useResourceTracker: () => {
+      const ownedListeners = []
+      onUnmounted(() => {
+        ownedListeners.forEach(({ target, event, listener, options }) => {
+          target.removeEventListener(event, listener, options)
+          const index = trackedListeners.findIndex((entry) => entry.listener === listener)
+          if (index !== -1) trackedListeners.splice(index, 1)
+        })
+      })
+      return {
+        addEventListener: (target, event, listener, options) => {
+          if (typeof event === 'string' && typeof listener === 'function') {
+            target.addEventListener(event, listener, options)
+            const entry = { target, event, listener, options }
+            ownedListeners.push(entry)
+            trackedListeners.push(entry)
+          }
+        },
       }
     },
-  }),
-}))
+  }
+})
 
 import ProviderSelector from './ProviderSelector.vue'
 
@@ -251,9 +266,12 @@ const providers = [
   icon: `providers/${provider.id}.svg`, supported: true, features: ['translation'], ...provider,
 }))
 
-const attachSelector = async (props = {}, { realTeleport = false, shadow = false, popupAncestor = false, selectorClass, rect } = {}) => {
+const attachSelector = async (props = {}, {
+  realTeleport = false, shadow = false, popupAncestor = false, selectorClass, containerClass, rect, containerRect,
+} = {}) => {
   const container = document.createElement('div')
   if (popupAncestor) container.classList.add('translation-view')
+  if (containerClass) container.classList.add(containerClass)
   document.body.appendChild(container)
   let mountPoint = container
   let shadowRoot
@@ -278,12 +296,78 @@ const attachSelector = async (props = {}, { realTeleport = false, shadow = false
   })
   const anchor = wrapper.element.querySelector('.ti-split-translate-button-container, .ti-provider-button-container, .ti-provider-icon-only-container, .ti-provider-mobile-container')
   if (anchor) {
-    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+    const anchorRect = {
       top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
       ...rect,
-    })
+    }
+    vi.spyOn(anchor, 'getBoundingClientRect').mockImplementation(() => ({ ...anchorRect }))
+    const trigger = wrapper.element.querySelector('.ti-provider-dropdown-area, .ti-provider-button, .ti-provider-icon-button, .ti-provider-mobile-button')
+    if (trigger) vi.spyOn(trigger, 'getBoundingClientRect').mockImplementation(() => ({ ...anchorRect }))
+    if (containerClass) {
+      const scrollContainerRect = {
+        top: 0, left: 0, right: 600, bottom: 600, width: 600, height: 600,
+        ...containerRect,
+      }
+      vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ ...scrollContainerRect })
+      return { wrapper, container, shadowRoot, setRect: (next) => Object.assign(anchorRect, next) }
+    }
+    return { wrapper, container, shadowRoot, setRect: (next) => Object.assign(anchorRect, next) }
   }
   return { wrapper, container, shadowRoot }
+}
+
+const enterOptionsPage = () => {
+  const previousUrl = window.location.href
+  window.history.replaceState({}, '', `${window.location.origin}/options.html`)
+  return () => window.history.replaceState({}, '', previousUrl)
+}
+
+const enterOtherPage = () => {
+  const previousUrl = window.location.href
+  window.history.replaceState({}, '', `${window.location.origin}/popup.html`)
+  return () => window.history.replaceState({}, '', previousUrl)
+}
+
+const stubAnimationFrames = () => {
+  const requestDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame')
+  const cancelDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'cancelAnimationFrame')
+  const frames = new Map()
+  const cancelled = []
+  let nextId = 1
+
+  Object.defineProperty(globalThis, 'requestAnimationFrame', {
+    configurable: true,
+    writable: true,
+    value: (callback) => {
+      const id = nextId++
+      frames.set(id, callback)
+      return id
+    },
+  })
+  Object.defineProperty(globalThis, 'cancelAnimationFrame', {
+    configurable: true,
+    writable: true,
+    value: (id) => {
+      cancelled.push(id)
+      frames.delete(id)
+    },
+  })
+
+  return {
+    frames,
+    cancelled,
+    flush(id = frames.keys().next().value) {
+      const callback = frames.get(id)
+      frames.delete(id)
+      callback?.(0)
+    },
+    restore() {
+      if (requestDescriptor) Object.defineProperty(globalThis, 'requestAnimationFrame', requestDescriptor)
+      else delete globalThis.requestAnimationFrame
+      if (cancelDescriptor) Object.defineProperty(globalThis, 'cancelAnimationFrame', cancelDescriptor)
+      else delete globalThis.cancelAnimationFrame
+    },
+  }
 }
 
 describe('ProviderSelector provider list contract', () => {
@@ -892,6 +976,179 @@ describe('ProviderSelector provider list contract', () => {
     } finally {
       wrapper.unmount()
       container.remove()
+    }
+  })
+
+  it.each([false, true])('ignores window scrolling and installs no window scroll listener (Options=%s)', async (optionsPage) => {
+    const restoreLocation = optionsPage ? enterOptionsPage() : enterOtherPage()
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(trackedListeners.some(({ target, event }) => target === window && event === 'scroll')).toBe(false)
+      window.dispatchEvent(new Event('scroll'))
+      await wrapper.vm.$nextTick()
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      restoreLocation()
+    }
+  })
+
+  it('coalesces Options tab scrolls, repositions from the moved trigger, and preserves resize', async () => {
+    const restoreLocation = enterOptionsPage()
+    const raf = stubAnimationFrames()
+    const { wrapper, container, setRect } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' },
+      { realTeleport: true, containerClass: 'tab-content-container' },
+    )
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.style.left).toBe('100px')
+      expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(true)
+      expect(trackedListeners.some(({ target, event }) => target === window && event === 'scroll')).toBe(false)
+      expect(trackedListeners.some(({ target, event }) => target === window && event === 'resize')).toBe(true)
+
+      setRect({ left: 150, right: 350, x: 150 })
+      container.dispatchEvent(new Event('scroll'))
+      container.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(menu.style.left).toBe('150px')
+
+      setRect({ left: 190, right: 390, x: 190 })
+      window.dispatchEvent(new Event('resize'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(menu.style.left).toBe('190px')
+
+      menu.querySelector('.ti-provider-dropdown-list').dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(0)
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      raf.restore()
+      restoreLocation()
+    }
+  })
+
+  it('does not attach Options tab-scroll repositioning in another context', async () => {
+    const restoreLocation = enterOtherPage()
+    const raf = stubAnimationFrames()
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' },
+      { realTeleport: true, containerClass: 'tab-content-container' },
+    )
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(false)
+      container.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(0)
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      raf.restore()
+      restoreLocation()
+    }
+  })
+
+  it.each([
+    { label: 'entirely below its Options container', width: 800, moved: { top: 410, bottom: 450 } },
+    { label: 'exactly at the Options container edge', width: 800, moved: { top: 400, bottom: 440 } },
+    { label: 'entirely beyond the horizontal viewport', width: 360, moved: { left: 370, right: 410, x: 370 } },
+  ])('silently closes when the trigger is $label', async ({ width, moved }) => {
+    const restoreLocation = enterOptionsPage()
+    const widthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth')
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    const raf = stubAnimationFrames()
+    const { wrapper, container, setRect } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' },
+      {
+        realTeleport: true,
+        containerClass: 'tab-content-container',
+        containerRect: { top: 100, left: 0, right: 600, bottom: 400, width: 600, height: 300 },
+      },
+    )
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      const triggerFocus = vi.spyOn(trigger.element, 'focus')
+      setRect(moved)
+      container.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+      expect(triggerFocus).not.toHaveBeenCalled()
+      expect(menu.isConnected).toBe(false)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      raf.restore()
+      restoreLocation()
+      if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor)
+      else delete window.innerWidth
+    }
+  })
+
+  it('keeps a partially visible trigger open while repositioning', async () => {
+    const restoreLocation = enterOptionsPage()
+    const raf = stubAnimationFrames()
+    const { wrapper, container, setRect } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' },
+      {
+        realTeleport: true,
+        containerClass: 'tab-content-container',
+        containerRect: { top: 100, left: 0, right: 600, bottom: 400, width: 600, height: 300 },
+      },
+    )
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      setRect({ top: 390, bottom: 430 })
+      container.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      raf.restore()
+      restoreLocation()
+    }
+  })
+
+  it('cancels pending position work and removes tracked listeners on unmount', async () => {
+    const restoreLocation = enterOptionsPage()
+    const raf = stubAnimationFrames()
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' },
+      { realTeleport: true, containerClass: 'tab-content-container' },
+    )
+    await wrapper.find('.ti-provider-button').trigger('click')
+    container.dispatchEvent(new Event('scroll'))
+    expect(raf.frames.size).toBe(1)
+    const [frameId] = raf.frames.keys()
+    expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(true)
+    wrapper.unmount()
+    try {
+      expect(raf.cancelled).toContain(frameId)
+      expect(raf.frames.size).toBe(0)
+      expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(false)
+      expect(trackedListeners.some(({ target, event }) => target === window && event === 'resize')).toBe(false)
+    } finally {
+      container.remove()
+      raf.restore()
+      restoreLocation()
     }
   })
 
