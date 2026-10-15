@@ -83,11 +83,11 @@ We welcome contributions of all kinds! While we have a recommended workflow to k
 
 ### Recommended Workflow:
 
-1. **Fork the Repository**: Create your own copy of the project.
-2. **Create a Branch**: It’s helpful to use a descriptive name like `feature/new-button` or `fix/typo`.
+1. **Fork the Repository**: Create your own copy of `Translate-It-App/Translate-It` on GitHub.
+2. **Create a Branch**: Clone your fork and create a feature branch.
 3. **Make Your Changes**: Implement your feature or fix.
 4. **Validation**: It's a good idea to run a quick lint/build check (see [Code Quality](#code-quality-and-validation)) to ensure everything is working correctly.
-5. **Submit a Pull Request (PR)**:
+5. **Submit a Pull Request (PR)**: Open a PR from your fork's branch to the upstream `main` branch.
    - Give your PR a clear title (preferably naming the feature or fix you added).
    - Briefly explain what you’ve changed.
 
@@ -110,7 +110,7 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone the repository and run setup:
+Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone upstream to build or explore the project; to contribute, clone your fork instead. Run setup from either clone:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git
@@ -139,9 +139,9 @@ pnpm run build:chrome
 pnpm run build:firefox
 ```
 
-Development builds preserve console logs and skip production minification; production builds apply optimizations and create ZIP packages.
+Development builds preserve console calls and skip production minification; production builds apply optimizations and create ZIP packages. Both build types use versioned output folders. At the current `package.json` version (1.23.0), these are `dist/chrome/Translate-It-v1.23.0/` and `dist/firefox/Translate-It-v1.23.0/`; the directory names change when the package version changes.
 
-To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**.
+To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**, selecting the Chrome output folder. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**, and select `manifest.json` inside the Firefox output folder.
 
 To actively develop and apply changes in real time, use the following commands:
 
@@ -150,6 +150,29 @@ To actively develop and apply changes in real time, use the following commands:
 pnpm run watch:chrome
 pnpm run watch:firefox
 ```
+
+Watch builds update the output files but do not automatically reload the extension. Reload it in `chrome://extensions` or `about:debugging` after a rebuild; refresh open pages as well to reload content scripts, and reopen extension views such as the popup or Options page.
+
+### Viewing Logs and Debug Mode
+
+Development builds do not strip console calls, but the logging system defaults each component to **Warn**, so Debug-level messages are hidden until enabled. To enable targeted debug output:
+
+1. Open **Options** → **Advance** and check **Debug Mode**.
+2. Expand the **Debug Mode** section and find the component you want to inspect.
+3. Change that component from **Warn** (the default) to **Debug**. Log levels are ordered **Error (0)**, **Warn (1)**, **Info (2)**, **Debug (3)**; selecting Debug shows all levels for that component. Prefer changing only the relevant component.
+4. Choose **Save Settings** in the Options navigation. If settings appear stale, reload the extension and refresh the page or reopen the extension view.
+
+Debug Mode enables global `SafeConsole` output but does not raise component levels by itself. When finished, restore changed components to **Warn**, turn off **Debug Mode**, and save settings again. See [Logging System](../technical/LOGGING_SYSTEM.md) for advanced details.
+
+Open DevTools for the context that produced the message; extension contexts have separate consoles:
+
+- **Content scripts:** inspect the webpage tab. In Chrome, select the extension/content-script context from the Console context dropdown; in Firefox, use that page's DevTools.
+- **Background:** in Chrome, open `chrome://extensions` and choose **Inspect views** for the service worker. In Firefox, open `about:debugging` → **This Firefox** → **Inspect** for the extension, then use its Console; Firefox uses an event page, not a service worker.
+- **Popup:** in Chrome, right-click the open popup and choose **Inspect**. In Firefox, open the extension Toolbox and select the popup in its page selector (disable popup auto-hide if needed).
+- **Options:** inspect the Options tab in Chrome; in Firefox, use the extension Toolbox to select the Options iframe.
+- **Side Panel:** in Chrome, right-click the open panel and choose **Inspect**. In Firefox, use the extension Toolbox document selector to choose the sidebar.
+
+Before sharing logs, redact API keys, credentials, private text, and other sensitive data. See the browser guides for [Chrome](https://developer.chrome.com/docs/extensions/get-started/tutorial/debug) and [Firefox](https://extensionworkshop.com/documentation/develop/debugging/) for more debugging details.
 
 ### Firefox Android Development
 
@@ -176,6 +199,9 @@ To ensure code quality and catch potential issues early, you can run ESLint and 
 ```bash
 # Run tests
 pnpm run test:run
+
+# Run one test file
+pnpm run test:run src/shared/logging/logConstants.test.js
 
 # Lint JS source code
 pnpm run lint

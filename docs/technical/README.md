@@ -15,6 +15,7 @@ Flattened technical guides that cover standalone features and general engineerin
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — high-level repository and runtime architecture overview.
 - [MessagingSystem.md](MessagingSystem.md) — race-condition-free communication.
+- [LOGGING_SYSTEM.md](LOGGING_SYSTEM.md) — component log levels, Debug Mode, and console visibility.
 - [TRANSLATION_PROVIDER_LOGIC.md](TRANSLATION_PROVIDER_LOGIC.md) — canonical provider selection/execution and retry/structured-recovery boundaries; API-key failover details are in the [Provider Contract](contracts/PROVIDER_CONTRACT.md).
 - [VITE_BUILD_SYSTEM.md](VITE_BUILD_SYSTEM.md) — modular bundling and manual chunking.
 - [CSS_ARCHITECTURE.md](CSS_ARCHITECTURE.md), [CSS_VARIABLES_GUIDE.md](CSS_VARIABLES_GUIDE.md), [ICON_SYSTEM.md](ICON_SYSTEM.md) — styling and icon standards.
