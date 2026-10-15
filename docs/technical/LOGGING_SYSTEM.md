@@ -5,7 +5,8 @@ The extension uses a **unified, strictly filtered** logging system for structure
 ## Quick Start
 
 ```javascript
-import { getScopedLogger, LOG_COMPONENTS } from '@/shared/logging/logger.js'
+import { getScopedLogger } from '@/shared/logging/logger.js'
+import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 
 // Standard static initialization
 const logger = getScopedLogger(LOG_COMPONENTS.CONTENT, 'MyComponent')
@@ -23,16 +24,18 @@ To maintain a clean console, logging follows a strict numerical hierarchy: `leve
 
 | Level | Name | Responsibility (Strategy) | Visibility |
 |-------|------|---------------------------|------------|
-| `0` | **ERROR** | **Final Handlers & Critical Background.** `ErrorHandler`, fatal app crashes, or unexpected runtime errors. | Always |
-| `1` | **WARN** | **Providers & Core.** Used for technical limits (429, 402, Network errors). | **Production Default** |
-| `2` | **INFO** | **Milestones.** Processes starting/ending (e.g., "Translation started"). | Development/Debug |
-| `3` | **DEBUG** | **Granular Traces.** High-frequency events (e.g., "Mouse moved", "Message sent"). | Development only |
+| `0` | **ERROR** | **Final Handlers & Critical Background.** `ErrorHandler`, fatal app crashes, or unexpected runtime errors. | When allowed by the component level and console output is enabled |
+| `1` | **WARN** | **Providers & Core.** Used for technical limits (429, 402, Network errors). | Default component level |
+| `2` | **INFO** | **Milestones.** Processes starting/ending (e.g., "Translation started"). | Only when the component is set to INFO or DEBUG and console output is enabled |
+| `3` | **DEBUG** | **Granular Traces.** High-frequency events (e.g., "Mouse moved", "Message sent"). | Only when the component is set to DEBUG and console output is enabled |
 
 ---
 
 ## Strict Filtering Mandate
 
-The system **strictly** enforces levels. The `DEBUG_MODE` setting or environment flags do **not** bypass component-specific filters. If a component is set to Level 1 (WARN), all INFO and DEBUG logs are silenced.
+The logger first applies `level <= componentLevel`, independently of `DEBUG_MODE`. Each known component defaults to WARN (1); an unknown component falls back to the global level, also WARN (1). Thus, Debug Mode does not raise component levels or make INFO/DEBUG calls pass this filter. `isDebugEnabled()` is a separate helper that returns true when the debug override is on or the component level is DEBUG; it does not change the filtering of `logger.debug()`.
+
+Console output is a second, global gate: `SafeConsole` suppresses all wrapped output, including ERROR, while disabled. Production starts with it disabled. Development builds initially enable it, but `DebugModeBridge.initialize()` later applies the persisted `DEBUG_MODE` setting; when that setting is false (the default), it disables output again. For reliable debugging, enable **Debug Mode** in Options, set the relevant component's log level to **Debug** (or the level needed), and click **Save Settings**. A log is visible only if it passes both gates (and any configured runtime filter).
 
 ### Performance Optimization
 
@@ -52,10 +55,12 @@ logger.debug(`Complex State: ${JSON.stringify(heavyObject)}`)
 The primary way to manage log levels is through the Options UI:
 - **Location**: `Options Page` -> `Advance Tab` (`AdvanceTab.vue`).
 - **Section**: Look for the **Debug Mode** accordion (`DEBUG_MODE_SECTION`).
-- **Features**: 
-  - **Global Toggle**: Enables/disables the debug override system.
-  - **Granular Control**: Set specific log levels (Error to Debug) for individual components organized by categories (UI, Background, Messaging, etc.).
-- **Sync**: Changes are broadcasted to all extension contexts (Background, Content, Sidepanel) in real-time via the `DebugModeBridge`.
+- **Features**:
+  - **Debug Mode toggle**: Enables/disables `SafeConsole` output and sets the debug override used by `isDebugEnabled()`; it does not bypass component-level filtering.
+  - **Granular control**: Set specific log levels (Error to Debug) for individual components organized by categories (UI, Background, Messaging, etc.).
+- **Apply changes**: The checkbox and component-level edits are drafts in the Options settings store. Click **Save Settings** to persist them; only then do storage listeners and the `DebugModeBridge` synchronize the changed values to other contexts.
+
+For troubleshooting, check the component's configured level as well as the global Debug Mode gate. Extension contexts have separate consoles (for example, the background worker and a page's content script), so inspect the console belonging to the context that emitted the log.
 
 ### 2. Default Values
 To change default verbosity permanently:
@@ -65,13 +70,15 @@ To change default verbosity permanently:
 ### 3. Adding Components
 1.  **Open**: `src/shared/logging/logConstants.js`
 2.  **Add**: A new key to the `LOG_COMPONENTS` object.
-3.  **Result**: The system automatically registers the component and adds it to the Options Page UI.
+3.  **UI**: Add the component explicitly to the appropriate `LOG_CATEGORIES` entry in `logConstants.js` if it should have a control in the Options UI. `LOG_CATEGORIES` is a hand-maintained list; adding a `LOG_COMPONENTS` key alone does not add it to the UI.
+
+### 4. Return to normal logging
+
+Set the affected components back to **Warn**, turn off **Debug Mode**, and click **Save Settings**. If a context still appears to use stale settings, reload that extension context so it reloads the persisted values.
 
 ## Summary
 
 The logging system provides:
 - **Numerical Filtering**: Simple, strict logic (`level <= componentLevel`).
-- **Sync Architecture**: Real-time synchronization across all extension layers via `DebugModeBridge`.
+- **Sync Architecture**: Saved settings are synchronized across extension contexts via storage listeners and `DebugModeBridge`.
 - **Memory Efficient**: Singleton logger instances with internal caching.
-
-**Last Updated:** May 2026
