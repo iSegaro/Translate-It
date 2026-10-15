@@ -116,6 +116,63 @@
   "incompatible_label": {
     "message": "Incompatible"
   },
+  "provider_category_free": {
+    "message": "Traditional"
+  },
+  "provider_category_ai": {
+    "message": "AI"
+  },
+  "provider_category_local": {
+    "message": "Other"
+  },
+  "provider_category_custom": {
+    "message": "Custom List"
+  },
+  "custom_provider_list_label": {
+    "message": "Custom Provider List"
+  },
+  "custom_provider_list_description": {
+    "message": "Choose providers that appear together in the Custom List category."
+  },
+  "custom_provider_list_manage_btn": {
+    "message": "Manage List"
+  },
+  "custom_provider_list_group_label": {
+    "message": "Custom Provider List"
+  },
+  "custom_provider_list_instruction": {
+    "message": "Drag rows to reorder, or move them with the arrow buttons."
+  },
+  "custom_provider_list_add_placeholder": {
+    "message": "Add a provider…"
+  },
+  "custom_provider_list_add_btn": {
+    "message": "Add"
+  },
+  "custom_provider_list_empty": {
+    "message": "No providers added yet."
+  },
+  "custom_provider_list_unavailable_tag": {
+    "message": "Currently unavailable"
+  },
+  "custom_provider_list_move_up_label": {
+    "message": "Move up"
+  },
+  "custom_provider_list_move_down_label": {
+    "message": "Move down"
+  },
+  "custom_provider_list_remove_label": {
+    "message": "Remove from list"
+  },
+  "custom_provider_list_done_btn": {
+    "message": "Done"
+  },
+  "configure_providers": {
+    "message": "Configure Providers"
+  },
+  "switch_provider_label": {
+    "message": "Switch translation service"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },
@@ -1428,7 +1485,7 @@
     "message": "Find public Lingva instances."
   },
   "show_provider_in_list_label": {
-    "message": "Show in provider list"
+    "message": "Show this provider in dropdowns"
   },
   "openai_api_settings_title": {
     "message": "OpenAI Settings"
@@ -2179,10 +2236,22 @@
     "message": "Restore original page content"
   },
   "sync_page_label": {
-    "message": "Sync Page"
+    "message": "Page Translate"
   },
   "sync_element_label": {
-    "message": "Sync Element"
+    "message": "Select Element"
+  },
+  "sync_page_selected_tooltip": {
+    "message": "Page translation follows the provider selected here"
+  },
+  "sync_page_own_tooltip": {
+    "message": "Page translation uses its configured provider, or falls back to the current or default provider."
+  },
+  "sync_element_selected_tooltip": {
+    "message": "Select Element translation follows the provider selected here"
+  },
+  "sync_element_own_tooltip": {
+    "message": "Select Element translation uses its configured provider, or falls back to the current or default provider."
   },
   "api_key_show": {
     "message": "Show"

@@ -116,6 +116,63 @@
   "incompatible_label": {
     "message": "互換性なし"
   },
+  "provider_category_free": {
+    "message": "従来型"
+  },
+  "provider_category_ai": {
+    "message": "AI"
+  },
+  "provider_category_local": {
+    "message": "その他"
+  },
+  "provider_category_custom": {
+    "message": "カスタムリスト"
+  },
+  "custom_provider_list_label": {
+    "message": "カスタムプロバイダーリスト"
+  },
+  "custom_provider_list_description": {
+    "message": "カスタムリストのカテゴリにまとめて表示するプロバイダーを選択します。"
+  },
+  "custom_provider_list_manage_btn": {
+    "message": "リストの管理"
+  },
+  "custom_provider_list_group_label": {
+    "message": "カスタムプロバイダーリスト"
+  },
+  "custom_provider_list_instruction": {
+    "message": "行をドラッグして並べ替えるか、矢印ボタンで移動します。"
+  },
+  "custom_provider_list_add_placeholder": {
+    "message": "プロバイダーを追加…"
+  },
+  "custom_provider_list_add_btn": {
+    "message": "追加"
+  },
+  "custom_provider_list_empty": {
+    "message": "まだプロバイダーは追加されていません。"
+  },
+  "custom_provider_list_unavailable_tag": {
+    "message": "現在利用できません"
+  },
+  "custom_provider_list_move_up_label": {
+    "message": "上へ移動"
+  },
+  "custom_provider_list_move_down_label": {
+    "message": "下へ移動"
+  },
+  "custom_provider_list_remove_label": {
+    "message": "リストから削除"
+  },
+  "custom_provider_list_done_btn": {
+    "message": "完了"
+  },
+  "configure_providers": {
+    "message": "翻訳プロバイダーの設定"
+  },
+  "switch_provider_label": {
+    "message": "翻訳サービスの切り替え"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },
@@ -1428,7 +1485,7 @@
     "message": "公開されているLingvaインスタンスを探す。"
   },
   "show_provider_in_list_label": {
-    "message": "プロバイダーリストに表示する"
+    "message": "このプロバイダーをドロップダウンに表示する"
   },
   "openai_api_settings_title": {
     "message": "OpenAI 設定"
@@ -2179,10 +2236,22 @@
     "message": "元のページ内容を復元"
   },
   "sync_page_label": {
-    "message": "ページ同期"
+    "message": "ページ翻訳"
   },
   "sync_element_label": {
-    "message": "要素同期"
+    "message": "要素選択"
+  },
+  "sync_page_selected_tooltip": {
+    "message": "ページ翻訳はここで選択したプロバイダーに従います"
+  },
+  "sync_page_own_tooltip": {
+    "message": "ページ翻訳は設定済みのプロバイダーを使用し、未設定の場合は現在のプロバイダーまたは既定のプロバイダーを使用します。"
+  },
+  "sync_element_selected_tooltip": {
+    "message": "要素選択の翻訳はここで選択したプロバイダーに従います"
+  },
+  "sync_element_own_tooltip": {
+    "message": "要素選択の翻訳は設定済みのプロバイダーを使用し、未設定の場合は現在のプロバイダーまたは既定のプロバイダーを使用します。"
   },
   "api_key_show": {
     "message": "表示"

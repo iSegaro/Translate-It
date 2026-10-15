@@ -68,6 +68,9 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.GEMINI_THINKING_MODE).toBe('default');
     expect(defaults).not.toHaveProperty('OPENAI_API_URL');
     expect(defaults.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
+    expect(defaults.CUSTOM_PROVIDER_LIST_ENABLED).toBe(false);
+    expect(defaults.CUSTOM_PROVIDER_LIST).toEqual([]);
+    expect(defaults.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 0 });
     expect(defaults.MOUSE_HOVER_TRIGGER).toBe(CONFIG.MOUSE_HOVER_TRIGGER);
     expect(defaults.translationHistory).toBeUndefined();
     expect(defaults.PROMPT_TEMPLATE).toBe(CONFIG.PROMPT_TEMPLATE);

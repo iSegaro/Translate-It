@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
+import browser from 'webextension-polyfill';
 import useSettingsStore from './settings.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
 import secureStorage from '@/shared/storage/core/SecureStorage.js';
@@ -60,6 +61,10 @@ describe('Settings Store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
+    browser.runtime.sendMessage.mockResolvedValue({
+      success: true,
+      state: { ids: [], revision: 1 }
+    });
   });
 
   const getStorageChangeListener = async (store) => {
@@ -172,6 +177,274 @@ describe('Settings Store', () => {
       onChange({ key: 'OPENAI_API_KEY', newValue: 'promoted-after-import', oldValue: '' });
 
       expect(store.settings.OPENAI_API_KEY).toBe('promoted-after-import');
+    });
+  });
+
+  describe('custom provider list settings', () => {
+    it('persists custom provider list settings through Save', async () => {
+      const store = useSettingsStore();
+      store.updateSettingLocally('CUSTOM_PROVIDER_LIST_ENABLED', true);
+      store.updateSettingLocally('CUSTOM_PROVIDER_LIST', ['openai', 'gemini']);
+
+      await store.saveAllSettings();
+
+      expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
+        CUSTOM_PROVIDER_LIST_ENABLED: true,
+        CUSTOM_PROVIDER_LIST: ['openai', 'gemini']
+      }));
+    });
+
+    it('syncs cross-context updates and preserves existing dirty drafts', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+
+      onChange({ key: 'CUSTOM_PROVIDER_LIST_ENABLED', newValue: true, oldValue: false });
+      onChange({
+        key: 'CUSTOM_PROVIDER_LIST',
+        newValue: ['gemini', 'openai'],
+        oldValue: []
+      });
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'external-key', oldValue: '' });
+
+      expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+      expect(store.settings.CUSTOM_PROVIDER_LIST).toEqual(['gemini', 'openai']);
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+    });
+
+    it('includes custom provider list settings in export and imports them', async () => {
+      const exportedSettings = {
+        CUSTOM_PROVIDER_LIST_ENABLED: true,
+        CUSTOM_PROVIDER_LIST: ['openai', 'gemini']
+      };
+      secureStorage.prepareForExport.mockResolvedValueOnce(exportedSettings);
+      const store = useSettingsStore();
+      store.settings.CUSTOM_PROVIDER_LIST_ENABLED = true;
+      store.settings.CUSTOM_PROVIDER_LIST = ['openai', 'gemini'];
+
+      const exported = await store.exportSettings();
+      expect(exported).toMatchObject(exportedSettings);
+      expect(secureStorage.prepareForExport).toHaveBeenCalledWith(
+        expect.objectContaining(exportedSettings),
+        ''
+      );
+
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        ...exportedSettings
+      });
+      await store.importSettings({ _exported: true, ...exportedSettings });
+
+      expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+      expect(store.settings.CUSTOM_PROVIDER_LIST).toEqual(['openai', 'gemini']);
+      expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining(exportedSettings));
+    });
+  });
+
+  describe('provider category collapse persistence', () => {
+    it('restores persisted collapsed categories in a fresh store while others stay expanded', async () => {
+      storageManager.get.mockResolvedValueOnce({
+        COLLAPSED_PROVIDER_CATEGORIES: { ids: ['ai'], revision: 7 }
+      });
+      setActivePinia(createPinia());
+      const store = useSettingsStore();
+
+      await store.loadSettings();
+
+      expect(storageManager.get).toHaveBeenCalledWith(null);
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: ['ai'], revision: 7 });
+    });
+
+    it('persists category intents through the background serializer', async () => {
+      const store = useSettingsStore();
+      browser.runtime.sendMessage.mockResolvedValueOnce({
+        success: true,
+        state: { ids: ['free'], revision: 3 }
+      });
+
+      await expect(store.setProviderCategoryCollapsed('free', true)).resolves.toEqual({
+        ids: ['free'],
+        revision: 3
+      });
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith({
+        action: 'SET_PROVIDER_CATEGORY_COLLAPSED',
+        categoryId: 'free',
+        collapsed: true
+      });
+    });
+
+    it('dispatches rapid category intents in invocation order without optimistic state', async () => {
+      const store = useSettingsStore();
+      const requests = [];
+      browser.runtime.sendMessage.mockImplementation(message => new Promise(resolve => {
+        requests.push({ message, resolve });
+      }));
+
+      const first = store.setProviderCategoryCollapsed('free', true);
+      const second = store.setProviderCategoryCollapsed('ai', true);
+      const third = store.setProviderCategoryCollapsed('local', true);
+      await Promise.resolve();
+
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+      expect(requests[0].message).toMatchObject({ categoryId: 'free', collapsed: true });
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 0 });
+
+      requests[0].resolve({ success: true, state: { ids: ['free'], revision: 1 } });
+      await first;
+      await Promise.resolve();
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(2);
+      expect(requests[1].message).toMatchObject({ categoryId: 'ai', collapsed: true });
+
+      requests[1].resolve({ success: true, state: { ids: ['free', 'ai'], revision: 2 } });
+      await second;
+      await Promise.resolve();
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(3);
+      expect(requests[2].message).toMatchObject({ categoryId: 'local', collapsed: true });
+
+      requests[2].resolve({ success: true, state: { ids: ['free', 'ai', 'local'], revision: 3 } });
+      await third;
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({
+        ids: ['free', 'ai', 'local'],
+        revision: 3
+      });
+    });
+
+    it('continues the invocation queue after rejection and ignores a stale event', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      const requests = [];
+      browser.runtime.sendMessage.mockImplementation(message => new Promise((resolve, reject) => {
+        requests.push({ message, resolve, reject });
+      }));
+
+      const first = store.setProviderCategoryCollapsed('ai', true);
+      const second = store.setProviderCategoryCollapsed('local', true);
+      await Promise.resolve();
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(1);
+
+      const requestError = new Error('request failed');
+      requests[0].reject(requestError);
+      await expect(first).rejects.toBe(requestError);
+      await Promise.resolve();
+      expect(browser.runtime.sendMessage).toHaveBeenCalledTimes(2);
+      expect(requests[1].message).toMatchObject({ categoryId: 'local', collapsed: true });
+
+      requests[1].resolve({ success: true, state: { ids: ['local'], revision: 9 } });
+      await second;
+      onChange({
+        key: 'COLLAPSED_PROVIDER_CATEGORIES',
+        newValue: { ids: ['ai'], revision: 8 },
+        oldValue: { ids: [], revision: 7 }
+      });
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: ['local'], revision: 9 });
+    });
+
+    it('ignores delayed older storage events and excludes the key from ordinary Save', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.settings.COLLAPSED_PROVIDER_CATEGORIES = { ids: ['local'], revision: 8 };
+      onChange({
+        key: 'COLLAPSED_PROVIDER_CATEGORIES',
+        newValue: { ids: ['free'], revision: 7 },
+        oldValue: { ids: [], revision: 6 }
+      });
+
+      await store.saveAllSettings();
+
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: ['local'], revision: 8 });
+      expect(storageManager.set.mock.calls.at(-1)[0]).not.toHaveProperty('COLLAPSED_PROVIDER_CATEGORIES');
+    });
+
+    it('does not update local state when the serializer request fails', async () => {
+      const store = useSettingsStore();
+      const error = new Error('background unavailable');
+      browser.runtime.sendMessage.mockRejectedValueOnce(error);
+
+      await expect(store.setProviderCategoryCollapsed('ai', true)).rejects.toBe(error);
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 0 });
+    });
+
+    it('rejects generic persistence APIs for serialized category state', async () => {
+      const store = useSettingsStore();
+      const collapseState = { ids: ['free'], revision: 4 };
+
+      await expect(store.updateSettingAndPersist('COLLAPSED_PROVIDER_CATEGORIES', collapseState))
+        .rejects.toThrow('Use setProviderCategoryCollapsed');
+      await expect(store.updateMultipleSettings({ COLLAPSED_PROVIDER_CATEGORIES: collapseState }))
+        .rejects.toThrow('Use setProviderCategoryCollapsed');
+
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 0 });
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('exports and imports category IDs through canonical settings', async () => {
+      const store = useSettingsStore();
+      store.settings.COLLAPSED_PROVIDER_CATEGORIES = { ids: ['ai', 'free'], revision: 5 };
+      await store.exportSettings();
+      expect(secureStorage.prepareForExport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          COLLAPSED_PROVIDER_CATEGORIES: { ids: ['ai', 'free'], revision: 5 }
+        }),
+        ''
+      );
+
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        COLLAPSED_PROVIDER_CATEGORIES: { ids: ['local'], revision: 999 }
+      });
+      browser.runtime.sendMessage.mockResolvedValueOnce({
+        success: true,
+        state: { ids: ['local'], revision: 6 }
+      });
+      await store.importSettings({ _exported: true, THEME: 'dark' });
+
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'SET_PROVIDER_CATEGORY_COLLAPSED',
+        replace: true,
+        ids: ['local']
+      }));
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: ['local'], revision: 6 });
+    });
+
+    it('replaces collapse state during reset without writing it from the full default snapshot', async () => {
+      const store = useSettingsStore();
+      browser.runtime.sendMessage.mockResolvedValueOnce({
+        success: true,
+        state: { ids: [], revision: 12 }
+      });
+
+      await store.resetSettings();
+
+      expect(storageManager.set.mock.calls.at(-1)[0]).not.toHaveProperty('COLLAPSED_PROVIDER_CATEGORIES');
+      expect(browser.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'SET_PROVIDER_CATEGORY_COLLAPSED',
+        replace: true,
+        ids: []
+      }));
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 12 });
+    });
+
+    it('queues reset replacement after a pending toggle and continues after its rejection', async () => {
+      const store = useSettingsStore();
+      const requests = [];
+      browser.runtime.sendMessage.mockImplementation(message => new Promise((resolve, reject) => {
+        requests.push({ message, resolve, reject });
+      }));
+
+      const toggle = store.setProviderCategoryCollapsed('ai', true);
+      const reset = store.resetSettings();
+      await Promise.resolve();
+      expect(requests).toHaveLength(1);
+      expect(requests[0].message).toMatchObject({ categoryId: 'ai', collapsed: true });
+
+      requests[0].reject(new Error('toggle failed'));
+      await expect(toggle).rejects.toThrow('toggle failed');
+      await vi.waitFor(() => expect(requests).toHaveLength(2));
+      expect(requests[1].message).toMatchObject({ replace: true, ids: [] });
+
+      requests[1].resolve({ success: true, state: { ids: [], revision: 2 } });
+      await reset;
+      expect(store.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 2 });
     });
   });
 
@@ -1005,10 +1278,59 @@ describe('Settings Store', () => {
     await store.resetSettings();
     await nextTick();
     
-    expect(storageManager.clear).toHaveBeenCalled();
-    expect(storageManager.set).toHaveBeenCalledWith(getPersistedDefaultSettings());
+    expect(storageManager.clear).not.toHaveBeenCalled();
+    const persistedDefaults = getPersistedDefaultSettings();
+    delete persistedDefaults.COLLAPSED_PROVIDER_CATEGORIES;
+    expect(storageManager.set).toHaveBeenCalledWith(persistedDefaults);
     expect(store.settings.THEME).toBe('auto');
     expect(store.settings.translationHistory).toEqual([]);
+  });
+
+  it('reset preserves collapse revision and rejects delayed pre-reset events in every context', async () => {
+    const firstStore = useSettingsStore();
+    const firstListener = await getStorageChangeListener(firstStore);
+    firstStore.settings.COLLAPSED_PROVIDER_CATEGORIES = { ids: ['ai'], revision: 5 };
+
+    setActivePinia(createPinia());
+    const secondStore = useSettingsStore();
+    const secondListener = await getStorageChangeListener(secondStore);
+    secondStore.settings.COLLAPSED_PROVIDER_CATEGORIES = { ids: ['ai'], revision: 5 };
+
+    storageManager.get.mockResolvedValueOnce({
+      COLLAPSED_PROVIDER_CATEGORIES: { ids: ['ai'], revision: 5 },
+      translationHistory: [{ text: 'history' }],
+      unrelatedLegacyKey: 'remove-me'
+    });
+    browser.runtime.sendMessage.mockResolvedValueOnce({
+      success: true,
+      state: { ids: [], revision: 6 }
+    });
+    await firstStore.resetSettings();
+
+    expect(storageManager.remove).toHaveBeenCalledWith(
+      expect.arrayContaining(['translationHistory', 'unrelatedLegacyKey'])
+    );
+    expect(storageManager.remove.mock.calls.at(-1)[0]).not.toContain('COLLAPSED_PROVIDER_CATEGORIES');
+    expect(firstStore.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 6 });
+
+    secondListener({
+      key: 'COLLAPSED_PROVIDER_CATEGORIES',
+      newValue: { ids: [], revision: 6 },
+      oldValue: { ids: ['ai'], revision: 5 }
+    });
+    secondListener({
+      key: 'COLLAPSED_PROVIDER_CATEGORIES',
+      newValue: { ids: ['ai'], revision: 5 },
+      oldValue: { ids: ['ai'], revision: 4 }
+    });
+    firstListener({
+      key: 'COLLAPSED_PROVIDER_CATEGORIES',
+      newValue: { ids: ['ai'], revision: 5 },
+      oldValue: { ids: ['ai'], revision: 4 }
+    });
+
+    expect(secondStore.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 6 });
+    expect(firstStore.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 6 });
   });
 
   describe('desktop FAB exclusions import/export', () => {
@@ -1102,8 +1424,13 @@ describe('Settings Store', () => {
       expect(await listDesktopFabExclusions()).toEqual([]);
       expect(persisted.has(pageKey)).toBe(false);
       expect(persisted.has(siteKey)).toBe(false);
-      expect(store.settings).toMatchObject(getPersistedDefaultSettings());
-      expect(storageManager.set.mock.calls.at(-1)[0]).toEqual(getPersistedDefaultSettings());
+      expect(store.settings).toMatchObject({
+        ...getPersistedDefaultSettings(),
+        COLLAPSED_PROVIDER_CATEGORIES: { ids: [], revision: 1 }
+      });
+      const persistedDefaults = getPersistedDefaultSettings();
+      delete persistedDefaults.COLLAPSED_PROVIDER_CATEGORIES;
+      expect(storageManager.set.mock.calls.at(-1)[0]).toEqual(persistedDefaults);
     });
 
     it('round-trips exclusions through export and import', async () => {

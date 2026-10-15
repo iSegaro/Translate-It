@@ -116,6 +116,63 @@
   "incompatible_label": {
     "message": "ناسازگار"
   },
+  "provider_category_free": {
+    "message": "سنتی"
+  },
+  "provider_category_ai": {
+    "message": "هوش مصنوعی"
+  },
+  "provider_category_local": {
+    "message": "سایر"
+  },
+  "provider_category_custom": {
+    "message": "فهرست سفارشی"
+  },
+  "custom_provider_list_label": {
+    "message": "فهرست سرویس‌دهنده‌های سفارشی"
+  },
+  "custom_provider_list_description": {
+    "message": "سرویس‌دهنده‌هایی را انتخاب کنید که با هم در دسته «فهرست سفارشی» نمایش داده می‌شوند."
+  },
+  "custom_provider_list_manage_btn": {
+    "message": "مدیریت فهرست"
+  },
+  "custom_provider_list_group_label": {
+    "message": "فهرست سرویس‌دهنده‌های سفارشی"
+  },
+  "custom_provider_list_instruction": {
+    "message": "برای تغییر ترتیب، ردیف‌ها را بکشید یا از دکمه‌های فلش استفاده کنید."
+  },
+  "custom_provider_list_add_placeholder": {
+    "message": "افزودن سرویس‌دهنده…"
+  },
+  "custom_provider_list_add_btn": {
+    "message": "افزودن"
+  },
+  "custom_provider_list_empty": {
+    "message": "هنوز هیچ سرویس‌دهنده‌ای اضافه نشده است."
+  },
+  "custom_provider_list_unavailable_tag": {
+    "message": "در حال حاضر در دسترس نیست"
+  },
+  "custom_provider_list_move_up_label": {
+    "message": "انتقال به بالا"
+  },
+  "custom_provider_list_move_down_label": {
+    "message": "انتقال به پایین"
+  },
+  "custom_provider_list_remove_label": {
+    "message": "حذف از فهرست"
+  },
+  "custom_provider_list_done_btn": {
+    "message": "تمام"
+  },
+  "configure_providers": {
+    "message": "تنظیمات ارائه‌دهندگان"
+  },
+  "switch_provider_label": {
+    "message": "تغییر سرویس ترجمه"
+  },
   "provider_google_title": {
     "message": "مترجم گوگل (کلاسیک)"
   },
@@ -1428,7 +1485,7 @@
     "message": "یافتن نمونه‌های عمومی لینگوا."
   },
   "show_provider_in_list_label": {
-    "message": "نمایش در لیست سرویس‌دهندگان"
+    "message": "نمایش این سرویس‌دهنده در فهرست‌های کشویی"
   },
   "openai_api_settings_title": {
     "message": "تنظیمات OpenAI"
@@ -2179,10 +2236,22 @@
     "message": "بازیابی محتوای اصلی صفحه"
   },
   "sync_page_label": {
-    "message": "همگام صفحه"
+    "message": "ترجمه صفحه"
   },
   "sync_element_label": {
-    "message": "همگام المان"
+    "message": "انتخاب عنصر"
+  },
+  "sync_page_selected_tooltip": {
+    "message": "ترجمهٔ صفحه از ارائه‌دهندهٔ انتخاب‌شده در اینجا استفاده می‌کند"
+  },
+  "sync_page_own_tooltip": {
+    "message": "ترجمهٔ صفحه از ارائه‌دهندهٔ تنظیم‌شدهٔ خود استفاده می‌کند؛ در صورت نبود آن، از ارائه‌دهندهٔ فعلی یا پیش‌فرض استفاده می‌کند."
+  },
+  "sync_element_selected_tooltip": {
+    "message": "ترجمهٔ انتخاب عنصر از ارائه‌دهندهٔ انتخاب‌شده در اینجا استفاده می‌کند"
+  },
+  "sync_element_own_tooltip": {
+    "message": "ترجمهٔ انتخاب عنصر از ارائه‌دهندهٔ تنظیم‌شدهٔ خود استفاده می‌کند؛ در صورت نبود آن، از ارائه‌دهندهٔ فعلی یا پیش‌فرض استفاده می‌کند."
   },
   "api_key_show": {
     "message": "نمایش"

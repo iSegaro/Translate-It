@@ -5,6 +5,7 @@ import { ref, nextTick } from 'vue';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import PromptTab from './tabs/PromptTab.vue';
 import TTSTab from './tabs/TTSTab.vue';
+import ProvidersTab from './tabs/ProvidersTab.vue';
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue';
 
 /**
@@ -120,6 +121,18 @@ vi.mock('vue-router', () => ({
     name: 'prompt',
     query: {}
   })
+}));
+
+// ProvidersTab's drawer is driven through the OptionSlot picker stub below;
+// base components, the real ProviderSelector-adjacent layers and the store
+// stay real while the selection-only picker contract is held by the stub.
+vi.mock('@/components/shared/ProviderSelector.vue', () => ({
+  default: {
+    name: 'ProviderSelector',
+    props: ['modelValue', 'selectionOnly', 'excludeIds'],
+    emits: ['update:modelValue'],
+    template: '<select class="provider-picker-stub" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option value=""/><option value="deepl"/><option value="openai"/></select>'
+  }
 }));
 
 // Background notification boundary for the Global Save flow.
@@ -367,7 +380,84 @@ describe('Options save integration (store + tabs + Global Save)', () => {
     expect(reloadedTts.find('.voice-select-dropdown').element.value).toBe('en-US-AriaNeural');
   });
 
-  it('(6) save in flight survives unmount: write started before resolve, visible after reload', async () => {
+  it('(6) Providers custom list stages the row checkbox and drawer ids with zero writes; Save persists; reload restores', async () => {
+    const store = await freshStore();
+    const tab = mountTab(ProvidersTab);
+    const nav = mountTab(OptionsNavigation);
+
+    // Enable is staged directly from the row (outside the drawer).
+    await tab.find('#CUSTOM_PROVIDER_LIST_ENABLED input').setValue(true);
+    expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
+
+    await tab.find('#CUSTOM_PROVIDER_LIST_MANAGE_BTN').trigger('click');
+    await flushPromises();
+
+    const drawer = tab.get('#CUSTOM_PROVIDER_LIST_DRAWER');
+    expect(drawer.attributes('role')).toBe('dialog');
+
+    // Stage: add two providers through the (stubbed) selection-only picker.
+    await tab.get('.custom-list-add-row .provider-picker-stub').setValue('deepl');
+    await tab.get('.custom-list-add-btn').trigger('click');
+    await tab.get('.custom-list-add-row .provider-picker-stub').setValue('openai');
+    await tab.get('.custom-list-add-btn').trigger('click');
+
+    // Draft-local: still nothing written to the browser boundary, and the
+    // store list only gains the ids once Done stages them.
+    expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
+
+    // Done stages the ids only; the checkbox already staged the enable state.
+    await drawer.get('.custom-list-drawer-footer button').trigger('click');
+    await flushPromises();
+    expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(store.settings.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
+
+    await clickGlobalSave(nav);
+    expect(saveStatusClass(nav)).toContain('status-success');
+    expect(fakeBrowserStorage.data.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(fakeBrowserStorage.data.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
+
+    const reloadedStore = await reloadStore();
+    expect(reloadedStore.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(reloadedStore.settings.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
+    const reloadedTab = mountTab(ProvidersTab);
+    expect(reloadedTab.find('#CUSTOM_PROVIDER_LIST_ENABLED input').element.checked).toBe(true);
+    await reloadedTab.find('#CUSTOM_PROVIDER_LIST_MANAGE_BTN').trigger('click');
+    await flushPromises();
+    expect(reloadedTab.get('#CUSTOM_PROVIDER_LIST_DRAWER').findAll('.custom-list-entry')).toHaveLength(2);
+  });
+
+  it('(6b) relocated provider visibility checkbox stages HIDDEN_PROVIDERS; Save persists the exact ID; reload restores', async () => {
+    const store = await freshStore();
+    const tab = mountTab(ProvidersTab);
+    const nav = mountTab(OptionsNavigation);
+
+    // Relocated placement: the checkbox is a direct child of the settings
+    // container, above the Custom Provider List row.
+    const order = ['PROVIDERS_CONFIGURE_SECTION', 'HIDDEN_PROVIDERS_CHECKBOX', 'CUSTOM_PROVIDER_LIST'];
+    const nodes = order.map((id) => tab.element.querySelector(`#${id}`));
+    expect(nodes).not.toContain(null);
+    for (let i = 0; i < nodes.length - 1; i++) {
+      expect(nodes[i].compareDocumentPosition(nodes[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(nodes[1].querySelector('input').checked).toBe(true);
+
+    // Hide the active/default config provider ('googlev2'); staging is local.
+    await tab.get('#HIDDEN_PROVIDERS_CHECKBOX input').setValue(false);
+    expect(store.settings.TRANSLATION_API).toBe('googlev2');
+    expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
+
+    await clickGlobalSave(nav);
+    expect(saveStatusClass(nav)).toContain('status-success');
+    expect(fakeBrowserStorage.data.HIDDEN_PROVIDERS).toEqual(['googlev2']);
+
+    const reloadedStore = await reloadStore();
+    expect(reloadedStore.settings.HIDDEN_PROVIDERS).toEqual(['googlev2']);
+    const reloadedTab = mountTab(ProvidersTab);
+    expect(reloadedTab.get('#HIDDEN_PROVIDERS_CHECKBOX input').element.checked).toBe(false);
+  });
+
+  it('(7) save in flight survives unmount: write started before resolve, visible after reload', async () => {
     await freshStore();
     const tab = mountTab(PromptTab);
     const nav = mountTab(OptionsNavigation);

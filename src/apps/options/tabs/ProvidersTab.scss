@@ -278,25 +278,6 @@
         display: inline !important;
       }
     }
-    .provider-visibility-group {
-      margin-top: $spacing-md !important;
-      padding-top: $spacing-md !important;
-      border-top: 1px solid var(--color-border-light);
-      width: 100% !important;
-
-      :deep(.base-checkbox) {
-        background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.02));
-        padding: $spacing-sm $spacing-md;
-        border-radius: $border-radius-base;
-        border: 1px solid var(--color-border-light);
-        transition: all $transition-base;
-        
-        &:hover {
-          background: var(--color-background-alt, rgba(var(--color-text-rgb), 0.04));
-          border-color: var(--color-primary-alpha);
-        }
-      }
-    }
   }
 
   .provider-settings {
@@ -368,5 +349,496 @@
     .primary-service-selection {
       width: 100% !important;
     }
+  }
+}
+
+// Provider visibility checkbox: renders with the bare BaseCheckbox look —
+// no boxed/bordered styling (old :deep(.base-checkbox) was dead in plain
+// SCSS and matched a class the component doesn't render; removing it avoids
+// an unwanted card-like appearance). Vertical separation of the two
+// checkboxes stays with existing group spacing rules.
+
+// --- Custom Provider List row -------------------------------------------------
+// Namespaced (custom-list-*) on purpose: ActivationTab.scss / TTSTab.scss
+// publish global .drawer-* / .setting-row classes once visited, so reusing
+// those names here would inherit unrelated !important rules cross-tab.
+.custom-provider-list-row {
+  margin-top: $spacing-lg;
+  width: 100%;
+
+  .custom-list-row-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: $spacing-md;
+    width: 100%;
+
+    // Checkbox takes the row; the Manage button pops in beside it.
+    .ti-checkbox {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+  }
+
+  // Animated Manage-button housing (mirrors ActivationTab's
+  // .fab-mode-select-wrapper reveal). Stable sizing: width, overflow and flex
+  // basis are IDENTICAL in both states — only max-width/opacity/transform
+  // animate — so the reveal cannot jump on intrinsic text width (open width,
+  // overflow/shrink toggles and an open-only margin made the collapsed state
+  // resolve differently mid-transition). Row gap already spaces the controls.
+  .custom-list-manage-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    align-self: center;
+    overflow: hidden;
+    width: 220px;
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-10px) scale(0.95);
+    flex: 0 0 auto;
+    pointer-events: none;
+    transition:
+      max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.open {
+      max-width: 220px;
+      opacity: 1;
+      transform: translateX(0) scale(1);
+      pointer-events: auto;
+    }
+  }
+
+  // Mirrors ActivationTab's .manage-rules-button token-for-token, INCLUDING
+  // the !important priority: BaseButton.scss (.ti-btn / .ti-btn--primary /
+  // .ti-btn--sm) loads after this file and publishes its values with
+  // !important, so overrides carry the same priority here to keep
+  // dark/bg/focus/dimensions identical to the reference button. The nested
+  // selector compiles to .custom-provider-list-row .manage-list-button
+  // (0,2,0), outranking BaseButton's single-class (0,1,0) rules on ties.
+  .manage-list-button {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    padding: 4px $spacing-sm !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    height: 34px !important;
+    background-color: var(--color-background-alt, var(--color-surface)) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: $border-radius-base !important;
+    cursor: pointer !important;
+    transition: all $transition-base !important;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    color: var(--color-text) !important;
+    font-size: $font-size-sm !important;
+    font-weight: 500 !important;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-text-secondary) !important;
+      background-color: var(--color-background) !important;
+      color: var(--color-text) !important;
+    }
+
+    // Outranks BaseButton's .ti-btn:focus primary ring (same priority class,
+    // higher specificity + later cascade position in this tab bundle).
+    &:focus,
+    &:focus-visible {
+      outline: none !important;
+      border-color: var(--color-text-secondary) !important;
+      background-color: var(--color-background-alt, var(--color-surface)) !important;
+      box-shadow: 0 0 0 2px var(--color-border-light, rgba(0, 0, 0, 0.05)) !important;
+    }
+
+    &:disabled {
+      opacity: 0.6 !important;
+      cursor: not-allowed !important;
+    }
+  }
+
+  .custom-list-row-desc {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    line-height: 1.5;
+    padding-inline-start: 32px;
+    margin-top: 2px;
+    max-width: var(--input-max-width, 100%);
+  }
+}
+
+// RTL opposite translate for the manage-button reveal: the closed offset
+// mirrors the LTR -10px (open state stays the shared centered reset). The
+// .rtl class also exists on the drawer via its own isRTL binding.
+.rtl .custom-list-manage-wrapper:not(.open) {
+  transform: translateX(10px) scale(0.95);
+}
+
+// --- Custom Provider List slide-out drawer ------------------------------------
+.providers-tab {
+  .custom-list-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1040;
+  }
+
+  .custom-list-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    width: 480px;
+    max-width: 90vw;
+    height: 100vh;
+    background-color: var(--color-background);
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-border);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+
+    // RTL mirror (same layout flip as ActivationTab drawers)
+    &.rtl {
+      right: auto;
+      left: 0;
+      border-left: none;
+      border-right: 1px solid var(--color-border);
+      box-shadow: 8px 0 30px rgba(0, 0, 0, 0.15);
+
+      .custom-list-close-btn {
+        margin-right: auto;
+        margin-left: 0;
+      }
+
+      .custom-list-add-row {
+        flex-direction: row-reverse;
+      }
+    }
+  }
+
+  .custom-list-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-lg;
+    border-bottom: 1px solid var(--color-border);
+
+    h3 {
+      margin: 0;
+      font-size: $font-size-lg;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .custom-list-close-btn {
+      background: none;
+      border: none;
+      font-size: $font-size-lg;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      padding: $spacing-xs;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: $border-radius-full;
+      width: 32px;
+      height: 32px;
+      transition: background-color $transition-fast, color $transition-fast;
+
+      &:hover {
+        background-color: var(--color-background-hover);
+        color: var(--color-text);
+      }
+    }
+  }
+
+  .custom-list-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: $border-radius-full;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--color-text-secondary);
+    }
+  }
+
+  .custom-list-instruction {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    padding: $spacing-sm $spacing-md;
+    background-color: var(--color-background-secondary, var(--color-surface));
+    border: 1px solid var(--color-border-light, var(--color-border));
+    border-radius: $border-radius-sm;
+  }
+
+  .custom-list-add-row {
+    display: flex;
+    gap: $spacing-sm;
+    align-items: center;
+    width: 100%;
+
+    // Selection-only ProviderSelector picker; the teleported menu itself is
+    // styled by the shared selector styles and painted above the drawer.
+    .ti-provider-button-container {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+    }
+
+    .custom-list-add-btn {
+      height: 32px;
+      flex-shrink: 0;
+
+      // The Add action stays keyboard-reachable as the menu Tab boundary even
+      // without a choice; the pending cue communicates it is not actionable.
+      &.custom-list-add-btn--pending {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+  }
+
+  .custom-list-empty {
+    padding: $spacing-md;
+    border: 1px dashed var(--color-border);
+    border-radius: $border-radius-sm;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    text-align: start;
+    overflow-wrap: anywhere;
+  }
+
+  .custom-list-entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .custom-list-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: $border-radius-sm;
+    background-color: var(--color-background-hover, var(--color-surface));
+    min-width: 0;
+    box-sizing: border-box;
+    cursor: grab;
+    transition: border-color $transition-fast, box-shadow $transition-fast, opacity $transition-fast;
+
+    &:hover {
+      border-color: var(--color-text-secondary);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    &.is-dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    &.is-drag-over {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px var(--color-primary-alpha);
+    }
+
+    .custom-list-grip {
+      flex: 0 0 auto;
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      letter-spacing: -2px;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .custom-list-entry-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 13px;
+      color: var(--color-text);
+      overflow-wrap: anywhere;
+
+      .custom-list-entry-raw {
+        font-family: var(--font-family-mono, monospace);
+        color: var(--color-text-secondary);
+      }
+    }
+
+    .custom-list-entry-tag {
+      flex: 0 0 auto;
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-full;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    .custom-list-entry-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+
+    button.custom-list-move-btn,
+    button.custom-list-remove-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: none;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: $border-radius-full;
+      font-size: 14px;
+      padding: 0;
+      transition: background-color $transition-fast, color $transition-fast;
+
+      &:hover:not(:disabled) {
+        background-color: var(--color-background-hover);
+        color: var(--color-text);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+    }
+
+    button.custom-list-remove-btn:hover:not(:disabled) {
+      background-color: var(--color-error-alpha, rgba(211, 47, 47, 0.1));
+      color: var(--color-error, #d32f2f);
+    }
+  }
+
+  .custom-list-drawer-footer {
+    padding: $spacing-lg;
+    border-top: 1px solid var(--color-border);
+    // Single action aligned to the reading-direction end (right in LTR,
+    // left in RTL), like the FAB exclusions footer.
+    justify-content: flex-end;
+    align-items: center;
+    display: flex;
+    gap: $spacing-md;
+    background-color: var(--color-background);
+
+    .custom-list-drawer-footer-actions {
+      display: flex;
+      align-items: center;
+      gap: $spacing-md;
+    }
+  }
+
+  // Vue transition classes for the drawer
+  .custom-list-fade-enter-active,
+  .custom-list-fade-leave-active {
+    transition: opacity 0.25s ease-in-out;
+  }
+
+  .custom-list-fade-enter-from,
+  .custom-list-fade-leave-to {
+    opacity: 0;
+  }
+
+  .custom-list-slide-enter-active,
+  .custom-list-slide-leave-active {
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+  }
+
+  .custom-list-slide-enter-from,
+  .custom-list-slide-leave-to {
+    transform: translateX(100%);
+    opacity: 0.95;
+
+    &.rtl {
+      transform: translateX(-100%);
+    }
+  }
+}
+
+// Drawer + row on tablet/mobile
+@media (max-width: 768px) {
+  // stylelint-disable-next-line selector-class-pattern -- required to beat the nested desktop drawer rule
+  .providers-tab .custom-list-drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .custom-provider-list-row {
+    // Narrow screens set the same declared housing width in both states.
+    // The base max-width: 0 still collapses the closed used size to zero;
+    // only the open state lifts the animated cap to 160px, avoiding a plateau.
+    .custom-list-manage-wrapper {
+      width: 160px;
+    }
+
+    .custom-list-manage-wrapper.open {
+      max-width: 160px;
+    }
+
+    .custom-list-row-desc {
+      padding-inline-start: 0;
+    }
+  }
+
+  // Stack the picker row so the button-mode trigger and Add button fit.
+  // Match the desktop row specificity so mobile alignment wins in both directions.
+  // stylelint-disable-next-line selector-class-pattern -- required to match desktop row specificity
+  .providers-tab .custom-list-add-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: $spacing-xs;
+  }
+
+  // Match desktop RTL specificity so this mobile direction wins that rule.
+  // stylelint-disable-next-line selector-class-pattern, selector-max-class -- required to beat the nested desktop RTL rule
+  .providers-tab .custom-list-drawer.rtl .custom-list-add-row {
+    flex-direction: column;
+  }
+
+  // stylelint-disable-next-line selector-class-pattern -- legacy custom-list class names are part of the rendered markup
+  .custom-list-add-row .custom-list-add-btn {
+    width: 100%;
   }
 }

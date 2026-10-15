@@ -1,3 +1,11 @@
+#### Unreleased
+
+##### Added
+
+- Added a customizable [Provider List](#/providers?highlight=CUSTOM_PROVIDER_LIST) in Settings to organize and easily access your preferred translation providers.
+
+---
+
 #### v1.23.0 – Released on October 14, 2026
 
 ##### Added

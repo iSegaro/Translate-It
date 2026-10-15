@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { mount, flushPromises } from '@vue/test-utils';
 import { nextTick, reactive, ref } from 'vue';
 import ProvidersTab from './ProvidersTab.vue';
@@ -263,5 +264,107 @@ describe('ProvidersTab.vue - Live Dubbing provider separation', () => {
     // and selection live behind the dedicated Live Dubbing control in Popup.
     expect(wrapper.find('#LIVE_DUBBING_PROVIDER').exists()).toBe(false);
     expect(mockSettingsStore.settings.TRANSLATION_API).toBe('google');
+  });
+});
+
+describe('ProvidersTab.vue - Provider visibility checkbox placement & behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentRouteQuery.value = {};
+    mockSettingsStore.settings.TRANSLATION_API = 'googlev2';
+    mockSettingsStore.settings.HIDDEN_PROVIDERS = [];
+    mockSettingsStore.activeConfigProvider = 'test-provider';
+    // Staging mirror, like the real store action: local state only, nothing
+    // is persisted until Global Save.
+    mockUpdateSettingLocally.mockImplementation((key, value) => {
+      mockSettingsStore.settings[key] = value;
+    });
+  });
+
+  const mountAndFindCheckbox = async () => {
+    const wrapper = mountTab();
+    await nextTick();
+    return { wrapper, checkbox: wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input') };
+  };
+
+  it('renders the visibility checkbox bare: no new card/border/divider, modest spacing', () => {
+    const scss = readFileSync('src/apps/options/tabs/ProvidersTab.scss', 'utf8');
+    // No box/tint/divider rules for the visibility checkbox (bare look).
+    expect(scss).not.toMatch(/\.provider-visibility-group\s*\{[^}]*background:/);
+    expect(scss).not.toMatch(/\.provider-visibility-group[^{]*\{[^}]*border(?:-top)?:/);
+    expect(scss).not.toMatch(/\.provider-visibility-group[^{]*\{[^}]*padding:/);
+    // Modest gap to the Custom Provider List row via the existing token
+    // spacing (one of the existing tokens, not a large custom value).
+    const rowBlock = scss.slice(scss.indexOf('.custom-provider-list-row {'), scss.indexOf('.custom-list-row-main'));
+    const marginMatch = rowBlock.match(/margin-top: \$spacing-([a-z]+);/);
+    expect(marginMatch).toBeTruthy();
+    expect(['xs', 'sm', 'md', 'lg']).toContain(marginMatch[1]);
+    // Sanity: the drawer and manage animation styles stay untouched.
+    expect(scss).toContain('.custom-list-manage-wrapper');
+  });
+
+  it('renders the visibility checkbox between the config selector and the Custom Provider List row', async () => {
+    const { wrapper } = await mountAndFindCheckbox();
+
+    const order = ['PROVIDERS_CONFIGURE_SECTION', 'HIDDEN_PROVIDERS_CHECKBOX', 'CUSTOM_PROVIDER_LIST', 'OPTIMIZATION_LEVELS_SECTION'];
+    const nodes = order.map((id) => wrapper.element.querySelector(`#${id}`));
+    expect(nodes).not.toContain(null);
+    for (let i = 0; i < nodes.length - 1; i++) {
+      expect(nodes[i].compareDocumentPosition(nodes[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it('keeps the checkbox stable across provider switches (outside the keyed panel)', async () => {
+    const { wrapper, checkbox } = await mountAndFindCheckbox();
+
+    // The keyed fade-slide panel no longer hosts this row.
+    expect(checkbox.element.closest('.provider-settings')).toBeNull();
+    await wrapper.find('.provider-selector-stub').setValue('other-provider');
+    await nextTick();
+    expect(wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input').element === checkbox.element).toBe(true);
+  });
+
+  it('labels the checkbox through the existing i18n key (fallback text updated)', async () => {
+    const { wrapper } = await mountAndFindCheckbox();
+
+    const label = wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX label');
+    expect(label.text()).toBe('show_provider_in_list_label');
+    expect(wrapper.text()).not.toContain('Show in provider list');
+  });
+
+  it('follows the selected provider states: toggling stages exactly the target ID', async () => {
+    mockSettingsStore.settings.HIDDEN_PROVIDERS = ['test-provider'];
+    const { wrapper, checkbox } = await mountAndFindCheckbox();
+
+    // test-provider is hidden: the checkbox reflects it.
+    expect(checkbox.element.checked).toBe(false);
+
+    // Switch config panel to another provider: visible by default.
+    await wrapper.find('.provider-selector-stub').setValue('other-provider');
+    await nextTick();
+    expect(wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input').element.checked).toBe(true);
+
+    // Hiding stages only that ID on top of the existing list.
+    await wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input').setValue(false);
+    expect(mockUpdateSettingLocally).toHaveBeenCalledWith('HIDDEN_PROVIDERS', ['test-provider', 'other-provider']);
+    expect(mockSettingsStore.settings.TRANSLATION_API).toBe('googlev2');
+    expect(mockSettingsStore.activeConfigProvider).toBe('other-provider');
+
+    // Back to the first provider: its hidden state persisted through the switch.
+    await wrapper.find('.provider-selector-stub').setValue('test-provider');
+    await nextTick();
+    expect(wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input').element.checked).toBe(false);
+
+    // Unhiding it stages the list without the target ID.
+    await wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input').setValue(true);
+    expect(mockUpdateSettingLocally).toHaveBeenLastCalledWith('HIDDEN_PROVIDERS', ['other-provider']);
+  });
+
+  it('stages no persistence writes for the toggle (only the local HIDDEN_PROVIDERS key)', async () => {
+    const { wrapper } = await mountAndFindCheckbox();
+
+    await wrapper.get('#HIDDEN_PROVIDERS_CHECKBOX input').setValue(false);
+    const keys = mockUpdateSettingLocally.mock.calls.map((call) => call[0]);
+    expect(keys).toEqual(['HIDDEN_PROVIDERS']);
   });
 });

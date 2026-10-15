@@ -13,14 +13,16 @@ Certain settings take effect immediately the moment the user interacts with the 
 
 - **Theme Switching**: Switching between Light, Dark, or Auto mode.
 - **UI Language (Localization)**: Changing the interface language of the extension.
+- **Provider category collapse**: The grouped provider dropdown starts expanded. Its Custom List, Traditional, AI, and Other headings can be collapsed independently; the choice applies immediately to grouped selectors and survives reopening or restarting the extension. A category that temporarily has no eligible providers keeps its preference. Default, Sync, and Configure Providers remain outside the collapsible groups; the native compact selector and selection-only picker are unchanged.
 
 **Technical Implementation:**
-These settings use the `updateSettingAndPersist` method in the `settings` store, which updates the local state and immediately calls `storageManager.set()` to persist the change.
+Theme and language use `updateSettingAndPersist` in the settings store. Category collapse uses `setProviderCategoryCollapsed`, which sends a category-ID intent to the background settings handler. The handler serializes intents and persists `{ ids: [], revision: 0 }` under the canonical `COLLAPSED_PROVIDER_CATEGORIES` setting (actual IDs and revision change as users interact). The revision prevents delayed storage events from undoing newer choices. Ordinary Save Settings excludes this immediate setting so an older Options snapshot cannot overwrite it; import/export and reset include it through the canonical schema and serializer.
 
 ### 2. Save-Triggered Application (Manual Save Required)
 Most other configurations are buffered in the local state and require the user to explicitly click **"Save"** to be permanently applied and synchronized across tabs. The action stays at the bottom of the navigation on desktop, beside the scrollable navigation on tablet, and in a bottom action bar on mobile.
 
 - **Translation Providers**: API keys, model selections, and provider-specific URLs.
+- **Custom Provider List**: The Providers-tab checkbox stages the enabled state independently. When enabled, Manage List opens a drawer where Done stages only the ordered provider IDs; closing without Done discards that opening's list edits. The main Save button persists both settings. Disabling the list preserves its saved order for later use.
 - **Languages**: Source and Target language preferences.
 - **Activation Modes**: Enabling/disabling Select Element, Text Selection, or Whole Page translation.
 - **Advanced Settings**: Proxy configurations, exclusion lists, and debug mode.
@@ -35,7 +37,7 @@ These settings use the `updateSettingLocally` method, which only modifies the re
 The `useSettingsStore` (Pinia) is the single source of truth for all settings.
 - **`settings`**: A reactive object containing all configuration keys.
 - **`loadSettings()`**: Fetches data from storage on initialization.
-- **`saveAllSettings()`**: Persists all current local changes to storage.
+- **`saveAllSettings()`**: Persists Save-triggered settings, excluding the immediately persisted category-collapse state.
 - **`resetSettings()`**: Restores all settings to their default values.
 
 ### Layout: `OptionsLayout.vue`
@@ -50,6 +52,8 @@ The configuration is divided into logical tabs:
 - **Appearance**: Theme, font family, and font size settings.
 - **Activation**: Toggle specific features (Select Element, Page Translation, etc.).
 - **Providers**: Detailed configuration for each API (Gemini, OpenAI, etc.).
+- **Custom Provider List**: An optional Providers-tab drawer places chosen providers in a user-defined order ahead of the remaining providers in the selector. Remaining providers retain the existing category-grouping rules. The selector still applies its existing visibility, configuration, feature, debug, and support filters; temporarily ineligible IDs remain saved for when they become eligible again. This changes display order only, not provider selection or translation routing.
+- **Provider categories**: When grouping is active, eligible providers appear under Traditional, AI, and Other, after Custom List if enabled and populated. WebAI belongs to AI; Browser Translation and Development Mock remain in the internally named `local` category displayed as Other. Collapsing a group only hides its rows, not its membership or selection.
 - **Prompt**: Custom AI prompt templates.
 - **Advance**: Exclusion sites, Proxy settings, and Debug mode.
 - **Import/Export**: Backup and restore settings via JSON.

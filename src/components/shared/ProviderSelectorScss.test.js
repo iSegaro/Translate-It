@@ -62,3 +62,16 @@ describe('ProviderSelector.scss dead Popup override', () => {
     expect(css).toContain(':global(.rtl)')
   })
 })
+
+describe('ProviderSelector.scss Popup and Sidepanel menu sizing', () => {
+  it('compiles shared Popup Text and Sidepanel 245px sizing with a narrow-safe minimum', () => {
+    const { css } = compile()
+    const popupRule = css.match(/\.ti-provider-dropdown-menu--popup\s*,\s*\.ti-provider-dropdown-menu--sidepanel\s*\{[^}]*\}/)?.[0]
+
+    expect(popupRule).toBeTruthy()
+    expect(popupRule).toMatch(/width:\s*(?:245px|min\(245px,\s*calc\(100vw\s*-\s*16px\)\))/)
+    expect(popupRule).toMatch(/max-width:\s*calc\(100vw\s*-\s*16px\)/)
+    expect(popupRule).toMatch(/min-width:\s*(?:0(?:px)?|min\(\s*220px\s*,\s*calc\(100vw\s*-\s*16px\)\s*\))/)
+    expect(css).not.toMatch(/\.ti-provider-dropdown-menu\s*\{[^}]*width:\s*245px/)
+  })
+})

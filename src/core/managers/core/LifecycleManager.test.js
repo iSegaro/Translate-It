@@ -43,6 +43,9 @@ describe('LifecycleManager translation text routing', () => {
     expect(registeredHandlers.get(MessageActions.TRANSLATE_TEXT)).toBe(translateTextHandler)
     expect(registeredHandlers.get('translateText')).toBe(translateTextHandler)
     expect(registeredHandlers.get(MessageActions.SETTINGS_UPDATED)).toBe(settingsUpdatedHandler)
+    expect(registeredHandlers.get(MessageActions.SET_PROVIDER_CATEGORY_COLLAPSED)).toBe(
+      Handlers.handleSetProviderCategoryCollapsedLazy
+    )
     expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME)).toEqual(expect.any(Function))
     expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME)).toEqual(expect.any(Function))
     expect(registeredHandlers.get(LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME)).toEqual(expect.any(Function))
