@@ -21,7 +21,7 @@ These settings use the `updateSettingAndPersist` method in the `settings` store,
 Most other configurations are buffered in the local state and require the user to explicitly click **"Save"** to be permanently applied and synchronized across tabs. The action stays at the bottom of the navigation on desktop, beside the scrollable navigation on tablet, and in a bottom action bar on mobile.
 
 - **Translation Providers**: API keys, model selections, and provider-specific URLs.
-- **Custom Provider List**: The Providers tab's Manage List drawer stages its enabled state and ordered provider IDs when Done is pressed. Closing the drawer without Done discards that opening's edits; the main Save button persists staged changes. Disabling the list preserves its saved order for later use.
+- **Custom Provider List**: The Providers-tab checkbox stages the enabled state independently. When enabled, Manage List opens a drawer where Done stages only the ordered provider IDs; closing without Done discards that opening's list edits. The main Save button persists both settings. Disabling the list preserves its saved order for later use.
 - **Languages**: Source and Target language preferences.
 - **Activation Modes**: Enabling/disabling Select Element, Text Selection, or Whole Page translation.
 - **Advanced Settings**: Proxy configurations, exclusion lists, and debug mode.

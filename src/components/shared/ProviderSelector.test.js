@@ -18,6 +18,8 @@ const registry = vi.hoisted(() => ({
 const openOptionsPage = vi.hoisted(() => vi.fn())
 const extensionContext = vi.hoisted(() => ({ isContentScript: false }))
 const trackedListeners = vi.hoisted(() => [])
+const deactivateSelectMode = vi.hoisted(() => vi.fn())
+const selectMode = vi.hoisted(() => ({ active: false }))
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => settingsStore,
@@ -52,6 +54,7 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
         provider_category_local: 'Local',
         provider_category_custom: 'Custom List',
         configure_providers: 'Configure Providers',
+        custom_provider_list_add_placeholder: 'Add a provider…',
       }
       if (labels[key]) return labels[key]
       if (/(traditional|free)/i.test(key) && /(category|group|provider)/i.test(key)) return 'Traditional'
@@ -67,8 +70,8 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 
 vi.mock('@/features/translation/composables/useTranslationModes.js', () => ({
   useSelectElementTranslation: () => ({
-    isSelectModeActive: ref(false),
-    deactivateSelectMode: vi.fn(),
+    isSelectModeActive: ref(selectMode.active),
+    deactivateSelectMode,
   }),
 }))
 
@@ -278,12 +281,12 @@ const providers = [
 }))
 
 const attachSelector = async (props = {}, {
-  realTeleport = false, shadow = false, popupAncestor = false, selectorClass, containerClass, rect, containerRect,
+  realTeleport = false, shadow = false, popupAncestor = false, selectorClass, containerClass, rect, containerRect, parent,
 } = {}) => {
   const container = document.createElement('div')
   if (popupAncestor) container.classList.add('translation-view')
   if (containerClass) container.classList.add(containerClass)
-  document.body.appendChild(container)
+  ;(parent || document.body).appendChild(container)
   let mountPoint = container
   let shadowRoot
   if (shadow) {
@@ -339,8 +342,7 @@ const enterOtherPage = () => {
   return () => window.history.replaceState({}, '', previousUrl)
 }
 
-const stubAnimationFrames = () => {
-  const requestDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame')
+const stubAnimationFrames = () => {  const requestDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'requestAnimationFrame')
   const cancelDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'cancelAnimationFrame')
   const frames = new Map()
   const cancelled = []
@@ -381,6 +383,28 @@ const stubAnimationFrames = () => {
   }
 }
 
+/**
+ * Drawer-dialog fixture mirroring the host structure the second designer
+ * owns: dialog element (role=dialog subtree carrying the teleport target id)
+ * → scrollable drawer body → mount container. Modeled with plain divs so
+ * jsdom stays deterministic.
+ */
+const attachDialogSelector = async (props = {}, { rect, dialogRect, drawerRect } = {}) => {
+  const dialog = document.createElement('div')
+  dialog.id = 'CUSTOM_PROVIDER_LIST_DRAWER'
+  const drawerBody = document.createElement('div')
+  drawerBody.className = 'custom-list-drawer-body'
+  dialog.appendChild(drawerBody)
+  document.body.appendChild(dialog)
+  const mounted = await attachSelector(
+    { mode: 'button', selectionOnly: true, modelValue: '', menuTeleportTarget: '#CUSTOM_PROVIDER_LIST_DRAWER', ...props },
+    { realTeleport: true, parent: drawerBody, rect },
+  )
+  if (dialogRect) vi.spyOn(dialog, 'getBoundingClientRect').mockReturnValue({ ...dialogRect })
+  if (drawerRect) vi.spyOn(drawerBody, 'getBoundingClientRect').mockReturnValue({ ...drawerRect })
+  return { ...mounted, dialog, drawerBody }
+}
+
 describe('ProviderSelector provider list contract', () => {
   beforeEach(() => {
     registry.providers = providers.map((provider) => ({ ...provider }))
@@ -392,6 +416,8 @@ describe('ProviderSelector provider list contract', () => {
     openOptionsPage.mockReset()
     Object.assign(translationStore.ephemeralSync, { page: false, element: false })
     translationStore.selectedProvider = null
+    deactivateSelectMode.mockReset()
+    selectMode.active = false
     extensionContext.isContentScript = false
   })
 
@@ -708,6 +734,272 @@ describe('ProviderSelector provider list contract', () => {
       wrapper.unmount()
       container.remove()
     }
+  })
+
+  it('selection-only mode filters exclusions and hidden providers, stays flat, and ignores injected defaults', async () => {
+    registry.providers = providers.map(provider => ({ ...provider }))
+    Object.assign(settingsStore.settings, {
+      TRANSLATION_API: 'googlev2',
+      HIDDEN_PROVIDERS: ['deepl'],
+      CUSTOM_PROVIDER_LIST_ENABLED: true,
+      CUSTOM_PROVIDER_LIST: ['gemini'],
+    })
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', selectionOnly: true, modelValue: '', excludeIds: ['browser'], allowDefault: true,
+    })
+    try {
+      expect(wrapper.vm.currentProvider).toBe('')
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = wrapper.find('.ti-provider-dropdown-menu')
+      expect(menu.findAll('.ti-dropdown-group-header')).toHaveLength(0)
+      expect(menu.findAll('.ti-dropdown-item').map(item => item.text().trim())).toEqual([
+        'Google', 'Unconfigured', 'OpenAI', 'Gemini',
+      ])
+      expect(menu.findAll('.ti-dropdown-item-btn')).toHaveLength(4)
+      await wrapper.setProps({ modelValue: 'deepl' })
+      expect(wrapper.findAll('.ti-dropdown-item').map(item => item.text().trim())).not.toContain('DeepL')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('selection-only click and keyboard selection emit only model events and leave stores and select mode untouched', async () => {
+    selectMode.active = true
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', selectionOnly: true, isGlobal: true, modelValue: '',
+    })
+    try {
+      expect(wrapper.vm.currentProvider).toBe('')
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(wrapper.findAll('.ti-dropdown-item').map(item => item.text().trim()).slice(0, 2)).toEqual(['Google', 'DeepL'])
+      await wrapper.findAll('.ti-dropdown-item-btn')[1].trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('update:modelValue')).toEqual([['deepl']])
+      expect(wrapper.emitted('provider-change')).toEqual([['deepl']])
+      expect(wrapper.emitted('translate')).toBeUndefined()
+      expect(settingsStore.updateSettingAndPersist).not.toHaveBeenCalled()
+      expect(translationStore.selectedProvider).toBeNull()
+      expect(deactivateSelectMode).not.toHaveBeenCalled()
+
+      await wrapper.setProps({ modelValue: 'googlev2' })
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const firstMenuButton = wrapper.find('.ti-dropdown-item-btn')
+      firstMenuButton.element.focus()
+      firstMenuButton.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')).toEqual([['deepl'], ['deepl']])
+      expect(settingsStore.updateSettingAndPersist).not.toHaveBeenCalled()
+      expect(translationStore.selectedProvider).toBeNull()
+      expect(deactivateSelectMode).not.toHaveBeenCalled()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('selection-only Escape stops before window handlers, including for an empty menu', async () => {
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', selectionOnly: true, excludeIds: providers.map(provider => provider.id),
+    })
+    const parentKeyHandler = vi.fn()
+    window.addEventListener('keydown', parentKeyHandler)
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = wrapper.find('.ti-provider-dropdown-menu')
+      expect(menu.findAll('.ti-dropdown-item')).toHaveLength(0)
+      const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      menu.element.dispatchEvent(escape)
+      expect(escape.defaultPrevented).toBe(true)
+      expect(parentKeyHandler).not.toHaveBeenCalled()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.ti-provider-dropdown-menu').exists()).toBe(false)
+    } finally {
+      window.removeEventListener('keydown', parentKeyHandler)
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('selection-only trigger shows the add placeholder instead of the global provider identity until a pick', async () => {
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', selectionOnly: true, modelValue: '',
+    })
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      expect(trigger.find('img').exists()).toBe(false)
+      expect(trigger.find('.ti-provider-button-placeholder').text()).toBe('Add a provider…')
+      expect(trigger.text()).not.toContain('Google')
+
+      await trigger.trigger('click')
+      await wrapper.findAll('.ti-dropdown-item-btn')[0].trigger('click')
+      expect(wrapper.emitted('update:modelValue')).toEqual([['googlev2']])
+
+      await wrapper.setProps({ modelValue: 'googlev2' })
+      const pickedTrigger = wrapper.find('.ti-provider-button')
+      expect(pickedTrigger.find('.ti-provider-button-placeholder').exists()).toBe(false)
+      expect(pickedTrigger.find('img').exists()).toBe(true)
+      expect(pickedTrigger.text()).toContain('Google')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('selection-only menu hides Default, star, sync, Configure Providers, and compact configure regardless of accidental props', async () => {
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', selectionOnly: true, modelValue: '', allowDefault: true, allowSetDefault: true, isGlobal: false, showSync: true,
+    })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = wrapper.find('.ti-provider-dropdown-menu')
+      expect(menu.findAll('.ti-dropdown-item').map(item => item.text().trim())).not.toContain('Default')
+      expect(menu.findAll('.ti-set-default-btn')).toHaveLength(0)
+      expect(menu.findAll('.ti-sync-row')).toHaveLength(0)
+      expect(menu.find('.ti-configure-row').exists()).toBe(false)
+      expect(wrapper.find('.ti-provider-dropdown-footer').exists()).toBe(false)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+
+    const compact = await attachSelector({ mode: 'compact', selectionOnly: true, modelValue: '' })
+    try {
+      expect(compact.wrapper.find('.ti-provider-compact-config-btn').exists()).toBe(false)
+      expect(Array.from(compact.wrapper.find('select').element.options, option => option.value)).toEqual([
+        'googlev2', 'deepl', 'unconfigured', 'openai', 'gemini', 'browser',
+      ])
+    } finally {
+      compact.wrapper.unmount()
+      compact.container.remove()
+    }
+  })
+
+  it('removes the open teleported menu when the selection-only host unmounts', async () => {
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', selectionOnly: true, modelValue: '' },
+      { realTeleport: true },
+    )
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+    expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+  })
+
+  it.each([
+    { label: 'LTR narrow', width: 240, dir: 'ltr', rect: { left: 180, right: 220, width: 40 } },
+    { label: 'RTL narrow', width: 240, dir: 'rtl', rect: { left: 20, right: 60, width: 40 } },
+    { label: 'LTR roomy', width: 520, dir: 'ltr', rect: { left: 150, right: 350, width: 200 } },
+    { label: 'RTL roomy', width: 520, dir: 'rtl', rect: { left: 170, right: 370, width: 200 } },
+  ])('clamps the selection-only menu inside 8px viewport gutters: $label', async ({ width, dir, rect }) => {
+    const widthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth')
+    const previousDir = document.documentElement.dir
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    document.documentElement.dir = dir
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', selectionOnly: true, modelValue: '' },
+      { realTeleport: true, rect },
+    )
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(false)
+      expect(menu.classList.contains('ti-provider-dropdown-menu--sidepanel')).toBe(false)
+      const menuWidth = Math.min(Math.max(rect.width, 220), width - 16)
+      expect(menu.style.width).toBe(`${menuWidth}px`)
+      const left = menu.style.left !== 'auto'
+        ? Number.parseFloat(menu.style.left)
+        : width - Number.parseFloat(menu.style.right) - menuWidth
+      expect(left).toBeGreaterThanOrEqual(8)
+      expect(left + menuWidth).toBeLessThanOrEqual(width - 8)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      document.documentElement.dir = previousDir
+      if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor)
+      else delete window.innerWidth
+    }
+  })
+
+  it('coalesces drawer body scrolls with the Options RAF and repositions while the trigger stays visible', async () => {
+    const raf = stubAnimationFrames()
+    const { wrapper, container, setRect } = await attachSelector(
+      { mode: 'button', selectionOnly: true, modelValue: '' },
+      { realTeleport: true, containerClass: 'custom-list-drawer-body' },
+    )
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.style.left).toBe('100px')
+      expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(true)
+      expect(trackedListeners.some(({ target, event }) => target === window && event === 'scroll')).toBe(false)
+
+      setRect({ left: 140, right: 340, x: 140 })
+      container.dispatchEvent(new Event('scroll'))
+      container.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(menu.style.left).toBe('140px')
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      raf.restore()
+    }
+  })
+
+  it('silently closes when the trigger scrolls fully out of the drawer body', async () => {
+    const raf = stubAnimationFrames()
+    const { wrapper, container, setRect } = await attachSelector(
+      { mode: 'button', selectionOnly: true, modelValue: '' },
+      {
+        realTeleport: true,
+        containerClass: 'custom-list-drawer-body',
+        containerRect: { top: 100, left: 0, right: 600, bottom: 400, width: 600, height: 300 },
+      },
+    )
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      const triggerFocus = vi.spyOn(trigger.element, 'focus')
+      setRect({ top: 410, bottom: 450 })
+      container.dispatchEvent(new Event('scroll'))
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+      expect(triggerFocus).not.toHaveBeenCalled()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      raf.restore()
+    }
+  })
+
+  it('cancels pending drawer RAF work and removes the drawer scroll listener on unmount', async () => {
+    const raf = stubAnimationFrames()
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', selectionOnly: true, modelValue: '' },
+      { realTeleport: true, containerClass: 'custom-list-drawer-body' },
+    )
+    await wrapper.find('.ti-provider-button').trigger('click')
+    container.dispatchEvent(new Event('scroll'))
+    expect(raf.frames.size).toBe(1)
+    const [frameId] = raf.frames.keys()
+    expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(true)
+    wrapper.unmount()
+    expect(raf.cancelled).toContain(frameId)
+    expect(raf.frames.size).toBe(0)
+    expect(trackedListeners.some(({ target, event }) => target === container && event === 'scroll')).toBe(false)
+    container.remove()
+    raf.restore()
   })
 
   it('renders each mode with its expected provider-selection control', async () => {
@@ -1443,6 +1735,220 @@ describe('ProviderSelector provider list contract', () => {
     } finally {
       wrapper.unmount()
       container.remove()
+    }
+  })
+
+  const DIALOG_RECT = { top: 40, left: 20, right: 420, bottom: 640, width: 400, height: 600 }
+  const TRIGGER_RECT = { top: 60, bottom: 100, left: 40, right: 400, width: 360, height: 40, x: 40, y: 60 }
+  const DRAWER_RECT = { top: 0, left: 0, right: 600, bottom: 600, width: 600, height: 600 }
+
+  it('teleports the selection-only menu into the provided dialog target and positions it absolutely relative to the dialog', async () => {
+    const { wrapper, dialog, drawerBody } = await attachDialogSelector({}, {
+      rect: TRIGGER_RECT, dialogRect: DIALOG_RECT, drawerRect: DRAWER_RECT,
+    })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = dialog.querySelector('.ti-provider-dropdown-menu')
+      expect(menu).toBeTruthy()
+      expect(menu.parentElement).toBe(dialog)
+      expect(menu.parentElement).not.toBe(drawerBody)
+      expect(document.body.querySelector(':scope > .ti-provider-dropdown-menu')).toBeNull()
+      // Dialog-relative math, not viewport-fixed: trigger bottom 100 minus
+      // dialog top 40 + 4 → 64 (viewport math would say 104).
+      expect(menu.style.position).toBe('absolute')
+      expect(menu.style.top).toBe('64px')
+      // Trigger starts 20px inside the dialog → menu pinned to that inset,
+      // trigger width (360) since it fits the dialog budget (384).
+      expect(menu.style.left).toBe('20px')
+      expect(menu.style.width).toBe('360px')
+    } finally {
+      wrapper.unmount()
+      dialog.remove()
+    }
+  })
+
+  it('fails closed when the provided dialog target is missing: no body teleport and no inline fallback', async () => {
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', selectionOnly: true, modelValue: '', menuTeleportTarget: '#CUSTOM_PROVIDER_LIST_DRAWER' },
+      { realTeleport: true },
+    )
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      expect(wrapper.find('.ti-provider-dropdown-menu').exists()).toBe(false)
+      expect(wrapper.find('.ti-provider-button').attributes('aria-expanded')).toBe('false')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('fails closed when the resolved dialog target disconnects while the menu is open', async () => {
+    const raf = stubAnimationFrames()
+    const { wrapper, dialog, drawerBody } = await attachDialogSelector({}, {
+      rect: TRIGGER_RECT, dialogRect: DIALOG_RECT, drawerRect: DRAWER_RECT,
+    })
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      expect(dialog.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+      // Host closes the drawer: dialog subtree detaches, scroll event still hits the listener.
+      dialog.remove()
+      drawerBody.dispatchEvent(new Event('scroll'))
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      expect(trigger.attributes('aria-expanded')).toBe('false')
+    } finally {
+      wrapper.unmount()
+      raf.restore()
+    }
+  })
+
+  it.each([
+    { label: 'LTR narrow', dir: 'ltr', rect: { left: 180, right: 220, width: 40, x: 180 }, expected: { left: '8px' } },
+    { label: 'RTL narrow', dir: 'rtl', rect: { left: 30, right: 70, width: 40, x: 30 }, expected: { right: '8px' } },
+  ])('clamps the dialog menu inside the dialog with 8px gutters: $label', async ({ dir, rect, expected }) => {
+    const previousDir = document.documentElement.dir
+    document.documentElement.dir = dir
+    const dialogRect = { left: 20, right: 260, width: 240, top: 40, bottom: 640, height: 600 }
+    const { wrapper, dialog } = await attachDialogSelector({}, {
+      rect: { ...TRIGGER_RECT, ...rect }, dialogRect, drawerRect: DRAWER_RECT,
+    })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = dialog.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.style.width).toBe('220px')
+      expect(menu.style.left).toBe(expected.left ?? 'auto')
+      expect(menu.style.right).toBe(expected.right ?? 'auto')
+      // Reconstruct viewport-space bounds and assert 8px dialog gutters.
+      const menuWidth = 220
+      const left = menu.style.left !== 'auto'
+        ? dialogRect.left + Number.parseFloat(menu.style.left)
+        : dialogRect.right - Number.parseFloat(menu.style.right) - menuWidth
+      expect(left).toBeGreaterThanOrEqual(dialogRect.left + 8)
+      expect(left + menuWidth).toBeLessThanOrEqual(dialogRect.right - 8)
+    } finally {
+      wrapper.unmount()
+      dialog.remove()
+      document.documentElement.dir = previousDir
+    }
+  })
+
+  it('places the dialog menu above the trigger with dialog-relative bottom coordinates when placement is up', async () => {
+    const { wrapper, dialog } = await attachDialogSelector({ placement: 'up' }, {
+      rect: TRIGGER_RECT, dialogRect: DIALOG_RECT,
+    })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = dialog.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.style.position).toBe('absolute')
+      // dialog height 600 − (trigger top 60 − dialog top 40) + 4 → 584 (viewport math would say 712).
+      expect(menu.style.bottom).toBe('584px')
+      expect(menu.style.top).toBe('auto')
+      expect(menu.style.left).toBe('20px')
+    } finally {
+      wrapper.unmount()
+      dialog.remove()
+    }
+  })
+
+  it('repositions the dialog menu on window resize using the fresh dialog-relative frame', async () => {
+    const raf = stubAnimationFrames()
+    const { wrapper, dialog } = await attachDialogSelector({}, {
+      rect: TRIGGER_RECT, dialogRect: DIALOG_RECT,
+    })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = dialog.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.style.top).toBe('64px')
+
+      const anchor = wrapper.element.querySelector('.ti-provider-button-container')
+      vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+        ...TRIGGER_RECT, top: 90, bottom: 130, y: 90,
+      })
+      window.dispatchEvent(new Event('resize'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      // Trigger bottom 130 − dialog top 40 + 4 → 94.
+      expect(menu.style.top).toBe('94px')
+      // Menu stays dialog-owned after resize, never moved to body.
+      expect(dialog.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
+    } finally {
+      wrapper.unmount()
+      dialog.remove()
+      raf.restore()
+    }
+  })
+
+  it.each([
+    { label: 'visible: coalesces and repositions', movedLeft: 30 },
+    { label: 'invisible: closes silently', movedBelow: 620 },
+  ])('keeps drawer-body scroll behavior for the dialog menu: $label', async ({ movedLeft, movedBelow }) => {
+    const raf = stubAnimationFrames()
+    const { wrapper, dialog, drawerBody } = await attachDialogSelector({}, {
+      rect: TRIGGER_RECT, dialogRect: DIALOG_RECT, drawerRect: DRAWER_RECT,
+    })
+    try {
+      const anchor = wrapper.element.querySelector('.ti-provider-button-container')
+      const triggerEl = wrapper.element.querySelector('.ti-provider-button')
+      const moved = movedBelow
+        ? { ...TRIGGER_RECT, top: movedBelow, bottom: movedBelow + 40, y: movedBelow }
+        : { ...TRIGGER_RECT, left: movedLeft, right: TRIGGER_RECT.right - 10, x: movedLeft }
+      // Both the container (position source) and the trigger (visibility
+      // source) report the moved geometry for the scroll frame.
+      for (const element of [anchor, triggerEl]) {
+        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(moved)
+      }
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = dialog.querySelector('.ti-provider-dropdown-menu')
+      expect(menu).toBeTruthy()
+      expect(trackedListeners.some(({ target, event }) => target === drawerBody && event === 'scroll')).toBe(true)
+      expect(trackedListeners.some(({ target, event }) => target === window && event === 'scroll')).toBe(false)
+
+      drawerBody.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(1)
+      raf.flush()
+      await wrapper.vm.$nextTick()
+      if (movedBelow) {
+        expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      } else {
+        // Trigger now starts 10px inside the dialog → menu inset 10px.
+        expect(dialog.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
+        expect(menu.style.left).toBe(`${movedLeft - 20}px`)
+      }
+    } finally {
+      wrapper.unmount()
+      dialog.remove()
+      raf.restore()
+    }
+  })
+
+  it('cleans up on unmount: cancels pending drawer RAF, removes listeners, and removes the dialog menu', async () => {
+    const raf = stubAnimationFrames()
+    const { wrapper, dialog, drawerBody } = await attachDialogSelector({}, {
+      rect: TRIGGER_RECT, dialogRect: DIALOG_RECT, drawerRect: DRAWER_RECT,
+    })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(dialog.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+      drawerBody.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(1)
+      const [frameId] = raf.frames.keys()
+      expect(trackedListeners.some(({ target, event }) => target === drawerBody && event === 'scroll')).toBe(true)
+      wrapper.unmount()
+      expect(raf.cancelled).toContain(frameId)
+      expect(raf.frames.size).toBe(0)
+      expect(trackedListeners.some(({ target, event }) => target === drawerBody && event === 'scroll')).toBe(false)
+      expect(dialog.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      // Listener is really removed: scoped to the drawer body, the re-dispatch schedules nothing.
+      drawerBody.dispatchEvent(new Event('scroll'))
+      expect(raf.frames.size).toBe(0)
+    } finally {
+      dialog.remove()
+      raf.restore()
     }
   })
 })

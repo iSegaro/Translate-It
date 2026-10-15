@@ -123,10 +123,16 @@ vi.mock('vue-router', () => ({
   })
 }));
 
-// ProvidersTab's own dropdown is unrelated to the custom list drawer here;
-// the drawer flow uses native elements and the base components stay real.
+// ProvidersTab's drawer is driven through the OptionSlot picker stub below;
+// base components, the real ProviderSelector-adjacent layers and the store
+// stay real while the selection-only picker contract is held by the stub.
 vi.mock('@/components/shared/ProviderSelector.vue', () => ({
-  default: { name: 'ProviderSelector', template: '<div />' }
+  default: {
+    name: 'ProviderSelector',
+    props: ['modelValue', 'selectionOnly', 'excludeIds'],
+    emits: ['update:modelValue'],
+    template: '<select class="provider-picker-stub" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option value=""/><option value="deepl"/><option value="openai"/></select>'
+  }
 }));
 
 // Background notification boundary for the Global Save flow.
@@ -374,10 +380,15 @@ describe('Options save integration (store + tabs + Global Save)', () => {
     expect(reloadedTts.find('.voice-select-dropdown').element.value).toBe('en-US-AriaNeural');
   });
 
-  it('(6) Providers custom list drawer stages both keys with zero writes; Save persists; reload restores', async () => {
+  it('(6) Providers custom list stages the row checkbox and drawer ids with zero writes; Save persists; reload restores', async () => {
     const store = await freshStore();
     const tab = mountTab(ProvidersTab);
     const nav = mountTab(OptionsNavigation);
+
+    // Enable is staged directly from the row (outside the drawer).
+    await tab.find('#CUSTOM_PROVIDER_LIST_ENABLED input').setValue(true);
+    expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
 
     await tab.find('#CUSTOM_PROVIDER_LIST_MANAGE_BTN').trigger('click');
     await flushPromises();
@@ -385,17 +396,17 @@ describe('Options save integration (store + tabs + Global Save)', () => {
     const drawer = tab.get('#CUSTOM_PROVIDER_LIST_DRAWER');
     expect(drawer.attributes('role')).toBe('dialog');
 
-    // Stage: enable the list and add two providers.
-    await drawer.find('#CUSTOM_PROVIDER_LIST_ENABLED input').setValue(true);
-    await drawer.get('.custom-list-add-select').setValue('deepl');
-    await drawer.get('.custom-list-add-btn').trigger('click');
-    await drawer.get('.custom-list-add-select').setValue('openai');
-    await drawer.get('.custom-list-add-btn').trigger('click');
+    // Stage: add two providers through the (stubbed) selection-only picker.
+    await tab.get('.custom-list-add-row .provider-picker-stub').setValue('deepl');
+    await tab.get('.custom-list-add-btn').trigger('click');
+    await tab.get('.custom-list-add-row .provider-picker-stub').setValue('openai');
+    await tab.get('.custom-list-add-btn').trigger('click');
 
-    // Staged locally, nothing written to the browser boundary.
+    // Draft-local: still nothing written to the browser boundary, and the
+    // store list only gains the ids once Done stages them.
     expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
-    expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(false);
 
+    // Done stages the ids only; the checkbox already staged the enable state.
     await drawer.get('.custom-list-drawer-footer button').trigger('click');
     await flushPromises();
     expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
@@ -410,11 +421,10 @@ describe('Options save integration (store + tabs + Global Save)', () => {
     expect(reloadedStore.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
     expect(reloadedStore.settings.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
     const reloadedTab = mountTab(ProvidersTab);
+    expect(reloadedTab.find('#CUSTOM_PROVIDER_LIST_ENABLED input').element.checked).toBe(true);
     await reloadedTab.find('#CUSTOM_PROVIDER_LIST_MANAGE_BTN').trigger('click');
     await flushPromises();
-    const reloadedDrawer = reloadedTab.get('#CUSTOM_PROVIDER_LIST_DRAWER');
-    expect(reloadedDrawer.find('#CUSTOM_PROVIDER_LIST_ENABLED input').element.checked).toBe(true);
-    expect(reloadedDrawer.findAll('.custom-list-entry')).toHaveLength(2);
+    expect(reloadedTab.get('#CUSTOM_PROVIDER_LIST_DRAWER').findAll('.custom-list-entry')).toHaveLength(2);
   });
 
   it('(7) save in flight survives unmount: write started before resolve, visible after reload', async () => {

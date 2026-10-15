@@ -140,12 +140,6 @@
   "custom_provider_list_group_label": {
     "message": "فهرست سرویس‌دهنده‌های سفارشی"
   },
-  "custom_provider_list_enable_label": {
-    "message": "فعال‌سازی فهرست سفارشی"
-  },
-  "custom_provider_list_enable_description": {
-    "message": "وقتی خاموش باشد، سرویس‌دهنده‌های انتخابی ذخیره می‌مانند تا بعداً فهرست را دوباره فعال کنید."
-  },
   "custom_provider_list_instruction": {
     "message": "برای تغییر ترتیب، ردیف‌ها را بکشید یا از دکمه‌های فلش استفاده کنید."
   },

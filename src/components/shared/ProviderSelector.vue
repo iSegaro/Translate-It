@@ -90,12 +90,20 @@
       @keydown="handleKeydown"
     >
       <img
+        v-if="!selectionOnly || currentProvider"
         :src="currentProviderIcon"
         alt="API Provider"
         class="ti-api-provider-icon"
         :class="{ 'ti-invert-dark': isProviderInverted(currentProvider) }"
       >
-      <span>{{ currentProviderName }}</span>
+      <!-- Selection-only picker: empty model shows the add placeholder,
+           never the global provider icon/name (the default branch is absent
+           for default consumers, whose provider is always resolvable). -->
+      <span
+        v-if="selectionOnly && !currentProvider"
+        class="ti-provider-button-placeholder"
+      >{{ selectionPlaceholderLabel }}</span>
+      <span v-else>{{ currentProviderName }}</span>
       <IconButton
         icon="dropdown-arrow.svg"
         alt="Dropdown"
@@ -219,6 +227,7 @@
       </template>
     </select>
     <button
+      v-if="!selectionOnly"
       type="button"
       class="ti-provider-compact-config-btn"
       :title="configureProvidersLabel"
@@ -306,9 +315,10 @@
               <span>{{ item.name }}</span>
             </button>
 
-            <!-- Set as Default (Star) Icon -->
+            <!-- Set as Default (Star) Icon — never in selection-only pickers,
+                 regardless of accidental allowSetDefault/isGlobal props -->
             <button
-              v-if="allowSetDefault && !isGlobal"
+              v-if="!selectionOnly && allowSetDefault && !isGlobal"
               type="button"
               class="ti-set-default-btn"
               :class="{ 'is-default': globalDefaultProvider === item.id }"
@@ -326,9 +336,13 @@
         </div>
       </div>
 
-      <!-- Dropdown footer: ephemeral sync rows (optional) + persistent Configure Providers action.
-           Toggles stay open (no dismissal) so chained decisions are possible. -->
-      <div class="ti-provider-dropdown-footer">
+      <!-- Dropdown footer (ephemeral sync rows + Configure Providers) is a
+           synthetic action surface: never rendered for selection-only
+           pickers, whatever showSync/accidental props say. -->
+      <div
+        v-if="!selectionOnly"
+        class="ti-provider-dropdown-footer"
+      >
         <template v-if="showSync">
           <button
             type="button"
@@ -449,6 +463,22 @@ const props = defineProps({
     type: String,
     default: ''
   },
+  selectionOnly: {
+    type: Boolean,
+    default: false
+  },
+  excludeIds: {
+    type: Array,
+    default: () => []
+  },
+  // Opt-in dialog-owned menu (used only with selectionOnly): host passes a
+  // selector for the accessible dialog subtree the menu must live in (e.g.
+  // '#CUSTOM_PROVIDER_LIST_DRAWER'). Resolved at mount via closest(); a
+  // missing or disconnected target fails closed.
+  menuTeleportTarget: {
+    type: String,
+    default: ''
+  },
   disabled: {
     type: Boolean,
     default: false
@@ -512,6 +542,10 @@ const mainActionLabel = computed(() => (props.loading ? stopActionLabel.value : 
 // the name from the inner image alt attribute.
 const dropdownTriggerLabel = computed(() => t('switch_provider_label') || 'Switch translation service')
 
+// Selection-only empty trigger placeholder (localization falls back to the
+// same wording used by the Custom List drawer add row).
+const selectionPlaceholderLabel = computed(() => t('custom_provider_list_add_placeholder') || 'Add a provider…')
+
 // Stable per-instance prefix for the menu and its category headings
 const dropdownUid = `ti-provider-dropdown-${useId()}`
 const menuId = `${dropdownUid}-menu`
@@ -538,8 +572,14 @@ const dropdownStyles = ref({})
 
 const teleportTarget = ref('body')
 const isTeleportEnabled = ref(false)
+// Dialog-owned menu state (selectionOnly + menuTeleportTarget only):
+// isDialogMenuContext switches positioning to dialog-absolute; menuTargetFailed
+// blocks opening entirely when the explicit dialog target was not found.
+const isDialogMenuContext = ref(false)
+const menuTargetFailed = ref(false)
 let resizeAnimationFrameId = null
-// Options pages: the tab content container is the only scroll source we track
+// The one tracked scroll source: Options tab content, or the Custom List
+// drawer body for selection-only pickers inside that drawer
 let optionsScrollAnimationFrameId = null
 
 /**
@@ -671,6 +711,7 @@ const handleKeydown = (event) => {
       break
     case 'Escape':
       event.preventDefault()
+      if (props.selectionOnly) event.stopPropagation()
       closeDropdown(true)
       break
     // 'Tab': let the browser move focus naturally (item → star → sync →
@@ -711,6 +752,12 @@ const moveListFocus = () => {
  */
 const handleMenuKeydown = (event) => {
   const { key } = event
+  if (key === 'Escape' && props.selectionOnly) {
+    event.preventDefault()
+    event.stopPropagation()
+    closeDropdown(true)
+    return
+  }
   const items = menuItems.value
   if (!items.length) return
 
@@ -736,6 +783,7 @@ const handleMenuKeydown = (event) => {
 
   if (key === 'Escape') {
     event.preventDefault()
+    if (props.selectionOnly) event.stopPropagation()
     closeDropdown(true)
   }
 }
@@ -833,13 +881,17 @@ const availableProviders = computed(() => {
   // Filter out hidden providers (but always show currently selected even if hidden)
   if (!props.ignoreHidden) {
     filteredRegistry = filteredRegistry.filter(p => {
-      return !hiddenProviders.includes(p.id) || currentProvider.value === p.id;
+      return !hiddenProviders.includes(p.id) || (!props.selectionOnly && currentProvider.value === p.id);
     });
   }
 
   // Filter by configuration status if requested
   if (props.onlyConfigured) {
     filteredRegistry = filteredRegistry.filter(p => isProviderConfigured(p.id, settingsStore.settings));
+  }
+
+  if (props.excludeIds.length) {
+    filteredRegistry = filteredRegistry.filter(provider => !props.excludeIds.includes(provider.id));
   }
 
   const mappedProviders = filteredRegistry.map(provider => ({
@@ -849,7 +901,7 @@ const availableProviders = computed(() => {
     category: provider.category || ''
   }));
 
-  if (props.allowDefault) {
+  if (props.allowDefault && !props.selectionOnly) {
     const defaultProviderId = settingsStore.settings?.TRANSLATION_API || 'googlev2';
     const defaultProvider = getProviderById(defaultProviderId);
     
@@ -908,6 +960,14 @@ const CUSTOM_CATEGORY_KEY = 'custom-list'
 
 const groupedMenu = computed(() => {
   const all = availableProviders.value
+  if (props.selectionOnly) {
+    return [{
+      key: 'selection-only',
+      header: '',
+      headerId: '',
+      items: all.map((provider, index) => ({ ...provider, index }))
+    }]
+  }
   const hasDefault = props.allowDefault && all.length > 0 && all[0].id === 'default'
   const fullReal = hasDefault ? all.slice(1) : all
 
@@ -1014,6 +1074,7 @@ const ephemeralSync = computed(() => translationStore.ephemeralSync)
  */
 const currentProvider = computed(() => {
   if (props.modelValue) return props.modelValue
+  if (props.selectionOnly) return ''
   return settingsStore.settings.TRANSLATION_API
 })
 
@@ -1037,6 +1098,9 @@ const currentProviderIcon = computed(() => {
 })
 
 const currentProviderName = computed(() => {
+  // Empty selection-only model: show nothing (no synthetic name, no
+  // unknown-provider warn) until the user picks a provider.
+  if (props.selectionOnly && !currentProvider.value) return ''
   if (currentProvider.value === 'default') {
     const baseName = t('provider_default') || 'Default';
     return isDefaultInvalid.value ? `${baseName} (${t('incompatible_label') || 'Incompatible'})` : baseName;
@@ -1212,10 +1276,12 @@ const handleTranslate = () => {
  * Toggles the provider selection dropdown
  */
 const toggleDropdown = () => {
-  if (isProviderSelectionDisabled.value) return;
+  // Explicit dialog target not found: fail closed — no menu at body, no
+  // inline fallback (which would be clipped and misleading).
+  if (isProviderSelectionDisabled.value || menuTargetFailed.value) return;
 
   // Deactivate select element mode if it's active when user interacts with this control
-  if (isSelectModeActive.value) {
+  if (isSelectModeActive.value && !props.selectionOnly) {
     deactivateSelectMode();
   }
 
@@ -1251,6 +1317,14 @@ const updateDropdownPosition = () => {
   const trigger = triggerBtnRef.value
 
   if (!selector?.isConnected || !trigger?.isConnected) return false
+
+  // Dialog-owned menu: a disconnected explicit target closes the menu (never
+  // re-positions it against a stale rect or lets it leak to body/viewport).
+  const isDialogMenu = isDialogMenuContext.value && isTeleportEnabled.value
+  const dialogRect = isDialogMenu && teleportTarget.value?.isConnected
+    ? teleportTarget.value.getBoundingClientRect()
+    : null
+  if (isDialogMenu && !dialogRect) return false
 
   const rect = selector.getBoundingClientRect()
   const dimensions = [rect.width, rect.height]
@@ -1289,16 +1363,23 @@ const updateDropdownPosition = () => {
 
   if (isTeleport) {
     const styles = {
-      position: 'fixed !important',
+      // Dialog-owned menus position absolute against the dialog itself: the
+      // drawer's slide transforms turn viewport-fixed into a transformed
+      // containing block, so fixed would anchor to the wrong element.
+      position: dialogRect ? 'absolute !important' : 'fixed !important',
       zIndex: '2147483647 !important',
       maxHeight: `${dropdownMaxHeight.value} !important`
     };
 
     if (isUpward.value) {
-      styles.bottom = `${window.innerHeight - rect.top + 4}px !important`;
+      styles.bottom = dialogRect
+        ? `${dialogRect.height - (rect.top - dialogRect.top) + 4}px !important`
+        : `${window.innerHeight - rect.top + 4}px !important`;
       styles.top = 'auto !important';
     } else {
-      styles.top = `${rect.bottom + 4}px !important`;
+      styles.top = dialogRect
+        ? `${rect.bottom - dialogRect.top + 4}px !important`
+        : `${rect.bottom + 4}px !important`;
       styles.bottom = 'auto !important';
     }
 
@@ -1318,6 +1399,41 @@ const updateDropdownPosition = () => {
       if (isRTL.value) {
         const desiredRight = window.innerWidth - rect.right;
         styles.right = `${Math.max(8, Math.min(desiredRight, maxOffset))}px !important`;
+        styles.left = 'auto !important';
+      } else {
+        styles.left = `${Math.max(8, Math.min(rect.left, maxOffset))}px !important`;
+        styles.right = 'auto !important';
+      }
+    } else if (dialogRect) {
+      // Dialog-owned selection-only menu: horizontal insets subtract the
+      // dialog rect (absolute positioning needs dialog coordinates, not
+      // viewport ones); width follows the trigger with the same 220px
+      // readability floor, clamped to the dialog with 8px gutters, anchored
+      // to the trigger start edge in both LTR and RTL.
+      const menuWidth = Math.min(Math.max(rect.width, 220), dialogRect.width - 16)
+      styles.width = `${menuWidth}px !important`;
+      styles.minWidth = '0 !important';
+      const maxOffset = Math.max(8, dialogRect.width - 16 - menuWidth);
+      if (isRTL.value) {
+        const desiredRight = dialogRect.right - rect.right;
+        styles.right = `${Math.max(8, Math.min(desiredRight, maxOffset))}px !important`;
+        styles.left = 'auto !important';
+      } else {
+        styles.left = `${Math.max(8, Math.min(rect.left - dialogRect.left, maxOffset))}px !important`;
+        styles.right = 'auto !important';
+      }
+    } else if (props.selectionOnly) {
+      // Selection-only picker (drawer/modal trigger): menu width follows the
+      // button trigger with the same 220px readability floor as button mode,
+      // clamped to the viewport with 8px gutters on narrow windows; anchored
+      // to the trigger start edge in both LTR and RTL. Popup Text and
+      // Sidepanel keep their own fixed-budget sizing (branch above).
+      const menuWidth = Math.min(Math.max(rect.width, 220), window.innerWidth - 16)
+      styles.width = `${menuWidth}px !important`;
+      styles.minWidth = '0 !important';
+      const maxOffset = Math.max(8, window.innerWidth - 16 - menuWidth);
+      if (isRTL.value) {
+        styles.right = `${Math.max(8, Math.min(window.innerWidth - rect.right, maxOffset))}px !important`;
         styles.left = 'auto !important';
       } else {
         styles.left = `${Math.max(8, Math.min(rect.left, maxOffset))}px !important`;
@@ -1382,9 +1498,9 @@ const selectProvider = async (provider) => {
 
   try {
     // Always update the store's active provider so other components (and sync logic) use the latest selection
-    translationStore.selectedProvider = provider.id
+    if (!props.selectionOnly) translationStore.selectedProvider = provider.id
 
-    if (props.isGlobal) {
+    if (props.isGlobal && !props.selectionOnly) {
       await settingsStore.updateSettingAndPersist('TRANSLATION_API', provider.id)
       logger.debug('Global provider updated successfully:', provider.id)
     } else {
@@ -1396,7 +1512,7 @@ const selectProvider = async (provider) => {
     closeDropdown(true)
 
     // Auto-trigger translation in split mode after selecting a provider
-    if (props.mode === 'split' && !props.disabled && props.translateOnProviderChange) {
+    if (!props.selectionOnly && props.mode === 'split' && !props.disabled && props.translateOnProviderChange) {
       emit('translate', { provider: provider.id })
     }
   } catch (error) {
@@ -1428,7 +1544,20 @@ const handleStorageChange = (changes, areaName) => {
 // Initialize providers
 onMounted(() => {
   // Determine teleport target dynamically
-  if (ExtensionContextManager.isContentScript() && selectorRef.value) {
+  if (props.selectionOnly && props.menuTeleportTarget) {
+    // Opt-in dialog-owned menu: resolve the caller-declared dialog ancestor
+    // here at mount (NOT from a parent ref during setup render). Missing or
+    // disconnected target fails closed — toggleDropdown stays blocked so the
+    // menu can never appear at body or clipped inline.
+    const dialogTarget = selectorRef.value?.closest?.(props.menuTeleportTarget) ?? null
+    if (dialogTarget && dialogTarget.isConnected) {
+      teleportTarget.value = dialogTarget
+      isTeleportEnabled.value = true
+      isDialogMenuContext.value = true
+    } else {
+      menuTargetFailed.value = true
+    }
+  } else if (ExtensionContextManager.isContentScript() && selectorRef.value) {
     const rootNode = selectorRef.value.getRootNode();
     if (rootNode instanceof ShadowRoot) {
       // Find a suitable overlay/container that is fixed and has no transform
@@ -1467,16 +1596,20 @@ onMounted(() => {
   tracker.addEventListener(document, 'pointerup', handleMenuPointerTracking, { capture: true })
   tracker.addEventListener(document, 'pointercancel', handleMenuPointerTracking, { capture: true })
   
-  // Page/container scrolling alone never closes the menu. In the Options page
-  // (only place with `.tab-content-container`, per OptionsLayout), its scroll
-  // is tracked: when the scroll moves the trigger fully out of the visible
-  // area, dismiss silently; otherwise reposition. Teleported menu internal
-  // scrolling lives under body and never bubbles through this container.
-  const optionsContainer = window.location.href.includes('options.html')
-    ? (selectorRef.value?.closest?.('.tab-content-container') ?? null)
-    : null
-  if (optionsContainer) {
-    tracker.addEventListener(optionsContainer, 'scroll', () => {
+  // Container scrolling alone never closes the menu. The nearest real scroll
+  // source is tracked: the Options page (only place with
+  // `.tab-content-container`, per OptionsLayout) for the regular activation
+  // surfaces, or the Custom List drawer body for selection-only pickers. When
+  // the scroll moves the trigger fully out of the visible area, dismiss
+  // silently; otherwise reposition. Menu-internal scrolling never bubbles
+  // through these source containers.
+  const scrollContainer = props.selectionOnly
+    ? (selectorRef.value?.closest?.('.custom-list-drawer-body') ?? null)
+    : (window.location.href.includes('options.html')
+      ? (selectorRef.value?.closest?.('.tab-content-container') ?? null)
+      : null)
+  if (scrollContainer) {
+    tracker.addEventListener(scrollContainer, 'scroll', () => {
       if (!isDropdownOpen.value || optionsScrollAnimationFrameId !== null) return
       optionsScrollAnimationFrameId = requestAnimationFrame(() => {
         optionsScrollAnimationFrameId = null
@@ -1484,7 +1617,7 @@ onMounted(() => {
         const trigger = triggerBtnRef.value
         if (!trigger) return
         const triggerRect = trigger.getBoundingClientRect()
-        const containerRect = optionsContainer.getBoundingClientRect()
+        const containerRect = scrollContainer.getBoundingClientRect()
         // Zero-area intersection counts as invisible: exact shared boundary
         // (bottom === container top, top === viewport bottom, …) means the
         // trigger no longer has visible area. One-pixel overlap stays open.

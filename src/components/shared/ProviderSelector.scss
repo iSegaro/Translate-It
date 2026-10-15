@@ -171,6 +171,13 @@
       overflow: hidden !important; 
       text-overflow: ellipsis !important; 
     }
+
+    /* Selection-only empty trigger (Custom List drawer picker): the
+       localized add placeholder never reads as a selected provider. Direct
+       declaration wins over the inherited button color, no !important. */
+    .ti-provider-button-placeholder {
+      color: var(--color-text-muted);
+    }
   }
 }
 

@@ -20,31 +20,37 @@
       </div>
 
       <div class="api-settings-section">
-        <!-- Custom Provider List row.
-             Deliberately a plain row (no toggle gating): the list is managed
-             in its drawer even while the list itself is off. -->
+        <!-- Custom Provider List row (FAB-row pattern): the checkbox stages the
+             enabled state directly, the Manage List button exists only while
+             enabled and is animated in/out like the FAB mode select. -->
         <div
           id="CUSTOM_PROVIDER_LIST"
           class="setting-group custom-provider-list-row"
         >
           <div class="custom-list-row-main">
-            <div class="custom-list-row-info">
-              <label class="custom-list-row-label">{{ t('custom_provider_list_label') || 'Custom Provider List' }}</label>
-              <span class="custom-list-row-desc">
-                {{ t('custom_provider_list_description') || 'Choose providers that appear together in the Custom List category.' }}
-              </span>
-            </div>
-            <div class="custom-list-row-control">
+            <BaseCheckbox
+              id="CUSTOM_PROVIDER_LIST_ENABLED"
+              v-model="customListEnabled"
+              :label="t('custom_provider_list_label') || 'Custom Provider List'"
+            />
+            <div
+              ref="customListManageWrapperRef"
+              class="custom-list-manage-wrapper"
+              :class="{ open: customListEnabled }"
+              :inert="customListEnabled ? undefined : 'inert'"
+            >
               <BaseButton
                 id="CUSTOM_PROVIDER_LIST_MANAGE_BTN"
                 class="manage-list-button"
-                variant="outline"
                 @click="openCustomListDrawer"
               >
                 {{ t('custom_provider_list_manage_btn') || 'Manage List' }}
               </BaseButton>
             </div>
           </div>
+          <span class="custom-list-row-desc">
+            {{ t('custom_provider_list_description') || 'Choose providers that appear together in the Custom List category.' }}
+          </span>
         </div>
 
         <div class="provider-settings-container">
@@ -137,8 +143,9 @@
 
     <!-- Custom Provider List slide-out Drawer.
          Staged-draft semantics (mirrors the Auto Page Rules drawer): opening
-         snapshots the store, Done stages both keys via updateSettingLocally,
-         and close/overlay/Escape discards this opening's draft. Only the
+         snapshots the store, Done stages only the ordered provider IDs (the
+         row checkbox stages the enabled state outside the drawer), and
+         close/overlay/Escape discards this opening's draft. Only the
          existing Options Save persists anything to storage. -->
     <Transition name="custom-list-fade">
       <div
@@ -172,46 +179,26 @@
         </div>
 
         <div class="custom-list-drawer-body">
-          <div
-            id="CUSTOM_PROVIDER_LIST_ENABLED_GROUP"
-            class="custom-list-enable"
-          >
-            <BaseCheckbox
-              id="CUSTOM_PROVIDER_LIST_ENABLED"
-              v-model="customListEnabledDraft"
-              :label="t('custom_provider_list_enable_label') || 'Enable Custom Provider List'"
-            />
-            <span class="custom-list-drawer-desc">
-              {{ t('custom_provider_list_enable_description') || 'When off, the selected providers stay saved so you can turn the list back on later.' }}
-            </span>
-          </div>
-
           <div class="custom-list-instruction">
             {{ t('custom_provider_list_instruction') || 'Drag rows to reorder, or move them with the arrow buttons.' }}
           </div>
 
           <div class="custom-list-add-row">
-            <select
+            <ProviderSelector
               v-model="customListAddSelection"
-              class="custom-list-add-select"
-              :aria-label="t('custom_provider_list_add_placeholder') || 'Add a provider…'"
-            >
-              <option value="">
-                {{ t('custom_provider_list_add_placeholder') || 'Add a provider…' }}
-              </option>
-              <option
-                v-for="candidate in customListAddCandidates"
-                :key="candidate.id"
-                :value="candidate.id"
-              >
-                {{ candidate.label }}
-              </option>
-            </select>
+              class="custom-list-add-picker"
+              mode="button"
+              :is-global="false"
+              selection-only
+              :exclude-ids="customListDraftIds"
+              menu-teleport-target="#CUSTOM_PROVIDER_LIST_DRAWER"
+            />
             <BaseButton
               class="custom-list-add-btn"
+              :class="{ 'custom-list-add-btn--pending': !customListAddSelection }"
               variant="primary"
               size="sm"
-              :disabled="!customListAddSelection"
+              :aria-disabled="!customListAddSelection || undefined"
               @click="addSelectedCustomProvider"
             >
               {{ t('custom_provider_list_add_btn') || 'Add' }}
@@ -456,11 +443,31 @@ const handleValidationFeedback = (e) => {
 // --- Custom Provider List drawer (staged draft like the Auto Page Rules drawer) ---
 const isCustomListDrawerOpen = ref(false)
 const customListDrawerRef = ref(null)
-const customListEnabledDraft = ref(false)
+const customListManageWrapperRef = ref(null)
 const customListDraftIds = ref([])
 const customListAddSelection = ref('')
 const isDraggingCustomListId = ref(null)
 const isDragOverIndex = ref(-1)
+
+// Enable toggle lives OUTSIDE the drawer and stages directly: Global Save
+// stays the only persistence writer; the disabled state never clears the
+// saved provider list.
+const customListEnabled = computed({
+  get: () => settingsStore.settings?.CUSTOM_PROVIDER_LIST_ENABLED === true,
+  set: (value) => {
+    settingsStore.updateSettingLocally('CUSTOM_PROVIDER_LIST_ENABLED', value)
+    if (value) return
+    // The Manage List button is leaving the accessibility tree; never strand
+    // focus in it or one of its descendants.
+    nextTick(() => {
+      if (isCustomListDrawerOpen.value) return
+      const wrapper = customListManageWrapperRef.value
+      if (!wrapper || !wrapper.contains(document.activeElement)) return
+      document.getElementById('CUSTOM_PROVIDER_LIST_ENABLED')?.querySelector('input')
+        ?.focus({ preventScroll: true })
+    })
+  }
+})
 
 // RTL check (same convention as OptionsApp/ActivationTab)
 const isRTL = computed(() => {
@@ -472,7 +479,9 @@ const isRTL = computed(() => {
 })
 
 // Add-source eligibility: supported registry metadata with the same debug
-// gating as the selectors, minus providers hidden from lists. Stored ids are
+// gating as the selectors, minus providers hidden from lists — the picker's
+// selection-only mode mirrors this, but Add re-verifies because registry
+// visibility can change while the teleported menu is open. Stored ids are
 // never dropped from the draft, even when they become ineligible — they are
 // displayed with their name (or raw id) and an "unavailable" tag until the
 // user removes them.
@@ -485,18 +494,9 @@ const isCustomProviderSelectable = (id) => {
 
 const resolveCustomProviderLabel = (id) => getProviderById(id)?.name || ''
 
-const customListAddCandidates = computed(() => {
-  const selected = new Set(customListDraftIds.value)
-  return getProvidersForDropdown(settingsStore.settings?.DEBUG_MODE || false)
-    .filter(provider => !selected.has(provider.id))
-    .filter(provider => isCustomProviderSelectable(provider.id))
-    .map(provider => ({ id: provider.id, label: provider.name }))
-})
-
 const openCustomListDrawer = () => {
   const settings = settingsStore.settings || {}
   const storedIds = Array.isArray(settings.CUSTOM_PROVIDER_LIST) ? settings.CUSTOM_PROVIDER_LIST : []
-  customListEnabledDraft.value = settings.CUSTOM_PROVIDER_LIST_ENABLED === true
   customListDraftIds.value = [...new Set(storedIds.filter(id => typeof id === 'string'))]
   customListAddSelection.value = ''
   isCustomListDrawerOpen.value = true
@@ -516,8 +516,9 @@ const closeCustomListDrawer = () => {
   nextTick(refocusCustomListManageButton)
 }
 
+// Draft semantics: staging IDs only — the enabled state is staged directly by
+// the row checkbox; Global Save persists both.
 const saveAndCloseCustomListDrawer = () => {
-  settingsStore.updateSettingLocally('CUSTOM_PROVIDER_LIST_ENABLED', customListEnabledDraft.value)
   settingsStore.updateSettingLocally('CUSTOM_PROVIDER_LIST', [...customListDraftIds.value])
   isCustomListDrawerOpen.value = false
   nextTick(refocusCustomListManageButton)
@@ -560,9 +561,15 @@ const moveCustomListEntry = (index, direction) => {
 
 const addSelectedCustomProvider = () => {
   const id = customListAddSelection.value
-  if (!id || customListDraftIds.value.includes(id)) return
+  if (!id) return
+  // Re-verify at Add time: registry eligibility and excluded ids may have
+  // changed while the teleported menu was open.
+  if (!isCustomProviderSelectable(id) || customListDraftIds.value.includes(id)) {
+    customListAddSelection.value = ''
+    return
+  }
   customListDraftIds.value.push(id)
-  // Back to the placeholder so the next choice is always explicit.
+  // Back to the empty selection so the next choice is always explicit.
   customListAddSelection.value = ''
 }
 
@@ -594,34 +601,76 @@ const onCustomListDragEnd = () => {
   isDragOverIndex.value = -1
 }
 
-// Keep Tab cycling inside this drawer (close button ⇄ list rows ⇄ Done).
-// Escape bypasses the trap and is handled by the window handler below.
+// Dialog-level Tab trap. The picker's menu is teleported INSIDE the dialog
+// element (menuTeleportTarget, outside the scrollable body), so focus may
+// legitimately sit in the menu subtree: Tab from the last menu control moves
+// to the drawer Add button, Shift+Tab from the first returns to the trigger,
+// and the close ⇄ rows ⇄ Done wrap is preserved (with an open menu, Tab from
+// Done flows natively into the trailing menu instead of wrapping).
+const CUSTOM_LIST_FOCUSABLE_SELECTOR =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 const handleCustomListKeydown = (e) => {
-  if (e.key !== 'Tab') return
+  if (e.defaultPrevented || e.key !== 'Tab') return
   const container = customListDrawerRef.value
   if (!container) return
-  const focusable = Array.from(container.querySelectorAll(
-    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-  ))
-  if (focusable.length === 0) return
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
+  // This picker's menu is identified through the trigger element's
+  // aria-controls target in the document.
+  const trigger = container.querySelector('[aria-controls]')
+  const menuEl = trigger ? document.getElementById(trigger.getAttribute('aria-controls')) : null
   const active = document.activeElement
-  const isOutside = !active || !container.contains(active)
-  if (e.shiftKey) {
-    if (active === first || isOutside) {
+  if (!active) return
+  const focusablesIn = (root) => Array.from(root.querySelectorAll(CUSTOM_LIST_FOCUSABLE_SELECTOR))
+
+  // Menu boundary: boundary-only handling, mid-menu Tab flows natively.
+  if (menuEl && menuEl.contains(active)) {
+    const menuFocusables = focusablesIn(menuEl)
+    if (!menuFocusables.length) return
+    if (!e.shiftKey && active === menuFocusables[menuFocusables.length - 1]) {
       e.preventDefault()
-      last.focus({ preventScroll: true })
+      container.querySelector('.custom-list-add-btn')?.focus({ preventScroll: true })
+    } else if (e.shiftKey && active === menuFocusables[0]) {
+      e.preventDefault()
+      trigger.focus({ preventScroll: true })
     }
-  } else if (active === last || isOutside) {
+    return
+  }
+
+  const drawerFocusables = focusablesIn(container).filter(
+    (el) => !menuEl || !menuEl.contains(el)
+  )
+  if (!drawerFocusables.length) return
+  const first = drawerFocusables[0]
+  const last = drawerFocusables[drawerFocusables.length - 1]
+
+  // Forward from the last drawer control: natural DOM order continues into a
+  // trailing open menu; with the menu closed it wraps to the close button.
+  // Reverse Tab from Done is NOT hijacked — the browser owns backward
+  // traversal from the last control.
+  if (!e.shiftKey && active === last) {
+    if (menuEl) return
     e.preventDefault()
     first.focus({ preventScroll: true })
+    return
+  }
+
+  // Shift+Tab from the first drawer control (or re-entry from outside) wraps
+  // to the true end of the cycle: the trailing menu's last control when open,
+  // the footer Done when closed. The event is consumed before the manual
+  // focus so the browser cannot move focus a second time.
+  if (e.shiftKey && (active === first || !container.contains(active))) {
+    e.preventDefault()
+    const lastOverall = (menuEl ? focusablesIn(menuEl).slice(-1)[0] : null) || last
+    lastOverall.focus({ preventScroll: true })
   }
 }
 
-// Escape discards this opening's draft without staging anything.
+// Escape discards this opening's draft without staging anything. A
+// defaultPrevented Escape belongs to the picker (selection-only Escape on the
+// trigger or teleported menu closes the menu first); the next unchanged
+// Escape then closes the drawer.
 const handleCustomListEscape = (e) => {
-  if (e.key !== 'Escape' || !isCustomListDrawerOpen.value) return
+  if (e.defaultPrevented || e.key !== 'Escape' || !isCustomListDrawerOpen.value) return
   closeCustomListDrawer()
 }
 
