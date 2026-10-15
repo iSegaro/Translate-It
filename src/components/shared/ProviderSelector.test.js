@@ -251,7 +251,7 @@ const providers = [
   icon: `providers/${provider.id}.svg`, supported: true, features: ['translation'], ...provider,
 }))
 
-const attachSelector = async (props = {}, { realTeleport = false, shadow = false, popupAncestor = false, rect } = {}) => {
+const attachSelector = async (props = {}, { realTeleport = false, shadow = false, popupAncestor = false, selectorClass, rect } = {}) => {
   const container = document.createElement('div')
   if (popupAncestor) container.classList.add('translation-view')
   document.body.appendChild(container)
@@ -270,7 +270,12 @@ const attachSelector = async (props = {}, { realTeleport = false, shadow = false
     extensionContext.isContentScript = true
   }
   const global = realTeleport || shadow ? {} : { stubs: { Teleport: true } }
-  const wrapper = mount(ProviderSelector, { props, attachTo: mountPoint, global })
+  const wrapper = mount(ProviderSelector, {
+    props,
+    attrs: selectorClass ? { class: selectorClass } : undefined,
+    attachTo: mountPoint,
+    global,
+  })
   const anchor = wrapper.element.querySelector('.ti-split-translate-button-container, .ti-provider-button-container, .ti-provider-icon-only-container, .ti-provider-mobile-container')
   if (anchor) {
     vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
@@ -612,6 +617,7 @@ describe('ProviderSelector provider list contract', () => {
       await wrapper.find('.ti-provider-dropdown-area').trigger('click')
       const menu = document.body.querySelector('.ti-provider-dropdown-menu')
       expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(true)
+      expect(menu.style.width).toBe('245px')
       expect(menu.textContent).toContain(longName)
       expect(menu.querySelector('.ti-set-default-btn')).toBeTruthy()
       expect(menu.querySelectorAll('.ti-sync-row')).toHaveLength(2)
@@ -669,6 +675,93 @@ describe('ProviderSelector provider list contract', () => {
       document.documentElement.dir = previousDir
       if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor)
       else delete window.innerWidth
+    }
+  })
+
+  it.each([
+    { label: 'LTR narrow', width: 280, dir: 'ltr', rect: { left: 220, right: 260, width: 40 } },
+    { label: 'RTL narrow', width: 280, dir: 'rtl', rect: { left: 20, right: 60, width: 40 } },
+    { label: 'LTR wide', width: 520, dir: 'ltr', rect: { left: 460, right: 500, width: 40 } },
+    { label: 'RTL wide', width: 520, dir: 'rtl', rect: { left: 20, right: 60, width: 40 } },
+  ])('clamps the Sidepanel menu in $label viewports', async ({ width, dir, rect }) => {
+    const widthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth')
+    const previousDir = document.documentElement.dir
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    document.documentElement.dir = dir
+    const { wrapper, container } = await attachSelector(
+      { mode: 'split', modelValue: 'googlev2' },
+      { realTeleport: true, selectorClass: 'ti-sidepanel-split-selector', rect },
+    )
+    try {
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.classList.contains('ti-provider-dropdown-menu--sidepanel')).toBe(true)
+      const menuWidth = Math.min(245, width - 16)
+      expect(menu.style.width).toBe(`${menuWidth}px`)
+      const left = menu.style.left !== 'auto'
+        ? Number.parseFloat(menu.style.left)
+        : width - Number.parseFloat(menu.style.right) - menuWidth
+      expect(left).toBeGreaterThanOrEqual(8)
+      expect(left + menuWidth).toBeLessThanOrEqual(width - 8)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      document.documentElement.dir = previousDir
+      if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor)
+      else delete window.innerWidth
+    }
+  })
+
+  it('keeps long provider names, stars, sync rows, and Configure Providers in the Sidepanel menu', async () => {
+    const longName = 'A deliberately long Sidepanel provider name that should remain available'
+    registry.providers[1].name = longName
+    const { wrapper, container } = await attachSelector({
+      mode: 'split', modelValue: 'googlev2', isGlobal: false, allowSetDefault: true, showSync: true,
+    }, { realTeleport: true, selectorClass: 'ti-sidepanel-split-selector' })
+    try {
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.classList.contains('ti-provider-dropdown-menu--sidepanel')).toBe(true)
+      expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(false)
+      expect(menu.textContent).toContain(longName)
+      expect(menu.querySelectorAll('.ti-set-default-btn')).toHaveLength(6)
+      expect(menu.querySelectorAll('.ti-sync-row')).toHaveLength(2)
+      expect(menu.querySelector('.ti-configure-row')).toBeTruthy()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('does not apply Sidepanel sizing to Popup, PDF compact-label, Options, Subtitle, mobile, or Floating Window menus', async () => {
+    const consumers = [
+      { mode: 'split', props: { presentation: 'compact-label' } },
+      { mode: 'button' },
+      { mode: 'mobile' },
+      { mode: 'icon-only', selectorClass: 'ti-window-provider-selector' },
+      { mode: 'split', popupAncestor: true, popup: true },
+    ]
+    for (const { mode, props = {}, selectorClass, popupAncestor, popup = false } of consumers) {
+      const { wrapper, container } = await attachSelector(
+        { mode, modelValue: 'googlev2', ...props },
+        { realTeleport: true, selectorClass, popupAncestor },
+      )
+      try {
+        await wrapper.find({
+          split: '.ti-provider-dropdown-area',
+          button: '.ti-provider-button',
+          mobile: '.ti-provider-mobile-button',
+          'icon-only': '.ti-provider-icon-button',
+        }[mode]).trigger('click')
+        const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+        expect(menu.classList.contains('ti-provider-dropdown-menu--sidepanel')).toBe(false)
+        expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(popup)
+        if (popup) expect(menu.style.width).toBe('245px')
+        else expect(menu.style.width).not.toBe('245px')
+      } finally {
+        wrapper.unmount()
+        container.remove()
+      }
     }
   })
 

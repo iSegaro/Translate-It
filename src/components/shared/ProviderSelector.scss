@@ -290,8 +290,11 @@ img.ti-dropdown-arrow,
   }
 }
 
-/* Popup Text menu uses a fixed width budget, viewport-bounded on both axes. */
-.ti-provider-dropdown-menu--popup {
+/* Popup Text view and Sidepanel split share a fixed width budget,
+   viewport-bounded on both axes (the menus teleport to body, so the
+   `--popup`/`--sidepanel` classes on the teleported root carry the look). */
+.ti-provider-dropdown-menu--popup,
+.ti-provider-dropdown-menu--sidepanel {
   box-sizing: border-box !important;
   min-width: 0 !important;
   width: 245px !important;
@@ -683,19 +686,6 @@ img.ti-dropdown-arrow,
     left: 0 !important;
     right: 0 !important;
     max-width: none !important;
-  }
-}
-
-/* Specific centering for Sidepanel split selector to avoid edge overflow */
-.ti-sidepanel-split-selector {
-  &.ti-split-translate-button-container .ti-provider-dropdown-menu {
-    left: 50% !important;
-    right: auto !important;
-    inset-inline-start: auto !important;
-    inset-inline-end: auto !important;
-    transform: translateX(-50%) !important;
-    width: max-content !important;
-    min-width: 190px !important;
   }
 }
 

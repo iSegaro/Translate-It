@@ -63,10 +63,10 @@ describe('ProviderSelector.scss dead Popup override', () => {
   })
 })
 
-describe('ProviderSelector.scss Popup Text menu sizing', () => {
-  it('compiles a popup-only 245px width bounded by the viewport with a narrow-safe minimum', () => {
+describe('ProviderSelector.scss Popup and Sidepanel menu sizing', () => {
+  it('compiles shared Popup Text and Sidepanel 245px sizing with a narrow-safe minimum', () => {
     const { css } = compile()
-    const popupRule = css.match(/\.ti-provider-dropdown-menu--popup\s*\{[^}]*\}/)?.[0]
+    const popupRule = css.match(/\.ti-provider-dropdown-menu--popup\s*,\s*\.ti-provider-dropdown-menu--sidepanel\s*\{[^}]*\}/)?.[0]
 
     expect(popupRule).toBeTruthy()
     expect(popupRule).toMatch(/width:\s*(?:245px|min\(245px,\s*calc\(100vw\s*-\s*16px\)\))/)

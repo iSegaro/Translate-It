@@ -243,10 +243,11 @@
       :id="menuId"
       ref="dropdownMenuElRef"
       class="ti-provider-dropdown-menu"
-      :class="{ 
+      :class="{
         'ti-open-upward': isUpward,
         'ti-is-teleported': isTeleportEnabled,
-        'ti-provider-dropdown-menu--popup': isPopupTextContext
+        'ti-provider-dropdown-menu--popup': isPopupTextContext,
+        'ti-provider-dropdown-menu--sidepanel': isSidepanelSplitContext
       }"
       :style="dropdownStyles"
       @click.stop
@@ -553,6 +554,16 @@ const isProviderSelectionDisabled = computed(() => props.disabled || props.dropd
  * reach it, hence the explicit menu-root class used with this detection.
  */
 const isPopupTextContext = computed(() => !!selectorRef.value?.closest?.('.translation-view'))
+
+/**
+ * Sidepanel split detection: `ti-sidepanel-split-selector` is carried by this
+ * component's own split container (wide and narrow Sidepanel layouts; the
+ * toolbar icon-only selector does not carry it). Shares the popup viewport
+ * budget sizing/positioning branch; the teleported menu gets a dedicated
+ * `--sidepanel` marking class so ancestor CSS cannot be relied on.
+ */
+const isSidepanelSplitContext = computed(() =>
+  props.mode === 'split' && !!selectorRef.value?.classList?.contains('ti-sidepanel-split-selector'))
 
 /**
  * Computed property to identify the current global default provider
@@ -1233,10 +1244,11 @@ const updateDropdownPosition = () => {
       styles.insetInlineStart = `${rect.right + 10}px !important`;
       styles.top = `${rect.top}px !important`;
       styles.bottom = 'auto !important';
-    } else if (isPopupTextContext.value) {
-      // Popup Text view: fixed budget width (user-approved ~245px), clamped
-      // to the viewport with 8px gutters; left/right anchored to the trigger
-      // edge and clamped again so the bounded width never leaves the viewport.
+    } else if (isPopupTextContext.value || isSidepanelSplitContext.value) {
+      // Popup Text view and Sidepanel split: fixed budget width (user-approved
+      // ~245px), clamped to the viewport with 8px gutters; left/right anchored
+      // to the trigger edge and clamped again so the bounded width never
+      // leaves the viewport (LTR and RTL).
       const popupWidth = Math.min(POPUP_MENU_WIDTH, window.innerWidth - 16)
       styles.width = `${popupWidth}px !important`;
       styles.minWidth = '0 !important';
