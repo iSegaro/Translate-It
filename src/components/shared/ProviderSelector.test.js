@@ -50,6 +50,7 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
         provider_category_free: 'Traditional',
         provider_category_ai: 'AI',
         provider_category_local: 'Local',
+        provider_category_custom: 'Custom List',
         configure_providers: 'Configure Providers',
       }
       if (labels[key]) return labels[key]
@@ -72,7 +73,7 @@ vi.mock('@/features/translation/composables/useTranslationModes.js', () => ({
 }))
 
 vi.mock('@/core/provider-registry.js', () => ({
-  getProvidersForDropdown: (debugMode) => registry.providers.filter((provider) => provider.id !== 'mock' || debugMode),
+  getProvidersForDropdown: (debugMode) => registry.providers.filter((provider) => provider.supported !== false && (provider.id !== 'mock' || debugMode)),
   getProviderById: (id) => registry.providers.find((provider) => provider.id === id),
 }))
 
@@ -383,7 +384,10 @@ const stubAnimationFrames = () => {
 describe('ProviderSelector provider list contract', () => {
   beforeEach(() => {
     registry.providers = providers.map((provider) => ({ ...provider }))
-    Object.assign(settingsStore.settings, { TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [] })
+    Object.assign(settingsStore.settings, {
+      TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [],
+      CUSTOM_PROVIDER_LIST_ENABLED: false, CUSTOM_PROVIDER_LIST: [],
+    })
     settingsStore.updateSettingAndPersist.mockReset()
     openOptionsPage.mockReset()
     Object.assign(translationStore.ephemeralSync, { page: false, element: false })
@@ -476,6 +480,164 @@ describe('ProviderSelector provider list contract', () => {
     } finally {
       singleCategory.wrapper.unmount()
       singleCategory.container.remove()
+    }
+  })
+
+  it('preserves manifest ordering and flat grouping when the custom list is disabled', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+      expect(wrapper.find('.ti-provider-dropdown-menu').text()).not.toContain('Custom List')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('puts configured eligible providers first, then groups the remaining providers using the full-list threshold', async () => {
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: true, CUSTOM_PROVIDER_LIST: ['gemini', 'googlev2', 'gemini'] })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2', allowDefault: true })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = wrapper.find('.ti-provider-dropdown-menu')
+      expect(Array.from(menu.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List', 'Traditional', 'AI', 'Local'])
+      expect(menu.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Default', 'Gemini', 'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Browser',
+      ])
+      expect(new Set(menu.findAll('.ti-dropdown-item-btn').map(button => button.text())).size).toBe(7)
+      expect(menu.findAll('.ti-dropdown-item').map(item => item.text().trim()).filter(name => name === 'Gemini')).toHaveLength(1)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('renders each provider ID only once when the configured list contains duplicates', async () => {
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: true, CUSTOM_PROVIDER_LIST: ['gemini', 'googlev2', 'gemini'] })
+    const { wrapper, container } = await attachSelector({ mode: 'compact', modelValue: 'googlev2' })
+    try {
+      const ids = Array.from(wrapper.find('select').element.options, option => option.value)
+      expect(ids).toHaveLength(6)
+      expect(new Set(ids).size).toBe(ids.length)
+      expect(ids.slice(0, 2)).toEqual(['gemini', 'googlev2'])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('keeps a short custom group visible and applies eligibility filters before splitting', async () => {
+    Object.assign(settingsStore.settings, {
+      CUSTOM_PROVIDER_LIST_ENABLED: true,
+      CUSTOM_PROVIDER_LIST: ['deepl', 'googlev2', 'mock', 'unconfigured', 'browser'],
+      HIDDEN_PROVIDERS: ['deepl'],
+    })
+    registry.providers.push({ id: 'mock', name: 'Mock', category: 'local', icon: 'mock.svg', supported: true, features: ['translation'] })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'deepl', onlyConfigured: true })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = wrapper.find('.ti-provider-dropdown-menu')
+      expect(Array.from(menu.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List'])
+      expect(menu.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'DeepL', 'Google', 'Browser', 'OpenAI', 'Gemini',
+      ])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('does not create an empty custom group and exposes the same order to compact options and keyboard navigation', async () => {
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: true, CUSTOM_PROVIDER_LIST: ['mock', 'missing', 'default'] })
+    const compact = await attachSelector({ mode: 'compact', modelValue: 'googlev2', allowDefault: true })
+    try {
+      expect(Array.from(compact.wrapper.find('select').element.options, option => option.value)).toEqual([
+        'default', 'googlev2', 'deepl', 'unconfigured', 'openai', 'gemini', 'browser',
+      ])
+    } finally {
+      compact.wrapper.unmount()
+      compact.container.remove()
+    }
+
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST: ['gemini', 'googlev2'] })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Gemini', 'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Browser',
+      ])
+      const keyOnFocusedControl = async (key) => {
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+        await wrapper.vm.$nextTick()
+      }
+      await keyOnFocusedControl('ArrowDown')
+      await keyOnFocusedControl('Enter')
+      expect(wrapper.emitted('provider-change')).toEqual([['googlev2']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('retains category grouping when custom selection removes a category and orders active compact options', async () => {
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: true, CUSTOM_PROVIDER_LIST: ['openai', 'gemini'] })
+    const compact = await attachSelector({ mode: 'compact', modelValue: 'googlev2' })
+    try {
+      const select = compact.wrapper.find('select').element
+      expect(Array.from(select.options, option => option.value)).toEqual([
+        'openai', 'gemini', 'googlev2', 'deepl', 'unconfigured', 'browser',
+      ])
+      expect(Array.from(select.children, child => child.label)).toEqual(['Custom List', 'Traditional', 'Local'])
+    } finally {
+      compact.wrapper.unmount()
+      compact.container.remove()
+    }
+
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(Array.from(wrapper.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List', 'Traditional', 'Local'])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('ignores a malformed imported provider list without breaking the menu', async () => {
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: true, CUSTOM_PROVIDER_LIST: {} })
+    const { wrapper, container } = await attachSelector({ mode: 'compact', modelValue: 'googlev2' })
+    try {
+      expect(Array.from(wrapper.find('select').element.options, option => option.value)).toEqual([
+        'googlev2', 'deepl', 'unconfigured', 'openai', 'gemini', 'browser',
+      ])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('keeps configured IDs while unsupported and feature-ineligible providers are absent, then restores eligible IDs', async () => {
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: true, CUSTOM_PROVIDER_LIST: ['unsupported', 'bulk-only'] })
+    registry.providers.push(
+      { id: 'unsupported', name: 'Unsupported', category: 'ai', icon: 'unsupported.svg', supported: false, features: ['translation'] },
+      { id: 'bulk-only', name: 'Bulk Only', category: 'local', icon: 'bulk.svg', supported: true, features: ['bulk'] },
+    )
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2', requiredFeature: 'translation' })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      expect(wrapper.findAll('.ti-dropdown-item').map(item => item.text().trim())).not.toContain('Unsupported')
+      expect(wrapper.findAll('.ti-dropdown-item').map(item => item.text().trim())).not.toContain('Bulk Only')
+      expect(settingsStore.settings.CUSTOM_PROVIDER_LIST).toEqual(['unsupported', 'bulk-only'])
+
+      await wrapper.setProps({ requiredFeature: 'bulk' })
+      expect(wrapper.findAll('.ti-dropdown-item').map(item => item.text().trim())).toContain('Bulk Only')
+      expect(wrapper.findAll('.ti-dropdown-group-header').map(header => header.text())).toContain('Custom List')
+    } finally {
+      wrapper.unmount()
+      container.remove()
     }
   })
 

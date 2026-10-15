@@ -26,6 +26,10 @@ describe('Settings Migrations', () => {
     const persistedDefaults = getPersistedDefaultSettings();
     expect(updates.APPLICATION_LOCALIZE).toBe(persistedDefaults.APPLICATION_LOCALIZE);
     expect(logs).toContain('Added missing setting: APPLICATION_LOCALIZE');
+    expect(updates.CUSTOM_PROVIDER_LIST_ENABLED).toBe(false);
+    expect(updates.CUSTOM_PROVIDER_LIST).toEqual([]);
+    expect(logs).toContain('Added missing setting: CUSTOM_PROVIDER_LIST_ENABLED');
+    expect(logs).toContain('Added missing setting: CUSTOM_PROVIDER_LIST');
     expect(updates.TIMEOUT).toBe(CONFIG.TIMEOUT);
     expect(updates.TEXT_FIELD_SHORTCUT).toBe(CONFIG.TEXT_FIELD_SHORTCUT);
     expect(updates.translationHistory).toBeUndefined();

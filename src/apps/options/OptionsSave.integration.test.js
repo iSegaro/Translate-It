@@ -5,6 +5,7 @@ import { ref, nextTick } from 'vue';
 import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import PromptTab from './tabs/PromptTab.vue';
 import TTSTab from './tabs/TTSTab.vue';
+import ProvidersTab from './tabs/ProvidersTab.vue';
 import OptionsNavigation from '@/components/layout/OptionsNavigation.vue';
 
 /**
@@ -120,6 +121,12 @@ vi.mock('vue-router', () => ({
     name: 'prompt',
     query: {}
   })
+}));
+
+// ProvidersTab's own dropdown is unrelated to the custom list drawer here;
+// the drawer flow uses native elements and the base components stay real.
+vi.mock('@/components/shared/ProviderSelector.vue', () => ({
+  default: { name: 'ProviderSelector', template: '<div />' }
 }));
 
 // Background notification boundary for the Global Save flow.
@@ -367,7 +374,50 @@ describe('Options save integration (store + tabs + Global Save)', () => {
     expect(reloadedTts.find('.voice-select-dropdown').element.value).toBe('en-US-AriaNeural');
   });
 
-  it('(6) save in flight survives unmount: write started before resolve, visible after reload', async () => {
+  it('(6) Providers custom list drawer stages both keys with zero writes; Save persists; reload restores', async () => {
+    const store = await freshStore();
+    const tab = mountTab(ProvidersTab);
+    const nav = mountTab(OptionsNavigation);
+
+    await tab.find('#CUSTOM_PROVIDER_LIST_MANAGE_BTN').trigger('click');
+    await flushPromises();
+
+    const drawer = tab.get('#CUSTOM_PROVIDER_LIST_DRAWER');
+    expect(drawer.attributes('role')).toBe('dialog');
+
+    // Stage: enable the list and add two providers.
+    await drawer.find('#CUSTOM_PROVIDER_LIST_ENABLED input').setValue(true);
+    await drawer.get('.custom-list-add-select').setValue('deepl');
+    await drawer.get('.custom-list-add-btn').trigger('click');
+    await drawer.get('.custom-list-add-select').setValue('openai');
+    await drawer.get('.custom-list-add-btn').trigger('click');
+
+    // Staged locally, nothing written to the browser boundary.
+    expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
+    expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(false);
+
+    await drawer.get('.custom-list-drawer-footer button').trigger('click');
+    await flushPromises();
+    expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(store.settings.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
+
+    await clickGlobalSave(nav);
+    expect(saveStatusClass(nav)).toContain('status-success');
+    expect(fakeBrowserStorage.data.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(fakeBrowserStorage.data.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
+
+    const reloadedStore = await reloadStore();
+    expect(reloadedStore.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+    expect(reloadedStore.settings.CUSTOM_PROVIDER_LIST).toEqual(['deepl', 'openai']);
+    const reloadedTab = mountTab(ProvidersTab);
+    await reloadedTab.find('#CUSTOM_PROVIDER_LIST_MANAGE_BTN').trigger('click');
+    await flushPromises();
+    const reloadedDrawer = reloadedTab.get('#CUSTOM_PROVIDER_LIST_DRAWER');
+    expect(reloadedDrawer.find('#CUSTOM_PROVIDER_LIST_ENABLED input').element.checked).toBe(true);
+    expect(reloadedDrawer.findAll('.custom-list-entry')).toHaveLength(2);
+  });
+
+  it('(7) save in flight survives unmount: write started before resolve, visible after reload', async () => {
     await freshStore();
     const tab = mountTab(PromptTab);
     const nav = mountTab(OptionsNavigation);

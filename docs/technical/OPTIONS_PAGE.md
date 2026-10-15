@@ -21,6 +21,7 @@ These settings use the `updateSettingAndPersist` method in the `settings` store,
 Most other configurations are buffered in the local state and require the user to explicitly click **"Save"** to be permanently applied and synchronized across tabs. The action stays at the bottom of the navigation on desktop, beside the scrollable navigation on tablet, and in a bottom action bar on mobile.
 
 - **Translation Providers**: API keys, model selections, and provider-specific URLs.
+- **Custom Provider List**: The Providers tab's Manage List drawer stages its enabled state and ordered provider IDs when Done is pressed. Closing the drawer without Done discards that opening's edits; the main Save button persists staged changes. Disabling the list preserves its saved order for later use.
 - **Languages**: Source and Target language preferences.
 - **Activation Modes**: Enabling/disabling Select Element, Text Selection, or Whole Page translation.
 - **Advanced Settings**: Proxy configurations, exclusion lists, and debug mode.
@@ -50,6 +51,7 @@ The configuration is divided into logical tabs:
 - **Appearance**: Theme, font family, and font size settings.
 - **Activation**: Toggle specific features (Select Element, Page Translation, etc.).
 - **Providers**: Detailed configuration for each API (Gemini, OpenAI, etc.).
+- **Custom Provider List**: An optional Providers-tab drawer places chosen providers in a user-defined order ahead of the remaining providers in the selector. Remaining providers retain the existing category-grouping rules. The selector still applies its existing visibility, configuration, feature, debug, and support filters; temporarily ineligible IDs remain saved for when they become eligible again. This changes display order only, not provider selection or translation routing.
 - **Prompt**: Custom AI prompt templates.
 - **Advance**: Exclusion sites, Proxy settings, and Debug mode.
 - **Import/Export**: Backup and restore settings via JSON.

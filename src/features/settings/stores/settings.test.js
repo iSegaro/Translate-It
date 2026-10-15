@@ -175,6 +175,67 @@ describe('Settings Store', () => {
     });
   });
 
+  describe('custom provider list settings', () => {
+    it('persists custom provider list settings through Save', async () => {
+      const store = useSettingsStore();
+      store.updateSettingLocally('CUSTOM_PROVIDER_LIST_ENABLED', true);
+      store.updateSettingLocally('CUSTOM_PROVIDER_LIST', ['openai', 'gemini']);
+
+      await store.saveAllSettings();
+
+      expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining({
+        CUSTOM_PROVIDER_LIST_ENABLED: true,
+        CUSTOM_PROVIDER_LIST: ['openai', 'gemini']
+      }));
+    });
+
+    it('syncs cross-context updates and preserves existing dirty drafts', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      store.updateSettingLocally('OPENAI_API_KEY', 'draft-key');
+
+      onChange({ key: 'CUSTOM_PROVIDER_LIST_ENABLED', newValue: true, oldValue: false });
+      onChange({
+        key: 'CUSTOM_PROVIDER_LIST',
+        newValue: ['gemini', 'openai'],
+        oldValue: []
+      });
+      onChange({ key: 'OPENAI_API_KEY', newValue: 'external-key', oldValue: '' });
+
+      expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+      expect(store.settings.CUSTOM_PROVIDER_LIST).toEqual(['gemini', 'openai']);
+      expect(store.settings.OPENAI_API_KEY).toBe('draft-key');
+    });
+
+    it('includes custom provider list settings in export and imports them', async () => {
+      const exportedSettings = {
+        CUSTOM_PROVIDER_LIST_ENABLED: true,
+        CUSTOM_PROVIDER_LIST: ['openai', 'gemini']
+      };
+      secureStorage.prepareForExport.mockResolvedValueOnce(exportedSettings);
+      const store = useSettingsStore();
+      store.settings.CUSTOM_PROVIDER_LIST_ENABLED = true;
+      store.settings.CUSTOM_PROVIDER_LIST = ['openai', 'gemini'];
+
+      const exported = await store.exportSettings();
+      expect(exported).toMatchObject(exportedSettings);
+      expect(secureStorage.prepareForExport).toHaveBeenCalledWith(
+        expect.objectContaining(exportedSettings),
+        ''
+      );
+
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        ...exportedSettings
+      });
+      await store.importSettings({ _exported: true, ...exportedSettings });
+
+      expect(store.settings.CUSTOM_PROVIDER_LIST_ENABLED).toBe(true);
+      expect(store.settings.CUSTOM_PROVIDER_LIST).toEqual(['openai', 'gemini']);
+      expect(storageManager.set).toHaveBeenCalledWith(expect.objectContaining(exportedSettings));
+    });
+  });
+
   describe('provider model draft reconciliation', () => {
     it('protects each dirty provider group while clean provider groups sync independently', async () => {
       const store = useSettingsStore();

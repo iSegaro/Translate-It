@@ -904,20 +904,45 @@ const CATEGORY_LABEL_KEYS = {
   ai: 'provider_category_ai',
   local: 'provider_category_local'
 }
+const CUSTOM_CATEGORY_KEY = 'custom-list'
 
 const groupedMenu = computed(() => {
   const all = availableProviders.value
   const hasDefault = props.allowDefault && all.length > 0 && all[0].id === 'default'
-  const real = hasDefault ? all.slice(1) : all
+  const fullReal = hasDefault ? all.slice(1) : all
+
+  const settings = settingsStore.settings
+  const customListEnabled = settings?.CUSTOM_PROVIDER_LIST_ENABLED === true
+  const configuredIds = Array.isArray(settings?.CUSTOM_PROVIDER_LIST) ? settings.CUSTOM_PROVIDER_LIST : []
+  const eligibleIds = new Set(fullReal.map(provider => provider.id))
+  const customIds = customListEnabled
+    ? [...new Set(configuredIds)].filter(id => id !== 'default' && eligibleIds.has(id))
+    : []
+  const customIdSet = new Set(customIds)
+  const custom = customIds.map(id => fullReal.find(provider => provider.id === id))
+  const real = customIds.length ? fullReal.filter(provider => !customIdSet.has(provider.id)) : fullReal
 
   const normalized = real.map(provider => ({
     ...provider,
     categoryKey: String(provider.category || '').trim().toLowerCase()
   }))
-  const categorySet = new Set(normalized.map(provider => provider.categoryKey).filter(Boolean))
-  const useGroups = real.length >= 6 && categorySet.size >= 2
+  const categorySet = new Set(fullReal.map(provider => String(provider.category || '').trim().toLowerCase()).filter(Boolean))
+  const useGroups = fullReal.length >= 6 && categorySet.size >= 2
 
   if (!useGroups) {
+    if (customIds.length) {
+      const entries = []
+      if (hasDefault) entries.push({ key: 'default', header: '', items: [all[0]] })
+      entries.push({ key: CUSTOM_CATEGORY_KEY, header: t('provider_category_custom') || 'Custom List', items: custom })
+      if (real.length) entries.push({ key: 'remaining', header: '', items: real })
+      let cursor = 0
+      return entries.map((entry, groupIndex) => ({
+        key: `${entry.key}-${groupIndex}`,
+        header: entry.header,
+        headerId: entry.header ? `${dropdownUid}-group-${groupIndex}` : '',
+        items: entry.items.map(provider => ({ ...provider, index: cursor++ }))
+      }))
+    }
     const items = all.map((provider, index) => ({ ...provider, index }))
     return [{ key: 'flat', header: '', headerId: '', items }]
   }
@@ -941,6 +966,9 @@ const groupedMenu = computed(() => {
   const entries = []
   if (hasDefault) {
     entries.push({ key: 'default', header: '', items: [all[0]] })
+  }
+  if (customIds.length) {
+    entries.push({ key: CUSTOM_CATEGORY_KEY, header: t('provider_category_custom') || 'Custom List', items: custom })
   }
   for (const categoryKey of order) {
     const items = buckets.get(categoryKey)

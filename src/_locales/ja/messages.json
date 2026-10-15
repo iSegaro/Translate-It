@@ -125,6 +125,54 @@
   "provider_category_local": {
     "message": "ローカル"
   },
+  "provider_category_custom": {
+    "message": "カスタムリスト"
+  },
+  "custom_provider_list_label": {
+    "message": "カスタムプロバイダーリスト"
+  },
+  "custom_provider_list_description": {
+    "message": "カスタムリストのカテゴリにまとめて表示するプロバイダーを選択します。"
+  },
+  "custom_provider_list_manage_btn": {
+    "message": "リストの管理"
+  },
+  "custom_provider_list_group_label": {
+    "message": "カスタムプロバイダーリスト"
+  },
+  "custom_provider_list_enable_label": {
+    "message": "カスタムリストを有効化"
+  },
+  "custom_provider_list_enable_description": {
+    "message": "オフにしても選択したプロバイダーは保存され、後でリストを再び有効にできます。"
+  },
+  "custom_provider_list_instruction": {
+    "message": "行をドラッグして並べ替えるか、矢印ボタンで移動します。"
+  },
+  "custom_provider_list_add_placeholder": {
+    "message": "プロバイダーを追加…"
+  },
+  "custom_provider_list_add_btn": {
+    "message": "追加"
+  },
+  "custom_provider_list_empty": {
+    "message": "まだプロバイダーは追加されていません。"
+  },
+  "custom_provider_list_unavailable_tag": {
+    "message": "現在利用できません"
+  },
+  "custom_provider_list_move_up_label": {
+    "message": "上へ移動"
+  },
+  "custom_provider_list_move_down_label": {
+    "message": "下へ移動"
+  },
+  "custom_provider_list_remove_label": {
+    "message": "リストから削除"
+  },
+  "custom_provider_list_done_btn": {
+    "message": "完了"
+  },
   "configure_providers": {
     "message": "翻訳プロバイダーの設定"
   },

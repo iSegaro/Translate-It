@@ -70,6 +70,8 @@ export const CONFIG = {
   // --- Core Settings ---
   DEBUG_MODE: false,
   HIDDEN_PROVIDERS: [],
+  CUSTOM_PROVIDER_LIST_ENABLED: false,
+  CUSTOM_PROVIDER_LIST: [],
   COMPONENT_LOG_LEVELS: {}, // Custom log levels per component
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",

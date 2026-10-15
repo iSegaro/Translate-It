@@ -370,3 +370,431 @@
     }
   }
 }
+
+// --- Custom Provider List row -------------------------------------------------
+// Namespaced (custom-list-*) on purpose: ActivationTab.scss / TTSTab.scss
+// publish global .drawer-* / .setting-row classes once visited, so reusing
+// those names here would inherit unrelated !important rules cross-tab.
+.custom-provider-list-row {
+  margin-top: $spacing-lg;
+  width: 100%;
+  box-sizing: border-box;
+
+  .custom-list-row-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: $spacing-md;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .custom-list-row-info {
+    flex: 1 1 240px;
+    min-width: 0;
+  }
+
+  .custom-list-row-label {
+    display: block;
+    font-weight: 500;
+    color: var(--color-text);
+    margin-bottom: 2px;
+  }
+
+  .custom-list-row-desc {
+    display: block;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    line-height: 1.5;
+    max-width: var(--input-max-width, 100%);
+  }
+
+  .custom-list-row-control {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .manage-list-button {
+    min-width: 140px;
+    height: 34px;
+    padding: 6px $spacing-md;
+    border: 1px solid var(--color-border);
+    border-radius: $border-radius-base;
+    background-color: var(--color-background-hover, var(--color-surface));
+    color: var(--color-text);
+    font-size: $font-size-sm;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color $transition-fast, background-color $transition-fast;
+
+    &:hover:not(:disabled) {
+      border-color: var(--color-text-secondary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 1px;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// --- Custom Provider List slide-out drawer ------------------------------------
+.providers-tab {
+  .custom-list-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 1040;
+  }
+
+  .custom-list-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    width: 480px;
+    max-width: 90vw;
+    height: 100vh;
+    background-color: var(--color-background);
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-border);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+
+    // RTL mirror (same layout flip as ActivationTab drawers)
+    &.rtl {
+      right: auto;
+      left: 0;
+      border-left: none;
+      border-right: 1px solid var(--color-border);
+      box-shadow: 8px 0 30px rgba(0, 0, 0, 0.15);
+
+      .custom-list-close-btn {
+        margin-right: auto;
+        margin-left: 0;
+      }
+
+      .custom-list-add-row {
+        flex-direction: row-reverse;
+      }
+    }
+  }
+
+  .custom-list-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-lg;
+    border-bottom: 1px solid var(--color-border);
+
+    h3 {
+      margin: 0;
+      font-size: $font-size-lg;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .custom-list-close-btn {
+      background: none;
+      border: none;
+      font-size: $font-size-lg;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      padding: $spacing-xs;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: $border-radius-full;
+      width: 32px;
+      height: 32px;
+      transition: background-color $transition-fast, color $transition-fast;
+
+      &:hover {
+        background-color: var(--color-background-hover);
+        color: var(--color-text);
+      }
+    }
+  }
+
+  .custom-list-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: $spacing-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-md;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: $border-radius-full;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--color-text-secondary);
+    }
+  }
+
+  .custom-list-enable {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-xs;
+
+    .custom-list-drawer-desc {
+      color: var(--color-text-secondary);
+      font-size: $font-size-sm;
+      padding-inline-start: 24px;
+    }
+  }
+
+  .custom-list-instruction {
+    font-size: $font-size-xs;
+    color: var(--color-text-secondary);
+    padding: $spacing-sm $spacing-md;
+    background-color: var(--color-background-secondary, var(--color-surface));
+    border: 1px solid var(--color-border-light, var(--color-border));
+    border-radius: $border-radius-sm;
+  }
+
+  .custom-list-add-row {
+    display: flex;
+    gap: $spacing-sm;
+    align-items: center;
+    width: 100%;
+
+    .custom-list-add-select {
+      flex: 1;
+      height: 32px;
+      min-width: 0;
+      box-sizing: border-box;
+      padding: $spacing-xs $spacing-sm;
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-sm;
+      background-color: var(--color-background);
+      color: var(--color-text);
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+
+      &:focus {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 2px var(--color-primary-alpha);
+      }
+    }
+
+    .custom-list-add-btn {
+      height: 32px;
+      flex-shrink: 0;
+    }
+  }
+
+  .custom-list-empty {
+    padding: $spacing-md;
+    border: 1px dashed var(--color-border);
+    border-radius: $border-radius-sm;
+    color: var(--color-text-secondary);
+    font-size: $font-size-sm;
+    text-align: start;
+    overflow-wrap: anywhere;
+  }
+
+  .custom-list-entries {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .custom-list-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: $border-radius-sm;
+    background-color: var(--color-background-hover, var(--color-surface));
+    min-width: 0;
+    box-sizing: border-box;
+    cursor: grab;
+    transition: border-color $transition-fast, box-shadow $transition-fast, opacity $transition-fast;
+
+    &:hover {
+      border-color: var(--color-text-secondary);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    &.is-dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    &.is-drag-over {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px var(--color-primary-alpha);
+    }
+
+    .custom-list-grip {
+      flex: 0 0 auto;
+      color: var(--color-text-secondary);
+      font-size: 13px;
+      letter-spacing: -2px;
+      line-height: 1;
+      user-select: none;
+    }
+
+    .custom-list-entry-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 13px;
+      color: var(--color-text);
+      overflow-wrap: anywhere;
+
+      .custom-list-entry-raw {
+        font-family: var(--font-family-mono, monospace);
+        color: var(--color-text-secondary);
+      }
+    }
+
+    .custom-list-entry-tag {
+      flex: 0 0 auto;
+      font-size: $font-size-xs;
+      color: var(--color-text-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: $border-radius-full;
+      padding: 2px 8px;
+      white-space: nowrap;
+    }
+
+    .custom-list-entry-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+
+    button.custom-list-move-btn,
+    button.custom-list-remove-btn {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: none;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: $border-radius-full;
+      font-size: 14px;
+      padding: 0;
+      transition: background-color $transition-fast, color $transition-fast;
+
+      &:hover:not(:disabled) {
+        background-color: var(--color-background-hover);
+        color: var(--color-text);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+    }
+
+    button.custom-list-remove-btn:hover:not(:disabled) {
+      background-color: var(--color-error-alpha, rgba(211, 47, 47, 0.1));
+      color: var(--color-error, #d32f2f);
+    }
+  }
+
+  .custom-list-drawer-footer {
+    padding: $spacing-lg;
+    border-top: 1px solid var(--color-border);
+    // Single action aligned to the reading-direction end (right in LTR,
+    // left in RTL), like the FAB exclusions footer.
+    justify-content: flex-end;
+    align-items: center;
+    display: flex;
+    gap: $spacing-md;
+    background-color: var(--color-background);
+
+    .custom-list-drawer-footer-actions {
+      display: flex;
+      align-items: center;
+      gap: $spacing-md;
+    }
+  }
+
+  // Vue transition classes for the drawer
+  .custom-list-fade-enter-active,
+  .custom-list-fade-leave-active {
+    transition: opacity 0.25s ease-in-out;
+  }
+
+  .custom-list-fade-enter-from,
+  .custom-list-fade-leave-to {
+    opacity: 0;
+  }
+
+  .custom-list-slide-enter-active,
+  .custom-list-slide-leave-active {
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease;
+  }
+
+  .custom-list-slide-enter-from,
+  .custom-list-slide-leave-to {
+    transform: translateX(100%);
+    opacity: 0.95;
+
+    &.rtl {
+      transform: translateX(-100%);
+    }
+  }
+}
+
+// Drawer + row on tablet/mobile
+@media (max-width: 768px) {
+  .custom-list-drawer {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .custom-provider-list-row {
+    .custom-list-row-control {
+      width: 100%;
+      justify-content: stretch;
+    }
+
+    .manage-list-button {
+      width: 100%;
+    }
+  }
+}
