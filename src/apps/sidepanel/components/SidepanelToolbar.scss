@@ -70,6 +70,37 @@
     }
   }
 
+  .toolbar-button {
+    color: var(--color-text, var(--text-color)) !important;
+    cursor: pointer !important;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary, #1976d2) !important;
+      outline-offset: 1px !important;
+    }
+
+    &:disabled {
+      background-color: transparent !important;
+      cursor: not-allowed !important;
+      opacity: 0.5 !important;
+      transform: none !important;
+    }
+  }
+
+  .toolbar-button:hover:not(:disabled) .toolbar-mask-icon {
+    opacity: var(--icon-hover-opacity, 1) !important;
+  }
+
+  .toolbar-mask-icon {
+    color: inherit;
+    opacity: var(--icon-opacity, 0.8);
+    transition: opacity 0.2s ease;
+  }
+
+  .toolbar-button:disabled .toolbar-icon {
+    opacity: var(--icon-opacity, 0.8) !important;
+  }
+
   /* ---- Layout groups ---- */
   .toolbar-group,
   .toolbar-group-bottom {
@@ -121,10 +152,12 @@
     }
   }
 
-  /* Multicolor Subtitle icon (same as PDF pattern): keep brand colors —
+  /* Multicolor Subtitle/PDF icons keep their brand colors —
      the base/dark --icon-filter invert must never recolor it. */
   #subtitleBtn img,
-  #subtitleBtn .toolbar-icon {
+  #subtitleBtn .toolbar-icon,
+  #pdfBtn img,
+  #pdfBtn .toolbar-icon {
     filter: none !important;
     opacity: 1 !important;
   }
@@ -206,15 +239,17 @@
          Leave Provider and Page Translation colored
       */
       &#selectElementBtn img,
-      &#revertActionBtn img,
-      &#historyBtn img,
-      &#settingsBtn img {
+      &#revertActionBtn img {
         filter: brightness(0) invert(1) !important;
         opacity: 0.8 !important;
       }
 
       &:hover img {
         opacity: 1 !important;
+      }
+
+      &:disabled .toolbar-icon {
+        opacity: var(--icon-opacity, 0.8) !important;
       }
 
       /* Protect colored icons (Translate button) */

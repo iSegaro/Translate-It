@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { ref } from 'vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
 import SidepanelMainContent from './SidepanelMainContent.vue';
 import { TranslationMode } from '@/shared/config/config.js';
 
@@ -176,6 +177,60 @@ describe('SidepanelMainContent.vue', () => {
 
     expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('en');
     expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('fa');
+  });
+
+  it('keeps the accessible clear mask action in both 510px layout branches', async () => {
+    const previousResizeObserver = globalThis.ResizeObserver;
+    const previousOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+    let width = 510;
+    let wrapper;
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get: () => width,
+    });
+    globalThis.ResizeObserver = class {
+      observe() {}
+      disconnect() {}
+    };
+    vi.useFakeTimers();
+
+    try {
+      wrapper = mount(SidepanelMainContent, { props: { provider: '' } });
+      await vi.advanceTimersByTimeAsync(100);
+      const wideButton = wrapper.get('.inline-clear-btn');
+      const wideIcon = wideButton.findComponent(MaskIcon);
+      expect(wideButton.attributes('aria-label')).toBeTruthy();
+      expect(wideButton.attributes('aria-label')).toBe(wideButton.attributes('title'));
+      expect(wideIcon.classes()).toContain('clear-mask-icon');
+      expect(wideIcon.props('size')).toBe(16);
+      expect(wideIcon.attributes('aria-hidden')).toBe('true');
+      await wideButton.trigger('click');
+      expect(mockUnifiedTranslation.clearTranslation).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+
+      width = 509;
+      wrapper = mount(SidepanelMainContent, { props: { provider: '' } });
+      await vi.advanceTimersByTimeAsync(100);
+      const narrowButton = wrapper.get('.row-clear-btn');
+      const narrowIcon = narrowButton.findComponent(MaskIcon);
+      expect(narrowButton.attributes('aria-label')).toBeTruthy();
+      expect(narrowButton.attributes('aria-label')).toBe(narrowButton.attributes('title'));
+      expect(narrowIcon.classes()).toContain('clear-mask-icon');
+      expect(narrowIcon.props('size')).toBe(16);
+      expect(narrowIcon.attributes('aria-hidden')).toBe('true');
+      await narrowButton.trigger('click');
+      expect(mockUnifiedTranslation.clearTranslation).toHaveBeenCalledTimes(2);
+    } finally {
+      wrapper?.unmount();
+      vi.useRealTimers();
+      if (previousResizeObserver === undefined) delete globalThis.ResizeObserver;
+      else globalThis.ResizeObserver = previousResizeObserver;
+      if (previousOffsetWidth) {
+        Object.defineProperty(HTMLElement.prototype, 'offsetWidth', previousOffsetWidth);
+      } else {
+        delete HTMLElement.prototype.offsetWidth;
+      }
+    }
   });
 
   it('passes public action capabilities and existing callbacks to TranslationDisplay', async () => {

@@ -259,10 +259,28 @@
   /* ---- Icon button (Sidepanel-owned override) ---- */
   .ti-icon-button {
     @include ti-toolbar-button-minimal;
+    filter: none !important;
+    color: var(--color-text, var(--text-color)) !important;
+
+    &.inline-clear-btn:focus-visible,
+    &.row-clear-btn:focus-visible {
+      outline: 2px solid var(--color-primary, #1976d2) !important;
+      outline-offset: 1px !important;
+    }
 
     &:hover:not(:disabled) {
       background-color: var(--toolbar-link-hover-bg-color, rgba(0, 0, 0, 0.05)) !important;
     }
+  }
+
+  .ti-icon-button .clear-mask-icon {
+    color: inherit;
+    opacity: var(--icon-opacity, 0.8);
+    transition: opacity 0.2s ease;
+  }
+
+  .ti-icon-button:hover:not(:disabled) .clear-mask-icon {
+    opacity: 1;
   }
 
   /* ---- Translation form ---- */
@@ -345,16 +363,6 @@ body.sidepanel-context .ti-icon-button:hover .ti-toolbar-icon {
 
     &:hover:not(:disabled) {
       background-color: #424242 !important; /* Matches window header button hover */
-    }
-
-    /* 2. Force the icon to be PURE WHITE like TTS button */
-    .ti-toolbar-icon {
-      filter: brightness(0) invert(1) !important;
-      opacity: 0.9 !important;
-    }
-
-    &:hover .ti-toolbar-icon {
-      opacity: 1 !important;
     }
   }
 }

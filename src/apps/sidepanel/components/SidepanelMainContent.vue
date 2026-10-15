@@ -37,13 +37,14 @@
           <button
             class="ti-icon-button inline-clear-btn"
             :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
+            :aria-label="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
             @click="clearFields"
           >
-            <img
+            <MaskIcon
               :src="browser.runtime.getURL('icons/ui/clear.png')"
-              class="ti-toolbar-icon"
-              alt="Clear"
-            >
+              class="clear-mask-icon"
+              :size="16"
+            />
           </button>
           <ProviderSelector
             v-model="currentProviderLocal"
@@ -68,13 +69,14 @@
         <button
           class="ti-icon-button row-clear-btn"
           :title="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
+          :aria-label="t('SIDEPANEL_CLEAR_STORAGE_TITLE_ICON', 'Clear fields')"
           @click="clearFields"
         >
-          <img
+          <MaskIcon
             :src="browser.runtime.getURL('icons/ui/clear.png')"
-            class="ti-toolbar-icon"
-            alt="Clear"
-          >
+            class="clear-mask-icon"
+            :size="16"
+          />
         </button>
         <div class="center-spacer">
           <ProviderSelector
@@ -164,6 +166,7 @@ import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
 import TranslationInputField from '@/components/shared/TranslationInputField.vue'
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 import browser from 'webextension-polyfill'
 
 import { getScopedLogger } from '@/shared/logging/logger.js';

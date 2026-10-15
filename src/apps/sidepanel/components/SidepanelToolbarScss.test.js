@@ -3,6 +3,13 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as sass from 'sass'
 
+const specificityScore = (selector) => {
+  const ids = (selector.match(/#[\w-]+/g) || []).length
+  const classes = (selector.match(/\.[\w-]+/g) || []).length
+  const pseudoClasses = (selector.match(/:(?!:)[\w-]+/g) || []).length
+  return ids * 10000 + (classes + pseudoClasses) * 100
+}
+
 const here = dirname(fileURLToPath(import.meta.url))
 const srcDir = resolve(here, '..', '..', '..')
 const scssPath = resolve(here, 'SidepanelToolbar.scss')
@@ -145,8 +152,11 @@ describe('SidepanelToolbar.scss icon behavior (migrated from _sidepanel.scss)', 
     expect(css).toContain('brightness(0) invert(1)')
     expect(css).toContain('#selectElementBtn img')
     expect(css).toContain('#revertActionBtn img')
-    expect(css).toContain('#historyBtn img')
-    expect(css).toContain('#settingsBtn img')
+    expect(css).not.toMatch(/#historyBtn\s+img/)
+    expect(css).not.toMatch(/#settingsBtn\s+img/)
+    const maskRule = css.match(/\.side-toolbar\s+\.toolbar-mask-icon\s*\{([^}]*)\}/)
+    expect(maskRule).not.toBeNull()
+    expect(maskRule[1]).not.toMatch(/filter\s*:/)
   })
 
   it('preserves provider icon protection (no filter in dark theme)', () => {
@@ -261,5 +271,43 @@ describe('SidepanelToolbar.scss Desktop FAB toggle contract', () => {
     expect(base[0]).not.toMatch(/overflow/)
     expect(css).toContain('width: 34px !important')
     expect(css).toContain('height: 34px !important')
+  })
+})
+
+describe('SidepanelToolbar.scss accessible icon contract', () => {
+  it('keeps currentColor mask glyphs unfiltered in dark mode', () => {
+    const { css } = compile()
+    const maskRule = css.match(/\.side-toolbar\s+\.toolbar-mask-icon\s*\{([^}]*)\}/)
+
+    expect(maskRule).not.toBeNull()
+    expect(maskRule[1]).toContain('color: inherit')
+    expect(maskRule[1]).toContain('opacity: var(--icon-opacity')
+    expect(maskRule[1]).not.toMatch(/filter\s*:/)
+    expect(css).not.toMatch(/\.theme-dark[^{}]*\.toolbar-mask-icon\s*\{[^}]*filter\s*:/)
+  })
+
+  it('preserves focus-visible over the important outline reset and styles disabled buttons', () => {
+    const { css } = compile()
+    const focusRule = css.match(/\.side-toolbar\s+\.toolbar-button:focus-visible\s*\{([^}]*)\}/)
+    const baseRule = css.match(/\.side-toolbar\s+\.toolbar-button,\s*\.side-toolbar\s+\.ti-provider-icon-button,\s*\.side-toolbar\s+\.ti-btn,\s*\.side-toolbar\s+button\s*\{([^}]*)\}/)
+
+    expect(baseRule?.[1]).toContain('outline: none !important')
+    expect(focusRule?.[1]).toMatch(/outline:\s*2px solid .* !important/)
+    const baseSpecificity = Math.max(...baseRule[0].split(',').map((selector) => specificityScore(selector)))
+    expect(specificityScore(focusRule[0].split('{')[0])).toBeGreaterThan(baseSpecificity)
+    expect(css).toMatch(/\.side-toolbar\s+\.toolbar-button:disabled\s*\{[^}]*opacity:\s*0\.[0-9]+ !important/)
+  })
+
+  it('keeps brand PDF and Subtitle images unfiltered', () => {
+    const { css } = compile()
+    const rules = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+
+    for (const button of ['pdfBtn', 'subtitleBtn']) {
+      const rule = rules.find(([, selectors]) => selectors.split(',')
+        .some((selector) => selector.trim().endsWith(`#${button} img`)))
+      expect(rule, `compiled ${button} image rule`).toBeDefined()
+      expect(rule[2]).toContain('filter: none !important')
+      expect(rule[2]).toContain('opacity: 1 !important')
+    }
   })
 })

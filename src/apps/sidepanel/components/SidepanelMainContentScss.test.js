@@ -47,6 +47,7 @@ const mobileRules = (css) => {
 }
 
 const classSpecificity = (selector) => (selector.match(/\.[\w-]+/g) || []).length
+const selectorSpecificity = (selector) => classSpecificity(selector) + (selector.match(/:(?!:)[\w-]+/g) || []).length
 
 /**
  * Sidepanel CSS is bundled into shared CSS loaded by other surfaces
@@ -262,5 +263,32 @@ describe('compiled Phase 1 language-control styles', () => {
     expect(classSpecificity(sidepanelImage.selector)).toBeGreaterThan(classSpecificity(sharedImage.selector))
     expect(sidepanelButton.selector).toContain(':not(.ti-language-controls--vertical)')
     expect(sidepanelImage.selector).toContain(':not(.ti-language-controls--vertical)')
+  })
+
+  it('keeps clear-button focus visible above reset styles and preserves mask styling', () => {
+    const { css } = compile()
+    const resetRule = findRule(css, '.sidepanel-wrapper .ti-icon-button')
+    const clearFocusRules = [
+      '.inline-clear-btn:focus-visible',
+      '.row-clear-btn:focus-visible'
+    ]
+
+    for (const selector of clearFocusRules) {
+      const rule = findRule(css, selector)
+      expect(rule, `compiled rule containing ${selector}`).toBeDefined()
+      expect(rule[2]).toMatch(/outline:\s*2px solid .* !important/)
+      expect(rule[2]).toContain('outline-offset: 1px !important')
+      expect(selectorSpecificity(rule[1])).toBeGreaterThan(selectorSpecificity(resetRule[1]))
+    }
+
+    expect(css).toContain('.sidepanel-wrapper .ti-icon-button.inline-clear-btn')
+    expect(css).toContain('.sidepanel-wrapper .ti-icon-button.row-clear-btn')
+    for (const button of ['inline-clear-btn', 'row-clear-btn']) {
+      expect(css).toMatch(new RegExp(`\\.theme-dark \\.ti-icon-button\\.${button}[^{}]*\\{[^}]*filter: none !important`))
+    }
+    const clearMaskRule = findRule(css, '.ti-icon-button .clear-mask-icon')
+    expect(clearMaskRule).toBeDefined()
+    expect(clearMaskRule[2]).toContain('color: inherit')
+    expect(clearMaskRule[2]).not.toMatch(/filter\s*:/)
   })
 })
