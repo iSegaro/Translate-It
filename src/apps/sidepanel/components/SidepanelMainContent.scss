@@ -71,11 +71,10 @@
     box-sizing: border-box;
     padding: 0 8px;
 
-    :deep(.ti-language-controls) {
+    .ti-language-controls {
       width: 100%;
       max-width: calc(100% - 16px);
       display: flex !important;
-      flex-direction: row !important;
       align-items: center !important;
       gap: 8px;
       padding: 8px 0;
@@ -84,20 +83,32 @@
       height: auto;
       justify-content: flex-start;
       flex-wrap: nowrap !important;
+      --ti-language-select-default-action-inline-end: 24px;
     }
 
-    :deep(.ti-language-select) {
+    .ti-language-select {
       flex: 1 1 auto !important;
       min-width: 70px;
       max-width: 120px !important;
+      height: 32px !important;
+      border-radius: 6px !important;
+      font-size: 13px !important;
+      padding-block: 0 !important;
+      padding-inline-start: 8px !important;
+      padding-inline-end: 44px !important;
       opacity: 1 !important;
       visibility: visible !important;
       display: block !important;
       position: relative !important;
       box-sizing: border-box !important;
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary, #1976d2) !important;
+        outline-offset: 1px !important;
+      }
     }
 
-    :deep(.ti-swap-button) {
+    .ti-swap-button {
       flex: 0 0 32px !important;
       width: 32px;
       height: 32px;
@@ -108,23 +119,112 @@
       justify-content: center !important;
       position: relative !important;
       z-index: 120 !important;
-      background: var(--color-bg-secondary) !important;
+      background: var(--color-bg-secondary, var(--color-background-hover)) !important;
       border: 1px solid var(--color-border) !important;
-      border-radius: 4px !important;
+      border-radius: 6px !important;
       box-sizing: border-box !important;
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease !important;
+
+      &:where(:hover:not(:disabled)) {
+        background-color: var(--toolbar-link-hover-bg-color, var(--color-background-hover)) !important;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary, #1976d2) !important;
+        outline-offset: 1px !important;
+      }
+
+      &:where(:active:not(:disabled)) {
+        transform: scale(0.96) !important;
+      }
     }
 
-    :deep(.ti-swap-button img) {
+    .ti-swap-button img {
       opacity: 1 !important;
       visibility: visible !important;
       display: block !important;
-      width: 16px !important;
-      height: 16px !important;
+      width: 18px !important;
+      height: 18px !important;
+    }
+
+    :where(.ti-language-control-group--with-default-action) .ti-default-action-button {
+      width: 18px !important;
+      height: 18px !important;
+      min-width: 18px !important;
+      inset-inline-end: 24px !important;
+      border-radius: 6px !important;
+      color: var(--tab-button-color, #5f6368) !important;
+      transition: background-color 0.2s ease, color 0.2s ease, opacity 0.14s ease !important;
+
+      &:where(:hover:not(:disabled)) {
+        background-color: var(--toolbar-link-hover-bg-color, var(--color-background-hover)) !important;
+        color: var(--color-primary, #1976d2) !important;
+      }
+
+      &.is-active {
+        opacity: 0 !important;
+        color: var(--color-primary, #1976d2) !important;
+      }
+
+      &.is-active:where(:disabled) {
+        opacity: 0 !important;
+      }
+
+      &:where(:disabled) {
+        cursor: not-allowed !important;
+        opacity: 0.45 !important;
+      }
+
+      &:where(:focus-visible) {
+        outline: 2px solid var(--color-primary, #1976d2) !important;
+        outline-offset: 1px !important;
+      }
+    }
+
+    :where(.ti-language-control-group:hover, .ti-language-control-group:focus-within) .ti-default-action-button.is-active,
+    :where(.ti-language-control-group .ti-default-action-button.is-active:focus-visible) {
+      opacity: 1 !important;
+    }
+
+    .ti-language-control-group .ti-default-action-button.is-active:where(:hover:not(:disabled)) {
+      color: var(--color-primary, #1976d2) !important;
+    }
+
+    .ti-language-control-group .ti-default-action-button:not(.is-active):where(:hover:not(:disabled)) {
+      color: var(--tab-button-color, #5f6368) !important;
+    }
+
+    :where(.ti-language-control-group:hover, .ti-language-control-group:focus-within) .ti-default-action-button.is-active:where(:disabled) {
+      opacity: 0.45 !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .language-selector-row .ti-language-controls:not(.ti-language-controls--vertical) .ti-language-control-group .ti-language-select {
+      max-width: 120px !important;
+      height: 32px !important;
+      border-radius: 6px !important;
+      font-size: 13px !important;
+      padding-block: 0 !important;
+      padding-inline-start: 8px !important;
+      padding-inline-end: 44px !important;
+    }
+
+    .language-selector-row .ti-language-controls:not(.ti-language-controls--vertical) > .ti-swap-button {
+      flex: 0 0 32px !important;
+      width: 32px !important;
+      min-width: 32px !important;
+      height: 32px !important;
+    }
+
+    .language-selector-row .ti-language-controls:not(.ti-language-controls--vertical) > .ti-swap-button img {
+      width: 18px !important;
+      height: 18px !important;
     }
   }
 
   /* In wide layout, make language selects slightly smaller to make room for Translate button */
-  .language-controls--wide .language-selector-row :deep(.ti-language-select) {
+  .language-controls--wide .language-selector-row .ti-language-select {
     max-width: 100px !important;
     min-width: 65px;
   }
@@ -205,6 +305,11 @@
     flex-direction: column;
     min-height: 0;
   }
+}
+
+:is(.theme-dark, .is-dark) .sidepanel-wrapper .language-selector-row .ti-language-controls {
+  --bg-disabled: rgba(255, 255, 255, 0.04);
+  --text-disabled: rgba(255, 255, 255, 0.48);
 }
 
 // Scoped under the Sidepanel body context (parallel to the popup's

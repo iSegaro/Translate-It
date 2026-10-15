@@ -450,7 +450,7 @@
 
 /* Mobile Media Queries (Legacy support) */
 @media (max-width: 480px) {
-  .ti-language-controls:not(.ti-compact-mode) {
+  .ti-language-controls:not(.ti-compact-mode):not(.ti-language-controls--vertical) {
     margin: 0 !important;
     padding: 0 !important;
     flex-direction: row !important;

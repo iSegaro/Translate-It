@@ -6,8 +6,9 @@ import * as sass from 'sass'
 const here = dirname(fileURLToPath(import.meta.url))
 const srcDir = resolve(here, '..', '..', '..')
 const scssPath = resolve(here, 'SidepanelMainContent.scss')
+const languageSelectorScssPath = resolve(srcDir, 'components', 'shared', 'LanguageSelector.scss')
 
-const compile = () => sass.compile(scssPath, {
+const compile = (path = scssPath) => sass.compile(path, {
   importers: [{
     findFileUrl(url) {
       if (url.startsWith('@/')) {
@@ -17,6 +18,35 @@ const compile = () => sass.compile(scssPath, {
     }
   }]
 })
+
+const findRule = (css, selectorPart) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .find(([, selector]) => selector.trim().includes(selectorPart))
+
+const expectDeclaration = (css, selectorPart, declaration) => {
+  const rule = findRule(css, selectorPart)
+  expect(rule, `compiled rule containing ${selectorPart}`).toBeDefined()
+  expect(rule[2]).toContain(declaration)
+}
+
+const mobileRules = (css) => {
+  const query = '@media (max-width: 480px)'
+  const start = css.indexOf(query)
+  if (start === -1) return []
+
+  const open = css.indexOf('{', start)
+  let depth = 1
+  let close = open + 1
+  while (depth && close < css.length) {
+    if (css[close] === '{') depth++
+    if (css[close] === '}') depth--
+    close++
+  }
+
+  return [...css.slice(open + 1, close - 1).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(([, selector, declarations]) => ({ selector: selector.trim(), declarations }))
+}
+
+const classSpecificity = (selector) => (selector.match(/\.[\w-]+/g) || []).length
 
 /**
  * Sidepanel CSS is bundled into shared CSS loaded by other surfaces
@@ -153,5 +183,84 @@ describe('SidepanelMainContent.scss selector ownership', () => {
     // Dark theme selectors must still be present
     expect(css).toContain('.theme-dark .ti-icon-button.row-clear-btn')
     expect(css).toContain('.theme-dark .ti-icon-button.inline-clear-btn')
+  })
+})
+
+describe('compiled Phase 1 language-control styles', () => {
+  it('keeps language-control rules scoped and free of :deep while preserving unrelated deep selectors', () => {
+    const { css } = compile()
+
+    expect(css).toContain('.sidepanel-wrapper .language-selector-row .ti-language-controls')
+    expect(css).toContain('.sidepanel-wrapper .language-selector-row .ti-language-select')
+    expect(css).toContain('.sidepanel-wrapper .language-selector-row .ti-swap-button')
+    expect(css).not.toMatch(/[^{}]*(?:\.ti-language-select|\.ti-swap-button|\.ti-default-action-button)[^{}]*:deep/)
+    expect(css).toContain(':deep(.provider-selector)')
+    expect(css).toContain(':deep(.textarea-container)')
+  })
+
+  it('compiles compact sizing, narrow vertical guard, wide sizing, and swap focus/image rules', () => {
+    const { css } = compile()
+
+    expectDeclaration(css, '.sidepanel-wrapper .language-selector-row .ti-language-select', 'height: 32px !important')
+    expectDeclaration(css, '.sidepanel-wrapper .language-selector-row .ti-language-select', 'border-radius: 6px !important')
+    expectDeclaration(css, '.sidepanel-wrapper .language-selector-row .ti-language-select', 'font-size: 13px !important')
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.ti-language-controls:not\(\.ti-language-controls--vertical\)/)
+    expectDeclaration(css, '.language-controls--wide .language-selector-row .ti-language-select', 'max-width: 100px !important')
+    expectDeclaration(css, '.sidepanel-wrapper .language-selector-row .ti-language-select:focus-visible', 'outline: 2px solid var(--color-primary, #1976d2) !important')
+    expectDeclaration(css, '.sidepanel-wrapper .language-selector-row .ti-swap-button:focus-visible', 'outline: 2px solid var(--color-primary, #1976d2) !important')
+    expectDeclaration(css, '.sidepanel-wrapper .language-selector-row .ti-swap-button img', 'width: 18px !important')
+  })
+
+  it('compiles star resting, reveal, hover, disabled, and keyboard-focus behavior', () => {
+    const { css } = compile()
+
+    expectDeclaration(css, '.ti-default-action-button.is-active', 'opacity: 0 !important')
+    expectDeclaration(css, '.ti-language-control-group:hover', 'opacity: 1 !important')
+    expectDeclaration(css, '.ti-language-control-group .ti-default-action-button.is-active:where(:hover:not(:disabled))', 'color: var(--color-primary, #1976d2) !important')
+    expectDeclaration(css, '.ti-language-control-group .ti-default-action-button:not(.is-active):where(:hover:not(:disabled))', 'color: var(--tab-button-color, #5f6368) !important')
+    expectDeclaration(css, '.ti-default-action-button.is-active:where(:disabled)', 'opacity: 0 !important')
+    expectDeclaration(css, ':focus-within) .ti-default-action-button.is-active:where(:disabled)', 'opacity: 0.45 !important')
+    expectDeclaration(css, '.ti-default-action-button:where(:focus-visible)', 'outline: 2px solid var(--color-primary, #1976d2) !important')
+  })
+
+  it('compiles shared narrow/vertical, dark-theme, RTL logical, and swap-image rules', () => {
+    const { css } = compile(languageSelectorScssPath)
+
+    expect(css).toMatch(/@media \(max-width: 480px\)[\s\S]*?\.ti-language-controls:not\(\.ti-compact-mode\):not\(\.ti-language-controls--vertical\)/)
+    expectDeclaration(css, '.ti-language-controls.ti-language-controls--vertical', 'flex-direction: column !important')
+    expectDeclaration(css, '.ti-language-controls.ti-language-controls--dark', '--bg-disabled: rgba(255, 255, 255, 0.04)')
+    expectDeclaration(css, ':is([dir=rtl], html[dir=rtl]) .ti-language-select', 'padding-inline-start: 25px !important')
+    expectDeclaration(css, '.ti-swap-button--mirrored img', 'transform: scaleX(-1) !important')
+    expect(css).toContain('filter: var(--icon-filter, none) !important')
+  })
+
+  it('keeps narrow horizontal Sidepanel swap dimensions above shared mobile overrides', () => {
+    const sidepanelCss = compile().css
+    const sharedCss = compile(languageSelectorScssPath).css
+    const sidepanelRules = mobileRules(sidepanelCss)
+    const sharedRules = mobileRules(sharedCss)
+    const sharedButton = sharedRules.find(({ selector }) =>
+      selector.includes('.ti-language-controls:not(.ti-compact-mode):not(.ti-language-controls--vertical) .ti-swap-button'))
+    const sharedImage = sharedRules.find(({ selector }) =>
+      selector.includes('.ti-language-controls:not(.ti-compact-mode):not(.ti-language-controls--vertical) .ti-swap-button img'))
+    const sidepanelButton = sidepanelRules.find(({ selector, declarations }) =>
+      selector.includes('.sidepanel-wrapper .language-selector-row .ti-language-controls:not(.ti-language-controls--vertical) > .ti-swap-button') &&
+      declarations.includes('width: 32px !important'))
+    const sidepanelImage = sidepanelRules.find(({ selector, declarations }) =>
+      selector.includes('.sidepanel-wrapper .language-selector-row .ti-language-controls:not(.ti-language-controls--vertical) > .ti-swap-button img') &&
+      declarations.includes('width: 18px !important'))
+
+    expect(sharedButton?.declarations).toContain('width: 44px !important')
+    expect(sharedButton?.declarations).toContain('height: 30px !important')
+    expect(sharedImage?.declarations).toContain('width: 24px !important')
+    expect(sharedImage?.declarations).toContain('height: 24px !important')
+    expect(sidepanelButton?.declarations).toContain('width: 32px !important')
+    expect(sidepanelButton?.declarations).toContain('height: 32px !important')
+    expect(sidepanelImage?.declarations).toContain('width: 18px !important')
+    expect(sidepanelImage?.declarations).toContain('height: 18px !important')
+    expect(classSpecificity(sidepanelButton.selector)).toBeGreaterThan(classSpecificity(sharedButton.selector))
+    expect(classSpecificity(sidepanelImage.selector)).toBeGreaterThan(classSpecificity(sharedImage.selector))
+    expect(sidepanelButton.selector).toContain(':not(.ti-language-controls--vertical)')
+    expect(sidepanelImage.selector).toContain(':not(.ti-language-controls--vertical)')
   })
 })

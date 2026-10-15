@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import LanguageSelector from './LanguageSelector.vue'
 
@@ -68,7 +68,7 @@ vi.mock('@/shared/config/config.js', () => ({
 vi.mock('@/utils/UtilsFactory.js', () => ({
   utilsFactory: {
     getI18nUtils: vi.fn().mockResolvedValue({
-      findLanguageCode: vi.fn((value) => Promise.resolve(value))
+      getLanguageCodeForTTS: vi.fn((value) => Promise.resolve(value))
     })
   }
 }))
@@ -163,6 +163,51 @@ describe('LanguageSelector', () => {
     await wrapper.get('button[title="Target default"]').trigger('click')
 
     expect(wrapper.emitted('set-default-target')).toHaveLength(1)
+  })
+
+  it('gives star buttons accessible names and native button tab semantics', () => {
+    const wrapper = mountSelector({ showDefaultActions: true })
+    const sourceButton = wrapper.get('button[aria-label="Set source as default"]')
+    const targetButton = wrapper.get('button[aria-label="Set target as default"]')
+
+    expect(sourceButton.element.tagName).toBe('BUTTON')
+    expect(sourceButton.attributes('type')).toBe('button')
+    expect(sourceButton.attributes('tabindex')).toBeUndefined()
+    expect(targetButton.element.tagName).toBe('BUTTON')
+    expect(targetButton.attributes('type')).toBe('button')
+    expect(targetButton.attributes('tabindex')).toBeUndefined()
+  })
+
+  it('does not emit a default action when its button is disabled', async () => {
+    const wrapper = mountSelector({ showDefaultActions: true, defaultActionsEnabled: false })
+
+    wrapper.get('button[aria-label="Set source as default"]').element.click()
+    wrapper.get('button[aria-label="Set target as default"]').element.click()
+    await flushPromises()
+
+    expect(wrapper.emitted('set-default-source')).toBeUndefined()
+    expect(wrapper.emitted('set-default-target')).toBeUndefined()
+  })
+
+  it('emits source and target updates when their selections change', async () => {
+    const wrapper = mountSelector()
+
+    await wrapper.find('.ti-language-control-group--source select').setValue('fr')
+    await wrapper.find('.ti-language-control-group--target select').setValue('en')
+
+    expect(wrapper.emitted('update:sourceLanguage')).toEqual([['fr']])
+    expect(wrapper.emitted('update:targetLanguage')).toEqual([['en']])
+  })
+
+  it('emits swapped values and both language updates for an allowed pair', async () => {
+    const wrapper = mountSelector({ sourceLanguage: 'fr', targetLanguage: 'fa' })
+
+    await wrapper.get('.ti-swap-button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('update:sourceLanguage')).toEqual([['fa']])
+    expect(wrapper.emitted('update:targetLanguage')).toEqual([['fr']])
+    expect(wrapper.emitted('swap-languages')).toHaveLength(1)
   })
 
   describe('enableSelectElementIntegration prop', () => {
