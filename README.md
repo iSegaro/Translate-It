@@ -195,6 +195,12 @@ Translate It is free and open source. Sponsorship directly supports its continue
 
 ---
 
+## Partnerships
+
+For technical, ecosystem, or commercial collaboration inquiries, see our [Partnerships](./PARTNERSHIPS.md) page.
+
+---
+
 <p align="center">
   <a href="https://www.greptile.com/?utm_source=oss_badge&utm_medium=readme&utm_campaign=greptile_for_open_source">
     <img src="https://www.greptile.com/badge.svg" alt="Greptile: The War on Bugs">

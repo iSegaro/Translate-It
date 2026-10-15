@@ -195,6 +195,12 @@ Translate It は無料のオープンソースソフトウェアです。ご支�
 
 ---
 
+## パートナーシップ
+
+技術、エコシステム、事業に関する連携については、[パートナーシップ](../PARTNERSHIPS.md)ページをご覧ください。
+
+---
+
 <p align="center">
   <a href="https://www.greptile.com/?utm_source=oss_badge&utm_medium=readme&utm_campaign=greptile_for_open_source">
     <img src="https://www.greptile.com/badge.svg" alt="Greptile: The War on Bugs">

@@ -195,6 +195,12 @@ Translate It رایگان و متن‌باز است. حمایت مالی به ا
 
 ---
 
+## همکاری‌ها
+
+برای درخواست‌های همکاری فنی، اکوسیستمی یا تجاری، صفحهٔ [همکاری‌ها](../PARTNERSHIPS.md) را ببینید.
+
+---
+
 <p align="center">
   <a href="https://www.greptile.com/?utm_source=oss_badge&utm_medium=readme&utm_campaign=greptile_for_open_source">
     <img src="https://www.greptile.com/badge.svg" alt="Greptile: The War on Bugs">
