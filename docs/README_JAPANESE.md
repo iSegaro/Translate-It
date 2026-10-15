@@ -185,13 +185,13 @@ Vue 3、Pinia、Vite を使った **Feature-Based Architecture** を採用して
 
 ---
 
-## サポートとパートナーシップ
+## プロジェクトを応援する
 
 Translate It は無料のオープンソースソフトウェアです。ご支援は、開発、テスト、メンテナンスの継続に役立ちます。
 
 - **GitHub でスター:** Translate It が役に立ったら、[GitHub でスターを付けて](https://github.com/Translate-It-App/Translate-It)応援してください。プロジェクトをより多くの人に知ってもらう助けにもなります。
-- **スポンサー:** [GitHub Sponsors](https://github.com/sponsors/Translate-It-App)からご支援いただけます。詳しくは [SPONSORSHIP.md](../SPONSORSHIP.md)をご覧ください。
-- **パートナーシップ:** 技術、エコシステム、事業に関する連携は個別に受け付けています。詳しくは [PARTNERSHIPS.md](../PARTNERSHIPS.md)をご覧ください。
+- **コントリビューション:** コミュニティからの貢献がプロジェクトを前進させます。コード、翻訳、バグ報告、アイデアを歓迎します。まずは [CONTRIBUTING.md](./guides/CONTRIBUTING.md) をご覧ください。
+- **スポンサー:** [GitHub Sponsors](https://github.com/sponsors/Translate-It-App)から資金面でご支援いただけます。詳しくは [SPONSORSHIP.md](../SPONSORSHIP.md)をご覧ください。
 
 ---
 

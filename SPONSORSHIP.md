@@ -1,12 +1,12 @@
 # Sponsorship
 
-Translate It is an open-source project focused on making translation and multilingual workflows more useful, flexible, and accessible.
+Translate It is an independent open-source project focused on making translation and multilingual workflows more useful, flexible, and accessible.
 
-Sponsorship helps support ongoing development, testing, maintenance, infrastructure, and other costs involved in keeping the project active.
+Community sponsorship helps support ongoing development, testing, maintenance, infrastructure, and other costs involved in keeping the project active.
 
 ## Ways to support
 
-Support is available through GitHub Sponsors with both monthly and one-time contributions.
+You can support through [GitHub Sponsors](https://github.com/sponsors/Translate-It-App) with monthly or one-time contributions.
 
 ### $5/month — Supporter
 
@@ -16,13 +16,13 @@ A simple way to support the continued development and maintenance of Translate I
 
 For individuals or teams that would like to support the project at a higher level.
 
-If desired, the sponsor's name can be listed in the sponsors section of the README and website.
+If desired, your name can be listed in the README and on the website.
 
 ### $100/month — Organization Sponsor
 
 For companies and organizations that want to support Translate It.
 
-If desired, the organization's name, logo, and website link can be shown in the sponsors section of the README and website.
+If desired, your organization's name, logo, and website link can be listed in the README and on the website.
 
 ### One-time support
 
@@ -42,15 +42,3 @@ Sponsors do not receive:
 - exclusivity
 
 Technical and product decisions remain based on what is best for the project and its users.
-
-## Sponsorship and partnerships
-
-Sponsorship and partnerships are handled separately.
-
-Sponsorship is a way to support the ongoing development of Translate It.
-
-Partnerships may involve technical integrations, compatibility work, services, user benefits, or other forms of collaboration and are considered separately on a case-by-case basis.
-
-For partnership inquiries, contact:
-
-**partnerships@translate-it.app**
