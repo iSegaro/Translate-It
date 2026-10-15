@@ -422,9 +422,9 @@ import { TranslationMode } from '@/shared/config/config.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProviderSelector')
 
-// Popup Text view menu budget (~280–300 CSS px approved), clamped to the
+// Popup Text view menu budget (user-approved 245 CSS px), clamped to the
 // viewport with 8px gutters on both sizing and positioning.
-const POPUP_MENU_WIDTH = 290
+const POPUP_MENU_WIDTH = 245
 
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('provider-selector')
@@ -1234,7 +1234,7 @@ const updateDropdownPosition = () => {
       styles.top = `${rect.top}px !important`;
       styles.bottom = 'auto !important';
     } else if (isPopupTextContext.value) {
-      // Popup Text view: fixed budget width (user-approved ~290px), clamped
+      // Popup Text view: fixed budget width (user-approved ~245px), clamped
       // to the viewport with 8px gutters; left/right anchored to the trigger
       // edge and clamped again so the bounded width never leaves the viewport.
       const popupWidth = Math.min(POPUP_MENU_WIDTH, window.innerWidth - 16)

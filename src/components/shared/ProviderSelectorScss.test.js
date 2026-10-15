@@ -64,14 +64,14 @@ describe('ProviderSelector.scss dead Popup override', () => {
 })
 
 describe('ProviderSelector.scss Popup Text menu sizing', () => {
-  it('compiles a popup-only 290px width bounded by the viewport with a narrow-safe minimum', () => {
+  it('compiles a popup-only 245px width bounded by the viewport with a narrow-safe minimum', () => {
     const { css } = compile()
     const popupRule = css.match(/\.ti-provider-dropdown-menu--popup\s*\{[^}]*\}/)?.[0]
 
     expect(popupRule).toBeTruthy()
-    expect(popupRule).toMatch(/width:\s*(?:290px|min\(290px,\s*calc\(100vw\s*-\s*16px\)\))/)
+    expect(popupRule).toMatch(/width:\s*(?:245px|min\(245px,\s*calc\(100vw\s*-\s*16px\)\))/)
     expect(popupRule).toMatch(/max-width:\s*calc\(100vw\s*-\s*16px\)/)
     expect(popupRule).toMatch(/min-width:\s*(?:0(?:px)?|min\(\s*220px\s*,\s*calc\(100vw\s*-\s*16px\)\s*\))/)
-    expect(css).not.toMatch(/\.ti-provider-dropdown-menu\s*\{[^}]*width:\s*290px/)
+    expect(css).not.toMatch(/\.ti-provider-dropdown-menu\s*\{[^}]*width:\s*245px/)
   })
 })

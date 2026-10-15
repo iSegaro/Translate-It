@@ -632,7 +632,7 @@ describe('ProviderSelector provider list contract', () => {
         }[mode]).trigger('click')
         const menu = document.body.querySelector('.ti-provider-dropdown-menu')
         expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(false)
-        expect(menu.style.width).not.toBe('290px')
+        expect(menu.style.width).not.toBe('245px')
       } finally {
         regular.wrapper.unmount()
         regular.container.remove()
@@ -657,7 +657,7 @@ describe('ProviderSelector provider list contract', () => {
       await wrapper.find('.ti-provider-dropdown-area').trigger('click')
       const menu = document.body.querySelector('.ti-provider-dropdown-menu')
       expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(true)
-      const menuWidth = Math.min(290, width - 16)
+      const menuWidth = Math.min(245, width - 16)
       const left = menu.style.left !== 'auto'
         ? Number.parseFloat(menu.style.left)
         : width - Number.parseFloat(menu.style.right) - menuWidth
