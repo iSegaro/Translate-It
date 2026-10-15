@@ -393,31 +393,34 @@
     }
   }
 
-  // Animated Manage-button housing, mirroring ActivationTab's
-  // .fab-mode-select-wrapper (closed: translateX(-10px) scale(0.95), open:
-  // 160→in place; .3s cubic-bezier(0.4, 0, 0.2, 1)).
+  // Animated Manage-button housing (mirrors ActivationTab's
+  // .fab-mode-select-wrapper reveal). Stable sizing: width, overflow and flex
+  // basis are IDENTICAL in both states — only max-width/opacity/transform
+  // animate — so the reveal cannot jump on intrinsic text width (open width,
+  // overflow/shrink toggles and an open-only margin made the collapsed state
+  // resolve differently mid-transition). Row gap already spaces the controls.
   .custom-list-manage-wrapper {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     align-self: center;
     overflow: hidden;
+    width: 220px;
     max-width: 0;
     opacity: 0;
     transform: translateX(-10px) scale(0.95);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    flex: 0 0 auto;
     pointer-events: none;
-    flex-shrink: 0;
+    transition:
+      max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     &.open {
       max-width: 220px;
-      width: 100%;
       opacity: 1;
       transform: translateX(0) scale(1);
       pointer-events: auto;
-      margin-inline-start: $spacing-sm;
-      overflow: visible;
-      flex-shrink: 1;
     }
   }
 
@@ -815,17 +818,15 @@
   }
 
   .custom-provider-list-row {
-    // Row stays horizontal like the FAB row; the animated Manage button gets
-    // the FAB's reduced mobile opening width (ActivationTab.scss ~L585-588).
-    .custom-list-manage-wrapper.open {
-      max-width: 160px;
-      min-width: 120px;
+    // Narrow screens set the same declared housing width in both states.
+    // The base max-width: 0 still collapses the closed used size to zero;
+    // only the open state lifts the animated cap to 160px, avoiding a plateau.
+    .custom-list-manage-wrapper {
+      width: 160px;
     }
 
-    .manage-list-button {
-      min-width: 0;
-      padding: 4px $spacing-xs;
-      white-space: normal;
+    .custom-list-manage-wrapper.open {
+      max-width: 160px;
     }
 
     .custom-list-row-desc {

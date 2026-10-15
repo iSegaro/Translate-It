@@ -262,18 +262,76 @@ describe('ProvidersTab custom provider list drawer (staged semantics)', () => {
     expect(focusSpy).toHaveBeenLastCalledWith({ preventScroll: true });
   });
 
-  it('matches the FAB reveal animation timings (translate/scale/max-width/RTL opposite)', () => {
+  it('keeps the Manage reveal stable: constant box properties, animation only on max-width/opacity/transform', () => {
+    const scss = readFileSync('src/apps/options/tabs/ProvidersTab.scss', 'utf8');
+    const wrapperStart = scss.indexOf('.custom-list-manage-wrapper {');
+    const wrapperEnd = scss.indexOf('.manage-list-button {');
+    const wrapperBlock = scss.slice(wrapperStart, wrapperEnd);
+
+    // Same (fixed or bounded) width, overflow and flex basis in closed and
+    // open states: no per-state width/overflow/shrink/margin flips.
+    expect(wrapperBlock).toContain('width: 220px;');
+    expect(wrapperBlock).toContain('overflow: hidden;');
+    expect(wrapperBlock).toContain('flex: 0 0 auto;');
+    expect(wrapperBlock).not.toContain('width: 100%');
+    expect(wrapperBlock).not.toContain('min-width');
+    expect(wrapperBlock).not.toContain('flex-shrink');
+    expect(wrapperBlock).not.toContain('margin-inline-start');
+    // The open state only lifts the animated constraints.
+    const openBlock = wrapperBlock.slice(wrapperBlock.indexOf('&.open'), wrapperEnd);
+    expect(openBlock).toContain('max-width: 220px');
+    expect(openBlock).toContain('opacity: 1');
+    expect(openBlock).toContain('transform: translateX(0) scale(1)');
+    expect(openBlock).not.toContain('overflow');
+    expect(openBlock).not.toContain('width: 100%');
+    expect(openBlock).not.toContain('margin-inline-start');
+    // Exactly the three reveal properties animate at the shared beat.
+    expect(wrapperBlock).not.toContain('transition: all');
+    expect(wrapperBlock).toContain('max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1)');
+    expect(wrapperBlock).toContain('opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)');
+    expect(wrapperBlock).toContain('transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)');
+  });
+
+  it('preserves the FAB-family reveal feel and RTL opposite translate', () => {
     const scss = readFileSync('src/apps/options/tabs/ProvidersTab.scss', 'utf8');
     // Reveal/easing beats copied from activation .fab-mode-select-wrapper.
     expect(scss).toContain('transform: translateX(-10px) scale(0.95)');
-    expect(scss).toContain('transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1)');
     expect(scss).toContain('transform: translateX(0) scale(1)');
     expect(scss).toContain('max-width: 0');
-    // RTL closed state flips the offset direction.
-    expect(scss).toContain('.rtl .custom-list-manage-wrapper:not(.open) {\n  transform: translateX(10px) scale(0.95);\n}');
+    const wrapperBlock = scss.slice(
+      scss.indexOf('.custom-list-manage-wrapper {'),
+      scss.indexOf('.manage-list-button {'),
+    );
+    expect(wrapperBlock).toContain('0.3s cubic-bezier(0.4, 0, 0.2, 1)');
+    expect(scss).toMatch(/\.rtl \.custom-list-manage-wrapper:not\(\.open\)\s*\{\s*transform:\s*translateX\(10px\) scale\(0\.95\)/);
     // Manage button token parity with .manage-rules-button.
     expect(scss).toContain('box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05)');
     expect(scss).toContain('box-shadow: 0 0 0 2px var(--color-border-light, rgba(0, 0, 0, 0.05))');
+  });
+
+  it('keeps narrow screens and long labels inside the bounded housing', () => {
+    const scss = readFileSync('src/apps/options/tabs/ProvidersTab.scss', 'utf8');
+    const mobileBlock = scss.slice(scss.indexOf('@media (max-width: 768px)'));
+    // The mobile housing width applies to BOTH states (same declared width
+    // across the collapse/reveal); the open state only lifts the
+    // animated cap — a desktop max-width leftover (220px) would plateau the
+    // collapse at 160px until it decays below the housing.
+    expect(mobileBlock).toMatch(/\.custom-list-manage-wrapper\s*\{\s*width:\s*160px;/);
+    const openRule = mobileBlock.match(/\.custom-list-manage-wrapper\.open\s*\{([^}]*)\}/)[1];
+    expect(openRule).toContain('max-width: 160px');
+    expect(openRule).not.toMatch(/[\s;{]width:/);
+    expect(mobileBlock).not.toContain('max-width: 220px');
+    expect(mobileBlock).not.toContain('min-width: 120px');
+    // The closed state keeps the animation start at zero via the base
+    // max-width: 0; long localized labels clip (overflow hidden in both
+    // states) instead of reflowing the row or pushing past the housing.
+    const baseWrapperBlock = scss.slice(
+      scss.indexOf('.custom-list-manage-wrapper {'),
+      scss.indexOf('.manage-list-button {'),
+    );
+    expect(baseWrapperBlock).toContain('max-width: 0;');
+    expect(baseWrapperBlock).toContain('width: 220px;');
+    expect(baseWrapperBlock.match(/overflow: hidden;/g)).toHaveLength(1);
   });
 
   it('gives the Manage button reference cascade priority (!important parity with .manage-rules-button)', () => {
