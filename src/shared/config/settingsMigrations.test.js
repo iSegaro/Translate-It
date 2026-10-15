@@ -28,6 +28,7 @@ describe('Settings Migrations', () => {
     expect(logs).toContain('Added missing setting: APPLICATION_LOCALIZE');
     expect(updates.CUSTOM_PROVIDER_LIST_ENABLED).toBe(false);
     expect(updates.CUSTOM_PROVIDER_LIST).toEqual([]);
+    expect(updates.COLLAPSED_PROVIDER_CATEGORIES).toEqual({ ids: [], revision: 0 });
     expect(logs).toContain('Added missing setting: CUSTOM_PROVIDER_LIST_ENABLED');
     expect(logs).toContain('Added missing setting: CUSTOM_PROVIDER_LIST');
     expect(updates.TIMEOUT).toBe(CONFIG.TIMEOUT);

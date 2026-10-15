@@ -316,22 +316,92 @@ img.ti-dropdown-arrow,
   &::-webkit-scrollbar-thumb { background: var(--color-border) !important; border-radius: 2px !important; }
 }
 
-/* Conditional Traditional / AI / Local group bins */
+/* Conditional Traditional / AI / Other group bins */
 .ti-dropdown-group {
   display: block !important;
 }
 
-.ti-dropdown-group-header {
-  padding: 6px 14px 4px !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  color: var(--color-text-muted) !important;
-  background: transparent !important;
-  user-select: none !important;
-  pointer-events: none !important;
+/* Row list of one group — wrapper node is the stable aria-controls target for
+   the header disclosure and stays mounted when collapsed. Plain block (not
+   display:contents): the element must keep its box in the accessibility tree
+   for aria-controls resolution; an empty block has zero height without
+   padding/border, so collapsed groups stay gap-free. */
+.ti-dropdown-group-rows {
+  display: block;
+}
 
-  :root.theme-dark &, .theme-dark &, .is-dark & {
-    color: var(--color-text-secondary) !important;
+/* Category heading: accessible disclosure button (was an aria-hidden
+   non-interactive label). Collapsed/expanded arrow mirrors the trigger
+   dropdown arrow: chevron-down rest → rotated 180° when expanded; rotation
+   is RTL-direction-neutral, color follows the header text in dark themes.
+   No !important here: nothing else targets these classes, so plain
+   specificity keeps the stylelint declaration baseline untouched. */
+.ti-dropdown-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 14px 4px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+  text-align: start;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--color-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: -2px !important;
+    border-radius: $border-radius-sm;
+  }
+
+  .ti-dropdown-group-title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :root.theme-dark &,
+  .theme-dark &,
+  .is-dark & {
+    color: var(--color-text-secondary);
+
+    &:hover,
+    &:focus-visible {
+      color: var(--color-text);
+    }
+  }
+}
+
+.ti-provider-chevron {
+  display: block;
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform 0.2s ease;
+
+  &.is-expanded {
+    transform: rotate(180deg);
+  }
+
+  :root.theme-dark &,
+  .theme-dark &,
+  .is-dark & {
+    color: var(--color-text-secondary);
   }
 }
 

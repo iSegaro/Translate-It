@@ -9,6 +9,7 @@ import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { DESKTOP_FAB_EXCLUSION_PREFIX, DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY, serializeDesktopFabExclusions, parseDesktopFabExclusionsSection, replaceDesktopFabExclusions } from '@/features/desktop-fab/desktopFabExclusions.js'
 import ExtensionContextManager from '@/core/extensionContext.js'
 import { runSettingsMigrations } from '@/shared/config/settingsMigrations.js'
+import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
@@ -58,9 +59,18 @@ function buildPersistedSnapshot(source) {
   return snapshot;
 }
 
+function normalizeProviderCategoryCollapseState(value) {
+  const ids = Array.isArray(value) ? value : value?.ids
+  return {
+    ids: Array.isArray(ids) ? [...new Set(ids.filter(id => typeof id === 'string'))] : [],
+    revision: Number.isSafeInteger(value?.revision) && value.revision >= 0 ? value.revision : 0
+  }
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   // State - complete settings object with CONFIG defaults
   const settings = ref(getDefaultSettings())
+  let providerCategoryIntentQueue = Promise.resolve()
   const dirtySettingVersions = new Map()
   let nextSettingEditVersion = 0
   const apiKeySettingKeys = new Set([
@@ -235,7 +245,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
       // Write-boundary: persist canonical schema keys only, with live values.
       const savedSettingVersions = new Map(dirtySettingVersions)
-      await storageManager.set(buildPersistedSnapshot(settings.value));
+      const snapshot = buildPersistedSnapshot(settings.value)
+      // This setting is mutated through the background serializer, never as a
+      // stale full-settings snapshot.
+      delete snapshot.COLLAPSED_PROVIDER_CATEGORIES
+      await storageManager.set(snapshot);
       for (const [key, version] of savedSettingVersions) {
         if (dirtySettingVersions.get(key) === version) dirtySettingVersions.delete(key)
       }
@@ -260,9 +274,48 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  const enqueueProviderCategoryIntent = (intent) => {
+    const operation = providerCategoryIntentQueue.then(intent)
+    providerCategoryIntentQueue = operation.catch(() => {})
+    return operation
+  }
+
+  const setProviderCategoryCollapsed = (categoryId, collapsed) => {
+    return enqueueProviderCategoryIntent(async () => {
+      const response = await browser.runtime.sendMessage({
+        action: MessageActions.SET_PROVIDER_CATEGORY_COLLAPSED,
+        categoryId,
+        collapsed
+      })
+      if (!response?.success) throw new Error(response?.error || 'Failed to save provider category state')
+      const next = normalizeProviderCategoryCollapseState(response.state)
+      const current = normalizeProviderCategoryCollapseState(settings.value.COLLAPSED_PROVIDER_CATEGORIES)
+      if (next.revision > current.revision) settings.value.COLLAPSED_PROVIDER_CATEGORIES = next
+      return settings.value.COLLAPSED_PROVIDER_CATEGORIES
+    })
+  }
+
+  const replaceProviderCategoryCollapseState = (ids) => {
+    return enqueueProviderCategoryIntent(async () => {
+      const response = await browser.runtime.sendMessage({
+        action: MessageActions.SET_PROVIDER_CATEGORY_COLLAPSED,
+        replace: true,
+        ids
+      })
+      if (!response?.success) throw new Error(response?.error || 'Failed to save provider category state')
+      const next = normalizeProviderCategoryCollapseState(response.state)
+      const current = normalizeProviderCategoryCollapseState(settings.value.COLLAPSED_PROVIDER_CATEGORIES)
+      if (next.revision > current.revision) settings.value.COLLAPSED_PROVIDER_CATEGORIES = next
+      return settings.value.COLLAPSED_PROVIDER_CATEGORIES
+    })
+  }
+
   // Action to update a single setting and immediately persist it to storage
   const updateSettingAndPersist = async (key, value) => {
     try {
+      if (key === 'COLLAPSED_PROVIDER_CATEGORIES') {
+        throw new Error('Use setProviderCategoryCollapsed to update category state')
+      }
       settings.value[key] = value // Update local state
       
       const updates = { [key]: value };
@@ -317,6 +370,9 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const updateMultipleSettings = async (updates) => {
     try {
+      if (Object.prototype.hasOwnProperty.call(updates || {}, 'COLLAPSED_PROVIDER_CATEGORIES')) {
+        throw new Error('Use setProviderCategoryCollapsed to update category state')
+      }
       // Update local state (all keys, including non-schema runtime keys)
       Object.assign(settings.value, updates)
 
@@ -342,7 +398,10 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const resetSettings = async () => {
     try {
-      await storageManager.clear();
+      const storedSettings = await storageManager.get(null)
+      const keysToRemove = Object.keys(storedSettings || {})
+        .filter(key => key !== 'COLLAPSED_PROVIDER_CATEGORIES')
+      if (keysToRemove.length > 0) await storageManager.remove(keysToRemove)
       const defaults = getDefaultSettings();
       // Preserve reference to reactive object
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
@@ -350,7 +409,10 @@ export const useSettingsStore = defineStore('settings', () => {
       dirtySettingVersions.clear()
       // Persist canonical settings only; translation history is store-owned
       // feature data and is already cleared with storage above.
-      await storageManager.set(getPersistedDefaultSettings());
+      const persistedDefaults = getPersistedDefaultSettings()
+      delete persistedDefaults.COLLAPSED_PROVIDER_CATEGORIES
+      await storageManager.set(persistedDefaults);
+      await replaceProviderCategoryCollapseState([])
       return true;
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -488,6 +550,14 @@ export const useSettingsStore = defineStore('settings', () => {
       // 3. Apply migrated values, then remove retired settings.
       Object.assign(mergedSettings, updates);
       removals.forEach(key => delete mergedSettings[key]);
+      const importedCollapseIds = normalizeProviderCategoryCollapseState(
+        mergedSettings.COLLAPSED_PROVIDER_CATEGORIES
+      ).ids
+      // A backup's collapse revision is not authoritative. Keep the live
+      // revision until the background serializer returns its current value.
+      mergedSettings.COLLAPSED_PROVIDER_CATEGORIES = normalizeProviderCategoryCollapseState(
+        settings.value.COLLAPSED_PROVIDER_CATEGORIES
+      )
       
       if (logs && logs.length > 0) {
         logger.info('[Import] Migrations applied:', logs);
@@ -506,6 +576,7 @@ export const useSettingsStore = defineStore('settings', () => {
       dirtySettingVersions.clear()
 
       await saveAllSettings();
+      await replaceProviderCategoryCollapseState(importedCollapseIds)
       if (removals.length > 0) {
         try {
           await storageManager.remove(removals);
@@ -712,6 +783,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Handle storage changes from other parts of extension
   const handleStorageChange = ({ key, newValue, oldValue }) => {
+    if (key === 'COLLAPSED_PROVIDER_CATEGORIES') {
+      const next = normalizeProviderCategoryCollapseState(newValue)
+      const current = normalizeProviderCategoryCollapseState(settings.value.COLLAPSED_PROVIDER_CATEGORIES)
+      if (next.revision > current.revision) settings.value.COLLAPSED_PROVIDER_CATEGORIES = next
+      return
+    }
     // Keep local API-key/model-setting drafts until Save succeeds, while allowing
     // clean provider groups and unrelated settings to sync independently.
     if (apiKeySettingKeys.has(key) ? dirtySettingVersions.has(key) : isSettingDirty(key)) return
@@ -880,6 +957,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loadSettings,
     saveAllSettings,
     updateSettingLocally,
+    setProviderCategoryCollapsed,
     isSettingDirty,
     updateSettingAndPersist,
     updateMultipleSettings,

@@ -72,6 +72,7 @@ export const CONFIG = {
   HIDDEN_PROVIDERS: [],
   CUSTOM_PROVIDER_LIST_ENABLED: false,
   CUSTOM_PROVIDER_LIST: [],
+  COLLAPSED_PROVIDER_CATEGORIES: { ids: [], revision: 0 },
   COMPONENT_LOG_LEVELS: {}, // Custom log levels per component
   ENABLE_TRANSLATION_HISTORY: true, // Enable/disable translation history
   APPLICATION_LOCALIZE: "en",

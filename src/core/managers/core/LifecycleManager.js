@@ -227,6 +227,7 @@ class LifecycleManager {
       'REFRESH_CONTEXT_MENUS': Handlers.handleRefreshContextMenusLazy,
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
       [MessageActions.SETTINGS_UPDATED]: Handlers.handleSettingsUpdatedLazy,
+      [MessageActions.SET_PROVIDER_CATEGORY_COLLAPSED]: Handlers.handleSetProviderCategoryCollapsedLazy,
       
       // Lifecycle handlers
       'contextInvalid': Handlers.handleContextInvalid,

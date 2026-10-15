@@ -203,7 +203,7 @@ const getRawManifest = () => [
     name: ProviderNames.WEBAI,
     displayName: "WebAI Local Server",
     type: ProviderTypes.AI,
-    category: ProviderCategories.LOCAL,
+    category: ProviderCategories.AI,
     icon: "webai.png",
     importFunction: () => import("./WebAI.js").then(m => ({ default: m.WebAIProvider })),
     features: ["translation", "subtitle", "text", "autoDetect", "context", "offline", "dictionary", "bulk", "bilingual"],

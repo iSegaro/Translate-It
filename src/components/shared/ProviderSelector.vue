@@ -269,69 +269,94 @@
         @mouseleave="focusedIndex = -1"
       >
         <div
-          v-for="group in groupedMenu"
+          v-for="group in visibleGroups"
           :key="group.key"
           class="ti-dropdown-group"
           :role="group.header ? 'group' : undefined"
           :aria-labelledby="group.headerId || undefined"
         >
-          <!-- Category heading (announced via the group's aria-labelledby) -->
-          <div
+          <!-- Category heading: an accessible disclosure button (was an
+               aria-hidden label). Toggles this group's persisted collapse
+               state via the storage lane; Default/Sync/Configure stay
+               outside collapse. -->
+          <button
             v-if="group.header"
             :id="group.headerId"
+            type="button"
             class="ti-dropdown-group-header"
-            aria-hidden="true"
+            :class="{ 'is-collapsed': group.collapsed }"
+            :aria-expanded="!group.collapsed"
+            :aria-controls="group.rowsId"
+            @click="toggleCategoryCollapse(group)"
           >
-            {{ group.header }}
-          </div>
+            <span class="ti-dropdown-group-title">{{ group.header }}</span>
+            <Icon
+              icon="fa6-solid:chevron-down"
+              class="ti-provider-chevron"
+              :class="{ 'is-expanded': !group.collapsed }"
+            />
+          </button>
 
+          <!-- Row list of one group: the wrapper is the stable aria-controls
+               target for the header disclosure and stays in the DOM when
+               collapsed (empty, so no rows render, no focusables live here and
+               no vertical gap appears) — rows are withdrawn from the menu
+               when collapsed (headers stay; menu rows are only the visible
+               ones). -->
           <div
-            v-for="item in group.items"
-            :key="item.id"
-            class="ti-dropdown-item"
-            :class="{
-              'ti-active': currentProvider === item.id,
-              'is-focused': focusedIndex === item.index
-            }"
-            @click="selectProvider(item)"
-            @mouseenter="focusedIndex = item.index"
+            :id="group.rowsId || undefined"
+            class="ti-dropdown-group-rows"
           >
-            <!-- Semantic selection button: owns the full selectable rectangle
-                 (padding lives on it) and keyboard activation. The sibling star
-                 stays an independent control; the row is only a click safety
-                 net for edge/gap hits. -->
-            <button
-              type="button"
-              class="ti-dropdown-item-btn"
-              :aria-current="currentProvider === item.id ? 'true' : undefined"
-              @click.stop="selectProvider(item)"
-              @focus="focusedIndex = item.index"
-            >
-              <img
-                :src="getProviderIcon(item.icon)"
-                alt=""
-                :class="{ 'ti-invert-dark': isProviderInverted(item.id) }"
+            <template v-if="!group.collapsed">
+              <div
+                v-for="item in group.items"
+                :key="item.id"
+                class="ti-dropdown-item"
+                :class="{
+                  'ti-active': currentProvider === item.id,
+                  'is-focused': focusedIndex === item.index
+                }"
+                @click="selectProvider(item)"
+                @mouseenter="focusedIndex = item.index"
               >
-              <span>{{ item.name }}</span>
-            </button>
+                <!-- Semantic selection button: owns the full selectable rectangle
+                     (padding lives on it) and keyboard activation. The sibling star
+                     stays an independent control; the row is only a click safety
+                     net for edge/gap hits. -->
+                <button
+                  type="button"
+                  class="ti-dropdown-item-btn"
+                  :aria-current="currentProvider === item.id ? 'true' : undefined"
+                  @click.stop="selectProvider(item)"
+                  @focus="handleRowFocus(item)"
+                >
+                  <img
+                    :src="getProviderIcon(item.icon)"
+                    alt=""
+                    :class="{ 'ti-invert-dark': isProviderInverted(item.id) }"
+                  >
+                  <span>{{ item.name }}</span>
+                </button>
 
-            <!-- Set as Default (Star) Icon — never in selection-only pickers,
-                 regardless of accidental allowSetDefault/isGlobal props -->
-            <button
-              v-if="!selectionOnly && allowSetDefault && !isGlobal"
-              type="button"
-              class="ti-set-default-btn"
-              :class="{ 'is-default': globalDefaultProvider === item.id }"
-              :title="globalDefaultProvider === item.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
-              :aria-label="globalDefaultProvider === item.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
-              :aria-pressed="globalDefaultProvider === item.id ? 'true' : 'false'"
-              @click.stop="setAsGlobalDefault(item)"
-            >
-              <Icon
-                :icon="globalDefaultProvider === item.id ? 'fa6-solid:star' : 'fa6-regular:star'"
-                class="ti-star-icon"
-              />
-            </button>
+                <!-- Set as Default (Star) Icon — never in selection-only pickers,
+                     regardless of accidental allowSetDefault/isGlobal props -->
+                <button
+                  v-if="!selectionOnly && allowSetDefault && !isGlobal"
+                  type="button"
+                  class="ti-set-default-btn"
+                  :class="{ 'is-default': globalDefaultProvider === item.id }"
+                  :title="globalDefaultProvider === item.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+                  :aria-label="globalDefaultProvider === item.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+                  :aria-pressed="globalDefaultProvider === item.id ? 'true' : 'false'"
+                  @click.stop="setAsGlobalDefault(item)"
+                >
+                  <Icon
+                    :icon="globalDefaultProvider === item.id ? 'fa6-solid:star' : 'fa6-regular:star'"
+                    class="ti-star-icon"
+                  />
+                </button>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -421,7 +446,7 @@
 
 <script setup>
 import './ProviderSelector.scss'
-import { ref, computed, onMounted, onUnmounted, nextTick, useId } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, useId } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
@@ -567,6 +592,10 @@ const dropdownMenuElRef = ref(null)
 const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const focusedIndex = ref(-1)
+// Identity of the row that last received REAL focus (recorded at the focus
+// event, before any reactive reshaping) — external collapse reconciliation
+// re-anchors by this id.
+const rowFocusProviderId = ref('')
 const dropdownMaxHeight = ref('400px')
 const dropdownStyles = ref({})
 
@@ -694,11 +723,13 @@ const handleKeydown = (event) => {
   switch (key) {
     case 'ArrowDown':
       event.preventDefault()
+      if (!menuItems.value.length) break
       focusedIndex.value = (focusedIndex.value + 1) % menuItems.value.length
       moveListFocus()
       break
     case 'ArrowUp':
       event.preventDefault()
+      if (!menuItems.value.length) break
       focusedIndex.value = (focusedIndex.value - 1 + menuItems.value.length) % menuItems.value.length
       moveListFocus()
       break
@@ -717,6 +748,15 @@ const handleKeydown = (event) => {
     // 'Tab': let the browser move focus naturally (item → star → sync →
     // configure); the menu closes via focusout once focus leaves it.
   }
+}
+
+/**
+ * Records the row that actually received real focus: contiguous focusedIndex
+ * plus its stable provider id for the external-collapse reconciliation.
+ */
+const handleRowFocus = (item) => {
+  focusedIndex.value = item.index
+  rowFocusProviderId.value = item.id
 }
 
 /**
@@ -752,9 +792,12 @@ const moveListFocus = () => {
  */
 const handleMenuKeydown = (event) => {
   const { key } = event
-  if (key === 'Escape' && props.selectionOnly) {
+  // Escape must close/re-focus even with zero visible rows: category headers
+  // remain rendered when every group is collapsed, so handle it before the
+  // empty-menu early return.
+  if (key === 'Escape') {
     event.preventDefault()
-    event.stopPropagation()
+    if (props.selectionOnly) event.stopPropagation()
     closeDropdown(true)
     return
   }
@@ -779,12 +822,6 @@ const handleMenuKeydown = (event) => {
       selectProvider(items[focusedIndex.value])
     }
     return
-  }
-
-  if (key === 'Escape') {
-    event.preventDefault()
-    if (props.selectionOnly) event.stopPropagation()
-    closeDropdown(true)
   }
 }
 
@@ -940,7 +977,7 @@ const availableProviders = computed(() => {
   return mappedProviders;
 });
 
-// ─── Conditional Category Grouping (Traditional / AI / Local) ──────────────
+// ─── Conditional Category Grouping (Traditional / AI / Other) ──────────────
 // Grouping is view-only on top of availableProviders (filters + synthetic
 // Default stay untouched). Rules:
 // - Only group when >= 6 visible real providers span >= 2 categories; keep the
@@ -998,13 +1035,14 @@ const groupedMenu = computed(() => {
       let cursor = 0
       return entries.map((entry, groupIndex) => ({
         key: `${entry.key}-${groupIndex}`,
+        categoryId: entry.key,
         header: entry.header,
         headerId: entry.header ? `${dropdownUid}-group-${groupIndex}` : '',
         items: entry.items.map(provider => ({ ...provider, index: cursor++ }))
       }))
     }
     const items = all.map((provider, index) => ({ ...provider, index }))
-    return [{ key: 'flat', header: '', headerId: '', items }]
+    return [{ key: 'flat', header: '', headerId: '', categoryId: '', items }]
   }
 
   const order = ['free', 'ai', 'local']
@@ -1047,13 +1085,236 @@ const groupedMenu = computed(() => {
   let cursor = 0
   return entries.map((entry, groupIndex) => ({
     key: `${entry.key}-${groupIndex}`,
+    categoryId: entry.key,
     header: entry.header,
     headerId: entry.header ? `${dropdownUid}-group-${groupIndex}` : '',
     items: entry.items.map(provider => ({ ...provider, index: cursor++ }))
   }))
 })
 
-const menuItems = computed(() => groupedMenu.value.flatMap(group => group.items))
+/**
+ * Downstream collapsible application: groups with a category header become
+ * disclosure groups whose rows are withdrawn from the visible menu when the
+ * persisted collapsed-category store marks them. Grouping/filtering/
+ * eligibility (groupedMenu) is untouched; this only shapes what is rendered
+ * and navigable. Default/Sync/Configure/headerless groups stay expanded.
+ */
+const visibleGroups = computed(() => {
+  const all = groupedMenu.value
+  if (props.selectionOnly) return all
+  // Rendered rows are re-indexed contiguously over the visible order so
+  // focusedIndex/menuItems stay aligned when a group is withdrawn. Collapsed
+  // groups still carry their full items (count powers index-shift math) but
+  // are not rendered.
+  let nextIndex = 0
+  return all.map((group) => {
+    const collapsed = Boolean(group.header && group.categoryId && viewCategoryCollapsed(group.categoryId))
+    const startIndex = nextIndex
+    const items = collapsed
+      ? group.items
+      : group.items.map(provider => ({ ...provider, index: nextIndex++ }))
+    return {
+      ...group,
+      collapsed,
+      items,
+      rowsId: group.headerId ? `${group.headerId}-items` : '',
+      startIndex
+    }
+  })
+})
+
+/**
+ * Stable category IDs persisted by the storage lane. Canonical shape is a
+ * versioned { ids, revision } payload; a plain ID array from the handoff
+ * window is accepted defensively too.
+ */
+const normalizeCollapsedCategoryIds = (value) => {
+  if (Array.isArray(value)) return value
+  if (value && Array.isArray(value.ids)) return value.ids
+  return []
+}
+
+const collapsedCategoryIds = computed(() =>
+  new Set(normalizeCollapsedCategoryIds(settingsStore.settings?.COLLAPSED_PROVIDER_CATEGORIES)))
+
+const isCategoryCollapsed = (categoryId) => collapsedCategoryIds.value.has(categoryId)
+
+// Pending per-category collapse intent, applied to the view immediately on
+// click. The store action does NOT update state synchronously — state arrives
+// reactively with the authoritative storage event / promise result, so the
+// intent bridges the gap and is cleared by the reconciliation watch below
+// once the authoritative state agrees (or on rejection, where the display
+// reverts to the store and the failure surfaces through handleError).
+const collapseOverrides = reactive(new Map())
+// Per-category token for the in-flight persistence request: only the latest
+// request's outcome (or an external authoritative event after completion) may
+// reconcile the display, so superseded rapid toggles can never flap the view.
+const collapseTokens = new Map()
+let collapseTokenSeed = 0
+
+/**
+ * External authoritative collapse changes while the open menu reshapes
+ * visible rows: re-anchor real focus by provider identity, never by stale
+ * index. Snapshot conditions — real focus must sit on a provider row inside
+ * this menu (never on a disclosure header, footer action, the trigger or an
+ * outside control). After the DOM flush: a still-visible provider keeps real
+ * focus (node persists or is re-focused) and just gets a fresh contiguous
+ * focusedIndex; a withdrawn one hands focus to its category's disclosure
+ * button. Categories owned by our own in-flight requests are left to the
+ * local toggle path, which already moves focus; the watch skip below keeps
+ * rapid-toggle handling untouched.
+ */
+const reconcileFocusToVisibleRows = () => {
+  // Root-aware active element: inside a (open) ShadowRoot document.activeElement
+  // is the shadow HOST, while the menu's getRootNode().activeElement is the
+  // focused descendant. The root is captured once for the snapshot and the
+  // same root is re-read after the DOM flush; Document roots behave exactly
+  // like plain document.activeElement.
+  const menuRoot = dropdownMenuElRef.value
+  if (!menuRoot?.isConnected) return
+  const focusRoot = menuRoot.getRootNode?.() ?? document
+
+  const focusedRow = focusRoot.activeElement?.closest?.('.ti-dropdown-item-btn')
+  if (!focusedRow || !menuRoot.contains(focusedRow)) return
+
+  const providerId = rowFocusProviderId.value
+  if (!providerId) return
+  nextTick(() => {
+    if (!isDropdownOpen.value) return
+    // Post-flush no-steal guard: focus may have moved since the snapshot.
+    // Reconcile only when
+    //  (a) the captured row still holds real focus (root-scoped), or
+    //  (b) the captured row was withdrawn by the collapse render and focus
+    //      fell to browser neutral as that removal's side effect.
+    // Neutral at document level is null/body; for a ShadowRoot it is also the
+    // null shadow-root activeElement while document-level focus merely sits on
+    // the host. A deliberately focused outside control (anything else) is
+    // never re-targeted — footer, another disclosure, the trigger, or outside.
+    const rootActive = focusRoot.activeElement ?? null
+    const docActive = document.activeElement
+    const rowStillFocused = rootActive === focusedRow
+    const rowRemoved = !focusedRow.isConnected
+    // Neutral = the focused row's tree-level focus was dropped without a
+    // deliberate redirect. Document root: null or body exactly as before.
+    // ShadowRoot: its own activeElement is null while document-level focus
+    // only sits on the host (or is otherwise gone). A deliberately focused
+    // outside control (anything else) is never re-targeted — footer, another
+    // disclosure, the trigger, or outside.
+    const focusNeutral = focusRoot === document
+      ? (rootActive === null || rootActive === document.body)
+      : (rootActive === null && (!docActive || docActive === document.body || docActive === focusRoot.host))
+    if (!rowStillFocused && !(rowRemoved && focusNeutral)) return
+    const newIndex = menuItems.value.findIndex((item) => item.id === providerId)
+    if (newIndex >= 0) {
+      focusedIndex.value = newIndex
+      const rowButton = dropdownMenuRef.value?.querySelectorAll('.ti-dropdown-item-btn')[newIndex]
+      if (rowButton && rootActive !== rowButton) {
+        rowButton.focus()
+        scrollToFocused()
+      }
+      return
+    }
+    const owningGroup = visibleGroups.value.find((group) =>
+      group.headerId && group.items.some((item) => item.id === providerId))
+    if (!owningGroup) return
+    focusedIndex.value = -1
+    dropdownMenuRef.value?.querySelector(`#${owningGroup.headerId}`)?.focus()
+  })
+}
+
+watch(collapsedCategoryIds, (authoritativeIds, previousIds) => {
+  for (const [categoryId, intent] of [...collapseOverrides]) {
+    if (collapseTokens.has(categoryId)) continue
+    if (authoritativeIds.has(categoryId) === intent) collapseOverrides.delete(categoryId)
+  }
+
+  // Focus reconciliation only for changes no local request owns: every
+  // changed category with a pending token is ours and the local toggle path
+  // already moved focus; mixed events still reconcile for the external part.
+  const previousSet = previousIds ?? new Set()
+  let externalChange = false
+  authoritativeIds.forEach((id) => {
+    if (!previousSet.has(id) && !collapseTokens.has(id)) externalChange = true
+  })
+  previousSet.forEach((id) => {
+    if (!authoritativeIds.has(id) && !collapseTokens.has(id)) externalChange = true
+  })
+  if (externalChange) reconcileFocusToVisibleRows()
+})
+
+const viewCategoryCollapsed = (categoryId) =>
+  collapseOverrides.has(categoryId)
+    ? collapseOverrides.get(categoryId)
+    : isCategoryCollapsed(categoryId)
+
+/**
+ * Toggles one collapsible category's persisted collapse state. The view flips
+ * immediately (pending intent), so rapid toggles of the same header before an
+ * earlier persistence resolves always carry a fresh, opposite intent.
+ * Persistence failures delete that category's intent (display reverts to the
+ * authoritative store state) and surface through handleError — never
+ * swallowed. Real focus and focusedIndex are reconciled with the reshaped
+ * visible row list (see below).
+ */
+const toggleCategoryCollapse = async (group) => {
+  const categoryId = group.categoryId
+  const collapsing = !viewCategoryCollapsed(categoryId)
+  const start = group.startIndex
+  const length = group.items.length
+
+  // If real focus sits on a row this toggle withdraws, move it to the group's
+  // header button after the collapse render settles (same post-flush focus
+  // discipline as moveListFocus — the flush can replace menu nodes); rows in
+  // earlier groups keep their indices, rows in later ones keep real focus (DOM
+  // nodes persist) and only their focusedIndex shifts.
+  if (collapsing && focusedIndex.value >= start && focusedIndex.value < start + length) {
+    focusedIndex.value = -1
+    nextTick(() => {
+      dropdownMenuRef.value?.querySelector(`#${group.headerId}`)?.focus()
+    })
+  } else if (collapsing && focusedIndex.value >= start + length) {
+    focusedIndex.value -= length
+  } else if (!collapsing && focusedIndex.value >= start) {
+    focusedIndex.value += length
+  }
+
+  const token = ++collapseTokenSeed
+  collapseTokens.set(categoryId, token)
+  collapseOverrides.set(categoryId, collapsing)
+
+  if (typeof settingsStore.setProviderCategoryCollapsed !== 'function') {
+    // Handoff window without the store action: nothing authoritative can land,
+    // so reverse the local intent to keep the display reconciled.
+    collapseTokens.delete(categoryId)
+    collapseOverrides.delete(categoryId)
+    logger.debug('setProviderCategoryCollapsed unavailable; collapse not persisted')
+    return
+  }
+  try {
+    await settingsStore.setProviderCategoryCollapsed(categoryId, collapsing)
+  } catch (error) {
+    // Only the request whose decision is still current unwinds its intent; a
+    // superseded request's failure never reverts the newest toggle's view.
+    if (collapseTokens.get(categoryId) === token) {
+      collapseTokens.delete(categoryId)
+      if (collapseOverrides.get(categoryId) === collapsing) {
+        collapseOverrides.delete(categoryId)
+      }
+    }
+    logger.error('Failed to persist category collapse state:', categoryId, error)
+    await handleError(error, 'provider-selector-toggle-collapse')
+    return
+  }
+  // This request is still the category's latest: its authoritative state will
+  // agree with the intent, so reconcile the display to the store now.
+  if (collapseTokens.get(categoryId) === token) {
+    collapseTokens.delete(categoryId)
+    collapseOverrides.delete(categoryId)
+  }
+}
+
+const menuItems = computed(() =>
+  visibleGroups.value.flatMap(group => group.collapsed ? [] : group.items))
 
 /**
  * Opens the Providers tab of the options page (background resolves the anchor).
@@ -1305,8 +1566,17 @@ const toggleDropdown = () => {
         closeDropdown()
         return
       }
-      // Move real focus into the menu so keyboard interaction is immediate
-      moveListFocus()
+      if (menuItems.value.length) {
+        // Move real focus into the menu so keyboard interaction is immediate
+        moveListFocus()
+      } else {
+        // Zero visible rows (every collapsible category collapsed, no
+        // synthetic Default): seed focus on the first disclosure button so the
+        // opening keyboard path is operational — Enter/Space natively expand;
+        // Default keeps row priority whenever it renders.
+        focusedIndex.value = -1
+        dropdownMenuRef.value?.querySelector('.ti-dropdown-group-header')?.focus()
+      }
       scrollToFocused()
     })
   }

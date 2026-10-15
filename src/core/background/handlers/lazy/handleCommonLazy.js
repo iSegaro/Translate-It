@@ -74,6 +74,16 @@ export async function handleSettingsUpdatedLazy(message, sender, sendResponse) {
     }
 }
 
+export async function handleSetProviderCategoryCollapsedLazy(message, sender) {
+    try {
+        const { handleSetProviderCategoryCollapsed } = await import('../common/handleProviderCategoryCollapse.js');
+        return handleSetProviderCategoryCollapsed(message, sender);
+    } catch (error) {
+        logger.error('Failed to load provider category collapse handler:', error);
+        return { success: false, error: 'Failed to save provider category state' };
+    }
+}
+
 export async function handleLiveDubbingStartLazy(message, sender) {
     try {
         const { handleLiveDubbingStart } = await import('@/features/live-dubbing/background/handlers.js');

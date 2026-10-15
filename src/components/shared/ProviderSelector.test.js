@@ -6,8 +6,27 @@ const settingsStore = vi.hoisted(() => ({
   settings: null,
   isDarkTheme: false,
   updateSettingAndPersist: vi.fn(),
+  setProviderCategoryCollapsed: vi.fn(),
 }))
 settingsStore.settings = reactive({ TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [] })
+// Storage-lane contract: action receives (categoryId, collapsed) and does NOT
+// update state synchronously; the authoritative { ids, revision } entry lands
+// reactively with the promise result. `behavior` may replace the default
+// (deferred control) in specific tests.
+const makeCollapseStore = (behavior) => {
+  settingsStore.setProviderCategoryCollapsed.mockReset()
+  settingsStore.setProviderCategoryCollapsed.mockImplementation(async (categoryId, collapsed) => {
+    if (behavior) return behavior(categoryId, collapsed)
+    const current = settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES
+    const ids = Array.isArray(current)
+      ? [...current]
+      : (current && Array.isArray(current.ids) ? [...current.ids] : [])
+    const nextIds = ids.filter((id) => id !== categoryId)
+    if (collapsed) nextIds.push(categoryId)
+    settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES = { ids: nextIds, revision: (current?.revision || 0) + 1 }
+  })
+}
+makeCollapseStore()
 const translationStore = vi.hoisted(() => ({ ephemeralSync: null, selectedProvider: null }))
 translationStore.ephemeralSync = reactive({ page: false, element: false })
 const registry = vi.hoisted(() => ({
@@ -31,8 +50,9 @@ vi.mock('@/features/translation/stores/translation.js', () => ({
 
 vi.mock('@/core/helpers.js', () => ({ openOptionsPage }))
 
+const errorHandler = vi.hoisted(() => ({ handleError: vi.fn() }))
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
-  useErrorHandler: () => ({ handleError: vi.fn() }),
+  useErrorHandler: () => errorHandler,
 }))
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
@@ -51,14 +71,14 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
         provider_does_not_support_bulk: 'This provider does not support Page Translate and Select Element translation.',
         provider_category_free: 'Traditional',
         provider_category_ai: 'AI',
-        provider_category_local: 'Local',
+        provider_category_local: 'Other',
         provider_category_custom: 'Custom List',
         configure_providers: 'Configure Providers',
         custom_provider_list_add_placeholder: 'Add a provider…',
       }
       if (labels[key]) return labels[key]
       if (/(traditional|free)/i.test(key) && /(category|group|provider)/i.test(key)) return 'Traditional'
-      if (/local/i.test(key) && /(category|group|provider)/i.test(key)) return 'Local'
+      if (/local/i.test(key) && /(category|group|provider)/i.test(key)) return 'Other'
       if (/\bai\b|_ai|ai_/i.test(key) && /(category|group|provider)/i.test(key)) return 'AI'
       if (/configure.*provider|provider.*configure/i.test(key)) return 'Configure Providers'
       if (/page/i.test(key) && /sync/i.test(key)) return `Page Translate: ${values.providerName || values.provider || values.service || key}`
@@ -411,14 +431,17 @@ describe('ProviderSelector provider list contract', () => {
     Object.assign(settingsStore.settings, {
       TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [],
       CUSTOM_PROVIDER_LIST_ENABLED: false, CUSTOM_PROVIDER_LIST: [],
+      COLLAPSED_PROVIDER_CATEGORIES: [],
     })
     settingsStore.updateSettingAndPersist.mockReset()
+    makeCollapseStore()
     openOptionsPage.mockReset()
     Object.assign(translationStore.ephemeralSync, { page: false, element: false })
     translationStore.selectedProvider = null
     deactivateSelectMode.mockReset()
     selectMode.active = false
     extensionContext.isContentScript = false
+    errorHandler.handleError.mockReset()
   })
 
   it('groups six providers by registry category in Traditional, AI, Local order, preserving manifest order', async () => {
@@ -429,8 +452,8 @@ describe('ProviderSelector provider list contract', () => {
       const categoryLabels = Array.from(menu.element.querySelectorAll('*'))
         .filter((element) => !element.closest('.ti-dropdown-item') && element.children.length === 0)
         .map((element) => element.textContent.trim())
-        .filter((text) => ['Traditional', 'AI', 'Local'].includes(text))
-      expect(categoryLabels).toEqual(['Traditional', 'AI', 'Local'])
+        .filter((text) => ['Traditional', 'AI', 'Other'].includes(text))
+      expect(categoryLabels).toEqual(['Traditional', 'AI', 'Other'])
       expect(menu.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
         'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
       ])
@@ -529,7 +552,7 @@ describe('ProviderSelector provider list contract', () => {
     try {
       await wrapper.find('.ti-provider-button').trigger('click')
       const menu = wrapper.find('.ti-provider-dropdown-menu')
-      expect(Array.from(menu.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List', 'Traditional', 'AI', 'Local'])
+      expect(Array.from(menu.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List', 'Traditional', 'AI', 'Other'])
       expect(menu.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
         'Default', 'Gemini', 'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Browser',
       ])
@@ -616,7 +639,7 @@ describe('ProviderSelector provider list contract', () => {
       expect(Array.from(select.options, option => option.value)).toEqual([
         'openai', 'gemini', 'googlev2', 'deepl', 'unconfigured', 'browser',
       ])
-      expect(Array.from(select.children, child => child.label)).toEqual(['Custom List', 'Traditional', 'Local'])
+      expect(Array.from(select.children, child => child.label)).toEqual(['Custom List', 'Traditional', 'Other'])
     } finally {
       compact.wrapper.unmount()
       compact.container.remove()
@@ -625,7 +648,7 @@ describe('ProviderSelector provider list contract', () => {
     const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
     try {
       await wrapper.find('.ti-provider-button').trigger('click')
-      expect(Array.from(wrapper.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List', 'Traditional', 'Local'])
+      expect(Array.from(wrapper.findAll('.ti-dropdown-group-header'), header => header.text())).toEqual(['Custom List', 'Traditional', 'Other'])
     } finally {
       wrapper.unmount()
       container.remove()
@@ -1949,6 +1972,1200 @@ describe('ProviderSelector provider list contract', () => {
     } finally {
       dialog.remove()
       raf.restore()
+    }
+  })
+})
+
+describe('ProviderSelector collapsible category groups', () => {
+  beforeEach(() => {
+    registry.providers = providers.map((provider) => ({ ...provider }))
+    Object.assign(settingsStore.settings, {
+      TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [],
+      CUSTOM_PROVIDER_LIST_ENABLED: false, CUSTOM_PROVIDER_LIST: [],
+      COLLAPSED_PROVIDER_CATEGORIES: [],
+    })
+    makeCollapseStore()
+    settingsStore.updateSettingAndPersist.mockReset()
+    openOptionsPage.mockReset()
+    Object.assign(translationStore.ephemeralSync, { page: false, element: false })
+    translationStore.selectedProvider = null
+    deactivateSelectMode.mockReset()
+    selectMode.active = false
+    extensionContext.isContentScript = false
+    errorHandler.handleError.mockReset()
+  })
+
+  const openMenu = async (wrapper) => {
+    const anchor = wrapper.find('.ti-provider-button-container')
+    vi.spyOn(anchor.element, 'getBoundingClientRect').mockReturnValue({
+      top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+    })
+    await wrapper.find('.ti-provider-button').trigger('click')
+    return wrapper.find('.ti-provider-dropdown-menu')
+  }
+
+  // Deterministic flush for promise reactions + Vue watcher/render queues.
+  const flushReactions = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  }
+
+  // Real-teleport open helper: mocks the anchor rect, opens the menu, and
+  // settles the open-time focus move across two flushes.
+  const openRealMenu = async (wrapper, rect = {}) => {
+    const anchor = wrapper.element.querySelector('.ti-provider-button-container')
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+      top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+      ...rect,
+    })
+    await wrapper.find('.ti-provider-button').trigger('click')
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+  }
+
+  // Steps real-focus down one row per call (double-flush discipline mirrors
+  // the component's post-render focus move).
+  const arrowDown = async (wrapper) => {
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+  }
+
+  // Shadow-root variant: dispatch from the root's own activeElement (the
+  // document-level activeElement is the host when focus lives in a ShadowRoot).
+  const shadowArrowDown = async (wrapper, shadowRoot) => {
+    shadowRoot.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+  }
+
+  it('renders accessible disclosure headers with unique IDs, expand state, and chevron', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const headers = menu.findAll('.ti-dropdown-group-header')
+      expect(headers.map((header) => header.text().trim())).toEqual(['Traditional', 'AI', 'Other'])
+      const headerIds = headers.map((header) => header.attributes('id'))
+      expect(headerIds.every(Boolean)).toBe(true)
+      expect(new Set(headerIds).size).toBe(headerIds.length)
+      headers.forEach((header) => {
+        expect(header.attributes('aria-expanded')).toBe('true')
+        const rowsId = header.attributes('aria-controls')
+        expect(rowsId).toBeTruthy()
+        const rows = menu.findAll(`[id="${rowsId}"] .ti-dropdown-item`)
+        expect(rows.length).toBeGreaterThan(0)
+        expect(header.find('.ti-provider-chevron').exists()).toBe(true)
+      })
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('collapses a category on header click: rows withdraw, header persists, store persists the stable ID', async () => {    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const [traditional] = menu.findAll('.ti-dropdown-group-header')
+      expect(traditional.attributes('aria-expanded')).toBe('true')
+
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(settingsStore.setProviderCategoryCollapsed).toHaveBeenCalledWith('free', true)
+      expect(settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES.ids).toEqual(['free'])
+
+      // Header persists while visible; rows of the collapsed group withdraw
+      // and later groups keep order. The open menu re-renders in place.
+      const traditionalAfter = wrapper.findAll('.ti-dropdown-group-header')
+        .find((header) => header.text().trim() === 'Traditional')
+      expect(traditionalAfter.exists()).toBe(true)
+      expect(traditionalAfter.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      await traditionalAfter.trigger('click')
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(settingsStore.setProviderCategoryCollapsed).toHaveBeenCalledWith('free', false)
+      expect(settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES.ids).toEqual([])
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('shares persisted category collapse state between mounted selectors', async () => {
+    const first = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    const second = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const firstMenu = await openMenu(first.wrapper)
+      const firstTraditional = firstMenu.findAll('.ti-dropdown-group-header')
+        .find((header) => header.text().trim() === 'Traditional')
+      await firstTraditional.trigger('click')
+      await first.wrapper.vm.$nextTick()
+      await second.wrapper.vm.$nextTick()
+      await flushReactions()
+      await second.wrapper.vm.$nextTick()
+
+      const secondMenu = await openMenu(second.wrapper)
+      const secondTraditional = secondMenu.findAll('.ti-dropdown-group-header')
+        .find((header) => header.text().trim() === 'Traditional')
+      expect(secondTraditional.attributes('aria-expanded')).toBe('false')
+      expect(secondMenu.findAll('.ti-dropdown-item').map((item) => item.text().trim()))
+        .not.toContain('Google')
+
+      await secondTraditional.trigger('click')
+      await second.wrapper.vm.$nextTick()
+      await flushReactions()
+
+      const reopenedFirstMenu = await openMenu(first.wrapper)
+      const firstTraditionalAfter = reopenedFirstMenu.findAll('.ti-dropdown-group-header')
+        .find((header) => header.text().trim() === 'Traditional')
+      expect(firstTraditionalAfter.attributes('aria-expanded')).toBe('true')
+      expect(reopenedFirstMenu.findAll('.ti-dropdown-item').map((item) => item.text().trim()))
+        .toContain('Google')
+    } finally {
+      first.wrapper.unmount()
+      first.container.remove()
+      second.wrapper.unmount()
+      second.container.remove()
+    }
+  })
+
+  it('applies the versioned persisted shape and star/sync controls keep working around collapsed groups', async () => {
+    Object.assign(settingsStore.settings, {
+      COLLAPSED_PROVIDER_CATEGORIES: { ids: ['free'], revision: 2 },
+    })
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', modelValue: 'googlev2', allowDefault: true, allowSetDefault: true, isGlobal: false, showSync: true,
+    })
+    try {
+      const menu = await openMenu(wrapper)
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Default', 'OpenAI', 'Gemini', 'Browser',
+      ])
+      // Default entry remains visible and carries no disclosure header.
+      const headers = menu.findAll('.ti-dropdown-group-header').map((header) => header.text().trim())
+      expect(headers).toEqual(['Traditional', 'AI', 'Other'])
+      // Star and sync stay functional with collapsed categories (the Default
+      // row also carries a star; target the OpenAI row's own star).
+      const openAiRow = wrapper.findAll('.ti-dropdown-item')
+        .find((item) => item.text().trim().includes('OpenAI'))
+      await openAiRow.find('.ti-set-default-btn').trigger('click')
+      expect(settingsStore.updateSettingAndPersist).toHaveBeenCalledWith('TRANSLATION_API', 'openai')
+      // The star action dismissed the menu; reopen for the sync row check.
+      const reOpenedTrigger = wrapper.find('.ti-provider-button')
+      await reOpenedTrigger.trigger('click')
+      await wrapper.vm.$nextTick()
+      const syncRow = wrapper.findAll('.ti-sync-row').at(0)
+      await syncRow.trigger('click')
+      expect(translationStore.ephemeralSync.page).toBe(true)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('custom list groups collapse under their stable ID and disabled custom list yields no header', async () => {
+    Object.assign(settingsStore.settings, {
+      CUSTOM_PROVIDER_LIST_ENABLED: true,
+      CUSTOM_PROVIDER_LIST: ['gemini'],
+      COLLAPSED_PROVIDER_CATEGORIES: [],
+    })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const [customHeader] = menu.findAll('.ti-dropdown-group-header')
+      expect(menu.findAll('.ti-dropdown-group-header').map((header) => header.text().trim())).toEqual(['Custom List', 'Traditional', 'AI', 'Other'])
+
+      await customHeader.trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(settingsStore.setProviderCategoryCollapsed).toHaveBeenCalledWith('custom-list', true)
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Browser',
+      ])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+
+    Object.assign(settingsStore.settings, { CUSTOM_PROVIDER_LIST_ENABLED: false, CUSTOM_PROVIDER_LIST: [] })
+    const flat = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const flatMenu = await openMenu(flat.wrapper)
+      // Still grouped by category (threshold unchanged) but no Custom List
+      // header; a stale collapsed custom-list ID hides nothing.
+      const flatHeaders = flatMenu.findAll('.ti-dropdown-group-header').map((header) => header.text().trim())
+      expect(flatHeaders).toEqual(['Traditional', 'AI', 'Other'])
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['custom-list'] })
+      expect(flat.wrapper.vm.$.setupState.visibleGroups.length).toBe(3)
+      expect(flat.wrapper.vm.$.setupState.menuItems).toHaveLength(6)
+      expect(flatMenu.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+    } finally {
+      flat.wrapper.unmount()
+      flat.container.remove()
+    }
+  })
+
+  it('keyboard navigation walks visible rows only and Enter selects in the reshaped order', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      await openMenu(wrapper)
+      // Collapse the first group via its header (pending intent applies
+      // immediately), then close and re-open the menu.
+      const [traditional] = wrapper.findAll('.ti-dropdown-group-header')
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click') // close
+      await wrapper.find('.ti-provider-button').trigger('click') // re-open
+      await wrapper.vm.$nextTick()
+      const keyOnFocusedControl = async (key) => {
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+        await wrapper.vm.$nextTick()
+      }
+      // Selected provider is hidden inside the collapsed group: focus starts
+      // on the first visible row (OpenAI) and stays contiguously ordered.
+      expect(document.activeElement.textContent).toContain('OpenAI')
+      await keyOnFocusedControl('ArrowDown')
+      await keyOnFocusedControl('Enter')
+      expect(wrapper.emitted('provider-change')).toEqual([['gemini']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  // Uses the real teleported menu (production path) so nodes persist across
+  // the collapse re-render, as in the browser.
+  it('collapsing a group that holds real focus moves focus to its header button', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      const anchor = wrapper.element.querySelector('.ti-provider-button-container')
+      vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+        top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+      })
+      await wrapper.find('.ti-provider-button').trigger('click')
+      // Opening placed real focus on the first row (inside Traditional).
+      const firstRowButton = document.activeElement
+      expect(firstRowButton.textContent).toContain('Google')
+
+      const header = document.body.querySelectorAll('.ti-dropdown-group-header')[0]
+      header.click()
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(header.isConnected).toBe(true)
+      expect(document.activeElement).toBe(header)
+      expect(header.getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  // Uses the real teleported menu (production path) so row DOM nodes persist
+  // across the expansion re-render, as in the browser.
+  it('expanding above a later focused row keeps real focus and shifts its index correctly', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      const anchor = wrapper.element.querySelector('.ti-provider-button-container')
+      vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+        top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+      })
+      await wrapper.find('.ti-provider-button').trigger('click')
+      // Collapse Traditional via its header.
+      document.body.querySelectorAll('.ti-dropdown-group-header')[0].click()
+      await wrapper.vm.$nextTick()
+      expect(Array.from(document.body.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim()))
+        .toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click') // close
+      await trigger.trigger('click') // re-open
+      await wrapper.vm.$nextTick()
+      // Real focus starts on OpenAI (first visible row, AI group below the
+      // collapsed Traditional group).
+      const openAiBtn = document.activeElement
+      expect(document.activeElement.textContent).toContain('OpenAI')
+
+      // Expand Traditional: rows re-inserted above OpenAI; the focused row's
+      // index must shift so OpenAI stays index 3 (menuItems visible rows).
+      Array.from(document.body.querySelectorAll('.ti-dropdown-group-header'))
+        .find((header) => header.textContent.trim() === 'Traditional')
+        .click()
+      await wrapper.vm.$nextTick()
+      expect(openAiBtn.isConnected).toBe(true)
+      expect(document.activeElement).toBe(openAiBtn)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(3)
+
+      // From the row, ArrowDown moves to the row right after OpenAI: Gemini.
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement.textContent).toContain('Gemini')
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')).toEqual([['gemini']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('persistence failure reverts the pending intent and surfaces through handleError', async () => {
+    makeCollapseStore(async () => { throw new Error('persist failed') })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const [traditional] = menu.findAll('.ti-dropdown-group-header')
+      await traditional.trigger('click')
+      // Pending intent flips the view immediately, ahead of persistence.
+      const traditionalPending = wrapper.findAll('.ti-dropdown-group-header')
+        .find((header) => header.text().trim() === 'Traditional')
+      expect(traditionalPending.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.vm.$nextTick()
+      // Store rejected without reacting: pending intent unwinds, display reverts.
+      const traditionalReverted = wrapper.findAll('.ti-dropdown-group-header')
+        .find((header) => header.text().trim() === 'Traditional')
+      expect(traditionalReverted.attributes('aria-expanded')).toBe('true')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+      expect(settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual([])
+      expect(errorHandler.handleError).toHaveBeenCalledTimes(1)
+      expect(errorHandler.handleError).toHaveBeenCalledWith(expect.any(Error), 'provider-selector-toggle-collapse')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      makeCollapseStore()
+    }
+  })
+
+  it('rapid toggles before persistence resolves queue fresh opposite intents deterministically', async () => {
+    // Deferred control: promises resolve only on demand; authoritative state
+    // lands manually as the lane's storage event would.
+    const deferredActions = []
+    makeCollapseStore((categoryId, collapsed) => new Promise((resolve, reject) => {
+      deferredActions.push({ categoryId, collapsed, resolve, reject })
+    }))
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      let traditional = menu.findAll('.ti-dropdown-group-header')[0]
+
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+      traditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      // Pending intent: collapsed instantly, even though nothing persisted yet.
+      expect(traditional.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual(['OpenAI', 'Gemini', 'Browser'])
+      expect(settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual([])
+
+      // Second rapid click still flips the view to expanded (new intent), and
+      // the store stays untouched until authoritative events land.
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+      traditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(traditional.attributes('aria-expanded')).toBe('true')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+      expect(deferredActions.map((action) => [action.categoryId, action.collapsed])).toEqual([['free', true], ['free', false]])
+      expect(settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES).toEqual([])
+
+      // Stale first persistence resolves; the authoritative event toggling 'free'
+      // on must NOT override the newer expanding intent (display stays expanded).
+      deferredActions[0].resolve()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: { ids: ['free'], revision: 1 } })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+
+      // Newest persistence resolves; the authoritative state agrees with the
+      // pending intent and the reconciliation watch clears it.
+      deferredActions[1].resolve()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: { ids: [], revision: 2 } })
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+      expect(settingsStore.settings.COLLAPSED_PROVIDER_CATEGORIES.revision).toBe(2)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      makeCollapseStore()
+    }
+  })
+
+  it('keeps the header aria-controls target mounted (visible and collapsed) without rendering rows when collapsed', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const traditional = menu.findAll('.ti-dropdown-group-header')[0]
+      const rowsId = traditional.attributes('aria-controls')
+      expect(rowsId).toBeTruthy()
+      expect(menu.find(`[id="${rowsId}"]`).findAll('.ti-dropdown-item')).toHaveLength(3)
+
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+      // Whole menu re-query after the collapse render.
+      const collapsedMenu = wrapper.find('.ti-provider-dropdown-menu')
+      const collapsedHeader = collapsedMenu.findAll('.ti-dropdown-group-header')[0]
+      expect(collapsedHeader.attributes('aria-expanded')).toBe('false')
+      expect(collapsedHeader.attributes('aria-controls')).toBe(rowsId)
+      const target = collapsedMenu.find(`[id="${rowsId}"]`)
+      expect(target.exists()).toBe(true)
+      expect(target.findAll('.ti-dropdown-item')).toHaveLength(0)
+      expect(target.findAll('.ti-dropdown-item-btn')).toHaveLength(0)
+      expect(target.findAll('button')).toHaveLength(0)
+      // Expanded again: the same stable target resolves the rows.
+      await collapsedHeader.trigger('click')
+      await wrapper.vm.$nextTick()
+      const expandedMenu = wrapper.find('.ti-provider-dropdown-menu')
+      expect(expandedMenu.find(`[id="${rowsId}"]`).findAll('.ti-dropdown-item')).toHaveLength(3)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('Escape on a category header closes an all-collapsed zero-rows menu and restores trigger focus', async () => {
+    Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free', 'ai', 'local'] })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      expect(menu.findAll('.ti-dropdown-group-header').map((header) => header.text().trim())).toEqual(['Traditional', 'AI', 'Other'])
+      expect(menu.findAll('.ti-dropdown-item')).toHaveLength(0)
+
+      const header = menu.findAll('.ti-dropdown-group-header')[0]
+      header.element.focus()
+      header.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.ti-provider-dropdown-menu').exists()).toBe(false)
+      expect(document.activeElement).toBe(wrapper.find('.ti-provider-button').element)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('deferred rapid toggles: earlier acks and failures never clear the latest pending intent', async () => {
+    const deferredActions = []
+    makeCollapseStore((categoryId, collapsed) => new Promise((resolve, reject) => {
+      deferredActions.push({ categoryId, collapsed, resolve, reject })
+    }))
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const traditional = menu.findAll('.ti-dropdown-group-header')[0]
+      await traditional.trigger('click')
+      await traditional.trigger('click')
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+      // A(true) → B(false) → C(true): display follows the latest intent (collapsed).
+      expect(deferredActions.map((action) => [action.categoryId, action.collapsed])).toEqual([['free', true], ['free', false], ['free', true]])
+      let currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(currentTraditional.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      // A (earlier) FAILS: intent C survives, display stays collapsed.
+      deferredActions[0].reject(new Error('A failed'))
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(currentTraditional.attributes('aria-expanded')).toBe('false')
+      expect(errorHandler.handleError).toHaveBeenCalledTimes(1)
+
+      // B (superseded) acks false: transient authoritative expansion must not
+      // flip the view while C is still pending.
+      deferredActions[1].resolve()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: { ids: [], revision: 2 } })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(currentTraditional.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      // C (latest) succeeds: intent cleared, view reconciles to the store.
+      deferredActions[2].resolve()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: { ids: ['free'], revision: 3 } })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(currentTraditional.attributes('aria-expanded')).toBe('false')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual(['OpenAI', 'Gemini', 'Browser'])
+      expect(errorHandler.handleError).toHaveBeenCalledTimes(1)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      makeCollapseStore()
+    }
+  })
+
+  it('deferred failure of the latest request reverts the display; later superseded acks reconcile the store', async () => {
+    const deferredActions = []
+    makeCollapseStore((categoryId, collapsed) => new Promise((resolve, reject) => {
+      deferredActions.push({ categoryId, collapsed, resolve, reject })
+    }))
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      const traditional = menu.findAll('.ti-dropdown-group-header')[0]
+      await traditional.trigger('click')
+      await traditional.trigger('click')
+      await traditional.trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(deferredActions).toHaveLength(3)
+
+      // C (latest) FAILS first: display reverts to the store (expanded), and
+      // the failure surfaces through handleError.
+      deferredActions[2].reject(new Error('C failed'))
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      let currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(currentTraditional.attributes('aria-expanded')).toBe('true')
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+      expect(errorHandler.handleError).toHaveBeenCalledTimes(1)
+
+      // Superseded A now acks: completion passed, so the authoritative state
+      // drives the display (collapsed again).
+      deferredActions[0].resolve()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: { ids: ['free'], revision: 1 } })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(currentTraditional.attributes('aria-expanded')).toBe('false')
+
+      // Superseded B acks: authoritative expansion wins post-completion.
+      deferredActions[1].resolve()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: { ids: [], revision: 2 } })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      currentTraditional = wrapper.findAll('.ti-dropdown-group-header')[0]
+      expect(wrapper.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      makeCollapseStore()
+    }
+  })
+
+  it('external collapse focuses the matching disclosure when the focused row hides', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      await arrowDown(wrapper)
+      const deepLBtn = document.activeElement
+      expect(deepLBtn.textContent).toContain('DeepL')
+
+      // Authoritative external event (no local request owns it).
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(-1)
+      const header = document.activeElement
+      expect(header.classList.contains('ti-dropdown-group-header')).toBe(true)
+      expect(header.textContent).toContain('Traditional')
+      expect(header.getAttribute('aria-expanded')).toBe('false')
+      expect(Array.from(document.body.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim()))
+        .toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      // Escape from the disclosure restores trigger focus as before.
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(wrapper.find('.ti-provider-button').element)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('external collapse/expand above the focused row preserves real focus and shifts its index', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      await arrowDown(wrapper)
+      await arrowDown(wrapper)
+      await arrowDown(wrapper)
+      const openAiBtn = document.activeElement
+      expect(openAiBtn.textContent).toContain('OpenAI')
+
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      // Real focus never left the node; the index shifted contiguously.
+      expect(document.activeElement).toBe(openAiBtn)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(0)
+
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(openAiBtn)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(3)
+
+      // Keyboard continues from the re-anchored position.
+      await arrowDown(wrapper)
+      expect(document.activeElement.textContent).toContain('Gemini')
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')).toEqual([['gemini']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('post-flush no-steal guard: focus redirected between snapshot and repair survives (footer, header, expanded row)', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      // Walk to DeepL while real focus genuinely sits on the row.
+      for (let step = 0; step < 3; step += 1) {
+        if (document.activeElement.textContent.includes('DeepL')) break
+        await arrowDown(wrapper)
+      }
+      expect(document.activeElement.textContent).toContain('DeepL')
+      // The repair's identity source was recorded at the actual focus event.
+      expect(wrapper.vm.$.setupState.rowFocusProviderId).toBe('deepl')
+      const deepLBtn = document.activeElement
+
+      // Phase 1 (expanded-row redirect): order the events so the watcher's
+      // snapshot runs while the row is focused — mutate, yield exactly one
+      // microtask so the flush (snapshot + repair enqueue) completes, THEN
+      // redirect to the footer before the queued repair callback executes.
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await Promise.resolve()
+      const footer = document.body.querySelector('.ti-configure-row')
+      footer.focus()
+      await wrapper.vm.$nextTick()
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      // The withdrawal happened (watcher pipeline definitely ran) ...
+      expect(deepLBtn.isConnected).toBe(false)
+      expect(Array.from(document.body.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim())).toEqual([
+        'OpenAI', 'Gemini', 'Browser',
+      ])
+      // ... but the repair never moved focus away from the redirected footer.
+      expect(document.activeElement).toBe(footer)
+      // Without the post-flush guard the repair would have focused the
+      // Traditional disclosure instead; neither provider row nor header won.
+      expect(document.activeElement.classList.contains('ti-dropdown-group-header')).toBe(false)
+      expect(document.activeElement.classList.contains('ti-dropdown-item-btn')).toBe(false)
+
+      // Phase 2 (disclosure redirect): restore the row, re-focus it, mutate,
+      // yield one microtask, redirect to a header, let the repair run.
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      const reFocusedDeepL = Array.from(document.body.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((element) => element.textContent.trim() === 'DeepL')
+      reFocusedDeepL.focus()
+      expect(wrapper.vm.$.setupState.rowFocusProviderId).toBe('deepl')
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await Promise.resolve()
+      const aiHeader = Array.from(document.body.querySelectorAll('.ti-dropdown-group-header'))
+        .find((element) => element.textContent.trim() === 'AI')
+      aiHeader.focus()
+      await wrapper.vm.$nextTick()
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(aiHeader)
+      expect(Array.from(document.body.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim())).toEqual([
+        'OpenAI', 'Gemini', 'Browser',
+      ])
+
+      // Phase 3 (surviving row): expanding and re-collapsing above OpenAI
+      // must leave that row focused with its updated visible index.
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      const openAiRow = Array.from(document.body.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((element) => element.textContent.trim() === 'OpenAI')
+      openAiRow.focus()
+      expect(wrapper.vm.$.setupState.rowFocusProviderId).toBe('openai')
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await Promise.resolve()
+      openAiRow.focus()
+      await wrapper.vm.$nextTick()
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(openAiRow)
+      // OpenAI stays the first visible row under AI.
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(0)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('shadow menu: external collapse focused row transfers to its disclosure via root-scoped focus', async () => {
+    const { wrapper, container, shadowRoot } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true, shadow: true },
+    )
+    try {
+      await openRealMenu(wrapper)
+      // Walk to DeepL with the shadow root's own activeElement.
+      for (let step = 0; step < 3; step += 1) {
+        const current = shadowRoot.activeElement
+        if (current?.textContent.includes('DeepL')) break
+        current?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        await wrapper.vm.$nextTick()
+        await wrapper.vm.$nextTick()
+      }
+      const deepLBtn = shadowRoot.activeElement
+      expect(deepLBtn?.textContent).toContain('DeepL')
+
+      // Authoritative external change, no local request owns it.
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+
+      const header = shadowRoot.activeElement
+      expect(header?.classList.contains('ti-dropdown-group-header')).toBe(true)
+      expect(header?.textContent).toContain('Traditional')
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(-1)
+      const menuRoot = shadowRoot.querySelector('.ti-provider-dropdown-menu')
+      expect(Array.from(menuRoot.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim()))
+        .toEqual(['OpenAI', 'Gemini', 'Browser'])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('shadow menu: external collapse/expand above the focused provider reindexes by identity', async () => {
+    const { wrapper, container, shadowRoot } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true, shadow: true },
+    )
+    try {
+      await openRealMenu(wrapper)
+      for (let step = 0; step < 3; step += 1) {
+        const current = shadowRoot.activeElement
+        if (current?.textContent.includes('OpenAI')) break
+        current?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+        await wrapper.vm.$nextTick()
+        await wrapper.vm.$nextTick()
+      }
+      const openAiBtn = shadowRoot.activeElement
+      expect(openAiBtn?.textContent).toContain('OpenAI')
+
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(shadowRoot.activeElement).toBe(openAiBtn)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(0)
+
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(shadowRoot.activeElement).toBe(openAiBtn)
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(3)
+
+      // Arrow navigation continues from the re-anchored position.
+      await shadowArrowDown(wrapper, shadowRoot)
+      expect(shadowRoot.activeElement?.textContent).toContain('Gemini')
+      shadowRoot.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')).toEqual([['gemini']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('shadow menu: post-flush redirects (footer, outside document focus) are never stolen by the repair', async () => {
+    const { wrapper, container, shadowRoot } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true, shadow: true },
+    )
+    try {
+      await openRealMenu(wrapper)
+      // Redirect to the menu footer (Configure Providers) synchronously after
+      // the watcher snapshot; the queued repair must not pull focus back out of
+      // the footer into any provider row.
+      await shadowArrowDown(wrapper, shadowRoot)
+      expect(shadowRoot.activeElement?.textContent).toContain('DeepL')
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await Promise.resolve()
+      const footer = shadowRoot.querySelector('.ti-configure-row')
+      footer.focus()
+      await wrapper.vm.$nextTick()
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(shadowRoot.activeElement).toBe(footer)
+      expect(Array.from(shadowRoot.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim()))
+        .toEqual(['OpenAI', 'Gemini', 'Browser'])
+
+      // Reopen-fresh state, row focused; then the true post-flush redirect
+      // ordering: mutate first (repair enqueued), yield one microtask so the
+      // watcher snapshot runs, THEN redirect to the outside document control.
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      const deepLRow = Array.from(shadowRoot.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((element) => element.textContent.trim() === 'DeepL')
+      deepLRow.focus()
+      expect(shadowRoot.activeElement).toBe(deepLRow)
+      const outsideButton = document.createElement('button')
+      outsideButton.textContent = 'Outside control'
+      container.appendChild(outsideButton)
+      // Needed by the no-steal assertions below (header must stay unfocused).
+      const traditionalHeader = Array.from(shadowRoot.querySelectorAll('.ti-dropdown-group-header'))
+        .find((header) => header.textContent.trim() === 'Traditional')
+
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await Promise.resolve()
+      outsideButton.focus()
+      await wrapper.vm.$nextTick()
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      // No steal: the redirected outside control keeps document-level focus;
+      // neither the captured-withdrawn row nor its Traditional disclosure
+      // re-took focus. (Whether the shadow-boundary focusout auto-closed the
+      // menu or not is a jsdom artifact; real browsers close it via the
+      // menu's focusout handling and this assertion set stays valid either
+      // way.)
+      expect(document.activeElement).toBe(outsideButton)
+      expect(shadowRoot.activeElement ?? null).not.toBe(deepLRow)
+      expect(shadowRoot.activeElement ?? null).not.toBe(traditionalHeader)
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+      expect(traditionalHeader?.getAttribute('aria-expanded')).toBe('false')
+      expect(shadowRoot.activeElement).not.toBe(traditionalHeader)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('external collapse reconciles focus only when it still belongs to the captured row or fell neutral on withdrawal', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+
+      // (a) Focus moved to the footer Configure action after the snapshot:
+      // the reconciliation must not steal focus back to the provider row.
+      // Walk toward DeepL one step at a time (focus settles per step).
+      for (let step = 0; step < 3; step += 1) {
+        if (document.activeElement.textContent.includes('DeepL')) break
+        await arrowDown(wrapper)
+      }
+      expect(document.activeElement.textContent).toContain('DeepL')
+      const configure = document.body.querySelector('.ti-configure-row')
+      configure.focus()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(configure)
+      // focusedIndex is left at the (stale) row position; selection unaffected.
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(1)
+      expect(settingsStore.setProviderCategoryCollapsed).not.toHaveBeenCalled()
+
+      // (b) From footer focus, external EXPAND above a row that is not focused:
+      // no steal either (the captured-row guard fails for a footer target).
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(configure)
+
+      // (c) Row-focused external collapse with withdrawal → matching header.
+      const deepLBtn = Array.from(document.body.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((element) => element.textContent.trim() === 'DeepL')
+      deepLBtn.focus()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      const header = document.activeElement
+      expect(header.classList.contains('ti-dropdown-group-header')).toBe(true)
+      expect(header.textContent).toContain('Traditional')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('external expand above the focused row keeps real focus; synchronously-redirected footer focus survives', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await openRealMenu(wrapper)
+      // Real focus starts on OpenAI (first visible row); external expand above re-widens.
+      const openAiBtn = document.activeElement
+      expect(openAiBtn.textContent).toContain('OpenAI')
+
+      // Redirect to a category header synchronously BEFORE the flush tick:
+      // the reconciliation must not pull focus back to the provider row.
+      const aiHeader = Array.from(document.body.querySelectorAll('.ti-dropdown-group-header'))
+        .find((element) => element.textContent.trim() === 'AI')
+      aiHeader.focus()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: [] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(aiHeader)
+      expect(aiHeader.getAttribute('aria-expanded')).toBe('true')
+
+      // And from the header, header-held Arrow navigation still lands on rows.
+      const menuRoot = document.body.querySelector('.ti-provider-dropdown-menu')
+      menuRoot.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement.classList.contains('ti-dropdown-item-btn')).toBe(true)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('opens an all-collapsed grouped menu focused on the first disclosure, whose native activation exposes rows', async () => {
+    Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free', 'ai', 'local'] })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      const menuRoot = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menuRoot.querySelectorAll('.ti-dropdown-item')).toHaveLength(0)
+      const header = document.activeElement
+      expect(header.classList.contains('ti-dropdown-group-header')).toBe(true)
+      expect(header.id).toBe('ti-provider-dropdown-v-0-group-0')
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(-1)
+
+      // Browser Enter/Space performs the native button activation; jsdom lacks
+      // synthesized keydown→click, so single click stands in for the test.
+      // Expanding the Traditional category only exposes its three rows.
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      header.click()
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      const expandedMenu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(Array.from(expandedMenu.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured',
+      ])
+
+      // Arrow navigation works from the disclosure into the exposed rows;
+      // dispatch on the live menu root, whose nodes were patched by the flush.
+      expandedMenu.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement.classList.contains('ti-dropdown-item-btn')).toBe(true)
+      expect(document.activeElement.textContent).toContain('Google')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('synthetic Default keeps row priority when the grouped menu has zero real visible rows', async () => {
+    Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free', 'ai', 'local'] })
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', modelValue: 'googlev2', allowDefault: true,
+    }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      const menuRoot = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(Array.from(menuRoot.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim()))
+        .toEqual(['Default'])
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(0)
+      expect(document.activeElement.classList.contains('ti-dropdown-item-btn')).toBe(true)
+      expect(document.activeElement.textContent).toContain('Default')
+      // The Default row keeps selection-row semantics (single selectable row).
+      expect(document.activeElement.closest('.ti-dropdown-group').querySelectorAll('.ti-dropdown-item')).toHaveLength(1)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('external collapse leaves disclosure/footer/trigger focus untouched and selection-only rows put', async () => {
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', modelValue: 'googlev2', showSync: false,
+    }, { realTeleport: true })
+    try {
+      await openRealMenu(wrapper)
+      // Footer focus (Configure Providers) must not be moved.
+      const configure = document.body.querySelector('.ti-configure-row')
+      configure.focus()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(configure)
+
+      // Disclosure focus must not be moved either.
+      const aiHeader = Array.from(document.body.querySelectorAll('.ti-dropdown-group-header'))
+        .find((element) => element.textContent.trim() === 'AI')
+      aiHeader.focus()
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free', 'ai'] })
+      await flushReactions()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(aiHeader)
+      expect(aiHeader.getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+
+    // Selection-only rows are headerless: external changes must not move focus.
+    const solo = await attachSelector({ mode: 'button', selectionOnly: true, modelValue: '' }, { realTeleport: true })
+    try {
+      await openRealMenu(solo.wrapper)
+      const googleRow = document.activeElement
+      expect(googleRow.textContent).toContain('Google')
+      Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free', 'ai', 'local'] })
+      await flushReactions()
+      await solo.wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(googleRow)
+      expect(Array.from(document.body.querySelectorAll('.ti-dropdown-item'), (item) => item.textContent.trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+    } finally {
+      solo.wrapper.unmount()
+      solo.container.remove()
+    }
+  })
+
+  it('collapsing with the first row after the group focused shifts its index across the boundary', async () => {
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' }, { realTeleport: true })
+    try {
+      const anchor = wrapper.element.querySelector('.ti-provider-button-container')
+      vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+        top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+      })
+      await wrapper.find('.ti-provider-button').trigger('click')
+      // Arrow moves real focus in a post-render task (same-tick focus() can be
+      // dropped by the flush), so each step settles across two ticks.
+      const keyOnFocusedControl = async (key) => {
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+        await wrapper.vm.$nextTick()
+        await wrapper.vm.$nextTick()
+      }
+      // Walk to OpenAI — the first row after Traditional (boundary index 3).
+      // Two flushes settle the open-time focus move before the walk starts.
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      await keyOnFocusedControl('ArrowDown')
+      await keyOnFocusedControl('ArrowDown')
+      await keyOnFocusedControl('ArrowDown')
+      expect(document.activeElement.textContent).toContain('OpenAI')
+
+      // Collapse Traditional: equality with `start + length` must shift the
+      // later row, keeping real focus and keyboard continuity (OpenAI → 0).
+      document.body.querySelectorAll('.ti-dropdown-group-header')[0].click()
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement.textContent).toContain('OpenAI')
+      await keyOnFocusedControl('ArrowDown')
+      expect(document.activeElement.textContent).toContain('Gemini')
+      document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.emitted('provider-change')).toEqual([['gemini']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('collapsing every category leaves zero rows with no modulo fault and safe keyboard handling', async () => {
+    Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free', 'ai', 'local'] })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      const menu = await openMenu(wrapper)
+      expect(menu.findAll('.ti-dropdown-group-header').map((header) => header.text().trim())).toEqual(['Traditional', 'AI', 'Other'])
+      expect(menu.findAll('.ti-dropdown-item')).toHaveLength(0)
+
+      // Trigger-follows-menu keyboard branch must survive zero visible rows.
+      const trigger = wrapper.find('.ti-provider-button')
+      trigger.element.focus()
+      trigger.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+      trigger.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true, cancelable: true }))
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('.ti-provider-dropdown-menu').exists()).toBe(true)
+
+      trigger.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      expect(document.activeElement).toBe(trigger.element)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('keeps header IDs unique across two selectors in the same app and wires aria-controls per group', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const wrapper = mount({
+      components: { ProviderSelector },
+      template: '<div><ProviderSelector mode="button" model-value="googlev2" /><ProviderSelector mode="button" model-value="deepl" /></div>',
+    }, { attachTo: container, global: { stubs: { Teleport: true } } })
+    try {
+      wrapper.element.querySelectorAll('.ti-provider-button-container').forEach((anchor) => {
+        vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+          top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+        })
+      })
+      const triggers = wrapper.findAll('.ti-provider-button')
+      await triggers[0].trigger('click')
+      const firstHeaderIds = wrapper.findAll('.ti-dropdown-group-header').map((header) => header.attributes('id'))
+      const firstRowsIds = firstHeaderIds.map((id) => `${id}-items`)
+      // Only one menu open at a time; close the first before opening the second
+      // so the sets are compared in isolation.
+      await triggers[0].trigger('click')
+      await triggers[1].trigger('click')
+      const secondHeaderIds = wrapper.findAll('.ti-dropdown-group-header').map((header) => header.attributes('id'))
+      const secondRowsIds = secondHeaderIds.map((id) => `${id}-items`)
+      expect(firstHeaderIds).toHaveLength(3)
+      expect(secondHeaderIds).toHaveLength(3)
+      expect(firstHeaderIds.every(Boolean)).toBe(true)
+      expect(new Set(firstHeaderIds).size).toBe(firstHeaderIds.length)
+      expect(new Set(secondHeaderIds).size).toBe(secondHeaderIds.length)
+      expect(firstHeaderIds.some((id) => secondHeaderIds.includes(id))).toBe(false)
+      expect(firstRowsIds.some((id) => secondRowsIds.includes(id))).toBe(false)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('selection-only menus stay header-free and compact mode ignores collapse state', async () => {
+    Object.assign(settingsStore.settings, {
+      COLLAPSED_PROVIDER_CATEGORIES: ['free'],
+      CUSTOM_PROVIDER_LIST_ENABLED: true,
+      CUSTOM_PROVIDER_LIST: ['gemini'],
+    })
+    const { wrapper, container } = await attachSelector({ mode: 'button', selectionOnly: true, modelValue: '' })
+    try {
+      const menu = await openMenu(wrapper)
+      expect(menu.findAll('.ti-dropdown-group-header')).toHaveLength(0)
+      expect(menu.findAll('.ti-dropdown-item').map((item) => item.text().trim())).toEqual([
+        'Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser',
+      ])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+
+    // Compact keeps its groupedMenu regardless of the collapse state; drop the
+    // custom-list overrides applied for the selection-only phase above.
+    Object.assign(settingsStore.settings, {
+      CUSTOM_PROVIDER_LIST_ENABLED: false,
+      CUSTOM_PROVIDER_LIST: [],
+    })
+    const compact = await attachSelector({ mode: 'compact', modelValue: 'googlev2' })
+    try {
+      const select = compact.wrapper.get('select.ti-provider-select')
+      expect(Array.from(select.element.options).map((option) => option.value)).toEqual([
+        'googlev2', 'deepl', 'unconfigured', 'openai', 'gemini', 'browser',
+      ])
+    } finally {
+      compact.wrapper.unmount()
+      compact.container.remove()
     }
   })
 })
