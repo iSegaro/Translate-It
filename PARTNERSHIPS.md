@@ -1,10 +1,8 @@
 # Partnerships
 
-Translate It is open to partnerships that can bring useful technology, services, infrastructure, or other benefits to the project and its users.
+Translate It is open to partnerships that bring technology, services, infrastructure, or other benefits to the project and its users. Proposals are reviewed individually for usefulness, transparency, and alignment with the project's interests.
 
-Partnership proposals are reviewed individually. The goal is to keep collaborations useful, transparent, and aligned with the interests of the project and its users.
-
-## Types of partnerships
+## Partnership scope
 
 Examples include:
 
@@ -18,18 +16,7 @@ Examples include:
 
 This list is not exhaustive.
 
-## Possible collaboration
-
-Depending on the partnership, collaboration may include:
-
-- integration or compatibility work
-- testing and technical feedback
-- documentation
-- credits or benefits for users
-- public acknowledgement of the partnership
-- collaboration on relevant features or technical work
-
-The scope of each partnership is agreed separately.
+Collaboration may include integration or compatibility work, testing and technical feedback, documentation, credits or benefits for users, public acknowledgement, and collaboration on relevant technical work. The scope of each partnership is agreed separately.
 
 ## Independence
 
