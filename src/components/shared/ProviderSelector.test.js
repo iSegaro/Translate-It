@@ -251,8 +251,9 @@ const providers = [
   icon: `providers/${provider.id}.svg`, supported: true, features: ['translation'], ...provider,
 }))
 
-const attachSelector = async (props = {}, { realTeleport = false, shadow = false } = {}) => {
+const attachSelector = async (props = {}, { realTeleport = false, shadow = false, popupAncestor = false, rect } = {}) => {
   const container = document.createElement('div')
+  if (popupAncestor) container.classList.add('translation-view')
   document.body.appendChild(container)
   let mountPoint = container
   let shadowRoot
@@ -274,6 +275,7 @@ const attachSelector = async (props = {}, { realTeleport = false, shadow = false
   if (anchor) {
     vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
       top: 10, left: 100, right: 300, bottom: 50, width: 200, height: 40, x: 100, y: 10,
+      ...rect,
     })
   }
   return { wrapper, container, shadowRoot }
@@ -597,6 +599,76 @@ describe('ProviderSelector provider list contract', () => {
       wrapper.unmount()
       container.remove()
       document.documentElement.dir = previousDir
+    }
+  })
+
+  it('marks only Popup Text menus for popup sizing and keeps provider controls intact', async () => {
+    const longName = 'A deliberately long provider display name that should remain available'
+    registry.providers[1].name = longName
+    const { wrapper, container } = await attachSelector({
+      mode: 'split', modelValue: 'googlev2', isGlobal: false, allowSetDefault: true, showSync: true,
+    }, { realTeleport: true, popupAncestor: true })
+    try {
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(true)
+      expect(menu.textContent).toContain(longName)
+      expect(menu.querySelector('.ti-set-default-btn')).toBeTruthy()
+      expect(menu.querySelectorAll('.ti-sync-row')).toHaveLength(2)
+      expect(menu.querySelector('.ti-configure-row')).toBeTruthy()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+
+    for (const mode of ['split', 'button', 'icon-only', 'mobile']) {
+      const regular = await attachSelector({ mode, modelValue: 'googlev2' }, { realTeleport: true })
+      try {
+        await regular.wrapper.find({
+          split: '.ti-provider-dropdown-area',
+          button: '.ti-provider-button',
+          'icon-only': '.ti-provider-icon-button',
+          mobile: '.ti-provider-mobile-button',
+        }[mode]).trigger('click')
+        const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+        expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(false)
+        expect(menu.style.width).not.toBe('290px')
+      } finally {
+        regular.wrapper.unmount()
+        regular.container.remove()
+      }
+    }
+  })
+
+  it.each([
+    { label: 'LTR near the right edge', width: 360, dir: 'ltr', rect: { left: 250, right: 300, width: 50 } },
+    { label: 'RTL near the left edge', width: 360, dir: 'rtl', rect: { left: 10, right: 60, width: 50 } },
+    { label: 'narrow viewport', width: 240, dir: 'ltr', rect: { left: 180, right: 220, width: 40 } },
+  ])('clamps Popup Text menu within the viewport: $label', async ({ width, dir, rect }) => {
+    const widthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth')
+    const previousDir = document.documentElement.dir
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    document.documentElement.dir = dir
+    const { wrapper, container } = await attachSelector(
+      { mode: 'split', modelValue: 'googlev2' },
+      { realTeleport: true, popupAncestor: true, rect },
+    )
+    try {
+      await wrapper.find('.ti-provider-dropdown-area').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(menu.classList.contains('ti-provider-dropdown-menu--popup')).toBe(true)
+      const menuWidth = Math.min(290, width - 16)
+      const left = menu.style.left !== 'auto'
+        ? Number.parseFloat(menu.style.left)
+        : width - Number.parseFloat(menu.style.right) - menuWidth
+      expect(left).toBeGreaterThanOrEqual(8)
+      expect(left + menuWidth).toBeLessThanOrEqual(width - 8)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+      document.documentElement.dir = previousDir
+      if (widthDescriptor) Object.defineProperty(window, 'innerWidth', widthDescriptor)
+      else delete window.innerWidth
     }
   })
 

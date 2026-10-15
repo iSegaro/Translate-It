@@ -245,7 +245,8 @@
       class="ti-provider-dropdown-menu"
       :class="{ 
         'ti-open-upward': isUpward,
-        'ti-is-teleported': isTeleportEnabled
+        'ti-is-teleported': isTeleportEnabled,
+        'ti-provider-dropdown-menu--popup': isPopupTextContext
       }"
       :style="dropdownStyles"
       @click.stop
@@ -421,6 +422,10 @@ import { TranslationMode } from '@/shared/config/config.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'ProviderSelector')
 
+// Popup Text view menu budget (~280–300 CSS px approved), clamped to the
+// viewport with 8px gutters on both sizing and positioning.
+const POPUP_MENU_WIDTH = 290
+
 // Resource tracker for automatic cleanup
 const tracker = useResourceTracker('provider-selector')
 
@@ -541,6 +546,13 @@ const isRTL = computed(() => {
 })
 
 const isProviderSelectionDisabled = computed(() => props.disabled || props.dropdownDisabled)
+
+/**
+ * Popup Text view detection via its unique `.translation-view` ancestor. The
+ * menu teleports to body (or the shadow overlay), where ancestor CSS cannot
+ * reach it, hence the explicit menu-root class used with this detection.
+ */
+const isPopupTextContext = computed(() => !!selectorRef.value?.closest?.('.translation-view'))
 
 /**
  * Computed property to identify the current global default provider
@@ -1221,6 +1233,22 @@ const updateDropdownPosition = () => {
       styles.insetInlineStart = `${rect.right + 10}px !important`;
       styles.top = `${rect.top}px !important`;
       styles.bottom = 'auto !important';
+    } else if (isPopupTextContext.value) {
+      // Popup Text view: fixed budget width (user-approved ~290px), clamped
+      // to the viewport with 8px gutters; left/right anchored to the trigger
+      // edge and clamped again so the bounded width never leaves the viewport.
+      const popupWidth = Math.min(POPUP_MENU_WIDTH, window.innerWidth - 16)
+      styles.width = `${popupWidth}px !important`;
+      styles.minWidth = '0 !important';
+      const maxOffset = Math.max(8, window.innerWidth - 16 - popupWidth);
+      if (isRTL.value) {
+        const desiredRight = window.innerWidth - rect.right;
+        styles.right = `${Math.max(8, Math.min(desiredRight, maxOffset))}px !important`;
+        styles.left = 'auto !important';
+      } else {
+        styles.left = `${Math.max(8, Math.min(rect.left, maxOffset))}px !important`;
+        styles.right = 'auto !important';
+      }
     } else {
       if (props.mode === 'button' || props.mode === 'mobile') {
         styles.width = `${rect.width}px !important`;

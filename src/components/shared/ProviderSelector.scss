@@ -290,6 +290,14 @@ img.ti-dropdown-arrow,
   }
 }
 
+/* Popup Text menu uses a fixed width budget, viewport-bounded on both axes. */
+.ti-provider-dropdown-menu--popup {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  width: 290px !important;
+  max-width: calc(100vw - 16px) !important;
+}
+
 .ti-provider-dropdown-list {
   max-height: inherit !important;
   overflow-y: auto !important;
