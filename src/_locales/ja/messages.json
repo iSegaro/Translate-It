@@ -116,6 +116,21 @@
   "incompatible_label": {
     "message": "互換性なし"
   },
+  "provider_category_free": {
+    "message": "従来型"
+  },
+  "provider_category_ai": {
+    "message": "AI"
+  },
+  "provider_category_local": {
+    "message": "ローカル"
+  },
+  "configure_providers": {
+    "message": "翻訳プロバイダーの設定"
+  },
+  "switch_provider_label": {
+    "message": "翻訳サービスの切り替え"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },

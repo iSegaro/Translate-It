@@ -48,12 +48,15 @@
           >{{ stopActionLabel }}</span>
         </span>
       </button>
-      <button 
+      <button
         ref="triggerBtnRef"
         type="button"
         class="ti-provider-dropdown-area"
         :class="{ 'ti-active': isDropdownOpen }"
         :disabled="isProviderSelectionDisabled"
+        :aria-expanded="isDropdownOpen"
+        :aria-controls="menuId"
+        :aria-label="dropdownTriggerLabel"
         @click.stop="toggleDropdown"
         @keydown="handleKeydown"
       >
@@ -81,6 +84,8 @@
       class="ti-provider-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :disabled="isProviderSelectionDisabled"
+      :aria-expanded="isDropdownOpen"
+      :aria-controls="menuId"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -116,6 +121,8 @@
       :class="{ 'ti-active': isDropdownOpen }"
       :title="currentProviderName"
       :disabled="isProviderSelectionDisabled"
+      :aria-expanded="isDropdownOpen"
+      :aria-controls="menuId"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -141,6 +148,8 @@
       class="ti-provider-mobile-button"
       :class="{ 'ti-active': isDropdownOpen }"
       :disabled="isProviderSelectionDisabled"
+      :aria-expanded="isDropdownOpen"
+      :aria-controls="menuId"
       @click="toggleDropdown"
       @keydown="handleKeydown"
     >
@@ -162,7 +171,7 @@
     </button>
   </div>
   
-  <!-- Compact Mode -->
+  <!-- Compact Mode (Native select + adjacent accessible Configure Providers control) -->
   <div
     v-else
     class="ti-provider-compact-container"
@@ -176,14 +185,51 @@
       :disabled="isProviderSelectionDisabled"
       @change="handleProviderChange"
     >
-      <option
-        v-for="provider in availableProviders"
-        :key="provider.id"
-        :value="provider.id"
+      <!-- Single source of truth: groupedMenu preserves EVERY entry
+           (synthetic Default, uncategorized providers included) in full menu
+           visual order. Labeled bins become optgroups; unlabeled bins
+           (Default first, uncategorized) stay as loose options so all
+           selections remain available. -->
+      <template
+        v-for="group in groupedMenu"
+        :key="group.key"
       >
-        {{ provider.name }}
-      </option>
+        <optgroup
+          v-if="group.header"
+          :key="`${group.key}-optgroup`"
+          :label="group.header"
+        >
+          <option
+            v-for="item in group.items"
+            :key="item.id"
+            :value="item.id"
+          >
+            {{ item.name }}
+          </option>
+        </optgroup>
+        <template v-else>
+          <option
+            v-for="item in group.items"
+            :key="item.id"
+            :value="item.id"
+          >
+            {{ item.name }}
+          </option>
+        </template>
+      </template>
     </select>
+    <button
+      type="button"
+      class="ti-provider-compact-config-btn"
+      :title="configureProvidersLabel"
+      :aria-label="configureProvidersLabel"
+      @click.stop="openProvidersSettings"
+    >
+      <Icon
+        icon="fa6-solid:gear"
+        class="ti-compact-config-icon"
+      />
+    </button>
   </div>
 
   <!-- Common Dropdown Teleport (Single instance for all modes) -->
@@ -192,8 +238,10 @@
     :to="teleportTarget"
     :disabled="!isTeleportEnabled"
   >
-    <div 
+    <div
       v-if="isDropdownOpen"
+      :id="menuId"
+      ref="dropdownMenuElRef"
       class="ti-provider-dropdown-menu"
       :class="{ 
         'ti-open-upward': isUpward,
@@ -201,6 +249,8 @@
       }"
       :style="dropdownStyles"
       @click.stop
+      @keydown="handleMenuKeydown"
+      @focusout="handleMenuFocusOut"
     >
       <div
         ref="dropdownMenuRef"
@@ -208,92 +258,137 @@
         @mouseleave="focusedIndex = -1"
       >
         <div
-          v-for="(provider, index) in availableProviders"
-          :key="provider.id"
-          class="ti-dropdown-item"
-          :class="{ 
-            'ti-active': currentProvider === provider.id,
-            'is-focused': focusedIndex === index 
-          }"
-          @click="selectProvider(provider)"
-          @mouseenter="focusedIndex = index"
+          v-for="group in groupedMenu"
+          :key="group.key"
+          class="ti-dropdown-group"
+          :role="group.header ? 'group' : undefined"
+          :aria-labelledby="group.headerId || undefined"
         >
-          <img
-            :src="getProviderIcon(provider.icon)"
-            :alt="provider.name"
-            :class="{ 'ti-invert-dark': isProviderInverted(provider.id) }"
+          <!-- Category heading (announced via the group's aria-labelledby) -->
+          <div
+            v-if="group.header"
+            :id="group.headerId"
+            class="ti-dropdown-group-header"
+            aria-hidden="true"
           >
-          <span>{{ provider.name }}</span>
+            {{ group.header }}
+          </div>
 
-          <!-- Set as Default (Star) Icon -->
-          <button
-            v-if="allowSetDefault && !isGlobal"
-            class="ti-set-default-btn"
-            :class="{ 'is-default': globalDefaultProvider === provider.id }"
-            :title="globalDefaultProvider === provider.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
-            @click.stop="setAsGlobalDefault(provider)"
+          <div
+            v-for="item in group.items"
+            :key="item.id"
+            class="ti-dropdown-item"
+            :class="{
+              'ti-active': currentProvider === item.id,
+              'is-focused': focusedIndex === item.index
+            }"
+            @click="selectProvider(item)"
+            @mouseenter="focusedIndex = item.index"
           >
-            <Icon 
-              :icon="globalDefaultProvider === provider.id ? 'fa6-solid:star' : 'fa6-regular:star'" 
-              class="ti-star-icon"
-            />
-          </button>
+            <!-- Semantic selection button; the star below is an independent
+                 sibling control, never nested inside an interactive element -->
+            <button
+              type="button"
+              class="ti-dropdown-item-btn"
+              :aria-current="currentProvider === item.id ? 'true' : undefined"
+              @focus="focusedIndex = item.index"
+            >
+              <img
+                :src="getProviderIcon(item.icon)"
+                alt=""
+                :class="{ 'ti-invert-dark': isProviderInverted(item.id) }"
+              >
+              <span>{{ item.name }}</span>
+            </button>
+
+            <!-- Set as Default (Star) Icon -->
+            <button
+              v-if="allowSetDefault && !isGlobal"
+              type="button"
+              class="ti-set-default-btn"
+              :class="{ 'is-default': globalDefaultProvider === item.id }"
+              :title="globalDefaultProvider === item.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+              :aria-label="globalDefaultProvider === item.id ? t('is_default_provider_tooltip') || 'Default Service' : t('set_as_default_tooltip') || 'Set as Default Service'"
+              :aria-pressed="globalDefaultProvider === item.id ? 'true' : 'false'"
+              @click.stop="setAsGlobalDefault(item)"
+            >
+              <Icon
+                :icon="globalDefaultProvider === item.id ? 'fa6-solid:star' : 'fa6-regular:star'"
+                class="ti-star-icon"
+              />
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Ephemeral Sync Footer -->
-      <div
-        v-if="showSync"
-        class="ti-provider-dropdown-footer"
-      >
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.page,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('page')"
+      <!-- Dropdown footer: ephemeral sync rows (optional) + persistent Configure Providers action -->
+      <div class="ti-provider-dropdown-footer">
+        <template v-if="showSync">
+          <button
+            class="ti-sync-row"
+            :class="{
+              'is-active': ephemeralSync.page,
+              'is-disabled': !canSyncToBulk
+            }"
+            :disabled="!canSyncToBulk"
+            :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+            @click.stop="canSyncToBulk && toggleSync('page')"
+          >
+            <div class="ti-sync-info">
+              <Icon
+                :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'"
+                class="ti-sync-icon"
+              />
+              <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+            </div>
+            <img
+              :src="getEffectiveIcon('page')"
+              class="ti-sync-provider-icon"
+              :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
+              alt="Target Provider"
+            >
+          </button>
+
+          <button
+            class="ti-sync-row"
+            :class="{
+              'is-active': ephemeralSync.element,
+              'is-disabled': !canSyncToBulk
+            }"
+            :disabled="!canSyncToBulk"
+            :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
+            @click.stop="canSyncToBulk && toggleSync('element')"
+          >
+            <div class="ti-sync-info">
+              <Icon
+                :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'"
+                class="ti-sync-icon"
+              />
+              <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
+            </div>
+            <img
+              :src="getEffectiveIcon('element')"
+              class="ti-sync-provider-icon"
+              :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
+              alt="Target Provider"
+            >
+          </button>
+        </template>
+
+        <button
+          type="button"
+          class="ti-configure-row"
+          :title="configureProvidersLabel"
+          :aria-label="configureProvidersLabel"
+          @click.stop="openProvidersSettings"
         >
           <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
+            <Icon
+              icon="fa6-solid:gear"
               class="ti-sync-icon"
             />
-            <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+            <span>{{ configureProvidersLabel }}</span>
           </div>
-          <img
-            :src="getEffectiveIcon('page')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
-            alt="Target Provider"
-          >
-        </button>
-        
-        <button 
-          class="ti-sync-row" 
-          :class="{ 
-            'is-active': ephemeralSync.element,
-            'is-disabled': !canSyncToBulk
-          }"
-          :disabled="!canSyncToBulk"
-          :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-          @click.stop="canSyncToBulk && toggleSync('element')"
-        >
-          <div class="ti-sync-info">
-            <Icon 
-              :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'" 
-              class="ti-sync-icon"
-            />
-            <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
-          </div>
-          <img
-            :src="getEffectiveIcon('element')"
-            class="ti-sync-provider-icon"
-            :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
-            alt="Target Provider"
-          >
         </button>
       </div>
     </div>
@@ -302,13 +397,14 @@
 
 <script setup>
 import './ProviderSelector.scss'
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, useId } from 'vue'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useTranslationStore } from '@/features/translation/stores/translation.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import { useSelectElementTranslation } from '@/features/translation/composables/useTranslationModes.js'
 import { getProvidersForDropdown, getProviderById } from '@/core/provider-registry.js'
+import { openOptionsPage } from '@/core/helpers.js'
 import { isProviderConfigured } from '@/features/translation/utils/providerValidator.js'
 import IconButton from './IconButton.vue'
 import { Icon } from '@iconify/vue'
@@ -398,6 +494,13 @@ const props = defineProps({
 const translateActionLabel = computed(() => t('popup_translate_button_text') || 'Translate')
 const stopActionLabel = computed(() => t('popup_stop_button_title') || 'Stop')
 const mainActionLabel = computed(() => (props.loading ? stopActionLabel.value : translateActionLabel.value))
+// Accessible name for the split-mode arrow trigger — it otherwise only derives
+// the name from the inner image alt attribute.
+const dropdownTriggerLabel = computed(() => t('switch_provider_label') || 'Switch translation service')
+
+// Stable per-instance prefix for the menu and its category headings
+const dropdownUid = `ti-provider-dropdown-${useId()}`
+const menuId = `${dropdownUid}-menu`
 
 // Emits
 const emit = defineEmits(['translate', 'cancel', 'provider-change', 'update:modelValue'])
@@ -412,6 +515,7 @@ const { isSelectModeActive, deactivateSelectMode } = useSelectElementTranslation
 const selectorRef = ref(null)
 const triggerBtnRef = ref(null)
 const dropdownMenuRef = ref(null)
+const dropdownMenuElRef = ref(null)
 const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const focusedIndex = ref(-1)
@@ -493,65 +597,142 @@ const handleKeydown = (event) => {
         handleTranslate()
       } else {
         toggleDropdown()
-        focusedIndex.value = currentIndex !== -1 ? currentIndex : 0
+        focusedIndex.value = indexInMenuItems() !== -1 ? indexInMenuItems() : 0
       }
       return
     }
     if (key === ' ') {
       event.preventDefault()
       toggleDropdown()
-      focusedIndex.value = currentIndex !== -1 ? currentIndex : 0
+      focusedIndex.value = indexInMenuItems() !== -1 ? indexInMenuItems() : 0
       return
     }
     return
   }
 
-  // If dropdown is open, handle navigation within the list
+  // Dropdown open (focus still on the trigger): mirror the menu keyboard
+  // model. All open-menu navigation is driven by focusedIndex state so the
+  // outcome is identical whether the browser moved focus into the menu or the
+  // trigger still holds focus.
   switch (key) {
     case 'ArrowDown':
       event.preventDefault()
-      focusedIndex.value = (focusedIndex.value + 1) % items.length
-      scrollToFocused()
+      focusedIndex.value = (focusedIndex.value + 1) % menuItems.value.length
+      moveListFocus()
       break
     case 'ArrowUp':
       event.preventDefault()
-      focusedIndex.value = (focusedIndex.value - 1 + items.length) % items.length
-      scrollToFocused()
+      focusedIndex.value = (focusedIndex.value - 1 + menuItems.value.length) % menuItems.value.length
+      moveListFocus()
       break
     case 'Enter':
     case ' ':
       event.preventDefault()
-      if (focusedIndex.value >= 0 && focusedIndex.value < items.length) {
-        selectProvider(items[focusedIndex.value])
+      if (focusedIndex.value >= 0 && focusedIndex.value < menuItems.value.length) {
+        selectProvider(menuItems.value[focusedIndex.value])
       }
       break
     case 'Escape':
-    case 'Tab':
-      closeDropdown()
+      event.preventDefault()
+      closeDropdown(true)
       break
+    // 'Tab': let the browser move focus naturally (item → star → sync →
+    // configure); the menu closes via focusout once focus leaves it.
   }
+}
+
+/**
+ * Index of the current selection within the visual (group-ordered) menu list
+ */
+const indexInMenuItems = () => menuItems.value.findIndex(p => p.id === currentProvider.value)
+
+/**
+ * Moves real DOM focus to the provider row at the current focused index.
+ * The focus() must run AFTER the open/position flush settles: a rendering
+ * pass within the same flush (style patch after positioning, teleport stub
+ * re-render in tests) can replace menu nodes and silently drop a same-tick
+ * focus(). The current focusedIndex is read at execution time so a queued
+ * move never reverts newer state advances.
+ */
+const moveListFocus = () => {
+  nextTick(() => {
+    const container = dropdownMenuRef.value
+    if (!container) return
+    const rows = container.querySelectorAll('.ti-dropdown-item')
+    rows[focusedIndex.value]?.querySelector('.ti-dropdown-item-btn')?.focus()
+  })
+  scrollToFocused()
+}
+
+/**
+ * Delegated keyboard handling for the open dropdown menu.
+ * Arrow keys move real focus between provider rows (visual order, groups
+ * included); Enter/Space select. The star, sync rows and the Configure action
+ * are natural buttons reached by Tab — Tab itself is not intercepted, so
+ * focus moves freely between those controls; the menu closes once focus
+ * leaves the menu (see handleMenuFocusOut).
+ */
+const handleMenuKeydown = (event) => {
+  const { key } = event
+  const items = menuItems.value
+  if (!items.length) return
+
+  if (key === 'ArrowDown' || key === 'ArrowUp') {
+    event.preventDefault()
+    const delta = key === 'ArrowDown' ? 1 : -1
+    const next = (focusedIndex.value + delta + items.length) % items.length
+    focusedIndex.value = next
+    moveListFocus(next)
+    return
+  }
+
+  if (key === 'Enter' || key === ' ') {
+    // Only provider selection buttons are activated here; the star, sync and
+    // footer controls rely on their native button activation.
+    if (!event.target?.closest?.('.ti-dropdown-item-btn')) return
+    event.preventDefault()
+    if (focusedIndex.value >= 0 && focusedIndex.value < items.length) {
+      selectProvider(items[focusedIndex.value])
+    }
+    return
+  }
+
+  if (key === 'Escape') {
+    event.preventDefault()
+    closeDropdown(true)
+  }
+}
+
+/**
+ * Closes the menu silently when focus moves out of it entirely (e.g. Tab past
+ * the Configure row). Moving focus between controls inside the menu keeps it
+ * open. Outside clicks should never steal focus, so this close is silent.
+ */
+const handleMenuFocusOut = (event) => {
+  if (!isDropdownOpen.value) return
+  if (dropdownMenuElRef.value?.contains(event.relatedTarget)) return
+  closeDropdown(false)
 }
 
 const scrollToFocused = () => {
   nextTick(() => {
-    if (dropdownMenuRef.value) {
-      const container = dropdownMenuRef.value
-      const items = container.children
-      const focusedEl = items[focusedIndex.value]
-      
-      if (focusedEl) {
-        const containerTop = container.scrollTop
-        const containerBottom = containerTop + container.clientHeight
-        const elementTop = focusedEl.offsetTop
-        const elementBottom = elementTop + focusedEl.offsetHeight
+    const container = dropdownMenuRef.value
+    if (!container) return
+    // Rows live inside optional category groups; query the row list instead
+    // of container.children so group headings never corrupt the index.
+    const rows = container.querySelectorAll('.ti-dropdown-item')
+    const focusedEl = rows[focusedIndex.value]
 
-        if (elementTop < containerTop) {
-          // Scroll up to show element at top
-          container.scrollTo({ top: elementTop, behavior: 'smooth' })
-        } else if (elementBottom > containerBottom) {
-          // Scroll down to show element at bottom
-          container.scrollTo({ top: elementBottom - container.clientHeight, behavior: 'smooth' })
-        }
+    if (focusedEl) {
+      const containerRect = container.getBoundingClientRect()
+      const elementRect = focusedEl.getBoundingClientRect()
+
+      if (elementRect.top < containerRect.top) {
+        // Scroll up to show element at top
+        container.scrollTo({ top: container.scrollTop - (containerRect.top - elementRect.top), behavior: 'smooth' })
+      } else if (elementRect.bottom > containerRect.bottom) {
+        // Scroll down to show element at bottom
+        container.scrollTo({ top: container.scrollTop + (elementRect.bottom - containerRect.bottom), behavior: 'smooth' })
       }
     }
   })
@@ -568,7 +749,9 @@ const handleClickOutside = (event) => {
   
   // If the component container is NOT in the event path, the click was outside
   if (!path.includes(selectorRef.value)) {
-    closeDropdown()
+    // Silent close — restoring trigger focus here would steal focus from
+    // wherever the user clicked (including clicks inside the menu).
+    closeDropdown(false)
   }
 }
 
@@ -602,7 +785,8 @@ const availableProviders = computed(() => {
   const mappedProviders = filteredRegistry.map(provider => ({
     id: provider.id,
     name: provider.name,
-    icon: provider.icon
+    icon: provider.icon,
+    category: provider.category || ''
   }));
 
   if (props.allowDefault) {
@@ -643,6 +827,93 @@ const availableProviders = computed(() => {
   
   return mappedProviders;
 });
+
+// ─── Conditional Category Grouping (Traditional / AI / Local) ──────────────
+// Grouping is view-only on top of availableProviders (filters + synthetic
+// Default stay untouched). Rules:
+// - Only group when >= 6 visible real providers span >= 2 categories; keep the
+//   list flat otherwise.
+// - The synthetic "Default" entry leads the menu and is never classified/
+//   bucketed (no category, no cost implication).
+// - FREE category means Traditional translation services, not free-of-cost.
+// - Category buckets keep stable manifest order inside them, so Vajehyab
+//   (traditional per FREE category, trailing after the LOCAL providers in the
+//   manifest) trails inside the Traditional bucket.
+const CATEGORY_LABEL_KEYS = {
+  free: 'provider_category_free',
+  ai: 'provider_category_ai',
+  local: 'provider_category_local'
+}
+
+const groupedMenu = computed(() => {
+  const all = availableProviders.value
+  const hasDefault = props.allowDefault && all.length > 0 && all[0].id === 'default'
+  const real = hasDefault ? all.slice(1) : all
+
+  const normalized = real.map(provider => ({
+    ...provider,
+    categoryKey: String(provider.category || '').trim().toLowerCase()
+  }))
+  const categorySet = new Set(normalized.map(provider => provider.categoryKey).filter(Boolean))
+  const useGroups = real.length >= 6 && categorySet.size >= 2
+
+  if (!useGroups) {
+    const items = all.map((provider, index) => ({ ...provider, index }))
+    return [{ key: 'flat', header: '', headerId: '', items }]
+  }
+
+  const order = ['free', 'ai', 'local']
+  for (const categoryKey of categorySet) {
+    if (!order.includes(categoryKey)) order.push(categoryKey)
+  }
+
+  const buckets = new Map()
+  const uncategorized = []
+  for (const provider of normalized) {
+    if (!provider.categoryKey) {
+      uncategorized.push(provider)
+      continue
+    }
+    if (!buckets.has(provider.categoryKey)) buckets.set(provider.categoryKey, [])
+    buckets.get(provider.categoryKey).push(provider)
+  }
+
+  const entries = []
+  if (hasDefault) {
+    entries.push({ key: 'default', header: '', items: [all[0]] })
+  }
+  for (const categoryKey of order) {
+    const items = buckets.get(categoryKey)
+    if (!items?.length) continue
+    const labelKey = CATEGORY_LABEL_KEYS[categoryKey]
+    entries.push({
+      key: categoryKey,
+      header: labelKey ? (t(labelKey) || '') : '',
+      items
+    })
+  }
+  if (uncategorized.length) {
+    entries.push({ key: 'uncategorized', header: '', items: uncategorized })
+  }
+
+  let cursor = 0
+  return entries.map((entry, groupIndex) => ({
+    key: `${entry.key}-${groupIndex}`,
+    header: entry.header,
+    headerId: entry.header ? `${dropdownUid}-group-${groupIndex}` : '',
+    items: entry.items.map(provider => ({ ...provider, index: cursor++ }))
+  }))
+})
+
+const menuItems = computed(() => groupedMenu.value.flatMap(group => group.items))
+
+/**
+ * Opens the Providers tab of the options page (background resolves the anchor).
+ */
+const configureProvidersLabel = computed(() => t('configure_providers') || 'Configure Providers')
+const openProvidersSettings = () => {
+  openOptionsPage('providers')
+}
 
 // Ephemeral Sync State from store
 const ephemeralSync = computed(() => translationStore.ephemeralSync)
@@ -829,11 +1100,9 @@ const toggleDropdown = () => {
 
   const newState = !isDropdownOpen.value;
 
-  // Sync focusedIndex with current selection when opening
+  // Sync focusedIndex with current selection when opening (visual menu order)
   if (newState) {
-    const items = availableProviders.value;
-    const currentIndex = items.findIndex(p => p.id === currentProvider.value);
-    focusedIndex.value = currentIndex !== -1 ? currentIndex : 0;
+    focusedIndex.value = indexInMenuItems() !== -1 ? indexInMenuItems() : 0;
   }
 
   logger.debug('Provider selector dropdown toggled!', {
@@ -849,6 +1118,8 @@ const toggleDropdown = () => {
         closeDropdown()
         return
       }
+      // Move real focus into the menu so keyboard interaction is immediate
+      moveListFocus()
       scrollToFocused()
     })
   }
@@ -947,10 +1218,13 @@ const updateDropdownPosition = () => {
 }
 
 /**
- * Closes the dropdown and restores focus to the trigger button
+ * Closes the dropdown. `restoreFocus` puts focus back on the trigger (Escape,
+ * provider selection). Other closes (outside clicks, scroll, resize, focus
+ * leaving the menu) must be silent so they do not steal focus.
  */
-const closeDropdown = () => {
+const closeDropdown = (restoreFocus = true) => {
   isDropdownOpen.value = false;
+  if (!restoreFocus) return;
   // Return focus to trigger button to prevent focus jumping to tab/top of page
   nextTick(() => {
     triggerBtnRef.value?.focus();
@@ -981,7 +1255,7 @@ const selectProvider = async (provider) => {
     
     emit('update:modelValue', provider.id)
     emit('provider-change', provider.id)
-    closeDropdown()
+    closeDropdown(true)
 
     // Auto-trigger translation in split mode after selecting a provider
     if (props.mode === 'split' && !props.disabled && props.translateOnProviderChange) {
@@ -1062,14 +1336,14 @@ onMounted(() => {
       
       if (isInternalScroll) return;
       
-      closeDropdown();
+      closeDropdown(false);
     }, { capture: true, passive: true });
 
     tracker.addEventListener(window, 'resize', () => {
       if (!isDropdownOpen.value || resizeAnimationFrameId !== null) return
       resizeAnimationFrameId = requestAnimationFrame(() => {
         resizeAnimationFrameId = null
-        if (isDropdownOpen.value && !updateDropdownPosition()) closeDropdown()
+        if (isDropdownOpen.value && !updateDropdownPosition()) closeDropdown(false)
       })
     }, { passive: true });
   }

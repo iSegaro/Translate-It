@@ -116,6 +116,21 @@
   "incompatible_label": {
     "message": "Incompatible"
   },
+  "provider_category_free": {
+    "message": "Traditional"
+  },
+  "provider_category_ai": {
+    "message": "AI"
+  },
+  "provider_category_local": {
+    "message": "Local"
+  },
+  "configure_providers": {
+    "message": "Configure Providers"
+  },
+  "switch_provider_label": {
+    "message": "Switch translation service"
+  },
   "provider_google_title": {
     "message": "Google Translate (Classic)"
   },

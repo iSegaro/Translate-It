@@ -272,6 +272,7 @@ img.ti-dropdown-arrow,
   box-shadow: $shadow-lg !important;
   z-index: 2147483647 !important;
   min-width: 220px !important;
+  max-width: calc(100vw - 16px) !important; /* Narrow-viewports safety cap */
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -297,23 +298,65 @@ img.ti-dropdown-arrow,
   &::-webkit-scrollbar-thumb { background: var(--color-border) !important; border-radius: 2px !important; }
 }
 
+/* Conditional Traditional / AI / Local group bins */
+.ti-dropdown-group {
+  display: block !important;
+}
+
+.ti-dropdown-group-header {
+  padding: 6px 14px 4px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--color-text-muted) !important;
+  background: transparent !important;
+  user-select: none !important;
+  pointer-events: none !important;
+
+  :root.theme-dark &, .theme-dark &, .is-dark & {
+    color: var(--color-text-secondary) !important;
+  }
+}
+
 .ti-dropdown-item {
   display: flex !important; align-items: center !important;
-  gap: 10px !important; padding: 10px 14px !important;
+  gap: 4px !important; padding: 6px 10px !important;
   cursor: pointer !important; color: var(--color-text) !important;
   border-bottom: 1px solid var(--color-border-light, var(--color-border)) !important;
   &:last-child { border-bottom: none !important; }
   &:hover, &.is-focused { background-color: var(--color-primary-alpha) !important; }
   &.ti-active { background-color: var(--color-primary-alpha) !important; color: var(--color-primary) !important; font-weight: 600 !important; }
+}
+
+/* Last visible row must not draw a separator above the footer */
+.ti-dropdown-group:last-of-type .ti-dropdown-item:last-child { border-bottom: none !important; }
+
+/* Semantic selection control fills the row; star is an independent sibling */
+.ti-dropdown-item-btn {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  color: inherit !important;
+  font: inherit !important;
+  font-weight: inherit !important;
+  text-align: start !important;
+
+  &:hover, &:focus-visible { background: none !important; }
   img { width: 16px !important; height: 16px !important; object-fit: contain !important; }
-  span { font-size: 14px !important; white-space: nowrap !important; }
+  span { font-size: 13px !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
 }
 
 .ti-set-default-btn {
   margin-inline-start: auto !important;
   background: none !important;
   border: none !important;
-  padding: 4px !important;
+  padding: 5px !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
@@ -323,10 +366,21 @@ img.ti-dropdown-arrow,
   opacity: 0.3;
   z-index: 2 !important;
 
+  /* Minimal tap target for the independent star control */
+  min-width: 26px !important;
+  min-height: 26px !important;
+
   &:hover {
     transform: scale(1.2);
     color: var(--color-primary) !important;
     opacity: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: 1px !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 
   &.is-default {
@@ -342,6 +396,13 @@ img.ti-dropdown-arrow,
     width: 14px !important;
     height: 14px !important;
   }
+}
+
+/* 5a. Semantic selection button + keyboard focus visibility */
+.ti-dropdown-item-btn:focus-visible {
+  outline: 2px solid var(--color-primary) !important;
+  outline-offset: -2px !important;
+  border-radius: $border-radius-sm !important;
 }
 
 /* 6. RTL Support - Simplified using Logical Properties */
@@ -361,6 +422,10 @@ img.ti-dropdown-arrow,
   border-top: 1px solid var(--color-border) !important;
   display: flex !important;
   flex-direction: row !important;
+
+  /* Wrap lets the full-width configure row own its own bottom line while the
+     two sync rows keep sharing the footer width */
+  flex-wrap: wrap !important;
   gap: 4px !important;
 
   /* Dark theme override for footer background */
@@ -477,6 +542,91 @@ img.ti-dropdown-arrow,
   opacity: 0.8 !important;
 }
 
+/* 7a. Configure Providers row — persistent footer action (bottom of menu,
+   regardless of showSync). Never reuses .ti-sync-row so sync-row counts
+   stay independent. */
+.ti-configure-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 4px !important;
+  flex-basis: 100% !important; /* own line under the sync pair */
+  min-width: 0 !important;
+  padding: 5px 6px !important;
+  border: 1px solid transparent !important;
+  border-radius: $border-radius-sm !important;
+  background-color: var(--color-background) !important;
+  color: var(--color-text) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-sizing: border-box !important;
+
+  &:hover {
+    border-color: var(--color-primary-light) !important;
+    background-color: var(--color-primary-alpha) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: 1px !important;
+  }
+
+  :root.is-dark &, .is-dark &, :root.theme-dark &, .theme-dark & {
+    background-color: var(--color-surface, #0f172a) !important;
+    border-color: var(--color-border) !important;
+
+    &:hover {
+      background-color: var(--color-primary-alpha) !important;
+    }
+
+    .ti-sync-icon {
+      color: rgb(255 255 255 / 50%) !important;
+      filter: brightness(1.2) !important;
+    }
+  }
+}
+
+/* 9. Compact Mode (native select + adjacent accessible Configure action) */
+.ti-provider-compact-container {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  max-width: 100% !important;
+
+  .ti-provider-select {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  .ti-provider-compact-config-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    width: 26px !important;
+    height: 26px !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+    background: var(--color-background) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: $border-radius-sm !important;
+    color: var(--color-text) !important;
+    transition: border-color 0.2s ease !important;
+
+    &:hover { border-color: var(--color-primary) !important; }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-primary) !important;
+      outline-offset: 1px !important;
+    }
+  }
+
+  .ti-compact-config-icon {
+    width: 12px !important;
+    height: 12px !important;
+  }
+}
+
 /* 8. Mobile Mode (Bottom Sheets) */
 .ti-provider-mobile-container {
   position: relative !important;
@@ -536,4 +686,15 @@ img.ti-dropdown-arrow,
     width: max-content !important;
     min-width: 190px !important;
   }
+}
+
+/* 10. Trigger focus visibility — placed last so :focus-visible wins over the
+   deliberate `:focus { outline: none }` resets above. */
+.ti-provider-dropdown-area:focus-visible,
+.ti-provider-button:focus-visible,
+.ti-provider-icon-button:focus-visible,
+.ti-provider-mobile-button:focus-visible,
+.ti-sync-row:focus-visible {
+  outline: 2px solid var(--color-primary) !important;
+  outline-offset: 2px !important;
 }

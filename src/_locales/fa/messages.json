@@ -116,6 +116,21 @@
   "incompatible_label": {
     "message": "ناسازگار"
   },
+  "provider_category_free": {
+    "message": "سنتی"
+  },
+  "provider_category_ai": {
+    "message": "هوش مصنوعی"
+  },
+  "provider_category_local": {
+    "message": "محلی"
+  },
+  "configure_providers": {
+    "message": "تنظیمات ارائه‌دهندگان"
+  },
+  "switch_provider_label": {
+    "message": "تغییر سرویس ترجمه"
+  },
   "provider_google_title": {
     "message": "مترجم گوگل (کلاسیک)"
   },
