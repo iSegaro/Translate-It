@@ -326,56 +326,61 @@
         </div>
       </div>
 
-      <!-- Dropdown footer: ephemeral sync rows (optional) + persistent Configure Providers action -->
+      <!-- Dropdown footer: ephemeral sync rows (optional) + persistent Configure Providers action.
+           Toggles stay open (no dismissal) so chained decisions are possible. -->
       <div class="ti-provider-dropdown-footer">
         <template v-if="showSync">
           <button
+            type="button"
             class="ti-sync-row"
             :class="{
               'is-active': ephemeralSync.page,
               'is-disabled': !canSyncToBulk
             }"
             :disabled="!canSyncToBulk"
-            :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-            @click.stop="canSyncToBulk && toggleSync('page')"
+            :aria-pressed="ephemeralSync.page ? 'true' : 'false'"
+            :title="syncTooltip('page')"
+            @click.stop="canSyncToBulk && toggleSync('page', $event)"
           >
             <div class="ti-sync-info">
               <Icon
                 :icon="ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'"
                 class="ti-sync-icon"
               />
-              <span>{{ t('sync_page_label') || 'Sync Page' }}</span>
+              <span>{{ t('sync_page_label') || 'Page Translate' }}</span>
             </div>
             <img
               :src="getEffectiveIcon('page')"
               class="ti-sync-provider-icon"
               :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('page')) }"
-              alt="Target Provider"
+              alt=""
             >
           </button>
 
           <button
+            type="button"
             class="ti-sync-row"
             :class="{
               'is-active': ephemeralSync.element,
               'is-disabled': !canSyncToBulk
             }"
             :disabled="!canSyncToBulk"
-            :title="!canSyncToBulk ? t('provider_does_not_support_bulk') || 'This provider does not support page/element translation' : ''"
-            @click.stop="canSyncToBulk && toggleSync('element')"
+            :aria-pressed="ephemeralSync.element ? 'true' : 'false'"
+            :title="syncTooltip('element')"
+            @click.stop="canSyncToBulk && toggleSync('element', $event)"
           >
             <div class="ti-sync-info">
               <Icon
                 :icon="ephemeralSync.element ? 'fa6-solid:link' : 'fa6-solid:link-slash'"
                 class="ti-sync-icon"
               />
-              <span>{{ t('sync_element_label') || 'Sync Element' }}</span>
+              <span>{{ t('sync_element_label') || 'Select Element' }}</span>
             </div>
             <img
               :src="getEffectiveIcon('element')"
               class="ti-sync-provider-icon"
               :class="{ 'ti-invert-dark': isProviderInverted(getEffectiveProviderId('element')) }"
-              alt="Target Provider"
+              alt=""
             >
           </button>
         </template>
@@ -1116,17 +1121,44 @@ const getEffectiveIcon = (type) => {
 }
 
 /**
+ * Tooltip explaining what reflects the CURRENT sync state: while enabled the
+ * feature follows the provider selected here; while disabled it uses the
+ * feature's configured provider or its normal fallback. Never claims that the
+ * click itself translates.
+ */
+const SYNC_STATE_TOOLTIPS = {
+  page: {
+    selected: ['sync_page_selected_tooltip', 'Page translation follows the provider selected here'],
+    own: ['sync_page_own_tooltip', 'Page translation uses its configured provider, or falls back to the current or default provider.']
+  },
+  element: {
+    selected: ['sync_element_selected_tooltip', 'Select Element translation follows the provider selected here'],
+    own: ['sync_element_own_tooltip', 'Select Element translation uses its configured provider, or falls back to the current or default provider.']
+  }
+}
+const syncTooltip = (type) => {
+  if (!canSyncToBulk.value) {
+    return t('provider_does_not_support_bulk') || 'This provider does not support page/element translation'
+  }
+  const entry = SYNC_STATE_TOOLTIPS[type][ephemeralSync.value[type] ? 'selected' : 'own']
+  return t(entry[0]) || entry[1]
+}
+
+/**
  * Toggles provider synchronization for specific modes
  */
-const toggleSync = (type) => {
+const toggleSync = (type, event) => {
   translationStore.ephemeralSync[type] = !translationStore.ephemeralSync[type]
   
   // Also update translationStore.selectedProvider to match current UI selection
   // This ensures UnifiedTranslationService knows WHICH provider to use when synced
   translationStore.selectedProvider = currentProvider.value
   
-  // Control activation closes the menu (silent)
-  if (isDropdownOpen.value) closeDropdown(false)
+  // No dismissal here: the menu stays open so a sync toggle can be followed by
+  // further provider decisions. Focus stays on the toggled button — affirmed
+  // explicitly so it holds across activation paths (browsers focus clicked
+  // buttons natively; keyboard activation is already focused).
+  event?.currentTarget?.focus?.()
 
   logger.debug(`[ProviderSelector] Toggled sync for ${type}:`, translationStore.ephemeralSync[type])
 }

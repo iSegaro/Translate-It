@@ -2194,10 +2194,22 @@
     "message": "元のページ内容を復元"
   },
   "sync_page_label": {
-    "message": "ページ同期"
+    "message": "ページ翻訳"
   },
   "sync_element_label": {
-    "message": "要素同期"
+    "message": "要素選択"
+  },
+  "sync_page_selected_tooltip": {
+    "message": "ページ翻訳はここで選択したプロバイダーに従います"
+  },
+  "sync_page_own_tooltip": {
+    "message": "ページ翻訳は設定済みのプロバイダーを使用し、未設定の場合は現在のプロバイダーまたは既定のプロバイダーを使用します。"
+  },
+  "sync_element_selected_tooltip": {
+    "message": "要素選択の翻訳はここで選択したプロバイダーに従います"
+  },
+  "sync_element_own_tooltip": {
+    "message": "要素選択の翻訳は設定済みのプロバイダーを使用し、未設定の場合は現在のプロバイダーまたは既定のプロバイダーを使用します。"
   },
   "api_key_show": {
     "message": "表示"

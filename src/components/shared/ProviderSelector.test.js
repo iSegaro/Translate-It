@@ -8,7 +8,8 @@ const settingsStore = vi.hoisted(() => ({
   updateSettingAndPersist: vi.fn(),
 }))
 settingsStore.settings = reactive({ TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [] })
-const translationStore = vi.hoisted(() => ({ ephemeralSync: {}, selectedProvider: null }))
+const translationStore = vi.hoisted(() => ({ ephemeralSync: null, selectedProvider: null }))
+translationStore.ephemeralSync = reactive({ page: false, element: false })
 const registry = vi.hoisted(() => ({
   providers: [
     { id: 'googlev2', name: 'Google', icon: 'providers/google.svg', category: 'FREE', supported: true, features: ['translation', 'bulk'] },
@@ -34,11 +35,18 @@ vi.mock('@/composables/shared/useErrorHandler.js', () => ({
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({
-    t: (key) => {
+    t: (key, values = {}) => {
       const labels = {
         popup_translate_button_text: 'Translate',
         popup_stop_button_title: 'Stop',
         provider_default: 'Default',
+        sync_page_label: 'Page Translate',
+        sync_element_label: 'Select Element',
+        sync_page_selected_tooltip: 'Page translation follows the provider selected here',
+        sync_page_own_tooltip: 'Page translation uses its configured provider, or falls back to the current or default provider.',
+        sync_element_selected_tooltip: 'Select Element translation follows the provider selected here',
+        sync_element_own_tooltip: 'Select Element translation uses its configured provider, or falls back to the current or default provider.',
+        provider_does_not_support_bulk: 'This provider does not support Page Translate and Select Element translation.',
         provider_category_free: 'Traditional',
         provider_category_ai: 'AI',
         provider_category_local: 'Local',
@@ -49,6 +57,8 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
       if (/local/i.test(key) && /(category|group|provider)/i.test(key)) return 'Local'
       if (/\bai\b|_ai|ai_/i.test(key) && /(category|group|provider)/i.test(key)) return 'AI'
       if (/configure.*provider|provider.*configure/i.test(key)) return 'Configure Providers'
+      if (/page/i.test(key) && /sync/i.test(key)) return `Page Translate: ${values.providerName || values.provider || values.service || key}`
+      if (/element/i.test(key) && /sync/i.test(key)) return `Select Element: ${values.providerName || values.provider || values.service || key}`
       return key
     },
   }),
@@ -75,7 +85,7 @@ vi.mock('./IconButton.vue', () => ({
 }))
 
 vi.mock('@iconify/vue', () => ({
-  Icon: { template: '<span class="mock-icon" />' },
+  Icon: { props: ['icon'], template: '<span class="mock-icon" :data-icon="icon" />' },
 }))
 
 vi.mock('webextension-polyfill', () => ({ default: {} }))
@@ -376,7 +386,7 @@ describe('ProviderSelector provider list contract', () => {
     Object.assign(settingsStore.settings, { TRANSLATION_API: 'googlev2', DEBUG_MODE: false, HIDDEN_PROVIDERS: [] })
     settingsStore.updateSettingAndPersist.mockReset()
     openOptionsPage.mockReset()
-    translationStore.ephemeralSync = {}
+    Object.assign(translationStore.ephemeralSync, { page: false, element: false })
     translationStore.selectedProvider = null
     extensionContext.isContentScript = false
   })
@@ -617,6 +627,105 @@ describe('ProviderSelector provider list contract', () => {
       await wrapper.findAll('.ti-sync-row')[0].trigger('click')
       expect(translationStore.ephemeralSync.page).toBe(true)
       expect(settingsStore.updateSettingAndPersist).toHaveBeenCalledTimes(1)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('toggles Page and Element sync repeatedly without closing or selecting a provider', async () => {
+    settingsStore.settings.TRANSLATION_API = 'deepl'
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', modelValue: 'googlev2', showSync: true,
+    }, { realTeleport: true })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      const [page, element] = menu.querySelectorAll('.ti-sync-row')
+      expect(page.textContent).toContain('Page Translate')
+      expect(element.textContent).toContain('Select Element')
+      expect(page.getAttribute('aria-pressed')).toBe('false')
+      expect(element.getAttribute('aria-pressed')).toBe('false')
+      expect(page.getAttribute('title')).toBe('Page translation uses its configured provider, or falls back to the current or default provider.')
+      expect(element.getAttribute('title')).toBe('Select Element translation uses its configured provider, or falls back to the current or default provider.')
+      expect(page.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link-slash')
+
+      page.focus()
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      page.dispatchEvent(enter)
+      expect(enter.defaultPrevented).toBe(false)
+      await wrapper.vm.$nextTick()
+      page.focus()
+      page.click() // jsdom does not synthesize native button activation from keydown.
+      await wrapper.vm.$nextTick()
+      expect(page.getAttribute('aria-pressed')).toBe('true')
+      expect(page.getAttribute('title')).toBe('Page translation follows the provider selected here')
+      expect(page.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link')
+      expect(document.activeElement).toBe(page)
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
+      expect(wrapper.find('.ti-provider-button').attributes('aria-expanded')).toBe('true')
+
+      page.click()
+      await wrapper.vm.$nextTick()
+      expect(page.getAttribute('aria-pressed')).toBe('false')
+      expect(page.getAttribute('title')).toBe('Page translation uses its configured provider, or falls back to the current or default provider.')
+      expect(page.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link-slash')
+
+      element.focus()
+      const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+      element.dispatchEvent(space)
+      expect(space.defaultPrevented).toBe(false)
+      await wrapper.vm.$nextTick()
+      element.focus()
+      element.click()
+      await wrapper.vm.$nextTick()
+      expect(element.getAttribute('aria-pressed')).toBe('true')
+      expect(element.getAttribute('title')).toBe('Select Element translation follows the provider selected here')
+      expect(document.activeElement).toBe(element)
+      expect(menu.querySelector('.ti-configure-row')).toBeTruthy()
+
+      element.click()
+      await wrapper.vm.$nextTick()
+      expect(element.getAttribute('aria-pressed')).toBe('false')
+      expect(element.getAttribute('title')).toBe('Select Element translation uses its configured provider, or falls back to the current or default provider.')
+      expect(element.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link-slash')
+      expect(translationStore.ephemeralSync).toEqual({ page: false, element: false })
+      expect(translationStore.selectedProvider).toBe('googlev2')
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+      expect(wrapper.emitted('translate')).toBeUndefined()
+      expect(settingsStore.updateSettingAndPersist).not.toHaveBeenCalled()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('disables both sync controls and prevents mutation for a provider without bulk support', async () => {
+    registry.providers = [{
+      id: 'local-only', name: 'Local Only', category: 'local', icon: 'providers/local.svg',
+      supported: true, features: ['translation'],
+    }]
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', modelValue: 'local-only', showSync: true,
+    }, { realTeleport: true })
+    try {
+      await wrapper.find('.ti-provider-button').trigger('click')
+      const rows = Array.from(document.body.querySelectorAll('.ti-sync-row'))
+      expect(rows).toHaveLength(2)
+      expect(rows.every((row) => row.disabled)).toBe(true)
+      expect(rows.every((row) => Boolean(row.title))).toBe(true)
+      expect(rows.map((row) => row.title)).toEqual([
+        'This provider does not support Page Translate and Select Element translation.',
+        'This provider does not support Page Translate and Select Element translation.',
+      ])
+      rows.forEach((row) => row.click())
+      expect(translationStore.ephemeralSync).toEqual({ page: false, element: false })
+      expect(translationStore.selectedProvider).toBeNull()
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+      expect(wrapper.emitted('translate')).toBeUndefined()
+      expect(settingsStore.updateSettingAndPersist).not.toHaveBeenCalled()
     } finally {
       wrapper.unmount()
       container.remove()
@@ -946,8 +1055,7 @@ describe('ProviderSelector provider list contract', () => {
       expect(translationStore.ephemeralSync.page).toBe(true)
       expect(wrapper.emitted('provider-change')).toBeUndefined()
 
-      await trigger.trigger('click')
-      menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
       menu.querySelector('.ti-configure-row').click()
       expect(openOptionsPage).toHaveBeenCalledWith('providers')
       expect(wrapper.emitted('provider-change')).toBeUndefined()

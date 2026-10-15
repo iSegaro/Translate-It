@@ -2194,10 +2194,22 @@
     "message": "Restore original page content"
   },
   "sync_page_label": {
-    "message": "Sync Page"
+    "message": "Page Translate"
   },
   "sync_element_label": {
-    "message": "Sync Element"
+    "message": "Select Element"
+  },
+  "sync_page_selected_tooltip": {
+    "message": "Page translation follows the provider selected here"
+  },
+  "sync_page_own_tooltip": {
+    "message": "Page translation uses its configured provider, or falls back to the current or default provider."
+  },
+  "sync_element_selected_tooltip": {
+    "message": "Select Element translation follows the provider selected here"
+  },
+  "sync_element_own_tooltip": {
+    "message": "Select Element translation uses its configured provider, or falls back to the current or default provider."
   },
   "api_key_show": {
     "message": "Show"
