@@ -427,6 +427,36 @@ describe('Options save integration (store + tabs + Global Save)', () => {
     expect(reloadedTab.get('#CUSTOM_PROVIDER_LIST_DRAWER').findAll('.custom-list-entry')).toHaveLength(2);
   });
 
+  it('(6b) relocated provider visibility checkbox stages HIDDEN_PROVIDERS; Save persists the exact ID; reload restores', async () => {
+    const store = await freshStore();
+    const tab = mountTab(ProvidersTab);
+    const nav = mountTab(OptionsNavigation);
+
+    // Relocated placement: the checkbox is a direct child of the settings
+    // container, above the Custom Provider List row.
+    const order = ['PROVIDERS_CONFIGURE_SECTION', 'HIDDEN_PROVIDERS_CHECKBOX', 'CUSTOM_PROVIDER_LIST'];
+    const nodes = order.map((id) => tab.element.querySelector(`#${id}`));
+    expect(nodes).not.toContain(null);
+    for (let i = 0; i < nodes.length - 1; i++) {
+      expect(nodes[i].compareDocumentPosition(nodes[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(nodes[1].querySelector('input').checked).toBe(true);
+
+    // Hide the active/default config provider ('googlev2'); staging is local.
+    await tab.get('#HIDDEN_PROVIDERS_CHECKBOX input').setValue(false);
+    expect(store.settings.TRANSLATION_API).toBe('googlev2');
+    expect(fakeBrowserStorage.writeCalls).toHaveLength(0);
+
+    await clickGlobalSave(nav);
+    expect(saveStatusClass(nav)).toContain('status-success');
+    expect(fakeBrowserStorage.data.HIDDEN_PROVIDERS).toEqual(['googlev2']);
+
+    const reloadedStore = await reloadStore();
+    expect(reloadedStore.settings.HIDDEN_PROVIDERS).toEqual(['googlev2']);
+    const reloadedTab = mountTab(ProvidersTab);
+    expect(reloadedTab.get('#HIDDEN_PROVIDERS_CHECKBOX input').element.checked).toBe(false);
+  });
+
   it('(7) save in flight survives unmount: write started before resolve, visible after reload', async () => {
     await freshStore();
     const tab = mountTab(PromptTab);

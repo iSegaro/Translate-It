@@ -1485,7 +1485,7 @@
     "message": "Find public Lingva instances."
   },
   "show_provider_in_list_label": {
-    "message": "Show in provider list"
+    "message": "Show this provider in dropdowns"
   },
   "openai_api_settings_title": {
     "message": "OpenAI Settings"

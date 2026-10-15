@@ -1485,7 +1485,7 @@
     "message": "公開されているLingvaインスタンスを探す。"
   },
   "show_provider_in_list_label": {
-    "message": "プロバイダーリストに表示する"
+    "message": "このプロバイダーをドロップダウンに表示する"
   },
   "openai_api_settings_title": {
     "message": "OpenAI 設定"

@@ -10,13 +10,26 @@
       >
         <label>{{ t('providers_configure_label') || 'Provider to configure' }}</label>
         <div class="selector-wrapper">
-          <ProviderSelector 
-            v-model="selectedProvider" 
+          <ProviderSelector
+            v-model="selectedProvider"
             mode="button"
             :is-global="false"
             ignore-hidden
           />
         </div>
+      </div>
+
+      <!-- Provider visibility for the configured provider: a top-level staged
+           setting (HIDDEN_PROVIDERS) instead of part of the per-provider
+           panel, so it no longer swaps out on provider changes. -->
+      <div
+        id="HIDDEN_PROVIDERS_CHECKBOX"
+        class="setting-group vertical provider-visibility-group"
+      >
+        <BaseCheckbox
+          v-model="showInList"
+          :label="t('show_provider_in_list_label') || 'Show this provider in dropdowns'"
+        />
       </div>
 
       <div class="api-settings-section">
@@ -125,16 +138,6 @@
               </div>
 
               <component :is="providerSettingsComponent" />
-
-              <div 
-                id="HIDDEN_PROVIDERS_CHECKBOX" 
-                class="setting-group vertical provider-visibility-group"
-              >
-                <BaseCheckbox
-                  v-model="showInList"
-                  :label="t('show_provider_in_list_label') || 'Show in provider list'"
-                />
-              </div>
             </div>
           </Transition>
         </div>
