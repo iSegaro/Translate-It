@@ -84,10 +84,10 @@ We welcome contributions of all kinds! While we have a recommended workflow to k
 ### Recommended Workflow:
 
 1. **Fork the Repository**: Create your own copy of `Translate-It-App/Translate-It` on GitHub.
-2. **Clone Your Fork and Create a Branch**: Run `git clone https://github.com/YOUR-USERNAME/Translate-It.git` (replace `YOUR-USERNAME`), then `cd Translate-It` and `git switch -c feature/new-button`. Optionally track the original repository with `git remote add upstream https://github.com/Translate-It-App/Translate-It.git`.
+2. **Create a Branch**: Clone your fork and create a feature branch.
 3. **Make Your Changes**: Implement your feature or fix.
 4. **Validation**: It's a good idea to run a quick lint/build check (see [Code Quality](#code-quality-and-validation)) to ensure everything is working correctly.
-5. **Push and Submit a Pull Request (PR)**: Push your branch with `git push -u origin feature/new-button`, then open a PR from your fork's branch to `Translate-It-App/Translate-It`'s `main` branch.
+5. **Submit a Pull Request (PR)**: Open a PR from your fork's branch to the upstream `main` branch.
    - Give your PR a clear title (preferably naming the feature or fix you added).
    - Briefly explain what you’ve changed.
 
@@ -110,7 +110,7 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). The direct upstream clone below is fine for build or exploration; contributors should clone their fork as described in the [recommended workflow](#recommended-workflow). Run setup from the repository directory:
+Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone upstream to build or explore the project; to contribute, clone your fork instead. Run setup from either clone:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git
