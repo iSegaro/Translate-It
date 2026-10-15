@@ -534,6 +534,8 @@ const dropdownStyles = ref({})
 const teleportTarget = ref('body')
 const isTeleportEnabled = ref(false)
 let resizeAnimationFrameId = null
+// Options pages: the tab content container is the only scroll source we track
+let optionsScrollAnimationFrameId = null
 
 /**
  * Detects RTL direction for correct alignment of teleported dropdowns.
@@ -1405,23 +1407,43 @@ onMounted(() => {
   tracker.addEventListener(document, 'pointerup', handleMenuPointerTracking, { capture: true })
   tracker.addEventListener(document, 'pointercancel', handleMenuPointerTracking, { capture: true })
   
-  // Close dropdown on scroll; reposition on resize when teleported
-  if (isTeleportEnabled.value) {
-    tracker.addEventListener(window, 'scroll', (event) => {
-      if (!isDropdownOpen.value) return;
-      
-      // Ignore scroll events originating from within the dropdown itself
-      const path = event.composedPath();
-      const isInternalScroll = path.some(el => 
-        el instanceof HTMLElement && 
-        (el.classList?.contains('ti-provider-dropdown-menu') || el.classList?.contains('ti-provider-dropdown-list'))
-      );
-      
-      if (isInternalScroll) return;
-      
-      closeDropdown(false);
-    }, { capture: true, passive: true });
+  // Page/container scrolling alone never closes the menu. In the Options page
+  // (only place with `.tab-content-container`, per OptionsLayout), its scroll
+  // is tracked: when the scroll moves the trigger fully out of the visible
+  // area, dismiss silently; otherwise reposition. Teleported menu internal
+  // scrolling lives under body and never bubbles through this container.
+  const optionsContainer = window.location.href.includes('options.html')
+    ? (selectorRef.value?.closest?.('.tab-content-container') ?? null)
+    : null
+  if (optionsContainer) {
+    tracker.addEventListener(optionsContainer, 'scroll', () => {
+      if (!isDropdownOpen.value || optionsScrollAnimationFrameId !== null) return
+      optionsScrollAnimationFrameId = requestAnimationFrame(() => {
+        optionsScrollAnimationFrameId = null
+        if (!isDropdownOpen.value) return
+        const trigger = triggerBtnRef.value
+        if (!trigger) return
+        const triggerRect = trigger.getBoundingClientRect()
+        const containerRect = optionsContainer.getBoundingClientRect()
+        // Zero-area intersection counts as invisible: exact shared boundary
+        // (bottom === container top, top === viewport bottom, …) means the
+        // trigger no longer has visible area. One-pixel overlap stays open.
+        const fullyInvisible =
+          triggerRect.bottom <= containerRect.top || triggerRect.top >= containerRect.bottom ||
+          triggerRect.right <= containerRect.left || triggerRect.left >= containerRect.right ||
+          triggerRect.bottom <= 0 || triggerRect.top >= window.innerHeight ||
+          triggerRect.right <= 0 || triggerRect.left >= window.innerWidth
+        if (fullyInvisible) {
+          closeDropdown(false)
+          return
+        }
+        if (!updateDropdownPosition()) closeDropdown(false)
+      })
+    }, { passive: true })
+  }
 
+  // Reposition on resize when teleported
+  if (isTeleportEnabled.value) {
     tracker.addEventListener(window, 'resize', () => {
       if (!isDropdownOpen.value || resizeAnimationFrameId !== null) return
       resizeAnimationFrameId = requestAnimationFrame(() => {
@@ -1439,6 +1461,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (resizeAnimationFrameId !== null) cancelAnimationFrame(resizeAnimationFrameId)
+  if (optionsScrollAnimationFrameId !== null) cancelAnimationFrame(optionsScrollAnimationFrameId)
   // Event listener cleanup is now handled automatically by useResourceTracker
 })
 </script>
