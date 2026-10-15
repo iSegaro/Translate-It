@@ -319,10 +319,13 @@ img.ti-dropdown-arrow,
 
 .ti-dropdown-item {
   display: flex !important; align-items: center !important;
-  gap: 4px !important; padding: 6px 10px !important;
+  gap: 4px !important;
+
+  /* No padding here: the semantic selection button owns the whole clickable
+     rectangle (padding and edges) so real-browsers hit it directly and never
+     blur via a non-focusable row region. */
   cursor: pointer !important; color: var(--color-text) !important;
   border-bottom: 1px solid var(--color-border-light, var(--color-border)) !important;
-  &:last-child { border-bottom: none !important; }
   &:hover, &.is-focused { background-color: var(--color-primary-alpha) !important; }
   &.ti-active { background-color: var(--color-primary-alpha) !important; color: var(--color-primary) !important; font-weight: 600 !important; }
 }
@@ -339,7 +342,7 @@ img.ti-dropdown-arrow,
   gap: 10px !important;
   background: none !important;
   border: none !important;
-  padding: 0 !important;
+  padding: 6px 10px !important;
   margin: 0 !important;
   cursor: pointer !important;
   color: inherit !important;

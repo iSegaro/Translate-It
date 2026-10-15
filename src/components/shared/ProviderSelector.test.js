@@ -198,7 +198,7 @@ describe('ProviderSelector split mode', () => {
       })
 
       await wrapper.find('.ti-provider-dropdown-area').trigger('click')
-      await wrapper.find('.ti-dropdown-item').trigger('click')
+      await wrapper.find('.ti-dropdown-item-btn').trigger('click')
 
       expect(wrapper.emitted('provider-change')).toEqual([['googlev2']])
       expect(wrapper.emitted('update:modelValue')).toEqual([['googlev2']])
@@ -607,7 +607,7 @@ describe('ProviderSelector provider list contract', () => {
     try {
       await wrapper.find('.ti-provider-button').trigger('click')
       const menu = document.body.querySelector('.ti-provider-dropdown-menu')
-      await menu.querySelectorAll('.ti-dropdown-item')[1].click()
+      await menu.querySelectorAll('.ti-dropdown-item-btn')[1].click()
       await wrapper.vm.$nextTick()
       expect(wrapper.emitted('provider-change')).toEqual([['deepl']])
       expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
@@ -624,14 +624,125 @@ describe('ProviderSelector provider list contract', () => {
     }
   })
 
+  it('does not classify a real teleported menu click as outside during capture', async () => {
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true },
+    )
+    let captureState
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      const observeCapture = () => { captureState = wrapper.vm.$.setupState.isDropdownOpen }
+      document.addEventListener('click', observeCapture, true)
+      try {
+        menu.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }))
+      } finally {
+        document.removeEventListener('click', observeCapture, true)
+      }
+      expect(captureState).toBe(true)
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('preserves provider selection when a row-edge pointer sequence moves focus before click', async () => {
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true },
+    )
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      const menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      const row = menu.querySelectorAll('.ti-dropdown-item')[1]
+      const rowButton = row.querySelector('.ti-dropdown-item-btn')
+      rowButton.focus()
+
+      // jsdom has no CSS hit testing; the row container represents its padding edge.
+      row.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }))
+      row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }))
+      rowButton.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+
+      row.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(wrapper.emitted('provider-change')).toEqual([['deepl']])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('keeps star, sync, and configure clicks independent from provider selection', async () => {
+    const { wrapper, container } = await attachSelector({
+      mode: 'button', modelValue: 'googlev2', isGlobal: false, allowSetDefault: true, showSync: true,
+    }, { realTeleport: true })
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      let menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      await menu.querySelector('.ti-dropdown-item-btn[aria-current="true"]')
+        .closest('.ti-dropdown-item').querySelector('.ti-set-default-btn').click()
+      expect(settingsStore.updateSettingAndPersist).toHaveBeenCalledWith('TRANSLATION_API', 'googlev2')
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+
+      await trigger.trigger('click')
+      menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      menu.querySelector('.ti-sync-row').click()
+      expect(translationStore.ephemeralSync.page).toBe(true)
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+
+      await trigger.trigger('click')
+      menu = document.body.querySelector('.ti-provider-dropdown-menu')
+      menu.querySelector('.ti-configure-row').click()
+      expect(openOptionsPage).toHaveBeenCalledWith('providers')
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('dismisses on a real outside click without selecting or stealing focus', async () => {
+    const { wrapper, container } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true },
+    )
+    const outside = document.createElement('button')
+    outside.textContent = 'Outside'
+    container.appendChild(outside)
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('click')
+      const triggerFocus = vi.spyOn(trigger.element, 'focus')
+      outside.click()
+      await wrapper.vm.$nextTick()
+      expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+      expect(triggerFocus).not.toHaveBeenCalled()
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
   it('teleports into the component shadow root when running in content-script context', async () => {
     const { wrapper, container, shadowRoot } = await attachSelector(
       { mode: 'button', modelValue: 'googlev2' }, { shadow: true },
     )
     try {
       await wrapper.find('.ti-provider-button').trigger('click')
-      expect(shadowRoot.querySelector('.ti-provider-dropdown-menu')).toBeTruthy()
+      const menu = shadowRoot.querySelector('.ti-provider-dropdown-menu')
+      expect(menu).toBeTruthy()
       expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBeNull()
+      const trigger = wrapper.find('.ti-provider-button')
+      menu.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }))
+      await wrapper.vm.$nextTick()
+      expect(trigger.attributes('aria-expanded')).toBe('true')
       const configure = Array.from(shadowRoot.querySelectorAll('button'))
         .find((button) => button.textContent.includes('Configure Providers'))
       expect(configure).toBeTruthy()

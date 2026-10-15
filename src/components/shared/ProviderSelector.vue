@@ -285,12 +285,15 @@
             @click="selectProvider(item)"
             @mouseenter="focusedIndex = item.index"
           >
-            <!-- Semantic selection button; the star below is an independent
-                 sibling control, never nested inside an interactive element -->
+            <!-- Semantic selection button: owns the full selectable rectangle
+                 (padding lives on it) and keyboard activation. The sibling star
+                 stays an independent control; the row is only a click safety
+                 net for edge/gap hits. -->
             <button
               type="button"
               class="ti-dropdown-item-btn"
               :aria-current="currentProvider === item.id ? 'true' : undefined"
+              @click.stop="selectProvider(item)"
               @focus="focusedIndex = item.index"
             >
               <img
@@ -559,6 +562,10 @@ const setAsGlobalDefault = async (provider) => {
       await selectProvider(provider)
     }
     
+    // 3. Control activation closes the menu (selection path above already
+    //    closed it when the provider changed)
+    if (isDropdownOpen.value) closeDropdown(false)
+
     logger.info(`Provider ${provider.id} set as global default.`)
   } catch (error) {
     logger.error('Failed to set global default provider:', error)
@@ -706,12 +713,31 @@ const handleMenuKeydown = (event) => {
 /**
  * Closes the menu silently when focus moves out of it entirely (e.g. Tab past
  * the Configure row). Moving focus between controls inside the menu keeps it
- * open. Outside clicks should never steal focus, so this close is silent.
+ * open, as does a blur-to-null caused by the pointer interacting with a
+ * non-focusable menu region during an in-menu pointer interaction (tracked by
+ * the pointer latch below). Outside clicks should never steal focus, so this
+ * close is silent.
  */
 const handleMenuFocusOut = (event) => {
   if (!isDropdownOpen.value) return
   if (dropdownMenuElRef.value?.contains(event.relatedTarget)) return
+  if (menuPointerInside) return
   closeDropdown(false)
+}
+
+/**
+ * Pointer latch for the focusout suppression above: latched while a pointer
+ * interaction begins inside the menu, cleared by pointerup anywhere or
+ * pointercancel, so a canceled/outside pointer can never leave it stuck and
+ * keyboard-only focus changes (no latch) still dismiss the menu normally.
+ */
+let menuPointerInside = false
+const handleMenuPointerTracking = (event) => {
+  if (event.type === 'pointerdown') {
+    menuPointerInside = event.composedPath().includes(dropdownMenuElRef.value)
+  } else {
+    menuPointerInside = false
+  }
 }
 
 const scrollToFocused = () => {
@@ -747,8 +773,12 @@ const handleClickOutside = (event) => {
 
   if (!isDropdownOpen.value || !selectorRef.value) return
   
-  // If the component container is NOT in the event path, the click was outside
-  if (!path.includes(selectorRef.value)) {
+  // The click is internal when the trigger container OR the (possibly
+  // teleported) menu is in the event path — Teleport on body and in a
+  // shadow root both report the menu node in composedPath().
+  // Inside-menu clicks must not close during capture: real click flows
+  // dismiss through their own handlers (selection, footer actions).
+  if (!path.includes(selectorRef.value) && !path.includes(dropdownMenuElRef.value)) {
     // Silent close — restoring trigger focus here would steal focus from
     // wherever the user clicked (including clicks inside the menu).
     closeDropdown(false)
@@ -912,6 +942,9 @@ const menuItems = computed(() => groupedMenu.value.flatMap(group => group.items)
  */
 const configureProvidersLabel = computed(() => t('configure_providers') || 'Configure Providers')
 const openProvidersSettings = () => {
+  // Control activation closes the menu (silent — focus must stay with the
+  // activating control while the options page opens).
+  if (isDropdownOpen.value) closeDropdown(false)
   openOptionsPage('providers')
 }
 
@@ -1067,6 +1100,9 @@ const toggleSync = (type) => {
   // This ensures UnifiedTranslationService knows WHICH provider to use when synced
   translationStore.selectedProvider = currentProvider.value
   
+  // Control activation closes the menu (silent)
+  if (isDropdownOpen.value) closeDropdown(false)
+
   logger.debug(`[ProviderSelector] Toggled sync for ${type}:`, translationStore.ephemeralSync[type])
 }
 
@@ -1321,6 +1357,13 @@ onMounted(() => {
    * (like TranslationWindow.vue). This ensures the dropdown closes correctly in Shadow DOM.
    */
   tracker.addEventListener(document, 'click', handleClickOutside, { capture: true })
+
+  // Pointer latch tracking (see handleMenuFocusOut / handleMenuPointerTracking):
+  // pointerdown decides whether the interaction begins inside the menu;
+  // pointerup/pointercancel anywhere release the latch.
+  tracker.addEventListener(document, 'pointerdown', handleMenuPointerTracking, { capture: true })
+  tracker.addEventListener(document, 'pointerup', handleMenuPointerTracking, { capture: true })
+  tracker.addEventListener(document, 'pointercancel', handleMenuPointerTracking, { capture: true })
   
   // Close dropdown on scroll; reposition on resize when teleported
   if (isTeleportEnabled.value) {

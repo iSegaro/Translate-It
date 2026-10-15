@@ -210,7 +210,10 @@
   display: flex !important;
   align-items: center !important;
   gap: 10px !important;
-  padding: 8px 12px !important;
+
+  /* Padding intentionally absent here: the semantic selection button owns the
+     full clickable rectangle (mirrors ProviderSelector.scss), so a hit on the
+     row edge focuses the button instead of blurring it. */
   cursor: pointer !important;
   transition: background-color 0.2s ease !important;
   border: none !important;
@@ -240,6 +243,13 @@
     text-overflow: ellipsis !important;
     flex: 1 !important;
   }
+}
+
+/* Floating Window density override — moved from the row (now padding-free so
+   the semantic selection button owns the hit rectangle) onto the button so
+   the 8px/12px look and full-edge hit target are preserved here. */
+.ti-window-provider-selector .ti-dropdown-item-btn {
+  padding: 8px 12px !important;
 }
 
 // Header close section
