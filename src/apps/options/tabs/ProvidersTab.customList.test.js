@@ -649,6 +649,50 @@ describe('ProvidersTab custom provider list drawer (staged semantics)', () => {
 
   // --- Reorder: keyboard and drag & drop ---
 
+  it.each([
+    { direction: -1, index: 1, focusedArrow: 0, replacementArrow: 1, expected: ['openai', 'deepl', 'googlev2'] },
+    { direction: 1, index: 1, focusedArrow: 1, replacementArrow: 0, expected: ['deepl', 'googlev2', 'openai'] },
+  ])('moves focus to the enabled same-row arrow when reordering to an edge ($direction)', async ({
+    index, focusedArrow, replacementArrow, expected,
+  }) => {
+    mocks.store.settings.CUSTOM_PROVIDER_LIST = ['deepl', 'openai', 'googlev2'];
+    wrapper = mountTab();
+    await nextTick();
+    await openDrawer();
+
+    const focusedButton = entriesOf().at(index).findAll('.custom-list-move-btn').at(focusedArrow);
+    focusedButton.element.focus();
+    await focusedButton.trigger('click');
+    await nextTick();
+    const movedRow = entriesOf().find((row) => row.get('.custom-list-entry-name').attributes('title') === 'openai');
+    const replacement = movedRow.findAll('.custom-list-move-btn').at(replacementArrow).element;
+
+    expect(entriesOf().map((row) => row.get('.custom-list-entry-name').attributes('title'))).toEqual(expected);
+    expect(document.activeElement).toBe(replacement);
+    expect(replacement.disabled).toBe(false);
+  });
+
+  it('keeps same-row focus for non-edge moves and does not steal focus from another control', async () => {
+    mocks.store.settings.CUSTOM_PROVIDER_LIST = ['deepl', 'openai', 'googlev2', 'edge'];
+    wrapper = mountTab();
+    await nextTick();
+    await openDrawer();
+
+    const rowValues = () => entriesOf().map((row) => row.get('.custom-list-entry-name').attributes('title'));
+    const nonEdgeButton = entriesOf().at(2).findAll('.custom-list-move-btn').at(0);
+    nonEdgeButton.element.focus();
+    await nonEdgeButton.trigger('click');
+    await nextTick();
+    expect(rowValues()).toEqual(['deepl', 'googlev2', 'openai', 'edge']);
+    expect(document.activeElement).toBe(nonEdgeButton.element);
+
+    const doneButton = wrapper.get('.custom-list-drawer-footer button').element;
+    doneButton.focus();
+    await entriesOf().at(1).findAll('.custom-list-move-btn').at(0).trigger('click');
+    await nextTick();
+    expect(document.activeElement).toBe(doneButton);
+  });
+
   it('Move Up/Down reorder the draft without staging', async () => {
     mocks.store.settings.CUSTOM_PROVIDER_LIST = ['deepl', 'openai', 'googlev2'];
     wrapper = mountTab();

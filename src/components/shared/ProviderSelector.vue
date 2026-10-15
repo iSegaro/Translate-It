@@ -315,7 +315,7 @@
                 class="ti-dropdown-item"
                 :class="{
                   'ti-active': currentProvider === item.id,
-                  'is-focused': !isCategoryHeaderHovered && focusedIndex === item.index
+                  'is-focused': !isCategoryHeaderHovered && (pointerIndex === item.index || (pointerIndex < 0 && focusedIndex === item.index))
                 }"
                 @click="selectProvider(item)"
                 @mouseenter="handleRowPointerEnter(item)"
@@ -593,6 +593,7 @@ const dropdownMenuElRef = ref(null)
 const isDropdownOpen = ref(false)
 const isUpward = ref(false)
 const focusedIndex = ref(-1)
+const pointerIndex = ref(-1)
 const isCategoryHeaderHovered = ref(false)
 // Identity of the row that last received REAL focus (recorded at the focus
 // event, before any reactive reshaping) — external collapse reconciliation
@@ -679,7 +680,7 @@ const handleKeydown = (event) => {
   if (props.disabled) return
 
   const { key } = event
-  const items = availableProviders.value
+  const items = groupedMenu.value.flatMap(group => group.items)
   const currentIndex = items.findIndex(p => p.id === currentProvider.value)
 
   // If dropdown is closed, Arrow keys change selection directly (Native behavior - No looping)
@@ -758,18 +759,19 @@ const handleKeydown = (event) => {
  */
 const handleRowFocus = (item) => {
   isCategoryHeaderHovered.value = false
+  pointerIndex.value = -1
   focusedIndex.value = item.index
   rowFocusProviderId.value = item.id
 }
 
 const handleRowPointerEnter = (item) => {
   isCategoryHeaderHovered.value = false
-  focusedIndex.value = item.index
+  pointerIndex.value = item.index
 }
 
 const handleMenuPointerLeave = () => {
   isCategoryHeaderHovered.value = false
-  focusedIndex.value = -1
+  pointerIndex.value = -1
 }
 
 /**
@@ -785,12 +787,23 @@ const handleCategoryPointerEnter = () => {
   const focusedRow = activeElement?.closest?.('.ti-dropdown-item-btn')
   if (!menuRoot?.contains(focusedRow)) {
     focusedIndex.value = -1
+    pointerIndex.value = -1
     return
   }
 
   const rows = dropdownMenuRef.value?.querySelectorAll('.ti-dropdown-item-btn') ?? []
   const realFocusIndex = Array.prototype.indexOf.call(rows, focusedRow)
   focusedIndex.value = realFocusIndex
+  pointerIndex.value = -1
+}
+
+const focusedMenuRowIndex = () => {
+  const menu = dropdownMenuRef.value
+  const root = menu?.getRootNode?.() ?? document
+  const focusedRow = root.activeElement?.closest?.('.ti-dropdown-item-btn')
+  if (!menu?.contains(focusedRow)) return -1
+  const rows = menu.querySelectorAll('.ti-dropdown-item-btn')
+  return Array.prototype.indexOf.call(rows, focusedRow)
 }
 
 /**
@@ -841,8 +854,11 @@ const handleMenuKeydown = (event) => {
   if (key === 'ArrowDown' || key === 'ArrowUp') {
     event.preventDefault()
     const delta = key === 'ArrowDown' ? 1 : -1
-    const next = (focusedIndex.value + delta + items.length) % items.length
+    const realFocusIndex = focusedMenuRowIndex()
+    const originIndex = realFocusIndex >= 0 ? realFocusIndex : focusedIndex.value
+    const next = (originIndex + delta + items.length) % items.length
     focusedIndex.value = next
+    pointerIndex.value = -1
     moveListFocus(next)
     return
   }
@@ -850,11 +866,14 @@ const handleMenuKeydown = (event) => {
   if (key === 'Enter' || key === ' ') {
     // Only provider selection buttons are activated here; the star, sync and
     // footer controls rely on their native button activation.
-    if (!event.target?.closest?.('.ti-dropdown-item-btn')) return
+    const menu = dropdownMenuRef.value
+    const rowButton = event.target?.closest?.('.ti-dropdown-item-btn')
+    if (!rowButton || !menu?.contains(rowButton)) return
+    const rows = menu.querySelectorAll('.ti-dropdown-item-btn')
+    const rowIndex = Array.prototype.indexOf.call(rows, rowButton)
+    if (rowIndex < 0 || !items[rowIndex]) return
     event.preventDefault()
-    if (focusedIndex.value >= 0 && focusedIndex.value < items.length) {
-      selectProvider(items[focusedIndex.value])
-    }
+    selectProvider(items[rowIndex])
     return
   }
 }

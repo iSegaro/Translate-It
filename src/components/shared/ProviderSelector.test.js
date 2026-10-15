@@ -503,6 +503,51 @@ describe('ProviderSelector provider list contract', () => {
     }
   })
 
+  it('moves closed-selector arrows through custom-list visual order without wrapping', async () => {
+    Object.assign(settingsStore.settings, {
+      CUSTOM_PROVIDER_LIST_ENABLED: true,
+      CUSTOM_PROVIDER_LIST: ['gemini', 'googlev2'],
+    })
+    const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'gemini' })
+    try {
+      const trigger = wrapper.find('.ti-provider-button')
+      await trigger.trigger('keydown', { key: 'ArrowUp' })
+      expect(wrapper.emitted('provider-change')).toBeUndefined()
+
+      await trigger.trigger('keydown', { key: 'ArrowDown' })
+      expect(wrapper.emitted('provider-change')).toEqual([['googlev2']])
+      await wrapper.setProps({ modelValue: 'browser' })
+      await trigger.trigger('keydown', { key: 'ArrowDown' })
+      expect(wrapper.emitted('provider-change')).toHaveLength(1)
+      await trigger.trigger('keydown', { key: 'ArrowUp' })
+      expect(wrapper.emitted('provider-change')?.at(-1)).toEqual(['openai'])
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it('keeps closed arrows eligible across collapsed groups and in selection-only mode', async () => {
+    Object.assign(settingsStore.settings, { COLLAPSED_PROVIDER_CATEGORIES: ['free'] })
+    const regular = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
+    try {
+      await regular.wrapper.find('.ti-provider-button').trigger('keydown', { key: 'ArrowDown' })
+      expect(regular.wrapper.emitted('provider-change')).toEqual([['deepl']])
+    } finally {
+      regular.wrapper.unmount()
+      regular.container.remove()
+    }
+
+    const selectionOnly = await attachSelector({ mode: 'button', selectionOnly: true, modelValue: 'googlev2' })
+    try {
+      await selectionOnly.wrapper.find('.ti-provider-button').trigger('keydown', { key: 'ArrowDown' })
+      expect(selectionOnly.wrapper.emitted('provider-change')).toEqual([['deepl']])
+    } finally {
+      selectionOnly.wrapper.unmount()
+      selectionOnly.container.remove()
+    }
+  })
+
   it('uses unique menu and category IDs for selectors in the same Vue app', async () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -2074,6 +2119,67 @@ describe('ProviderSelector collapsible category groups', () => {
   }
 
   it.each([
+    { label: 'Document', shadow: false },
+    { label: 'ShadowRoot', shadow: true },
+  ])('selects the actually focused row after pointer hover in $label menus for Enter and Space', async ({ shadow }) => {
+    for (const key of ['Enter', ' ']) {
+      const { wrapper, container, shadowRoot } = await attachSelector(
+        { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true, shadow },
+      )
+      try {
+        await openRealMenu(wrapper)
+        const root = shadowRoot ?? document
+        const button = (name) => Array.from(root.querySelectorAll('.ti-dropdown-item-btn'))
+          .find((candidate) => candidate.textContent.trim() === name)
+        const focusedButton = button('DeepL')
+        focusedButton.focus()
+        button('Browser').closest('.ti-dropdown-item').dispatchEvent(new MouseEvent('mouseenter'))
+        await wrapper.vm.$nextTick()
+        expect(wrapper.vm.$.setupState.focusedIndex).toBe(1)
+        expect(wrapper.vm.$.setupState.pointerIndex).toBe(5)
+
+        focusedButton.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+        await wrapper.vm.$nextTick()
+        expect(wrapper.emitted('provider-change')?.at(-1)).toEqual(['deepl'])
+      } finally {
+        wrapper.unmount()
+        container.remove()
+      }
+    }
+  })
+
+  it.each([
+    { label: 'Document', shadow: false },
+    { label: 'ShadowRoot', shadow: true },
+  ])('continues arrows from the real focused row after pointer hover in $label menus', async ({ shadow }) => {
+    const { wrapper, container, shadowRoot } = await attachSelector(
+      { mode: 'button', modelValue: 'googlev2' }, { realTeleport: true, shadow },
+    )
+    try {
+      await openRealMenu(wrapper)
+      const root = shadowRoot ?? document
+      const button = (name) => Array.from(root.querySelectorAll('.ti-dropdown-item-btn'))
+        .find((candidate) => candidate.textContent.trim() === name)
+      const focusedButton = button('OpenAI')
+      focusedButton.focus()
+      button('Google').closest('.ti-dropdown-item').dispatchEvent(new MouseEvent('mouseenter'))
+      await wrapper.vm.$nextTick()
+
+      focusedButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(root.activeElement.textContent.trim()).toBe('Gemini')
+      root.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }))
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(root.activeElement.textContent.trim()).toBe('OpenAI')
+    } finally {
+      wrapper.unmount()
+      container.remove()
+    }
+  })
+
+  it.each([
     { label: 'pointer from above', focused: 'OpenAI', focusedIndex: 3, pointer: 'Google', next: 'Gemini' },
     { label: 'pointer from below', focused: 'Google', focusedIndex: 0, pointer: 'Browser', next: 'DeepL' },
     { label: 'pointer between categories', focused: 'DeepL', focusedIndex: 1, pointer: 'Gemini', next: 'Unconfigured' },
@@ -2088,7 +2194,8 @@ describe('ProviderSelector collapsible category groups', () => {
       focusedButton.focus()
       pointerRow.dispatchEvent(new MouseEvent('mouseenter'))
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.$.setupState.focusedIndex).toBe(
+      expect(wrapper.vm.$.setupState.focusedIndex).toBe(focusedIndex)
+      expect(wrapper.vm.$.setupState.pointerIndex).toBe(
         ['Google', 'DeepL', 'Unconfigured', 'OpenAI', 'Gemini', 'Browser'].indexOf(pointer),
       )
       expect(pointerRow.classList.contains('is-focused')).toBe(true)
@@ -2132,7 +2239,7 @@ describe('ProviderSelector collapsible category groups', () => {
         .find((row) => row.textContent.trim().includes(pointer))
       pointerRow.dispatchEvent(new MouseEvent('mouseenter'))
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.$.setupState.focusedIndex).toBeGreaterThanOrEqual(0)
+      expect(wrapper.vm.$.setupState.pointerIndex).toBeGreaterThanOrEqual(0)
       expect(pointerRow.classList.contains('is-focused')).toBe(true)
 
       aiHeader.dispatchEvent(new MouseEvent('mouseenter'))
@@ -2166,7 +2273,7 @@ describe('ProviderSelector collapsible category groups', () => {
         .find((row) => row.textContent.trim() === 'Browser')
       browserRow.dispatchEvent(new MouseEvent('mouseenter'))
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.$.setupState.focusedIndex).toBe(5)
+      expect(wrapper.vm.$.setupState.pointerIndex).toBe(5)
 
       document.body.querySelector('.ti-dropdown-group-header')
         .dispatchEvent(new MouseEvent('mouseenter'))
@@ -2202,7 +2309,7 @@ describe('ProviderSelector collapsible category groups', () => {
       openAiButton.focus()
       providerButton('Browser').closest('.ti-dropdown-item').dispatchEvent(new MouseEvent('mouseenter'))
       await wrapper.vm.$nextTick()
-      expect(wrapper.vm.$.setupState.focusedIndex).toBe(5)
+      expect(wrapper.vm.$.setupState.pointerIndex).toBe(5)
 
       shadowRoot.querySelector('.ti-dropdown-group-header').dispatchEvent(new MouseEvent('mouseenter'))
       await wrapper.vm.$nextTick()

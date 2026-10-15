@@ -799,7 +799,8 @@
 
 // Drawer + row on tablet/mobile
 @media (max-width: 768px) {
-  .custom-list-drawer {
+  // stylelint-disable-next-line selector-class-pattern -- required to beat the nested desktop drawer rule
+  .providers-tab .custom-list-drawer {
     width: 100%;
     max-width: 100%;
   }
@@ -822,13 +823,22 @@
   }
 
   // Stack the picker row so the button-mode trigger and Add button fit.
-  .custom-list-add-row {
+  // Match the desktop row specificity so mobile alignment wins in both directions.
+  // stylelint-disable-next-line selector-class-pattern -- required to match desktop row specificity
+  .providers-tab .custom-list-add-row {
     flex-direction: column;
     align-items: stretch;
     gap: $spacing-xs;
+  }
 
-    .custom-list-add-btn {
-      width: 100%;
-    }
+  // Match desktop RTL specificity so this mobile direction wins that rule.
+  // stylelint-disable-next-line selector-class-pattern, selector-max-class -- required to beat the nested desktop RTL rule
+  .providers-tab .custom-list-drawer.rtl .custom-list-add-row {
+    flex-direction: column;
+  }
+
+  // stylelint-disable-next-line selector-class-pattern -- legacy custom-list class names are part of the rendered markup
+  .custom-list-add-row .custom-list-add-btn {
+    width: 100%;
   }
 }

@@ -257,7 +257,7 @@
                   class="custom-list-move-btn"
                   :disabled="index === 0"
                   :aria-label="`${t('custom_provider_list_move_up_label') || 'Move up'}: ${resolveCustomProviderLabel(id) || id}`"
-                  @click="moveCustomListEntry(index, -1)"
+                  @click="moveCustomListEntry(index, -1, $event)"
                 >
                   ↑
                 </button>
@@ -266,7 +266,7 @@
                   class="custom-list-move-btn"
                   :disabled="index === customListDraftIds.length - 1"
                   :aria-label="`${t('custom_provider_list_move_down_label') || 'Move down'}: ${resolveCustomProviderLabel(id) || id}`"
-                  @click="moveCustomListEntry(index, 1)"
+                  @click="moveCustomListEntry(index, 1, $event)"
                 >
                   ↓
                 </button>
@@ -553,13 +553,30 @@ const removeCustomListEntry = (index) => {
   restoreCustomListEntryFocus(index)
 }
 
-const moveCustomListEntry = (index, direction) => {
+const moveCustomListEntry = (index, direction, event) => {
   const target = index + direction
   if (target < 0 || target >= customListDraftIds.value.length) return
+  const entryId = customListDraftIds.value[index]
+  const activatedControl = event?.currentTarget
+  const ownsFocus = activatedControl === document.activeElement
   const ids = [...customListDraftIds.value]
   const [entry] = ids.splice(index, 1)
   ids.splice(target, 0, entry)
   customListDraftIds.value = ids
+
+  // Moving an entry to an edge disables the activated arrow. Keep focus in the
+  // row, transferring to the opposite arrow only when the clicked control owns it.
+  if (ownsFocus) {
+    nextTick(() => {
+      const active = document.activeElement
+      if (active !== activatedControl && active !== document.body && active !== document.documentElement) return
+      const row = Array.from(customListDrawerRef.value?.querySelectorAll('.custom-list-entry') || [])
+        .find((item) => item.querySelector('.custom-list-entry-name')?.getAttribute('title') === entryId)
+      const arrowIndex = target === 0 ? 1 : target === ids.length - 1 ? 0 : direction < 0 ? 0 : 1
+      row?.querySelectorAll('.custom-list-move-btn')[arrowIndex]
+        ?.focus({ preventScroll: true })
+    })
+  }
 }
 
 const addSelectedCustomProvider = () => {
