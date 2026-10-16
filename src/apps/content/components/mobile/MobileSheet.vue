@@ -1,12 +1,12 @@
 <template>
-  <div 
+  <div
     v-if="isOpen && !isFullscreen"
     class="ti-m-sheet-overlay notranslate"
     translate="no"
     :class="{ 'is-dark': settingsStore.isDarkTheme }"
     @mousedown.self.prevent="closeSheet"
   >
-    <div 
+    <div
       class="ti-m-sheet notranslate"
       translate="no"
       :class="[`state-${sheetState}`, { 'is-dark': settingsStore.isDarkTheme }]"
@@ -15,8 +15,8 @@
       @touchstart="onSheetMouseDown"
     >
       <!-- Drag Handle Header -->
-      <div 
-        class="ti-m-sheet-header" 
+      <div
+        class="ti-m-sheet-header"
         @touchstart.stop.prevent="onDragStart"
         @touchmove.stop.prevent="onDragMove"
         @touchend.stop="onDragEnd"
@@ -26,14 +26,18 @@
       </div>
 
       <!-- Main Content Container -->
-      <div 
-        class="ti-m-sheet-content" 
-        :class="{ 'view-dashboard': activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD }"
+      <div
+        class="ti-m-sheet-content"
+        :class="{
+          'view-dashboard': activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD,
+        }"
       >
         <DashboardView v-if="activeView === MOBILE_CONSTANTS.VIEWS.DASHBOARD" />
         <SelectionView v-if="activeView === MOBILE_CONSTANTS.VIEWS.SELECTION" />
         <InputView v-if="activeView === MOBILE_CONSTANTS.VIEWS.INPUT" />
-        <PageTranslationView v-if="activeView === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION" />
+        <PageTranslationView
+          v-if="activeView === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION"
+        />
         <HistoryView v-if="activeView === MOBILE_CONSTANTS.VIEWS.HISTORY" />
       </div>
 
@@ -44,205 +48,217 @@
 </template>
 
 <script setup>
-import './MobileSheet.scss'
-import { computed, ref, watch, onUnmounted } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useMobileStore } from '@/store/modules/mobile.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
-import { sendMessage } from '@/shared/messaging/core/UnifiedMessaging.js'
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
-import ExtensionContextManager from '@/core/extensionContext.js'
+import "./MobileSheet.scss";
+import { computed, ref, watch, onUnmounted } from "vue";
+import { storeToRefs } from "pinia";
+import { useMobileStore } from "@/store/modules/mobile.js";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
+import { MOBILE_CONSTANTS } from "@/shared/constants/mobile.js";
+import { useResourceTracker } from "@/composables/core/useResourceTracker.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { sendMessage } from "@/shared/messaging/core/UnifiedMessaging.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
 
-import DashboardView from './views/DashboardView.vue'
-import SelectionView from './views/SelectionView.vue'
-import InputView from './views/InputView.vue'
-import PageTranslationView from './views/PageTranslationView.vue'
-import HistoryView from './views/HistoryView.vue'
+import DashboardView from "./views/DashboardView.vue";
+import SelectionView from "./views/SelectionView.vue";
+import InputView from "./views/InputView.vue";
+import PageTranslationView from "./views/PageTranslationView.vue";
+import HistoryView from "./views/HistoryView.vue";
 
-const mobileStore = useMobileStore()
-const settingsStore = useSettingsStore()
-const { isOpen, activeView, sheetState, isFullscreen } = storeToRefs(mobileStore)
-const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileSheet')
+const mobileStore = useMobileStore();
+const settingsStore = useSettingsStore();
+const { isOpen, activeView, sheetState, isFullscreen } =
+  storeToRefs(mobileStore);
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, "MobileSheet");
 
 // MEMORY MANAGEMENT
-const tracker = useResourceTracker('mobile-sheet')
+const tracker = useResourceTracker("mobile-sheet");
 
 // Drag and drop logic
-const startY = ref(0)
-const currentY = ref(0)
-const isDragging = ref(false)
+const startY = ref(0);
+const currentY = ref(0);
+const isDragging = ref(false);
 
 const onDragStart = (e) => {
-  isDragging.value = true
-  startY.value = e.touches ? e.touches[0].clientY : e.clientY
-  currentY.value = 0
-  
+  isDragging.value = true;
+  startY.value = e.touches ? e.touches[0].clientY : e.clientY;
+  currentY.value = 0;
+
   if (!e.touches) {
-    tracker.addEventListener(window, 'mousemove', onDragMove)
-    tracker.addEventListener(window, 'mouseup', onDragEnd)
+    tracker.addEventListener(window, "mousemove", onDragMove);
+    tracker.addEventListener(window, "mouseup", onDragEnd);
   }
-}
+};
 
 const onDragMove = (e) => {
-  if (!isDragging.value) return
-  const y = e.touches ? e.touches[0].clientY : e.clientY
-  currentY.value = y - startY.value
-}
+  if (!isDragging.value) return;
+  const y = e.touches ? e.touches[0].clientY : e.clientY;
+  currentY.value = y - startY.value;
+};
 
 const onDragEnd = (e) => {
-  if (!isDragging.value) return
-  isDragging.value = false
-  
-  const isMouseEvent = e && e.type === 'mouseup';
+  if (!isDragging.value) return;
+  isDragging.value = false;
+
+  const isMouseEvent = e && e.type === "mouseup";
   if (isMouseEvent) {
-    tracker.removeEventListener(window, 'mousemove', onDragMove)
-    tracker.removeEventListener(window, 'mouseup', onDragEnd)
+    tracker.removeEventListener(window, "mousemove", onDragMove);
+    tracker.removeEventListener(window, "mouseup", onDragEnd);
   }
-  
-  const dragDistance = currentY.value
-  const isFullState = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL
-  
+
+  const dragDistance = currentY.value;
+  const isFullState = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.FULL;
+
   // State-aware navigation logic
   if (isFullState) {
     if (dragDistance > 250) {
       // Very large drag down from FULL -> Close
-      logger.debug('Mobile sheet closed via large drag from FULL');
-      mobileStore.closeSheet()
+      logger.debug("Mobile sheet closed via large drag from FULL");
+      mobileStore.closeSheet();
     } else if (dragDistance > 70) {
       // Moderate drag down from FULL -> Go to PEEK
-      logger.debug('Mobile sheet state changed: FULL -> PEEK');
-      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK)
+      logger.debug("Mobile sheet state changed: FULL -> PEEK");
+      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.PEEK);
     }
   } else {
     // We are in PEEK state
     if (dragDistance > 100) {
       // Drag down from PEEK -> Close
-      logger.debug('Mobile sheet closed via drag from PEEK');
-      mobileStore.closeSheet()
+      logger.debug("Mobile sheet closed via drag from PEEK");
+      mobileStore.closeSheet();
     } else if (dragDistance < -70) {
       // Drag up from PEEK -> Go to FULL
-      logger.info('Mobile sheet expanded: PEEK -> FULL');
-      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL)
+      logger.info("Mobile sheet expanded: PEEK -> FULL");
+      mobileStore.setSheetState(MOBILE_CONSTANTS.SHEET_STATE.FULL);
     }
   }
-  
-  currentY.value = 0
-}
+
+  currentY.value = 0;
+};
 
 // Watch for isOpen to lock/unlock body scroll
-watch(isOpen, (newValue) => {
-  logger.info(newValue ? 'Mobile sheet opened' : 'Mobile sheet closed', { view: activeView.value });
-  // Check if the device has a mouse/fine pointer
-  const hasMouse = window.matchMedia('(pointer: fine)').matches;
-  
-  // Only lock scroll if:
-  // 1. It is open
-  // 2. We are NOT on a device with a mouse (Desktop/Laptop)
-  if (newValue && !hasMouse) {
-    document.body.style.overflow = 'hidden'
-    document.body.style.touchAction = 'none'
-    // CRITICAL: Also lock documentElement to prevent horizontal scroll issues on mobile
-    document.documentElement.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-    document.body.style.touchAction = ''
-    document.documentElement.style.overflow = ''
+watch(
+  isOpen,
+  (newValue) => {
+    logger.info(newValue ? "Mobile sheet opened" : "Mobile sheet closed", {
+      view: activeView.value,
+    });
+    // Check if the device has a mouse/fine pointer
+    const hasMouse = window.matchMedia("(pointer: fine)").matches;
 
-    // Owner-aware TTS cleanup when sheet closes
-    if (newValue === false) {
-      sendMessage({
-        action: MessageActions.TTS_STOP,
-        data: {
-          source: 'mobile-sheet-close',
-          stopOnlyIfOwner: true
-        }
-      }).catch(err => {
-        if (ExtensionContextManager.isContextError(err)) {
-          // Ignore context errors during cleanup as they are expected when extension reloads
-          return;
-        }
-        logger.debug('Failed to stop TTS on mobile sheet close:', err);
-      });
-    }  }
-}, { immediate: true })
+    // Only lock scroll if:
+    // 1. It is open
+    // 2. We are NOT on a device with a mouse (Desktop/Laptop)
+    if (newValue && !hasMouse) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      // CRITICAL: Also lock documentElement to prevent horizontal scroll issues on mobile
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+
+      // Owner-aware TTS cleanup when sheet closes
+      if (newValue === false) {
+        sendMessage({
+          action: MessageActions.TTS_STOP,
+          data: {
+            source: "mobile-sheet-close",
+            stopOnlyIfOwner: true,
+          },
+        }).catch((err) => {
+          if (ExtensionContextManager.isContextError(err)) {
+            // Ignore context errors during cleanup as they are expected when extension reloads
+            return;
+          }
+          logger.debug("Failed to stop TTS on mobile sheet close:", err);
+        });
+      }
+    }
+  },
+  { immediate: true },
+);
 
 const sheetStyle = computed(() => {
-  const y = isDragging.value ? currentY.value : 0
-  const isPeek = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK
-  
+  const y = isDragging.value ? currentY.value : 0;
+  const isPeek = sheetState.value === MOBILE_CONSTANTS.SHEET_STATE.PEEK;
+
   // Use VisualViewport height for more stable calculations on mobile
-  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  
+  const viewportHeight = window.visualViewport
+    ? window.visualViewport.height
+    : window.innerHeight;
+
   // Dynamic height for peek mode based on view using px for stability
-  let targetHeightPx = isPeek ? (viewportHeight * 0.35) : (viewportHeight * 0.75);
-  
+  let targetHeightPx = isPeek ? viewportHeight * 0.35 : viewportHeight * 0.75;
+
   if (isPeek) {
     if (activeView.value === MOBILE_CONSTANTS.VIEWS.DASHBOARD) {
-      targetHeightPx = 180
+      targetHeightPx = 180;
     } else if (activeView.value === MOBILE_CONSTANTS.VIEWS.PAGE_TRANSLATION) {
       // Stabilize height for page translation to prevent jumping and content overflow
-      targetHeightPx = 220
+      targetHeightPx = 220;
     }
   }
-  
-  const targetHeight = `${targetHeightPx}px`
-  let transformValue = 'translateY(0)'
-  let heightValue = targetHeight
+
+  const targetHeight = `${targetHeightPx}px`;
+  let transformValue = "translateY(0)";
+  let heightValue = targetHeight;
 
   if (isDragging.value) {
     if (y > 0) {
-      transformValue = `translateY(${y}px)`
+      transformValue = `translateY(${y}px)`;
     } else {
-      heightValue = `calc(${targetHeight} + ${Math.abs(y)}px)`
+      heightValue = `calc(${targetHeight} + ${Math.abs(y)}px)`;
     }
   }
 
   return {
-    '--sheet-transform': transformValue,
-    '--sheet-transition': isDragging.value ? 'none' : 'transform 0.3s ease-out, height 0.3s ease-out',
-    '--sheet-height': heightValue
-  }
-})
+    "--sheet-transform": transformValue,
+    "--sheet-transition": isDragging.value
+      ? "none"
+      : "transform 0.3s ease-out, height 0.3s ease-out",
+    "--sheet-height": heightValue,
+  };
+});
 
 const closeSheet = () => {
   // Ensure body/html are unlocked before closing
-  document.body.style.overflow = ''
-  document.body.style.touchAction = ''
-  document.documentElement.style.overflow = ''
-  mobileStore.closeSheet()
-}
+  document.body.style.overflow = "";
+  document.body.style.touchAction = "";
+  document.documentElement.style.overflow = "";
+  mobileStore.closeSheet();
+};
 
 const isNativeInteractiveControl = (target) => {
-  if (!target) return false
-  if (target.isContentEditable) return true
+  if (!target) return false;
+  if (target.isContentEditable) return true;
 
-  const tagName = target.tagName
-  if (!tagName) return false
+  const tagName = target.tagName;
+  if (!tagName) return false;
 
-  if (['TEXTAREA', 'INPUT', 'SELECT', 'OPTION'].includes(tagName)) {
-    return true
+  if (["TEXTAREA", "INPUT", "SELECT", "OPTION"].includes(tagName)) {
+    return true;
   }
 
   // Defensive: some browsers may surface option descendants when interacting with a select.
-  return typeof target.closest === 'function' && !!target.closest('select')
-}
+  return typeof target.closest === "function" && !!target.closest("select");
+};
 
 const onSheetMouseDown = (e) => {
   // CRITICAL: Prevent focus shift from page to sheet to preserve selection
   const target = e.target;
-  
+
   // 1. Identify native interactive controls that must keep their browser behavior
   const isFocusable = isNativeInteractiveControl(target);
-  
+
   // 2. Identify elements that should trigger clicks (Buttons, Links, etc.)
   // We don't want to preventDefault on touchstart for these to allow the sequence to complete.
-  const isClickable = target.closest('button') || target.closest('a');
+  const isClickable = target.closest("button") || target.closest("a");
 
-  if (e.type === 'mousedown') {
+  if (e.type === "mousedown") {
     // For mouse, prevent focus shift for everything except focusable inputs
     // This preserves selection while allowing buttons to be clicked
     if (!isFocusable) {
@@ -251,10 +267,10 @@ const onSheetMouseDown = (e) => {
     return;
   }
 
-  if (e.type === 'touchstart') {
+  if (e.type === "touchstart") {
     // For touch, only prevent on "dead zones" (not scrollable, not clickable)
     // to avoid breaking mobile gestures or click sequences.
-    const isScrollable = target.closest('.ti-m-sheet-content');
+    const isScrollable = target.closest(".ti-m-sheet-content");
     if (!isFocusable && !isClickable && !isScrollable && e.cancelable) {
       e.preventDefault();
     }
@@ -262,8 +278,8 @@ const onSheetMouseDown = (e) => {
 };
 
 onUnmounted(() => {
-  document.body.style.overflow = ''
-  document.body.style.touchAction = ''
-  document.documentElement.style.overflow = ''
-})
+  document.body.style.overflow = "";
+  document.body.style.touchAction = "";
+  document.documentElement.style.overflow = "";
+});
 </script>
