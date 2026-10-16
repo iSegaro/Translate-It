@@ -9,32 +9,32 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import './MaskIcon.scss'
+import { computed } from "vue";
+import "./MaskIcon.scss";
 
 const props = defineProps({
   src: {
     type: String,
-    required: true
+    required: true,
   },
   size: {
     type: [String, Number],
-    default: '1em'
+    default: "1em",
   },
   ariaLabel: {
     type: String,
-    default: ''
-  }
-})
+    default: "",
+  },
+});
 
 const iconSize = computed(() => {
-  return typeof props.size === 'number' ? `${props.size}px` : props.size
-})
+  return typeof props.size === "number" ? `${props.size}px` : props.size;
+});
 
 const maskStyle = computed(() => ({
   width: iconSize.value,
   height: iconSize.value,
   maskImage: `url("${props.src}")`,
-  WebkitMaskImage: `url("${props.src}")`
-}))
+  WebkitMaskImage: `url("${props.src}")`,
+}));
 </script>

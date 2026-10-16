@@ -1,26 +1,26 @@
 <!-- src/components/shared/PageTranslationStatus.vue -->
 <script setup>
-import { computed } from 'vue';
-import './PageTranslationStatus.scss'
-import { useMobileStore } from '@/store/modules/mobile.js';
-import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
+import { computed } from "vue";
+import "./PageTranslationStatus.scss";
+import { useMobileStore } from "@/store/modules/mobile.js";
+import { TRANSLATION_STATUS } from "@/shared/constants/translation.js";
 
 const props = defineProps({
   // برای استفاده در Popup/Sidepanel که داده‌ها را دستی پاس می‌دهیم
   statusData: {
     type: Object,
-    default: null
+    default: null,
   },
   // حالت نمایش: 'desktop-fab' | 'mobile-header' | 'menu-item' | 'compact'
   mode: {
     type: String,
-    default: 'desktop-fab'
+    default: "desktop-fab",
   },
   // اجبار به نمایش (حتی اگر وضعیتی فعال نباشد)
   forceShow: {
     type: Boolean,
-    default: false
-  }
+    default: false,
+  },
 });
 
 const mobileStore = useMobileStore();
@@ -31,26 +31,33 @@ const status = computed(() => {
   if (!data) return { isActive: false };
 
   // منطق تشخیص وضعیت (با در نظر گرفتن هر دو ساختار داده در Content و Popup)
-  const isTranslating = !!(data.status === TRANSLATION_STATUS.TRANSLATING || data.isTranslating);
-  const isAuto = !!(data.isAutoTranslating);
-  const isError = !!(data.status === 'error' || data.hasError);
-  
+  const isTranslating = !!(
+    data.status === TRANSLATION_STATUS.TRANSLATING || data.isTranslating
+  );
+  const isAuto = !!data.isAutoTranslating;
+  const isError = !!(data.status === "error" || data.hasError);
+
   // وضعیت تکمیل شده
-  const isCompleted = !isError && !isTranslating && !isAuto && 
-                     (data.status === TRANSLATION_STATUS.COMPLETED || data.isTranslated || (data.totalCount > 0 && data.translatedCount >= data.totalCount));
+  const isCompleted =
+    !isError &&
+    !isTranslating &&
+    !isAuto &&
+    (data.status === TRANSLATION_STATUS.COMPLETED ||
+      data.isTranslated ||
+      (data.totalCount > 0 && data.translatedCount >= data.totalCount));
 
   const isActive = isTranslating || isAuto || isCompleted || isError;
-  
-  let type = '';
-  if (isError) type = 'error';
-  else if (isTranslating) type = 'translating';
-  else if (isAuto) type = 'auto';
-  else if (isCompleted) type = 'completed';
+
+  let type = "";
+  if (isError) type = "error";
+  else if (isTranslating) type = "translating";
+  else if (isAuto) type = "auto";
+  else if (isCompleted) type = "completed";
 
   return {
     isActive,
     type,
-    isPulse: isTranslating || isAuto
+    isPulse: isTranslating || isAuto,
   };
 });
 </script>
@@ -59,11 +66,7 @@ const status = computed(() => {
   <div
     v-if="status.isActive || forceShow"
     class="ti-page-status-indicator"
-    :class="[
-      status.type,
-      `mode-${mode}`,
-      { 'has-pulse': status.isPulse }
-    ]"
+    :class="[status.type, `mode-${mode}`, { 'has-pulse': status.isPulse }]"
   >
     <div
       v-if="status.isPulse"

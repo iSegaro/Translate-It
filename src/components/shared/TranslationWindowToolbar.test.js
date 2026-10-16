@@ -149,6 +149,6 @@ describe('TranslationWindowToolbar.vue', () => {
 
     expect(source).not.toContain('@/features/windows');
     expect(source).not.toContain('src/features/windows');
-    expect(source).toContain("import './TranslationWindowToolbar.scss'");
+    expect(source).toMatch(/import ['"]\.\/TranslationWindowToolbar\.scss['"]/);
   });
 });

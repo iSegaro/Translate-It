@@ -25,9 +25,7 @@
       v-if="isLoading && !isStreaming"
       class="ti-loading-overlay"
     >
-      <LoadingSpinner
-        size="lg"
-      />
+      <LoadingSpinner size="lg" />
     </div>
 
     <!-- Main Content State -->
@@ -57,20 +55,25 @@
         ref="contentRef"
         class="ti-translation-content"
         :class="[
-          { 'has-error': hasError, 'rtl-content': textDirection?.dir === 'rtl' },
+          {
+            'has-error': hasError,
+            'rtl-content': textDirection?.dir === 'rtl',
+          },
           contentClass,
         ]"
         :dir="textDirection?.dir || 'ltr'"
-        :style="mode === 'mobile' ? { ...fontStyles, ...cssVariables } : { ...(fontStyles || {}), ...(cssVariables || {}) }"
+        :style="
+          mode === 'mobile'
+            ? { ...fontStyles, ...cssVariables }
+            : { ...(fontStyles || {}), ...(cssVariables || {}) }
+        "
         @click="handleContentClick"
       >
         <div
           v-if="hasError"
           class="error-message"
         >
-          <div class="error-text">
-            ⚠️ {{ displayErrorMessage }}
-          </div>
+          <div class="error-text">&#32;⚠️ {{ displayErrorMessage }}</div>
           <div
             v-if="canRetry || canOpenSettings"
             class="error-actions"
@@ -80,14 +83,14 @@
               class="error-action retry-btn"
               @click="handleRetry"
             >
-              🔄 {{ t('action_retry') }}
+              🔄 {{ t("action_retry") }}
             </button>
             <button
               v-if="canOpenSettings"
               class="error-action settings-btn"
               @click="handleSettings"
             >
-              ⚙️ {{ t('action_settings') }}
+              ⚙️ {{ t("action_settings") }}
             </button>
           </div>
         </div>
@@ -113,9 +116,13 @@
         class="ti-mobile-actions"
         @click.stop
       >
-        <button 
-          class="mobile-action-btn secondary-action" 
-          :title="ttsStatus === 'playing' ? t('mobile_selection_stop_tooltip') : ttsTitle" 
+        <button
+          class="mobile-action-btn secondary-action"
+          :title="
+            ttsStatus === 'playing'
+              ? t('mobile_selection_stop_tooltip')
+              : ttsTitle
+          "
           @click="handleMobileSpeak"
         >
           <svg
@@ -136,12 +143,16 @@
             src="@/icons/ui/speaker.png"
             :alt="ttsAlt"
             class="mobile-action-icon"
-          >
+          />
           <span class="mobile-action-label">
-            {{ ttsStatus === 'playing' ? t('mobile_selection_stop_label') : t('mobile_selection_speak_tooltip') }}
+            {{
+              ttsStatus === "playing"
+                ? t("mobile_selection_stop_label")
+                : t("mobile_selection_speak_tooltip")
+            }}
           </span>
         </button>
-        
+
         <button
           class="mobile-action-btn secondary-action"
           :title="copyTitle"
@@ -151,10 +162,12 @@
             src="@/icons/ui/copy.png"
             :alt="copyAlt"
             class="mobile-action-icon"
-          >
-          <span class="mobile-action-label">{{ t('mobile_selection_copy_tooltip') }}</span>
+          />
+          <span class="mobile-action-label">{{
+            t("mobile_selection_copy_tooltip")
+          }}</span>
         </button>
-        
+
         <button
           class="mobile-action-btn icon-only-action"
           :title="t('mobile_selection_history_tooltip')"
@@ -164,7 +177,7 @@
             src="@/icons/ui/history.svg"
             :alt="t('mobile_history_button_alt')"
             class="mobile-action-icon"
-          >
+          />
         </button>
       </div>
     </template>
@@ -172,11 +185,14 @@
 </template>
 
 <script setup>
-import './TranslationDisplay.scss';
+import "./TranslationDisplay.scss";
 import { ref, computed, watch, onMounted } from "vue";
 import { useSettingsStore } from "@/features/settings/stores/settings.js";
 import { useTextDirection } from "@/composables/shared/useTextDirection.js";
-import { SimpleMarkdown, ExtractionStrategy } from "@/shared/utils/text/markdown.js";
+import {
+  SimpleMarkdown,
+  ExtractionStrategy,
+} from "@/shared/utils/text/markdown.js";
 import { TranslationMode } from "@/shared/config/config.js";
 import { renderMarkdownPreview } from "@/shared/utils/text/markdownPreview.js";
 import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
@@ -243,9 +259,14 @@ const props = defineProps({
     type: String,
     default: "standard", // standard, compact, popup, sidepanel, selection, mobile
     validator: (value) =>
-      ["standard", "compact", "popup", "sidepanel", "selection", "mobile"].includes(
-        value,
-      ),
+      [
+        "standard",
+        "compact",
+        "popup",
+        "sidepanel",
+        "selection",
+        "mobile",
+      ].includes(value),
   },
   placeholder: {
     type: String,
@@ -310,7 +331,7 @@ const props = defineProps({
   },
   lastTranslation: {
     type: Object,
-    default: null
+    default: null,
   },
   // TTS Status for mobile toggle
   ttsStatus: {
@@ -352,32 +373,39 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationDisplay");
 
 // Computed
 const hasContent = computed(
-  () => (props.content && props.content.trim().length > 0 && !props.isLoading) || (props.isStreaming && props.content)
+  () =>
+    (props.content && props.content.trim().length > 0 && !props.isLoading) ||
+    (props.isStreaming && props.content),
 );
 const hasError = computed(() => !!props.error && !props.isLoading);
 
 // Check if current translation is in dictionary mode
 const isDictionary = computed(() => {
   const mode = props.lastTranslation?.mode || props.mode;
-  return mode === TranslationMode.Dictionary_Translation || mode === TranslationMode.LEGACY_DICTIONARY;
+  return (
+    mode === TranslationMode.Dictionary_Translation ||
+    mode === TranslationMode.LEGACY_DICTIONARY
+  );
 });
 
 // Reactive error message display
 const displayErrorMessage = computed(() => {
   if (!props.errorType) return props.error;
-  
+
   // Construct translation key (standard ERRORS_ prefix)
-  const key = props.errorType.startsWith('ERRORS_') ? props.errorType : `ERRORS_${props.errorType}`;
+  const key = props.errorType.startsWith("ERRORS_")
+    ? props.errorType
+    : `ERRORS_${props.errorType}`;
   const translated = t(key);
-  
+
   // For specific technical errors, if we have a detailed message from the provider, show it
   const useRawMessage = [
-    'SERVER_ERROR', 
-    'MODEL_OVERLOADED', 
-    'HTTP_ERROR', 
-    'TRANSLATION_ERROR', 
-    'API_RESPONSE_INVALID',
-    'UNKNOWN'
+    "SERVER_ERROR",
+    "MODEL_OVERLOADED",
+    "HTTP_ERROR",
+    "TRANSLATION_ERROR",
+    "API_RESPONSE_INVALID",
+    "UNKNOWN",
   ].includes(props.errorType);
 
   if (useRawMessage && props.error && props.error !== props.errorType) {
@@ -385,19 +413,19 @@ const displayErrorMessage = computed(() => {
   }
 
   // If translation exists, return it, otherwise fallback to static error prop
-  return (translated && translated !== key) ? translated : props.error;
+  return translated && translated !== key ? translated : props.error;
 });
 
 // Safe language code detector for UI
 const currentUiLang = computed(() => {
-  const lang = locale.value || 'en';
+  const lang = locale.value || "en";
   return String(lang).toLowerCase();
 });
 
 // Setup centralized text direction using the composable
 const { direction: detectedDir, textAlign: detectedAlign } = useTextDirection(
-  computed(() => hasError.value ? "" : props.content),
-  computed(() => hasError.value ? currentUiLang.value : props.targetLanguage)
+  computed(() => (hasError.value ? "" : props.content)),
+  computed(() => (hasError.value ? currentUiLang.value : props.targetLanguage)),
 );
 
 // Final text direction for display, with special handling for error states
@@ -405,7 +433,7 @@ const textDirection = computed(() => {
   if (hasError.value) {
     return {
       dir: detectedDir.value,
-      textAlign: 'center', // Center align errors for better UX
+      textAlign: "center", // Center align errors for better UX
     };
   }
 
@@ -423,12 +451,14 @@ try {
   // Initialize useFont with target language (or UI language if there's an error)
   const { fontStyles: computedFontStyles, cssVariables: computedCssVariables } =
     useFont(
-      computed(() => hasError.value ? currentUiLang.value : props.targetLanguage),
+      computed(() =>
+        hasError.value ? currentUiLang.value : props.targetLanguage,
+      ),
       {
         enableSmartDetection: true,
         fallbackFont: "system",
         enableCSSVariables: true,
-        forcedDirection: computed(() => textDirection.value.dir) // Pass detected direction
+        forcedDirection: computed(() => textDirection.value.dir), // Pass detected direction
       },
     );
 
@@ -438,21 +468,23 @@ try {
   cssVariables = computed(() => {
     const vars = { ...computedCssVariables.value };
     // Ensure direction variables match our text direction
-    if (textDirection.value.dir === 'rtl') {
-      vars['--translation-direction'] = 'rtl';
-      vars['--translation-text-align'] = 'right';
-      vars['--list-padding'] = '0 3em 0 0';
-      vars['--list-text-align'] = 'right';
+    if (textDirection.value.dir === "rtl") {
+      vars["--translation-direction"] = "rtl";
+      vars["--translation-text-align"] = "right";
+      vars["--list-padding"] = "0 3em 0 0";
+      vars["--list-text-align"] = "right";
     } else {
-      vars['--translation-direction'] = 'ltr';
-      vars['--translation-text-align'] = 'left';
-      vars['--list-padding'] = '0 0 0 3em';
-      vars['--list-text-align'] = 'left';
+      vars["--translation-direction"] = "ltr";
+      vars["--translation-text-align"] = "left";
+      vars["--list-padding"] = "0 0 0 3em";
+      vars["--list-text-align"] = "left";
     }
     return vars;
   });
 
-  logger.debug("Font management initialized successfully with RTL-aware CSS variables");
+  logger.debug(
+    "Font management initialized successfully with RTL-aware CSS variables",
+  );
 } catch (error) {
   logger.warn("Font management not available, using fallback styles:", error);
   // Fallback styles when useFont fails
@@ -462,10 +494,10 @@ try {
   cssVariables = computed(() => {
     const dir = textDirection.value.dir;
     return {
-      '--translation-direction': dir,
-      '--translation-text-align': dir === 'rtl' ? 'right' : 'left',
-      '--list-padding': dir === 'rtl' ? '0 2em 0 0' : '0 0 0 2em',
-      '--list-text-align': dir === 'rtl' ? 'right' : 'left',
+      "--translation-direction": dir,
+      "--translation-text-align": dir === "rtl" ? "right" : "left",
+      "--list-padding": dir === "rtl" ? "0 2em 0 0" : "0 0 0 2em",
+      "--list-text-align": dir === "rtl" ? "right" : "left",
     };
   });
 }
@@ -477,7 +509,7 @@ const sanitizedContent = computed(() => {
 
 const renderedContent = computed(() => {
   if (!props.content) {
-    return '';
+    return "";
   }
 
   return renderMarkdownPreview(props.content, {
@@ -523,30 +555,35 @@ const handleActionFailed = (error) => {
 };
 
 const handleMobileSpeak = () => {
-  if (props.ttsStatus === 'playing') {
-    emit('tts-stopped');
+  if (props.ttsStatus === "playing") {
+    emit("tts-stopped");
   } else {
-    emit('tts-started', {
+    emit("tts-started", {
       text: props.content,
-      language: props.targetLanguage
+      language: props.targetLanguage,
     });
   }
 };
 
 const handleMobileCopy = async () => {
-  const strategy = isDictionary.value ? ExtractionStrategy.CLEAN_DICT : ExtractionStrategy.FULL_TEXT;
-  const textToCopy = SimpleMarkdown.getCleanTranslation(props.content, strategy);
-  
+  const strategy = isDictionary.value
+    ? ExtractionStrategy.CLEAN_DICT
+    : ExtractionStrategy.FULL_TEXT;
+  const textToCopy = SimpleMarkdown.getCleanTranslation(
+    props.content,
+    strategy,
+  );
+
   try {
     await navigator.clipboard.writeText(textToCopy);
-    emit('text-copied', textToCopy);
+    emit("text-copied", textToCopy);
   } catch (error) {
-    emit('action-failed', error);
+    emit("action-failed", error);
   }
 };
 
 const handleMobileHistory = () => {
-  emit('history-requested');
+  emit("history-requested");
 };
 
 // Error action handlers

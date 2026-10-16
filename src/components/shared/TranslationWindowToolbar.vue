@@ -156,29 +156,29 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import './TranslationWindowToolbar.scss';
-import ProviderSelector from '@/components/shared/ProviderSelector.vue';
-import TTSButton from '@/components/shared/TTSButton.vue';
+import { ref } from "vue";
+import "./TranslationWindowToolbar.scss";
+import ProviderSelector from "@/components/shared/ProviderSelector.vue";
+import TTSButton from "@/components/shared/TTSButton.vue";
 
 defineOptions({
-  name: 'TranslationWindowToolbar',
+  name: "TranslationWindowToolbar",
 });
 
 defineProps({
-  provider: { type: String, default: '' },
-  theme: { type: String, default: 'light' },
+  provider: { type: String, default: "" },
+  theme: { type: String, default: "light" },
   isPinned: { type: Boolean, default: false },
   showOriginal: { type: Boolean, default: false },
   isDictionary: { type: Boolean, default: false },
-  ttsText: { type: String, default: '' },
-  ttsLanguage: { type: String, default: '' },
-  targetLanguageLabel: { type: String, default: '' },
-  detectedLanguageLabel: { type: String, default: '' },
-  pinTitle: { type: String, default: '' },
-  copyTitle: { type: String, default: '' },
-  originalTitle: { type: String, default: '' },
-  closeTitle: { type: String, default: '' },
+  ttsText: { type: String, default: "" },
+  ttsLanguage: { type: String, default: "" },
+  targetLanguageLabel: { type: String, default: "" },
+  detectedLanguageLabel: { type: String, default: "" },
+  pinTitle: { type: String, default: "" },
+  copyTitle: { type: String, default: "" },
+  originalTitle: { type: String, default: "" },
+  closeTitle: { type: String, default: "" },
   showProviderSelector: { type: Boolean, default: true },
   showPinButton: { type: Boolean, default: true },
   showCopyButton: { type: Boolean, default: true },
@@ -187,54 +187,60 @@ defineProps({
   showCloseButton: { type: Boolean, default: true },
   providerSelectorMode: {
     type: String,
-    default: 'icon-only',
-    validator: (value) => ['split', 'button', 'icon-only', 'compact', 'mobile'].includes(value),
+    default: "icon-only",
+    validator: (value) =>
+      ["split", "button", "icon-only", "compact", "mobile"].includes(value),
   },
   providerSelectorIsGlobal: { type: Boolean, default: false },
   providerSelectorAllowDefault: { type: Boolean, default: false },
   providerSelectorAllowSetDefault: { type: Boolean, default: true },
   providerSelectorOnlyConfigured: { type: Boolean, default: true },
-  providerSelectorRequiredFeature: { type: String, default: 'translation' },
+  providerSelectorRequiredFeature: { type: String, default: "translation" },
 });
 
 const emit = defineEmits([
-  'close',
-  'copy',
-  'provider-change',
-  'toggle-pin',
-  'toggle-original',
-  'tts-started',
-  'tts-stopped',
-  'tts-error',
-  'tts-state-changed',
+  "close",
+  "copy",
+  "provider-change",
+  "toggle-pin",
+  "toggle-original",
+  "tts-started",
+  "tts-stopped",
+  "tts-error",
+  "tts-state-changed",
 ]);
 
-const lastProviderChangeValue = ref('');
+const lastProviderChangeValue = ref("");
 const ttsButtonRef = ref(null);
 
 const handleProviderChange = (newProvider) => {
-  const normalizedProvider = typeof newProvider === 'string' ? newProvider.trim() : '';
+  const normalizedProvider =
+    typeof newProvider === "string" ? newProvider.trim() : "";
 
-  if (!normalizedProvider || normalizedProvider === lastProviderChangeValue.value) {
+  if (
+    !normalizedProvider ||
+    normalizedProvider === lastProviderChangeValue.value
+  ) {
     return;
   }
 
   lastProviderChangeValue.value = normalizedProvider;
   queueMicrotask(() => {
     if (lastProviderChangeValue.value === normalizedProvider) {
-      lastProviderChangeValue.value = '';
+      lastProviderChangeValue.value = "";
     }
   });
 
-  emit('provider-change', normalizedProvider);
+  emit("provider-change", normalizedProvider);
 };
 
-const stopTTS = async (options = {}) => ttsButtonRef.value?.stop?.(options) ?? true;
+const stopTTS = async (options = {}) =>
+  ttsButtonRef.value?.stop?.(options) ?? true;
 
-const forwardTtsStarted = (...args) => emit('tts-started', ...args);
-const forwardTtsStopped = (...args) => emit('tts-stopped', ...args);
-const forwardTtsError = (...args) => emit('tts-error', ...args);
-const forwardTtsStateChanged = (...args) => emit('tts-state-changed', ...args);
+const forwardTtsStarted = (...args) => emit("tts-started", ...args);
+const forwardTtsStopped = (...args) => emit("tts-stopped", ...args);
+const forwardTtsError = (...args) => emit("tts-error", ...args);
+const forwardTtsStateChanged = (...args) => emit("tts-state-changed", ...args);
 
 defineExpose({
   stopTTS,

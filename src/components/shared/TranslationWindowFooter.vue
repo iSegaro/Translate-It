@@ -15,7 +15,12 @@
       </span>
 
       <span
-        v-if="showDetectedLanguage && detectedLanguageLabel && showTargetLanguage && targetLanguageLabel"
+        v-if="
+          showDetectedLanguage &&
+          detectedLanguageLabel &&
+          showTargetLanguage &&
+          targetLanguageLabel
+        "
         class="ti-footer-language-separator"
         aria-hidden="true"
         data-testid="translation-window-footer-language-separator"
@@ -53,60 +58,61 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import MaskIcon from './MaskIcon.vue'
-import retryIcon from '@/icons/ui/retry.svg?url'
-import './TranslationWindowFooter.scss'
+import { computed } from "vue";
+import MaskIcon from "./MaskIcon.vue";
+import retryIcon from "@/icons/ui/retry.svg?url";
+import "./TranslationWindowFooter.scss";
 
 defineOptions({
-  name: 'TranslationWindowFooter'
-})
+  name: "TranslationWindowFooter",
+});
 
 const props = defineProps({
   detectedLanguageLabel: {
     type: String,
-    default: ''
+    default: "",
   },
   showDetectedLanguage: {
     type: Boolean,
-    default: true
+    default: true,
   },
   targetLanguageLabel: {
     type: String,
-    default: ''
+    default: "",
   },
   showTargetLanguage: {
     type: Boolean,
-    default: true
+    default: true,
   },
   showRetry: {
     type: Boolean,
-    default: false
+    default: false,
   },
   retryDisabled: {
     type: Boolean,
-    default: false
+    default: false,
   },
   retryTitle: {
     type: String,
-    default: ''
+    default: "",
   },
   retryAriaLabel: {
     type: String,
-    default: ''
+    default: "",
   },
   theme: {
     type: String,
-    default: 'light',
-    validator: (value) => ['light', 'dark'].includes(value)
-  }
-})
+    default: "light",
+    validator: (value) => ["light", "dark"].includes(value),
+  },
+});
 
-const emit = defineEmits(['retry'])
+const emit = defineEmits(["retry"]);
 
-const showFooter = computed(() => (
-  (props.showDetectedLanguage && !!props.detectedLanguageLabel)
-  || (props.showTargetLanguage && !!props.targetLanguageLabel)
-  || props.showRetry
-))
+const showFooter = computed(
+  () =>
+    (props.showDetectedLanguage && !!props.detectedLanguageLabel) ||
+    (props.showTargetLanguage && !!props.targetLanguageLabel) ||
+    props.showRetry,
+);
 </script>
