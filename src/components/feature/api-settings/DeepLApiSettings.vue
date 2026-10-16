@@ -44,27 +44,15 @@
     </div>
 
     <div class="setting-group vertical">
-      <BaseCheckbox
-        v-model="deeplBetaLanguagesEnabled"
-        :label="t('deepl_beta_languages_label') || 'Enable Beta Languages'"
-        class="deepl-checkbox"
-      />
-      <p class="setting-description">
-        {{ t('deepl_beta_languages_description') || 'Enable support for beta languages. Beta languages do not support formality settings.' }}
-      </p>
-    </div>
-
-    <div class="setting-group vertical">
       <label>{{ t('deepl_formality_label') || 'Translation Formality' }}</label>
       <BaseSelect
         v-model="deeplFormality"
         :options="deeplFormalityOptions"
         class="formality-select"
         :style="rtlSelectStyle"
-        :disabled="deeplBetaLanguagesEnabled"
       />
       <p class="setting-description">
-        {{ t('deepl_formality_description') || 'Control the formality level of translations. Some languages may not support all options.' }}
+        {{ formalityMessage }}
       </p>
     </div>
   </div>
@@ -77,12 +65,12 @@ import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { CONFIG } from '@/shared/config/config.js'
 import BaseSelect from '@/components/base/BaseSelect.vue'
-import BaseCheckbox from '@/components/base/BaseCheckbox.vue'
 import ApiKeyInput from './ApiKeyInput.vue'
 import { useRTLSelect } from '@/composables/ui/useRTLSelect.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
 import { presentProviderSettingsError } from '@/features/settings/presentation/ProviderSettingsErrorPresenter.js'
+import { DEEPL_LANGUAGE_CATALOG_TTL_MS, getDeepLEligibleKeys, getDeepLLanguageIdentity, matchDeepLFormality } from '@/features/translation/providers/DeepLLanguageDiscovery.js'
 
 const { t } = useI18n()
 const { rtlSelectStyle } = useRTLSelect()
@@ -104,10 +92,27 @@ const deeplFormality = computed({
   set: (value) => settingsStore.updateSettingLocally('DEEPL_FORMALITY', value)
 })
 
-const deeplBetaLanguagesEnabled = computed({
-  get: () => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? true,
-  set: (value) => settingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', value)
+const formalitySupport = computed(() => {
+  const capabilities = settingsStore.deepLLanguageCapabilities
+  // Accept a fresh snapshot from any currently eligible key: capability
+  // discovery fails over to the first succeeding key, matching settings.js.
+  const configuredKeys = deeplApiKey.value
+  const tier = deeplApiTier.value
+  const eligibleIdentities = new Set(
+    getDeepLEligibleKeys(configuredKeys, tier).map(key => getDeepLLanguageIdentity(key, tier))
+  )
+  const age = capabilities?.fetchedAt == null ? Infinity : Date.now() - capabilities.fetchedAt
+  const fresh = capabilities?.status === 'ready' && eligibleIdentities.has(capabilities.identity)
+    && age >= 0 && age < DEEPL_LANGUAGE_CATALOG_TTL_MS
+  return fresh
+    ? matchDeepLFormality(capabilities.catalog, settingsStore.settings?.TARGET_LANGUAGE)
+    : 'unknown'
 })
+const formalityMessage = computed(() => formalitySupport.value === 'unsupported'
+  ? t('deepl_formality_unavailable')
+  : formalitySupport.value === 'unknown'
+    ? t('deepl_formality_unverified')
+    : t('deepl_formality_description') || 'Control the formality level of translations. Some languages may not support all options.')
 
 // Test keys functionality
 const testingKeys = ref(false)

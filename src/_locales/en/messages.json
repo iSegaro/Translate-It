@@ -1767,11 +1767,23 @@
   "deepl_formality_prefer_less": {
     "message": "Prefer Less Formal"
   },
-  "deepl_beta_languages_label": {
-    "message": "Enable Beta Languages"
+  "deepl_beta_label": {
+    "message": "Beta"
   },
-  "deepl_beta_languages_description": {
-    "message": "Enable support for beta languages. Beta languages do not support formality settings."
+  "validation_deepl_languages_unverified": {
+    "message": "DeepL languages could not be verified. Check your connection and try saving again."
+  },
+  "deepl_languages_loading": {
+    "message": "Loading DeepL languages…"
+  },
+  "deepl_languages_unavailable": {
+    "message": "DeepL languages are unavailable. Check your connection and try again."
+  },
+  "deepl_formality_unavailable": {
+    "message": "Formality settings are unavailable for this target language."
+  },
+  "deepl_formality_unverified": {
+    "message": "Formality support for this target language could not be verified because DeepL language information is unavailable."
   },
   "custom_api_settings_title": {
     "message": "Custom OpenAI Compatible API Settings"
@@ -2786,12 +2798,6 @@
   },
   "validation_same_languages": {
     "message": "Source and target languages cannot be the same."
-  },
-  "validation_deepl_source_language_beta_disabled": {
-    "message": "Source language {language} requires DeepL beta languages to be enabled."
-  },
-  "validation_deepl_target_language_beta_disabled": {
-    "message": "Target language {language} requires DeepL beta languages to be enabled."
   },
   "validation_deepl_source_language_unsupported": {
     "message": "Source language {language} is not supported by DeepL."

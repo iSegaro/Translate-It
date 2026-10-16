@@ -1767,11 +1767,23 @@
   "deepl_formality_prefer_less": {
     "message": "できるだけカジュアルに"
   },
-  "deepl_beta_languages_label": {
-    "message": "ベータ言語を有効にする"
+  "deepl_beta_label": {
+    "message": "ベータ"
   },
-  "deepl_beta_languages_description": {
-    "message": "ベータ言語のサポートを有効にします。ベータ言語は丁寧さの設定に対応していません。"
+  "validation_deepl_languages_unverified": {
+    "message": "DeepLの言語を確認できませんでした。接続を確認して、もう一度保存してください。"
+  },
+  "deepl_languages_loading": {
+    "message": "DeepLの言語を読み込み中…"
+  },
+  "deepl_languages_unavailable": {
+    "message": "DeepLの言語を利用できません。接続を確認して、もう一度お試しください。"
+  },
+  "deepl_formality_unavailable": {
+    "message": "この翻訳先言語ではフォーマル度を設定できません。"
+  },
+  "deepl_formality_unverified": {
+    "message": "DeepLの言語情報を利用できないため、この翻訳先言語のフォーマル度への対応を確認できません。"
   },
   "custom_api_settings_title": {
     "message": "OpenAI互換API設定"
@@ -2786,12 +2798,6 @@
   },
   "validation_same_languages": {
     "message": "翻訳元と翻訳先の言語が同じです。"
-  },
-  "validation_deepl_source_language_beta_disabled": {
-    "message": "翻訳元言語「{language}」を使用するには、DeepLのベータ言語を有効にしてください。"
-  },
-  "validation_deepl_target_language_beta_disabled": {
-    "message": "翻訳先言語「{language}」を使用するには、DeepLのベータ言語を有効にしてください。"
   },
   "validation_deepl_source_language_unsupported": {
     "message": "翻訳元言語「{language}」はDeepLでサポートされていません。"

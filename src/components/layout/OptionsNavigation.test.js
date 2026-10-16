@@ -27,6 +27,7 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 // Mock settings store
 const mockValidateSettings = vi.fn();
 const mockSaveSettings = vi.fn();
+const mockRefreshDeepLLanguageCapabilities = vi.fn();
 const mockSettingsStore = reactive({
   settings: {
     TRANSLATION_API: 'google',
@@ -34,7 +35,9 @@ const mockSettingsStore = reactive({
     PROMPT_TEMPLATE: 'valid template $_{SOURCE} $_{TARGET} $_{TEXT}'
   },
   validateSettings: mockValidateSettings,
-  saveAllSettings: mockSaveSettings
+  saveAllSettings: mockSaveSettings,
+  refreshDeepLLanguageCapabilities: mockRefreshDeepLLanguageCapabilities,
+  deepLLanguageCapabilities: { status: 'idle', identity: null, catalog: null, fetchedAt: null, error: null }
 });
 
 vi.mock('@/features/settings/stores/settings.js', () => ({
@@ -73,6 +76,7 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
     });
     vi.mocked(storageManager.set).mockResolvedValue(true);
     mockSaveSettings.mockResolvedValue(true);
+    mockRefreshDeepLLanguageCapabilities.mockResolvedValue({ status: 'ready' });
     safeSendMessageMock.mockResolvedValue({ success: true });
   });
 
@@ -557,8 +561,8 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
     currentRouteFullPath.value = '/providers';
     mockSettingsStore.settings = {
       TRANSLATION_API: 'deepl',
-      // Configured provider so the flow reaches the language-error branch
-      DEEPL_API_KEY: 'test-deepl-key',
+      DEEPL_API_KEY: 'deepl-test-key',
+      DEEPL_API_TIER: 'free',
       MODE_PROVIDERS: {}
     };
     mockSaveSettings.mockResolvedValue(true);
@@ -566,7 +570,7 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
 
   it('blocks save on beta-disabled target, routes to languages, focuses target', async () => {
     const { wrapper, feedbackListener } = await clickSaveWithErrors(
-      ['validation_deepl_target_language_beta_disabled:fa']
+      ['validation_deepl_target_language_unsupported:fa']
     );
     try {
       expect(mockSaveSettings).not.toHaveBeenCalled();
@@ -577,7 +581,7 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
         })
       );
       // Identity t resolves the base key, dropping the :code payload
-      expect(wrapper.find('#status').text()).toBe('validation_deepl_target_language_beta_disabled');
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_target_language_unsupported');
       expect(wrapper.find('#status').classes()).toContain('status-error');
     } finally {
       window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
@@ -587,7 +591,7 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
 
   it('focuses source on beta-disabled source', async () => {
     const { wrapper, feedbackListener } = await clickSaveWithErrors(
-      ['validation_deepl_source_language_beta_disabled:fa']
+      ['validation_deepl_source_language_unsupported:fa']
     );
     try {
       expect(mockSaveSettings).not.toHaveBeenCalled();
@@ -597,7 +601,7 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
           detail: { field: 'languages', focus: 'source' }
         })
       );
-      expect(wrapper.find('#status').text()).toBe('validation_deepl_source_language_beta_disabled');
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_source_language_unsupported');
     } finally {
       window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
       wrapper.unmount();
@@ -625,7 +629,7 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
   it('mixed DeepL + prompt errors still fully block save (no partial save)', async () => {
     const { wrapper, feedbackListener } = await clickSaveWithErrors(
       [
-        'validation_deepl_target_language_beta_disabled:fa',
+        'validation_deepl_target_language_unsupported:fa',
         'prompt:PROMPT_TEMPLATE:validation_prompt_template_empty'
       ]
     );
@@ -679,6 +683,84 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
       window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
       wrapper.unmount();
     }
+  });
+
+  it('refreshes current DeepL capabilities before validation and routes unverified metadata to languages', async () => {
+    const order = [];
+    mockRefreshDeepLLanguageCapabilities.mockImplementation(async () => {
+      order.push('refresh-start');
+      await Promise.resolve();
+      order.push('refresh-complete');
+      return { status: 'error' };
+    });
+    mockValidateSettings.mockImplementation(() => {
+      order.push('validate');
+      return { isValid: false, errors: ['validation_deepl_languages_unverified'] };
+    });
+    const feedbackListener = vi.fn();
+    window.addEventListener('options-trigger-validation-feedback', feedbackListener);
+    const wrapper = mountNavigation();
+    try {
+      await wrapper.find('#saveSettings').trigger('click');
+      await flushPromises();
+
+      expect(order).toEqual(['refresh-start', 'refresh-complete', 'validate']);
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_languages_unverified');
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: { field: 'languages', focus: 'source' } })
+      );
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('routes Pro DeepL with only a Free :fx key to Providers and highlights the key', async () => {
+    currentRouteName.value = 'languages';
+    mockSettingsStore.settings.DEEPL_API_KEY = 'free-key:fx';
+    mockSettingsStore.settings.DEEPL_API_TIER = 'pro';
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(['ERRORS_API_CONFIG_INVALID']);
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'providers', query: { highlight: 'DEEPL_API_KEY' } });
+      expect(feedbackListener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('does not treat a valid Pro DeepL key as missing when another config error is reported', async () => {
+    currentRouteName.value = 'languages';
+    mockSettingsStore.settings.DEEPL_API_KEY = 'valid-pro-key';
+    mockSettingsStore.settings.DEEPL_API_TIER = 'pro';
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(['ERRORS_API_CONFIG_INVALID']);
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).not.toHaveBeenCalledWith({ name: 'providers', query: { highlight: 'DEEPL_API_KEY' } });
+      expect(feedbackListener).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('keeps DeepL prompt-only errors on the existing partial-save path', async () => {
+    mockValidateSettings.mockReturnValue({
+      isValid: false,
+      errors: ['prompt:PROMPT_TEMPLATE:validation_prompt_template_empty']
+    });
+    mockSettingsStore.settings.PROMPT_TEMPLATE = 'invalid prompt';
+    const wrapper = mountNavigation();
+    await wrapper.find('#saveSettings').trigger('click');
+    await flushPromises();
+
+    expect(mockRefreshDeepLLanguageCapabilities).toHaveBeenCalledTimes(1);
+    expect(mockSaveSettings).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('#status').text()).toBe('OPTIONS_STATUS_SAVED_WITH_PROMPT_ERRORS');
+    expect(pushMock).toHaveBeenCalledWith({ name: 'prompt' });
   });
 });
 

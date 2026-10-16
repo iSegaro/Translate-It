@@ -46,7 +46,7 @@
                 :key="language.code"
                 :value="language.code"
               >
-                {{ language.name }}
+                {{ language.name }}{{ language.isBeta ? ` (${t('deepl_beta_label')})` : '' }}
               </option>
             </select>
             <button
@@ -105,7 +105,7 @@
               :key="language.code"
               :value="language.code"
             >
-              {{ language.name }}
+              {{ language.name }}{{ language.isBeta ? ` (${t('deepl_beta_label')})` : '' }}
             </option>
           </select>
           <button
@@ -151,11 +151,17 @@
         >{{ autoLanguageLabel }}</span
       >
     </div>
+    <span
+      v-if="deepLLanguageStatus"
+      class="ti-language-status"
+      role="status"
+      aria-live="polite"
+    >{{ t(deepLLanguageStatus) }}</span>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useLanguages } from "@/composables/shared/useLanguages.js";
 import { useErrorHandler } from "@/composables/shared/useErrorHandler.js";
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
@@ -172,6 +178,8 @@ import {
   getProviderLanguageCode,
 } from "@/shared/config/languageConstants.js";
 import { findProviderById } from "@/features/translation/providers/ProviderManifest.js";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
+import { DEEPL_LANGUAGE_CATALOG_TTL_MS, getDeepLEligibleKeys, getDeepLLanguageIdentity, matchDeepLLanguage, normalizeDeepLLanguageTag, resolveDeepLLanguageTag } from "@/features/translation/providers/DeepLLanguageDiscovery.js";
 
 // Import adjacent SCSS
 import "./LanguageSelector.scss";
@@ -191,10 +199,6 @@ const props = defineProps({
   provider: {
     type: String,
     default: "",
-  },
-  beta: {
-    type: Boolean,
-    default: false,
   },
   disabled: {
     type: Boolean,
@@ -299,6 +303,7 @@ const emit = defineEmits([
 // Composables
 const { t } = useUnifiedI18n();
 const languages = useLanguages();
+const settingsStore = useSettingsStore();
 const { handleError } = useErrorHandler();
 
 // Conditionally initialize select element integration only when enabled
@@ -322,6 +327,33 @@ const targetLanguage = computed({
 });
 
 const providerInfo = computed(() => findProviderById(props.provider));
+const isDeepLLanguageCatalogFresh = () => {
+  if (!props.provider?.toLowerCase().includes('deepl')) return false;
+  const capabilities = settingsStore.deepLLanguageCapabilities;
+  // Accept a fresh snapshot from any currently eligible key: capability
+  // discovery fails over to the first succeeding key, matching settings.js.
+  let eligibleIdentities;
+  try {
+    eligibleIdentities = new Set(getDeepLEligibleKeys(settingsStore.settings?.DEEPL_API_KEY || '', settingsStore.settings?.DEEPL_API_TIER)
+      .map(key => getDeepLLanguageIdentity(key, settingsStore.settings?.DEEPL_API_TIER)));
+  } catch { return false; }
+  const age = capabilities?.fetchedAt == null ? Infinity : Date.now() - capabilities.fetchedAt;
+  return capabilities?.status === 'ready' && eligibleIdentities.has(capabilities.identity) && age >= 0 && age < DEEPL_LANGUAGE_CATALOG_TTL_MS;
+};
+const hasFreshDeepLCatalog = computed(isDeepLLanguageCatalogFresh);
+const deepLLanguageStatus = computed(() => {
+  if (!props.provider?.toLowerCase().includes('deepl') || hasFreshDeepLCatalog.value) return '';
+  return settingsStore.deepLLanguageCapabilities?.status === 'loading'
+    ? 'deepl_languages_loading'
+    : 'deepl_languages_unavailable';
+});
+watch(() => [props.provider, settingsStore.settings?.DEEPL_API_KEY, settingsStore.settings?.DEEPL_API_TIER], () => {
+  if (!props.provider?.toLowerCase().includes('deepl') || !settingsStore.refreshDeepLLanguageCapabilities) return;
+  try {
+    getDeepLLanguageIdentity(settingsStore.settings?.DEEPL_API_KEY || '', settingsStore.settings?.DEEPL_API_TIER);
+    settingsStore.refreshDeepLLanguageCapabilities({ forProvider: props.provider });
+  } catch { /* no request without a configured, tier-eligible key */ }
+}, { immediate: true });
 const hasAutoDetect = computed(() =>
   providerInfo.value?.features?.includes("autoDetect"),
 );
@@ -348,8 +380,18 @@ const providerBaseLanguages = computed(() => {
   let mappingKey = "GOOGLE";
 
   if (providerKey.includes("deepl")) {
-    providerKey = props.beta ? "deepl_beta" : "deepl";
-    mappingKey = "DEEPL";
+    const capabilities = settingsStore.deepLLanguageCapabilities;
+    if (hasFreshDeepLCatalog.value) {
+      return capabilities.catalog.map(entry => ({ code: entry.lang, normalizedTag: entry.normalizedTag, name: entry.name || entry.lang, isBeta: entry.metadataValid === true && entry.status === 'beta', usableAsSource: entry.usableAsSource, usableAsTarget: entry.usableAsTarget }));
+    }
+    return [sourceLanguage.value, targetLanguage.value].reduce((entries, code) => {
+      if (code) {
+        const index = entries.findIndex(entry => normalizeDeepLLanguageTag(entry.code) === normalizeDeepLLanguageTag(code));
+        if (index === -1) entries.push({ code, name: code, isBeta: false });
+        else entries[index] = { ...entries[index], code };
+      }
+      return entries;
+    }, [...all]);
   } else if (providerKey.includes("google")) {
     providerKey = "google";
     mappingKey = "GOOGLE";
@@ -381,11 +423,35 @@ const providerBaseLanguages = computed(() => {
   return all;
 });
 
+const withSelectedDeepLLanguage = (list, savedTag, direction) => {
+  if (!savedTag) return list;
+  const normalized = normalizeDeepLLanguageTag(savedTag);
+  const resolved = resolveDeepLLanguageTag(savedTag, direction);
+  const existing = list.find(language => normalizeDeepLLanguageTag(language.code) === normalized)
+    || (resolved !== normalized && list.find(language => normalizeDeepLLanguageTag(language.code) === resolved));
+  const catalogEntry = settingsStore.deepLLanguageCapabilities?.catalog?.find(entry => entry.normalizedTag === resolved);
+  const selected = existing || (hasFreshDeepLCatalog.value && catalogEntry ? {
+    code: catalogEntry.lang,
+    name: catalogEntry.name || savedTag,
+    isBeta: catalogEntry.metadataValid === true && catalogEntry.status === 'beta',
+    usableAsSource: catalogEntry.usableAsSource,
+    usableAsTarget: catalogEntry.usableAsTarget
+  } : { code: savedTag, name: savedTag, isBeta: false });
+  const preserved = { ...selected, code: savedTag };
+  if (existing) return list.map(language => language === existing ? preserved : language);
+  return [...list, preserved];
+};
+
 /**
  * Filtered languages for the SOURCE dropdown.
  */
 const availableLanguages = computed(() => {
   let filtered = providerBaseLanguages.value;
+  if (hasFreshDeepLCatalog.value) {
+    const catalog = settingsStore.deepLLanguageCapabilities.catalog;
+    filtered = filtered.filter(language => matchDeepLLanguage(catalog, language.code, 'source') === 'supported');
+    return withSelectedDeepLLanguage(filtered, sourceLanguage.value, 'source');
+  }
 
   // Apply restricted source mapping if applicable (e.g., Vajehyab)
   const restrictedMap = PROVIDER_LANGUAGE_PAIRS[props.provider];
@@ -401,6 +467,11 @@ const availableLanguages = computed(() => {
  */
 const targetLanguages = computed(() => {
   const base = providerBaseLanguages.value;
+  if (hasFreshDeepLCatalog.value) {
+    const catalog = settingsStore.deepLLanguageCapabilities.catalog;
+    const filtered = base.filter(language => matchDeepLLanguage(catalog, language.code, 'target') === 'supported');
+    return withSelectedDeepLLanguage(filtered, targetLanguage.value, 'target');
+  }
   const restrictedMap = PROVIDER_LANGUAGE_PAIRS[props.provider];
 
   if (restrictedMap) {
@@ -424,7 +495,30 @@ const swapIcon = computed(() => {
   return browser.runtime.getURL("icons/ui/swap.png");
 });
 
+const isDeepLProvider = computed(() => props.provider?.toLowerCase().includes('deepl'));
+
+const isDeepLSwapPairSupported = (source, target) => {
+  const catalog = settingsStore.deepLLanguageCapabilities?.catalog;
+  return isDeepLLanguageCatalogFresh()
+    && resolveDeepLLanguageTag(source, 'source') !== resolveDeepLLanguageTag(target, 'target')
+    && matchDeepLLanguage(catalog, source, 'source') === 'supported'
+    && matchDeepLLanguage(catalog, target, 'target') === 'supported';
+};
+
 const isSwapPossible = computed(() => {
+  if (isDeepLProvider.value) {
+    if (!hasFreshDeepLCatalog.value
+      || matchDeepLLanguage(settingsStore.deepLLanguageCapabilities.catalog, targetLanguage.value, 'source') !== 'supported') return false;
+
+    const nextTargetCandidates = sourceLanguage.value === AUTO_DETECT_VALUE
+      ? [...new Set([CONFIG?.TARGET_LANGUAGE || 'en', 'en'])]
+      : [sourceLanguage.value === targetLanguage.value ? 'en' : sourceLanguage.value];
+    return nextTargetCandidates.every(language =>
+      resolveDeepLLanguageTag(targetLanguage.value, 'source') !== resolveDeepLLanguageTag(language, 'target')
+      && matchDeepLLanguage(settingsStore.deepLLanguageCapabilities.catalog, language, 'target') === 'supported'
+    );
+  }
+
   const restrictedMap = PROVIDER_LANGUAGE_PAIRS[props.provider];
   if (!restrictedMap) return true;
 
@@ -515,11 +609,16 @@ const handleSwapLanguages = async () => {
     return;
   }
 
+  const requestedSource = sourceLanguage.value;
+  const requestedTarget = targetLanguage.value;
+
   try {
     const { getLanguageCodeForTTS: getLanguageCode } =
       await utilsFactory.getI18nUtils();
     const defaultTarget =
       (await getLanguageCode(CONFIG?.TARGET_LANGUAGE)) || "en";
+
+    if (sourceLanguage.value !== requestedSource || targetLanguage.value !== requestedTarget) return;
 
     logger.debug("[LanguageSelector] Swap requested:", {
       current: { source: sourceLanguage.value, target: targetLanguage.value },
@@ -559,6 +658,8 @@ const handleSwapLanguages = async () => {
       currentSource = "en"; // Fallback to English
     }
 
+    if (isDeepLProvider.value && !isDeepLSwapPairSupported(currentTarget, currentSource)) return;
+
     // Perform the final swap with the potentially modified source language
     sourceLanguage.value = currentTarget;
     targetLanguage.value = currentSource;
@@ -569,8 +670,8 @@ const handleSwapLanguages = async () => {
     });
 
     emit("swap-languages", {
-      newSource: sourceLanguage.value,
-      newTarget: targetLanguage.value,
+      newSource: isDeepLProvider.value ? currentTarget : sourceLanguage.value,
+      newTarget: isDeepLProvider.value ? currentSource : targetLanguage.value,
     });
   } catch (error) {
     handleError(error, "language-swap-error");

@@ -21,7 +21,6 @@
         :provider="currentProvider"
         :disabled="liveDubbingBusy"
         :last-keyword="lastKeyword"
-        :beta="isDeeplBetaEnabled"
         show-default-actions
         :default-actions-enabled="isReady"
         :source-is-saved-default="sourceIsSavedDefault"
@@ -67,7 +66,6 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
 import ProviderSelector from '@/components/shared/ProviderSelector.vue'
@@ -138,10 +136,6 @@ const emit = defineEmits([
 ])
 
 const { t } = useUnifiedI18n()
-const settingsStore = useSettingsStore()
-
-const isDeeplBetaEnabled = computed(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ?? false)
-
 /** Monochrome clear icon rendered via CSS mask; inherits button color. */
 const clearIcon = computed(() => ExtensionContextManager.safeGetURL('icons/ui/clear.png'))
 

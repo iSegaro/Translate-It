@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { reactive, ref, nextTick } from 'vue';
 import LanguagesTab from './LanguagesTab.vue';
+import { getDeepLLanguageIdentity, normalizeDeepLLanguageCatalog } from '@/features/translation/providers/DeepLLanguageDiscovery.js';
 
 // Mock vue-router (useRouter for the tab, useRoute/useRouter for the mocked highlight manager path)
 const pushMock = vi.fn();
@@ -21,8 +22,7 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   })
 }));
 
-// Mock settings store: writes go through updateSettingLocally, exactly like
-// the beta toggles in DeepLApiSettings (Providers tab) and the Languages tab
+// Mock settings store: writes go through updateSettingLocally, like other tabs.
 const mockUpdateSettingLocally = vi.fn((key, value) => {
   mockSettingsStore.settings[key] = value;
 });
@@ -32,10 +32,13 @@ const mockSettingsStore = reactive({
     TRANSLATION_API: 'deepl',
     SOURCE_LANGUAGE: 'en',
     TARGET_LANGUAGE: 'fa',
-    DEEPL_BETA_LANGUAGES_ENABLED: true,
+    DEEPL_API_KEY: 'test-key',
+    DEEPL_API_TIER: 'free',
     MODE_PROVIDERS: {}
   },
   isSettingsValid: true,
+  deepLLanguageCapabilities: { status: 'idle', identity: null, catalog: null, fetchedAt: null, error: null },
+  refreshDeepLLanguageCapabilities: vi.fn(),
   updateSettingLocally: mockUpdateSettingLocally,
   validateSettings: (...args) => mockValidateSettings(...args)
 });
@@ -62,7 +65,7 @@ vi.mock('@/components/shared/ProviderSelector.vue', () => ({
 vi.mock('@/components/feature/LanguageDropdown.vue', () => ({
   default: {
     name: 'LanguageDropdown',
-    props: ['languages', 'modelValue', 'id', 'type'],
+    props: ['languages', 'modelValue', 'id', 'type', 'error'],
     emits: ['update:modelValue'],
     template: '<div class="language-dropdown-stub" />'
   }
@@ -132,23 +135,20 @@ const mountTab = () => {
   return wrapper;
 };
 
-const dropdownLanguages = (wrapper, id) => {
-  const props = dropdownProps(wrapper, id);
-  return props ? props.languages.map(l => l.code) : null;
-};
-
 const dropdownProps = (wrapper, id) => {
   const dropdowns = wrapper.findAllComponents({ name: 'LanguageDropdown' });
   return dropdowns.find(d => d.props('id') === id)?.props();
 };
 
-describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
+describe('LanguagesTab.vue - DeepL language metadata', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSettingsStore.settings.TRANSLATION_API = 'deepl';
     mockSettingsStore.settings.SOURCE_LANGUAGE = 'en';
     mockSettingsStore.settings.TARGET_LANGUAGE = 'fa';
-    mockSettingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED = true;
+    mockSettingsStore.settings.DEEPL_API_KEY = 'test-key';
+    mockSettingsStore.settings.DEEPL_API_TIER = 'free';
+    mockSettingsStore.deepLLanguageCapabilities = { status: 'idle', identity: null, catalog: null, fetchedAt: null, error: null };
     mockSettingsStore.isSettingsValid = true;
     mockValidateSettings.mockReturnValue({ isValid: true, errors: [] });
     missingSettingMocks.getFirstMissingSetting.mockReturnValue(null);
@@ -158,48 +158,6 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
     await vi.dynamicImportSettled();
     await flushPromises();
     while (mountedWrappers.length) mountedWrappers.pop().unmount();
-  });
-
-  it('preserves unsaved selections when beta is toggled off (no silent clear)', async () => {
-    mountTab();
-    await flushPromises();
-
-    // Beta toggle from either the Providers tab or the Languages tab path
-    // goes through updateSettingLocally — selections must survive it
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
-    await nextTick();
-    await flushPromises();
-
-    expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('fa');
-    expect(mockSettingsStore.settings.SOURCE_LANGUAGE).toBe('en');
-  });
-
-  it('keeps selections while dropdown options re-filter to standard-only', async () => {
-    const wrapper = mountTab();
-    await flushPromises();
-
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
-    await nextTick();
-    await flushPromises();
-
-    // Options re-filter, but the preserved selection is appended back with its
-    // label so the dropdown renders the value instead of blank
-    expect(dropdownLanguages(wrapper, 'TARGET_LANGUAGE')).toContain('fa');
-    expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('fa');
-  });
-
-  it('preserves selections when beta is re-enabled', async () => {
-    mountTab();
-    await flushPromises();
-
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
-    await nextTick();
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', true);
-    await nextTick();
-    await flushPromises();
-
-    expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('fa');
-    expect(mockSettingsStore.settings.SOURCE_LANGUAGE).toBe('en');
   });
 
   it('highlights TARGET_LANGUAGE when feedback focus is target', async () => {
@@ -238,9 +196,8 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
 
     mockValidateSettings.mockReturnValue({
       isValid: false,
-      errors: ['validation_deepl_target_language_beta_disabled:fa']
+      errors: ['validation_deepl_target_language_unsupported:fa']
     });
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
     await nextTick();
 
     // Save-feedback path surfaces the store conflict inline
@@ -249,9 +206,7 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
     }));
     await flushPromises();
 
-    const error = wrapper.find('.validation-error .error-message');
-    expect(error.exists()).toBe(true);
-    expect(error.text()).toBe('validation_deepl_target_language_beta_disabled');
+    expect(dropdownProps(wrapper, 'TARGET_LANGUAGE').error).toBe('validation_deepl_target_language_unsupported');
 
     // ...while the dropdown still renders the preserved (unsupported) value
     const props = dropdownProps(wrapper, 'TARGET_LANGUAGE');
@@ -267,31 +222,28 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
 
     mockValidateSettings.mockReturnValue({
       isValid: false,
-      errors: ['validation_deepl_target_language_beta_disabled:fa']
+      errors: ['validation_deepl_target_language_unsupported:fa']
     });
     window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
       detail: { field: 'languages', focus: 'target' }
     }));
     await flushPromises();
-    expect(wrapper.find('.validation-error').exists()).toBe(true);
+    expect(dropdownProps(wrapper, 'TARGET_LANGUAGE').error).toBe('validation_deepl_target_language_unsupported');
 
-    // Resolving (conflict gone) clears the inline error via the read-only
-    // beta watcher — the toggle fires it, validateLanguages() clears the key.
+    // Resolving (conflict gone) clears the inline error when draft credentials change.
     // (Asserted via isSettingsValid, which mirrors the inline error computed;
     // the Transition leave itself never completes under jsdom.)
     mockValidateSettings.mockReturnValue({ isValid: true, errors: [] });
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
+    mockSettingsStore.updateSettingLocally('DEEPL_API_KEY', 'updated-key');
     await nextTick();
     await flushPromises();
     expect(mockSettingsStore.isSettingsValid).toBe(true);
   });
 
-  it('preserves a conflicting target when source changes with beta disabled', async () => {
+  it('preserves an unsupported target when source changes', async () => {
     mountTab();
     await flushPromises();
 
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
-    await nextTick();
     expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('fa');
 
     // Changing source must not silently replace the conflicting target
@@ -319,15 +271,156 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
     expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('en');
   });
 
+  it('shows fresh v3 variants by direction and labels only known beta entries', async () => {
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} },
+        { lang: 'fr', name: 'French', usable_as_source: false, usable_as_target: true, status: 'beta', features: {} },
+        { lang: 'zh-Hans', name: 'Chinese (Simplified)', usable_as_source: false, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'qaa', name: 'Experimental', usable_as_source: false, usable_as_target: true, status: 'future', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE').languages;
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(source.map(language => language.code)).toContain('en');
+    expect(source.map(language => language.code)).not.toContain('fr');
+    expect(target.find(language => language.code === 'fr')).toMatchObject({ isBeta: true, status: 'beta' });
+    expect(target.find(language => language.code === 'zh-Hans').name).toBe('Chinese (Simplified)');
+    expect(target.map(language => language.code)).not.toContain('qaa');
+    expect(normalizeDeepLLanguageCatalog([{ lang: 'qaa', name: 'Experimental', usable_as_source: false, usable_as_target: true, status: 'future', features: {} }])[0].metadataValid).toBe(false);
+  });
+
+  it('keeps a selected unknown-status option visible without a Beta label and shows unverified validation', async () => {
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'QAA';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'qaa', name: 'Experimental', usable_as_source: false, usable_as_target: true, status: 'future', features: {} }
+      ])
+    };
+    mockValidateSettings.mockReturnValue({ isValid: false, errors: ['validation_deepl_languages_unverified'] });
+    const wrapper = mountTab();
+    await flushPromises();
+    window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { detail: { field: 'languages', focus: 'target' } }));
+    await flushPromises();
+
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE');
+    expect(target.languages.some(language => language.code === 'QAA')).toBe(true);
+    expect(target.languages.find(language => language.code === 'QAA').isBeta).not.toBe(true);
+    expect(target.error).toBe('validation_deepl_languages_unverified');
+  });
+
+  it('preserves the saved BCP47 variant spelling when matching catalog entries', async () => {
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'ZH_hans';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'zh-Hans', name: 'Chinese (Simplified)', usable_as_source: false, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE');
+    expect(target.modelValue).toBe('ZH_hans');
+    expect(target.languages.find(language => language.code === 'ZH_hans').name).toBe('Chinese (Simplified)');
+  });
+
+  it('accepts fresh metadata from the second eligible key after failover', async () => {
+    mockSettingsStore.settings.DEEPL_API_KEY = 'bad-key\ngood-key';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('good-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} },
+        { lang: 'fr', name: 'French', usable_as_source: false, usable_as_target: true, status: 'beta', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    // Lists and Beta labels render from the succeeding-key catalog ...
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE').languages;
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(source.map(language => language.code)).toContain('en');
+    expect(target.find(language => language.code === 'fr')).toMatchObject({ isBeta: true });
+    // ... and no loading/unavailable status is shown
+    expect(wrapper.find('.setting-description[role="status"]').exists()).toBe(false);
+  });
+
+  it('rejects metadata for a key no longer among eligible credentials', async () => {
+    mockSettingsStore.settings.DEEPL_API_KEY = 'other-key';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('good-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    // Saved selection stays visible, but metadata is no longer trusted
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE');
+    expect(target.languages.some(language => language.code === 'fa')).toBe(true);
+    expect(wrapper.find('.setting-description[role="status"]').exists()).toBe(true);
+  });
+
+  it('treats an expired snapshot as unverified regardless of identity', async () => {
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'),
+      fetchedAt: Date.now() - 300000, error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE').languages;
+    expect(source.find(language => language.code === 'en')).toBeDefined();
+    expect(wrapper.find('.setting-description[role="status"]').exists()).toBe(true);
+  });
+
+  it('resolves legacy Chinese aliases by direction while keeping saved codes and beta labels', async () => {
+    mockSettingsStore.settings.SOURCE_LANGUAGE = 'zh-cn';
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'zh-cn';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'zh', name: 'Chinese', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} },
+        { lang: 'zh-Hans', name: 'Chinese (Simplified)', usable_as_source: false, usable_as_target: true, status: 'beta', features: {} },
+        { lang: 'pt', name: 'Portuguese', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE');
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE');
+    expect(source.modelValue).toBe('zh-cn');
+    expect(source.languages.find(language => language.code === 'zh-cn')).toMatchObject({ name: 'Chinese', isBeta: false });
+    expect(target.modelValue).toBe('zh-cn');
+    expect(target.languages.find(language => language.code === 'zh-cn')).toMatchObject({ name: 'Chinese (Simplified)', isBeta: true });
+    expect(target.languages.some(language => language.code === 'pt-BR')).toBe(false);
+    expect(mockSettingsStore.settings.SOURCE_LANGUAGE).toBe('zh-cn');
+    expect(mockSettingsStore.settings.TARGET_LANGUAGE).toBe('zh-cn');
+
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'pt-BR';
+    const nonAlias = mountTab();
+    await flushPromises();
+    expect(dropdownProps(nonAlias, 'TARGET_LANGUAGE').languages.find(language => language.code === 'pt-BR'))
+      .toMatchObject({ name: 'pt-BR', isBeta: false });
+  });
+
   it('preserves an unsupported source when switching to DeepL', async () => {
     const wrapper = mountTab();
     await flushPromises();
 
-    // 'fa' source is valid for google; beta off makes it a DeepL conflict
+    // 'fa' is a preserved, incompatible source for the metadata fixture
     mockSettingsStore.updateSettingLocally('TRANSLATION_API', 'google');
     mockSettingsStore.updateSettingLocally('SOURCE_LANGUAGE', 'fa');
     mockSettingsStore.updateSettingLocally('TARGET_LANGUAGE', 'de');
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
     await nextTick();
     await flushPromises();
 
@@ -335,9 +428,8 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
     mockValidateSettings.mockImplementation(() => {
       const s = mockSettingsStore.settings;
       if (String(s.TRANSLATION_API).toLowerCase().includes('deepl')
-        && s.DEEPL_BETA_LANGUAGES_ENABLED === false
         && s.SOURCE_LANGUAGE === 'fa') {
-        return { isValid: false, errors: ['validation_deepl_source_language_beta_disabled:fa'] };
+        return { isValid: false, errors: ['validation_deepl_source_language_unsupported:fa'] };
       }
       return { isValid: true, errors: [] };
     });
@@ -355,9 +447,7 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
     }));
     await flushPromises();
 
-    const error = wrapper.find('.validation-error .error-message');
-    expect(error.exists()).toBe(true);
-    expect(error.text()).toBe('validation_deepl_source_language_beta_disabled');
+    expect(dropdownProps(wrapper, 'SOURCE_LANGUAGE').error).toBe('validation_deepl_source_language_unsupported');
   });
 
   it('clears a stale DeepL error when switching to an unconfigured provider', async () => {
@@ -367,15 +457,14 @@ describe('LanguagesTab.vue - DeepL beta toggle (#321)', () => {
     // Show a DeepL conflict inline first
     mockValidateSettings.mockReturnValue({
       isValid: false,
-      errors: ['validation_deepl_target_language_beta_disabled:fa']
+      errors: ['validation_deepl_target_language_unsupported:fa']
     });
-    mockSettingsStore.updateSettingLocally('DEEPL_BETA_LANGUAGES_ENABLED', false);
     await nextTick();
     window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
       detail: { field: 'languages', focus: 'target' }
     }));
     await flushPromises();
-    expect(wrapper.find('.validation-error').exists()).toBe(true);
+    expect(dropdownProps(wrapper, 'TARGET_LANGUAGE').error).toBe('validation_deepl_target_language_unsupported');
 
     // 'custom' has missing credentials → provider-config warning owns the display
     missingSettingMocks.getFirstMissingSetting.mockImplementation(

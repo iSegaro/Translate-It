@@ -221,7 +221,6 @@ describe('PopupApp', () => {
 
     mockSettingsStore = {
       settings: {
-        DEEPL_BETA_LANGUAGES_ENABLED: false,
         TRANSLATION_API: 'google',
         TARGET_LANGUAGE: 'de',
         LIVE_DUBBING_PROVIDER: 'openai',

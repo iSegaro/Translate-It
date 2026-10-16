@@ -90,12 +90,36 @@ import { getFirstMissingSetting } from '@/features/translation/utils/providerVal
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { CONFIG } from '@/shared/config/config.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
+import { getDeepLLanguageIdentity, MissingDeepLLanguageKeyError } from '@/features/translation/providers/DeepLLanguageDiscovery.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
 const { t, locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 const router = useRouter()
+let deepLLanguageRefreshTimer = null
+
+const scheduleDeepLLanguageRefresh = () => {
+  clearTimeout(deepLLanguageRefreshTimer)
+  deepLLanguageRefreshTimer = null
+  const settings = settingsStore.settings
+  if (settings.TRANSLATION_API !== ProviderRegistryIds.DEEPL
+    || getFirstMissingSetting(ProviderRegistryIds.DEEPL, settings)
+    || typeof settingsStore.refreshDeepLLanguageCapabilities !== 'function') return
+  deepLLanguageRefreshTimer = setTimeout(() => {
+    deepLLanguageRefreshTimer = null
+    settingsStore.refreshDeepLLanguageCapabilities()
+  }, 300)
+}
+
+watch(() => [
+  settingsStore.settings.TRANSLATION_API,
+  settingsStore.settings.DEEPL_API_KEY,
+  settingsStore.settings.DEEPL_API_TIER,
+], scheduleDeepLLanguageRefresh, { immediate: true })
+
+onBeforeUnmount(() => clearTimeout(deepLLanguageRefreshTimer))
 
 const navRoot = ref(null)
 const tabViewport = ref(null)
@@ -422,6 +446,13 @@ const translateValidationError = (error) => {
 // Save all settings
 const saveAllSettings = async () => {
   logger.debug('Save All Settings clicked!')
+
+  // Ensure Save validates against a current draft-key/tier catalog. The store
+  // returns without networking for other providers or missing credentials.
+  if (settingsStore.settings.TRANSLATION_API === ProviderRegistryIds.DEEPL
+    && typeof settingsStore.refreshDeepLLanguageCapabilities === 'function') {
+    await settingsStore.refreshDeepLLanguageCapabilities()
+  }
   
   // 1. Validate all critical settings before proceeding
   const validation = settingsStore.validateSettings()
@@ -452,7 +483,18 @@ const saveAllSettings = async () => {
 
       // Check if it's a provider configuration error
       const globalProvider = settingsStore.settings.TRANSLATION_API;
-      const missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
+      let missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
+      if (!missingKey
+        && globalProvider === ProviderRegistryIds.DEEPL
+        && settingsStore.settings.DEEPL_API_TIER === 'pro'
+        && validation.errors.includes('ERRORS_API_CONFIG_INVALID')) {
+        try {
+          getDeepLLanguageIdentity(settingsStore.settings.DEEPL_API_KEY || '', 'pro')
+        } catch (error) {
+          if (error instanceof MissingDeepLLanguageKeyError) missingKey = 'DEEPL_API_KEY'
+          else throw error
+        }
+      }
       
       if (missingKey) {
         // Redirect to providers tab with highlight parameter if not already there

@@ -4,6 +4,7 @@ import { reactive } from 'vue';
 import DeepLApiSettings from './DeepLApiSettings.vue';
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js';
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js';
+import { getDeepLLanguageIdentity, normalizeDeepLLanguageCatalog } from '@/features/translation/providers/DeepLLanguageDiscovery.js';
 
 const mocks = vi.hoisted(() => ({
   settingsStore: null,
@@ -17,6 +18,9 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
 vi.mock('@/features/translation/providers/ApiKeyManager.js', () => ({
   ApiKeyManager: {
     testKeysDirect: mocks.testKeysDirect,
+    parseKeys: (value) => typeof value === 'string' && value.trim()
+      ? value.split(/[\n,]+/).map((key) => key.trim()).filter(Boolean)
+      : [],
   },
 }));
 
@@ -58,7 +62,8 @@ vi.mock('@/components/base/BaseCheckbox.vue', () => ({
 describe('DeepLApiSettings', () => {
   beforeEach(() => {
     mocks.settingsStore = {
-      settings: reactive({ DEEPL_API_KEY: 'draft-key', DEEPL_API_TIER: 'pro' }),
+      settings: reactive({ DEEPL_API_KEY: 'draft-key', DEEPL_API_TIER: 'pro', TARGET_LANGUAGE: 'fr', DEEPL_FORMALITY: 'more' }),
+      deepLLanguageCapabilities: { status: 'idle', identity: null, catalog: null, fetchedAt: null },
       updateSettingLocally: vi.fn(),
     };
     mocks.testKeysDirect.mockReset().mockResolvedValue({
@@ -80,5 +85,86 @@ describe('DeepLApiSettings', () => {
       { apiTier: 'pro' },
     );
     wrapper.unmount();
+  });
+
+  it('removes the beta toggle and reports unknown formality metadata without resetting the preference', () => {
+    const wrapper = mount(DeepLApiSettings);
+    expect(wrapper.text()).not.toContain('deepl_beta_languages_label');
+    expect(wrapper.find('.formality-select').exists()).toBe(true);
+    expect(wrapper.text()).toContain('deepl_formality_unverified');
+    expect(mocks.settingsStore.settings.DEEPL_FORMALITY).toBe('more');
+    wrapper.unmount();
+  });
+
+  it('distinguishes unsupported target formality from unknown metadata and preserves preference', () => {
+    mocks.settingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('draft-key', 'pro'), fetchedAt: Date.now(),
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fr', name: 'French', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mount(DeepLApiSettings);
+    expect(wrapper.text()).toContain('deepl_formality_unavailable');
+    expect(mocks.settingsStore.settings.DEEPL_FORMALITY).toBe('more');
+    wrapper.unmount();
+
+    mocks.settingsStore.deepLLanguageCapabilities = {
+      ...mocks.settingsStore.deepLLanguageCapabilities,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fr', name: 'French', usable_as_source: true, usable_as_target: true, status: 'stable', features: { formality: { status: 'future' } } }
+      ])
+    };
+    const unknown = mount(DeepLApiSettings);
+    expect(unknown.text()).toContain('deepl_formality_unverified');
+    expect(mocks.settingsStore.settings.DEEPL_FORMALITY).toBe('more');
+    unknown.unmount();
+  });
+
+  it('uses the target alias catalog entry for formality support', () => {
+    mocks.settingsStore.settings.TARGET_LANGUAGE = 'zh-cn';
+    mocks.settingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('draft-key', 'pro'), fetchedAt: Date.now(),
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'zh-Hans', name: 'Chinese (Simplified)', usable_as_source: false, usable_as_target: true, status: 'beta', features: { formality: { status: 'stable' } } }
+      ])
+    };
+    const wrapper = mount(DeepLApiSettings);
+    expect(wrapper.text()).not.toContain('deepl_formality_unavailable');
+    expect(wrapper.text()).not.toContain('deepl_formality_unverified');
+    expect(mocks.settingsStore.settings.DEEPL_FORMALITY).toBe('more');
+    wrapper.unmount();
+  });
+
+  it('accepts fresh formality metadata from a later eligible key after failover', () => {
+    mocks.settingsStore.settings.DEEPL_API_KEY = 'draft-key\nfallback-key';
+    mocks.settingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('fallback-key', 'pro'), fetchedAt: Date.now(),
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fr', name: 'French', usable_as_source: true, usable_as_target: true, status: 'stable', features: { formality: { status: 'stable' } } }
+      ])
+    };
+    const wrapper = mount(DeepLApiSettings);
+    expect(wrapper.text()).toContain('deepl_formality_description');
+    expect(wrapper.text()).not.toContain('deepl_formality_unverified');
+    wrapper.unmount();
+  });
+
+  it('reports formality as unverified when the snapshot key is removed or expired', () => {
+    const ready = {
+      status: 'ready', identity: getDeepLLanguageIdentity('fallback-key', 'pro'), fetchedAt: Date.now(),
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fr', name: 'French', usable_as_source: true, usable_as_target: true, status: 'stable', features: { formality: { status: 'stable' } } }
+      ])
+    };
+    mocks.settingsStore.deepLLanguageCapabilities = ready;
+    const removed = mount(DeepLApiSettings);
+    expect(removed.text()).toContain('deepl_formality_unverified');
+    removed.unmount();
+
+    mocks.settingsStore.settings.DEEPL_API_KEY = 'draft-key\nfallback-key';
+    mocks.settingsStore.deepLLanguageCapabilities = { ...ready, fetchedAt: Date.now() - 300000 };
+    const expired = mount(DeepLApiSettings);
+    expect(expired.text()).toContain('deepl_formality_unverified');
+    expired.unmount();
   });
 });

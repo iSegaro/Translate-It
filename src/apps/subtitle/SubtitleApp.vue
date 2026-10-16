@@ -56,7 +56,6 @@
                   v-model:target-language="config.targetLanguage"
                   :provider="config.providerId"
                   :allow-auto="false"
-                  :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
                   :enable-select-element-integration="false"
                 />
               </div>

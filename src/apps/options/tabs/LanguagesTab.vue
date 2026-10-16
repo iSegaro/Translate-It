@@ -22,23 +22,27 @@
 
         <div class="languages-selectors-container">
           <div class="setting-group">
-            <label>{{ t('source_language_label') || 'Source Language' }}</label>
+            <label for="SOURCE_LANGUAGE">{{ t('source_language_label') || 'Source Language' }}</label>
             <LanguageDropdown
               id="SOURCE_LANGUAGE"
               v-model="sourceLanguage"
               :languages="filteredSourceLanguages"
               type="source"
+              :error="sourceLanguageError"
+              :beta-label="t('deepl_beta_label')"
               class="language-dropdown"
             />
           </div>
 
           <div class="setting-group">
-            <label>{{ t('target_language_label') || 'Target Language' }}</label>
+            <label for="TARGET_LANGUAGE">{{ t('target_language_label') || 'Target Language' }}</label>
             <LanguageDropdown
               id="TARGET_LANGUAGE"
               v-model="targetLanguage"
               :languages="filteredTargetLanguages"
               type="target"
+              :error="targetLanguageError"
+              :beta-label="t('deepl_beta_label')"
               class="language-dropdown"
             />
           </div>
@@ -56,7 +60,7 @@
           <!-- Validation Error (e.g., Same Source/Target Language) -->
           <Transition name="fade-slide">
             <div 
-              v-if="validationError && validationErrorKey !== 'PROVIDER_CONFIG_ERROR'" 
+              v-if="validationError && validationErrorKey !== 'PROVIDER_CONFIG_ERROR' && !validationErrorKey.startsWith('validation_deepl_')"
               class="validation-error"
             >
               <span class="error-icon">⛔</span>
@@ -90,6 +94,15 @@
             {{ t('smart_language_fallback_note') }}
           </p>
         </div>
+
+        <p
+          v-if="isDeepLProvider(selectedProvider) && deepLLanguageStatus"
+          class="setting-description"
+          role="status"
+          aria-live="polite"
+        >
+          {{ t(deepLLanguageStatus) }}
+        </p>
 
         <!-- Dictionary Mode -->
         <BaseAccordion
@@ -335,6 +348,7 @@ import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
 import { PROVIDER_SUPPORTED_LANGUAGES, PROVIDER_LANGUAGE_PAIRS, getCanonicalCode, getProviderLanguageCode } from '@/shared/config/languageConstants.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
 import { useHighlightManager } from '../composables/useHighlightManager.js'
+import { DEEPL_LANGUAGE_CATALOG_TTL_MS, getDeepLEligibleKeys, getDeepLLanguageIdentity, matchDeepLLanguage, normalizeDeepLLanguageTag, resolveDeepLLanguageTag } from '@/features/translation/providers/DeepLLanguageDiscovery.js'
 
 // Components
 import LanguageDropdown from '@/components/feature/LanguageDropdown.vue'
@@ -520,6 +534,19 @@ const showExamples = createSetting('DICTIONARY_SHOW_EXAMPLES', false)
 const isAIProvider = computed(() => ['gemini', 'openai', 'openrouter', 'requesty', 'deepseek', 'webai', 'custom'].includes(selectedProvider.value))
 const isAutoLanguageProvider = computed(() => selectedProviderInfo.value?.features?.includes('autoLanguage'))
 const selectedProviderInfo = computed(() => findProviderById(selectedProvider.value))
+const verifiedDeepLLanguageCatalog = computed(() => {
+  const capabilities = settingsStore.deepLLanguageCapabilities
+  if (capabilities?.status !== 'ready' || !Array.isArray(capabilities.catalog)) return null
+  // Accept a fresh snapshot from any currently eligible key: capability
+  // discovery fails over to the first succeeding key, matching settings.js.
+  const configuredKeys = settingsStore.settings?.DEEPL_API_KEY || ''
+  const tier = settingsStore.settings?.DEEPL_API_TIER
+  const eligibleIdentities = new Set(
+    getDeepLEligibleKeys(configuredKeys, tier).map(key => getDeepLLanguageIdentity(key, tier))
+  )
+  const age = capabilities.fetchedAt == null ? Infinity : Date.now() - capabilities.fetchedAt
+  return eligibleIdentities.has(capabilities.identity) && age >= 0 && age < DEEPL_LANGUAGE_CATALOG_TTL_MS ? capabilities.catalog : null
+})
 
 const getFilteredLanguages = (type) => {
   const provider = selectedProvider.value
@@ -545,7 +572,24 @@ const getFilteredLanguages = (type) => {
   // 2. Filter base languages supported by the provider
   let filtered = languages
   if (!isAIProvider.value) {
-    let providerKey = provider.toLowerCase().includes('deepl') ? (settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED ? 'deepl_beta' : 'deepl') : provider.toLowerCase()
+    if (isDeepLProvider(provider)) {
+      const catalog = verifiedDeepLLanguageCatalog.value
+      if (catalog?.length) {
+        filtered = catalog
+          .filter(entry => matchDeepLLanguage(catalog, entry.lang, type) === 'supported')
+          .map(entry => ({
+            code: entry.lang,
+            name: entry.name || languageLabelFor(entry.lang),
+            normalizedTag: entry.normalizedTag,
+            isBeta: entry.metadataValid === true && entry.status === 'beta',
+            status: entry.status,
+            features: entry.features
+          }))
+      }
+      if (type === 'source') return [{ code: 'auto', name: 'Auto-Detect' }, ...filtered]
+      return filtered
+    }
+    let providerKey = provider.toLowerCase()
     const mappingKey = providerKey.includes('google') || providerKey.includes('lingva') ? 'GOOGLE' : providerKey.includes('bing') || providerKey.includes('edge') ? 'BING' : providerKey.includes('deepl') ? 'DEEPL' : providerKey.includes('yandex') ? 'YANDEX' : 'BROWSER'
     
     if (providerKey.includes('google') || providerKey.includes('lingva')) providerKey = 'google'
@@ -601,13 +645,24 @@ const languageLabelFor = (code) => {
 
 // Visible options: filtered list plus the current selection when filtered
 // out, so a preserved-but-unsupported value still renders instead of blank.
-const withCurrentSelection = (list, current) => {
-  if (!current || list.some(l => l.code === current)) return list
-  return [...list, { code: current, name: languageLabelFor(current) }]
+const withCurrentSelection = (list, current, direction) => {
+  if (!current) return list
+  const normalized = normalizeDeepLLanguageTag(current)
+  const resolved = resolveDeepLLanguageTag(current, direction)
+  const existing = list.find(language => normalizeDeepLLanguageTag(language.code) === normalized)
+    || (resolved !== normalized && list.find(language => normalizeDeepLLanguageTag(language.code) === resolved))
+  if (existing) return list.map(language => language === existing ? { ...language, code: current } : language)
+  const catalogEntry = verifiedDeepLLanguageCatalog.value?.find(entry => entry.normalizedTag === resolved)
+  return [...list, {
+    code: current,
+    name: catalogEntry?.name || languageLabelFor(current),
+    isBeta: catalogEntry?.metadataValid === true && catalogEntry.status === 'beta',
+    status: catalogEntry?.metadataValid === true ? catalogEntry.status : null
+  }]
 }
 
-const filteredSourceLanguages = computed(() => withCurrentSelection(baseFilteredSourceLanguages.value, sourceLanguage.value))
-const filteredTargetLanguages = computed(() => withCurrentSelection(baseFilteredTargetLanguages.value, targetLanguage.value))
+const filteredSourceLanguages = computed(() => withCurrentSelection(baseFilteredSourceLanguages.value, sourceLanguage.value, 'source'))
+const filteredTargetLanguages = computed(() => withCurrentSelection(baseFilteredTargetLanguages.value, targetLanguage.value, 'target'))
 
 const isDeepLProvider = (provider) => typeof provider === 'string' && provider.toLowerCase().includes('deepl')
 
@@ -645,11 +700,16 @@ watch([selectedProvider, sourceLanguage], () => {
   validateLanguages()
 })
 
-// NOTE: toggling DEEPL_BETA_LANGUAGES_ENABLED intentionally preserves the
-// user's source/target selections (even when filtered out of the dropdowns)
-// so store-level validateSettings() can block save with feedback instead of
-// silently clearing them. Dropdown options still re-filter via computed.
-// The read-only watcher below only refreshes/clears the inline error.
+const deepLLanguageStatus = computed(() => {
+  if (!isDeepLProvider(selectedProvider.value)) return ''
+  const status = settingsStore.deepLLanguageCapabilities?.status
+  if (status === 'loading') return 'deepl_languages_loading'
+  return verifiedDeepLLanguageCatalog.value ? '' : 'deepl_languages_unavailable'
+})
+
+const deepLError = computed(() => validationErrorKey.value.startsWith('validation_deepl_') ? validationErrorKey.value : '')
+const sourceLanguageError = computed(() => deepLError.value.includes('source_language') || deepLError.value.includes('languages_unverified') ? validationError.value : '')
+const targetLanguageError = computed(() => deepLError.value.includes('target_language') || deepLError.value.includes('languages_unverified') ? validationError.value : '')
 
 // --- Validation ---
 
@@ -733,9 +793,12 @@ const validateLanguages = async (showFeedback = false) => {
   return true
 }
 
-// Re-evaluate inline validation when the beta flag changes (read-only:
-// selections are preserved; this only refreshes/clears the inline error).
-watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, () => {
+// Re-evaluate validation when provider credentials/tier drafts change; catalog
+// refresh preserves the saved language choices and updates their feedback.
+watch(() => [settingsStore.settings?.DEEPL_API_KEY, settingsStore.settings?.DEEPL_API_TIER, selectedProvider.value], async () => {
+  if (isDeepLProvider(selectedProvider.value) && settingsStore.refreshDeepLLanguageCapabilities) {
+    await settingsStore.refreshDeepLLanguageCapabilities()
+  }
   validateLanguages()
 })
 
@@ -760,7 +823,13 @@ onUnmounted(() => {
   window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
 })
 
-onMounted(async () => { await loadLanguages(); await validateLanguages() })
+onMounted(async () => {
+  await loadLanguages()
+  if (isDeepLProvider(selectedProvider.value) && settingsStore.refreshDeepLLanguageCapabilities) {
+    await settingsStore.refreshDeepLLanguageCapabilities()
+  }
+  await validateLanguages()
+})
 defineExpose({ validate: validateLanguages })
 
 </script>

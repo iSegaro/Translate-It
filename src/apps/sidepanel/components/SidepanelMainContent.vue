@@ -13,7 +13,6 @@
           v-model:target-language="targetLanguage"
           :provider="currentProviderLocal"
           :last-keyword="lastTranslation?.source"
-          :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           show-default-actions
           :default-actions-enabled="isReady"
           :source-is-saved-default="sourceIsSavedDefault"
@@ -159,7 +158,6 @@ import { useUnifiedTranslation } from '@/features/translation/composables/useUni
 import { useLanguageDefaults } from '@/features/settings/composables/useLanguageDefaults.js'
 import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
 
 // Components
 import LanguageSelector from '@/components/shared/LanguageSelector.vue'
@@ -176,8 +174,6 @@ const logger = getScopedLogger(LOG_COMPONENTS.UI, 'SidepanelMainContent');
 // Resource tracker for automatic cleanup
 
 // Stores
-const settingsStore = useSettingsStore()
-
 // Composables
 const { t } = useUnifiedI18n();
 
