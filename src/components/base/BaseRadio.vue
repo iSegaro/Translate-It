@@ -10,39 +10,40 @@
       :checked="modelValue === value"
       :disabled="disabled"
       @change="$emit('update:modelValue', value)"
-    >
+    />
     <span
       v-if="label"
       class="radio-label"
-    >{{ label }}</span>
+      >{{ label }}</span
+    >
     <slot v-else />
   </label>
 </template>
 
 <script setup>
-import './BaseRadio.scss'
+import "./BaseRadio.scss";
 defineProps({
   modelValue: {
     type: [String, Number, Boolean],
-    default: null
+    default: null,
   },
   value: {
     type: [String, Number, Boolean],
-    required: true
+    required: true,
   },
   name: {
     type: String,
-    required: true
+    required: true,
   },
   label: {
     type: String,
-    default: ''
+    default: "",
   },
   disabled: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-defineEmits(['update:modelValue'])
+defineEmits(["update:modelValue"]);
 </script>

@@ -11,7 +11,7 @@
     >
       {{ label }}
     </label>
-    
+
     <div class="ti-range__container">
       <input
         :id="rangeId"
@@ -23,7 +23,7 @@
         :disabled="disabled"
         class="ti-range"
         @input="handleInput"
-      >
+      />
       <span
         v-if="showValue"
         class="ti-range__value"
@@ -35,55 +35,55 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import './BaseRange.scss'
+import { ref } from "vue";
+import "./BaseRange.scss";
 
 defineProps({
   modelValue: {
     type: [Number, String],
-    required: true
+    required: true,
   },
   id: {
     type: String,
-    default: null
+    default: null,
   },
   min: {
     type: [Number, String],
-    default: 0
+    default: 0,
   },
   max: {
     type: [Number, String],
-    default: 100
+    default: 100,
   },
   step: {
     type: [Number, String],
-    default: 1
+    default: 1,
   },
   label: {
     type: String,
-    default: null
+    default: null,
   },
   disabled: {
     type: Boolean,
-    default: false
+    default: false,
   },
   showValue: {
     type: Boolean,
-    default: true
+    default: true,
   },
   valueSuffix: {
     type: String,
-    default: ''
-  }
-})
+    default: "",
+  },
+});
 
-const emit = defineEmits(['update:modelValue', 'change'])
+const emit = defineEmits(["update:modelValue", "change"]);
 
-const rangeId = ref(`range-${Math.random().toString(36).substr(2, 9)}`)
+const rangeId = ref(`range-${Math.random().toString(36).substr(2, 9)}`);
 
 const handleInput = (event) => {
-  const value = event.target.value
-  emit('update:modelValue', Number(value))
-  emit('change', Number(value))
-}
+  const value = event.target.value;
+  emit("update:modelValue", Number(value));
+  emit("change", Number(value));
+};
 </script>

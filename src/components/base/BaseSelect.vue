@@ -17,39 +17,40 @@
 </template>
 
 <script setup>
-import './BaseSelect.scss'
+import "./BaseSelect.scss";
 defineOptions({
-  inheritAttrs: false
-})
+  inheritAttrs: false,
+});
 
 defineProps({
   modelValue: {
     type: [String, Number, Boolean],
-    required: true
+    required: true,
   },
   options: {
     type: Array,
     required: true,
     validator: (options) => {
-      return options.every(option => 
-        typeof option === 'object' && 
-        option !== null && 
-        'value' in option && 
-        ('label' in option || 'name' in option)
-      )
-    }
+      return options.every(
+        (option) =>
+          typeof option === "object" &&
+          option !== null &&
+          "value" in option &&
+          ("label" in option || "name" in option),
+      );
+    },
   },
   disabled: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const emit = defineEmits(['update:modelValue', 'change'])
+const emit = defineEmits(["update:modelValue", "change"]);
 
 const handleChange = (event) => {
-  const value = event.target.value
-  emit('update:modelValue', value)
-  emit('change', value)
-}
+  const value = event.target.value;
+  emit("update:modelValue", value);
+  emit("change", value);
+};
 </script>

@@ -85,23 +85,30 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
-import { OVERLAY_ROOT_KEY } from './keys.js'
+import {
+  computed,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  ref,
+  nextTick,
+} from "vue";
+import { useResourceTracker } from "@/composables/core/useResourceTracker.js";
+import { OVERLAY_ROOT_KEY } from "./keys.js";
 
 const props = defineProps({
   variant: {
     type: String,
-    default: null
+    default: null,
   },
   placement: {
     type: String,
-    default: 'end',
-    validator: (v) => ['start', 'end'].includes(v)
+    default: "end",
+    validator: (v) => ["start", "end"].includes(v),
   },
   offset: {
     type: Number,
-    default: 8
+    default: 8,
   },
   /**
    * Force the inline anchored popover layout even at narrow viewport widths.
@@ -110,126 +117,128 @@ const props = defineProps({
    */
   forcePopover: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const emit = defineEmits(['open', 'close'])
+const emit = defineEmits(["open", "close"]);
 
-const overlayRoot = inject(OVERLAY_ROOT_KEY, null)
+const overlayRoot = inject(OVERLAY_ROOT_KEY, null);
 
 const teleportTarget = computed(() => {
-  if (overlayRoot?.value instanceof HTMLElement) return overlayRoot.value
-  return 'body'
-})
+  if (overlayRoot?.value instanceof HTMLElement) return overlayRoot.value;
+  return "body";
+});
 
 const rootClasses = computed(() => {
-  const classes = []
-  if (props.variant) classes.push(`toolbar-menu--${props.variant}`)
-  classes.push(`toolbar-menu--placement-${props.placement}`)
-  if (props.forcePopover) classes.push('toolbar-menu--force-popover')
-  return classes
-})
+  const classes = [];
+  if (props.variant) classes.push(`toolbar-menu--${props.variant}`);
+  classes.push(`toolbar-menu--placement-${props.placement}`);
+  if (props.forcePopover) classes.push("toolbar-menu--force-popover");
+  return classes;
+});
 
 const rootStyle = computed(() => ({
-  '--tm-offset': `${props.offset}px`
-}))
+  "--tm-offset": `${props.offset}px`,
+}));
 
 /**
  * Whether to render the mobile drawer branch. Honours the explicit
  * `forcePopover` opt-out so Popups (always narrower than 750px) keep using
  * the anchored popover layout instead of being hijacked by the drawer.
  */
-const useMobileLayout = computed(() => isMobile.value && !props.forcePopover)
+const useMobileLayout = computed(() => isMobile.value && !props.forcePopover);
 
-const tracker = useResourceTracker('toolbar-menu')
-const rootRef = ref(null)
-const menuRef = ref(null)
-const isOpen = ref(false)
-const isMobile = ref(false)
-const triggerEl = ref(null)
+const tracker = useResourceTracker("toolbar-menu");
+const rootRef = ref(null);
+const menuRef = ref(null);
+const isOpen = ref(false);
+const isMobile = ref(false);
+const triggerEl = ref(null);
 
-let mediaQuery = null
+let mediaQuery = null;
 
 const triggerAttrs = computed(() => ({
-  'aria-expanded': isOpen.value,
-  'aria-haspopup': 'menu'
-}))
+  "aria-expanded": isOpen.value,
+  "aria-haspopup": "menu",
+}));
 
 function setTriggerRef(el) {
-  triggerEl.value = el instanceof HTMLElement ? el : null
+  triggerEl.value = el instanceof HTMLElement ? el : null;
 }
 
 function open() {
-  isOpen.value = true
-  emit('open')
+  isOpen.value = true;
+  emit("open");
   nextTick(() => {
     const first = menuRef.value?.querySelector(
-      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    )
-    first?.focus({ preventScroll: true })
-  })
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    first?.focus({ preventScroll: true });
+  });
 }
 
 function close() {
-  isOpen.value = false
-  emit('close')
-  triggerEl.value?.focus()
+  isOpen.value = false;
+  emit("close");
+  triggerEl.value?.focus();
 }
 
 function toggle() {
   if (isOpen.value) {
-    close()
+    close();
   } else {
-    open()
+    open();
   }
 }
 
 function handleOutsidePointer(event) {
-  if (!isOpen.value) return
-  if (rootRef.value?.contains(event.target)) return
-  if (menuRef.value?.contains(event.target)) return
-  close()
+  if (!isOpen.value) return;
+  if (rootRef.value?.contains(event.target)) return;
+  if (menuRef.value?.contains(event.target)) return;
+  close();
 }
 
 function handleEscKey(event) {
-  if (event.key === 'Escape' && isOpen.value) {
-    close()
+  if (event.key === "Escape" && isOpen.value) {
+    close();
   }
 }
 
 function handleFocusOutside(event) {
-  if (!isOpen.value) return
-  if (rootRef.value?.contains(event.target)) return
-  if (menuRef.value?.contains(event.target)) return
-  close()
+  if (!isOpen.value) return;
+  if (rootRef.value?.contains(event.target)) return;
+  if (menuRef.value?.contains(event.target)) return;
+  close();
 }
 
-defineExpose({ open, close, toggle, isOpen })
+defineExpose({ open, close, toggle, isOpen });
 
 onMounted(() => {
-  if (typeof window.matchMedia === 'function') {
-    mediaQuery = window.matchMedia('(max-width: 749px)')
-    isMobile.value = mediaQuery.matches
-    mediaQuery.addEventListener('change', (e) => { isMobile.value = e.matches })
+  if (typeof window.matchMedia === "function") {
+    mediaQuery = window.matchMedia("(max-width: 749px)");
+    isMobile.value = mediaQuery.matches;
+    mediaQuery.addEventListener("change", (e) => {
+      isMobile.value = e.matches;
+    });
   }
 
-  tracker.addEventListener(document, 'pointerdown', handleOutsidePointer, true)
-  tracker.addEventListener(document, 'keydown', handleEscKey)
-  tracker.addEventListener(document, 'focusin', handleFocusOutside)
-})
+  tracker.addEventListener(document, "pointerdown", handleOutsidePointer, true);
+  tracker.addEventListener(document, "keydown", handleEscKey);
+  tracker.addEventListener(document, "focusin", handleFocusOutside);
+});
 
 onBeforeUnmount(() => {
   if (mediaQuery) {
-    mediaQuery.removeEventListener('change', () => {})
-    mediaQuery = null
+    mediaQuery.removeEventListener("change", () => {});
+    mediaQuery = null;
   }
   if (isOpen.value) {
-    isOpen.value = false
+    isOpen.value = false;
   }
-})
+});
 </script>
 
 <style lang="scss" scoped>
-@use './ToolbarMenu.scss';
+@use "./ToolbarMenu.scss";
 </style>

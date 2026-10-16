@@ -41,11 +41,11 @@
             </template>
           </BaseButton>
         </header>
-          
+
         <div class="modal-body">
           <slot />
         </div>
-          
+
         <footer
           v-if="$slots.footer"
           class="modal-footer"
@@ -58,110 +58,121 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue'
-import BaseButton from './BaseButton.vue'
-import MaskIcon from '@/components/shared/MaskIcon.vue'
-import closeIcon from '@/icons/ui/close.svg?url'
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js'
+import { onMounted, onUnmounted, watch } from "vue";
+import BaseButton from "./BaseButton.vue";
+import MaskIcon from "@/components/shared/MaskIcon.vue";
+import closeIcon from "@/icons/ui/close.svg?url";
+import { useResourceTracker } from "@/composables/core/useResourceTracker.js";
 
 const props = defineProps({
   modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   title: {
     type: String,
-    default: null
+    default: null,
   },
   size: {
     type: String,
-    default: 'md',
-    validator: (value) => ['sm', 'md', 'lg', 'xl'].includes(value)
+    default: "md",
+    validator: (value) => ["sm", "md", "lg", "xl"].includes(value),
   },
   closable: {
     type: Boolean,
-    default: true
+    default: true,
   },
   closeOnOverlay: {
     type: Boolean,
-    default: true
+    default: true,
   },
   closeOnEscape: {
     type: Boolean,
-    default: true
+    default: true,
   },
   fullscreen: {
     type: Boolean,
-    default: false
+    default: false,
   },
   scrollLock: {
     type: Boolean,
-    default: true
+    default: true,
   },
   mobileBehavior: {
     type: String,
-    default: 'sheet',
-    validator: (value) => ['sheet', 'dialog'].includes(value)
-  }
-})
+    default: "sheet",
+    validator: (value) => ["sheet", "dialog"].includes(value),
+  },
+});
 
-const emit = defineEmits(['update:modelValue', 'close', 'open'])
+const emit = defineEmits(["update:modelValue", "close", "open"]);
 
 // Resource tracker for automatic cleanup - Use a unique ID per instance to avoid cleanup collisions
-const tracker = useResourceTracker(`base-modal-${Math.random().toString(36).substr(2, 9)}`)
+const tracker = useResourceTracker(
+  `base-modal-${Math.random().toString(36).substr(2, 9)}`,
+);
 
 const handleClose = () => {
-  emit('update:modelValue', false)
-  emit('close')
-}
+  emit("update:modelValue", false);
+  emit("close");
+};
 
 const handleOverlayClick = () => {
   if (props.closeOnOverlay && props.closable) {
-    handleClose()
+    handleClose();
   }
-}
+};
 
 const handleEscapeKey = (event) => {
-  if (event.key === 'Escape' && props.closeOnEscape && props.closable && props.modelValue) {
-    handleClose()
+  if (
+    event.key === "Escape" &&
+    props.closeOnEscape &&
+    props.closable &&
+    props.modelValue
+  ) {
+    handleClose();
   }
-}
+};
 
 const lockScroll = () => {
   if (props.scrollLock) {
-    document.body.style.overflow = 'hidden'
-    document.body.style.paddingRight = `${window.innerWidth - document.documentElement.clientWidth}px`
+    document.body.style.overflow = "hidden";
+    document.body.style.paddingRight = `${window.innerWidth - document.documentElement.clientWidth}px`;
   }
-}
+};
 
 const unlockScroll = () => {
   if (props.scrollLock) {
-    document.body.style.overflow = ''
-    document.body.style.paddingRight = ''
+    document.body.style.overflow = "";
+    document.body.style.paddingRight = "";
   }
-}
+};
 
-watch(() => props.modelValue, (newValue) => {
-  if (newValue) {
-    lockScroll()
-    emit('open')
-  } else {
-    unlockScroll()
-  }
-}, { immediate: true })
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (newValue) {
+      lockScroll();
+      emit("open");
+    } else {
+      unlockScroll();
+    }
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
   // Add escape key listener with automatic cleanup
-  tracker.addEventListener(document, 'keydown', handleEscapeKey)
-})
+  tracker.addEventListener(document, "keydown", handleEscapeKey);
+});
 
 onUnmounted(() => {
   // Event listener cleanup is now handled automatically by useResourceTracker
   // No manual cleanup needed!
-  unlockScroll()
-})
+  unlockScroll();
+});
 </script>
 
 <style lang="scss">
-@use './BaseModal.scss';
+@use "./BaseModal.scss";
 </style>

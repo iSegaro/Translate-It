@@ -8,31 +8,32 @@
       :checked="modelValue"
       :disabled="disabled"
       @change="$emit('update:modelValue', $event.target.checked)"
-    >
+    />
     <span
       v-if="label"
       class="ti-checkbox__label"
-    >{{ label }}</span>
+      >{{ label }}</span
+    >
     <slot v-else />
   </label>
 </template>
 
 <script setup>
-import './BaseCheckbox.scss'
+import "./BaseCheckbox.scss";
 defineProps({
   modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   label: {
     type: String,
-    default: ''
+    default: "",
   },
   disabled: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-defineEmits(['update:modelValue'])
+defineEmits(["update:modelValue"]);
 </script>
