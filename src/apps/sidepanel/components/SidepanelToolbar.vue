@@ -1,12 +1,14 @@
 <template>
   <div class="side-toolbar">
     <div class="toolbar-group">
-      <!-- Select + Revert badge pair. The wrapper reserves 16px of block
-           space below Select, so the badge's 24x24 target descends INTO the
-           wrapper's own box: it can never reach Mouse Hover across any
-           group gap (14px default / 8px compacted) and the scroll state
-           (@max-height 500px) sees no extra overflow. Sibling native
-           buttons, never nested; ids and handlers unchanged. -->
+      <!-- Select + Revert badge pair. The wrapper reserves 24px of block
+           space below Select, so the badge's 24x24 target (y34..58) starts
+           exactly at Select's bottom edge and never overlaps it: no
+           invisible click region is taken from Select, and the target can
+           never reach Mouse Hover across any group gap (14px default /
+           8px compacted) nor add overflow in the scroll state
+           (@max-height 500px). Sibling native buttons, never nested; ids
+           and handlers unchanged. -->
       <div
         v-if="isSelectElementEnabled"
         class="toolbar-select-action"

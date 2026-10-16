@@ -369,23 +369,22 @@ describe('SidepanelToolbar.scss accessible icon contract', () => {
 })
 
 /**
- * Revert badge pair (Phase 3A). Select keeps the shared 34×34 row; its
- * wrapper adds 16px of reserved block space (50px flow box) and the badge
- * is an independent 24×24 native target anchored to the wrapper's
- * inline-end corner. The 16px surface sits centred in that target, so the
- * visible descent lives inside the wrapper — never in the group gap.
+ * Revert badge pair (Phase 3A). Select keeps the shared 34×34 row; the
+ * wrapper reserves enough block space for the independent 24×24 target to
+ * start at or below Select's bottom edge and end inside the wrapper. The
+ * following Mouse Hover button starts only after the wrapper plus its group
+ * gap, so the badge target never reaches it in normal or compact layouts.
  */
 describe('SidepanelToolbar.scss revert badge contract', () => {
   const compileCss = () => compile().css
   const badgeSelector = '.side-toolbar .toolbar-select-action button.toolbar-revert-badge'
 
-  it('reserves a 34×50 relative flow box for the Select + badge pair', () => {
+  it('reserves a relative flow box for the Select + badge pair', () => {
     const css = compileCss()
     const rule = css.match(/\.side-toolbar\s+\.toolbar-select-action\s*\{([^}]*)\}/)
     expect(rule).not.toBeNull()
     expect(rule[1]).toContain('position: relative')
     expect(rule[1]).toContain('width: 34px')
-    expect(rule[1]).toContain('height: 50px')
     // Scoped under .side-toolbar (ownership contract).
     expect(css).toContain('.side-toolbar .toolbar-select-action')
   })
@@ -406,13 +405,13 @@ describe('SidepanelToolbar.scss revert badge contract', () => {
       expect(rule[1]).toContain(declaration)
     }
     expect(rule[1]).toContain('position: absolute')
-    expect(rule[1]).toContain('inset-inline-end: 0')
+    expect(rule[1]).toContain('inset-inline-end: 1px')
     expect(rule[1]).toContain('inset-block-end: 0')
   })
 
   it('uses logical properties so RTL mirrors the badge (no physical offsets)', () => {
     const css = compileCss()
-    expect(css).toContain('inset-inline-end: 0')
+    expect(css).toContain('inset-inline-end: 1px')
     expect(css).toContain('inset-block-end: 0')
     const rule = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
     expect(rule).not.toBeNull()
@@ -504,8 +503,8 @@ describe('SidepanelToolbar.scss revert badge contract', () => {
     const rule = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
     expect(rule[1]).toContain('background: transparent !important')
     expect(css).toMatch(/button\.toolbar-revert-badge:hover[^{]*\{[^}]*background-color:\s*transparent !important/)
-    // Geometry reasoning: the 24px target at block-end 0 sits inside the
-    // 50px wrapper box (24 ≤ 50), so it can never cross the 14px default /
+    // Geometry reasoning is derived in the block-axis containment test:
+    // the target ends within the wrapper, so it cannot cross the 14px default /
     // 8px compacted group gap onto Mouse Hover.
     expect(css).toContain('gap: 14px')
     expect(css).toContain('gap: 8px')
@@ -513,7 +512,7 @@ describe('SidepanelToolbar.scss revert badge contract', () => {
 
   it('keeps compact and scroll behavior with the folded heights', () => {
     const css = compileCss()
-    // Compaction stays gap-only: the 50px wrapper (34 + 16 reserved) survives.
+    // Compaction stays gap-only: the wrapper and badge geometry survive.
     const compact = css.match(/@media \(max-height:\s*620px\)\s*\{[\s\S]*?\n\}/)
     expect(compact).not.toBeNull()
     expect(compact[0].replace(/@media[^{]+/, '')).not.toMatch(/\b(?:width|height)\s*:/)
@@ -535,30 +534,104 @@ describe('SidepanelToolbar.scss revert badge contract', () => {
     expect(focusRule?.[1]).toContain('outline-offset: -2px !important')
   })
 
-  it('keeps the flush-anchored target inside the scrollport in both rail layouts', () => {
+  it('keeps the inset target inside no-scroll and measured scrollport widths', () => {
     const css = compileCss()
-    const badge = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
-    // Flush anchor: the target's inline-end edge coincides with the wrapper
-    // edge, and the target itself is never shrunk below 24px.
-    expect(badge[1]).toContain('inset-inline-end: 0')
-    expect(badge[1]).toContain('width: 24px !important')
-    expect(badge[1]).toContain('height: 24px !important')
-    // Row arithmetic from the rail contract: 44px rail minus the 1px border
-    // → 43px content; the 34px wrapper centres → 4.5..38.5, so the flush
-    // 24px target spans 14.5..38.5 — 4.5px inside the content edge.
-    const wrapperWidth = 34
-    const targetWidth = 24
-    const contentWidth = 44 - 1
-    const wrapperStart = (contentWidth - wrapperWidth) / 2
-    expect(wrapperStart + wrapperWidth - targetWidth).toBeGreaterThanOrEqual(0)
-    expect(wrapperStart + wrapperWidth).toBeLessThanOrEqual(contentWidth)
-    // @max-height 500px the rail scrolls: scrollbar-width: thin reserves
-    // ~8px, the scrollport becomes ~35px and the wrapper re-centres to
-    // 0.5..34.5 → target 10.5..34.5, 0.5px clearance, never clipped.
-    const scrollport = contentWidth - 8
-    const scrolledStart = (scrollport - wrapperWidth) / 2
-    expect(scrolledStart + wrapperWidth - targetWidth).toBeGreaterThanOrEqual(0)
-    expect(scrolledStart + wrapperWidth).toBeLessThanOrEqual(scrollport)
+    const root = postcss.parse(css)
+    const rules = []
+    root.walkRules((rule) => rules.push(rule))
+    const wrapper = rules.find((rule) => rule.selectors.includes('.side-toolbar .toolbar-select-action'))
+    const badge = rules.find((rule) =>
+      rule.selectors.includes('.side-toolbar .toolbar-select-action button.toolbar-revert-badge'))
+    const value = (rule, property) => rule.nodes.find((node) =>
+      node.type === 'decl' && node.prop === property)?.value
+    const wrapperWidth = Number.parseFloat(value(wrapper, 'width'))
+    const targetWidth = Number.parseFloat(value(badge, 'width'))
+    const inlineEnd = Number.parseFloat(value(badge, 'inset-inline-end'))
+
+    expect(targetWidth).toBe(24)
+
+    // No scrollbar: 43px content. Chrome thin scrollbar (~10px) gives a
+    // measured 33px scrollport; 8px-reserving engines give 35px.
+    for (const scrollportWidth of [43, 33, 35]) {
+      const targetStart = (scrollportWidth - wrapperWidth) / 2
+        + wrapperWidth - inlineEnd - targetWidth
+      const targetEnd = targetStart + targetWidth
+      expect(targetStart).toBeGreaterThanOrEqual(0)
+      expect(targetEnd).toBeLessThanOrEqual(scrollportWidth)
+    }
+    expect(inlineEnd).toBe(1)
+  })
+
+  it('contains the full badge below Select and before Mouse Hover in normal, compact, and scroll layouts', () => {
+    const root = postcss.parse(compileCss())
+    const findRule = (selector, parent = root) => {
+      let found
+      parent.walkRules((rule) => {
+        if (!found && rule.parent === parent && rule.selectors.includes(selector)) found = rule
+      })
+      return found
+    }
+    const value = (rule, property) => rule.nodes.find((node) =>
+      node.type === 'decl' && node.prop === property)?.value
+
+    const wrapperRule = findRule('.side-toolbar .toolbar-select-action')
+    const selectRule = findRule('.side-toolbar .toolbar-button')
+    const badgeRule = findRule('.side-toolbar .toolbar-select-action button.toolbar-revert-badge')
+    const surfaceRule = findRule('.side-toolbar .toolbar-select-action .revert-badge-surface')
+    expect(wrapperRule).toBeDefined()
+    expect(selectRule).toBeDefined()
+    expect(badgeRule).toBeDefined()
+    expect(surfaceRule).toBeDefined()
+
+    const wrapperHeight = Number.parseFloat(value(wrapperRule, 'height'))
+    const selectHeight = Number.parseFloat(value(selectRule, 'height'))
+    const badgeHeight = Number.parseFloat(value(badgeRule, 'height'))
+    const badgeBlockEnd = Number.parseFloat(value(badgeRule, 'inset-block-end'))
+    expect(value(selectRule, 'width')).toBe('34px')
+    expect(value(badgeRule, 'width')).toBe('24px')
+    expect(badgeHeight).toBe(24)
+    expect(badgeBlockEnd).toBe(0)
+    expect(value(surfaceRule, 'width')).toBe('16px')
+    expect(value(surfaceRule, 'height')).toBe('16px')
+
+    const badgeStart = wrapperHeight - badgeHeight - badgeBlockEnd
+    const badgeBottom = badgeStart + badgeHeight
+    expect(badgeStart).toBeGreaterThanOrEqual(selectHeight)
+    expect(badgeBottom).toBeLessThanOrEqual(wrapperHeight)
+
+    const normalGroupRule = findRule('.side-toolbar .toolbar-group')
+    const compactMedia = root.nodes.find((node) =>
+      node.type === 'atrule' && node.params === '(max-height: 620px)')
+    const scrollMedia = root.nodes.find((node) =>
+      node.type === 'atrule' && node.params === '(max-height: 500px)')
+    expect(compactMedia).toBeDefined()
+    expect(scrollMedia).toBeDefined()
+    const compactGroupRule = findRule('.side-toolbar .toolbar-group', compactMedia)
+    expect(value(normalGroupRule, 'gap')).toBe('14px')
+    expect(value(compactGroupRule, 'gap')).toBe('8px')
+    expect(value(normalGroupRule, 'flex-direction')).toBe('column')
+    const normalMouseHoverStart = wrapperHeight + Number.parseFloat(value(normalGroupRule, 'gap'))
+    const compactMouseHoverStart = wrapperHeight + Number.parseFloat(value(compactGroupRule, 'gap'))
+    expect(badgeBottom).toBeLessThanOrEqual(normalMouseHoverStart)
+    expect(badgeBottom).toBeLessThanOrEqual(compactMouseHoverStart)
+
+    // The focus ring stays inside the badge's box; it cannot expand the
+    // target into either the Select row or the following gap.
+    const focusRule = findRule('.side-toolbar .toolbar-select-action button.toolbar-revert-badge:focus-visible')
+    const outlineWidth = Number(value(focusRule, 'outline').match(/^(\d+(?:\.\d+)?)px/)[1])
+    const outlineOffset = Number.parseFloat(value(focusRule, 'outline-offset'))
+    expect(outlineOffset).toBeLessThanOrEqual(-outlineWidth)
+
+    // Compact and scroll media change the gap/overflow only; neither may
+    // override the wrapper, target, surface, or focus-ring geometry.
+    for (const media of [compactMedia, scrollMedia]) {
+      const selectors = []
+      media.walkRules((rule) => selectors.push(...rule.selectors))
+      expect(selectors.some((selector) =>
+        /toolbar-select-action|toolbar-revert-badge|revert-badge-surface/.test(selector))).toBe(false)
+    }
+    const scrollRailRule = findRule('.side-toolbar', scrollMedia)
+    expect(value(scrollRailRule, 'overflow-y')).toBe('auto')
   })
 
   it('keeps badge hover transparent through the dark cascade while preserving dark button and surface hover', () => {

@@ -130,24 +130,34 @@
 
   /* ---- Select + Revert badge pair ----
      Select keeps the shared 34px row contract; its wrapper is the same
-     34px column plus 16px of reserved block space below it (50px flow box).
+     34px column plus 24px of reserved block space below it (58px flow box).
      The badge is an independent native 24x24 target anchored to the
      wrapper's inline-end corner via logical properties (RTL mirrors it).
-     The visible 16px surface sits centred in that target: 12px of visible
-     descent lives entirely inside the wrapper's reserved space - never in
-     the 8px compacted group gap.
-     Inline containment (row arithmetic, not re-measured):
+     Block geometry: the target spans y34..58 — its full hit box starts
+     exactly at Select's bottom edge, so it never overlaps the 34x34 Select
+     box (no invisible click region over Select) and it lives entirely in
+     the wrapper's reserved 24px — never in the 8px compacted group gap.
+     The 16px surface is aligned to the target's inline-end/block-start
+     corner: the disc touches Select's lower inline-end boundary tangentially
+     (no box overlap) and never rises above the target's top edge — no
+     misleading top-cap, no decorative ink over Select. Its inline-end edge
+     sits 1px inboard of the wrapper edge (target clearance below), still
+     visually reading as the under-corner pendant.
+     Inline containment (measured arithmetic; Chrome/Linux fixture):
      - no scrollbar: 34px wrapper centred in the 43px content box
-       (44px rail minus the 1px border); a 0px inline-end inset keeps the
-       24x24 target flush with the wrapper edge -> target at 14.5..38.5px,
-       4.5px inside the content edge.
-     - @max-height 500px the rail scrolls: scrollbar-width: thin reserves
-       ~8px at the content edge (overlay platforms: 0; engines without
-       thin support may differ), so the scrollport becomes ~35px, the
-       wrapper re-centres to 0.5..34.5px and the target lands at
-       10.5..34.5px - 0.5px clearance, never clipped.
-     - a >=10px classic scrollbar (no thin support) would also overflow
-       the 34px ROW contract itself; rows, not the badge, own that risk.
+       (44px rail minus the 1px border); a 1px inline-end inset keeps the
+       24x24 target clear of the scrollport edge -> target at
+       13.5..37.5px, 5.5px inside the content edge.
+     - @max-height 500px the rail scrolls: scrollbar-width: thin reserves a
+       platform-measured 10px on Chrome/Linux (~8-10px across engines;
+       overlay platforms: 0), so the scrollport becomes ~33-35px and the
+       wrapper re-centres to about -0.5..33.5px at the 10px end. The 1px
+       inline-end inset keeps the full 24x24 target INSIDE the scrollport
+       (8.5..32.5px, 0.5px clearance) — never clipped, never under the
+       scrollbar. The 34px ROW contract itself can still overflow the
+       scrollport by <=1px there, producing the same horizontal scrollbar
+       for badge-free rows (measured identical with and without the badge);
+       the badge adds no overflow of its own.
      The focus ring is drawn INSIDE the target (offset -2px) so its ink can
      never be cut by the rail edge or the scrollport edge, in any layout
      and either writing direction. Never shrink the 24x24 target to fit.
@@ -157,12 +167,12 @@
   .toolbar-select-action {
     position: relative;
     width: 34px;
-    height: 50px;
+    height: 58px;
     flex-shrink: 0;
 
     button.toolbar-revert-badge {
       position: absolute;
-      inset-inline-end: 0;
+      inset-inline-end: 1px;
       inset-block-end: 0;
       width: 24px !important;
       height: 24px !important;
@@ -175,8 +185,12 @@
       background: transparent !important;
       border-radius: 6px !important;
       display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
+      /* Disc sits at the target's inline-end/block-start corner: tangent
+         to Select's bottom edge, 1px inboard of the wrapper's inline-end
+         edge (same inset as the target itself), and never above the
+         target top (blanket flex-centring overrides). */
+      align-items: flex-start !important;
+      justify-content: flex-end !important;
       box-sizing: border-box !important;
       /* Not a .toolbar-button, so the rail colour rule does not apply; the
          mask glyph needs currentColor explicitly (theme tokens flip it). */
@@ -283,12 +297,12 @@
   }
 
   /* Short-height compaction. The rail is a full-height column of fixed 34px
-     rows; content is ~463px today and ~511px with the FAB toggle (+48px),
+     rows; content is ~471px today and ~519px with the FAB toggle (+48px),
      with no overflow handling on .side-toolbar — below that height the column
      would spill past the panel edge. Tighten only the row gap (never the
      34px geometry) so every button stays visible without a scrollbar.
      Column arithmetic after folding Revert into the Select badge wrapper:
-     511 = 543 − 34 (Revert row) − 14 (gap) + 16 (wrapper block space). */
+     519 = 543 − 34 (Revert row) − 14 (gap) + 24 (badge target space). */
   @media (max-height: 620px) {
     .toolbar-group,
     .toolbar-group-bottom {
@@ -297,7 +311,7 @@
   }
 
   /* Extreme short heights. After folding Revert into the Select badge
-     wrapper the compacted column needs ~457px of rail (483 − 34 − 8 + 16,
+     wrapper the compacted column needs ~465px of rail (483 − 34 − 8 + 24,
      row arithmetic), so a 480px rail fits it and only below 500px —
      strictly under the 520px fit and the 620px compaction — does the rail
      become its own scroll container, keeping normal heights on the exact
