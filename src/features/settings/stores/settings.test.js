@@ -1271,6 +1271,102 @@ describe('Settings Store', () => {
     });
   });
 
+  describe('DeepL Beta Language Validation (#321)', () => {
+    const setupDeepL = (store, { source = 'en', target = 'fa', beta = false, provider = 'deepl' } = {}) => {
+      store.settings.TRANSLATION_API = provider;
+      store.settings.DEEPL_BETA_LANGUAGES_ENABLED = beta;
+      store.settings.SOURCE_LANGUAGE = source;
+      store.settings.TARGET_LANGUAGE = target;
+    };
+    const deeplErrors = (result) => result.errors.filter(e => e.includes('deepl'));
+
+    it('blocks Persian target when DeepL beta is disabled', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'fa', beta: false });
+
+      const result = store.validateSettings();
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('validation_deepl_target_language_beta_disabled:fa');
+    });
+
+    it('blocks unsupported source with the source error (not target)', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'fa', target: 'de', beta: false });
+
+      const result = store.validateSettings();
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('validation_deepl_source_language_beta_disabled:fa');
+      expect(deeplErrors(result).some(e => e.startsWith('validation_deepl_target_language_beta_disabled'))).toBe(false);
+    });
+
+    it('lets auto-detect source through with beta disabled', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'auto', target: 'de', beta: false });
+
+      const result = store.validateSettings();
+      expect(deeplErrors(result)).toHaveLength(0);
+    });
+
+    it('matches case-insensitively and preserves the original code', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'FA', beta: false });
+
+      const result = store.validateSettings();
+      expect(result.errors).toContain('validation_deepl_target_language_beta_disabled:FA');
+    });
+
+    it('allows beta-only combos once beta is re-enabled', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'fa', beta: true });
+
+      const result = store.validateSettings();
+      expect(deeplErrors(result)).toHaveLength(0);
+    });
+
+    it('leaves valid DeepL standard combos unaffected', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de', beta: false });
+
+      const result = store.validateSettings();
+      expect(deeplErrors(result)).toHaveLength(0);
+    });
+
+    it('leaves other providers unaffected', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'fa', beta: false, provider: 'google' });
+
+      const result = store.validateSettings();
+      expect(deeplErrors(result)).toHaveLength(0);
+    });
+
+    it('blocks entirely-unsupported target even with beta enabled', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'tl', beta: true });
+
+      const result = store.validateSettings();
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('validation_deepl_target_language_unsupported:tl');
+    });
+
+    it('blocks entirely-unsupported source even with beta enabled', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'tl', target: 'de', beta: true });
+
+      const result = store.validateSettings();
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain('validation_deepl_source_language_unsupported:tl');
+    });
+
+    it('reports unsupported (not beta-disabled) for unknown codes with beta off', () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'tl', beta: false });
+
+      const result = store.validateSettings();
+      expect(result.errors).toContain('validation_deepl_target_language_unsupported:tl');
+      expect(deeplErrors(result).some(e => e.includes('beta_disabled'))).toBe(false);
+    });
+  });
+
   it('resetSettings should clear storage and restore defaults', async () => {
     const store = useSettingsStore();
     store.settings.THEME = 'dark';

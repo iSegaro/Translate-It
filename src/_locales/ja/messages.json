@@ -2787,6 +2787,18 @@
   "validation_same_languages": {
     "message": "翻訳元と翻訳先の言語が同じです。"
   },
+  "validation_deepl_source_language_beta_disabled": {
+    "message": "翻訳元言語「{language}」を使用するには、DeepLのベータ言語を有効にしてください。"
+  },
+  "validation_deepl_target_language_beta_disabled": {
+    "message": "翻訳先言語「{language}」を使用するには、DeepLのベータ言語を有効にしてください。"
+  },
+  "validation_deepl_source_language_unsupported": {
+    "message": "翻訳元言語「{language}」はDeepLでサポートされていません。"
+  },
+  "validation_deepl_target_language_unsupported": {
+    "message": "翻訳先言語「{language}」はDeepLでサポートされていません。"
+  },
   "validation_api_key_empty": {
     "message": "{provider} のAPIキーを入力してください。"
   },

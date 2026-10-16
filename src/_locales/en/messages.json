@@ -2787,6 +2787,18 @@
   "validation_same_languages": {
     "message": "Source and target languages cannot be the same."
   },
+  "validation_deepl_source_language_beta_disabled": {
+    "message": "Source language {language} requires DeepL beta languages to be enabled."
+  },
+  "validation_deepl_target_language_beta_disabled": {
+    "message": "Target language {language} requires DeepL beta languages to be enabled."
+  },
+  "validation_deepl_source_language_unsupported": {
+    "message": "Source language {language} is not supported by DeepL."
+  },
+  "validation_deepl_target_language_unsupported": {
+    "message": "Target language {language} is not supported by DeepL."
+  },
   "validation_api_key_empty": {
     "message": "API key for {provider} cannot be empty."
   },

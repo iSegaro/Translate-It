@@ -13,9 +13,38 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
+import { PROVIDER_SUPPORTED_LANGUAGES, getCanonicalCode, normalizeLanguageName } from '@/shared/config/languageConstants.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
+
+/**
+ * DeepL standard (non-beta) language codes, canonicalized for comparison.
+ * Precomputed once (lists are static).
+ */
+const DEEPL_STANDARD_LANGUAGE_SET = new Set(
+  (PROVIDER_SUPPORTED_LANGUAGES.deepl || []).map(code => getCanonicalCode(normalizeLanguageName(code)))
+);
+
+/**
+ * DeepL beta language codes, canonicalized. The effective set is standard
+ * alone when the beta flag is off, standard ∪ beta when on.
+ */
+const DEEPL_BETA_LANGUAGE_SET = new Set(
+  (PROVIDER_SUPPORTED_LANGUAGES.deepl_beta || []).map(code => getCanonicalCode(normalizeLanguageName(code)))
+);
+
+/**
+ * Error identifiers for DeepL language compatibility. The `:code` suffix
+ * carries the offending language; the `language` substring keeps these
+ * routable by the options save pipeline (it matches on `language`), and
+ * the source/target prefix lets it highlight the right dropdown.
+ * Never `prompt:`-prefixed, so partial-save semantics are untouched.
+ */
+export const DEEPL_SOURCE_BETA_ERROR = 'validation_deepl_source_language_beta_disabled';
+export const DEEPL_TARGET_BETA_ERROR = 'validation_deepl_target_language_beta_disabled';
+export const DEEPL_SOURCE_UNSUPPORTED_ERROR = 'validation_deepl_source_language_unsupported';
+export const DEEPL_TARGET_UNSUPPORTED_ERROR = 'validation_deepl_target_language_unsupported';
 
 // --- Helpers ------------------------------------------------------------
 /**
@@ -637,6 +666,40 @@ export const useSettingsStore = defineStore('settings', () => {
     
     if (sLang && tLang && sLang !== 'auto' && sLang === tLang) {
       errors.push('validation_same_languages')
+    }
+
+    // 1b. DeepL compatibility against the EFFECTIVE set for the current beta
+    // flag (store-level so it blocks save from any tab). Beta-only languages
+    // with the flag off are a config mistake worth blocking; languages DeepL
+    // doesn't support at all are blocked even with beta on. (Runtime
+    // auto-enables beta per-request, but that must not weaken save validation.)
+    const primaryProvider = settings.value.TRANSLATION_API;
+    const isDeepL = typeof primaryProvider === 'string' && primaryProvider.toLowerCase().includes('deepl');
+    if (isDeepL) {
+      const betaOff = settings.value.DEEPL_BETA_LANGUAGES_ENABLED === false;
+      // Auto-detect source is always allowed through
+      const normSource = normalizeLanguageName(sLang);
+      if (normSource && normSource !== 'auto') {
+        const canonSource = getCanonicalCode(normSource);
+        if (!DEEPL_STANDARD_LANGUAGE_SET.has(canonSource)) {
+          if (betaOff && DEEPL_BETA_LANGUAGE_SET.has(canonSource)) {
+            errors.push(`${DEEPL_SOURCE_BETA_ERROR}:${sLang}`);
+          } else if (!DEEPL_BETA_LANGUAGE_SET.has(canonSource)) {
+            errors.push(`${DEEPL_SOURCE_UNSUPPORTED_ERROR}:${sLang}`);
+          }
+        }
+      }
+      const normTarget = normalizeLanguageName(tLang);
+      if (normTarget) {
+        const canonTarget = getCanonicalCode(normTarget);
+        if (!DEEPL_STANDARD_LANGUAGE_SET.has(canonTarget)) {
+          if (betaOff && DEEPL_BETA_LANGUAGE_SET.has(canonTarget)) {
+            errors.push(`${DEEPL_TARGET_BETA_ERROR}:${tLang}`);
+          } else if (!DEEPL_BETA_LANGUAGE_SET.has(canonTarget)) {
+            errors.push(`${DEEPL_TARGET_UNSUPPORTED_ERROR}:${tLang}`);
+          }
+        }
+      }
     }
     
     // 2. Validate Global Translation Provider

@@ -404,6 +404,21 @@ const performPartialSave = async (errors) => {
   }
 }
 
+// Validation errors may carry a payload after ':' (DeepL errors append the
+// offending language code). Split it off for i18n lookup and pass it as the
+// {language} placeholder. prompt:-prefixed errors are handled separately.
+const translateValidationError = (error) => {
+  if (!error) return ''
+  const separatorIndex = error.indexOf(':')
+  if (separatorIndex === -1) return t(error)
+  const baseKey = error.slice(0, separatorIndex)
+  const payload = error.slice(separatorIndex + 1)
+  if (baseKey.startsWith('validation_deepl_') && baseKey.includes('language') && payload) {
+    return t(baseKey, { language: payload })
+  }
+  return t(error)
+}
+
 // Save all settings
 const saveAllSettings = async () => {
   logger.debug('Save All Settings clicked!')
@@ -427,7 +442,7 @@ const saveAllSettings = async () => {
         const subError = parts.length >= 3 ? parts[2] : 'validation_prompt_template_empty'
         statusMessage.value = t(subError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
       } else {
-        statusMessage.value = t(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
+        statusMessage.value = translateValidationError(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
       }
       
       setTimeout(() => {
@@ -475,11 +490,16 @@ const saveAllSettings = async () => {
 
       // Handle language validation errors
       if (validation.errors.some(e => e.includes('language'))) {
+        // Tell the languages tab which dropdown failed so it can highlight it
+        const firstLanguageError = validation.errors.find(e => e.includes('language'))
+        const focus = firstLanguageError && firstLanguageError.startsWith('validation_deepl_target_language_')
+          ? 'target'
+          : 'source'
         if (router.currentRoute.value.name !== 'languages') {
           await router.push({ name: 'languages' })
         }
         window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
-          detail: { field: 'languages' } 
+          detail: { field: 'languages', focus } 
         }))
         return
       }

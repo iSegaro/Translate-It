@@ -522,6 +522,166 @@ describe('OptionsNavigation.vue - Save Validation UX & Partial Save', () => {
   });
 });
 
+describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => {
+  const mountNavigation = () => mount(OptionsNavigation, {
+    global: {
+      stubs: {
+        RouterLink: true
+      },
+      mocks: {
+        $route: {
+          name: currentRouteName.value
+        }
+      }
+    }
+  });
+
+  const clickSaveWithErrors = async (errors) => {
+    mockValidateSettings.mockReturnValue({ isValid: false, errors });
+    const feedbackListener = vi.fn();
+    window.addEventListener('options-trigger-validation-feedback', feedbackListener);
+    try {
+      const wrapper = mountNavigation();
+      await wrapper.find('#saveSettings').trigger('click');
+      await flushPromises();
+      return { wrapper, feedbackListener };
+    } catch (error) {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      throw error;
+    }
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    currentRouteName.value = 'providers';
+    currentRouteFullPath.value = '/providers';
+    mockSettingsStore.settings = {
+      TRANSLATION_API: 'deepl',
+      // Configured provider so the flow reaches the language-error branch
+      DEEPL_API_KEY: 'test-deepl-key',
+      MODE_PROVIDERS: {}
+    };
+    mockSaveSettings.mockResolvedValue(true);
+  });
+
+  it('blocks save on beta-disabled target, routes to languages, focuses target', async () => {
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(
+      ['validation_deepl_target_language_beta_disabled:fa']
+    );
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { field: 'languages', focus: 'target' }
+        })
+      );
+      // Identity t resolves the base key, dropping the :code payload
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_target_language_beta_disabled');
+      expect(wrapper.find('#status').classes()).toContain('status-error');
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('focuses source on beta-disabled source', async () => {
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(
+      ['validation_deepl_source_language_beta_disabled:fa']
+    );
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { field: 'languages', focus: 'source' }
+        })
+      );
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_source_language_beta_disabled');
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('keeps generic language errors focused on source (back-compat)', async () => {
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(
+      ['validation_source_language_empty']
+    );
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { field: 'languages', focus: 'source' }
+        })
+      );
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('mixed DeepL + prompt errors still fully block save (no partial save)', async () => {
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(
+      [
+        'validation_deepl_target_language_beta_disabled:fa',
+        'prompt:PROMPT_TEMPLATE:validation_prompt_template_empty'
+      ]
+    );
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { field: 'languages', focus: 'target' }
+        })
+      );
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('routes entirely-unsupported target with target focus and translated toast', async () => {
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(
+      ['validation_deepl_target_language_unsupported:tl']
+    );
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { field: 'languages', focus: 'target' }
+        })
+      );
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_target_language_unsupported');
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+
+  it('routes entirely-unsupported source with source focus', async () => {
+    const { wrapper, feedbackListener } = await clickSaveWithErrors(
+      ['validation_deepl_source_language_unsupported:tl']
+    );
+    try {
+      expect(mockSaveSettings).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith({ name: 'languages' });
+      expect(feedbackListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { field: 'languages', focus: 'source' }
+        })
+      );
+      expect(wrapper.find('#status').text()).toBe('validation_deepl_source_language_unsupported');
+    } finally {
+      window.removeEventListener('options-trigger-validation-feedback', feedbackListener);
+      wrapper.unmount();
+    }
+  });
+});
+
 describe('OptionsNavigation.vue - navigation overflow behavior', () => {
   let resizeObserverCallback;
   let resizeObserverInstance;

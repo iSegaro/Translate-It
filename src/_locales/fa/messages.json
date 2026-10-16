@@ -2787,6 +2787,18 @@
   "validation_same_languages": {
     "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند."
   },
+  "validation_deepl_source_language_beta_disabled": {
+    "message": "زبان مبدا {language} فقط با فعال بودن زبان‌های بتای DeepL پشتیبانی می‌شود."
+  },
+  "validation_deepl_target_language_beta_disabled": {
+    "message": "زبان مقصد {language} فقط با فعال بودن زبان‌های بتای DeepL پشتیبانی می‌شود."
+  },
+  "validation_deepl_source_language_unsupported": {
+    "message": "زبان مبدا {language} توسط DeepL پشتیبانی نمی‌شود."
+  },
+  "validation_deepl_target_language_unsupported": {
+    "message": "زبان مقصد {language} توسط DeepL پشتیبانی نمی‌شود."
+  },
   "validation_api_key_empty": {
     "message": "کلید API برای {provider} نمی‌تواند خالی باشد."
   },

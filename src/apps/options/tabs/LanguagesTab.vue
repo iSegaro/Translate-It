@@ -586,10 +586,32 @@ const getFilteredLanguages = (type) => {
   return filtered
 }
 
-const filteredSourceLanguages = computed(() => getFilteredLanguages('source'))
-const filteredTargetLanguages = computed(() => getFilteredLanguages('target'))
+// Raw provider-filtered options (no selection backfill): the source of truth
+// for support checks and sync decisions below.
+const baseFilteredSourceLanguages = computed(() => getFilteredLanguages('source'))
+const baseFilteredTargetLanguages = computed(() => getFilteredLanguages('target'))
 
-const syncLanguagesWithProviderSupport = ({ clearInvalidTarget = false } = {}) => {
+// Label for a selected code missing from the loaded list (falls back to the
+// code itself so the dropdown never renders a blank selection).
+const languageLabelFor = (code) => {
+  if (!code) return ''
+  if (code === 'auto') return 'Auto-Detect'
+  return allLanguages.value?.find(l => l.code === code)?.name || code
+}
+
+// Visible options: filtered list plus the current selection when filtered
+// out, so a preserved-but-unsupported value still renders instead of blank.
+const withCurrentSelection = (list, current) => {
+  if (!current || list.some(l => l.code === current)) return list
+  return [...list, { code: current, name: languageLabelFor(current) }]
+}
+
+const filteredSourceLanguages = computed(() => withCurrentSelection(baseFilteredSourceLanguages.value, sourceLanguage.value))
+const filteredTargetLanguages = computed(() => withCurrentSelection(baseFilteredTargetLanguages.value, targetLanguage.value))
+
+const isDeepLProvider = (provider) => typeof provider === 'string' && provider.toLowerCase().includes('deepl')
+
+const syncLanguagesWithProviderSupport = () => {
   const provider = selectedProvider.value
   const providerInfo = findProviderById(provider)
   const hasAutoDetect = providerInfo?.features?.includes('autoDetect')
@@ -597,31 +619,37 @@ const syncLanguagesWithProviderSupport = ({ clearInvalidTarget = false } = {}) =
   // 1. Correct Source Language
   if (sourceLanguage.value === 'auto' && !hasAutoDetect) {
     // Switch to first available source (e.g., 'fa' or 'en' for Vajehyab)
-    sourceLanguage.value = filteredSourceLanguages.value[0]?.code || 'en'
-  } else if (!filteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)) {
+    sourceLanguage.value = baseFilteredSourceLanguages.value[0]?.code || 'en'
+  } else if (!baseFilteredSourceLanguages.value.some(l => l.code === sourceLanguage.value)) {
+    // Never silently drop a DeepL-conflicting source either: preserve the
+    // selection so store-level validation surfaces it with feedback (#321).
+    if (isDeepLProvider(selectedProvider.value)) return
     // If current source is not supported, default to first available
-    sourceLanguage.value = hasAutoDetect ? 'auto' : (filteredSourceLanguages.value[0]?.code || 'en')
+    sourceLanguage.value = hasAutoDetect ? 'auto' : (baseFilteredSourceLanguages.value[0]?.code || 'en')
   }
 
   // 2. Correct Target Language based on Source
-  if (!filteredTargetLanguages.value.some(l => l.code === targetLanguage.value)) {
-    targetLanguage.value = clearInvalidTarget
-      ? ''
-      : (filteredTargetLanguages.value.find(l => l.code === 'fa' || l.code === 'en' || getCanonicalCode(l.code) === 'en')?.code || filteredTargetLanguages.value[0]?.code || 'en')
+  // Never silently drop a DeepL-conflicting target: preserve the selection
+  // so store-level validation surfaces it with feedback (#321). All other
+  // providers keep the existing automatic replacement.
+  if (!baseFilteredTargetLanguages.value.some(l => l.code === targetLanguage.value)) {
+    if (isDeepLProvider(selectedProvider.value)) return
+    targetLanguage.value = (baseFilteredTargetLanguages.value.find(l => l.code === 'fa' || l.code === 'en' || getCanonicalCode(l.code) === 'en')?.code || baseFilteredTargetLanguages.value[0]?.code || 'en')
   }
 }
 
 watch([selectedProvider, sourceLanguage], () => {
   syncLanguagesWithProviderSupport()
+  // Refresh a showing DeepL conflict message (or clear it when resolved);
+  // never pops a new inline error unprompted — see validateLanguages.
+  validateLanguages()
 })
 
-watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, (isEnabled, previousValue) => {
-  if (selectedProvider.value !== ProviderRegistryIds.DEEPL || previousValue === undefined || isEnabled === previousValue) {
-    return
-  }
-
-  syncLanguagesWithProviderSupport({ clearInvalidTarget: true })
-})
+// NOTE: toggling DEEPL_BETA_LANGUAGES_ENABLED intentionally preserves the
+// user's source/target selections (even when filtered out of the dropdowns)
+// so store-level validateSettings() can block save with feedback instead of
+// silently clearing them. Dropdown options still re-filter via computed.
+// The read-only watcher below only refreshes/clears the inline error.
 
 // --- Validation ---
 
@@ -643,7 +671,15 @@ const validationError = computed(() => {
     return ''
   }
 
-  // 2. Otherwise show language validation errors (validationErrorKey holds the error key)
+  // 2. DeepL compatibility errors (store-level identifiers with a :code payload)
+  if (validationErrorKey.value.startsWith('validation_deepl_')) {
+    const separatorIndex = validationErrorKey.value.indexOf(':')
+    const baseKey = separatorIndex === -1 ? validationErrorKey.value : validationErrorKey.value.slice(0, separatorIndex)
+    const code = separatorIndex === -1 ? '' : validationErrorKey.value.slice(separatorIndex + 1)
+    return t(baseKey, { language: code }) || ''
+  }
+
+  // 3. Otherwise show language validation errors (validationErrorKey holds the error key)
   return getFirstErrorTranslated('sourceLanguage', t) || getFirstErrorTranslated('targetLanguage', t) || ''
 })
 
@@ -667,8 +703,27 @@ const validateLanguages = async (showFeedback = false) => {
   // 2. Provider configuration validation
   const missingKey = getFirstMissingSetting(selectedProvider.value, settingsStore.settings);
   if (missingKey) {
+    // Drop a stale DeepL conflict key: the provider-config warning owns the
+    // display from here (missingSetting drives its banner); the DeepL message
+    // no longer applies once the provider changed or needs configuration.
+    if (validationErrorKey.value.startsWith('validation_deepl_')) {
+      validationErrorKey.value = ''
+    }
     if (showFeedback) {
       validationErrorKey.value = 'PROVIDER_CONFIG_ERROR'
+    }
+    return false
+  }
+
+  // 3. DeepL effective-set compatibility — consume the store-level result
+  // (no duplicated logic). Refreshes a showing conflict message so it tracks
+  // the current selection, but only takes over the display on explicit
+  // feedback or when already showing a DeepL conflict.
+  const storeValidation = settingsStore.validateSettings()
+  const deeplError = storeValidation.errors.find(e => e.includes('deepl') && e.includes('language'))
+  if (deeplError) {
+    if (showFeedback || validationErrorKey.value.startsWith('validation_deepl_')) {
+      validationErrorKey.value = deeplError
     }
     return false
   }
@@ -678,16 +733,22 @@ const validateLanguages = async (showFeedback = false) => {
   return true
 }
 
+// Re-evaluate inline validation when the beta flag changes (read-only:
+// selections are preserved; this only refreshes/clears the inline error).
+watch(() => settingsStore.settings?.DEEPL_BETA_LANGUAGES_ENABLED, () => {
+  validateLanguages()
+})
+
 // Validation feedback listener
 const handleValidationFeedback = (e) => {
-  const { field } = e.detail || {};
+  const { field, focus } = e.detail || {};
   
   // Explicitly trigger validation feedback display
   validateLanguages(true);
 
   // Focus and highlight logic
   if (field === 'languages') {
-    highlightElement('SOURCE_LANGUAGE');
+    highlightElement(focus === 'target' ? 'TARGET_LANGUAGE' : 'SOURCE_LANGUAGE');
   }
 };
 
