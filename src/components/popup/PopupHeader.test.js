@@ -19,13 +19,14 @@ let sessionSet
 let sessionRemove
 let isMobile
 
-const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, mockSendMessage, mockFindProviderById, mockUpdateSetting } = vi.hoisted(() => ({
+const { mockSelectModeHolder, mockToggleSelectElement, mockToggleMouseHover, mockSendMessage, mockFindProviderById, mockUpdateSetting, mockHandleError } = vi.hoisted(() => ({
   mockSelectModeHolder: { ref: null },
   mockToggleSelectElement: vi.fn(),
   mockToggleMouseHover: vi.fn(),
   mockSendMessage: vi.fn(),
   mockFindProviderById: vi.fn(() => ({ features: ['bulk'] })),
-  mockUpdateSetting: vi.fn()
+  mockUpdateSetting: vi.fn(),
+  mockHandleError: vi.fn()
 }))
 const mockT = vi.hoisted(() => vi.fn((key, fallback) => fallback || key))
 
@@ -59,7 +60,7 @@ vi.mock('@/shared/messaging/composables/useMessaging.js', () => ({
 }))
 
 vi.mock('@/composables/shared/useErrorHandler.js', () => ({
-  useErrorHandler: () => ({ handleError: vi.fn() })
+  useErrorHandler: () => ({ handleError: mockHandleError })
 }))
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
@@ -168,6 +169,7 @@ describe('PopupHeader', () => {
     mockToggleMouseHover.mockClear()
     mockSendMessage.mockClear()
     mockSendMessage.mockResolvedValue({})
+    mockHandleError.mockReset()
     mockFindProviderById.mockReset()
     mockFindProviderById.mockImplementation(() => ({ features: ['bulk'] }))
     vi.mocked(openExtensionApp).mockClear()
@@ -970,6 +972,21 @@ describe('PopupHeader', () => {
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE
     }))
     expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
+  })
+
+  it('keeps restricted Revert responses and exceptions quiet', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    mockSendMessage.mockResolvedValueOnce({ success: false, isRestrictedPage: true })
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+    expect(mockHandleError).not.toHaveBeenCalled()
+
+    mockSendMessage.mockRejectedValueOnce(Object.assign(new Error('restricted'), { isRestrictedPage: true }))
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+    expect(mockHandleError).not.toHaveBeenCalled()
   })
 
   // ── More menu modernization ─────────────────────────────────────────

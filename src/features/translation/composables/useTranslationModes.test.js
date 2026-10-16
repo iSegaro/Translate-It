@@ -471,7 +471,41 @@ describe('useTranslationModes', () => {
     expect(await actions.revertTranslation()).toBe(true);
     expect(mocks.sendMessageViaMessaging).toHaveBeenCalledWith(expect.objectContaining({
       action: MessageActions.REVERT_SELECT_ELEMENT_MODE,
+    }), { returnFailureResponse: true });
+  });
+
+  it('reports full Revert success only for non-partial responses and treats restricted failures neutrally', async () => {
+    const [actions] = withSetup(useSidepanelActions);
+
+    mocks.sendMessageViaMessaging.mockResolvedValueOnce({ success: true, revertedCount: 0 });
+    expect(await actions.revertTranslation()).toBe(true);
+    expect(mocks.sendMessageViaMessaging).toHaveBeenLastCalledWith(
+      expect.objectContaining({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE }),
+      { returnFailureResponse: true }
+    );
+
+    mocks.sendMessageViaMessaging.mockResolvedValueOnce({
+      success: true,
+      partial: true,
+      revertedCount: 2,
+      message: 'Translation partially reverted',
+      errors: [{ system: 'vue', error: 'boom' }]
+    });
+    expect(await actions.revertTranslation()).toBe(false);
+    expect(actions.error.value).toContain('Partial Revert');
+    expect(actions.error.value).toContain('vue: boom');
+    expect(actions.error.value).not.toContain('[object Object]');
+
+    actions.error.value = null;
+    mocks.sendMessageViaMessaging.mockResolvedValueOnce({ success: false, isRestrictedPage: true });
+    expect(await actions.revertTranslation()).toBe(null);
+    expect(actions.error.value).toBe(null);
+
+    mocks.sendMessageViaMessaging.mockRejectedValueOnce(Object.assign(new Error('restricted'), {
+      isRestrictedPage: true
     }));
+    expect(await actions.revertTranslation()).toBe(null);
+    expect(actions.error.value).toBe(null);
   });
 
   it('keeps the stop TTS action', async () => {

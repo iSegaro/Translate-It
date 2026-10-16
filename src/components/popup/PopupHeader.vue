@@ -473,6 +473,7 @@ const handleRevert = async () => {
       await handleError(new Error(`Revert failed: ${errorMsg}`), { context: 'popup-header-revert-failed', isSilent: true })
     }
   } catch (error) {
+    if (error?.isRestrictedPage) return
     await handleError(error, { context: 'PopupHeader-revert', isSilent: true })
   }
 }

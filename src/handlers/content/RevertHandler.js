@@ -107,12 +107,16 @@ export class RevertHandler extends ResourceTracker {
       const shouldEmitNotification = isTopFrame || !canAccessTop;
 
       if (shouldEmitNotification) {
-        if (totalRevertedCount > 0) {
-          const { getTranslationString } = await utilsFactory.getI18nUtils();
-          const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
-          this.notificationManager.show(message, "revert", NOTIFICATION_TIME.REVERT);
-          logger.info('Success notification sent');
-        } else {
+        if (totalRevertedCount > 0 && errors.length === 0) {
+          try {
+            const { getTranslationString } = await utilsFactory.getI18nUtils();
+            const message = `${totalRevertedCount} ${(await getTranslationString("STATUS_Revert_Number")) || "(item(s) reverted)"}`;
+            this.notificationManager.show(message, "revert", NOTIFICATION_TIME.REVERT);
+            logger.info('Success notification sent');
+          } catch (notificationError) {
+            logger.warn('Failed to send revert notification:', notificationError);
+          }
+        } else if (totalRevertedCount === 0 && errors.length === 0) {
           // const { getTranslationString } = await utilsFactory.getI18nUtils();
           // const message = (await getTranslationString("STATUS_REVERT_NOT_FOUND")) || "No translations to revert.";
           // pageEventBus.emit('show-notification', { message, type: "warning", duration: NOTIFICATION_TIME.REVERT });
@@ -124,11 +128,15 @@ export class RevertHandler extends ResourceTracker {
       }
 
       const result = {
-        success: true,
+        success: totalRevertedCount > 0 || errors.length === 0,
+        partial: totalRevertedCount > 0 && errors.length > 0,
         revertedCount: totalRevertedCount,
         system: finalSystem,
         errors: errors.length > 0 ? errors : undefined
       };
+      if (!result.success) {
+        result.error = errors.map(({ system, error }) => `${system}: ${error}`).join('; ');
+      }
 
       logger.info('Returning result:', result);
       return result;
@@ -152,42 +160,36 @@ export class RevertHandler extends ResourceTracker {
    * @returns {Promise<number>} Number of reverted translations
    */
   async revertVueTranslations() {
-    try {
-      // First, try to revert Select Element translation using global state
-      // This works even when SelectElementManager is deactivated
-      const selectElementReverted = await revertSelectElementTranslation();
+    // First, try to revert Select Element translation using global state
+    // This works even when SelectElementManager is deactivated
+    const selectElementReverted = await revertSelectElementTranslation();
 
-      if (selectElementReverted) {
-        logger.debug('Reverted Select Element translation via global state');
-        
-        // Update store to reset Revert badge - only if Pinia is active
-        try {
-          if (getActivePinia()) {
-            const mobileStore = useMobileStore();
-            mobileStore.setHasElementTranslations(false);
-          }
-        } catch {
-          logger.debug('Pinia not available for store update during revert');
+    if (selectElementReverted > 0) {
+      logger.debug('Reverted Select Element translation via global state');
+
+      // Update store to reset Revert badge - only if Pinia is active
+      try {
+        if (getActivePinia()) {
+          const mobileStore = useMobileStore();
+          mobileStore.setHasElementTranslations(false);
         }
-        
-        return 1;
+      } catch {
+        logger.debug('Pinia not available for store update during revert');
       }
 
-      // Fallback: Try to get SelectElementManager instance using the unified getter
-      // which includes fallbacks to global window instances if FeatureManager is not available
-      const selectElementManager = await this.getSelectElementManager();
+      return selectElementReverted;
+    }
 
-      if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {
-        const revertedCount = await selectElementManager.revertTranslations();
-        logger.debug(`Reverted ${revertedCount} translations via SelectElementManager.`);
-        return revertedCount;
-      } else {
-        logger.debug('SelectElementManager not available or revertTranslations method not found');
-        return 0;
-      }
-    } catch (error) {
-      logger.error('Error in Vue revert:', error);
-      // Return 0 if this specific revert fails, so legacy can still try
+    // Fallback: Try to get SelectElementManager instance using the unified getter
+    // which includes fallbacks to global window instances if FeatureManager is not available
+    const selectElementManager = await this.getSelectElementManager();
+
+    if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {
+      const revertedCount = await selectElementManager.revertTranslations();
+      logger.debug(`Reverted ${revertedCount} translations via SelectElementManager.`);
+      return revertedCount;
+    } else {
+      logger.debug('SelectElementManager not available or revertTranslations method not found');
       return 0;
     }
   }
