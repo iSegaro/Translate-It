@@ -28,8 +28,9 @@
       <span
         class="ti-m-header-title"
         @click="goBack"
-      >{{ t('history_title', 'Translation History') }}</span>
-      
+        >{{ t("history_title", "Translation History") }}</span
+      >
+
       <div
         v-if="hasHistory"
         class="ti-m-header-actions"
@@ -40,12 +41,12 @@
             <img
               src="@/icons/ui/copy.png"
               class="ti-m-export-icon-img"
-            >
-            {{ t('SIDEPANEL_EXPORT_HISTORY', 'Export') }}
+            />
+            {{ t("SIDEPANEL_EXPORT_HISTORY", "Export") }}
           </div>
-          
+
           <!-- Native Select Overlay (Invisible but clickable) -->
-          <select 
+          <select
             class="ti-m-native-select"
             @change="handleNativeExport"
           >
@@ -54,28 +55,28 @@
               disabled
               selected
             >
-              {{ t('SIDEPANEL_EXPORT_HISTORY', 'Export') }}
+              {{ t("SIDEPANEL_EXPORT_HISTORY", "Export") }}
             </option>
             <option value="json_clean">
-              {{ t('SIDEPANEL_EXPORT_JSON_CLEAN', 'JSON (Clean)') }}
+              {{ t("SIDEPANEL_EXPORT_JSON_CLEAN", "JSON (Clean)") }}
             </option>
             <option value="json_raw">
-              {{ t('SIDEPANEL_EXPORT_JSON_RAW', 'JSON (Raw)') }}
+              {{ t("SIDEPANEL_EXPORT_JSON_RAW", "JSON (Raw)") }}
             </option>
             <option value="csv">
-              {{ t('SIDEPANEL_EXPORT_CSV', 'CSV') }}
+              {{ t("SIDEPANEL_EXPORT_CSV", "CSV") }}
             </option>
             <option value="anki">
-              {{ t('SIDEPANEL_EXPORT_ANKI', 'Anki') }}
+              {{ t("SIDEPANEL_EXPORT_ANKI", "Anki") }}
             </option>
           </select>
         </div>
 
-        <button 
-          class="ti-m-clear-all-btn" 
+        <button
+          class="ti-m-clear-all-btn"
           @click="clearAll"
         >
-          {{ t('history_clear_all', 'Clear All') }}
+          {{ t("history_clear_all", "Clear All") }}
         </button>
       </div>
     </div>
@@ -88,7 +89,7 @@
       >
         <div class="ti-m-spinner" />
       </div>
-      
+
       <div
         v-else-if="!hasHistory"
         class="ti-m-empty-state"
@@ -96,18 +97,18 @@
         <img
           src="@/icons/ui/history.svg"
           class="ti-m-empty-icon"
-        >
-        <span>{{ t('history_no_history', 'No translation history yet') }}</span>
+        />
+        <span>{{ t("history_no_history", "No translation history yet") }}</span>
       </div>
 
-      <TransitionGroup 
+      <TransitionGroup
         v-else
         name="ti-m-history-list"
         tag="div"
         class="ti-m-history-list-inner"
       >
-        <div 
-          v-for="(item, index) in previewHistoryItems" 
+        <div
+          v-for="(item, index) in previewHistoryItems"
           :key="item.timestamp || index"
           class="ti-m-history-card"
           @click="selectItem(item)"
@@ -115,32 +116,33 @@
           <!-- Card Header: Languages & Delete -->
           <div class="ti-m-card-header">
             <div class="ti-m-lang-badge">
-              {{ getLangName(item.sourceLanguage) }} → {{ getLangName(item.targetLanguage) }}
+              {{ getLangName(item.sourceLanguage) }} →
+              {{ getLangName(item.targetLanguage) }}
             </div>
-            <button 
+            <button
               class="ti-m-delete-btn"
               @click.stop="(e) => removeItem(index, e)"
             >
               <img
                 src="@/icons/ui/trash-small.svg"
                 class="ti-m-icon-img-trash"
-              >
+              />
             </button>
           </div>
 
           <!-- Card Content -->
-          <div 
-            class="ti-m-source-preview" 
+          <div
+            class="ti-m-source-preview"
             :dir="shouldApplyRtl(item.sourceText) ? 'rtl' : 'ltr'"
           >
             {{ item.sourceText }}
           </div>
           <SafeMarkdownPreview
-            class="ti-m-target-preview" 
+            class="ti-m-target-preview"
             :dir="shouldApplyRtl(item.translatedText) ? 'rtl' : 'ltr'"
             :html="item.translatedPreviewHtml"
           />
-          
+
           <div class="ti-m-timestamp">
             {{ formatTime(item.timestamp) }}
           </div>
@@ -151,99 +153,101 @@
 </template>
 
 <script setup>
-import './HistoryView.scss'
-import { computed, onMounted } from 'vue'
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import { useMobileStore } from '@/store/modules/mobile.js'
-import { useSettingsStore } from '@/features/settings/stores/settings.js'
-import { useHistory } from '@/features/history/composables/useHistory.js'
-import { useLanguages } from '@/composables/shared/useLanguages.js'
-import { renderMarkdownPreview } from '@/shared/utils/text/markdownPreview.js'
-import SafeMarkdownPreview from '@/components/shared/SafeMarkdownPreview.vue'
-import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js'
+import "./HistoryView.scss";
+import { computed, onMounted } from "vue";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
+import { useMobileStore } from "@/store/modules/mobile.js";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
+import { useHistory } from "@/features/history/composables/useHistory.js";
+import { useLanguages } from "@/composables/shared/useLanguages.js";
+import { renderMarkdownPreview } from "@/shared/utils/text/markdownPreview.js";
+import SafeMarkdownPreview from "@/components/shared/SafeMarkdownPreview.vue";
+import { MOBILE_CONSTANTS } from "@/shared/constants/mobile.js";
 import { shouldApplyRtl } from "@/shared/utils/text/textAnalysis.js";
-import { getScopedLogger } from '@/shared/logging/logger.js'
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js'
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
 
-const mobileStore = useMobileStore()
-const settingsStore = useSettingsStore()
-const { t } = useUnifiedI18n()
-const languages = useLanguages()
-const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'HistoryView')
-const { 
-  historyItems, 
-  isLoading, 
-  hasHistory, 
-  loadHistory, 
-  deleteHistoryItem, 
+const mobileStore = useMobileStore();
+const settingsStore = useSettingsStore();
+const { t } = useUnifiedI18n();
+const languages = useLanguages();
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, "HistoryView");
+const {
+  historyItems,
+  isLoading,
+  hasHistory,
+  loadHistory,
+  deleteHistoryItem,
   clearAllHistory,
   exportHistory,
-  formatTime
-} = useHistory()
+  formatTime,
+} = useHistory();
 
 const previewHistoryItems = computed(() => {
   return historyItems.value.map((item) => {
-    const rawSourceText = item.sourceText || ''
-    const rawTranslatedText = item.translatedText || ''
+    const rawSourceText = item.sourceText || "";
+    const rawTranslatedText = item.translatedText || "";
 
     return {
       ...item,
       sourceText: rawSourceText,
       translatedText: rawTranslatedText,
       translatedPreviewHtml: renderMarkdownPreview(rawTranslatedText, {
-        fallbackDir: shouldApplyRtl(rawTranslatedText) ? 'rtl' : 'ltr',
-        isDictionary: String(item.mode || '').toLowerCase().includes('dictionary'),
+        fallbackDir: shouldApplyRtl(rawTranslatedText) ? "rtl" : "ltr",
+        isDictionary: String(item.mode || "")
+          .toLowerCase()
+          .includes("dictionary"),
         enableMarkdown: true,
       }),
-    }
-  })
-})
+    };
+  });
+});
 
 onMounted(async () => {
-  await languages.loadLanguages()
-  await loadHistory(true)
-})
+  await languages.loadLanguages();
+  await loadHistory(true);
+});
 
 const getLangName = (code) => {
-  return languages.getLanguageName(code) || code
-}
+  return languages.getLanguageName(code) || code;
+};
 
 const handleNativeExport = (event) => {
-  const format = event.target.value
+  const format = event.target.value;
   if (format) {
-    logger.info('Exporting translation history', { format });
-    exportHistory(format)
-    event.target.value = ""
+    logger.info("Exporting translation history", { format });
+    exportHistory(format);
+    event.target.value = "";
   }
-}
+};
 
 const goBack = () => {
-  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD)
-}
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+};
 
 const removeItem = async (index, event) => {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
   }
-  logger.debug('Deleting history item');
-  await deleteHistoryItem(index)
-}
+  logger.debug("Deleting history item");
+  await deleteHistoryItem(index);
+};
 
 const clearAll = async () => {
-  logger.info('Clearing all translation history');
-  await clearAllHistory()
-}
+  logger.info("Clearing all translation history");
+  await clearAllHistory();
+};
 
 const selectItem = (item) => {
-  logger.info('History item selected for manual translation');
+  logger.info("History item selected for manual translation");
   mobileStore.updateSelectionData({
     text: item.sourceText,
     translation: item.translatedText,
     sourceLang: item.sourceLanguage,
     targetLang: item.targetLanguage,
-    mode: item.mode
-  })
-  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT)
-}
+    mode: item.mode,
+  });
+  mobileStore.navigate(MOBILE_CONSTANTS.VIEWS.INPUT);
+};
 </script>

@@ -1,15 +1,15 @@
 <template>
-  <div 
+  <div
     v-if="isReady"
     class="mobile-fab notranslate"
-    :class="{ 
+    :class="{
       'is-idle': isFabIdle && !isFabDragging && !isHovering,
       'is-dragging': isFabDragging,
       'is-positioning': isPositioning,
       'is-unstable': isViewportUnstable && !isFabDragging,
       'is-left': side === 'left',
       'is-right': side === 'right',
-      'is-hidden': !side || fabPosition.y === null
+      'is-hidden': !side || fabPosition.y === null,
     }"
     translate="no"
     :style="dynamicVars"
@@ -21,18 +21,16 @@
     @mouseleave="onMouseLeave"
   >
     <div class="mobile-fab-inner">
-      <img 
-        src="@/icons/extension/extension_icon_64.svg" 
-        :alt="t('mobile_fab_alt') || 'Translate'" 
-      >
+      <img
+        src="@/icons/extension/extension_icon_64.svg"
+        :alt="t('mobile_fab_alt') || 'Translate'"
+      />
 
       <!-- Page Translation Status Badge -->
-      <Transition
-        name="fade-scale"
-      >
-        <PageTranslationStatus 
-          v-if="pageTranslationStatus.isActive" 
-          mode="desktop-fab" 
+      <Transition name="fade-scale">
+        <PageTranslationStatus
+          v-if="pageTranslationStatus.isActive"
+          mode="desktop-fab"
         />
       </Transition>
     </div>
@@ -40,43 +38,45 @@
 </template>
 
 <script setup>
-import './MobileFab.scss';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
-import { useMobileStore } from '@/store/modules/mobile.js';
-import { useSettingsStore } from '@/features/settings/stores/settings.js';
-import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
-import { MOBILE_CONSTANTS } from '@/shared/constants/mobile.js';
-import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
-import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { pageEventBus } from '@/core/PageEventBus.js';
-import { SELECTION_EVENTS } from '@/features/text-selection/events/SelectionEvents.js';
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import ExtensionContextManager from '@/core/extensionContext.js';
-import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
+import "./MobileFab.scss";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { injectStylesToShadowRoot } from "@/utils/ui/styleInjector.js";
+import { useMobileStore } from "@/store/modules/mobile.js";
+import { useSettingsStore } from "@/features/settings/stores/settings.js";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
+import { useResourceTracker } from "@/composables/core/useResourceTracker.js";
+import { MOBILE_CONSTANTS } from "@/shared/constants/mobile.js";
+import { TRANSLATION_STATUS } from "@/shared/constants/translation.js";
+import { deviceDetector } from "@/utils/browser/compatibility.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { pageEventBus } from "@/core/PageEventBus.js";
+import { SELECTION_EVENTS } from "@/features/text-selection/events/SelectionEvents.js";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
+import PageTranslationStatus from "@/components/shared/PageTranslationStatus.vue";
 
-const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, 'MobileFab');
+const logger = getScopedLogger(LOG_COMPONENTS.MOBILE, "MobileFab");
 const { t } = useUnifiedI18n();
 const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 
-const fabIdleOpacity = computed(() => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100);
-const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || '1');
+const fabIdleOpacity = computed(
+  () => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100,
+);
+const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || "1");
 
 /**
  * MEMORY MANAGEMENT: Use the centralized ResourceTracker
  */
-const tracker = useResourceTracker('mobile-fab');
+const tracker = useResourceTracker("mobile-fab");
 
 // State
 const isReady = ref(false);
 const isPositioning = ref(true);
 const fabPosition = ref({ x: null, y: null });
-const userPreferredY = ref(null); 
+const userPreferredY = ref(null);
 const isFabDragging = ref(false);
 const isFabIdle = ref(true);
 const isHovering = ref(false);
@@ -87,23 +87,27 @@ const pageTranslationStatus = computed(() => {
   const data = mobileStore.pageTranslationData;
   const isTranslating = data.status === TRANSLATION_STATUS.TRANSLATING;
   const isAuto = data.isAutoTranslating;
-  
-  const isCompleted = !isTranslating && !isAuto && (
-    data.isTranslated || 
-    data.status === TRANSLATION_STATUS.COMPLETED || 
-    (data.totalCount > 0 && data.translatedCount >= data.totalCount)
-  );
-  
+
+  const isCompleted =
+    !isTranslating &&
+    !isAuto &&
+    (data.isTranslated ||
+      data.status === TRANSLATION_STATUS.COMPLETED ||
+      (data.totalCount > 0 && data.translatedCount >= data.totalCount));
+
   const isError = data.status === TRANSLATION_STATUS.ERROR;
   const isActive = isTranslating || isAuto || isCompleted || isError;
-  const percent = data.totalCount > 0 ? Math.round((data.translatedCount / data.totalCount) * 100) : 0;
-  
+  const percent =
+    data.totalCount > 0
+      ? Math.round((data.translatedCount / data.totalCount) * 100)
+      : 0;
+
   return { isActive, isTranslating, isAuto, isCompleted, isError, percent };
 });
 
-const side = ref(null); 
+const side = ref(null);
 const isSelectionDirty = ref(false);
-const pendingText = ref('');
+const pendingText = ref("");
 
 // Internal variables
 let dragStartX = 0;
@@ -114,11 +118,13 @@ let instabilityTimer = null;
 let fabIdleTimerId = null;
 
 const checkBounds = () => {
-  if (typeof window === 'undefined' || userPreferredY.value === null) return;
-  
+  if (typeof window === "undefined" || userPreferredY.value === null) return;
+
   // Use VisualViewport for more accurate visible area height on mobile
-  const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-  
+  const viewportHeight = window.visualViewport
+    ? window.visualViewport.height
+    : window.innerHeight;
+
   if (userPreferredY.value === -1) {
     fabPosition.value.y = Math.round(viewportHeight / 2);
     return;
@@ -129,21 +135,24 @@ const checkBounds = () => {
 };
 
 const updateViewport = () => {
-  if (typeof window === 'undefined') return;
-  
+  if (typeof window === "undefined") return;
+
   // Only hide FAB on scroll for actual mobile devices (where toolbars hide/show)
   // This prevents flickering during translation layout shifts on desktop emulators
-  if (deviceDetector.isMobile() && !window.matchMedia('(pointer: fine)').matches) {
+  if (
+    deviceDetector.isMobile() &&
+    !window.matchMedia("(pointer: fine)").matches
+  ) {
     isViewportUnstable.value = true;
   }
-  
+
   checkBounds();
-  
+
   if (instabilityTimer) {
     tracker.clearTimer(instabilityTimer);
     instabilityTimer = null;
   }
-  
+
   instabilityTimer = tracker.trackTimeout(() => {
     isViewportUnstable.value = false;
     instabilityTimer = null;
@@ -155,43 +164,53 @@ const updateViewport = () => {
 onMounted(async () => {
   // Inject Sheet-specific styles lazily into shadow root
   try {
-    const { sheetUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
+    const { sheetUiStyles } =
+      await import("@/core/content-scripts/chunks/lazy-styles.js");
     if (sheetUiStyles && injectStylesToShadowRoot) {
-      injectStylesToShadowRoot(sheetUiStyles, 'vue-sheet-specific-styles');
+      injectStylesToShadowRoot(sheetUiStyles, "vue-sheet-specific-styles");
     }
   } catch (error) {
-    console.warn('[MobileFab] Failed to load lazy styles:', error);
+    console.warn("[MobileFab] Failed to load lazy styles:", error);
   }
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     // Only update on resize/orientation changes.
     // position: fixed handles scrolling automatically.
-    tracker.addEventListener(window, 'resize', updateViewport);
-    
+    tracker.addEventListener(window, "resize", updateViewport);
+
     // NEW: Use VisualViewport API for better mobile support if available
     if (window.visualViewport) {
-      tracker.addEventListener(window.visualViewport, 'resize', updateViewport);
-      tracker.addEventListener(window.visualViewport, 'scroll', updateViewport);
+      tracker.addEventListener(window.visualViewport, "resize", updateViewport);
+      tracker.addEventListener(window.visualViewport, "scroll", updateViewport);
     }
   }
 
-  tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE, (detail) => {
-    isSelectionDirty.value = true;
-    pendingText.value = detail?.text || '';
-    startFabIdleTimer();
-  });
+  tracker.addEventListener(
+    pageEventBus,
+    SELECTION_EVENTS.GLOBAL_SELECTION_CHANGE,
+    (detail) => {
+      isSelectionDirty.value = true;
+      pendingText.value = detail?.text || "";
+      startFabIdleTimer();
+    },
+  );
 
-  tracker.addEventListener(pageEventBus, SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR, () => {
-    isSelectionDirty.value = false;
-    pendingText.value = '';
-  });
+  tracker.addEventListener(
+    pageEventBus,
+    SELECTION_EVENTS.GLOBAL_SELECTION_CLEAR,
+    () => {
+      isSelectionDirty.value = false;
+      pendingText.value = "";
+    },
+  );
 
   try {
-    const savedData = await storageManager.get('MOBILE_FAB_POSITION');
+    const savedData = await storageManager.get("MOBILE_FAB_POSITION");
     const pos = savedData.MOBILE_FAB_POSITION;
 
     if (pos) {
-      userPreferredY.value = pos.y !== null ? pos.y : MOBILE_CONSTANTS.FAB.DEFAULT_Y;
+      userPreferredY.value =
+        pos.y !== null ? pos.y : MOBILE_CONSTANTS.FAB.DEFAULT_Y;
       side.value = pos.side || MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
     } else {
       userPreferredY.value = MOBILE_CONSTANTS.FAB.DEFAULT_Y;
@@ -199,11 +218,11 @@ onMounted(async () => {
     }
 
     checkBounds();
-    
+
     // Settle position before showing to prevent jumps
     tracker.trackTimeout(() => {
       isReady.value = true;
-      
+
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           // If position not saved, settle it now based on current calculated default
@@ -211,7 +230,7 @@ onMounted(async () => {
           if (fabPosition.value.y !== null && userPreferredY.value !== -1) {
             userPreferredY.value = fabPosition.value.y;
           }
-          
+
           tracker.trackTimeout(() => {
             isPositioning.value = false;
           }, 150);
@@ -220,9 +239,12 @@ onMounted(async () => {
     }, 150);
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
-      ExtensionContextManager.handleContextError(err, 'mobile-fab:load-position');
+      ExtensionContextManager.handleContextError(
+        err,
+        "mobile-fab:load-position",
+      );
     } else {
-      logger.error('Failed to load mobile FAB position:', err);
+      logger.error("Failed to load mobile FAB position:", err);
     }
 
     // Set defaults on any error
@@ -233,11 +255,14 @@ onMounted(async () => {
   }
 
   // Listen for error resets to ensure UI stays in sync
-  tracker.trackResource('error-reset-sync', pageEventBus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
-    if (pageTranslationStatus.value.isError) {
-      logger.debug('Mobile FAB Error state reset via event');
-    }
-  }));
+  tracker.trackResource(
+    "error-reset-sync",
+    pageEventBus.on(MessageActions.PAGE_TRANSLATE_RESET_ERROR, () => {
+      if (pageTranslationStatus.value.isError) {
+        logger.debug("Mobile FAB Error state reset via event");
+      }
+    }),
+  );
 });
 
 /**
@@ -247,28 +272,28 @@ const dynamicVars = computed(() => {
   if (!isReady.value || side.value === null || fabPosition.value.y === null) {
     return {};
   }
-  
-  let currentOpacity = '1';
-  let pointerEvents = 'auto';
+
+  let currentOpacity = "1";
+  let pointerEvents = "auto";
 
   if (isViewportUnstable.value && !isFabDragging.value) {
-    currentOpacity = '0';
-    pointerEvents = 'none';
+    currentOpacity = "0";
+    pointerEvents = "none";
   } else if (isFabIdle.value && !isFabDragging.value && !isHovering.value) {
     currentOpacity = fabIdleOpacity.value.toString();
   }
-  
+
   const vars = {
-    '--fab-y': `${fabPosition.value.y}px`,
-    '--fab-opacity': currentOpacity,
-    '--fab-pointer-events': pointerEvents,
-    '--fab-scale': fabScale.value
+    "--fab-y": `${fabPosition.value.y}px`,
+    "--fab-opacity": currentOpacity,
+    "--fab-pointer-events": pointerEvents,
+    "--fab-scale": fabScale.value,
   };
 
   if (isFabDragging.value && fabPosition.value.x !== null) {
     // When dragging, use explicit left coordinate
-    vars['--fab-left'] = `${fabPosition.value.x}px`;
-    vars['--fab-right'] = 'auto';
+    vars["--fab-left"] = `${fabPosition.value.x}px`;
+    vars["--fab-right"] = "auto";
   }
 
   return vars;
@@ -276,40 +301,42 @@ const dynamicVars = computed(() => {
 
 // Event Handlers
 const onFabDragStart = (e) => {
-  const isMouseEvent = e.type === 'mousedown';
+  const isMouseEvent = e.type === "mousedown";
   if (isMouseEvent && e.button !== 0) return;
-  
+
   // CRITICAL: Prevent focus shift and selection loss
   if (e.cancelable) {
     e.preventDefault();
   }
-  
+
   const point = isMouseEvent ? e : e.touches[0];
-  
+
   dragStartX = point.clientX;
   dragStartY = point.clientY;
   initialFabY = fabPosition.value.y;
-  
+
   // Don't set isFabDragging = true yet, wait for move threshold in Move handler
   isFabDragging.value = false;
 
   if (isMouseEvent) {
-    tracker.addEventListener(window, 'mousemove', onFabDragMove);
-    tracker.addEventListener(window, 'mouseup', onFabDragEnd);
+    tracker.addEventListener(window, "mousemove", onFabDragMove);
+    tracker.addEventListener(window, "mouseup", onFabDragEnd);
   } else {
     // For touch, we must use window listeners with passive: false to allow preventDefault
-    tracker.addEventListener(window, 'touchmove', onFabDragMove, { passive: false });
-    tracker.addEventListener(window, 'touchend', onFabDragEnd);
-    tracker.addEventListener(window, 'touchcancel', onFabDragEnd);
+    tracker.addEventListener(window, "touchmove", onFabDragMove, {
+      passive: false,
+    });
+    tracker.addEventListener(window, "touchend", onFabDragEnd);
+    tracker.addEventListener(window, "touchcancel", onFabDragEnd);
   }
-  
+
   isFabIdle.value = false;
 };
 
 const onFabDragMove = (e) => {
-  const isMouseEvent = e.type === 'mousemove';
+  const isMouseEvent = e.type === "mousemove";
   const point = isMouseEvent ? e : e.touches[0];
-  
+
   // CRITICAL: Prevent page scroll during FAB drag
   if (!isMouseEvent && e.cancelable) {
     e.preventDefault();
@@ -324,7 +351,7 @@ const onFabDragMove = (e) => {
     const dy = currentY - dragStartY;
     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
       isFabDragging.value = true;
-      
+
       // Re-sync starting coordinates to current point to ensure smooth transition from threshold
       dragStartX = currentX;
       dragStartY = currentY;
@@ -333,41 +360,49 @@ const onFabDragMove = (e) => {
       return;
     }
   }
-  
+
   if (!animationFrameId) {
     animationFrameId = requestAnimationFrame(() => {
       // Inverted delta because we are controlling 'bottom' property
       // Moving finger UP (smaller currentY) should INCREASE 'bottom'
       const deltaY = dragStartY - currentY;
-      const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      fabPosition.value.y = Math.max(20, Math.min(viewportHeight - 80, initialFabY + deltaY));
-      
+      const viewportHeight = window.visualViewport
+        ? window.visualViewport.height
+        : window.innerHeight;
+      fabPosition.value.y = Math.max(
+        20,
+        Math.min(viewportHeight - 80, initialFabY + deltaY),
+      );
+
       const snapThreshold = window.innerWidth / 2;
-      side.value = currentX < snapThreshold ? MOBILE_CONSTANTS.FAB.SIDE.LEFT : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
-      
+      side.value =
+        currentX < snapThreshold
+          ? MOBILE_CONSTANTS.FAB.SIDE.LEFT
+          : MOBILE_CONSTANTS.FAB.SIDE.RIGHT;
+
       // Track X position during drag for smooth visualization
       fabPosition.value.x = currentX;
-      
+
       animationFrameId = null;
     });
   }
 };
 
 const onFabDragEnd = async (e) => {
-  const isMouseEvent = e && (e.type === 'mouseup' || e.type === 'mousemove');
-  
+  const isMouseEvent = e && (e.type === "mouseup" || e.type === "mousemove");
+
   if (isMouseEvent) {
-    tracker.removeEventListener(window, 'mousemove', onFabDragMove);
-    tracker.removeEventListener(window, 'mouseup', onFabDragEnd);
+    tracker.removeEventListener(window, "mousemove", onFabDragMove);
+    tracker.removeEventListener(window, "mouseup", onFabDragEnd);
   } else {
-    tracker.removeEventListener(window, 'touchmove', onFabDragMove);
-    tracker.removeEventListener(window, 'touchend', onFabDragEnd);
-    tracker.removeEventListener(window, 'touchcancel', onFabDragEnd);
+    tracker.removeEventListener(window, "touchmove", onFabDragMove);
+    tracker.removeEventListener(window, "touchend", onFabDragEnd);
+    tracker.removeEventListener(window, "touchcancel", onFabDragEnd);
   }
 
   if (!isFabDragging.value) {
     // If it was a touch event, manually trigger click because touchstart was prevented
-    if (e && (e.type === 'touchend')) {
+    if (e && e.type === "touchend") {
       onMobileFabClick();
     }
     return;
@@ -377,49 +412,63 @@ const onFabDragEnd = async (e) => {
   try {
     userPreferredY.value = fabPosition.value.y;
     await storageManager.set({
-      MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y }
+      MOBILE_FAB_POSITION: { side: side.value, y: fabPosition.value.y },
     });
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
-      ExtensionContextManager.handleContextError(err, 'mobile-fab:save-position');
+      ExtensionContextManager.handleContextError(
+        err,
+        "mobile-fab:save-position",
+      );
     } else {
-      logger.error('Failed to save mobile FAB position:', err);
+      logger.error("Failed to save mobile FAB position:", err);
     }
   }
-  
+
   startFabIdleTimer();
 };
 
 const onMobileFabClick = () => {
-  logger.info('Mobile FAB clicked');
+  logger.info("Mobile FAB clicked");
 
   try {
-    const selection = window.getSelection()?.toString().trim() || '';
+    const selection = window.getSelection()?.toString().trim() || "";
     const effectiveSelection = pendingText.value || selection;
-    const hasFreshSelection = effectiveSelection && (isSelectionDirty.value || effectiveSelection !== mobileStore.selectionData.text);
+    const hasFreshSelection =
+      effectiveSelection &&
+      (isSelectionDirty.value ||
+        effectiveSelection !== mobileStore.selectionData.text);
 
     if (hasFreshSelection) {
       window.windowsManagerInstance?._showMobileSheet(effectiveSelection);
       isSelectionDirty.value = false;
     } else {
-      mobileStore.openSheet(mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD);
+      mobileStore.openSheet(
+        mobileStore.activeView || MOBILE_CONSTANTS.VIEWS.DASHBOARD,
+      );
     }
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
-      ExtensionContextManager.handleContextError(err, 'mobile-fab:click');
+      ExtensionContextManager.handleContextError(err, "mobile-fab:click");
     } else {
-      logger.error('Mobile FAB click handler failed:', err);
+      logger.error("Mobile FAB click handler failed:", err);
     }
   }
 };
 
-const onMouseEnter = () => { isHovering.value = true; isFabIdle.value = false; };
-const onMouseLeave = () => { isHovering.value = false; startFabIdleTimer(); };
+const onMouseEnter = () => {
+  isHovering.value = true;
+  isFabIdle.value = false;
+};
+const onMouseLeave = () => {
+  isHovering.value = false;
+  startFabIdleTimer();
+};
 
 const startFabIdleTimer = () => {
   if (isHovering.value || isFabDragging.value) return;
   if (fabIdleTimerId) tracker.clearTimer(fabIdleTimerId);
-  
+
   isFabIdle.value = false;
   fabIdleTimerId = tracker.trackTimeout(() => {
     isFabIdle.value = true;
