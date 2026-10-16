@@ -6,7 +6,7 @@
     :class="[
       settingsStore.isDarkTheme ? 'theme-dark' : 'theme-light',
       side === 'right' ? 'is-right' : 'is-left',
-      { 'is-positioning': isPositioning }
+      { 'is-positioning': isPositioning },
     ]"
     translate="no"
     :style="containerStyle"
@@ -18,11 +18,16 @@
       name="fade-scale"
       :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
     >
-      <div 
-        v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)" 
+      <div
+        v-if="mobileStore.hasElementTranslations && (isHovered || isMenuOpen)"
         class="fab-revert-badge"
         :title="t('desktop_fab_revert_tooltip')"
-        :style="{ 'transform': getBadgeTransform(isHovered || isMenuOpen, isRevertHovered) }"
+        :style="{
+          transform: getBadgeTransform(
+            isHovered || isMenuOpen,
+            isRevertHovered,
+          ),
+        }"
         @click.stop="handleRevert"
         @mouseenter="isRevertHovered = true"
         @mouseleave="isRevertHovered = false"
@@ -30,7 +35,7 @@
         <img
           :src="IconRevert"
           :alt="t('desktop_fab_revert_tooltip')"
-        >
+        />
       </div>
     </Transition>
 
@@ -79,73 +84,77 @@
             class="fab-menu-item"
             :class="{
               'is-disabled': item.disabled,
-              'is-hovered': hoveredItemIndex === index
+              'is-hovered': hoveredItemIndex === index,
             }"
             @click.stop="item.disabled ? null : handleMenuItemClick(item)"
             @mouseenter="hoveredItemIndex = index"
             @mouseleave="hoveredItemIndex = -1"
           >
             <div class="menu-icon-wrapper">
-                <!-- Circle Progress for Page Translation -->
-                <svg
-                  v-if="item.showProgress"
-                  class="fab-circle-progress"
-                  viewBox="0 0 32 32"
-                >
-                  <circle
-                    class="progress-bg"
-                    cx="16"
-                    cy="16"
-                    r="14"
-                    fill="none"
-                    stroke-width="3"
-                  />
-                  <circle 
-                    class="progress-fill" 
-                    cx="16" 
-                    cy="16" 
-                    r="14" 
-                    fill="none" 
-                    stroke-width="3" 
-                    stroke-dasharray="88" 
-                    :stroke-dashoffset="88 - (88 * item.percent) / 100" 
-                  />
-                </svg>
+              <!-- Circle Progress for Page Translation -->
+              <svg
+                v-if="item.showProgress"
+                class="fab-circle-progress"
+                viewBox="0 0 32 32"
+              >
+                <circle
+                  class="progress-bg"
+                  cx="16"
+                  cy="16"
+                  r="14"
+                  fill="none"
+                  stroke-width="3"
+                />
+                <circle
+                  class="progress-fill"
+                  cx="16"
+                  cy="16"
+                  r="14"
+                  fill="none"
+                  stroke-width="3"
+                  stroke-dasharray="88"
+                  :stroke-dashoffset="88 - (88 * item.percent) / 100"
+                />
+              </svg>
 
-                <img 
-                  v-if="item.icon" 
-                  :src="item.icon" 
-                  :alt="item.label" 
-                  class="fab-menu-icon"
-                  :class="{ 'is-colored': item.id === 'translate_page' || item.id === 'translate_selection' }"
-                >
-              </div>
-              <span class="fab-menu-item-text">
-                {{ item.label }}
-              </span>
+              <img
+                v-if="item.icon"
+                :src="item.icon"
+                :alt="item.label"
+                class="fab-menu-icon"
+                :class="{
+                  'is-colored':
+                    item.id === 'translate_page' ||
+                    item.id === 'translate_selection',
+                }"
+              />
+            </div>
+            <span class="fab-menu-item-text">
+              {{ item.label }}
+            </span>
 
             <!-- Secondary Action (Auto-Translate Star Toggle) -->
             <button
               v-if="item.secondaryAction"
               ref="scopeTrigger"
               class="fab-menu-item-secondary-btn"
-              :class="{ 
+              :class="{
                 'is-active': item.secondaryAction.active,
-                'is-disabled': item.secondaryAction.disabled
+                'is-disabled': item.secondaryAction.disabled,
               }"
               :title="item.secondaryAction.title"
               :aria-label="item.secondaryAction.title"
               :aria-expanded="scopeMenuOpen"
               @click.stop="toggleScopeDisclosure"
             >
-              <svg 
-                viewBox="0 0 24 24" 
-                width="15" 
-                height="15" 
+              <svg
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
                 class="secondary-action-svg"
               >
-                <path 
-                  :fill="item.secondaryAction.active ? 'currentColor' : 'none'" 
+                <path
+                  :fill="item.secondaryAction.active ? 'currentColor' : 'none'"
                   stroke="currentColor"
                   stroke-width="2"
                   stroke-linejoin="round"
@@ -158,7 +167,12 @@
               v-if="item.secondaryAction && scopeMenuOpen"
               class="fab-auto-translate-scopes"
               role="group"
-              :aria-label="t('auto_translate_scope_menu_label', 'Auto-translate on future visits')"
+              :aria-label="
+                t(
+                  'auto_translate_scope_menu_label',
+                  'Auto-translate on future visits',
+                )
+              "
               @click.stop
               @keydown.escape.stop="onScopeGroupKeydown"
             >
@@ -167,29 +181,33 @@
                 :aria-pressed="hasPageRule"
                 @click.stop="scopeActions.togglePageScope()"
               >
-                <span>{{ hasPageRule ? '✓' : '' }}</span>{{ t('auto_translate_scope_this_page', 'This Page') }}
+                <span>{{ hasPageRule ? "✓" : "" }}</span>{{ t("auto_translate_scope_this_page", "This Page") }}
               </button>
               <button
                 v-if="siteScopeAvailable"
                 :aria-pressed="hasSiteRule"
                 @click.stop="scopeActions.toggleSiteScope()"
               >
-                <span>{{ hasSiteRule ? '✓' : '' }}</span>{{ t('auto_translate_scope_this_site', 'This Site') }}
+                <span>{{ hasSiteRule ? "✓" : "" }}</span>{{ t("auto_translate_scope_this_site", "This Site") }}
               </button>
               <template v-if="showManageRules">
-                <hr class="fab-scope-separator">
+                <hr class="fab-scope-separator" />
                 <div class="fab-scope-note">
-                  {{ t('auto_translate_scope_covered_note', 'Already covered by a broader rule') }}
+                  {{
+                    t(
+                      "auto_translate_scope_covered_note",
+                      "Already covered by a broader rule",
+                    )
+                  }}
                 </div>
                 <button
                   class="fab-scope-link"
                   @click.stop="openManageRules"
                 >
-                  {{ t('auto_translate_manage_rules', 'Manage Rules') }}
+                  {{ t("auto_translate_manage_rules", "Manage Rules") }}
                 </button>
               </template>
             </div>
-
           </div>
         </template>
       </div>
@@ -214,7 +232,12 @@
         v-if="showHideFabWarning"
         class="fab-hide-warning"
       >
-        {{ t('desktop_fab_hide_onfabclick_warning', 'While hidden, you can’t start selection translation from the Desktop FAB.') }}
+        {{
+          t(
+            "desktop_fab_hide_onfabclick_warning",
+            "While hidden, you can’t start selection translation from the Desktop FAB.",
+          )
+        }}
       </div>
       <div
         v-if="hideError"
@@ -228,14 +251,14 @@
         type="button"
         @click.stop="handleHideSelection('site')"
       >
-        {{ t('desktop_fab_hide_this_site', 'Hide on This Site') }}
+        {{ t("desktop_fab_hide_this_site", "Hide on This Site") }}
       </button>
       <button
         v-if="pageHideScopeSupported"
         type="button"
         @click.stop="handleHideSelection('page')"
       >
-        {{ t('desktop_fab_hide_this_page', 'Hide on This Page') }}
+        {{ t("desktop_fab_hide_this_page", "Hide on This Page") }}
       </button>
       <button
         ref="firstHideAction"
@@ -243,17 +266,17 @@
         class="fab-hide-close-now"
         @click.stop="handleHideSelection('temporary')"
       >
-        {{ t('desktop_fab_hide_close_for_now', 'Close for Now') }}
+        {{ t("desktop_fab_hide_close_for_now", "Close for Now") }}
       </button>
     </div>
 
     <!-- Main Button -->
     <div
       class="desktop-fab-button"
-      :class="{ 
-        'is-open': isMenuOpen, 
+      :class="{
+        'is-open': isMenuOpen,
         'is-dragging': isDragging,
-        'has-status': pageTranslationStatus.isActive
+        'has-status': pageTranslationStatus.isActive,
       }"
       :title="t('desktop_fab_tooltip')"
       :style="mainButtonStyle"
@@ -264,16 +287,16 @@
       <img
         :src="IconExtension"
         :alt="t('desktop_fab_alt')"
-      >
+      />
 
       <!-- Page Translation Status Badge (Bottom) -->
       <Transition
         name="fade-scale"
         :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
       >
-        <PageTranslationStatus 
-          v-if="pageTranslationStatus.isActive" 
-          mode="desktop-fab" 
+        <PageTranslationStatus
+          v-if="pageTranslationStatus.isActive"
+          mode="desktop-fab"
         />
       </Transition>
 
@@ -282,8 +305,12 @@
         name="fade-scale"
         :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
       >
-        <div 
-          v-if="pendingSelection.hasSelection && (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled)"
+        <div
+          v-if="
+            pendingSelection.hasSelection &&
+              (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK ||
+                !isTextSelectionEnabled)
+          "
           class="fab-translate-badge"
           @click.stop="triggerTranslation"
         >
@@ -298,13 +325,19 @@
       name="fade-scale"
       :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
     >
-      <div 
-        v-if="isMenuOpen" 
+      <div
+        v-if="isMenuOpen"
         class="fab-settings-badge"
         :title="t('desktop_fab_settings_tooltip')"
-        :style="{ 
-          '--badge-bottom-offset': (isTTSActive && (isHovered || isMenuOpen) ? 'calc(-2 * var(--badge-offset))' : 'calc(-1 * var(--badge-offset))'),
-          'transform': getBadgeTransform(isHovered || isMenuOpen, isSettingsHovered)
+        :style="{
+          '--badge-bottom-offset':
+            isTTSActive && (isHovered || isMenuOpen)
+              ? 'calc(-2 * var(--badge-offset))'
+              : 'calc(-1 * var(--badge-offset))',
+          transform: getBadgeTransform(
+            isHovered || isMenuOpen,
+            isSettingsHovered,
+          ),
         }"
         @click.stop="handleOpenSettings"
         @mouseenter="isSettingsHovered = true"
@@ -313,7 +346,7 @@
         <img
           :src="IconSettings"
           :alt="t('desktop_fab_settings_tooltip')"
-        >
+        />
       </div>
     </Transition>
 
@@ -322,14 +355,17 @@
       name="fade-scale"
       :duration="{ enter: ANIMATION_CONFIG.MENU_ENTER }"
     >
-      <div 
-        v-if="isTTSActive && (isHovered || isMenuOpen)" 
+      <div
+        v-if="isTTSActive && (isHovered || isMenuOpen)"
         class="fab-tts-badge"
-        :class="{ 'is-playing': ttsState === 'playing', 'is-loading': ttsState === 'loading' }"
+        :class="{
+          'is-playing': ttsState === 'playing',
+          'is-loading': ttsState === 'loading',
+        }"
         :title="ttsTooltip"
-        :style="{ 
-          '--badge-bottom-offset': 'calc(-1 * var(--badge-offset))', 
-          'transform': getBadgeTransform(isHovered || isMenuOpen, isTTSHovered)
+        :style="{
+          '--badge-bottom-offset': 'calc(-1 * var(--badge-offset))',
+          transform: getBadgeTransform(isHovered || isMenuOpen, isTTSHovered),
         }"
         @click.stop="handleTTS"
         @mouseenter="isTTSHovered = true"
@@ -374,82 +410,92 @@
           :src="IconTTS"
           :alt="t('desktop_fab_tts_tooltip')"
           class="fab-tts-icon"
-        >
+        />
       </div>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
-import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n';
-import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { sendMessage, sendRegularMessage } from '@/shared/messaging/core/UnifiedMessaging.js';
-import { useMobileStore } from '@/store/modules/mobile.js';
-import useSettingsStore from '@/features/settings/stores/settings.js';
-import ExtensionContextManager from '@/core/extensionContext.js';
-import { TRANSLATION_STATUS } from '@/shared/constants/translation.js';
-import { useResourceTracker } from '@/composables/core/useResourceTracker';
-import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getDesktopFabPositionAsync, TranslationMode, SelectionTranslationMode } from '@/shared/config/config.js';
-import { pageEventBus } from '@/core/PageEventBus.js';
-import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
-import { useErrorHandler } from '@/composables/shared/useErrorHandler.js';
-import { useMouseHoverToggle } from '@/features/mouse-hover/composables/useMouseHoverToggle.js';
-import useFabSelection from '@/apps/content/composables/useFabSelection.js';
-import ExclusionChecker from '@/features/exclusion/core/ExclusionChecker.js';
-import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';
-import { deviceDetector } from '@/utils/browser/compatibility.js';
-import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
-import { findProviderById } from '@/features/translation/providers/ProviderManifest.js';
-import { useAutoTranslateRules } from '@/features/page-translation/composables/useAutoTranslateRules.js';
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
+import { injectStylesToShadowRoot } from "@/utils/ui/styleInjector.js";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n";
+import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import {
+  sendMessage,
+  sendRegularMessage,
+} from "@/shared/messaging/core/UnifiedMessaging.js";
+import { useMobileStore } from "@/store/modules/mobile.js";
+import useSettingsStore from "@/features/settings/stores/settings.js";
+import ExtensionContextManager from "@/core/extensionContext.js";
+import { TRANSLATION_STATUS } from "@/shared/constants/translation.js";
+import { useResourceTracker } from "@/composables/core/useResourceTracker";
+import { storageManager } from "@/shared/storage/core/StorageCore.js";
+import {
+  getDesktopFabPositionAsync,
+  TranslationMode,
+  SelectionTranslationMode,
+} from "@/shared/config/config.js";
+import { pageEventBus } from "@/core/PageEventBus.js";
+import { useTTSSmart } from "@/features/tts/composables/useTTSSmart.js";
+import { useErrorHandler } from "@/composables/shared/useErrorHandler.js";
+import { useMouseHoverToggle } from "@/features/mouse-hover/composables/useMouseHoverToggle.js";
+import useFabSelection from "@/apps/content/composables/useFabSelection.js";
+import ExclusionChecker from "@/features/exclusion/core/ExclusionChecker.js";
+import PageTranslationStatus from "@/components/shared/PageTranslationStatus.vue";
+import { deviceDetector } from "@/utils/browser/compatibility.js";
+import { getLanguageNameFromCode } from "@/shared/config/languageConstants.js";
+import { findProviderById } from "@/features/translation/providers/ProviderManifest.js";
+import { useAutoTranslateRules } from "@/features/page-translation/composables/useAutoTranslateRules.js";
 import {
   addDesktopFabExclusion,
-  getDesktopFabExclusionKey
-} from '@/features/desktop-fab/desktopFabExclusions.js';
-import MaskIcon from '@/components/shared/MaskIcon.vue';
-import './DesktopFabMenu.scss';
+  getDesktopFabExclusionKey,
+} from "@/features/desktop-fab/desktopFabExclusions.js";
+import MaskIcon from "@/components/shared/MaskIcon.vue";
+import "./DesktopFabMenu.scss";
 
-import IconExtension from '@/icons/extension/extension_icon_64.svg';
-import IconSelectElement from '@/icons/ui/select.png';
-import IconTranslatePage from '@/icons/ui/whole-page.png';
-import IconScreenCapture from '@/icons/ui/capture.svg';
-import IconRevert from '@/icons/ui/revert.png';
-import IconRestore from '@/icons/ui/restore.png';
-import IconHourglass from '@/icons/ui/hourglass.png';
-import IconSettings from '@/icons/ui/settings.png';
-import IconTranslateSelection from '@/icons/ui/translate.png';
-import IconMouseHover from '@/icons/ui/mouse-hover.png';
-import IconTTS from '@/icons/ui/speaker.png';
-import IconEyeHide from '@/icons/ui/eye-hide.svg?url';
+import IconExtension from "@/icons/extension/extension_icon_64.svg";
+import IconSelectElement from "@/icons/ui/select.png";
+import IconTranslatePage from "@/icons/ui/whole-page.png";
+import IconScreenCapture from "@/icons/ui/capture.svg";
+import IconRevert from "@/icons/ui/revert.png";
+import IconRestore from "@/icons/ui/restore.png";
+import IconHourglass from "@/icons/ui/hourglass.png";
+import IconSettings from "@/icons/ui/settings.png";
+import IconTranslateSelection from "@/icons/ui/translate.png";
+import IconMouseHover from "@/icons/ui/mouse-hover.png";
+import IconTTS from "@/icons/ui/speaker.png";
+import IconEyeHide from "@/icons/ui/eye-hide.svg?url";
 
-const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, 'Menu');
+const logger = getScopedLogger(LOG_COMPONENTS.DESKTOP_FAB, "Menu");
 const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
 const { handleError } = useErrorHandler();
-const tracker = useResourceTracker('desktop-fab-menu');
+const tracker = useResourceTracker("desktop-fab-menu");
 const tts = useTTSSmart();
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle();
 const exclusionChecker = ExclusionChecker.getInstance();
 
-const emit = defineEmits(['dismiss', 'presence']);
+const emit = defineEmits(["dismiss", "presence"]);
 
 const sendPageCommand = (message) => {
   void sendRegularMessage(message, { returnFailureResponse: true })
     .then((response) => {
       if (response?.success === false) {
-        logger.debug('Page translation command rejected', response);
+        logger.debug("Page translation command rejected", response);
       }
     })
     .catch((error) => {
       if (ExtensionContextManager.isContextError(error)) {
-        ExtensionContextManager.handleContextError(error, 'desktop-fab:page-translation');
+        ExtensionContextManager.handleContextError(
+          error,
+          "desktop-fab:page-translation",
+        );
       } else {
-        logger.warn('Page translation command failed:', error);
+        logger.warn("Page translation command failed:", error);
       }
     });
 };
@@ -457,35 +503,40 @@ const sendPageCommand = (message) => {
 const allowedFeatures = ref({
   selectElement: true,
   pageTranslation: true,
-  screenCapture: true
+  screenCapture: true,
 });
 
 const updateAllowedFeatures = async () => {
   const status = await exclusionChecker.getFeatureStatus();
   if (status.initialized) {
-    allowedFeatures.value.selectElement = status.features.selectElement?.allowed ?? true;
-    allowedFeatures.value.pageTranslation = status.features.pageTranslation?.allowed ?? true;
-    allowedFeatures.value.screenCapture = status.features.screenCapture?.allowed ?? true;
-    logger.debug('FAB allowed features updated', allowedFeatures.value);
+    allowedFeatures.value.selectElement =
+      status.features.selectElement?.allowed ?? true;
+    allowedFeatures.value.pageTranslation =
+      status.features.pageTranslation?.allowed ?? true;
+    allowedFeatures.value.screenCapture =
+      status.features.screenCapture?.allowed ?? true;
+    logger.debug("FAB allowed features updated", allowedFeatures.value);
   }
 };
 
 const ANIMATION_CONFIG = {
-  MOVE_IN: '0.4s',
-  MOVE_OUT: '1.0s',
-  FADE_IN: '0.2s',
-  FADE_OUT: '1.0s',
-  QUICK_FADE: '0.3s',
+  MOVE_IN: "0.4s",
+  MOVE_OUT: "1.0s",
+  FADE_IN: "0.2s",
+  FADE_OUT: "1.0s",
+  QUICK_FADE: "0.3s",
   MENU_ENTER: 400,
-  SOFT_EASING: 'cubic-bezier(0.22, 1, 0.36, 1)',
-  STANDARD_EASING: 'ease',
+  SOFT_EASING: "cubic-bezier(0.22, 1, 0.36, 1)",
+  STANDARD_EASING: "ease",
   IDLE_TIMEOUT: 500,
   LEAVE_DELAY: 400,
-  OPACITY_FULL: 1
+  OPACITY_FULL: 1,
 };
 
-const fabIdleOpacity = computed(() => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100);
-const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || '1');
+const fabIdleOpacity = computed(
+  () => (settingsStore.settings?.FAB_IDLE_OPACITY ?? 20) / 100,
+);
+const fabScale = computed(() => settingsStore.settings?.FAB_SIZE || "1");
 
 const isMenuOpen = ref(false);
 const isFaded = ref(true);
@@ -504,16 +555,22 @@ const isLocalLoading = ref(false);
 const detectedLanguage = computed(() => {
   // Only display the detected language suffix if it corresponds to the currently selected text
   if (tts.lastText.value === pendingSelection.value.text) {
-    return tts.detectedLanguage.value || 'auto';
+    return tts.detectedLanguage.value || "auto";
   }
-  return 'auto';
+  return "auto";
 });
 
 const isFullscreen = computed(() => mobileStore.isFullscreen);
-watch([isReady, isFullscreen], () => {
-  emit('presence', Boolean(fabContainerRef.value));
-}, { flush: 'post' });
-const isTextSelectionEnabled = computed(() => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false);
+watch(
+  [isReady, isFullscreen],
+  () => {
+    emit("presence", Boolean(fabContainerRef.value));
+  },
+  { flush: "post" },
+);
+const isTextSelectionEnabled = computed(
+  () => settingsStore.settings?.TRANSLATE_ON_TEXT_SELECTION !== false,
+);
 
 const fabContainerRef = ref(null);
 let hoverTimerId = null;
@@ -532,50 +589,60 @@ const startFadeTimer = (forceVisible = true) => {
 // Initialize FAB selection logic
 const { pendingSelection, triggerTranslation } = useFabSelection({
   onSelectionPending: (detail) => {
-    if (detail.mode === SelectionTranslationMode.ON_FAB_CLICK || !isTextSelectionEnabled.value) {
+    if (
+      detail.mode === SelectionTranslationMode.ON_FAB_CLICK ||
+      !isTextSelectionEnabled.value
+    ) {
       startFadeTimer();
     }
-  }
+  },
 });
 
 // Check if this specific instance is currently responsible for the active TTS
 const isThisTTSActive = computed(() => {
-  return isLocalLoading.value || (!!(localTTSId.value && tts.currentTTSId.value === localTTSId.value));
+  return (
+    isLocalLoading.value ||
+    !!(localTTSId.value && tts.currentTTSId.value === localTTSId.value)
+  );
 });
 
 const ttsState = computed(() => {
   if (isThisTTSActive.value) return tts.ttsState.value;
-  return 'idle';
+  return "idle";
 });
 
 const ttsTooltip = computed(() => {
-  const langName = detectedLanguage.value && detectedLanguage.value !== 'auto'
-    ? getLanguageNameFromCode(detectedLanguage.value)
-    : '';
-  
-  const capitalizedLang = langName ? langName.charAt(0).toUpperCase() + langName.slice(1) : '';
-  const langSuffix = capitalizedLang ? ` (${capitalizedLang})` : '';
+  const langName =
+    detectedLanguage.value && detectedLanguage.value !== "auto"
+      ? getLanguageNameFromCode(detectedLanguage.value)
+      : "";
 
-  if (ttsState.value === 'playing') return t('desktop_fab_tts_stop_tooltip') + langSuffix;
-  if (ttsState.value === 'loading') return t('window_loading_alt');
-  return t('desktop_fab_tts_play_tooltip') + langSuffix;
+  const capitalizedLang = langName
+    ? langName.charAt(0).toUpperCase() + langName.slice(1)
+    : "";
+  const langSuffix = capitalizedLang ? ` (${capitalizedLang})` : "";
+
+  if (ttsState.value === "playing")
+    return t("desktop_fab_tts_stop_tooltip") + langSuffix;
+  if (ttsState.value === "loading") return t("window_loading_alt");
+  return t("desktop_fab_tts_play_tooltip") + langSuffix;
 });
 
 const updateViewport = () => {
-  if (typeof window === 'undefined') return;
-  
+  if (typeof window === "undefined") return;
+
   // Only hide FAB on scroll for actual mobile devices (where toolbars hide/show)
   if (deviceDetector.isMobile()) {
     isViewportUnstable.value = true;
   }
-  
+
   checkBounds();
-  
+
   if (instabilityTimer) {
     tracker.clearTimer(instabilityTimer);
     instabilityTimer = null;
   }
-  
+
   instabilityTimer = tracker.trackTimeout(() => {
     isViewportUnstable.value = false;
     instabilityTimer = null;
@@ -583,8 +650,14 @@ const updateViewport = () => {
 };
 
 const handleMouseEnter = () => {
-  if (hoverTimerId) { tracker.clearTimer(hoverTimerId); hoverTimerId = null; }
-  if (fadeTimerId) { tracker.clearTimer(fadeTimerId); fadeTimerId = null; }
+  if (hoverTimerId) {
+    tracker.clearTimer(hoverTimerId);
+    hoverTimerId = null;
+  }
+  if (fadeTimerId) {
+    tracker.clearTimer(fadeTimerId);
+    fadeTimerId = null;
+  }
   isHovered.value = true;
   isFaded.value = false;
 
@@ -608,13 +681,19 @@ const handleMouseLeave = () => {
 const supportsBulk = (mode) => {
   const providerId = settingsStore.getEffectiveProvider(mode);
   const provider = findProviderById(providerId);
-  return provider?.features?.includes('bulk') ?? true;
+  return provider?.features?.includes("bulk") ?? true;
 };
 
-const isSelectElementSupported = computed(() => supportsBulk(TranslationMode.Select_Element));
-const isPageTranslationSupported = computed(() => supportsBulk(TranslationMode.Page));
+const isSelectElementSupported = computed(() =>
+  supportsBulk(TranslationMode.Select_Element),
+);
+const isPageTranslationSupported = computed(() =>
+  supportsBulk(TranslationMode.Page),
+);
 
-const currentUrlStr = computed(() => typeof window !== 'undefined' ? window.location.href : '');
+const currentUrlStr = computed(() =>
+  typeof window !== "undefined" ? window.location.href : "",
+);
 
 const {
   isAutoTranslateToggleVisible,
@@ -630,7 +709,9 @@ const scopeMenuOpen = ref(false);
 const scopeTrigger = ref(null);
 const firstScopeAction = ref(null);
 const focusRefTarget = (templateRef) => {
-  const target = Array.isArray(templateRef.value) ? templateRef.value[0] : templateRef.value;
+  const target = Array.isArray(templateRef.value)
+    ? templateRef.value[0]
+    : templateRef.value;
   target?.focus();
 };
 const toggleScopeDisclosure = async () => {
@@ -652,29 +733,31 @@ const hideTrigger = ref(null);
 const firstHideAction = ref(null);
 const hidePopover = ref(null);
 const hidePopoverStyle = ref({});
-const hideError = ref('');
+const hideError = ref("");
 
 watch(isMenuOpen, (open) => {
   if (!open) {
     scopeMenuOpen.value = false;
     hideMenuOpen.value = false;
-    hideError.value = '';
+    hideError.value = "";
   }
 });
 
 const pageHideScopeSupported = computed(() =>
-  Boolean(getDesktopFabExclusionKey('page', currentUrlStr.value))
+  Boolean(getDesktopFabExclusionKey("page", currentUrlStr.value)),
 );
 const siteHideScopeSupported = computed(() =>
-  Boolean(getDesktopFabExclusionKey('site', currentUrlStr.value))
+  Boolean(getDesktopFabExclusionKey("site", currentUrlStr.value)),
 );
-const showHideFabWarning = computed(() =>
-  settingsStore.settings?.selectionTranslationMode === SelectionTranslationMode.ON_FAB_CLICK
+const showHideFabWarning = computed(
+  () =>
+    settingsStore.settings?.selectionTranslationMode ===
+    SelectionTranslationMode.ON_FAB_CLICK,
 );
 
 const toggleHideDisclosure = async () => {
   hideMenuOpen.value = !hideMenuOpen.value;
-  hideError.value = '';
+  hideError.value = "";
   if (hideMenuOpen.value) {
     await positionHidePopover();
     focusRefTarget(firstHideAction);
@@ -684,7 +767,7 @@ const toggleHideDisclosure = async () => {
 const closeHidePopover = () => {
   if (!hideMenuOpen.value) return;
   hideMenuOpen.value = false;
-  hideError.value = '';
+  hideError.value = "";
 };
 
 /**
@@ -703,10 +786,15 @@ const closeHidePopover = () => {
  */
 const positionHidePopover = async () => {
   await nextTick();
-  const anchor = Array.isArray(hideTrigger.value) ? hideTrigger.value[0] : hideTrigger.value;
-  const pop = Array.isArray(hidePopover.value) ? hidePopover.value[0] : hidePopover.value;
+  const anchor = Array.isArray(hideTrigger.value)
+    ? hideTrigger.value[0]
+    : hideTrigger.value;
+  const pop = Array.isArray(hidePopover.value)
+    ? hidePopover.value[0]
+    : hidePopover.value;
   const container = fabContainerRef.value;
-  if (!anchor || !pop || !container || !hideMenuOpen.value || !isMenuOpen.value) return;
+  if (!anchor || !pop || !container || !hideMenuOpen.value || !isMenuOpen.value)
+    return;
   const MARGIN = 8;
   const GAP = 6;
   const anchorRect = anchor.getBoundingClientRect();
@@ -718,7 +806,9 @@ const positionHidePopover = async () => {
   // anchor: measure its insets inside the popover and shift the preferred
   // placement by them. A missing or degenerate button rect falls back to
   // zero insets (the previous container-aligned formulas).
-  const closeBtn = Array.isArray(firstHideAction.value) ? firstHideAction.value[0] : firstHideAction.value;
+  const closeBtn = Array.isArray(firstHideAction.value)
+    ? firstHideAction.value[0]
+    : firstHideAction.value;
   const btnRect = closeBtn?.getBoundingClientRect?.();
   let bottomInset = 0;
   let leftInset = 0;
@@ -730,26 +820,34 @@ const positionHidePopover = async () => {
   }
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const direction = (container && typeof getComputedStyle !== 'undefined'
-    ? getComputedStyle(container).direction
-    : document.dir) || 'ltr';
+  const direction =
+    (container && typeof getComputedStyle !== "undefined"
+      ? getComputedStyle(container).direction
+      : document.dir) || "ltr";
   // Dock-aware trailing edge: the right dock hugs the right (edge) side, the
   // left dock hugs the left; mirrored in RTL.
-  const hugRight = (side.value === 'right') !== (direction === 'rtl');
+  const hugRight = (side.value === "right") !== (direction === "rtl");
 
   const anchorLeft = anchorRect.left - containerRect.left;
   const anchorTop = anchorRect.top - containerRect.top;
-  let left = hugRight ? anchorLeft + anchorRect.width - popWidth + rightInset : anchorLeft - leftInset;
+  let left = hugRight
+    ? anchorLeft + anchorRect.width - popWidth + rightInset
+    : anchorLeft - leftInset;
   const viewportLeft = containerRect.left + left;
   if (viewportLeft < MARGIN || viewportLeft + popWidth > vw - MARGIN) {
-    const flipped = hugRight ? anchorLeft - leftInset : anchorLeft + anchorRect.width - popWidth + rightInset;
+    const flipped = hugRight
+      ? anchorLeft - leftInset
+      : anchorLeft + anchorRect.width - popWidth + rightInset;
     const flippedViewportLeft = containerRect.left + flipped;
-    if (flippedViewportLeft >= MARGIN && flippedViewportLeft + popWidth <= vw - MARGIN) {
+    if (
+      flippedViewportLeft >= MARGIN &&
+      flippedViewportLeft + popWidth <= vw - MARGIN
+    ) {
       left = flipped;
     } else {
       left = Math.min(
         Math.max(MARGIN - containerRect.left, left),
-        vw - MARGIN - popWidth - containerRect.left
+        vw - MARGIN - popWidth - containerRect.left,
       );
     }
   }
@@ -760,40 +858,57 @@ const positionHidePopover = async () => {
     if (containerRect.top + below + popHeight <= vh - MARGIN) {
       top = below;
     } else {
-      top = Math.max(MARGIN - containerRect.top, vh - MARGIN - popHeight - containerRect.top);
+      top = Math.max(
+        MARGIN - containerRect.top,
+        vh - MARGIN - popHeight - containerRect.top,
+      );
     }
   }
   if (containerRect.top + top + popHeight > vh - MARGIN) {
-    top = Math.max(MARGIN - containerRect.top, vh - MARGIN - popHeight - containerRect.top);
+    top = Math.max(
+      MARGIN - containerRect.top,
+      vh - MARGIN - popHeight - containerRect.top,
+    );
   }
 
-  hidePopoverStyle.value = { left: `${Math.round(left)}px`, top: `${Math.round(top)}px` };
+  hidePopoverStyle.value = {
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+  };
 };
 
 // Re-anchor the detached popover when its content changes while open — the
 // warning, the error feedback, the supported scopes and the localized labels
 // all change its size without moving the toolbar anchor, so the stored
 // placement can overflow the viewport until something repositions it.
-const hidePopoverTextSignature = computed(() => [
-  t('desktop_fab_hide_close_for_now'),
-  t('desktop_fab_hide_this_page'),
-  t('desktop_fab_hide_this_site'),
-  t('desktop_fab_hide_options_label'),
-  t('desktop_fab_hide_onfabclick_warning'),
-].join('|'));
+const hidePopoverTextSignature = computed(() =>
+  [
+    t("desktop_fab_hide_close_for_now"),
+    t("desktop_fab_hide_this_page"),
+    t("desktop_fab_hide_this_site"),
+    t("desktop_fab_hide_options_label"),
+    t("desktop_fab_hide_onfabclick_warning"),
+  ].join("|"),
+);
 
 watch(
-  [showHideFabWarning, hideError, pageHideScopeSupported, siteHideScopeSupported, hidePopoverTextSignature],
+  [
+    showHideFabWarning,
+    hideError,
+    pageHideScopeSupported,
+    siteHideScopeSupported,
+    hidePopoverTextSignature,
+  ],
   () => {
     if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
   },
-  { flush: 'post' },
+  { flush: "post" },
 );
 
 const onHideOptionsKeydown = () => {
   if (!hideMenuOpen.value) return;
   hideMenuOpen.value = false;
-  hideError.value = '';
+  hideError.value = "";
   focusRefTarget(hideTrigger);
 };
 
@@ -803,11 +918,11 @@ const onHideOptionsKeydown = () => {
  * menu open with feedback instead of silently losing the user's choice.
  */
 const handleHideSelection = async (scope) => {
-  hideError.value = '';
+  hideError.value = "";
 
-  if (scope === 'temporary') {
+  if (scope === "temporary") {
     isMenuOpen.value = false;
-    emit('dismiss', { scope: 'temporary' });
+    emit("dismiss", { scope: "temporary" });
     return;
   }
 
@@ -815,25 +930,25 @@ const handleHideSelection = async (scope) => {
     const key = await addDesktopFabExclusion(scope, currentUrlStr.value);
     if (!key) {
       hideError.value = t(
-        'desktop_fab_hide_scope_unsupported',
-        'Hiding for this scope is not available on this page.'
+        "desktop_fab_hide_scope_unsupported",
+        "Hiding for this scope is not available on this page.",
       );
       return;
     }
   } catch (err) {
-    logger.warn('Failed to persist Desktop FAB exclusion:', err);
+    logger.warn("Failed to persist Desktop FAB exclusion:", err);
     hideError.value = t(
-      'desktop_fab_hide_save_failed',
-      'Could not save this hiding preference. Please try again.'
+      "desktop_fab_hide_save_failed",
+      "Could not save this hiding preference. Please try again.",
     );
     await handleError(err, {
       context: `desktop-fab:hide-${scope}`,
-      showToast: true
+      showToast: true,
     });
     return;
   }
 
-  emit('dismiss', { scope });
+  emit("dismiss", { scope });
 };
 
 const menuItems = computed(() => {
@@ -842,174 +957,205 @@ const menuItems = computed(() => {
   // Mouse Hover Toggle
   if (settingsStore.settings?.SHOW_MOUSE_HOVER_IN_FAB !== false) {
     items.push({
-      id: 'mouse_hover_toggle',
-      label: isMouseHoverEnabled.value 
-        ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') 
-        : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس'),
+      id: "mouse_hover_toggle",
+      label: isMouseHoverEnabled.value
+        ? t("mouse_hover_disable_label") || "غیرفعال‌سازی ترجمه با ماوس"
+        : t("mouse_hover_enable_label") || "فعال‌سازی ترجمه با ماوس",
       icon: IconMouseHover,
       closeMenu: false,
-      action: () => toggleMouseHover()
+      action: () => toggleMouseHover(),
     });
   }
 
-  if (pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK) {
+  if (
+    pendingSelection.value.hasSelection &&
+    pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK
+  ) {
     items.push({
-      id: 'translate_selection',
-      label: t('desktop_fab_translate_selection_label'),
+      id: "translate_selection",
+      label: t("desktop_fab_translate_selection_label"),
       icon: IconTranslateSelection,
       closeMenu: false,
-      action: () => triggerTranslation()
+      action: () => triggerTranslation(),
     });
   }
 
   if (allowedFeatures.value.selectElement) {
-    const provider = settingsStore.getEffectiveProvider(TranslationMode.Select_Element);
+    const provider = settingsStore.getEffectiveProvider(
+      TranslationMode.Select_Element,
+    );
     items.push({
-      id: 'select_element',
-      label: t('desktop_fab_select_element_label'),
-      tooltip: !isSelectElementSupported.value ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب المان پشتیبانی نمی‌کند') : '',
+      id: "select_element",
+      label: t("desktop_fab_select_element_label"),
+      tooltip: !isSelectElementSupported.value
+        ? t("provider_does_not_support_bulk") ||
+          "این سرویس از حالت انتخاب المان پشتیبانی نمی‌کند"
+        : "",
       icon: IconSelectElement,
       disabled: !isSelectElementSupported.value,
       closeMenu: true,
       action: async () => {
         try {
-          await sendMessage({ 
+          await sendMessage({
             action: MessageActions.ACTIVATE_SELECT_ELEMENT_MODE,
-            data: { provider }
+            data: { provider },
           });
         } catch (err) {
           if (ExtensionContextManager.isContextError(err)) {
-            ExtensionContextManager.handleContextError(err, 'desktop-fab:select-element');
+            ExtensionContextManager.handleContextError(
+              err,
+              "desktop-fab:select-element",
+            );
           } else {
-            await handleError(err, { 
-              context: 'desktop-fab:select-element',
-              showToast: true 
+            await handleError(err, {
+              context: "desktop-fab:select-element",
+              showToast: true,
             });
           }
         }
-      }
+      },
     });
   }
 
   if (allowedFeatures.value.screenCapture) {
     items.push({
-      id: 'screen_capture',
-      label: t('desktop_fab_screen_capture_label'),
+      id: "screen_capture",
+      label: t("desktop_fab_screen_capture_label"),
       icon: IconScreenCapture,
       closeMenu: true,
       action: async () => {
         try {
-          await sendMessage({ 
-            action: MessageActions.START_SCREEN_CAPTURE 
+          await sendMessage({
+            action: MessageActions.START_SCREEN_CAPTURE,
           });
         } catch (err) {
           if (ExtensionContextManager.isContextError(err)) {
-            ExtensionContextManager.handleContextError(err, 'desktop-fab:screen-capture');
+            ExtensionContextManager.handleContextError(
+              err,
+              "desktop-fab:screen-capture",
+            );
           } else {
-            await handleError(err, { 
-              context: 'desktop-fab:screen-capture',
-              showToast: true 
+            await handleError(err, {
+              context: "desktop-fab:screen-capture",
+              showToast: true,
             });
           }
         }
-      }
+      },
     });
   }
 
   const status = pageTranslationStatus.value;
   const isPageTranslationAllowed = allowedFeatures.value.pageTranslation;
 
-  const pageSecondaryAction = isAutoTranslateToggleVisible.value ? {
-    active: isActive.value,
-    title: t('auto_translate_scope_menu_label', 'Auto-translate on future visits'),
-  } : null;
+  const pageSecondaryAction = isAutoTranslateToggleVisible.value
+    ? {
+        active: isActive.value,
+        title: t(
+          "auto_translate_scope_menu_label",
+          "Auto-translate on future visits",
+        ),
+      }
+    : null;
 
   if (status.isAuto || status.isTranslating) {
     items.push({
-      id: 'page_translating_stop',
-      label: t('desktop_fab_stop_auto_translating_label'),
+      id: "page_translating_stop",
+      label: t("desktop_fab_stop_auto_translating_label"),
       icon: IconHourglass,
       showProgress: status.isTranslating,
       percent: status.percent,
       closeMenu: false,
       action: () => {
-        logger.info('Stopping page translation from FAB');
+        logger.info("Stopping page translation from FAB");
         sendPageCommand({ action: MessageActions.PAGE_TRANSLATE_STOP_AUTO });
       },
-      secondaryAction: pageSecondaryAction
+      secondaryAction: pageSecondaryAction,
     });
   } else if (status.isCompleted) {
     items.push({
-      id: 'restore_page',
-      label: t('desktop_fab_restore_original_label'),
+      id: "restore_page",
+      label: t("desktop_fab_restore_original_label"),
       icon: IconRestore,
       closeMenu: true,
       action: () => sendPageCommand({ action: MessageActions.PAGE_RESTORE }),
-      secondaryAction: pageSecondaryAction
+      secondaryAction: pageSecondaryAction,
     });
   } else if (isPageTranslationAllowed) {
     const provider = settingsStore.getEffectiveProvider(TranslationMode.Page);
     items.push({
-      id: 'translate_page',
-      label: t('desktop_fab_translate_page_label'),
-      tooltip: !isPageTranslationSupported.value ? (t('provider_does_not_support_bulk') || 'این سرویس از ترجمه صفحه پشتیبانی نمی‌کند') : '',
+      id: "translate_page",
+      label: t("desktop_fab_translate_page_label"),
+      tooltip: !isPageTranslationSupported.value
+        ? t("provider_does_not_support_bulk") ||
+          "این سرویس از ترجمه صفحه پشتیبانی نمی‌کند"
+        : "",
       icon: IconTranslatePage,
       disabled: !isPageTranslationSupported.value,
       closeMenu: false,
-      action: () => sendPageCommand({
-        action: MessageActions.PAGE_TRANSLATE,
-        data: { provider },
-      }),
-      secondaryAction: pageSecondaryAction
+      action: () =>
+        sendPageCommand({
+          action: MessageActions.PAGE_TRANSLATE,
+          data: { provider },
+        }),
+      secondaryAction: pageSecondaryAction,
     });
   }
 
   return items;
 });
 
-const isTTSActive = computed(() => pendingSelection.value.hasSelection || (isThisTTSActive.value && tts.isPlaying.value));
+const isTTSActive = computed(
+  () =>
+    pendingSelection.value.hasSelection ||
+    (isThisTTSActive.value && tts.isPlaying.value),
+);
 
 // Page Translation Status & Progress Logic
 const pageTranslationStatus = computed(() => {
   const data = mobileStore.pageTranslationData;
   const isTranslating = data.status === TRANSLATION_STATUS.TRANSLATING;
   const isAuto = data.isAutoTranslating;
-  
-  // A page is considered "Completed" (for UI purposes) if it's fully translated, 
+
+  // A page is considered "Completed" (for UI purposes) if it's fully translated,
   // marked as completed, OR has some partial translations that can be restored.
-  const isCompleted = !isTranslating && !isAuto && (
-    data.isTranslated || 
-    data.status === TRANSLATION_STATUS.COMPLETED || 
-    (data.totalCount > 0 && data.translatedCount >= data.totalCount)
-  );
-  
+  const isCompleted =
+    !isTranslating &&
+    !isAuto &&
+    (data.isTranslated ||
+      data.status === TRANSLATION_STATUS.COMPLETED ||
+      (data.totalCount > 0 && data.translatedCount >= data.totalCount));
+
   const isError = data.status === TRANSLATION_STATUS.ERROR;
-  
+
   const isActive = isTranslating || isAuto || isCompleted || isError;
   const processedCount = (data.translatedCount || 0) + (data.failedCount || 0);
-  const percent = data.totalCount > 0 ? Math.round((processedCount / data.totalCount) * 100) : 0;
-  
+  const percent =
+    data.totalCount > 0
+      ? Math.round((processedCount / data.totalCount) * 100)
+      : 0;
+
   return {
     isActive,
     isTranslating,
     isAuto,
     isCompleted,
     isError,
-    percent
+    percent,
   };
 });
 
 const verticalPos = ref(-1);
 const userPreferredY = ref(null);
-const side = ref('right');
+const side = ref("right");
 const isDragging = ref(false);
 const wasDragged = ref(false);
 let startY = 0;
 let startX = 0;
 
 const checkBounds = () => {
-  if (typeof window === 'undefined' || userPreferredY.value === null) return;
-  
+  if (typeof window === "undefined" || userPreferredY.value === null) return;
+
   // Dynamically calculate maxY based on window height and a safe margin
   // (using a slightly larger margin to account for responsive scaling)
   const maxY = window.innerHeight - 80;
@@ -1029,81 +1175,100 @@ watch(
   () => {
     if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
   },
-  { flush: 'post' },
+  { flush: "post" },
 );
 
 const containerStyle = computed(() => {
   let opacityValue = ANIMATION_CONFIG.OPACITY_FULL;
-  let pointerEvents = 'auto';
+  let pointerEvents = "auto";
 
   if (isViewportUnstable.value && !isDragging.value) {
     opacityValue = 0;
-    pointerEvents = 'none';
-  } else if (isFaded.value && !isHovered.value && !isMenuOpen.value && !isDragging.value) {
-    opacityValue = fabIdleOpacity.value; 
+    pointerEvents = "none";
+  } else if (
+    isFaded.value &&
+    !isHovered.value &&
+    !isMenuOpen.value &&
+    !isDragging.value
+  ) {
+    opacityValue = fabIdleOpacity.value;
   }
 
   const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
-  const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
+  const moveDuration = isActive
+    ? ANIMATION_CONFIG.MOVE_IN
+    : ANIMATION_CONFIG.MOVE_OUT;
   const easing = ANIMATION_CONFIG.SOFT_EASING;
 
   // Build transition string dynamically
-  let transitionStr = 'none';
+  let transitionStr = "none";
   if (!isPositioning.value && !isViewportUnstable.value) {
-    const opacityDuration = isMenuOpen.value ? ANIMATION_CONFIG.QUICK_FADE : (opacityValue === ANIMATION_CONFIG.OPACITY_FULL ? ANIMATION_CONFIG.FADE_IN : ANIMATION_CONFIG.FADE_OUT);
+    const opacityDuration = isMenuOpen.value
+      ? ANIMATION_CONFIG.QUICK_FADE
+      : opacityValue === ANIMATION_CONFIG.OPACITY_FULL
+        ? ANIMATION_CONFIG.FADE_IN
+        : ANIMATION_CONFIG.FADE_OUT;
     transitionStr = `transform ${moveDuration} ${easing}, left ${moveDuration} ${easing}, right ${moveDuration} ${easing}, opacity ${opacityDuration} ${easing}`;
   }
 
   const style = {
-    '--fab-opacity': opacityValue,
-    '--fab-pointer-events': pointerEvents,
-    '--fab-transition': transitionStr,
-    '--fab-scale': fabScale.value
+    "--fab-opacity": opacityValue,
+    "--fab-pointer-events": pointerEvents,
+    "--fab-transition": transitionStr,
+    "--fab-scale": fabScale.value,
   };
 
   if (verticalPos.value === -1) {
-    style['--fab-top'] = '50%';
-    style['--fab-transform'] = 'translateY(-50%)';
+    style["--fab-top"] = "50%";
+    style["--fab-transform"] = "translateY(-50%)";
   } else {
-    style['--fab-top'] = `${verticalPos.value}px`;
-    style['--fab-transform'] = 'none';
+    style["--fab-top"] = `${verticalPos.value}px`;
+    style["--fab-transform"] = "none";
   }
 
   return style;
 });
 
 const mainButtonStyle = computed(() => {
-  const isRight = side.value === 'right';
+  const isRight = side.value === "right";
   const isActive = isHovered.value || isMenuOpen.value || isDragging.value;
-  const moveDuration = isActive ? ANIMATION_CONFIG.MOVE_IN : ANIMATION_CONFIG.MOVE_OUT;
-  
-  const translateValue = isActive 
-    ? (isRight ? 'calc(-1 * var(--fab-active-translate))' : 'var(--fab-active-translate)') 
-    : '0px';
+  const moveDuration = isActive
+    ? ANIMATION_CONFIG.MOVE_IN
+    : ANIMATION_CONFIG.MOVE_OUT;
+
+  const translateValue = isActive
+    ? isRight
+      ? "calc(-1 * var(--fab-active-translate))"
+      : "var(--fab-active-translate)"
+    : "0px";
 
   return {
-    'transform': `translateX(${translateValue})`,
-    'transition': `transform ${moveDuration} ${ANIMATION_CONFIG.SOFT_EASING}, background-color 0.2s ease, box-shadow 0.3s ease`
+    transform: `translateX(${translateValue})`,
+    transition: `transform ${moveDuration} ${ANIMATION_CONFIG.SOFT_EASING}, background-color 0.2s ease, box-shadow 0.3s ease`,
   };
 });
 
 const getBadgeTransform = (isHoveredOrOpen, isIndividualHovered) => {
-  const isRight = side.value === 'right';
+  const isRight = side.value === "right";
   // Use CSS variables for responsive translate amount
-  const translateValue = isHoveredOrOpen 
-    ? (isRight ? 'calc(-1 * var(--fab-active-translate))' : 'var(--fab-active-translate)') 
-    : '0px';
-    
+  const translateValue = isHoveredOrOpen
+    ? isRight
+      ? "calc(-1 * var(--fab-active-translate))"
+      : "var(--fab-active-translate)"
+    : "0px";
+
   const scale = isIndividualHovered ? 1.15 : 1;
   return `translateX(${translateValue}) scale(${scale})`;
 };
 
 const toggleMenu = () => {
   if (isDragging.value || wasDragged.value) return;
-  const isOnFabClickMode = pendingSelection.value.hasSelection && pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK;
+  const isOnFabClickMode =
+    pendingSelection.value.hasSelection &&
+    pendingSelection.value.mode === SelectionTranslationMode.ON_FAB_CLICK;
 
   if (isOnFabClickMode) {
-    logger.info('Translation triggered via Desktop FAB click');
+    logger.info("Translation triggered via Desktop FAB click");
     triggerTranslation();
     isMenuOpen.value = false;
   } else {
@@ -1114,28 +1279,33 @@ const toggleMenu = () => {
       pageEventBus.emit(MessageActions.PAGE_TRANSLATE_RESET_ERROR);
     }
 
-    logger.debug(isMenuOpen.value ? 'Desktop FAB menu opened' : 'Desktop FAB menu closed');
+    logger.debug(
+      isMenuOpen.value ? "Desktop FAB menu opened" : "Desktop FAB menu closed",
+    );
   }
 };
 const handleMenuItemClick = async (item) => {
-  logger.info('Desktop FAB menu item clicked', { id: item.id });
+  logger.info("Desktop FAB menu item clicked", { id: item.id });
   closeHidePopover();
   if (item.closeMenu) isMenuOpen.value = false;
-  if (typeof item.action === 'function') await item.action();
+  if (typeof item.action === "function") await item.action();
 };
 
 const handleOpenSettings = async () => {
   try {
-    logger.info('Opening settings from Desktop FAB');
+    logger.info("Opening settings from Desktop FAB");
     await sendMessage({ action: MessageActions.OPEN_OPTIONS_PAGE });
     isMenuOpen.value = false;
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
-      ExtensionContextManager.handleContextError(err, 'desktop-fab:open-settings');
+      ExtensionContextManager.handleContextError(
+        err,
+        "desktop-fab:open-settings",
+      );
     } else {
-      await handleError(err, { 
-        context: 'desktop-fab:open-settings',
-        showToast: true 
+      await handleError(err, {
+        context: "desktop-fab:open-settings",
+        showToast: true,
       });
     }
   }
@@ -1143,31 +1313,31 @@ const handleOpenSettings = async () => {
 
 const handleRevert = async () => {
   try {
-    logger.info('Reverting translations from Desktop FAB');
+    logger.info("Reverting translations from Desktop FAB");
     mobileStore.setHasElementTranslations(false);
     await sendMessage({ action: MessageActions.REVERT_SELECT_ELEMENT_MODE });
   } catch (err) {
     if (ExtensionContextManager.isContextError(err)) {
-      ExtensionContextManager.handleContextError(err, 'desktop-fab:revert');
+      ExtensionContextManager.handleContextError(err, "desktop-fab:revert");
     } else {
-      await handleError(err, { 
-        context: 'desktop-fab:revert',
-        showToast: true 
+      await handleError(err, {
+        context: "desktop-fab:revert",
+        showToast: true,
       });
     }
   }
 };
 
 const handleTTS = async () => {
-  if (ttsState.value === 'playing' || ttsState.value === 'loading') {
-    logger.info('Stopping TTS from Desktop FAB');
+  if (ttsState.value === "playing" || ttsState.value === "loading") {
+    logger.info("Stopping TTS from Desktop FAB");
     await tts.stop();
   } else if (pendingSelection.value.hasSelection) {
-    logger.info('Starting TTS from Desktop FAB');
+    logger.info("Starting TTS from Desktop FAB");
     isLocalLoading.value = true;
     try {
       // Pass 'auto' to ensure the background triggers detection on the new text
-      const result = await tts.speak(pendingSelection.value.text, 'auto');
+      const result = await tts.speak(pendingSelection.value.text, "auto");
       if (result) {
         localTTSId.value = tts.currentTTSId.value;
       }
@@ -1178,42 +1348,42 @@ const handleTTS = async () => {
 };
 
 const startDrag = (e) => {
-  const isMouseEvent = e.type === 'mousedown';
+  const isMouseEvent = e.type === "mousedown";
   if (isMouseEvent && e.button !== 0) return;
-  
+
   if (verticalPos.value === -1) {
     const rect = fabContainerRef.value.getBoundingClientRect();
     verticalPos.value = rect.top;
   }
-  
+
   const point = isMouseEvent ? e : e.touches[0];
   isDragging.value = false;
   startY = point.clientY - verticalPos.value;
   startX = point.clientX;
-  
+
   if (isMouseEvent) {
-    tracker.addEventListener(window, 'mousemove', onDrag);
-    tracker.addEventListener(window, 'mouseup', stopDrag);
+    tracker.addEventListener(window, "mousemove", onDrag);
+    tracker.addEventListener(window, "mouseup", stopDrag);
   } else {
-    tracker.addEventListener(window, 'touchmove', onDrag, { passive: false });
-    tracker.addEventListener(window, 'touchend', stopDrag);
+    tracker.addEventListener(window, "touchmove", onDrag, { passive: false });
+    tracker.addEventListener(window, "touchend", stopDrag);
   }
 };
 
 const onDrag = (e) => {
-  const isMouseEvent = e.type === 'mousemove';
+  const isMouseEvent = e.type === "mousemove";
   const point = isMouseEvent ? e : e.touches[0];
 
   if (!isDragging.value) {
     const dy = point.clientY - (startY + verticalPos.value);
     const dx = point.clientX - startX;
-    
+
     // Only start dragging if moved beyond threshold
     if (Math.abs(dy) > 5 || Math.abs(dx) > 5) {
       isDragging.value = true;
       wasDragged.value = true;
       isFaded.value = false;
-      
+
       // Re-sync startY to current point to ensure smooth transition from threshold
       startY = point.clientY - verticalPos.value;
     }
@@ -1228,7 +1398,7 @@ const onDrag = (e) => {
     verticalPos.value = newY;
 
     const screenWidth = window.innerWidth;
-    const currentSide = point.clientX > screenWidth / 2 ? 'right' : 'left';
+    const currentSide = point.clientX > screenWidth / 2 ? "right" : "left";
     if (currentSide !== side.value) {
       side.value = currentSide;
     }
@@ -1236,31 +1406,36 @@ const onDrag = (e) => {
 };
 
 const stopDrag = (e) => {
-  const isMouseEvent = e && e.type === 'mouseup';
+  const isMouseEvent = e && e.type === "mouseup";
   if (isMouseEvent) {
-    tracker.removeEventListener(window, 'mousemove', onDrag);
-    tracker.removeEventListener(window, 'mouseup', stopDrag);
+    tracker.removeEventListener(window, "mousemove", onDrag);
+    tracker.removeEventListener(window, "mouseup", stopDrag);
   } else {
-    tracker.removeEventListener(window, 'touchmove', onDrag);
-    tracker.removeEventListener(window, 'touchend', stopDrag);
+    tracker.removeEventListener(window, "touchmove", onDrag);
+    tracker.removeEventListener(window, "touchend", stopDrag);
   }
-  
+
   if (isDragging.value) {
-    logger.debug('Desktop FAB drag ended', { side: side.value, y: verticalPos.value });
+    logger.debug("Desktop FAB drag ended", {
+      side: side.value,
+      y: verticalPos.value,
+    });
   }
 
   // Use a slightly longer delay to ensure ghost clicks are swallowed
-  setTimeout(async () => { 
-    isDragging.value = false; 
+  setTimeout(async () => {
+    isDragging.value = false;
     // Small extra delay for wasDragged to ensure toggleMenu doesn't fire
-    setTimeout(() => { wasDragged.value = false; }, 150);
-    
+    setTimeout(() => {
+      wasDragged.value = false;
+    }, 150);
+
     try {
       userPreferredY.value = verticalPos.value;
       const position = { side: side.value, y: verticalPos.value };
       await storageManager.set({ DESKTOP_FAB_POSITION: position });
     } catch (err) {
-      logger.info('Failed to save FAB state:', err);
+      logger.info("Failed to save FAB state:", err);
     }
 
     // Restart fade timer after drag ends
@@ -1271,12 +1446,13 @@ const stopDrag = (e) => {
 onMounted(async () => {
   // Inject FAB-specific styles lazily into shadow root
   try {
-    const { fabUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
+    const { fabUiStyles } =
+      await import("@/core/content-scripts/chunks/lazy-styles.js");
     if (fabUiStyles && injectStylesToShadowRoot) {
-      injectStylesToShadowRoot(fabUiStyles, 'vue-fab-specific-styles');
+      injectStylesToShadowRoot(fabUiStyles, "vue-fab-specific-styles");
     }
   } catch (error) {
-    console.warn('[DesktopFabMenu] Failed to load lazy styles:', error);
+    console.warn("[DesktopFabMenu] Failed to load lazy styles:", error);
   }
 
   try {
@@ -1289,32 +1465,40 @@ onMounted(async () => {
       if (position.side) side.value = position.side;
     }
     checkBounds();
-    
+
     // Initial check for allowed features
     await updateAllowedFeatures();
-    
+
     // Listen for settings and exclusion changes to re-evaluate allowed features
-    tracker.trackResource('exclusion-sync', pageEventBus.on('FEATURE_STATUS_CHANGED', updateAllowedFeatures));
-    tracker.trackResource('exclusion-re-sync', pageEventBus.on('sync-interaction-listeners', updateAllowedFeatures));
+    tracker.trackResource(
+      "exclusion-sync",
+      pageEventBus.on("FEATURE_STATUS_CHANGED", updateAllowedFeatures),
+    );
+    tracker.trackResource(
+      "exclusion-re-sync",
+      pageEventBus.on("sync-interaction-listeners", updateAllowedFeatures),
+    );
   } catch (err) {
-    logger.info('Failed to load FAB state:', err);
+    logger.info("Failed to load FAB state:", err);
   }
 
-  tracker.addEventListener(window, 'resize', updateViewport);
-  tracker.addEventListener(window, 'scroll', updateViewport, { passive: true });
+  tracker.addEventListener(window, "resize", updateViewport);
+  tracker.addEventListener(window, "scroll", updateViewport, { passive: true });
 
   // Keep the detached hide popover anchored while it is open; the tracker
   // owns cleanup on unmount, the guard covers menu close.
   const repositionHidePopover = () => {
     if (hideMenuOpen.value && isMenuOpen.value) positionHidePopover();
   };
-  tracker.addEventListener(window, 'resize', repositionHidePopover);
-  tracker.addEventListener(window, 'scroll', repositionHidePopover, { passive: true });
-  
+  tracker.addEventListener(window, "resize", repositionHidePopover);
+  tracker.addEventListener(window, "scroll", repositionHidePopover, {
+    passive: true,
+  });
+
   // Settle position before showing to prevent jumps
   setTimeout(() => {
     isReady.value = true;
-    
+
     // Settling pixel position on first mount if not already set
     // We do this in a double requestAnimationFrame or nextTick to ensure the DOM is ready
     requestAnimationFrame(() => {
@@ -1324,7 +1508,7 @@ onMounted(async () => {
           verticalPos.value = rect.top;
           userPreferredY.value = rect.top;
         }
-        
+
         setTimeout(() => {
           isPositioning.value = false;
         }, 150);
@@ -1340,12 +1524,14 @@ onMounted(async () => {
     if (!path.includes(fabContainerRef.value)) isMenuOpen.value = false;
   };
 
-  tracker.addEventListener(window, 'click', handleClickOutside);
+  tracker.addEventListener(window, "click", handleClickOutside);
 });
 
 onUnmounted(() => {
-  emit('presence', false);
-  logger.debug('[DesktopFabMenu] Unmounting - performing owner-aware TTS cleanup');
+  emit("presence", false);
+  logger.debug(
+    "[DesktopFabMenu] Unmounting - performing owner-aware TTS cleanup",
+  );
   tts.stop({ stopOnlyIfOwner: true }).catch(() => {});
 });
 </script>
