@@ -166,8 +166,34 @@ export class RevertHandler extends ResourceTracker {
    * @returns {Promise<number>} Number of reverted translations
    */
   async revertVueTranslations(onRestoreFailure) {
-    // First, try to revert Select Element translation using global state
-    // This works even when SelectElementManager is deactivated
+    // Cancel frame-local work before touching global restoration state. Keep
+    // the captured owner so a replacement manager is not accidentally cancelled.
+    const selectElementManager = await this.getSelectElementManager();
+    const adapter = selectElementManager?.domTranslatorAdapter;
+    const sessionId = adapter?.currentSessionId;
+    const hasSessionId = sessionId !== undefined;
+    if (adapter?.isCurrentlyTranslating?.() === true) {
+      if (typeof adapter.cancelTranslation !== 'function') {
+        throw new Error('Active Select Element translation cannot be cancelled before revert');
+      }
+
+      await adapter.cancelTranslation({ silent: true, awaitSettlement: true });
+      if (adapter.isCurrentlyTranslating?.() === true) {
+        throw new Error('Select Element translation remained active after cancellation');
+      }
+
+      const currentManager = await this.getSelectElementManager();
+      if (
+        currentManager !== selectElementManager ||
+        currentManager?.domTranslatorAdapter !== adapter ||
+        currentManager?.domTranslatorAdapter?.isCurrentlyTranslating?.() === true ||
+        (hasSessionId && adapter.currentSessionId !== sessionId)
+      ) {
+        throw new Error('Select Element owner or session changed during cancellation; revert was not applied');
+      }
+    }
+
+    // Revert Select Element history only after any active frame-local operation settles.
     const selectElementReverted = await revertSelectElementTranslation(null, { onRestoreFailure });
 
     if (selectElementReverted > 0) {
@@ -188,7 +214,17 @@ export class RevertHandler extends ResourceTracker {
 
     // Fallback: Try to get SelectElementManager instance using the unified getter
     // which includes fallbacks to global window instances if FeatureManager is not available
-    const selectElementManager = await this.getSelectElementManager();
+    // A global zero-count result may have yielded to a newer frame-local operation.
+    // Do not let the manager fallback cancel or consume that newer session.
+    if (
+      adapter &&
+      (selectElementManager.domTranslatorAdapter !== adapter ||
+        (hasSessionId && adapter.currentSessionId !== sessionId) ||
+        adapter.isCurrentlyTranslating?.() === true)
+    ) {
+      logger.debug('Skipping SelectElementManager fallback because its adapter changed during global revert');
+      return 0;
+    }
 
     if (selectElementManager && typeof selectElementManager.revertTranslations === 'function') {
       const revertedCount = await selectElementManager.revertTranslations();

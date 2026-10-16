@@ -225,12 +225,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
   /**
    * Loads original settings from storage
    */
-  async _loadOriginalSettings() {
+  async _loadOriginalSettings(translationToken = null) {
     const [source, target] = await Promise.all([
       getSourceLanguageAsync(),
       getTargetLanguageAsync()
     ]);
-    this.originalSettings = { source, target };
+    if (!translationToken || this.currentTranslationToken === translationToken && !translationToken.cancelled) {
+      this.originalSettings = { source, target };
+    }
   }
 
   /**
@@ -271,10 +273,27 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this._conversationAcceptanceEnabled = false;
       
       // Generate a fresh session ID and entropy-scoped escaping prefix for this specific translation request
-      this.currentSessionId = `s${Math.random().toString(36).substr(2, 6)}`;
+      const sessionId = `s${Math.random().toString(36).substr(2, 6)}`;
+      this.currentSessionId = sessionId;
       this.currentEntropy = Math.random().toString(36).substr(2, 4);
+      let resolveCancellation;
+      let resolveSettled;
+      translationToken = {
+        messageId: null,
+        sessionId,
+        cancelled: false,
+        cancelSignal: new Promise(resolve => { resolveCancellation = resolve; }),
+        signalCancellation: () => resolveCancellation(),
+        settled: new Promise(resolve => { resolveSettled = resolve; }),
+        resolveSettled: () => resolveSettled(),
+      };
+      this.currentTranslationToken = translationToken;
+      this.currentMessageId = null;
       
-      if (onProgress) await onProgress({ status: TRANSLATION_STATUS.TRANSLATING, message: 'Translating...' });
+      if (onProgress) {
+        await Promise.race([onProgress({ status: TRANSLATION_STATUS.TRANSLATING, message: 'Translating...' }), translationToken.cancelSignal]);
+        this._assertCurrentTranslationContext(translationToken);
+      }
 
       const originalHTML = element.innerHTML;
       const elementId = generateElementId();
@@ -282,24 +301,29 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.translatedSegmentMap = new Map();
 
       // Resolve provider and target language early to determine extraction strategy
-      const [provider, targetLanguage] = await Promise.all([
+      const [provider, targetLanguage] = await Promise.race([Promise.all([
         options.provider || getEffectiveProviderAsync(TranslationMode.Select_Element),
         options.targetLanguage || getTargetLanguageAsync()
-      ]);
+      ]), translationToken.cancelSignal]);
+      this._assertCurrentTranslationContext(translationToken);
       let translationFontFamily = null;
       try {
-        if (await getSelectElementUseTranslationFontAsync()) {
-          const configuredFont = await getTranslationFontFamilyAsync();
+        if (await Promise.race([getSelectElementUseTranslationFontAsync(), translationToken.cancelSignal])) {
+          this._assertCurrentTranslationContext(translationToken);
+          const configuredFont = await Promise.race([getTranslationFontFamilyAsync(), translationToken.cancelSignal]);
+          this._assertCurrentTranslationContext(translationToken);
           translationFontFamily = resolveTranslationFontFamily(configuredFont, targetLanguage);
         }
       } catch (error) {
+        this._assertCurrentTranslationContext(translationToken);
         this.logger.debug('Select Element font enhancement skipped', error);
         translationFontFamily = null;
       }
 
       // 1. Collect all valid text nodes using V2 or V3 extraction based on feature flag and provider type
       const isAIProvider = isProviderType(registryIdToName(provider), ProviderTypes.AI);
-      const isBlockGroupingEnabled = isAIProvider && (await getFeatureSemanticBlockGroupingAsync());
+      const isBlockGroupingEnabled = isAIProvider && (await Promise.race([getFeatureSemanticBlockGroupingAsync(), translationToken.cancelSignal]));
+      this._assertCurrentTranslationContext(translationToken);
       // Resolve the abstract extraction mode once per operation; the policy
       // decides traversal/capability from this mode (never from provider names).
       const extractionMode = isBlockGroupingEnabled
@@ -692,9 +716,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
       // Context
       const contextMetadata = extractContextMetadata(element);
       const contextSummary = contextMetadata.contextSummary; // Extract the summary
-      const isAIContextEnabled = await getAIContextTranslationEnabledAsync();
+      const isAIContextEnabled = await Promise.race([getAIContextTranslationEnabledAsync(), translationToken.cancelSignal]);
+      this._assertCurrentTranslationContext(translationToken);
 
-      if (!this.originalSettings) await this._loadOriginalSettings();
+      if (!this.originalSettings) {
+        await Promise.race([this._loadOriginalSettings(translationToken), translationToken.cancelSignal]);
+        this._assertCurrentTranslationContext(translationToken);
+      }
 
       // Store state BEFORE translation
       this._storeTranslationState({ 
@@ -707,15 +735,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
           blockId: d.blockId
         })), 
         targetLanguage,
-        sessionId: this.currentSessionId,
+        sessionId,
         partial: true,
         shadowSpanning,
       });
 
       const messageId = `m${Math.random().toString(36).substr(2, 6)}`;
       this.currentMessageId = messageId;
-      translationToken = { messageId, cancelled: false };
-      this.currentTranslationToken = translationToken;
+      translationToken.messageId = messageId;
       const contextInvalidationPromise = new Promise((_, reject) => {
         this._contextInvalidationResolver = reject;
       });
@@ -973,7 +1000,8 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.isTranslating = true;
       this.currentMessageId = messageId;
 
-      await contentScriptIntegration.initialize();
+      await Promise.race([contentScriptIntegration.initialize(), translationToken.cancelSignal]);
+      this._assertCurrentTranslationContext(translationToken);
       
       const response = await Promise.race([
         contentScriptIntegration.sendTranslationRequest({
@@ -991,12 +1019,13 @@ export class DomTranslatorAdapter extends ResourceTracker {
             contextMetadata: isAIContextEnabled ? contextMetadata : null,
             contextSummary: contextSummary,
             options: { rawJsonPayload: true, enableDictionary: false, smartContext: isAIContextEnabled },
-            sessionId: this.currentSessionId,
+            sessionId,
             conversationParents,
           },
           context: MessageContexts.SELECT_ELEMENT,
         }),
         contextInvalidationPromise,
+        translationToken.cancelSignal.then(() => ({ success: false, cancelled: true })),
       ]);
 
       if (!ExtensionContextManager.isValidSync()) {
@@ -1018,7 +1047,10 @@ export class DomTranslatorAdapter extends ResourceTracker {
         if (response.metadata?.batchCount !== undefined) {
           this.batchCount = response.metadata.batchCount;
         }
-        result = await streamEndPromise;
+        result = await Promise.race([
+          streamEndPromise,
+          translationToken.cancelSignal.then(() => ({ success: false, cancelled: true })),
+        ]);
       } else if (response?.success) {
         result = await this._handleDirectResponse(
           response,
@@ -1080,7 +1112,7 @@ export class DomTranslatorAdapter extends ResourceTracker {
       if (result?.success) settleTerminalParents(translationToken);
 
       const finalResult = await this._finalizeTranslation({
-        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId: this.currentSessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount, shadowSpanning
+        result, element, elementId, targetLanguage: effectiveTargetLanguage, onComplete, sessionId, translationToken, committedParentCount, totalParentCount: getCurrentOutcome().totalParentCount, shadowSpanning
       });
 
       // --- Phase 6 Shadow Mode Validation Gate ---
@@ -1137,13 +1169,34 @@ export class DomTranslatorAdapter extends ResourceTracker {
 
     } catch (error) {
       const originalError = unwrapMutationFailure(error);
-      this.isTranslating = false; 
+      const ownsCurrentOperation = !translationToken || this.currentTranslationToken === translationToken;
 
       const type = matchErrorToType(originalError);
-      const isCancellation = type === ErrorTypes.USER_CANCELLED || type === ErrorTypes.TRANSLATION_CANCELLED;
+      const isCancellation = translationToken?.cancelled
+        || originalError?.type === ErrorTypes.USER_CANCELLED
+        || originalError?.type === ErrorTypes.TRANSLATION_CANCELLED
+        || type === ErrorTypes.USER_CANCELLED
+        || type === ErrorTypes.TRANSLATION_CANCELLED;
       const outcome = getCurrentOutcome(isCancellation);
-      if (outcome.committedParentCount === 0) {
-        removeSelectElementTranslation(this.currentSessionId);
+      if (isCancellation
+          && translationToken
+          && (translationToken.cancelled || this.currentTranslationToken !== translationToken)
+          && !this._contextInvalidated
+          && ExtensionContextManager.isValidSync()) {
+        if (outcome.committedParentCount === 0) {
+          removeSelectElementTranslation(translationToken.sessionId);
+        }
+        return {
+          success: false,
+          cancelled: true,
+          element,
+          committedParentCount: outcome.committedParentCount,
+          totalParentCount: outcome.totalParentCount,
+          translationOutcome: outcome,
+        };
+      }
+      if (ownsCurrentOperation && outcome.committedParentCount === 0 && translationToken) {
+        removeSelectElementTranslation(translationToken.sessionId);
       }
       const finalError = attachTranslationOutcome(originalError, outcome);
 
@@ -1151,14 +1204,25 @@ export class DomTranslatorAdapter extends ResourceTracker {
         this.logger.debug('Translation error in DomTranslatorAdapter:', finalError);
       }
 
-      if (onError) await onError({ status: TRANSLATION_STATUS.ERROR, error: finalError });
+      if (ownsCurrentOperation && onError) {
+        await Promise.race([
+          onError({ status: TRANSLATION_STATUS.ERROR, error: finalError }),
+          translationToken?.cancelSignal,
+        ].filter(Boolean));
+      }
       throw finalError;
     } finally {
       if (ownsActiveTranslationRoot) {
         activeTranslationRoots.delete(element);
       }
-      await this._drainAcceptanceAcks();
-      this._cleanupCurrentSession(true, translationToken);
+      try {
+        if (translationToken && this.currentTranslationToken === translationToken) {
+          await this._drainAcceptanceAcks();
+          this._cleanupCurrentSession(true, translationToken);
+        }
+      } finally {
+        translationToken?.resolveSettled();
+      }
     }
   }
 
@@ -1589,13 +1653,20 @@ export class DomTranslatorAdapter extends ResourceTracker {
       }
     
     // Update the existing state entry with finalized metadata
+    this._assertCurrentTranslationContext(translationToken);
     if (globalSelectElementState.currentTranslation) {
       globalSelectElementState.currentTranslation.targetLanguage = finalTarget;
       globalSelectElementState.currentTranslation.partial = false;
       globalSelectElementState.currentTranslation.sessionId = sessionId;
     }
 
-    if (onComplete) await onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true });
+    if (onComplete) {
+      await Promise.race([
+        onComplete({ status: TRANSLATION_STATUS.COMPLETED, elementId, translated: true }),
+        translationToken?.cancelSignal,
+      ].filter(Boolean));
+      this._assertCurrentTranslationContext(translationToken);
+    }
 
     // Non-terminal partial completion: some requested logical parents committed,
     // at least one remains uncommitted (invalid/pending/missing/rejected), and the
@@ -1892,11 +1963,15 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.invalidateContext();
       throw this._createContextInvalidationError();
     }
+    if (!token || token.cancelled || this.currentTranslationToken !== token || this.currentMessageId !== token.messageId) {
+      throw Object.assign(new Error('Translation cancelled'), { type: ErrorTypes.TRANSLATION_CANCELLED });
+    }
   }
 
   async cancelTranslation(options = {}) {
-    const { silent = false } = options;
-    if (!this.isTranslating) return;
+    const { silent = false, awaitSettlement = false } = options;
+    const token = this.currentTranslationToken;
+    if (!this.isTranslating && !token) return;
 
     if (this._contextInvalidated || !ExtensionContextManager.isValidSync()) {
       this.invalidateContext();
@@ -1907,7 +1982,14 @@ export class DomTranslatorAdapter extends ResourceTracker {
       this.logger.debug('Cancelling element translation');
     }
 
-    const messageId = this.currentMessageId;
+    const messageId = token?.messageId || this.currentMessageId;
+    if (token) {
+      token.cancelled = true;
+      token.signalCancellation?.();
+      this._cleanupCurrentSession(false, token);
+    } else {
+      this._cleanupCurrentSession(false);
+    }
     if (messageId) {
       try {
         // 1. Stop the network request in background
@@ -1918,18 +2000,30 @@ export class DomTranslatorAdapter extends ResourceTracker {
         }
       }
     }
-
-    // 2. Clear state pointers
-    this._cleanupCurrentSession(false);
+    if (awaitSettlement && token) await token.settled;
 
     // NOTE: We do NOT revert partial translations on cancel.
     // The user can manually revert via the Revert button if desired.
     // Partial translations that were already applied remain visible.
   }
 
-  isCurrentlyTranslating() { return this.isTranslating; }
+  isCurrentlyTranslating() { return this.isTranslating || Boolean(this.currentTranslationToken); }
   hasTranslation() { return globalSelectElementState.translationHistory?.length > 0; }
-  async revertTranslation() { return await revertSelectElementTranslation(); }
+  async revertTranslation() {
+    const token = this.currentTranslationToken;
+    if (token) {
+      await this.cancelTranslation({ silent: true, awaitSettlement: true });
+      if (
+        !token.cancelled
+        || this.currentTranslationToken === token
+        || this.currentTranslationToken !== null
+        || this.currentSessionId !== token.sessionId
+      ) {
+        throw new Error('Cannot revert while translation cancellation is still active or a newer translation has started');
+      }
+    }
+    return await revertSelectElementTranslation();
+  }
 
   async cleanup() {
     if (this.currentSessionId) {

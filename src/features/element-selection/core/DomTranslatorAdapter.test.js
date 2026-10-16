@@ -3742,6 +3742,182 @@ describe('DomTranslatorAdapter', () => {
   });
 
   describe('cancelTranslation', () => {
+    it('invalidates an operation cancelled while initial progress is pending', async () => {
+      let releaseProgress;
+      const translation = adapter.translateElement(testElement, {
+        onProgress: () => new Promise(resolve => { releaseProgress = resolve; }),
+      });
+      await vi.waitFor(() => expect(releaseProgress).toBeDefined());
+      const token = adapter.currentTranslationToken;
+      expect(token).toMatchObject({ messageId: null, cancelled: false });
+
+      await adapter.cancelTranslation({ silent: true });
+      releaseProgress();
+
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(contentScriptIntegration.sendTranslationRequest).not.toHaveBeenCalled();
+      expect(testElement.textContent).toBe('Hello');
+      expect(adapter.currentTranslationToken).toBeNull();
+    });
+
+    it('does not let an old settings wait overwrite a newer operation', async () => {
+      const { getSourceLanguageAsync } = await import('@/config.js');
+      adapter.originalSettings = null;
+      let releaseOldSettings;
+      getSourceLanguageAsync
+        .mockImplementationOnce(() => new Promise(resolve => { releaseOldSettings = resolve; }))
+        .mockResolvedValueOnce('en');
+      const old = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(releaseOldSettings).toBeDefined());
+      await adapter.cancelTranslation({ silent: true });
+
+      const newerElement = document.createElement('div');
+      newerElement.textContent = 'New';
+      document.body.appendChild(newerElement);
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValueOnce({
+        success: true, streaming: false, translatedText: [{ t: 'Nouveau', i: 'n1' }],
+      });
+      await adapter.translateElement(newerElement);
+      const newerSession = adapter.currentSessionId;
+      const newerHistory = [...globalSelectElementState.translationHistory];
+      releaseOldSettings('stale-source');
+
+      await expect(old).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(adapter.currentSessionId).toBe(newerSession);
+      expect(adapter.isTranslating).toBe(false);
+      expect(globalSelectElementState.translationHistory).toEqual(newerHistory);
+      expect(testElement.textContent).toBe('Hello');
+    });
+
+    it('locally cancels even when background cancellation throws, then allows explicit revert', async () => {
+      let callbacks;
+      registerTranslation.mockImplementation((_id, value) => { callbacks = value; });
+      contentScriptIntegration.cancelTranslationRequest.mockImplementationOnce(() => { throw new Error('offline'); });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Hola', i: 'n1' }] });
+      await adapter.cancelTranslation({ silent: true });
+      const { revertSelectElementTranslation } = await vi.importActual('./DomTranslatorState.js');
+      await revertSelectElementTranslation(globalSelectElementState.translationHistory.at(-1).sessionId);
+      callbacks.onStreamEnd({ success: true });
+
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(testElement.textContent).toBe('Hello');
+      expect(adapter.isTranslating).toBe(false);
+    });
+
+    it('ignores a late direct V2 response after cancellation', async () => {
+      let resolveResponse;
+      contentScriptIntegration.sendTranslationRequest.mockImplementation(() => new Promise(resolve => { resolveResponse = resolve; }));
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(resolveResponse).toBeDefined());
+      await adapter.cancelTranslation({ silent: true });
+      resolveResponse({ success: true, streaming: false, translatedText: [{ t: 'late', i: 'n1' }] });
+
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(testElement.textContent).toBe('Hello');
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+    });
+
+    it('does not let a paused old finalizer alter a newer session', async () => {
+      const callbacks = [];
+      registerTranslation.mockImplementation((_id, value) => callbacks.push(value));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+      let finishOldComplete;
+      const old = adapter.translateElement(testElement, {
+        onComplete: () => new Promise(resolve => { finishOldComplete = resolve; }),
+      });
+      await vi.waitFor(() => expect(callbacks).toHaveLength(1));
+      callbacks[0].onStreamUpdate({ success: true, data: [{ t: 'Old', i: 'n1' }] });
+      callbacks[0].onStreamEnd({ success: true });
+      await vi.waitFor(() => expect(finishOldComplete).toBeDefined());
+
+      const newerElement = document.createElement('div');
+      newerElement.textContent = 'New';
+      document.body.appendChild(newerElement);
+      const newer = adapter.translateElement(newerElement);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(2));
+      const newerSession = adapter.currentSessionId;
+      finishOldComplete();
+      await expect(old).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(adapter.currentSessionId).toBe(newerSession);
+      expect(adapter.isTranslating).toBe(true);
+
+      callbacks[1].onStreamUpdate({ success: true, data: [{ t: 'Newer', i: 'n1' }] });
+      callbacks[1].onStreamEnd({ success: true });
+      await newer;
+    });
+
+    it('reverts a partially committed grouped operation before ignoring late V3 results', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValue(true);
+      const first = document.createTextNode('A');
+      const second = document.createTextNode('B');
+      testElement.replaceChildren(first, second);
+      collectBlockGroups.mockReturnValue([
+        { id: 'n1', blockId: 'g1', text: 'A', leadingWS: '', trailingWS: '', inlineParentTags: ['div'], mode: 'standard', node: first },
+        { id: 'n2', blockId: 'g2', text: 'B', leadingWS: '', trailingWS: '', inlineParentTags: ['div'], mode: 'standard', node: second },
+      ]);
+      let callbacks;
+      registerTranslation.mockImplementation((_id, value) => { callbacks = value; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true, streaming: true, conversationAcceptance: true,
+      });
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Uno', i: 'n1', b: 'g1' }] });
+      await vi.waitFor(() => expect(sendRegularMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ parentId: 'g1', accepted: true }) }),
+        expect.anything()
+      ));
+      const acknowledgementsBeforeRevert = sendRegularMessage.mock.calls.length;
+
+      await adapter.revertTranslation();
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'Dos', i: 'n2', b: 'g2' }] });
+      callbacks.onStreamEnd({ success: true });
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+
+      expect(first.nodeValue).toBe('A');
+      expect(second.nodeValue).toBe('B');
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+      expect(globalSelectElementState.snapshots.size).toBe(0);
+      expect(sendRegularMessage).toHaveBeenCalledTimes(acknowledgementsBeforeRevert);
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValue(false);
+    });
+
+    it('reverts before the first result without retaining history', async () => {
+      let callbacks;
+      registerTranslation.mockImplementation((_id, value) => { callbacks = value; });
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({ success: true, streaming: true });
+      const translation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toBeDefined());
+      expect(await adapter.revertTranslation()).toBe(0);
+      callbacks.onStreamUpdate({ success: true, data: [{ t: 'late', i: 'n1' }] });
+      callbacks.onStreamEnd({ success: true });
+      await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(testElement.textContent).toBe('Hello');
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+      expect(globalSelectElementState.snapshots.size).toBe(0);
+    });
+
+    it('keeps the token cancellable while onError is pending', async () => {
+      let releaseError;
+      contentScriptIntegration.sendTranslationRequest.mockRejectedValue(new Error('provider failure'));
+      const translation = adapter.translateElement(testElement, {
+        onError: () => new Promise(resolve => { releaseError = resolve; }),
+      });
+      await vi.waitFor(() => expect(releaseError).toBeDefined());
+      const token = adapter.currentTranslationToken;
+      expect(adapter.isCurrentlyTranslating()).toBe(true);
+      await adapter.cancelTranslation({ silent: true });
+      expect(token.cancelled).toBe(true);
+      releaseError();
+      await expect(translation).rejects.toMatchObject({ message: 'provider failure' });
+      expect(adapter.currentTranslationToken).toBeNull();
+    });
+
     it('should cancel an ongoing translation', async () => {
       adapter.isTranslating = true;
       adapter.currentMessageId = 'test-msg-id';
@@ -3759,6 +3935,144 @@ describe('DomTranslatorAdapter', () => {
       const cancelSpy = contentScriptIntegration.cancelTranslationRequest;
       await adapter.cancelTranslation();
       expect(cancelSpy).not.toHaveBeenCalled();
+    });
+
+    it.each(['rejects', 'does not invalidate'])('fails closed when cancellation %s before revert', async (mode) => {
+      const { revertSelectElementTranslation } = await import('./DomTranslatorState.js');
+      const historyEntry = { sessionId: 'keep-history', element: testElement };
+      globalSelectElementState.translationHistory = [historyEntry];
+      const token = { messageId: 'active-request', cancelled: false };
+      adapter.currentTranslationToken = token;
+      adapter.isTranslating = true;
+      vi.spyOn(adapter, 'cancelTranslation').mockImplementationOnce(() => {
+        if (mode === 'rejects') return Promise.reject(new Error('cancel failed'));
+        return Promise.resolve();
+      });
+
+      await expect(adapter.revertTranslation()).rejects.toThrow(
+        mode === 'rejects' ? 'cancel failed' : 'Cannot revert while translation cancellation is still active'
+      );
+      expect(revertSelectElementTranslation).not.toHaveBeenCalled();
+      expect(globalSelectElementState.translationHistory).toEqual([historyEntry]);
+      expect(testElement.textContent).toBe('Hello');
+      expect(adapter.currentTranslationToken).toBe(token);
+    });
+
+    it('does not let a pending old revert consume a newer operation history', async () => {
+      const { getFeatureSemanticBlockGroupingAsync } = await import('@/config.js');
+      const { collectBlockGroups } = await import('./DomTranslatorUtils.js');
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValue(true);
+      collectBlockGroups.mockImplementation(element => [{
+        id: 'n1', blockId: 'g1', text: element.textContent, leadingWS: '', trailingWS: '',
+        inlineParentTags: ['div'], mode: 'standard', node: element.firstChild,
+      }]);
+      const callbacks = [];
+      registerTranslation.mockImplementation((_id, value) => callbacks.push(value));
+      contentScriptIntegration.sendTranslationRequest.mockResolvedValue({
+        success: true, streaming: true, conversationAcceptance: true,
+      });
+      const oldTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(1));
+      const oldToken = adapter.currentTranslationToken;
+      let releaseCancellation;
+      vi.spyOn(adapter, 'cancelTranslation').mockImplementationOnce(() => {
+        oldToken.cancelled = true;
+        adapter._cleanupCurrentSession(false, oldToken);
+        return new Promise(resolve => { releaseCancellation = resolve; });
+      });
+      const oldRevert = adapter.revertTranslation();
+      await vi.waitFor(() => expect(releaseCancellation).toBeDefined());
+
+      const newerElement = document.createElement('div');
+      newerElement.textContent = 'New';
+      document.body.appendChild(newerElement);
+      const newTranslation = adapter.translateElement(newerElement);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(2));
+      const newerToken = adapter.currentTranslationToken;
+      const newerSession = newerToken.sessionId;
+      callbacks[1].onStreamUpdate({ success: true, data: [{ t: 'Newer', i: 'n1' }] });
+      await vi.waitFor(() => expect(globalSelectElementState.translationHistory.some(entry => entry.sessionId === newerSession)).toBe(true));
+      const acknowledgements = sendRegularMessage.mock.calls.length;
+
+      callbacks[0].onStreamEnd({ success: true });
+      await expect(oldTranslation).resolves.toMatchObject({ success: false, cancelled: true });
+      releaseCancellation();
+      await expect(oldRevert).rejects.toThrow(/newer translation has started/);
+      expect(adapter.currentTranslationToken).toBe(newerToken);
+      expect(adapter.currentSessionId).toBe(newerSession);
+      expect(newerElement.textContent).toContain('Newer');
+      expect(globalSelectElementState.translationHistory.some(entry => entry.sessionId === newerSession)).toBe(true);
+      expect(sendRegularMessage).toHaveBeenCalledTimes(acknowledgements);
+
+      callbacks[1].onStreamEnd({ success: true });
+      await newTranslation;
+      getFeatureSemanticBlockGroupingAsync.mockResolvedValue(false);
+    });
+
+    it.each([
+      { lateOutcome: 'resolve', networkCancel: 'normal' },
+      { lateOutcome: 'reject', networkCancel: 'normal' },
+      { lateOutcome: 'resolve', networkCancel: 'throws' },
+      { lateOutcome: 'reject', networkCancel: 'throws' },
+    ])('settles same-root revert/restart with late $lateOutcome and $networkCancel cancellation', async ({ lateOutcome, networkCancel }) => {
+      let settleOldProvider;
+      const oldProvider = new Promise((resolve, reject) => {
+        settleOldProvider = lateOutcome === 'resolve'
+          ? () => resolve({ success: true, streaming: false, translatedText: [{ t: 'stale', i: 'n1' }] })
+          : () => reject(new Error('late provider failure'));
+      });
+      contentScriptIntegration.sendTranslationRequest
+        .mockImplementationOnce(() => oldProvider)
+        .mockResolvedValueOnce({ success: true, streaming: true });
+      if (networkCancel === 'throws') {
+        contentScriptIntegration.cancelTranslationRequest.mockImplementationOnce(() => { throw new Error('offline'); });
+      }
+      const callbacks = [];
+      registerTranslation.mockImplementation((_id, value) => callbacks.push(value));
+      const oldTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(contentScriptIntegration.sendTranslationRequest).toHaveBeenCalledTimes(1));
+
+      await expect(adapter.revertTranslation()).resolves.toBe(0);
+      await expect(oldTranslation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+
+      const newTranslation = adapter.translateElement(testElement);
+      await vi.waitFor(() => expect(callbacks).toHaveLength(2));
+      const newToken = adapter.currentTranslationToken;
+      callbacks[1].onStreamUpdate({ success: true, data: [{ t: 'fresh', i: 'n1' }] });
+      callbacks[1].onStreamEnd({ success: true });
+      await expect(newTranslation).resolves.toMatchObject({ success: true });
+      const captureHistoryAndOwnership = () => ({
+        history: globalSelectElementState.translationHistory.map(entry => ({
+          sessionId: entry.sessionId,
+          partial: entry.partial,
+          units: entry.originalTextNodesData.map(({ node, originalText, appliedText }) => ({ node, originalText, appliedText })),
+          ownership: (entry.auxiliaryOwnershipRecords || []).map(record => ({ ...record })),
+        })),
+        ownership: [...globalSelectElementState.auxiliaryOwnership].map(([key, value]) => [
+          key,
+          Array.isArray(value) ? value.map(record => ({ ...record })) : value,
+        ]),
+      });
+      const newHistoryAndOwnership = captureHistoryAndOwnership();
+      const acknowledgementsAfterB = sendRegularMessage.mock.calls.map(([message, options]) => [
+        { ...message, data: message?.data ? { ...message.data } : message?.data },
+        options ? { ...options } : options,
+      ]);
+
+      settleOldProvider();
+      callbacks[0].onStreamUpdate({ success: true, data: [{ t: 'stale callback', i: 'n1' }] });
+      callbacks[0].onStreamEnd({ success: true });
+      await oldTranslation;
+
+      expect(testElement.textContent).toContain('fresh');
+      expect(captureHistoryAndOwnership()).toEqual(newHistoryAndOwnership);
+      expect(sendRegularMessage.mock.calls.map(([message, options]) => [
+        { ...message, data: message?.data ? { ...message.data } : message?.data },
+        options ? { ...options } : options,
+      ])).toEqual(acknowledgementsAfterB);
+      expect(adapter.currentTranslationToken).toBeNull();
+      expect(newToken.cancelled).toBe(false);
     });
 
     it('clears temporary translated segment state after session cleanup', () => {
@@ -3791,6 +4105,7 @@ describe('DomTranslatorAdapter', () => {
 
       streamCallbacks.onStreamEnd({ success: true });
       await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
     });
 
     it('preserves committed parents and blocks late DOM/ACK work after conflict-style cancellation', async () => {
@@ -3829,6 +4144,7 @@ describe('DomTranslatorAdapter', () => {
       await expect(translation).resolves.toMatchObject({ success: false, cancelled: true });
       expect(first.nodeValue).toContain('Uno');
       expect(second.nodeValue).toBe('B');
+      expect(globalSelectElementState.translationHistory).toHaveLength(1);
       expect(sendRegularMessage.mock.calls.filter(([message]) => message?.data?.accepted === true))
         .toHaveLength(acceptedBeforeConflict.length);
       expect(sendRegularMessage).not.toHaveBeenCalledWith(
@@ -5793,6 +6109,12 @@ describe('DomTranslatorAdapter', () => {
       cb.onStreamUpdate({ success: true, data: [{ t: 'TA', i: 'n1', b: 'g1' }] });
       cb.onStreamEnd({ success: true });
       await expect(p).resolves.toMatchObject({ success: false, cancelled: true });
+      expect(n1.nodeValue).toBe('Hello ');
+      expect(globalSelectElementState.translationHistory).toHaveLength(0);
+      expect(sendRegularMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: expect.anything(), data: expect.objectContaining({ accepted: true }) }),
+        expect.anything()
+      );
     });
 
     it('operationAborted propagates as systemic not parent-local', async () => {
