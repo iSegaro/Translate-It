@@ -23,17 +23,20 @@ const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   showVisualFeedback: vi.fn(),
   toggleMouseHover: vi.fn(),
+  revertTranslation: vi.fn().mockResolvedValue(true),
+  activateSelectMode: vi.fn().mockResolvedValue(true),
+  deactivateSelectMode: vi.fn().mockResolvedValue(true),
   findProviderById: vi.fn(() => ({ features: ['bulk'] }))
 }))
 
 vi.mock('@/features/translation/composables/useTranslationModes.js', () => ({
   useSelectElementTranslation: () => ({
     isSelectModeActive: ref(false),
-    activateSelectMode: vi.fn().mockResolvedValue(true),
-    deactivateSelectMode: vi.fn().mockResolvedValue(true),
+    activateSelectMode: mocks.activateSelectMode,
+    deactivateSelectMode: mocks.deactivateSelectMode,
     isActivating: ref(false)
   }),
-  useSidepanelActions: () => ({ revertTranslation: vi.fn().mockResolvedValue(true) })
+  useSidepanelActions: () => ({ revertTranslation: mocks.revertTranslation })
 }))
 
 vi.mock('@/features/mouse-hover/composables/useMouseHoverToggle.js', () => ({
@@ -156,6 +159,10 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     mocks.sendMessage = vi.fn().mockResolvedValue({})
     mocks.showVisualFeedback.mockReset()
     mocks.toggleMouseHover.mockReset()
+    mocks.revertTranslation.mockReset().mockResolvedValue(true)
+    mocks.activateSelectMode.mockReset().mockResolvedValue(true)
+    mocks.deactivateSelectMode.mockReset().mockResolvedValue(true)
+    mocks.findProviderById.mockReset().mockReturnValue({ features: ['bulk'] })
     originalOpenOptionsPage = globalThis.browser.runtime.openOptionsPage
     globalThis.browser.runtime.openOptionsPage = vi.fn().mockResolvedValue(undefined)
     globalThis.browser.tabs.query = vi.fn(async () => [TAB])
@@ -191,13 +198,19 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     expect(lower.map((button) => button.attributes('id'))).toEqual([
       'fabVisibilityBtn', 'pdfBtn', 'subtitleBtn', 'settingsBtn'
     ])
-    // The upper group is untouched: same 8 children, no FAB entry.
+    // The upper group folds Select + Revert into one badge wrapper:
+    // 7 direct children, no Revert row, no FAB entry.
     const upperChildren = [...wrapper.get('.toolbar-group').element.children]
-    expect(upperChildren).toHaveLength(8)
+    expect(upperChildren).toHaveLength(7)
     expect(wrapper.find('.toolbar-group #fabVisibilityBtn').exists()).toBe(false)
     expect(upperChildren.map((child) => child.id)).toEqual([
-      'selectElementBtn', 'revertActionBtn', '', '', 'screenCaptureBtn', '', '', 'historyBtn'
+      '', '', '', 'screenCaptureBtn', '', '', 'historyBtn'
     ])
+    // First child is the Select + Revert badge wrapper holding both ids.
+    const selectAction = wrapper.get('.toolbar-group .toolbar-select-action')
+    expect(selectAction.element.tagName).toBe('DIV')
+    expect(selectAction.find('#selectElementBtn').exists()).toBe(true)
+    expect(selectAction.find('#revertActionBtn').exists()).toBe(true)
     // Both groups keep the shared row contract.
     for (const button of lower) expect(button.classes()).toContain('toolbar-button')
   })
@@ -999,6 +1012,171 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     resolveLate(reply('visible'))
     await drain()
     expect(getCallCount()).toBe(readsBefore)
+  })
+
+  // ── Revert badge (Phase 3A) ──────────────────────────────────────────
+
+  describe('revert badge pair', () => {
+    it('keeps Select and Revert as sibling native buttons inside a relative wrapper', async () => {
+      await mountToolbar()
+
+      const pair = wrapper.get('.toolbar-select-action')
+      expect(pair.element.tagName).toBe('DIV')
+      expect(pair.classes()).toContain('toolbar-select-action')
+      // Positioning (relative wrapper, absolute badge) is pinned via
+      // compiled CSS in SidepanelToolbarScss.test.js — jsdom applies no
+      // stylesheets, so only the DOM contract is asserted here.
+
+      const select = wrapper.get('#selectElementBtn')
+      const badge = wrapper.get('#revertActionBtn')
+      expect(select.element.tagName).toBe('BUTTON')
+      expect(badge.element.tagName).toBe('BUTTON')
+      expect(badge.attributes('type')).toBe('button')
+      // Siblings under the wrapper — never nested in each other.
+      expect(select.element.parentElement).toBe(pair.element)
+      expect(badge.element.parentElement).toBe(pair.element)
+      expect(select.find('#revertActionBtn').exists()).toBe(false)
+      expect(badge.find('#selectElementBtn').exists()).toBe(false)
+      // Ids and handlers preserved on both controls.
+      expect([...pair.element.children].map((child) => child.id)).toEqual([
+        'selectElementBtn', 'revertActionBtn'
+      ])
+      // Mouse Hover stays outside the pair, not a sibling of the badge.
+      expect(wrapper.get('.toolbar-select-action + .toolbar-button').exists()).toBe(true)
+      expect(pair.find('.toolbar-button:not(#selectElementBtn)').exists()).toBe(false)
+    })
+
+    it('renders the badge surface aria-hidden with a 12px MaskIcon', async () => {
+      await mountToolbar()
+
+      const badge = wrapper.get('#revertActionBtn')
+      const surface = badge.get('.revert-badge-surface')
+      expect(surface.element.tagName).toBe('SPAN')
+      expect(surface.attributes('aria-hidden')).toBe('true')
+
+      const icon = badge.findComponent(MaskIcon)
+      expect(icon.exists()).toBe(true)
+      expect(icon.props('src')).toContain('revert.png')
+      expect(icon.props('size')).toBe(12)
+      expect(icon.classes()).toContain('revert-badge-icon')
+      expect(icon.classes()).not.toContain('toolbar-icon')
+      expect(icon.attributes('aria-hidden')).toBe('true')
+
+      const selectIcon = wrapper.get('#selectElementBtn').findComponent(MaskIcon)
+      expect(selectIcon.props('src')).toContain('select.png')
+      expect(selectIcon.props('size')).toBe(22)
+      expect(selectIcon.classes()).toContain('toolbar-mask-icon')
+    })
+
+    it('activates the badge once per click and never double-fires on keydown (native only)', async () => {
+      await mountToolbar()
+      const badge = wrapper.get('#revertActionBtn')
+      expect(badge.element.tagName).toBe('BUTTON')
+
+      await badge.trigger('click')
+      await drain()
+      expect(mocks.revertTranslation).toHaveBeenCalledTimes(1)
+
+      // No keydown handler is bound on the badge: synthetic keys do nothing,
+      // so Enter/Space can never double-fire — only native activation counts.
+      const callsBefore = mocks.revertTranslation.mock.calls.length
+      await badge.trigger('keydown', { key: 'Enter' })
+      await badge.trigger('keydown', { key: ' ' })
+      await drain()
+      expect(mocks.revertTranslation.mock.calls.length).toBe(callsBefore)
+    })
+
+    it('activates Select once each for click, Enter, and Space', async () => {
+      await mountToolbar()
+      const select = wrapper.get('#selectElementBtn')
+
+      await select.trigger('click')
+      await select.trigger('keydown', { key: 'Enter' })
+      await select.trigger('keydown', { key: ' ' })
+      await drain()
+      expect(mocks.activateSelectMode).toHaveBeenCalledTimes(3)
+      expect(mocks.revertTranslation).not.toHaveBeenCalled()
+    })
+
+    it('keeps badge and Select actions independent (one control, one call, zero cross-calls)', async () => {
+      await mountToolbar()
+
+      await wrapper.get('#revertActionBtn').trigger('click')
+      await drain()
+      expect(mocks.revertTranslation).toHaveBeenCalledTimes(1)
+      expect(mocks.activateSelectMode).not.toHaveBeenCalled()
+      expect(mocks.deactivateSelectMode).not.toHaveBeenCalled()
+
+      mocks.revertTranslation.mockClear()
+      await wrapper.get('#selectElementBtn').trigger('click')
+      await drain()
+      expect(mocks.activateSelectMode).toHaveBeenCalledTimes(1)
+      expect(mocks.revertTranslation).not.toHaveBeenCalled()
+    })
+
+    it('keeps Revert clickable while Select is disabled (unsupported provider)', async () => {
+      mocks.findProviderById.mockReturnValue({ features: [] })
+      await mountToolbar()
+
+      const select = wrapper.get('#selectElementBtn')
+      const badge = wrapper.get('#revertActionBtn')
+      expect(select.attributes('disabled')).toBeDefined()
+      expect(badge.attributes('disabled')).toBeUndefined()
+
+      await badge.trigger('click')
+      await drain()
+      expect(mocks.revertTranslation).toHaveBeenCalledTimes(1)
+      expect(mocks.activateSelectMode).not.toHaveBeenCalled()
+    })
+
+    it('pins type=button on both pair controls (no implicit submit)', async () => {
+      await mountToolbar()
+
+      expect(wrapper.get('#selectElementBtn').attributes('type')).toBe('button')
+      expect(wrapper.get('#revertActionBtn').attributes('type')).toBe('button')
+    })
+
+    it('keeps the Select accessible name stable when the provider lacks bulk', async () => {
+      mocks.findProviderById.mockReturnValue({ features: [] })
+      await mountToolbar()
+
+      const select = wrapper.get('#selectElementBtn')
+      // The NAME stays the action in all states; the disabled reason lives
+      // in title only, so AT users always hear the same control identity.
+      expect(select.attributes('aria-label')).toBe('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')
+      expect(select.attributes('title')).toBe('provider_does_not_support_bulk')
+      expect(select.attributes('title')).not.toBe(select.attributes('aria-label'))
+      expect(select.attributes('disabled')).toBeDefined()
+    })
+
+    it('exposes localized labels and Select pressed state', async () => {
+      await mountToolbar()
+
+      const select = wrapper.get('#selectElementBtn')
+      expect(select.attributes('aria-label')).toBeTruthy()
+      expect(select.attributes('aria-label')).toBe(select.attributes('title'))
+      expect(select.attributes('aria-pressed')).toBe('false')
+
+      const badge = wrapper.get('#revertActionBtn')
+      expect(badge.attributes('aria-label')).toBeTruthy()
+      expect(badge.attributes('aria-label')).toBe(badge.attributes('title'))
+    })
+
+    it('reports visual feedback against the preserved button ids', async () => {
+      await mountToolbar()
+
+      await wrapper.get('#revertActionBtn').trigger('click')
+      await drain()
+      expect(mocks.showVisualFeedback).toHaveBeenCalled()
+      const revertTarget = mocks.showVisualFeedback.mock.calls[0][0]
+      expect(revertTarget?.id ?? revertTarget?.getAttribute?.('id')).toBe('revertActionBtn')
+
+      mocks.showVisualFeedback.mockClear()
+      await wrapper.get('#selectElementBtn').trigger('click')
+      await drain()
+      const selectTarget = mocks.showVisualFeedback.mock.calls[0][0]
+      expect(selectTarget?.id ?? selectTarget?.getAttribute?.('id')).toBe('selectElementBtn')
+    })
   })
 
   it('stops the retry timer when the panel is hidden or the component unmounts', async () => {
