@@ -30,7 +30,6 @@
               type="source"
               :error="sourceLanguageError"
               :beta-label="t('deepl_beta_label')"
-              class="language-dropdown"
             />
           </div>
 
@@ -43,7 +42,6 @@
               type="target"
               :error="targetLanguageError"
               :beta-label="t('deepl_beta_label')"
-              class="language-dropdown"
             />
           </div>
 
