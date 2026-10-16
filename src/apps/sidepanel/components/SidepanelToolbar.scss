@@ -128,6 +128,109 @@
     justify-content: center;
   }
 
+  /* ---- Select + Revert badge pair ----
+     Select keeps the shared 34px row contract; its wrapper is the same
+     34px column plus 16px of reserved block space below it (50px flow box).
+     The badge is an independent native 24x24 target anchored to the
+     wrapper's inline-end corner via logical properties (RTL mirrors it).
+     The visible 16px surface sits centred in that target: 12px of visible
+     descent lives entirely inside the wrapper's reserved space - never in
+     the 8px compacted group gap.
+     Inline containment (row arithmetic, not re-measured):
+     - no scrollbar: 34px wrapper centred in the 43px content box
+       (44px rail minus the 1px border); a 0px inline-end inset keeps the
+       24x24 target flush with the wrapper edge -> target at 14.5..38.5px,
+       4.5px inside the content edge.
+     - @max-height 500px the rail scrolls: scrollbar-width: thin reserves
+       ~8px at the content edge (overlay platforms: 0; engines without
+       thin support may differ), so the scrollport becomes ~35px, the
+       wrapper re-centres to 0.5..34.5px and the target lands at
+       10.5..34.5px - 0.5px clearance, never clipped.
+     - a >=10px classic scrollbar (no thin support) would also overflow
+       the 34px ROW contract itself; rows, not the badge, own that risk.
+     The focus ring is drawn INSIDE the target (offset -2px) so its ink can
+     never be cut by the rail edge or the scrollport edge, in any layout
+     and either writing direction. Never shrink the 24x24 target to fit.
+     Independent controls: no parent-level :hover; the blanket 34x34
+     geometry, outline reset and press transforms are overridden here at
+     higher specificity than `.side-toolbar button`. */
+  .toolbar-select-action {
+    position: relative;
+    width: 34px;
+    height: 50px;
+    flex-shrink: 0;
+
+    button.toolbar-revert-badge {
+      position: absolute;
+      inset-inline-end: 0;
+      inset-block-end: 0;
+      width: 24px !important;
+      height: 24px !important;
+      min-width: 24px !important;
+      min-height: 24px !important;
+      max-height: 24px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      border: none !important;
+      background: transparent !important;
+      border-radius: 6px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-sizing: border-box !important;
+      /* Not a .toolbar-button, so the rail colour rule does not apply; the
+         mask glyph needs currentColor explicitly (theme tokens flip it). */
+      color: var(--color-text, var(--text-color)) !important;
+      cursor: pointer !important;
+      transition: background-color 0.2s ease !important;
+
+      /* Native press only: the visible surface never shifts under cursor. */
+      &:hover:not(:disabled),
+      &:active:not(:disabled) {
+        background-color: transparent !important;
+        transform: none !important;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--color-primary, #1976d2) !important;
+        /* Inside the target box: rings outside would be ink-clipped by the
+           rail edge (43px content) or the @max-height 500px scrollport. */
+        outline-offset: -2px !important;
+      }
+    }
+
+    .revert-badge-surface {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      box-sizing: border-box;
+      border: 1px solid var(--color-border);
+      border-radius: 50%;
+      /* Opaque theme surface (same token as the rail background): Select's
+         hover paint can never tint the disc. */
+      background-color: var(--color-surface-alt);
+    }
+
+    .revert-badge-icon {
+      color: inherit;
+      opacity: 0.65;
+      transition: opacity 0.2s ease;
+    }
+
+    button.toolbar-revert-badge:hover .revert-badge-surface,
+    button.toolbar-revert-badge:focus-visible .revert-badge-surface {
+      background-color: var(--toolbar-link-hover-bg-color);
+      border-color: var(--color-action-hover-accent);
+    }
+
+    button.toolbar-revert-badge:hover .revert-badge-icon,
+    button.toolbar-revert-badge:focus-visible .revert-badge-icon {
+      opacity: 1;
+    }
+  }
+
   /* ---- Icon Sizing Standardization ---- */
   img,
   .toolbar-icon {
@@ -180,10 +283,12 @@
   }
 
   /* Short-height compaction. The rail is a full-height column of fixed 34px
-     rows; content is ~495px today and ~543px with the FAB toggle (+48px),
+     rows; content is ~463px today and ~511px with the FAB toggle (+48px),
      with no overflow handling on .side-toolbar — below that height the column
      would spill past the panel edge. Tighten only the row gap (never the
-     34px geometry) so every button stays visible without a scrollbar. */
+     34px geometry) so every button stays visible without a scrollbar.
+     Column arithmetic after folding Revert into the Select badge wrapper:
+     511 = 543 − 34 (Revert row) − 14 (gap) + 16 (wrapper block space). */
   @media (max-height: 620px) {
     .toolbar-group,
     .toolbar-group-bottom {
@@ -191,14 +296,14 @@
     }
   }
 
-  /* Extreme short heights. The compacted column still needs ~483px of rail;
-     measured in a real browser, a 480px rail clips Settings by 7px and a
-     400px rail drops PDF/Subtitle/Settings entirely with no way to reach
-     them. Only below 500px — strictly under the 520px fit and the 620px
-     compaction — does the rail become its own scroll container, so normal
-     and 520px heights keep the exact same no-scrollbar feel. The thumb is
-     slimmed for a 44–50px column; token colours keep it correct in light
-     and dark, and RTL places it on the leading edge automatically. */
+  /* Extreme short heights. After folding Revert into the Select badge
+     wrapper the compacted column needs ~457px of rail (483 − 34 − 8 + 16,
+     row arithmetic), so a 480px rail fits it and only below 500px —
+     strictly under the 520px fit and the 620px compaction — does the rail
+     become its own scroll container, keeping normal heights on the exact
+     same no-scrollbar feel. The thumb is slimmed for a 44–50px column;
+     token colours keep it correct in light and dark, and RTL places it on
+     the leading edge automatically. */
   @media (max-height: 500px) {
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -235,14 +340,11 @@
       }
 
       /*
-         Standardize ONLY utility icons to White
-         Leave Provider and Page Translation colored
+         Select and Revert glyphs are MaskIcon spans (ADR-001 currentColor)
+         now: no img-invert rule is needed — `color: var(--color-text)`
+         (declared on the badge; `.toolbar-button` covers Select) flips
+         light/dark for both themes automatically.
       */
-      &#selectElementBtn img,
-      &#revertActionBtn img {
-        filter: brightness(0) invert(1) !important;
-        opacity: 0.8 !important;
-      }
 
       &:hover img {
         opacity: 1 !important;
@@ -265,5 +367,11 @@
       }
 
     }
+
+    /* Beat the dark button hover without painting the badge target. */
+    .toolbar-select-action button.toolbar-revert-badge:hover:not(:disabled) {
+      background-color: transparent !important;
+    }
+
   }
 }

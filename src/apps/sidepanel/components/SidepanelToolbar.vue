@@ -1,38 +1,55 @@
 <template>
   <div class="side-toolbar">
     <div class="toolbar-group">
-      <button
+      <!-- Select + Revert badge pair. The wrapper reserves 16px of block
+           space below Select, so the badge's 24x24 target descends INTO the
+           wrapper's own box: it can never reach Mouse Hover across any
+           group gap (14px default / 8px compacted) and the scroll state
+           (@max-height 500px) sees no extra overflow. Sibling native
+           buttons, never nested; ids and handlers unchanged. -->
+      <div
         v-if="isSelectElementEnabled"
-        id="selectElementBtn"
-        class="toolbar-button"
-        :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
-        :disabled="isActivating || !isSelectElementSupported"
-        :class="{ 'ti-active': isSelectModeActive }"
-        @click="handleSelectElement"
-        @keydown.enter.prevent="handleSelectElement"
-        @keydown.space.prevent="handleSelectElement"
+        class="toolbar-select-action"
       >
-        <img
-          :src="selectIcon"
-          alt="Select Element"
-          class="toolbar-icon"
+        <button
+          id="selectElementBtn"
+          type="button"
+          class="toolbar-button"
+          :title="!isSelectElementSupported ? (t('provider_does_not_support_bulk') || 'این سرویس از حالت انتخاب پشتیبانی نمی‌کند') : t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
+          :aria-label="t('SIDEPANEL_SELECT_ELEMENT_TOOLTIP')"
+          :disabled="isActivating || !isSelectElementSupported"
+          :aria-pressed="isSelectModeActive"
+          :class="{ 'ti-active': isSelectModeActive }"
+          @click="handleSelectElement"
+          @keydown.enter.prevent="handleSelectElement"
+          @keydown.space.prevent="handleSelectElement"
         >
-      </button>
-      <button
-        v-if="isSelectElementEnabled"
-        id="revertActionBtn"
-        class="toolbar-button"
-        :title="t('SIDEPANEL_REVERT_TOOLTIP')"
-        @click="handleRevertAction"
-        @keydown.enter.prevent="handleRevertAction"
-        @keydown.space.prevent="handleRevertAction"
-      >
-        <img
-          :src="revertIcon"
-          alt="Revert"
-          class="toolbar-icon"
+          <MaskIcon
+            :src="selectIcon"
+            class="toolbar-mask-icon"
+            :size="22"
+          />
+        </button>
+        <button
+          id="revertActionBtn"
+          type="button"
+          class="toolbar-revert-badge"
+          :title="t('SIDEPANEL_REVERT_TOOLTIP')"
+          :aria-label="t('SIDEPANEL_REVERT_TOOLTIP')"
+          @click="handleRevertAction"
         >
-      </button>
+          <span
+            class="revert-badge-surface"
+            aria-hidden="true"
+          >
+            <MaskIcon
+              :src="revertIcon"
+              class="revert-badge-icon"
+              :size="12"
+            />
+          </span>
+        </button>
+      </div>
 
       <!-- Mouse Hover Button -->
       <button

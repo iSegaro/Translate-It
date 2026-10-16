@@ -149,11 +149,14 @@ describe('SidepanelToolbar.scss icon behavior (migrated from _sidepanel.scss)', 
     expect(stripped).not.toMatch(/(^|[},])\s*\.toolbar-icon\s*\{/)
   })
 
-  it('preserves dark theme icon inversion for utility buttons', () => {
+  it('migrates Select/Revert glyphs to MaskIcon: no img invert, currentColor flips the theme', () => {
     const { css } = compile()
+    // MaskIcon spans (ADR-001 currentColor) need no img-invert rule: color
+    // tokens on `.toolbar-button` (Select) and the badge flip light/dark.
+    expect(css).not.toContain('#selectElementBtn img')
+    expect(css).not.toContain('#revertActionBtn img')
+    // The remaining <img>-glyph utility invert (restore button) is untouched.
     expect(css).toContain('brightness(0) invert(1)')
-    expect(css).toContain('#selectElementBtn img')
-    expect(css).toContain('#revertActionBtn img')
     expect(css).not.toMatch(/#historyBtn\s+img/)
     expect(css).not.toMatch(/#settingsBtn\s+img/)
     const maskRule = css.match(/\.side-toolbar\s+\.toolbar-mask-icon\s*\{([^}]*)\}/)
@@ -361,6 +364,270 @@ describe('SidepanelToolbar.scss accessible icon contract', () => {
       expect(rule, `compiled ${button} image rule`).toBeDefined()
       expect(rule[2]).toContain('filter: none !important')
       expect(rule[2]).toContain('opacity: 1 !important')
+    }
+  })
+})
+
+/**
+ * Revert badge pair (Phase 3A). Select keeps the shared 34×34 row; its
+ * wrapper adds 16px of reserved block space (50px flow box) and the badge
+ * is an independent 24×24 native target anchored to the wrapper's
+ * inline-end corner. The 16px surface sits centred in that target, so the
+ * visible descent lives inside the wrapper — never in the group gap.
+ */
+describe('SidepanelToolbar.scss revert badge contract', () => {
+  const compileCss = () => compile().css
+  const badgeSelector = '.side-toolbar .toolbar-select-action button.toolbar-revert-badge'
+
+  it('reserves a 34×50 relative flow box for the Select + badge pair', () => {
+    const css = compileCss()
+    const rule = css.match(/\.side-toolbar\s+\.toolbar-select-action\s*\{([^}]*)\}/)
+    expect(rule).not.toBeNull()
+    expect(rule[1]).toContain('position: relative')
+    expect(rule[1]).toContain('width: 34px')
+    expect(rule[1]).toContain('height: 50px')
+    // Scoped under .side-toolbar (ownership contract).
+    expect(css).toContain('.side-toolbar .toolbar-select-action')
+  })
+
+  it('keeps the badge a 24×24 target (never shrunk) on logical corner offsets', () => {
+    const css = compileCss()
+    expect(css).toContain(badgeSelector)
+    const rule = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
+    expect(rule).not.toBeNull()
+    // Never shrink the target to fit: every box prop stays 24px.
+    for (const declaration of [
+      'width: 24px !important',
+      'height: 24px !important',
+      'min-width: 24px !important',
+      'min-height: 24px !important',
+      'max-height: 24px !important'
+    ]) {
+      expect(rule[1]).toContain(declaration)
+    }
+    expect(rule[1]).toContain('position: absolute')
+    expect(rule[1]).toContain('inset-inline-end: 0')
+    expect(rule[1]).toContain('inset-block-end: 0')
+  })
+
+  it('uses logical properties so RTL mirrors the badge (no physical offsets)', () => {
+    const css = compileCss()
+    expect(css).toContain('inset-inline-end: 0')
+    expect(css).toContain('inset-block-end: 0')
+    const rule = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
+    expect(rule).not.toBeNull()
+    expect(rule[1]).not.toMatch(/(^|[;{]\s*)(right|left|top|bottom)\s*:/)
+  })
+
+  it('centers an opaque 16px surface carrying the glyph', () => {
+    const css = compileCss()
+    const surface = css.match(/\.revert-badge-surface\s*\{([^}]*)\}/)
+    expect(surface).not.toBeNull()
+    expect(surface[1]).toContain('width: 16px')
+    expect(surface[1]).toContain('height: 16px')
+    expect(surface[1]).toContain('border-radius: 50%')
+    // Opaque theme surface: Select's hover paint can never tint the disc.
+    expect(surface[1]).toContain('background-color: var(--color-surface-alt)')
+    expect(surface[1]).toMatch(/display:\s*flex/)
+    expect(surface[1]).toMatch(/align-items:\s*center/)
+    expect(surface[1]).toMatch(/justify-content:\s*center/)
+
+    const icon = css.match(/\.revert-badge-icon\s*\{([^}]*)\}/)
+    expect(icon).not.toBeNull()
+    expect(icon[1]).toContain('opacity: 0.65')
+    expect(icon[1]).not.toMatch(/filter\s*:/)
+    expect(css).toMatch(/button\.toolbar-revert-badge:hover\s+\.revert-badge-icon/)
+  })
+
+  it('overrides the blanket 34×34 geometry and press transforms at higher specificity', () => {
+    const css = compileCss()
+    const baseRule = css.match(/\.side-toolbar\s+\.toolbar-button,\s*\.side-toolbar\s+\.ti-provider-icon-button,\s*\.side-toolbar\s+\.ti-btn,\s*\.side-toolbar\s+button\s*\{([^}]*)\}/)
+    expect(baseRule?.[1]).toContain('width: 34px !important')
+
+    const badgeRule = css.match(new RegExp(`${badgeSelector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`))
+    expect(badgeRule).not.toBeNull()
+    expect(badgeRule[1]).toContain('width: 24px !important')
+    const baseSpecificity = Math.max(...baseRule[0].split(',').map((selector) => specificityScore(selector)))
+    expect(specificityScore(badgeSelector)).toBeGreaterThan(baseSpecificity)
+
+    // Native press only: the visible surface never shifts under the cursor.
+    expect(badgeRule[0] + css).toContain('transform: none !important')
+    expect(css).toMatch(/button\.toolbar-revert-badge:active[^{]*\{[^}]*transform:\s*none !important/)
+  })
+
+  it('keeps badge focus-visible beating the outline reset', () => {
+    const css = compileCss()
+    const focusRule = css.match(/button\.toolbar-revert-badge:focus-visible\s*\{([^}]*)\}/)
+    expect(focusRule?.[1]).toMatch(/outline:\s*2px solid .* !important/)
+    const baseRule = css.match(/\.side-toolbar\s+\.toolbar-button,\s*\.side-toolbar\s+\.ti-provider-icon-button,\s*\.side-toolbar\s+\.ti-btn,\s*\.side-toolbar\s+button\s*\{([^}]*)\}/)
+    expect(baseRule?.[1]).toContain('outline: none !important')
+    const baseSpecificity = Math.max(...baseRule[0].split(',').map((selector) => specificityScore(selector)))
+    expect(specificityScore(`${badgeSelector}:focus-visible`)).toBeGreaterThan(baseSpecificity)
+  })
+
+  it('applies the badge glyph colour via currentColor tokens in both themes', () => {
+    const css = compileCss()
+    const rule = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
+    expect(rule[1]).toContain('color: var(--color-text')
+    // Dark hover override for the rail is preserved.
+    expect(css).toContain('#424242')
+    // No dark img-invert rule may target the migrated MaskIcon glyphs.
+    expect(css).not.toContain('#selectElementBtn img')
+    expect(css).not.toContain('#revertActionBtn img')
+  })
+
+  it('matches the real DOM: badge selectors hit the badge, not Select or Mouse Hover', () => {
+    const host = document.createElement('div')
+    host.innerHTML = '<div class="side-toolbar"><div class="toolbar-group">'
+      + '<div class="toolbar-select-action"><button id="selectElementBtn" class="toolbar-button"></button>'
+      + '<button id="revertActionBtn" class="toolbar-revert-badge" type="button">'
+      + '<span class="revert-badge-surface" aria-hidden="true"></span></button></div>'
+      + '<button class="toolbar-button"></button></div></div>'
+    document.body.appendChild(host)
+    try {
+      const badge = host.querySelector('#revertActionBtn')
+      const select = host.querySelector('#selectElementBtn')
+      const hover = host.querySelector('.toolbar-group > .toolbar-button')
+      expect(badge.matches('.side-toolbar .toolbar-select-action button.toolbar-revert-badge')).toBe(true)
+      expect(select.matches('.side-toolbar .toolbar-select-action button.toolbar-revert-badge')).toBe(false)
+      expect(hover.matches('.side-toolbar .toolbar-select-action button.toolbar-revert-badge')).toBe(false)
+      expect(badge.matches('.side-toolbar .toolbar-select-action .revert-badge-surface')).toBe(false)
+      expect(host.querySelector('.revert-badge-surface').matches('.side-toolbar .toolbar-select-action .revert-badge-surface')).toBe(true)
+    } finally {
+      host.remove()
+    }
+  })
+
+  it('leaves Mouse Hover alone: no wrapper-level hover and a transparent badge hover', () => {
+    const css = compileCss()
+    expect(css).not.toMatch(/\.toolbar-select-action:hover/)
+    const rule = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
+    expect(rule[1]).toContain('background: transparent !important')
+    expect(css).toMatch(/button\.toolbar-revert-badge:hover[^{]*\{[^}]*background-color:\s*transparent !important/)
+    // Geometry reasoning: the 24px target at block-end 0 sits inside the
+    // 50px wrapper box (24 ≤ 50), so it can never cross the 14px default /
+    // 8px compacted group gap onto Mouse Hover.
+    expect(css).toContain('gap: 14px')
+    expect(css).toContain('gap: 8px')
+  })
+
+  it('keeps compact and scroll behavior with the folded heights', () => {
+    const css = compileCss()
+    // Compaction stays gap-only: the 50px wrapper (34 + 16 reserved) survives.
+    const compact = css.match(/@media \(max-height:\s*620px\)\s*\{[\s\S]*?\n\}/)
+    expect(compact).not.toBeNull()
+    expect(compact[0].replace(/@media[^{]+/, '')).not.toMatch(/\b(?:width|height)\s*:/)
+    expect(compact[0]).toContain('gap: 8px')
+    // Scroll floor stays strictly below the 520px fit.
+    const scroll = css.match(/@media \(max-height:\s*500px\)\s*\{[\s\S]*?\n\}/)
+    expect(scroll).not.toBeNull()
+    expect(Number(scroll[0].match(/max-height:\s*(\d+)px/)[1])).toBeLessThan(520)
+    expect(scroll[0]).toContain('overflow-y: auto')
+  })
+
+  it('draws the badge focus ring inside the target (never clipped)', () => {
+    const css = compileCss()
+    const focusRule = css.match(/button\.toolbar-revert-badge:focus-visible\s*\{([^}]*)\}/)
+    expect(focusRule?.[1]).toMatch(/outline:\s*2px solid .* !important/)
+    // Negative offset keeps the ring ink inside the 24px box: neither the
+    // rail edge nor the @max-height 500px scrollport edge can cut it, in
+    // either writing direction.
+    expect(focusRule?.[1]).toContain('outline-offset: -2px !important')
+  })
+
+  it('keeps the flush-anchored target inside the scrollport in both rail layouts', () => {
+    const css = compileCss()
+    const badge = css.match(/button\.toolbar-revert-badge\s*\{([^}]*)\}/)
+    // Flush anchor: the target's inline-end edge coincides with the wrapper
+    // edge, and the target itself is never shrunk below 24px.
+    expect(badge[1]).toContain('inset-inline-end: 0')
+    expect(badge[1]).toContain('width: 24px !important')
+    expect(badge[1]).toContain('height: 24px !important')
+    // Row arithmetic from the rail contract: 44px rail minus the 1px border
+    // → 43px content; the 34px wrapper centres → 4.5..38.5, so the flush
+    // 24px target spans 14.5..38.5 — 4.5px inside the content edge.
+    const wrapperWidth = 34
+    const targetWidth = 24
+    const contentWidth = 44 - 1
+    const wrapperStart = (contentWidth - wrapperWidth) / 2
+    expect(wrapperStart + wrapperWidth - targetWidth).toBeGreaterThanOrEqual(0)
+    expect(wrapperStart + wrapperWidth).toBeLessThanOrEqual(contentWidth)
+    // @max-height 500px the rail scrolls: scrollbar-width: thin reserves
+    // ~8px, the scrollport becomes ~35px and the wrapper re-centres to
+    // 0.5..34.5 → target 10.5..34.5, 0.5px clearance, never clipped.
+    const scrollport = contentWidth - 8
+    const scrolledStart = (scrollport - wrapperWidth) / 2
+    expect(scrolledStart + wrapperWidth - targetWidth).toBeGreaterThanOrEqual(0)
+    expect(scrolledStart + wrapperWidth).toBeLessThanOrEqual(scrollport)
+  })
+
+  it('keeps badge hover transparent through the dark cascade while preserving dark button and surface hover', () => {
+    const css = compileCss()
+    const compiledRules = []
+    postcss.parse(css).walkRules((rule) => {
+      if (rule.parent.type !== 'root') return
+      for (const declaration of rule.nodes.filter((node) =>
+        node.type === 'decl' && ['background', 'background-color'].includes(node.prop))) {
+        compiledRules.push({
+          selectors: rule.selectors,
+          prop: declaration.prop,
+          value: declaration.value,
+          important: declaration.important,
+          order: compiledRules.length
+        })
+      }
+    })
+
+    const previousRootClass = document.documentElement.className
+    const host = document.createElement('div')
+    host.innerHTML = '<div class="side-toolbar"><div class="toolbar-select-action">'
+      + '<button class="toolbar-revert-badge test-hover">'
+      + '<span class="revert-badge-surface"></span></button></div>'
+      + '<button class="toolbar-button test-hover"></button></div>'
+    document.body.appendChild(host)
+    const badge = host.querySelector('.toolbar-revert-badge')
+    const surface = host.querySelector('.revert-badge-surface')
+    const ordinary = host.querySelector('.toolbar-button')
+
+    const winningBackground = (element) => {
+      const matching = compiledRules.flatMap((rule) => rule.selectors
+        .filter((selector) => element.matches(selector.replaceAll(':hover', '.test-hover')))
+        .map((selector) => ({
+          ...rule,
+          specificity: specificityScore(selector)
+        })))
+      return matching.sort((a, b) => Number(a.important) - Number(b.important) ||
+        a.specificity - b.specificity || a.order - b.order).at(-1)
+    }
+
+    try {
+      const assertCascade = (darkSelector) => {
+        host.classList.toggle('theme-dark', darkSelector === 'ancestor')
+        document.documentElement.classList.toggle('theme-dark', darkSelector === 'root')
+
+        const badgeWinner = winningBackground(badge)
+        expect(badgeWinner?.value).toBe('transparent')
+        expect(badgeWinner?.important).toBe(true)
+
+        const ordinaryWinner = winningBackground(ordinary)
+        expect(ordinaryWinner?.value).toBe(
+          darkSelector ? '#424242' : 'rgba(0, 0, 0, 0.08)'
+        )
+        expect(ordinaryWinner?.important).toBe(true)
+
+        const surfaceWinner = winningBackground(surface)
+        expect(surfaceWinner?.value).toBe('var(--toolbar-link-hover-bg-color)')
+        expect(surfaceWinner?.important).toBeFalsy()
+      }
+
+      // Light state, .theme-dark ancestor selector, and :root.theme-dark
+      // selector are all exercised with actual Element.matches checks.
+      assertCascade('')
+      assertCascade('ancestor')
+      assertCascade('root')
+    } finally {
+      document.documentElement.className = previousRootClass
+      host.remove()
     }
   })
 })
