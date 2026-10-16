@@ -540,8 +540,8 @@ const saveAllSettings = async () => {
         if (router.currentRoute.value.name !== 'languages') {
           await router.push({ name: 'languages' })
         }
-        window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
-          detail: { field: 'languages', focus } 
+        window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+          detail: { field: 'languages', focus }
         }))
         return
       }
