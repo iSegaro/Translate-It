@@ -368,6 +368,27 @@ const vajehyabSearchUrl = computed(() => {
 });
 
 /**
+ * Canonical Translate It name for an exact normalized code match (pt vs
+ * pt-BR stay distinct). DeepL-specific codes without a match return ''.
+ */
+const canonicalNameFor = (code) => {
+  const normalized = normalizeDeepLLanguageTag(code);
+  if (!normalized) return "";
+  return languages.allLanguages.value?.find(language => normalizeDeepLLanguageTag(language.code) === normalized)?.name || "";
+};
+
+/**
+ * Display name for a DeepL catalog entry: the canonical name on an exact
+ * code match, otherwise the official DeepL name, otherwise the code itself.
+ */
+const deepLDisplayNameFor = (catalogEntry, code) => (
+  (catalogEntry && canonicalNameFor(catalogEntry.lang))
+  || catalogEntry?.name
+  || canonicalNameFor(code)
+  || code
+);
+
+/**
  * Base list of languages supported by the provider's general capabilities.
  * Does not include source/target specific pair restrictions yet.
  */
@@ -382,12 +403,12 @@ const providerBaseLanguages = computed(() => {
   if (providerKey.includes("deepl")) {
     const capabilities = settingsStore.deepLLanguageCapabilities;
     if (hasFreshDeepLCatalog.value) {
-      return capabilities.catalog.map(entry => ({ code: entry.lang, normalizedTag: entry.normalizedTag, name: entry.name || entry.lang, isBeta: entry.metadataValid === true && entry.status === 'beta', usableAsSource: entry.usableAsSource, usableAsTarget: entry.usableAsTarget }));
+      return capabilities.catalog.map(entry => ({ code: entry.lang, normalizedTag: entry.normalizedTag, name: deepLDisplayNameFor(entry, entry.lang), isBeta: entry.metadataValid === true && entry.status === 'beta', usableAsSource: entry.usableAsSource, usableAsTarget: entry.usableAsTarget }));
     }
     return [sourceLanguage.value, targetLanguage.value].reduce((entries, code) => {
       if (code) {
         const index = entries.findIndex(entry => normalizeDeepLLanguageTag(entry.code) === normalizeDeepLLanguageTag(code));
-        if (index === -1) entries.push({ code, name: code, isBeta: false });
+        if (index === -1)         entries.push({ code, name: deepLDisplayNameFor(undefined, code), isBeta: false });
         else entries[index] = { ...entries[index], code };
       }
       return entries;
@@ -432,11 +453,11 @@ const withSelectedDeepLLanguage = (list, savedTag, direction) => {
   const catalogEntry = settingsStore.deepLLanguageCapabilities?.catalog?.find(entry => entry.normalizedTag === resolved);
   const selected = existing || (hasFreshDeepLCatalog.value && catalogEntry ? {
     code: catalogEntry.lang,
-    name: catalogEntry.name || savedTag,
+    name: deepLDisplayNameFor(catalogEntry, savedTag),
     isBeta: catalogEntry.metadataValid === true && catalogEntry.status === 'beta',
     usableAsSource: catalogEntry.usableAsSource,
     usableAsTarget: catalogEntry.usableAsTarget
-  } : { code: savedTag, name: savedTag, isBeta: false });
+  } : { code: savedTag, name: deepLDisplayNameFor(undefined, savedTag), isBeta: false });
   const preserved = { ...selected, code: savedTag };
   if (existing) return list.map(language => language === existing ? preserved : language);
   return [...list, preserved];

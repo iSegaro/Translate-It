@@ -11,7 +11,7 @@ const mockUtils = vi.hoisted(() => ({ getI18nUtils: vi.fn() }))
 
 const mockLanguages = ref([
   { code: 'en', name: 'English' },
-  { code: 'fa', name: 'Persian' },
+  { code: 'fa', name: 'Farsi' },
   { code: 'fr', name: 'French' }
 ])
 
@@ -274,6 +274,57 @@ describe('LanguageSelector', () => {
     expect(wrapper.find('.ti-language-control-group--target option[value="pt-BR"]').exists()).toBe(false)
     expect(wrapper.emitted('update:sourceLanguage')).toBeUndefined()
     expect(wrapper.emitted('update:targetLanguage')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('shows the canonical Translate It name for a DeepL entry with an exact code match', async () => {
+    setDeepLCatalog([
+      { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+    ])
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+
+    // DeepL calls it 'Persian'; the canonical list calls it 'Farsi'
+    expect(wrapper.find('.ti-language-control-group--target option[value="fa"]').text()).toBe('Farsi')
+    expect(wrapper.find('.ti-language-control-group--source option[value="fa"]').text()).toBe('Farsi')
+    wrapper.unmount()
+  })
+
+  it('keeps the official DeepL name for a regional variant without an exact canonical match', async () => {
+    setDeepLCatalog([
+      { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'pt-BR', name: 'Portuguese (Brazilian)', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+    ])
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'pt-BR', targetLanguage: 'pt-BR' })
+    await flushPromises()
+
+    expect(wrapper.find('.ti-language-control-group--target option[value="pt-BR"]').text()).toBe('Portuguese (Brazilian)')
+    wrapper.unmount()
+  })
+
+  it('appends the localized Beta suffix to a canonical display name', async () => {
+    setDeepLCatalog([
+      { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'beta', features: {} }
+    ])
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+
+    expect(wrapper.find('.ti-language-control-group--target option[value="fa"]').text()).toBe('Farsi (deepl_beta_label)')
+    wrapper.unmount()
+  })
+
+  it('backfills a preserved selection with the canonical name instead of the raw code', async () => {
+    setDeepLCatalog([
+      { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+    ])
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+
+    const option = wrapper.find('.ti-language-control-group--target option[value="fa"]')
+    expect(option.exists()).toBe(true)
+    expect(option.text()).toBe('Farsi')
     wrapper.unmount()
   })
 

@@ -576,8 +576,8 @@ const getFilteredLanguages = (type) => {
         filtered = catalog
           .filter(entry => matchDeepLLanguage(catalog, entry.lang, type) === 'supported')
           .map(entry => ({
-            code: entry.lang,
-            name: entry.name || languageLabelFor(entry.lang),
+              code: entry.lang,
+              name: deepLDisplayNameFor(entry, entry.lang),
             normalizedTag: entry.normalizedTag,
             isBeta: entry.metadataValid === true && entry.status === 'beta',
             status: entry.status,
@@ -641,6 +641,23 @@ const languageLabelFor = (code) => {
   return allLanguages.value?.find(l => l.code === code)?.name || code
 }
 
+// Canonical Translate It name for an exact normalized code match (pt vs
+// pt-BR stay distinct). DeepL-specific codes without a match return ''.
+const canonicalNameFor = (code) => {
+  const normalized = normalizeDeepLLanguageTag(code)
+  if (!normalized) return ''
+  return allLanguages.value?.find(language => normalizeDeepLLanguageTag(language.code) === normalized)?.name || ''
+}
+
+// Display name for a DeepL catalog entry: the canonical name on an exact
+// code match, otherwise the official DeepL name, otherwise the code itself.
+const deepLDisplayNameFor = (catalogEntry, code) => (
+  (catalogEntry && canonicalNameFor(catalogEntry.lang))
+  || catalogEntry?.name
+  || canonicalNameFor(code)
+  || languageLabelFor(code)
+)
+
 // Visible options: filtered list plus the current selection when filtered
 // out, so a preserved-but-unsupported value still renders instead of blank.
 const withCurrentSelection = (list, current, direction) => {
@@ -653,7 +670,7 @@ const withCurrentSelection = (list, current, direction) => {
   const catalogEntry = verifiedDeepLLanguageCatalog.value?.find(entry => entry.normalizedTag === resolved)
   return [...list, {
     code: current,
-    name: catalogEntry?.name || languageLabelFor(current),
+    name: deepLDisplayNameFor(catalogEntry, current),
     isBeta: catalogEntry?.metadataValid === true && catalogEntry.status === 'beta',
     status: catalogEntry?.metadataValid === true ? catalogEntry.status : null
   }]

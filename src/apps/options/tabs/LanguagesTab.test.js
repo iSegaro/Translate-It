@@ -74,7 +74,7 @@ vi.mock('@/composables/shared/useLanguages.js', () => ({
   useLanguages: () => ({
     allLanguages: ref([
       { code: 'en', name: 'English' },
-      { code: 'fa', name: 'Persian' },
+      { code: 'fa', name: 'Farsi' },
       { code: 'de', name: 'German' }
     ]),
     loadLanguages: vi.fn().mockResolvedValue(),
@@ -479,5 +479,91 @@ describe('LanguagesTab.vue - DeepL language metadata', () => {
     expect(mockSettingsStore.isSettingsValid).toBe(true);
     // ... while the provider-config warning still displays
     expect(wrapper.find('.provider-config-warning').exists()).toBe(true);
+  });
+
+  it('shows the canonical Translate It name for a DeepL entry with an exact code match', async () => {
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    // DeepL calls it 'Persian'; the canonical list calls it 'Farsi'
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE').languages;
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(source.find(language => language.code === 'fa')).toMatchObject({ name: 'Farsi' });
+    expect(target.find(language => language.code === 'fa')).toMatchObject({ name: 'Farsi' });
+  });
+
+  it('keeps the official DeepL name for a regional variant without an exact canonical match', async () => {
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'pt-BR';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'pt', name: 'Portuguese', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'pt-BR', name: 'Portuguese (Brazilian)', usable_as_source: false, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    // pt and pt-BR stay distinct: no variant collapsing
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(target.find(language => language.code === 'pt-BR')).toMatchObject({ name: 'Portuguese (Brazilian)' });
+  });
+
+  it('keeps the Beta flag on a canonical display name', async () => {
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'fa', name: 'Persian', usable_as_source: false, usable_as_target: true, status: 'beta', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(target.find(language => language.code === 'fa')).toMatchObject({ name: 'Farsi', isBeta: true, status: 'beta' });
+  });
+
+  it('backfills a preserved selection with the canonical name instead of the raw code', async () => {
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'fa';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    const kept = target.find(language => language.code === 'fa');
+    expect(kept).toBeDefined();
+    expect(kept.name).toBe('Farsi');
+  });
+
+  it('backfills a direction-unsupported selection with the official DeepL name when no canonical match exists', async () => {
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'pt-BR';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'pt-BR', name: 'Portuguese (Brazilian)', usable_as_source: false, usable_as_target: false, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    const kept = target.find(language => language.code === 'pt-BR');
+    expect(kept).toBeDefined();
+    expect(kept.name).toBe('Portuguese (Brazilian)');
   });
 });
