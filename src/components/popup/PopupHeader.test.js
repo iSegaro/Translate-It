@@ -974,6 +974,40 @@ describe('PopupHeader', () => {
     expect(wrapper.find('.toolbar-menu-panel-stub').exists()).toBe(false)
   })
 
+  it('reports partial Revert details once without serializing error objects', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+    mockSendMessage.mockResolvedValueOnce({
+      success: true,
+      partial: true,
+      revertedCount: 2,
+      errors: [{ system: 'vue', error: 'restore failed' }],
+      message: 'Translation partially reverted'
+    })
+
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+
+    expect(mockHandleError).toHaveBeenCalledOnce()
+    const [error, options] = mockHandleError.mock.calls[0]
+    expect(error.message).toContain('Revert partially completed')
+    expect(error.message).toContain('vue: restore failed')
+    expect(error.message).not.toContain('[object Object]')
+    expect(error.message).not.toContain('Translation partially reverted')
+    expect(options).toEqual({ context: 'popup-header-revert-failed', isSilent: true })
+  })
+
+  it('treats a zero-count full Revert as success without error feedback', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+    mockSendMessage.mockResolvedValueOnce({ success: true, revertedCount: 0 })
+
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+
+    expect(mockHandleError).not.toHaveBeenCalled()
+  })
+
   it('keeps restricted Revert responses and exceptions quiet', async () => {
     const wrapper = mount(PopupHeader)
     await wrapper.vm.$nextTick()

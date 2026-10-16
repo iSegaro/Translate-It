@@ -52,11 +52,17 @@ export class RevertHandler extends ResourceTracker {
       let totalRevertedCount = 0;
       let systemsUsed = [];
       let errors = [];
+      const reportRestoreFailure = (system) => ({ phase, error }) => {
+        errors.push({
+          system,
+          error: `${phase}: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      };
 
       // Attempt to revert Vue / SelectElementManager translations
       try {
         logger.info('Attempting Vue revert...');
-        const vueRevertedCount = await this.revertVueTranslations();
+        const vueRevertedCount = await this.revertVueTranslations(reportRestoreFailure('vue'));
         logger.info(`Vue revert result: ${vueRevertedCount} items reverted`);
         if (vueRevertedCount > 0) {
           totalRevertedCount += vueRevertedCount;
@@ -68,13 +74,13 @@ export class RevertHandler extends ResourceTracker {
           stack: error.stack,
           errorType: error.name
         });
-        errors.push({ system: 'vue', error: error.message });
+        errors.push({ system: 'vue', error: String(error?.message ?? error) });
       }
 
       // Attempt to revert legacy translations
       try {
         logger.info('Attempting legacy revert...');
-        const legacyRevertedCount = await this.revertLegacyTranslations();
+        const legacyRevertedCount = await this.revertLegacyTranslations(reportRestoreFailure('legacy'));
         logger.info(`Legacy revert result: ${legacyRevertedCount} items reverted`);
         if (legacyRevertedCount > 0) {
           totalRevertedCount += legacyRevertedCount;
@@ -86,7 +92,7 @@ export class RevertHandler extends ResourceTracker {
           stack: error.stack,
           errorType: error.name
         });
-        errors.push({ system: 'legacy', error: error.message });
+        errors.push({ system: 'legacy', error: String(error?.message ?? error) });
       }
 
       const finalSystem = systemsUsed.length > 0 ? systemsUsed.join(',') : 'none';
@@ -159,10 +165,10 @@ export class RevertHandler extends ResourceTracker {
    * Revert Vue-based translations
    * @returns {Promise<number>} Number of reverted translations
    */
-  async revertVueTranslations() {
+  async revertVueTranslations(onRestoreFailure) {
     // First, try to revert Select Element translation using global state
     // This works even when SelectElementManager is deactivated
-    const selectElementReverted = await revertSelectElementTranslation();
+    const selectElementReverted = await revertSelectElementTranslation(null, { onRestoreFailure });
 
     if (selectElementReverted > 0) {
       logger.debug('Reverted Select Element translation via global state');
@@ -198,7 +204,7 @@ export class RevertHandler extends ResourceTracker {
    * Revert legacy translations
    * @returns {Promise<number>} Number of reverted translations
    */
-  async revertLegacyTranslations() {
+  async revertLegacyTranslations(onRestoreFailure) {
     try {
       const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
       
@@ -206,6 +212,7 @@ export class RevertHandler extends ResourceTracker {
         state,
         errorHandler: ErrorHandler.getInstance(),
         notifier: this.notificationManager,
+        onRestoreFailure,
       };
 
       // Element Selection revert system is now handled by SelectElementManager

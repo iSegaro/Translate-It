@@ -82,6 +82,69 @@ describe('RevertHandler result and count', () => {
     expect(mocks.show).not.toHaveBeenCalled();
   });
 
+  it('returns partial success when a system restores some nodes and reports a node failure', async () => {
+    handler.revertVueTranslations = vi.fn(async onRestoreFailure => {
+      onRestoreFailure({ phase: 'Text restoration', error: new Error('one node failed') });
+      return 2;
+    });
+
+    const result = await handler.executeRevert();
+
+    expect(result).toMatchObject({
+      success: true,
+      partial: true,
+      revertedCount: 2,
+      errors: [{ system: 'vue', error: 'Text restoration: one node failed' }],
+    });
+    expect(result.error).toBeUndefined();
+    expect(handler.revertLegacyTranslations).toHaveBeenCalledOnce();
+    expect(mocks.show).not.toHaveBeenCalled();
+  });
+
+  it('returns total failure when a restore callback reports an error and restores nothing', async () => {
+    handler.revertVueTranslations = vi.fn(async onRestoreFailure => {
+      onRestoreFailure({ phase: 'Metadata restoration', error: new Error('metadata failed') });
+      return 0;
+    });
+
+    const result = await handler.executeRevert();
+
+    expect(result).toMatchObject({
+      success: false,
+      partial: false,
+      revertedCount: 0,
+      error: 'vue: Metadata restoration: metadata failed',
+      errors: [{ system: 'vue', error: 'Metadata restoration: metadata failed' }],
+    });
+    expect(handler.revertLegacyTranslations).toHaveBeenCalledOnce();
+    expect(mocks.show).not.toHaveBeenCalled();
+  });
+
+  it('collects callback-reported failures from both systems without discarding restored counts', async () => {
+    handler.revertVueTranslations = vi.fn(async onRestoreFailure => {
+      onRestoreFailure({ phase: 'Text restoration', error: new Error('Vue node failed') });
+      return 1;
+    });
+    handler.revertLegacyTranslations = vi.fn(async onRestoreFailure => {
+      onRestoreFailure({ phase: 'legacy-container', error: new Error('legacy node failed') });
+      return 2;
+    });
+
+    const result = await handler.executeRevert();
+
+    expect(result).toMatchObject({
+      success: true,
+      partial: true,
+      revertedCount: 3,
+      system: 'vue,legacy',
+      errors: [
+        { system: 'vue', error: 'Text restoration: Vue node failed' },
+        { system: 'legacy', error: 'legacy-container: legacy node failed' },
+      ],
+    });
+    expect(mocks.show).not.toHaveBeenCalled();
+  });
+
   it.each(['i18n lookup', 'notification display'])('preserves restored counts when %s fails', async failurePoint => {
     mocks.revertSelectElementTranslation.mockResolvedValue(3);
     if (failurePoint === 'i18n lookup') {

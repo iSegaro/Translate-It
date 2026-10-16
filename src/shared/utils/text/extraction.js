@@ -360,12 +360,23 @@ export async function revertTranslations(context) {
         }
       } catch (error) {
         const errorMessage = `Failed to revert container with original text.`;
-        context.errorHandler.handle(error, {
-          type: ErrorTypes.UI,
-          context: "revert-translations-replace",
-          elementId: container.getAttribute("data-aiwc-original-id"),
-        });
         logger.error(errorMessage, error);
+
+        try {
+          context.errorHandler?.handle?.(error, {
+            type: ErrorTypes.UI,
+            context: "revert-translations-replace",
+            elementId: container.getAttribute("data-aiwc-original-id"),
+          });
+        } catch (secondaryError) {
+          logger.error('Error handler failed while reporting a revert failure.', secondaryError);
+        }
+
+        try {
+          context.onRestoreFailure?.({ phase: 'legacy-container', error });
+        } catch (secondaryError) {
+          logger.error('Restore failure observer failed.', secondaryError);
+        }
       }
     }
   });
