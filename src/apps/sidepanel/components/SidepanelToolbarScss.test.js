@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as sass from 'sass'
+import postcss from 'postcss'
 
 const specificityScore = (selector) => {
   const ids = (selector.match(/#[\w-]+/g) || []).length
@@ -13,8 +14,9 @@ const specificityScore = (selector) => {
 const here = dirname(fileURLToPath(import.meta.url))
 const srcDir = resolve(here, '..', '..', '..')
 const scssPath = resolve(here, 'SidepanelToolbar.scss')
+const providerSelectorScssPath = resolve(srcDir, 'components', 'shared', 'ProviderSelector.scss')
 
-const compile = () => sass.compile(scssPath, {
+const compile = (path = scssPath) => sass.compile(path, {
   importers: [{
     findFileUrl(url) {
       if (url.startsWith('@/')) {
@@ -159,15 +161,66 @@ describe('SidepanelToolbar.scss icon behavior (migrated from _sidepanel.scss)', 
     expect(maskRule[1]).not.toMatch(/filter\s*:/)
   })
 
-  it('preserves provider icon protection (no filter in dark theme)', () => {
-    const { css } = compile()
-    expect(css).toContain('.ti-provider-icon-only')
-    // Provider icons should not get the invert filter
-    const providerRule = css.match(
-      /\.ti-provider-icon-only\s*\{[^}]*\}/
-    )
-    expect(providerRule).not.toBeNull()
-    expect(providerRule[0]).toContain('filter: none')
+  it('lets ProviderSelector dark inversion win over Sidepanel rail styles', () => {
+    const sidepanelCss = compile().css
+    const providerCss = compile(providerSelectorScssPath).css
+    const filters = (css) => {
+      const rules = []
+      postcss.parse(css).walkRules((rule) => {
+        if (rule.parent.type !== 'root') return
+        for (const declaration of rule.nodes.filter((node) => node.type === 'decl' && node.prop === 'filter')) {
+          rules.push({
+            selectors: rule.selectors,
+            value: declaration.value,
+            important: declaration.important,
+          })
+        }
+      })
+      return rules
+    }
+    const rules = (providerFirst) => {
+      return (providerFirst ? [providerCss, sidepanelCss] : [sidepanelCss, providerCss])
+        .flatMap(filters)
+    }
+    const winningFilter = (compiledRules, element) => {
+      const matching = compiledRules.flatMap((rule, order) => rule.selectors
+        .filter((selector) => element.matches(selector))
+        .map((selector) => ({ ...rule, order, specificity: specificityScore(selector) })))
+      return matching.sort((a, b) => Number(a.important) - Number(b.important) ||
+        a.specificity - b.specificity || a.order - b.order).at(-1)
+    }
+
+    const previousRootClass = document.documentElement.className
+    const host = document.createElement('div')
+    host.innerHTML = '<div class="side-toolbar"><button class="ti-provider-icon-button"><img class="ti-provider-icon-only ti-invert-dark"></button></div><button><img class="ti-api-provider-icon ti-invert-dark"></button>'
+    document.body.appendChild(host)
+    const iconOnly = host.querySelector('.ti-provider-icon-only')
+    const splitIcon = host.querySelector('.ti-api-provider-icon')
+
+    try {
+      for (const providerFirst of [true, false]) {
+        document.documentElement.classList.add('theme-dark')
+        let filter = winningFilter(rules(providerFirst), iconOnly)
+        expect(filter?.value).toBe('invert(1) brightness(2)')
+        expect(filter?.important).toBe(true)
+
+        iconOnly.classList.remove('ti-invert-dark')
+        expect(winningFilter(rules(providerFirst), iconOnly)).toBeUndefined()
+        iconOnly.classList.add('ti-invert-dark')
+
+        document.documentElement.classList.remove('theme-dark')
+        filter = winningFilter(rules(providerFirst), iconOnly)
+        expect(filter).toBeUndefined()
+
+        document.documentElement.classList.add('theme-dark')
+        filter = winningFilter(rules(providerFirst), splitIcon)
+        expect(filter?.value).toBe('invert(1) brightness(2)')
+        expect(filter?.important).toBe(true)
+      }
+    } finally {
+      document.documentElement.className = previousRootClass
+      host.remove()
+    }
   })
 
   it('preserves translate button colored icon protection', () => {
