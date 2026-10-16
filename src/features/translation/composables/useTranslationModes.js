@@ -26,46 +26,50 @@ const sharedIsSelectModeActive = ref(false);
 let _selectStateListenerRegistered = false;
 let _selectStateHandler = null;
 let _currentTabId = null;
+let _currentWindowId = null;
 let _tabsActivatedHandler = null;
 let _selectStateSubscriberCount = 0;
 let _uiMessageHandler = null;
+let _selectStateGeneration = 0;
+let _selectStateLifecycle = 0;
+let _toggleInFlight = false;
+let _pendingSelectBroadcast = null;
+const _pendingTabActivations = new Map();
 
-const _registerSelectStateListener = async () => {
-  if (_selectStateListenerRegistered) return;
-  _selectStateListenerRegistered = true;
-
-  // Initialize from background via messaging
+const _requestSelectState = async (tabId, generation) => {
   try {
-    const { sendMessage, createMessage, MessageActions } = useMessaging(MessageContexts.SIDEPANEL);
-    const message = createMessage(MessageActions.GET_SELECT_ELEMENT_STATE);
-    const response = await sendMessage(message);
-    if (response && response.success) {
+    const response = await sendMessage({
+      action: MessageActions.GET_SELECT_ELEMENT_STATE,
+      context: MessageContexts.SIDEPANEL,
+      timestamp: Date.now(),
+      data: { tabId }
+    });
+    if (generation !== _selectStateGeneration || tabId !== _currentTabId) return;
+    if (response?.success && Number(response.tabId) === Number(tabId)) {
       sharedIsSelectModeActive.value = !!response.active;
-      _currentTabId = response.tabId;
     }
   } catch (err) {
-    logger.warn('[useSelectElementTranslation] Failed to query background for select state:', err);
+    logger.debug('Failed to refresh select element state:', err);
   }
+};
 
-  // Register handler with central MessageHandler for background broadcasts
+const _registerSelectStateListener = () => {
+  if (_selectStateListenerRegistered) return;
+  _selectStateListenerRegistered = true;
+  const lifecycle = ++_selectStateLifecycle;
+
+  // Install the broadcast handler before starting any asynchronous snapshot request.
   _selectStateHandler = (message) => {
     if (message?.action === MessageActions.SELECT_ELEMENT_STATE_CHANGED) {
-      const { tabId, active } = message.data || {};
-      try {
-        if (!_currentTabId) {
-          browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
-            if (tabs && tabs.length) _currentTabId = tabs[0].id;
-            if (_currentTabId && tabId && Number(tabId) === Number(_currentTabId)) {
-              sharedIsSelectModeActive.value = !!active;
-            }
-          });
-        } else {
-          if (_currentTabId && tabId && Number(tabId) === Number(_currentTabId)) {
-            sharedIsSelectModeActive.value = !!active;
-          }
-        }
-      } catch (e) {
-        logger.warn('[useSelectElementTranslation] broadcast handler error:', e);
+      const { tabId, active, windowId } = message.data || {};
+      if (windowId != null && _currentWindowId != null && windowId !== _currentWindowId) {
+        return { success: true, handled: true };
+      }
+      if (Number.isInteger(_currentTabId) && Number(tabId) === Number(_currentTabId)) {
+        _selectStateGeneration++;
+        sharedIsSelectModeActive.value = !!active;
+      } else if (!Number.isInteger(_currentTabId) && Number.isInteger(tabId)) {
+        _pendingSelectBroadcast = { tabId, active, windowId };
       }
       return { success: true, handled: true };
     }
@@ -90,6 +94,23 @@ const _registerSelectStateListener = async () => {
   } catch (e) {
     logger.warn('[useSelectElementTranslation] Could not register with MessageHandler:', e);
   }
+
+  browser.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+    if (lifecycle !== _selectStateLifecycle || !_selectStateListenerRegistered || !Number.isInteger(tab?.id)) return;
+    _currentWindowId = tab.windowId ?? null;
+    const activation = _pendingTabActivations.get(_currentWindowId);
+    _pendingTabActivations.clear();
+    const targetTabId = Number.isInteger(activation?.tabId) ? activation.tabId : tab.id;
+    _currentTabId = targetTabId;
+    sharedIsSelectModeActive.value = false;
+    if (_pendingSelectBroadcast && Number(_pendingSelectBroadcast.tabId) === Number(targetTabId) &&
+        (_pendingSelectBroadcast.windowId == null || _currentWindowId == null || _pendingSelectBroadcast.windowId === _currentWindowId)) {
+      sharedIsSelectModeActive.value = !!_pendingSelectBroadcast.active;
+    }
+    _pendingSelectBroadcast = null;
+    _selectStateGeneration++;
+    _requestSelectState(targetTabId, _selectStateGeneration);
+  }).catch((err) => logger.warn('[useSelectElementTranslation] Failed to resolve active tab:', err));
 };
 
 const _unregisterSelectStateListener = () => {
@@ -102,7 +123,15 @@ const _unregisterSelectStateListener = () => {
     }
     _selectStateHandler = null;
   }
+  _uiMessageHandler?.stopListening?.();
   _selectStateListenerRegistered = false;
+  _selectStateLifecycle++;
+  _selectStateGeneration++;
+  sharedIsSelectModeActive.value = false;
+  _currentTabId = null;
+  _currentWindowId = null;
+  _pendingSelectBroadcast = null;
+  _pendingTabActivations.clear();
 };
 
 export function useSelectElementTranslation() {
@@ -120,21 +149,16 @@ export function useSelectElementTranslation() {
       // Also register the tab activation listener only once
       try {
         _tabsActivatedHandler = async (activeInfo) => {
-          try {
-            _currentTabId = activeInfo.tabId;
-            // Query background directly for select element state for the new tab
-            const response = await sendMessage({
-              action: MessageActions.GET_SELECT_ELEMENT_STATE,
-              context: MessageContexts.SIDEPANEL,
-              timestamp: Date.now()
-            });
-            if (response && response.success) {
-              sharedIsSelectModeActive.value = !!response.active;
-              logger.debug('Select element state refreshed on tab change:', response.active);
-            }
-          } catch (err) {
-            logger.debug('Failed to refresh select element state on tab change:', err);
+          if (!Number.isInteger(activeInfo?.tabId)) return;
+          if (_currentWindowId == null) {
+            if (activeInfo.windowId != null) _pendingTabActivations.set(activeInfo.windowId, activeInfo);
+            return;
           }
+          if (activeInfo.windowId != null && activeInfo.windowId !== _currentWindowId) return;
+          _currentTabId = activeInfo.tabId;
+          sharedIsSelectModeActive.value = false;
+          const generation = ++_selectStateGeneration;
+          _requestSelectState(activeInfo.tabId, generation);
         };
         browser.tabs.onActivated.addListener(_tabsActivatedHandler);
       } catch {
@@ -249,6 +273,9 @@ export function useSelectElementTranslation() {
   };
 
   const toggleSelectElement = async (options = {}) => {
+    if (_toggleInFlight) return false;
+    _toggleInFlight = true;
+    const generation = ++_selectStateGeneration;
     const originalState = isSelectModeActive.value;
     // Optimistically update the UI for a smoother experience
     sharedIsSelectModeActive.value = !originalState;
@@ -265,7 +292,7 @@ export function useSelectElementTranslation() {
 
       // If the action failed, revert the optimistic update
       if (!success) {
-        sharedIsSelectModeActive.value = originalState;
+        if (generation === _selectStateGeneration) sharedIsSelectModeActive.value = originalState;
         logger.debug('Select element toggle failed, reverting UI state.');
         return false;
       }
@@ -273,9 +300,11 @@ export function useSelectElementTranslation() {
       return true;
     } catch (err) {
       // Revert on any unexpected errors as well
-      sharedIsSelectModeActive.value = originalState;
+      if (generation === _selectStateGeneration) sharedIsSelectModeActive.value = originalState;
       logger.error('An unexpected error occurred during toggleSelectElement:', err);
       return false;
+    } finally {
+      _toggleInFlight = false;
     }
   };
 
