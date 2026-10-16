@@ -328,6 +328,51 @@ describe('LanguageSelector', () => {
     wrapper.unmount()
   })
 
+  it('orders DeepL lists by canonical order first, DeepL-only entries in API order', async () => {
+    setDeepLCatalog([
+      { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'pt-BR', name: 'Portuguese (Brazilian)', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'en-GB', name: 'English (British)', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'fr', name: 'French', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+    ])
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+
+    // Canonical codes (en, fa, fr) follow allLanguages order regardless of
+    // API order; DeepL-only variants keep relative API order at the tail.
+    const targetValues = wrapper.findAll('.ti-language-control-group--target option').map(option => option.attributes('value'))
+    expect(targetValues).toEqual(['en', 'fa', 'fr', 'pt-BR', 'en-GB'])
+    const sourceValues = wrapper.findAll('.ti-language-control-group--source option').map(option => option.attributes('value'))
+    expect(sourceValues).toEqual(['en', 'fa', 'fr', 'pt-BR', 'en-GB'])
+    wrapper.unmount()
+  })
+
+  it('orders DeepL Source and Target lists by direction support', async () => {
+    setDeepLCatalog([
+      { lang: 'fa', name: 'Persian', usable_as_source: false, usable_as_target: true, status: 'stable', features: {} },
+      { lang: 'fr', name: 'French', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} },
+      { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+    ])
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+
+    const sourceValues = wrapper.findAll('.ti-language-control-group--source option').map(option => option.attributes('value'))
+    const targetValues = wrapper.findAll('.ti-language-control-group--target option').map(option => option.attributes('value'))
+    expect(sourceValues).toEqual(['en', 'fr'])
+    expect(targetValues).toEqual(['en', 'fa'])
+    wrapper.unmount()
+  })
+
+  it('keeps other providers in allLanguages order', async () => {
+    const wrapper = mountSelector({ provider: 'google', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+
+    const targetValues = wrapper.findAll('.ti-language-control-group--target option').map(option => option.attributes('value'))
+    expect(targetValues).toEqual(['en', 'fa', 'fr'])
+    wrapper.unmount()
+  })
+
   it('accepts fresh metadata fetched with a later eligible key after failover', async () => {
     mockStoreState.store.settings.DEEPL_API_KEY = 'bad-key\ngood-key'
     const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fr-CA' })

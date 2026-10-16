@@ -573,7 +573,7 @@ const getFilteredLanguages = (type) => {
     if (isDeepLProvider(provider)) {
       const catalog = verifiedDeepLLanguageCatalog.value
       if (catalog?.length) {
-        filtered = catalog
+        filtered = orderDeepLLanguages(catalog
           .filter(entry => matchDeepLLanguage(catalog, entry.lang, type) === 'supported')
           .map(entry => ({
               code: entry.lang,
@@ -582,7 +582,7 @@ const getFilteredLanguages = (type) => {
             isBeta: entry.metadataValid === true && entry.status === 'beta',
             status: entry.status,
             features: entry.features
-          }))
+          })))
       }
       if (type === 'source') return [{ code: 'auto', name: 'Auto-Detect' }, ...filtered]
       return filtered
@@ -657,6 +657,23 @@ const deepLDisplayNameFor = (catalogEntry, code) => (
   || canonicalNameFor(code)
   || languageLabelFor(code)
 )
+
+// DeepL dropdown order, mirroring other providers: entries exactly matching
+// a canonical code first in allLanguages order, then DeepL-only
+// languages/variants in relative API order. Sorts the freshly mapped option
+// copies; never mutates the catalog or cached data.
+const orderDeepLLanguages = (entries) => {
+  const order = new Map((allLanguages.value || []).map((language, index) => [normalizeDeepLLanguageTag(language.code), index]))
+  const canonical = []
+  const deepLOnly = []
+  for (const entry of entries) {
+    const normalized = normalizeDeepLLanguageTag(entry.code)
+    if (normalized && order.has(normalized)) canonical.push(entry)
+    else deepLOnly.push(entry)
+  }
+  canonical.sort((a, b) => order.get(normalizeDeepLLanguageTag(a.code)) - order.get(normalizeDeepLLanguageTag(b.code)))
+  return [...canonical, ...deepLOnly]
+}
 
 // Visible options: filtered list plus the current selection when filtered
 // out, so a preserved-but-unsupported value still renders instead of blank.

@@ -566,4 +566,72 @@ describe('LanguagesTab.vue - DeepL language metadata', () => {
     expect(kept).toBeDefined();
     expect(kept.name).toBe('Portuguese (Brazilian)');
   });
+
+  it('orders DeepL lists by canonical order first, DeepL-only entries in API order', async () => {
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'pt-BR', name: 'Portuguese (Brazilian)', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'en-GB', name: 'English (British)', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'de', name: 'German', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    // Canonical codes (en, fa, de) follow allLanguages order regardless of
+    // API order; DeepL-only variants keep relative API order at the tail.
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(target.map(language => language.code)).toEqual(['en', 'fa', 'de', 'pt-BR', 'en-GB']);
+    expect(target.find(language => language.code === 'fa').name).toBe('Farsi');
+
+    // Auto-Detect stays first in Source, then the same canonical ordering.
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE').languages;
+    expect(source.map(language => language.code)).toEqual(['auto', 'en', 'fa', 'de', 'pt-BR', 'en-GB']);
+  });
+
+  it('orders DeepL Source and Target lists by direction support', async () => {
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fa', name: 'Persian', usable_as_source: false, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'de', name: 'German', usable_as_source: true, usable_as_target: false, status: 'stable', features: {} },
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const source = dropdownProps(wrapper, 'SOURCE_LANGUAGE').languages;
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(source.map(language => language.code)).toEqual(['auto', 'en', 'de']);
+    expect(target.map(language => language.code)).toEqual(['en', 'fa']);
+  });
+
+  it('appends a preserved backfill after the ordered DeepL list', async () => {
+    mockSettingsStore.settings.TARGET_LANGUAGE = 'xx';
+    mockSettingsStore.deepLLanguageCapabilities = {
+      status: 'ready', identity: getDeepLLanguageIdentity('test-key', 'free'), fetchedAt: Date.now(), error: null,
+      catalog: normalizeDeepLLanguageCatalog([
+        { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+        { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} }
+      ])
+    };
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(target.map(language => language.code)).toEqual(['en', 'fa', 'xx']);
+  });
+
+  it('keeps other providers in allLanguages order', async () => {
+    mockSettingsStore.updateSettingLocally('TRANSLATION_API', 'google');
+    const wrapper = mountTab();
+    await flushPromises();
+
+    const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
+    expect(target.map(language => language.code)).toEqual(['en', 'fa', 'de']);
+  });
 });

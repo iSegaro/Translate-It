@@ -389,6 +389,25 @@ const deepLDisplayNameFor = (catalogEntry, code) => (
 );
 
 /**
+ * DeepL dropdown order, mirroring other providers: entries exactly matching
+ * a canonical code first in allLanguages order, then DeepL-only
+ * languages/variants in relative API order. Sorts the freshly mapped option
+ * copies; never mutates the catalog or cached data.
+ */
+const orderDeepLLanguages = (entries) => {
+  const order = new Map((languages.allLanguages.value || []).map((language, index) => [normalizeDeepLLanguageTag(language.code), index]));
+  const canonical = [];
+  const deepLOnly = [];
+  for (const entry of entries) {
+    const normalized = normalizeDeepLLanguageTag(entry.code);
+    if (normalized && order.has(normalized)) canonical.push(entry);
+    else deepLOnly.push(entry);
+  }
+  canonical.sort((a, b) => order.get(normalizeDeepLLanguageTag(a.code)) - order.get(normalizeDeepLLanguageTag(b.code)));
+  return [...canonical, ...deepLOnly];
+};
+
+/**
  * Base list of languages supported by the provider's general capabilities.
  * Does not include source/target specific pair restrictions yet.
  */
@@ -403,7 +422,7 @@ const providerBaseLanguages = computed(() => {
   if (providerKey.includes("deepl")) {
     const capabilities = settingsStore.deepLLanguageCapabilities;
     if (hasFreshDeepLCatalog.value) {
-      return capabilities.catalog.map(entry => ({ code: entry.lang, normalizedTag: entry.normalizedTag, name: deepLDisplayNameFor(entry, entry.lang), isBeta: entry.metadataValid === true && entry.status === 'beta', usableAsSource: entry.usableAsSource, usableAsTarget: entry.usableAsTarget }));
+      return orderDeepLLanguages(capabilities.catalog.map(entry => ({ code: entry.lang, normalizedTag: entry.normalizedTag, name: deepLDisplayNameFor(entry, entry.lang), isBeta: entry.metadataValid === true && entry.status === 'beta', usableAsSource: entry.usableAsSource, usableAsTarget: entry.usableAsTarget })));
     }
     return [sourceLanguage.value, targetLanguage.value].reduce((entries, code) => {
       if (code) {
