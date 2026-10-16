@@ -338,24 +338,41 @@ export function useSidepanelActions() {
         context: MessageContexts.SIDEPANEL,
         messageId: `sidepanel-revert-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`,
         timestamp: Date.now()
-      });
+      }, { returnFailureResponse: true });
 
-      if (response?.success) {
-        logger.debug(`[SidepanelActions] Revert successful: ${response.revertedCount || 0} translations reverted`);
-        return true;
-      } else if (response?.isRestrictedPage) {
+      if (response?.isRestrictedPage) {
         // Tab is restricted - log as debug and exit gracefully
         logger.debug('Revert action blocked (restricted page):', {
           message: response.message,
           tabUrl: response.tabUrl
         });
-        return true; // Return true to avoid error handling
-      } else {
-        const errorMsg = response?.error || response?.message || 'Unknown error';
-        error.value = `Revert failed: ${errorMsg}`;
-        logger.error('Revert failed:', errorMsg);
+        return null;
+      }
+
+      if (response?.success && !response.partial) {
+        logger.debug(`[SidepanelActions] Revert successful: ${response.revertedCount || 0} translations reverted`);
+        return true;
+      }
+
+      if (response?.partial) {
+        const details = Array.isArray(response.errors)
+          ? response.errors.map((item) => {
+            if (typeof item === 'string') return item;
+            if (!item || typeof item !== 'object') return '';
+            return [item.system, item.error].filter(Boolean).join(': ');
+          }).filter(Boolean).join('; ')
+          : '';
+        error.value = details
+          ? `Partial Revert: ${details}`
+          : `Partial Revert: ${response.message || response.error || 'Some translations could not be reverted'}`;
+        logger.info('Revert partially completed:', error.value);
         return false;
       }
+
+      const errorMsg = response?.error || response?.message || response?.errors?.join(', ') || 'Unknown error';
+      error.value = `Revert failed: ${errorMsg}`;
+      logger.error('Revert failed:', errorMsg);
+      return false;
     } catch (err) {
       // Check if this is a restricted page error with response data
       if (err.isRestrictedPage) {
@@ -363,7 +380,7 @@ export function useSidepanelActions() {
           message: err.message,
           tabUrl: err.tabUrl
         });
-        return true; // Exit gracefully without showing error to user
+        return null; // Exit gracefully without showing error to user
       }
 
       const errorMsg = err.message || "Failed to revert translation";

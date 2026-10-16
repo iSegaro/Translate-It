@@ -23,9 +23,10 @@ const errorHandler = new ErrorHandler();
  */
 export async function handleRevertTranslation(message, sender, sendResponse) {
   logger.debug('[Handler:revertTranslation] Processing translation revert request:', message.data);
+  let targetTabId;
 
   try {
-    let targetTabId = message.data?.tabId || sender.tab?.id;
+    targetTabId = message.data?.tabId || sender.tab?.id;
 
     // If no tab ID available (e.g., from sidepanel), get active tab
     if (!targetTabId) {
@@ -83,30 +84,44 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
       throw error;
     }
 
-    // Fix: Handle the case where multiple listeners cause false response
     if (contentScriptResponse === false) {
-      // Try again with a different approach - assume success for now
-      logger.debug(`Received false, assuming revert success (no active translations)`);
+      const error = 'Content script did not acknowledge the revert request';
+      logger.warn(error, { tabId: targetTabId });
       sendResponse({
-        success: true,
-        message: 'Translation reverted successfully',
+        success: false,
+        error,
         tabId: targetTabId,
-        revertedCount: 0,
-        system: 'background-fallback'
+        revertedCount: 0
       });
       return true;
     }
 
-    // Handle normal response
-    if (contentScriptResponse && contentScriptResponse.success) {
-      logger.info(`Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
+    if (contentScriptResponse == null) {
+      const error = 'Content script returned no response to the revert request';
+      logger.warn(error, { tabId: targetTabId });
+      sendResponse({ success: false, error, tabId: targetTabId, revertedCount: 0 });
+      return true;
+    }
+
+    if (contentScriptResponse.success) {
+      const isPartial = contentScriptResponse.partial === true;
+      if (isPartial) {
+        logger.warn(`Translation partially reverted for tab ${targetTabId}:`, contentScriptResponse);
+      } else {
+        logger.info(`Translation reverted successfully for tab ${targetTabId}:`, contentScriptResponse);
+      }
 
       sendResponse({
         success: true,
-        message: contentScriptResponse.message || 'Translation reverted successfully',
+        message: isPartial
+          ? 'Translation partially reverted'
+          : contentScriptResponse.message || 'Translation reverted successfully',
         tabId: targetTabId,
-        revertedCount: contentScriptResponse.revertedCount || 0,
-        system: contentScriptResponse.system || 'unknown'
+        revertedCount: contentScriptResponse.revertedCount ?? 0,
+        ...(contentScriptResponse.system !== undefined && { system: contentScriptResponse.system }),
+        ...(contentScriptResponse.partial !== undefined && { partial: contentScriptResponse.partial }),
+        ...(contentScriptResponse.errors !== undefined && { errors: contentScriptResponse.errors }),
+        ...(contentScriptResponse.reason !== undefined && { reason: contentScriptResponse.reason })
       });
     } else {
       const errorMessage = contentScriptResponse?.error || 'Content script revert failed';
@@ -114,7 +129,16 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
         response: contentScriptResponse,
         error: errorMessage
       });
-      throw new Error(errorMessage);
+      sendResponse({
+        success: false,
+        error: errorMessage,
+        tabId: targetTabId,
+        revertedCount: contentScriptResponse?.revertedCount ?? 0,
+        ...(contentScriptResponse?.system !== undefined && { system: contentScriptResponse.system }),
+        ...(contentScriptResponse?.partial !== undefined && { partial: contentScriptResponse.partial }),
+        ...(contentScriptResponse?.errors !== undefined && { errors: contentScriptResponse.errors }),
+        ...(contentScriptResponse?.reason !== undefined && { reason: contentScriptResponse.reason })
+      });
     }
 
     return true;
@@ -130,7 +154,9 @@ export async function handleRevertTranslation(message, sender, sendResponse) {
 
     sendResponse({
       success: false,
-      error: error.message || 'Translation revert failed'
+      error: error.message || 'Translation revert failed',
+      ...(typeof targetTabId !== 'undefined' && { tabId: targetTabId }),
+      revertedCount: 0
     });
     return false;
   }

@@ -234,7 +234,7 @@ function synchronizeAuxiliaryOwnership() {
   }
 }
 
-function restoreOwnedAuxiliaryRecords(sessionId, records, logger) {
+function restoreOwnedAuxiliaryRecords(sessionId, records, logger, reportRestoreFailure) {
   for (const record of [...records].reverse()) {
     const parsed = parseAuxiliaryProperty(record?.property);
     if (!parsed || !record?.element) continue;
@@ -265,6 +265,7 @@ function restoreOwnedAuxiliaryRecords(sessionId, records, logger) {
         element: record.element,
         error,
       });
+      reportRestoreFailure('Auxiliary property restoration', error);
     } finally {
       owners.splice(ownerIndex, 1);
     }
@@ -272,7 +273,7 @@ function restoreOwnedAuxiliaryRecords(sessionId, records, logger) {
   compactAuxiliaryOwnershipRegistry();
 }
 
-function restoreMetadataSnapshot(snapshot, logger) {
+function restoreMetadataSnapshot(snapshot, logger, reportRestoreFailure) {
   const element = snapshot?.element;
   if (!element?.isConnected) return;
 
@@ -281,6 +282,7 @@ function restoreMetadataSnapshot(snapshot, logger) {
     else element.removeAttribute(PAGE_TRANSLATION_ATTRIBUTES.HAS_ORIGINAL);
   } catch (error) {
     logger.error('[Rollback] Metadata restoration failed', { element, error });
+    reportRestoreFailure('Metadata restoration', error);
   }
 }
 
@@ -496,9 +498,10 @@ export function pruneDisconnectedSelectElementTranslations() {
  * Reverts active translations. Supports session-owned reversion to prevent stale races.
  *
  * @param {string|null} [targetSessionId=null] - The target session ID to revert, or null for all
+ * @param {{ onRestoreFailure?: (failure: {phase: string, error: unknown}) => void }} [options]
  * @returns {Promise<number>} Reverted count
  */
-export async function revertSelectElementTranslation(targetSessionId = null) {
+export async function revertSelectElementTranslation(targetSessionId = null, { onRestoreFailure } = {}) {
   if (!globalSelectElementState.translationHistory || globalSelectElementState.translationHistory.length === 0) {
     return 0;
   }
@@ -509,6 +512,11 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
 
   const logRestoreFailure = (phase, error, details = {}) => {
     logger.error(`[Rollback] ${phase} failed`, { ...details, error });
+    try {
+      onRestoreFailure?.({ phase, error });
+    } catch {
+      // Failure observers must not interrupt rollback or state cleanup.
+    }
   };
 
   try {
@@ -559,7 +567,15 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
           }
 
           if (typeof appliedText !== 'string') continue;
-          if (node.nodeValue !== appliedText) {
+          let currentText;
+          try {
+            currentText = node.nodeValue;
+          } catch (error) {
+            invalidatedNodes.add(node);
+            logRestoreFailure('Text value read', error, { tagName: element?.tagName });
+            continue;
+          }
+          if (currentText !== appliedText) {
             invalidatedNodes.add(node);
             logger.debug('Skipping externally changed translated node during revert', {
               tagName: element?.tagName,
@@ -593,7 +609,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
       const hasAuxiliaryOwnership = Array.isArray(translation.auxiliaryOwnershipRecords)
         && translation.auxiliaryOwnershipRecords.length > 0;
       if (hasAuxiliaryOwnership) {
-        restoreOwnedAuxiliaryRecords(sessionId, translation.auxiliaryOwnershipRecords, logger);
+        restoreOwnedAuxiliaryRecords(sessionId, translation.auxiliaryOwnershipRecords, logger, logRestoreFailure);
       } else if (originalTextNodesData?.length > 0 && !hasOwnedCurrentNode) {
         logger.debug('Skipping legacy auxiliary revert state after node ownership drift', {
           tagName: element?.tagName,
@@ -609,7 +625,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
         for (const snapshot of translation.originalMetadataSnapshots) {
           if (!snapshot?.element || restoredMetadataElements.has(snapshot.element)) continue;
           restoredMetadataElements.add(snapshot.element);
-          restoreMetadataSnapshot(snapshot, logger);
+          restoreMetadataSnapshot(snapshot, logger, logRestoreFailure);
         }
       } else {
         // Legacy entries predate identity-captured metadata. Keep fallback scoped
@@ -687,6 +703,7 @@ export async function revertSelectElementTranslation(targetSessionId = null) {
     return revertedCount;
   } catch (error) {
     logger.error('Failed to revert translations via global function', error);
+    logRestoreFailure('Revert operation', error);
     return revertedCount;
   }
 }

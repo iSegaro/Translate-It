@@ -736,6 +736,8 @@ const handleRevertAction = async () => {
     // Use composable method which handles all error scenarios
     const success = await revertTranslation()
 
+    if (success === null) return
+
     if (success) {
       getLogger().debug('[SidepanelToolbar] Revert successful')
       showVisualFeedback(document.getElementById('revertActionBtn'), 'success')

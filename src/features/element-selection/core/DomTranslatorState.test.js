@@ -196,6 +196,63 @@ describe('DomTranslatorState', () => {
       document.body.removeChild(container);
     });
 
+    it('reports text restoration failures without changing the numeric count or cleanup', async () => {
+      const { container, nodes } = appendTextNodes(['A', 'B']);
+      nodes.forEach(node => { node.nodeValue = 'Translated'; });
+      const error = new Error('first node failed');
+      vi.spyOn(nodes[0], 'nodeValue', 'set').mockImplementation(() => { throw error; });
+      globalSelectElementState.snapshots.set('session:block', []);
+      globalSelectElementState.translationHistory = [createTranslationEntry(container, [
+        { node: nodes[0], originalText: 'A' },
+        { node: nodes[1], originalText: 'B' },
+      ], 'session')];
+      const onRestoreFailure = vi.fn(() => { throw new Error('observer failed'); });
+
+      const count = await revertSelectElementTranslation(null, { onRestoreFailure });
+
+      expect(count).toBe(1);
+      expect(nodes.map(node => node.nodeValue)).toEqual(['Translated', 'B']);
+      expect(onRestoreFailure).toHaveBeenCalledOnce();
+      expect(onRestoreFailure).toHaveBeenCalledWith({ phase: 'Text restoration', error });
+      expect(globalSelectElementState.translationHistory).toEqual([]);
+      expect(globalSelectElementState.snapshots.size).toBe(0);
+      document.body.removeChild(container);
+    });
+
+    it('does not report detached or externally modified nodes as restoration failures', async () => {
+      const { container, nodes } = appendTextNodes(['External', 'Translated']);
+      const detached = document.createTextNode('Detached');
+      nodes[1].nodeValue = 'External edit';
+      globalSelectElementState.translationHistory = [createTranslationEntry(container, [
+        { node: detached, originalText: 'Detached source', appliedText: 'Detached' },
+        { node: nodes[1], originalText: 'Original', appliedText: 'Translated' },
+      ])];
+      const onRestoreFailure = vi.fn();
+
+      const count = await revertSelectElementTranslation(null, { onRestoreFailure });
+
+      expect(count).toBe(0);
+      expect(onRestoreFailure).not.toHaveBeenCalled();
+      expect(nodes[1].nodeValue).toBe('External edit');
+      document.body.removeChild(container);
+    });
+
+    it('reports metadata restoration failures', async () => {
+      const { container, nodes } = appendTextNodes(['Original']);
+      const error = new Error('metadata failed');
+      vi.spyOn(container, 'removeAttribute').mockImplementation(() => { throw error; });
+      globalSelectElementState.translationHistory = [{
+        ...createTranslationEntry(container, [{ node: nodes[0], originalText: 'Original' }]),
+        originalMetadataSnapshots: [{ element: container, present: false }],
+      }];
+      const onRestoreFailure = vi.fn();
+
+      await revertSelectElementTranslation(null, { onRestoreFailure });
+
+      expect(onRestoreFailure).toHaveBeenCalledWith({ phase: 'Metadata restoration', error });
+      document.body.removeChild(container);
+    });
+
     it('restores first and last text nodes when a middle setter throws', async () => {
       const { container, nodes } = appendTextNodes(['A', 'B', 'C']);
       nodes.forEach(node => { node.nodeValue = 'Translated'; });
@@ -333,6 +390,24 @@ describe('DomTranslatorState', () => {
       expect(removeAttribute).toHaveBeenCalled();
       expect(restoreElementDirection).toHaveBeenCalledWith(container);
       expect(globalSelectElementState.translationHistory).toHaveLength(0);
+      document.body.removeChild(container);
+    });
+
+    it('reports returned direction restoration failures', async () => {
+      const { restoreNodeDirectionState } = await import('@/utils/dom/DomDirectionManager.js');
+      const { container, nodes } = appendTextNodes(['Original']);
+      const error = new Error('direction failed');
+      restoreNodeDirectionState.mockReturnValueOnce([{ error, element: container }]);
+      globalSelectElementState.translationHistory = [{
+        ...createTranslationEntry(container, [{ node: nodes[0], originalText: 'Original' }]),
+        shadowSpanning: true,
+        originalDirectionSnapshots: [{ element: container }],
+      }];
+      const onRestoreFailure = vi.fn();
+
+      await revertSelectElementTranslation(null, { onRestoreFailure });
+
+      expect(onRestoreFailure).toHaveBeenCalledWith({ phase: 'Direction/style restoration', error });
       document.body.removeChild(container);
     });
 
@@ -651,6 +726,31 @@ describe('DomTranslatorState', () => {
       expect(container.style.getPropertyValue('direction')).toBe('ltr');
       expect(container.style.getPropertyPriority('direction')).toBe('important');
       expect(container.getAttribute('dir')).toBe('');
+      document.body.removeChild(container);
+    });
+
+    it('reports auxiliary property restoration failures', async () => {
+      const { container, nodes } = appendTextNodes(['Translated']);
+      container.setAttribute('data-restore-test', 'applied');
+      const error = new Error('auxiliary failed');
+      vi.spyOn(container, 'removeAttribute').mockImplementation(() => { throw error; });
+      globalSelectElementState.translationHistory = [{
+        ...createTranslationEntry(container, [{ node: nodes[0], originalText: 'Original' }]),
+        sessionId: 'aux-failure',
+        auxiliaryOwnershipRecords: [{
+          element: container,
+          property: 'attribute:data-restore-test',
+          original: { present: false, value: null },
+          applied: { present: true, value: 'applied' },
+        }],
+      }];
+      const onRestoreFailure = vi.fn();
+
+      await revertSelectElementTranslation(null, { onRestoreFailure });
+
+      expect(onRestoreFailure).toHaveBeenCalledWith({ phase: 'Auxiliary property restoration', error });
+      expect(globalSelectElementState.translationHistory).toEqual([]);
+      expect(globalSelectElementState.auxiliaryOwnership.size).toBe(0);
       document.body.removeChild(container);
     });
 

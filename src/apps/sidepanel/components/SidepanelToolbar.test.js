@@ -1177,6 +1177,17 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
       const selectTarget = mocks.showVisualFeedback.mock.calls[0][0]
       expect(selectTarget?.id ?? selectTarget?.getAttribute?.('id')).toBe('selectElementBtn')
     })
+
+    it('does not show revert feedback when the composable reports a restricted tab', async () => {
+      mocks.revertTranslation.mockResolvedValue(null)
+      await mountToolbar()
+
+      await wrapper.get('#revertActionBtn').trigger('click')
+      await drain()
+
+      expect(mocks.revertTranslation).toHaveBeenCalledOnce()
+      expect(mocks.showVisualFeedback).not.toHaveBeenCalled()
+    })
   })
 
   it('stops the retry timer when the panel is hidden or the component unmounts', async () => {
