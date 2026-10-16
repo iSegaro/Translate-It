@@ -4,8 +4,8 @@
     :class="{ 'is-open': isOpen, [itemClass]: !!itemClass }"
   >
     <!-- Header Section -->
-    <div 
-      class="accordion-header" 
+    <div
+      class="accordion-header"
       :class="{ 'is-active': isOpen, [headerClass]: !!headerClass }"
       @click="$emit('toggle')"
     >
@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import './BaseAccordion.scss';
+import "./BaseAccordion.scss";
 /**
  * BaseAccordion Component
  * A reusable, accessible accordion with smooth height transitions using CSS Grid.
@@ -50,29 +50,29 @@ defineProps({
   /** Whether the accordion is currently expanded */
   isOpen: {
     type: Boolean,
-    default: false
+    default: false,
   },
   /** Optional title if header slot is not used */
   title: {
     type: String,
-    default: ''
+    default: "",
   },
   /** Custom class for the root container */
   itemClass: {
     type: String,
-    default: ''
+    default: "",
   },
   /** Custom class for the header area */
   headerClass: {
     type: String,
-    default: ''
+    default: "",
   },
   /** Custom class for the body container */
   bodyClass: {
     type: String,
-    default: ''
-  }
+    default: "",
+  },
 });
 
-defineEmits(['toggle']);
+defineEmits(["toggle"]);
 </script>

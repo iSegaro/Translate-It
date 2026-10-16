@@ -9,27 +9,27 @@
       :checked="modelValue"
       :disabled="disabled"
       @change="$emit('update:modelValue', $event.target.checked)"
-    >
+    />
     <span class="slider round" />
   </label>
 </template>
 
 <script setup>
-import './BaseToggle.scss'
+import "./BaseToggle.scss";
 defineProps({
   modelValue: {
     type: Boolean,
-    default: false
+    default: false,
   },
   disabled: {
     type: Boolean,
-    default: false
+    default: false,
   },
   title: {
     type: String,
-    default: ''
-  }
-})
+    default: "",
+  },
+});
 
-defineEmits(['update:modelValue'])
+defineEmits(["update:modelValue"]);
 </script>

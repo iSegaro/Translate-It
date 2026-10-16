@@ -1,7 +1,10 @@
 <template>
   <div
     class="ti-textarea-wrapper"
-    :class="{ 'ti-textarea-wrapper--disabled': disabled, 'ti-textarea-wrapper--loading': loading }"
+    :class="{
+      'ti-textarea-wrapper--disabled': disabled,
+      'ti-textarea-wrapper--loading': loading,
+    }"
   >
     <button
       v-if="passwordMask && !hideToggle"
@@ -20,7 +23,7 @@
         class="toggle-visibility-icon"
         width="16"
         height="16"
-      >
+      />
       <img
         v-else
         :src="eyeHideIcon"
@@ -28,7 +31,7 @@
         class="toggle-visibility-icon"
         width="16"
         height="16"
-      >
+      />
     </button>
 
     <textarea
@@ -60,77 +63,78 @@
 </template>
 
 <script setup>
-import { computed, ref, nextTick } from 'vue'
-import './BaseTextarea.scss'
-import LoadingSpinner from './LoadingSpinner.vue'
-import eyeIcon from '@/icons/ui/eye-open.svg?url'
-import eyeHideIcon from '@/icons/ui/eye-hide.svg?url'
+import { computed, ref, nextTick } from "vue";
+import "./BaseTextarea.scss";
+import LoadingSpinner from "./LoadingSpinner.vue";
+import eyeIcon from "@/icons/ui/eye-open.svg?url";
+import eyeHideIcon from "@/icons/ui/eye-hide.svg?url";
 
 const props = defineProps({
   modelValue: {
     type: String,
-    default: ''
+    default: "",
   },
   placeholder: {
     type: String,
-    default: ''
+    default: "",
   },
   rows: {
     type: Number,
-    default: 3
+    default: 3,
   },
   disabled: {
     type: Boolean,
-    default: false
+    default: false,
   },
   readonly: {
     type: Boolean,
-    default: false
+    default: false,
   },
   loading: {
     type: Boolean,
-    default: false
+    default: false,
   },
   resize: {
     type: String,
-    default: 'vertical',
-    validator: (value) => ['none', 'both', 'horizontal', 'vertical'].includes(value)
+    default: "vertical",
+    validator: (value) =>
+      ["none", "both", "horizontal", "vertical"].includes(value),
   },
   passwordMask: {
     type: Boolean,
-    default: false
+    default: false,
   },
   hideToggle: {
     type: Boolean,
-    default: false
+    default: false,
   },
   showLabel: {
     type: String,
-    default: 'Show'
+    default: "Show",
   },
   hideLabel: {
     type: String,
-    default: 'Hide'
+    default: "Hide",
   },
   toggleTitle: {
     type: String,
-    default: null
+    default: null,
   },
   dir: {
     type: String,
     default: null,
-    validator: (value) => ['ltr', 'rtl', 'auto'].includes(value)
+    validator: (value) => ["ltr", "rtl", "auto"].includes(value),
   },
   id: { type: String, default: null },
   ariaLabel: { type: String, default: null },
   ariaDescribedby: { type: String, default: null },
-  ariaInvalid: { type: [Boolean, String], default: null }
-})
+  ariaInvalid: { type: [Boolean, String], default: null },
+});
 
-const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'input'])
+const emit = defineEmits(["update:modelValue", "focus", "blur", "input"]);
 
-const isFocused = ref(false)
-const visibilityVisible = ref(false)
+const isFocused = ref(false);
+const visibilityVisible = ref(false);
 
 // Hybrid password masking approach:
 // 1. Use CSS -webkit-text-security when available (modern browsers)
@@ -138,139 +142,155 @@ const visibilityVisible = ref(false)
 const displayValue = computed(() => {
   // When not password mode, or when visibility is toggled on, show actual value
   if (!props.passwordMask || visibilityVisible.value) {
-    return props.modelValue
+    return props.modelValue;
   }
 
   // When masked, use bullet replacement as fallback
   // CSS will also apply -webkit-text-security for double-protection
-  return props.modelValue ? props.modelValue.replace(/[^\n]/g, '•') : ''
-})
+  return props.modelValue ? props.modelValue.replace(/[^\n]/g, "•") : "";
+});
 
 const toggleVisibility = () => {
-  visibilityVisible.value = !visibilityVisible.value
-}
+  visibilityVisible.value = !visibilityVisible.value;
+};
 
 const textareaClasses = computed(() => [
-  'ti-textarea',
+  "ti-textarea",
   {
-    'ti-textarea--focused': isFocused.value,
-    'ti-textarea--readonly': props.readonly,
+    "ti-textarea--focused": isFocused.value,
+    "ti-textarea--readonly": props.readonly,
     // Apply password masking class when masked (passwordMask on, visibilityVisible off)
-    'ti-textarea--password': props.passwordMask && !visibilityVisible.value,
-    [`ti-textarea--resize-${props.resize}`]: true
-  }
-])
+    "ti-textarea--password": props.passwordMask && !visibilityVisible.value,
+    [`ti-textarea--resize-${props.resize}`]: true,
+  },
+]);
 
 // Ref to textarea element
-const textareaRef = ref(null)
+const textareaRef = ref(null);
 
 // Handle beforeinput when masked to prevent corruption
 const handleBeforeInput = (event) => {
   // Only handle when masked (showing bullets)
   if (!props.passwordMask || visibilityVisible.value) {
-    return // Let default behavior happen when unmasked
+    return; // Let default behavior happen when unmasked
   }
 
   // Paste is handled by the paste event, whose clipboard data is reliable in
   // browsers that omit it from beforeinput (including Firefox).
-  if (event.inputType === 'insertFromPaste') return
+  if (event.inputType === "insertFromPaste") return;
 
   // Prevent default to avoid corruption when typing into bullets
-  event.preventDefault()
+  event.preventDefault();
 
-  const target = event.target
-  const currentValue = props.modelValue || ''
-  const cursorStart = target.selectionStart
-  const cursorEnd = target.selectionEnd
+  const target = event.target;
+  const currentValue = props.modelValue || "";
+  const cursorStart = target.selectionStart;
+  const cursorEnd = target.selectionEnd;
 
-  let newValue = currentValue
-  let newCursorPos = cursorStart
+  let newValue = currentValue;
+  let newCursorPos = cursorStart;
 
   // Handle main input types
-  const inputType = event.inputType
+  const inputType = event.inputType;
 
-  if (inputType === 'insertText' && event.data) {
+  if (inputType === "insertText" && event.data) {
     // Character insertion
-    newValue = currentValue.slice(0, cursorStart) + event.data + currentValue.slice(cursorEnd)
-    newCursorPos = cursorStart + event.data.length
-  } else if (inputType === 'insertLineBreak' || inputType === 'insertParagraph') {
+    newValue =
+      currentValue.slice(0, cursorStart) +
+      event.data +
+      currentValue.slice(cursorEnd);
+    newCursorPos = cursorStart + event.data.length;
+  } else if (
+    inputType === "insertLineBreak" ||
+    inputType === "insertParagraph"
+  ) {
     // Enter key
-    newValue = currentValue.slice(0, cursorStart) + '\n' + currentValue.slice(cursorEnd)
-    newCursorPos = cursorStart + 1
-  } else if (inputType === 'deleteContentBackward') {
+    newValue =
+      currentValue.slice(0, cursorStart) + "\n" + currentValue.slice(cursorEnd);
+    newCursorPos = cursorStart + 1;
+  } else if (inputType === "deleteContentBackward") {
     // Backspace
     if (cursorStart === cursorEnd && cursorStart > 0) {
-      newValue = currentValue.slice(0, cursorStart - 1) + currentValue.slice(cursorEnd)
-      newCursorPos = cursorStart - 1
+      newValue =
+        currentValue.slice(0, cursorStart - 1) + currentValue.slice(cursorEnd);
+      newCursorPos = cursorStart - 1;
     } else if (cursorStart !== cursorEnd) {
-      newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd)
-      newCursorPos = cursorStart
+      newValue =
+        currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd);
+      newCursorPos = cursorStart;
     }
-  } else if (inputType === 'deleteContentForward') {
+  } else if (inputType === "deleteContentForward") {
     // Delete key
     if (cursorStart === cursorEnd && cursorStart < currentValue.length) {
-      newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd + 1)
-      newCursorPos = cursorStart
+      newValue =
+        currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd + 1);
+      newCursorPos = cursorStart;
     } else if (cursorStart !== cursorEnd) {
-      newValue = currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd)
-      newCursorPos = cursorStart
+      newValue =
+        currentValue.slice(0, cursorStart) + currentValue.slice(cursorEnd);
+      newCursorPos = cursorStart;
     }
   } else {
     // For other input types, let it through
-    return
+    return;
   }
 
   // Emit the new value
-  emit('update:modelValue', newValue)
-  emit('input', event)
+  emit("update:modelValue", newValue);
+  emit("input", event);
 
   // Restore cursor position
   nextTick(() => {
     if (textareaRef.value) {
-      textareaRef.value.setSelectionRange(newCursorPos, newCursorPos)
+      textareaRef.value.setSelectionRange(newCursorPos, newCursorPos);
     }
-  })
-}
+  });
+};
 
 const handlePaste = (event) => {
-  if (!props.passwordMask || visibilityVisible.value) return
-  const pastedText = event.clipboardData?.getData('text/plain')
-  event.preventDefault()
-  if (pastedText == null) return
-  const target = event.target
-  const currentValue = props.modelValue || ''
-  const cursorStart = target.selectionStart
-  const cursorEnd = target.selectionEnd
-  const newValue = currentValue.slice(0, cursorStart) + pastedText + currentValue.slice(cursorEnd)
-  emit('update:modelValue', newValue)
-  emit('input', event)
-  const newCursorPos = cursorStart + pastedText.length
-  nextTick(() => textareaRef.value?.setSelectionRange(newCursorPos, newCursorPos))
-}
+  if (!props.passwordMask || visibilityVisible.value) return;
+  const pastedText = event.clipboardData?.getData("text/plain");
+  event.preventDefault();
+  if (pastedText == null) return;
+  const target = event.target;
+  const currentValue = props.modelValue || "";
+  const cursorStart = target.selectionStart;
+  const cursorEnd = target.selectionEnd;
+  const newValue =
+    currentValue.slice(0, cursorStart) +
+    pastedText +
+    currentValue.slice(cursorEnd);
+  emit("update:modelValue", newValue);
+  emit("input", event);
+  const newCursorPos = cursorStart + pastedText.length;
+  nextTick(() =>
+    textareaRef.value?.setSelectionRange(newCursorPos, newCursorPos),
+  );
+};
 
 // Handle input event for cases where beforeinput didn't handle
 // (e.g., when unmasked or for edge cases)
 const handleInput = (event) => {
   // Only emit when unmasked (when masked, beforeinput handles everything)
   if (!props.passwordMask || visibilityVisible.value) {
-    emit('update:modelValue', event.target.value)
-    emit('input', event)
+    emit("update:modelValue", event.target.value);
+    emit("input", event);
   }
-}
+};
 
 const handleFocus = (event) => {
-  isFocused.value = true
-  emit('focus', event)
-}
+  isFocused.value = true;
+  emit("focus", event);
+};
 
 const handleBlur = (event) => {
-  isFocused.value = false
-  emit('blur', event)
-}
+  isFocused.value = false;
+  emit("blur", event);
+};
 
 // Expose for external access
 defineExpose({
   visibilityVisible,
-  toggleVisibility
-})
+  toggleVisibility,
+});
 </script>

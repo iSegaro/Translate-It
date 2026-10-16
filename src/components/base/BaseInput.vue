@@ -1,7 +1,10 @@
 <template>
   <div
     class="ti-input-wrapper"
-    :class="{ 'ti-input-wrapper--disabled': disabled, 'ti-input-wrapper--error': !!error }"
+    :class="{
+      'ti-input-wrapper--disabled': disabled,
+      'ti-input-wrapper--error': !!error,
+    }"
   >
     <label
       v-if="label"
@@ -12,9 +15,10 @@
       <span
         v-if="required"
         class="ti-input__required"
-      >*</span>
+        >*</span
+      >
     </label>
-    
+
     <div class="ti-input__container">
       <input
         :id="inputId"
@@ -29,8 +33,8 @@
         @input="handleInput"
         @focus="handleFocus"
         @blur="handleBlur"
-      >
-      
+      />
+
       <BaseButton
         v-if="clearable && modelValue && !disabled"
         variant="ghost"
@@ -40,7 +44,7 @@
         @click="handleClear"
       />
     </div>
-    
+
     <div
       v-if="error || hint"
       class="ti-input__help"
@@ -48,103 +52,107 @@
       <span
         v-if="error"
         class="ti-input__error"
-      >{{ error }}</span>
+        >{{ error }}</span
+      >
       <span
         v-else-if="hint"
         class="ti-input__hint"
-      >{{ hint }}</span>
+        >{{ hint }}</span
+      >
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import './BaseInput.scss'
-import BaseButton from './BaseButton.vue'
+import { computed, ref } from "vue";
+import "./BaseInput.scss";
+import BaseButton from "./BaseButton.vue";
 
 const props = defineProps({
   modelValue: {
     type: [String, Number],
-    default: ''
+    default: "",
   },
   type: {
     type: String,
-    default: 'text',
-    validator: (value) => ['text', 'password', 'email', 'number', 'url', 'search'].includes(value)
+    default: "text",
+    validator: (value) =>
+      ["text", "password", "email", "number", "url", "search"].includes(value),
   },
   label: {
     type: String,
-    default: null
+    default: null,
   },
   placeholder: {
     type: String,
-    default: null
+    default: null,
   },
   hint: {
     type: String,
-    default: null
+    default: null,
   },
   error: {
     type: String,
-    default: null
+    default: null,
   },
   size: {
     type: String,
-    default: 'md',
-    validator: (value) => ['sm', 'md', 'lg'].includes(value)
+    default: "md",
+    validator: (value) => ["sm", "md", "lg"].includes(value),
   },
   disabled: {
     type: Boolean,
-    default: false
+    default: false,
   },
   readonly: {
     type: Boolean,
-    default: false
+    default: false,
   },
   required: {
     type: Boolean,
-    default: false
+    default: false,
   },
   clearable: {
     type: Boolean,
-    default: false
+    default: false,
   },
   dir: {
     type: String,
     default: null,
-    validator: (value) => ['ltr', 'rtl', 'auto'].includes(value)
-  }
-})
+    validator: (value) => ["ltr", "rtl", "auto"].includes(value),
+  },
+});
 
-const emit = defineEmits(['update:modelValue', 'focus', 'blur', 'clear'])
+const emit = defineEmits(["update:modelValue", "focus", "blur", "clear"]);
 
-const inputId = ref(`input-${Math.random().toString(36).substr(2, 9)}`)
+const inputId = ref(`input-${Math.random().toString(36).substr(2, 9)}`);
 
 const inputClasses = computed(() => [
-  'ti-input',
+  "ti-input",
   `ti-input--${props.size}`,
   {
-    'ti-input--has-error': !!props.error,
-    'ti-input--readonly': props.readonly,
-    'ti-input--disabled': props.disabled,
-    'ti-input--clearable': props.clearable && props.modelValue && !props.disabled
-  }
-])
+    "ti-input--has-error": !!props.error,
+    "ti-input--readonly": props.readonly,
+    "ti-input--disabled": props.disabled,
+    "ti-input--clearable":
+      props.clearable && props.modelValue && !props.disabled,
+  },
+]);
 
 const handleInput = (event) => {
-  emit('update:modelValue', event.target.value)
-}
+  emit("update:modelValue", event.target.value);
+};
 
 const handleFocus = (event) => {
-  emit('focus', event)
-}
+  emit("focus", event);
+};
 
 const handleBlur = (event) => {
-  emit('blur', event)
-}
+  emit("blur", event);
+};
 
 const handleClear = () => {
-  emit('update:modelValue', '')
-  emit('clear')
-}
+  emit("update:modelValue", "");
+  emit("clear");
+};
 </script>
