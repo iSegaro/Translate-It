@@ -67,6 +67,17 @@ export default [
     },
   },
 
+  // Prettier owns Vue template layout outside Options; retain its lint rules there.
+  {
+    files: ["src/**/*.vue"],
+    ignores: ["src/apps/options/**/*.vue"],
+    rules: {
+      "vue/html-closing-bracket-newline": "off",
+      "vue/html-indent": "off",
+      "vue/singleline-html-element-content-newline": "off",
+    },
+  },
+
   // Configuration for JS files in src/
   {
     files: ["src/**/*.js"],

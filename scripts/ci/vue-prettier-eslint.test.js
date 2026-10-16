@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prettier from 'prettier';
+import { ESLint } from 'eslint';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const source = join(root, 'src/apps/options/components/InterfaceLocaleSelector.vue');
@@ -26,6 +27,30 @@ function lintText(text) {
 }
 
 describe('Prettier Vue output and ESLint layout rules', () => {
+  it('disables only Prettier-conflicting layout rules outside Options', async () => {
+    const filename = join(root, 'src/apps/pdf/components/PdfAppBrand.vue');
+    const eslintApi = new ESLint({ cwd: root });
+    const sourceText = readFileSync(filename, 'utf8');
+    const options = await prettier.resolveConfig(filename);
+    const formatted = await prettier.format(sourceText, { ...options, filepath: filename });
+    const [result] = await eslintApi.lintText(formatted, { filePath: filename });
+    expect(result.messages).toHaveLength(0);
+
+    const outsideOptions = await eslintApi.calculateConfigForFile(filename);
+    const optionsConfig = await eslintApi.calculateConfigForFile(source);
+    for (const rule of [
+      'vue/html-indent',
+      'vue/html-closing-bracket-newline',
+      'vue/singleline-html-element-content-newline',
+    ]) {
+      expect(outsideOptions.rules[rule][0]).toBe(0);
+      expect(optionsConfig.rules[rule][0]).toBe(1);
+    }
+    expect(outsideOptions.rules['vue/max-attributes-per-line'][0]).toBe(1);
+    const [unrelatedViolation] = await eslintApi.lintText('<template><div class="a" id="b"></div></template>', { filePath: filename });
+    expect(unrelatedViolation.messages.map(message => message.ruleId)).toContain('vue/max-attributes-per-line');
+  });
+
   it('formats the locale selector without the eight original Vue layout warnings and keeps rules active', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'vue-prettier-eslint-'));
     const copy = join(dir, 'InterfaceLocaleSelector.vue');
