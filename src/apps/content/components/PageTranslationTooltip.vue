@@ -4,35 +4,37 @@
     ref="tooltipRef"
     class="ti-page-translation-tooltip"
     :dir="direction"
-    :style="{ '--tooltip-transform': `translate3d(${position.x}px, ${position.y}px, 0)` }"
+    :style="{
+      '--tooltip-transform': `translate3d(${position.x}px, ${position.y}px, 0)`,
+    }"
   >
     {{ text }}
   </div>
 </template>
 
 <script setup>
-import './PageTranslationTooltip.scss'
-import { ref, nextTick } from 'vue';
-import { pageEventBus, PAGE_TRANSLATION_EVENTS } from '@/core/PageEventBus.js';
-import { detectDirectionFromContent } from '@/utils/dom/DomDirectionManager.js';
-import { useResourceTracker } from '@/composables/core/useResourceTracker.js';
+import "./PageTranslationTooltip.scss";
+import { ref, nextTick } from "vue";
+import { pageEventBus, PAGE_TRANSLATION_EVENTS } from "@/core/PageEventBus.js";
+import { detectDirectionFromContent } from "@/utils/dom/DomDirectionManager.js";
+import { useResourceTracker } from "@/composables/core/useResourceTracker.js";
 
 const isVisible = ref(false);
-const text = ref('');
-const direction = ref('ltr');
+const text = ref("");
+const direction = ref("ltr");
 const position = ref({ x: 0, y: 0 });
 const tooltipRef = ref(null);
 
 // Use the central resource tracker for safe memory management
-const tracker = useResourceTracker('page-translation-tooltip');
+const tracker = useResourceTracker("page-translation-tooltip");
 
 const showTooltip = async (detail) => {
   if (!detail.text) return;
-  
+
   text.value = detail.text;
   direction.value = detectDirectionFromContent(detail.text);
   isVisible.value = true;
-  
+
   // Wait for the DOM to get dimensions before calculating position
   await nextTick();
   calculatePosition(detail.position);
@@ -44,7 +46,7 @@ const hideTooltip = () => {
 
 const calculatePosition = (pos) => {
   if (!pos || !isVisible.value || !tooltipRef.value) return;
-  
+
   const el = tooltipRef.value;
   const rect = el.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
@@ -69,7 +71,19 @@ const updatePosition = (pos) => {
 };
 
 // Safe event listening with automatic cleanup
-tracker.addEventListener(pageEventBus, PAGE_TRANSLATION_EVENTS.SHOW_TOOLTIP, showTooltip);
-tracker.addEventListener(pageEventBus, PAGE_TRANSLATION_EVENTS.HIDE_TOOLTIP, hideTooltip);
-tracker.addEventListener(pageEventBus, PAGE_TRANSLATION_EVENTS.UPDATE_TOOLTIP_POSITION, updatePosition);
+tracker.addEventListener(
+  pageEventBus,
+  PAGE_TRANSLATION_EVENTS.SHOW_TOOLTIP,
+  showTooltip,
+);
+tracker.addEventListener(
+  pageEventBus,
+  PAGE_TRANSLATION_EVENTS.HIDE_TOOLTIP,
+  hideTooltip,
+);
+tracker.addEventListener(
+  pageEventBus,
+  PAGE_TRANSLATION_EVENTS.UPDATE_TOOLTIP_POSITION,
+  updatePosition,
+);
 </script>

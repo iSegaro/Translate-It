@@ -181,14 +181,16 @@
                 :aria-pressed="hasPageRule"
                 @click.stop="scopeActions.togglePageScope()"
               >
-                <span>{{ hasPageRule ? "✓" : "" }}</span>{{ t("auto_translate_scope_this_page", "This Page") }}
+                <span>{{ hasPageRule ? "✓" : "" }}</span
+                >{{ t("auto_translate_scope_this_page", "This Page") }}
               </button>
               <button
                 v-if="siteScopeAvailable"
                 :aria-pressed="hasSiteRule"
                 @click.stop="scopeActions.toggleSiteScope()"
               >
-                <span>{{ hasSiteRule ? "✓" : "" }}</span>{{ t("auto_translate_scope_this_site", "This Site") }}
+                <span>{{ hasSiteRule ? "✓" : "" }}</span
+                >{{ t("auto_translate_scope_this_site", "This Site") }}
               </button>
               <template v-if="showManageRules">
                 <hr class="fab-scope-separator" />
@@ -308,8 +310,8 @@
         <div
           v-if="
             pendingSelection.hasSelection &&
-              (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK ||
-                !isTextSelectionEnabled)
+            (pendingSelection.mode === SelectionTranslationMode.ON_FAB_CLICK ||
+              !isTextSelectionEnabled)
           "
           class="fab-translate-badge"
           @click.stop="triggerTranslation"
