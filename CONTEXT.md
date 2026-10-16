@@ -23,7 +23,7 @@ Check each accepted ADR's implementation/adoption status before comparing it wit
 ## Repository tooling
 
 - Package manager, dependencies, and runnable scripts: [package.json](package.json); workspace configuration: [pnpm-workspace.yaml](pnpm-workspace.yaml); dependency lock: [pnpm-lock.yaml](pnpm-lock.yaml).
-- Test configuration: [tests/vitest.config.js](tests/vitest.config.js); JavaScript lint configuration: [config/eslint.config.js](config/eslint.config.js); style lint configuration: [config/.stylelintrc.json](config/.stylelintrc.json).
+- Test configuration: [vitest.config.js](vitest.config.js); JavaScript lint configuration: [eslint.config.js](eslint.config.js); style lint configuration: [.stylelintrc.json](.stylelintrc.json).
 - Vite/build configuration: [config/vite/](config/vite/); build scripts: [scripts/build/](scripts/build/); validation tooling: [scripts/validate/](scripts/validate/).
 
 Common commands: `pnpm test:run`, `pnpm lint`, `pnpm lint:styles`, `pnpm build`, `pnpm pre-submit`.

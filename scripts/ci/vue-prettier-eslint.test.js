@@ -9,17 +9,16 @@ import prettier from 'prettier';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const source = join(root, 'src/apps/options/components/InterfaceLocaleSelector.vue');
 const eslint = join(root, 'node_modules/eslint/bin/eslint.js');
-const eslintConfig = join(root, 'config/eslint.config.js');
 
 function lintFile(file) {
-  return spawnSync(process.execPath, [eslint, '--config', eslintConfig, '--format', 'json', file], {
+  return spawnSync(process.execPath, [eslint, '--format', 'json', file], {
     cwd: root,
     encoding: 'utf8',
   });
 }
 
 function lintText(text) {
-  return spawnSync(process.execPath, [eslint, '--config', eslintConfig, '--format', 'json', '--stdin', '--stdin-filename', 'src/apps/options/components/InterfaceLocaleSelector.vue'], {
+  return spawnSync(process.execPath, [eslint, '--format', 'json', '--stdin', '--stdin-filename', 'src/apps/options/components/InterfaceLocaleSelector.vue'], {
     cwd: root,
     encoding: 'utf8',
     input: text,

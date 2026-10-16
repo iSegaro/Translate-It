@@ -3403,7 +3403,7 @@ describe('LiveDubbingControl', () => {
 
     // NOTE(spec §20): no test here by design — the contract is that the entire
     // pre-existing suite (Original Volume included) stays green. Verified by running
-    // `vitest --config tests/vitest.config.js src/components/popup/LiveDubbingControl.test.js`
+    // `vitest src/components/popup/LiveDubbingControl.test.js`
     // after adding this block.
   })
 
