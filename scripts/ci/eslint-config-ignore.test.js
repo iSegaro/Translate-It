@@ -8,7 +8,6 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const config = join(root, 'config/eslint.config.js');
 const eslintBin = join(root, 'node_modules/eslint/bin/eslint.js');
 const newlyCovered = [
   ...globSync('src/shared/config/**/*.js'),
@@ -26,7 +25,7 @@ const ignoredScriptModules = globSync('scripts/**/*.mjs', { cwd: root });
 
 describe('ESLint config directory ignores', () => {
   it('lints nested source config modules and retains intentional exclusions', async () => {
-    const lint = spawnSync(process.execPath, [eslintBin, '--config', config, '--format', 'json', ...newlyCovered], {
+    const lint = spawnSync(process.execPath, [eslintBin, '--format', 'json', ...newlyCovered], {
       cwd: root,
       encoding: 'utf8',
     });
@@ -36,7 +35,7 @@ describe('ESLint config directory ignores', () => {
     expect(reports).toHaveLength(newlyCovered.length);
     expect(reports.flatMap(report => report.messages)).toEqual([]);
 
-    const eslint = new ESLint({ overrideConfigFile: config });
+    const eslint = new ESLint();
     for (const file of newlyCovered) expect(await eslint.isPathIgnored(join(root, file)), file).toBe(false);
     for (const file of intentionallyIgnored) expect(await eslint.isPathIgnored(join(root, file)), file).toBe(true);
     expect(await eslint.isPathIgnored(join(root, 'config/vite/vite.config.chrome.js'))).toBe(true);
@@ -47,13 +46,13 @@ describe('ESLint config directory ignores', () => {
     try {
       const moduleFile = join(tempDir, 'new-module.mjs');
       writeFileSync(moduleFile, 'export {};\n');
-      const tempEslint = new ESLint({ overrideConfigFile: config, cwd: tempDir });
+      const tempEslint = new ESLint({ overrideConfigFile: join(root, 'eslint.config.js'), cwd: tempDir });
       expect(await tempEslint.isPathIgnored(moduleFile), moduleFile).toBe(false);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }
 
-    const violation = spawnSync(process.execPath, [eslintBin, '--config', config, '--format', 'json', '--stdin', '--stdin-filename', 'src/shared/config/config.js'], {
+    const violation = spawnSync(process.execPath, [eslintBin, '--format', 'json', '--stdin', '--stdin-filename', 'src/shared/config/config.js'], {
       cwd: root,
       encoding: 'utf8',
       input: 'const unused = 1;\n',

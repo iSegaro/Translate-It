@@ -147,7 +147,7 @@ Different layers have different coverage expectations based on complexity and bu
 
 ### CI/CD Integration
 
-Configure coverage thresholds in `tests/vitest.config.js`:
+Configure coverage thresholds in `vitest.config.js`:
 
 ```javascript
 coverage: {
