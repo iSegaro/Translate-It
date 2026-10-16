@@ -54,6 +54,189 @@ describe('RevertHandler result and count', () => {
     expect(revertTranslations).toHaveBeenCalledOnce();
   });
 
+  it('waits for active frame-local cancellation before restoring global history', async () => {
+    let finishCancellation;
+    let translating = true;
+    const order = [];
+    const adapter = {
+      isCurrentlyTranslating: vi.fn(() => translating),
+      // Resolve only after the captured translation's finally has settled.
+      cancelTranslation: vi.fn(() => new Promise(resolve => {
+        finishCancellation = () => {
+          translating = false;
+          order.push('cancelled');
+          resolve();
+        };
+      })),
+    };
+    handler.getSelectElementManager.mockResolvedValue({ domTranslatorAdapter: adapter });
+    mocks.revertSelectElementTranslation.mockImplementation(async () => {
+      order.push('restored');
+      return 2;
+    });
+
+    const restore = handler.revertVueTranslations();
+    await Promise.resolve();
+
+    expect(adapter.cancelTranslation).toHaveBeenCalledWith({ silent: true, awaitSettlement: true });
+    expect(mocks.revertSelectElementTranslation).not.toHaveBeenCalled();
+    finishCancellation();
+
+    await expect(restore).resolves.toBe(2);
+    expect(order).toEqual(['cancelled', 'restored']);
+  });
+
+  it.each(['missing', 'replacement'])('fails closed if the manager is %s after cancellation', async ownerState => {
+    let finishCancellation;
+    let translating = true;
+    const originalManager = {
+      domTranslatorAdapter: {
+        isCurrentlyTranslating: vi.fn(() => translating),
+        cancelTranslation: vi.fn(() => new Promise(resolve => {
+          finishCancellation = () => {
+            translating = false;
+            resolve();
+          };
+        })),
+      },
+    };
+    const replacementManager = {
+      domTranslatorAdapter: { isCurrentlyTranslating: vi.fn(() => false) },
+    };
+    handler.getSelectElementManager
+      .mockResolvedValueOnce(originalManager)
+      .mockResolvedValueOnce(ownerState === 'missing' ? null : replacementManager);
+    handler.revertLegacyTranslations = vi.fn().mockResolvedValue(1);
+
+    const resultPromise = handler.executeRevert();
+    await Promise.resolve();
+    expect(originalManager.domTranslatorAdapter.cancelTranslation).toHaveBeenCalledWith({
+      silent: true,
+      awaitSettlement: true,
+    });
+    expect(mocks.revertSelectElementTranslation).not.toHaveBeenCalled();
+    finishCancellation();
+
+    const result = await resultPromise;
+
+    expect(result).toMatchObject({
+      success: true,
+      partial: true,
+      revertedCount: 1,
+      errors: [{ system: 'vue', error: 'Select Element owner or session changed during cancellation; revert was not applied' }],
+    });
+    expect(mocks.revertSelectElementTranslation).not.toHaveBeenCalled();
+    expect(handler.revertLegacyTranslations).toHaveBeenCalledOnce();
+    expect(mocks.show).not.toHaveBeenCalled();
+  });
+
+  it('does not revert global history if a new session starts on the same adapter during cancellation', async () => {
+    let finishCancellation;
+    let translating = true;
+    const adapter = {
+      currentSessionId: 'old-session',
+      isCurrentlyTranslating: vi.fn(() => translating),
+      cancelTranslation: vi.fn(() => new Promise(resolve => {
+        finishCancellation = () => {
+          translating = false;
+          adapter.currentSessionId = 'new-session';
+          resolve();
+        };
+      })),
+    };
+    const manager = { domTranslatorAdapter: adapter };
+    handler.getSelectElementManager.mockResolvedValue(manager);
+    handler.revertLegacyTranslations = vi.fn().mockResolvedValue(1);
+
+    const resultPromise = handler.executeRevert();
+    await Promise.resolve();
+    expect(adapter.cancelTranslation).toHaveBeenCalledWith({ silent: true, awaitSettlement: true });
+    expect(mocks.revertSelectElementTranslation).not.toHaveBeenCalled();
+    finishCancellation();
+
+    const result = await resultPromise;
+
+    expect(result).toMatchObject({
+      success: true,
+      partial: true,
+      revertedCount: 1,
+      errors: [{ system: 'vue', error: 'Select Element owner or session changed during cancellation; revert was not applied' }],
+    });
+    expect(mocks.revertSelectElementTranslation).not.toHaveBeenCalled();
+    expect(handler.revertLegacyTranslations).toHaveBeenCalledOnce();
+    expect(mocks.show).not.toHaveBeenCalled();
+  });
+
+  it('does not restore Vue history when active frame-local cancellation fails, but still attempts legacy revert', async () => {
+    const adapter = {
+      isCurrentlyTranslating: vi.fn(() => true),
+      cancelTranslation: vi.fn().mockRejectedValue(new Error('cancel failed')),
+    };
+    handler.getSelectElementManager.mockResolvedValue({ domTranslatorAdapter: adapter });
+
+    const result = await handler.executeRevert();
+
+    expect(adapter.cancelTranslation).toHaveBeenCalledWith({ silent: true, awaitSettlement: true });
+    expect(result).toMatchObject({
+      success: false,
+      partial: false,
+      revertedCount: 0,
+      error: 'vue: cancel failed',
+      errors: [{ system: 'vue', error: 'cancel failed' }],
+    });
+    expect(mocks.revertSelectElementTranslation).not.toHaveBeenCalled();
+    expect(handler.revertLegacyTranslations).toHaveBeenCalledOnce();
+    expect(mocks.show).not.toHaveBeenCalled();
+  });
+
+  it('preserves global completed-history restoration when no frame-local operation is active', async () => {
+    const adapter = {
+      isCurrentlyTranslating: vi.fn(() => false),
+      cancelTranslation: vi.fn(),
+    };
+    handler.getSelectElementManager.mockResolvedValue({ domTranslatorAdapter: adapter });
+    mocks.revertSelectElementTranslation.mockResolvedValue(3);
+
+    const result = await handler.executeRevert();
+
+    expect(result).toMatchObject({ success: true, revertedCount: 3, partial: false });
+    expect(adapter.cancelTranslation).not.toHaveBeenCalled();
+    expect(mocks.revertSelectElementTranslation).toHaveBeenCalledOnce();
+  });
+
+  it('skips manager fallback if a new session starts while global restore returns zero', async () => {
+    const adapter = {
+      currentSessionId: 'completed-session',
+      currentTranslationToken: null,
+      isCurrentlyTranslating: vi.fn(function () {
+        return Boolean(this.currentTranslationToken);
+      }),
+      cancelTranslation: vi.fn(),
+      revertTranslation: vi.fn(),
+    };
+    const revertTranslations = vi.fn(async () => {
+      await adapter.revertTranslation();
+      return 5;
+    });
+    handler.getSelectElementManager.mockResolvedValue({ domTranslatorAdapter: adapter, revertTranslations });
+    mocks.revertSelectElementTranslation.mockImplementation(async () => {
+      await Promise.resolve();
+      adapter.currentSessionId = 'new-session';
+      adapter.currentTranslationToken = { sessionId: 'new-session' };
+      return 0;
+    });
+
+    const result = await handler.executeRevert();
+
+    expect(result).toMatchObject({ success: true, partial: false, revertedCount: 0, system: 'none' });
+    expect(mocks.revertSelectElementTranslation).toHaveBeenCalledOnce();
+    expect(revertTranslations).not.toHaveBeenCalled();
+    expect(adapter.revertTranslation).not.toHaveBeenCalled();
+    expect(adapter.currentTranslationToken).toEqual({ sessionId: 'new-session' });
+    expect(adapter.cancelTranslation).not.toHaveBeenCalled();
+    expect(result.errors).toBeUndefined();
+  });
+
   it.each([
     ['Vue and legacy succeed', 2, 4, { success: true, partial: false, revertedCount: 6 }],
     ['Vue fails and legacy succeeds', new Error('Vue broke'), 4, { success: true, partial: true, revertedCount: 4 }],
@@ -173,7 +356,7 @@ describe('RevertHandler result and count', () => {
       error: 'vue: global Vue revert failed',
       errors: [{ system: 'vue', error: 'global Vue revert failed' }],
     });
-    expect(handler.getSelectElementManager).not.toHaveBeenCalled();
+    expect(handler.getSelectElementManager).toHaveBeenCalledOnce();
     expect(handler.revertLegacyTranslations).toHaveBeenCalledOnce();
   });
 
