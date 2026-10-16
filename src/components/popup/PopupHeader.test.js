@@ -989,12 +989,35 @@ describe('PopupHeader', () => {
     await flushPromises()
 
     expect(mockHandleError).toHaveBeenCalledOnce()
-    const [error, options] = mockHandleError.mock.calls[0]
+    const [error, context, options] = mockHandleError.mock.calls[0]
     expect(error.message).toContain('Revert partially completed')
     expect(error.message).toContain('vue: restore failed')
     expect(error.message).not.toContain('[object Object]')
     expect(error.message).not.toContain('Translation partially reverted')
-    expect(options).toEqual({ context: 'popup-header-revert-failed', isSilent: true })
+    expect(context).toBe('popup-header-revert-failed')
+    expect(options).toEqual({ isSilent: true })
+  })
+
+  it('silently handles failed Revert responses and messaging errors with their contexts', async () => {
+    const wrapper = mount(PopupHeader)
+    await wrapper.vm.$nextTick()
+
+    mockSendMessage.mockResolvedValueOnce({ success: false, error: 'restore failed' })
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+    expect(mockHandleError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Revert failed: restore failed' }),
+      'popup-header-revert-failed',
+      { isSilent: true }
+    )
+
+    mockHandleError.mockClear()
+    const transportError = new Error('transport failed')
+    mockSendMessage.mockRejectedValueOnce(transportError)
+    await wrapper.find('.ti-btn-revert-badge').trigger('click')
+    await flushPromises()
+    expect(mockHandleError).toHaveBeenCalledOnce()
+    expect(mockHandleError).toHaveBeenCalledWith(transportError, 'PopupHeader-revert', { isSilent: true })
   })
 
   it('treats a zero-count full Revert as success without error feedback', async () => {

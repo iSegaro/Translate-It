@@ -479,18 +479,18 @@ const handleRevert = async () => {
         : ''
       const errorMsg = details || response.message || response.error || 'Some translations could not be reverted'
       reportingPartialFailure = true
-      await handleError(new Error(`Revert partially completed: ${errorMsg}`), {
-        context: 'popup-header-revert-failed',
-        isSilent: true
-      })
+      await handleError(new Error(`Revert partially completed: ${errorMsg}`),
+        'popup-header-revert-failed', {
+          isSilent: true
+        })
     } else if (!response?.success && !response?.isRestrictedPage) {
       const errorMsg = response?.error || response?.message || 'Unknown error'
-      await handleError(new Error(`Revert failed: ${errorMsg}`), { context: 'popup-header-revert-failed', isSilent: true })
+      await handleError(new Error(`Revert failed: ${errorMsg}`), 'popup-header-revert-failed', { isSilent: true })
     }
   } catch (error) {
     if (reportingPartialFailure) return
     if (error?.isRestrictedPage) return
-    await handleError(error, { context: 'PopupHeader-revert', isSilent: true })
+    await handleError(error, 'PopupHeader-revert', { isSilent: true })
   }
 }
 
