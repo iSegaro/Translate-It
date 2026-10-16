@@ -7,8 +7,12 @@
     <!-- Enhanced Text Actions Toolbar -->
     <ActionToolbar
       :text="modelValue"
-      :language="lastTranslation?.sourceLanguage || detectedSourceLanguage || language"
-      :detected-language="lastTranslation?.sourceLanguage || detectedSourceLanguage"
+      :language="
+        lastTranslation?.sourceLanguage || detectedSourceLanguage || language
+      "
+      :detected-language="
+        lastTranslation?.sourceLanguage || detectedSourceLanguage
+      "
       mode="input"
       :show-copy="true"
       :show-tts="true"
@@ -18,7 +22,7 @@
       class="ti-input-toolbar"
       @text-pasted="handlePaste"
     />
-    
+
     <!-- Textarea -->
     <textarea
       ref="textareaRef"
@@ -37,162 +41,165 @@
 </template>
 
 <script setup>
-import './TranslationInputField.scss'
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { useErrorHandler } from '@/composables/shared/useErrorHandler.js'
-import { correctTextDirection } from '@/shared/utils/text/textAnalysis.js'
-import ActionToolbar from '@/features/text-actions/components/ActionToolbar.vue'
-import { getScopedLogger } from '@/shared/logging/logger.js';
-import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
-import { AUTO_DETECT_VALUE } from '@/shared/config/constants';
+import "./TranslationInputField.scss";
+import { ref, computed, onMounted, nextTick } from "vue";
+import { useErrorHandler } from "@/composables/shared/useErrorHandler.js";
+import { correctTextDirection } from "@/shared/utils/text/textAnalysis.js";
+import ActionToolbar from "@/features/text-actions/components/ActionToolbar.vue";
+import { getScopedLogger } from "@/shared/logging/logger.js";
+import { LOG_COMPONENTS } from "@/shared/logging/logConstants.js";
+import { AUTO_DETECT_VALUE } from "@/shared/config/constants";
 import { useFont } from "@/composables/shared/useFont.js";
 
-const logger = getScopedLogger(LOG_COMPONENTS.UI, 'TranslationInputField');
+const logger = getScopedLogger(LOG_COMPONENTS.UI, "TranslationInputField");
 
 // Props
 const props = defineProps({
   modelValue: {
     type: String,
-    default: ''
+    default: "",
   },
   placeholder: {
     type: String,
-    default: 'Enter text here...'
+    default: "Enter text here...",
   },
   language: {
     type: String,
-    default: AUTO_DETECT_VALUE
+    default: AUTO_DETECT_VALUE,
   },
   rows: {
     type: Number,
-    default: 4
+    default: 4,
   },
   tabindex: {
     type: Number,
-    default: 1
+    default: 1,
   },
   textareaClass: {
     type: String,
-    default: ''
+    default: "",
   },
   // i18n titles
   copyTitle: {
     type: String,
-    default: undefined
+    default: undefined,
   },
   copyAlt: {
     type: String,
-    default: 'Copy'
+    default: "Copy",
   },
   ttsTitle: {
     type: String,
-    default: undefined
+    default: undefined,
   },
   ttsAlt: {
     type: String,
-    default: 'Play'
+    default: "Play",
   },
   pasteTitle: {
     type: String,
-    default: undefined
+    default: undefined,
   },
   pasteAlt: {
     type: String,
-    default: 'Paste'
+    default: "Paste",
   },
   // Language for TTS (inherited from translation)
   detectedSourceLanguage: {
     type: String,
-    default: undefined
+    default: undefined,
   },
   lastTranslation: {
     type: Object,
-    default: null
+    default: null,
   },
   // Auto-translate on paste
   autoTranslateOnPaste: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
 // Emits
 const emit = defineEmits([
-  'update:modelValue',
-  'translate',
-  'input',
-  'keydown'
-])
+  "update:modelValue",
+  "translate",
+  "input",
+  "keydown",
+]);
 
 // Refs
-const textareaRef = ref(null)
+const textareaRef = ref(null);
 
 // Composables
-const { handleError } = useErrorHandler()
+const { handleError } = useErrorHandler();
 
 const { fontStyles, cssVariables } = useFont(
   computed(() => props.detectedSourceLanguage || props.language),
   {
     enableSmartDetection: true,
     fallbackFont: "system",
-    enableCSSVariables: true
-  }
+    enableCSSVariables: true,
+  },
 );
 
 // Computed
-const hasContent = computed(() => props.modelValue.trim().length > 0)
+const hasContent = computed(() => props.modelValue.trim().length > 0);
 
 // Methods
 const handleInput = (event) => {
-  const value = event.target.value
-  emit('update:modelValue', value)
-  emit('input', event)
-  
+  const value = event.target.value;
+  emit("update:modelValue", value);
+  emit("input", event);
+
   // Text direction correction
   nextTick(() => {
     if (textareaRef.value) {
-      correctTextDirection(textareaRef.value, value)
+      correctTextDirection(textareaRef.value, value);
     }
-  })
-}
+  });
+};
 
 const handleKeydown = (event) => {
-  emit('keydown', event)
-  
+  emit("keydown", event);
+
   // Handle Ctrl+Enter for translation
-  if ((event.ctrlKey || event.metaKey) && (event.key === 'Enter' || event.key === '/')) {
-    event.preventDefault()
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    (event.key === "Enter" || event.key === "/")
+  ) {
+    event.preventDefault();
     if (hasContent.value) {
-      emit('translate')
+      emit("translate");
     }
   }
-}
+};
 
 const handlePaste = async (data) => {
   try {
-    const pastedText = data?.text || data // support both ActionToolbar format and direct string
+    const pastedText = data?.text || data; // support both ActionToolbar format and direct string
     if (pastedText) {
-      emit('update:modelValue', pastedText)
-      
+      emit("update:modelValue", pastedText);
+
       // Correct text direction
       nextTick(() => {
         if (textareaRef.value) {
-          correctTextDirection(textareaRef.value, pastedText)
+          correctTextDirection(textareaRef.value, pastedText);
         }
-      })
-      
+      });
+
       // Auto-translate if enabled (from ActionToolbar or prop)
       if (props.autoTranslateOnPaste || data?.autoTranslate) {
-        await nextTick()
-        emit('translate')
+        await nextTick();
+        emit("translate");
       }
-      
-      logger.debug('[TranslationInputField] Text pasted from clipboard')
+
+      logger.debug("[TranslationInputField] Text pasted from clipboard");
     }
   } catch (error) {
-    await handleError(error, 'translation-input-field-paste')
+    await handleError(error, "translation-input-field-paste");
   }
-}
+};
 
 // Lifecycle
 onMounted(async () => {
@@ -200,9 +207,9 @@ onMounted(async () => {
   if (textareaRef.value && props.modelValue) {
     nextTick(() => {
       if (textareaRef.value) {
-        correctTextDirection(textareaRef.value, props.modelValue)
+        correctTextDirection(textareaRef.value, props.modelValue);
       }
-    })
+    });
   }
 });
 </script>

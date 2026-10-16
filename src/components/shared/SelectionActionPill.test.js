@@ -88,6 +88,6 @@ describe('SelectionActionPill.vue', () => {
 
     expect(source).not.toContain('@/features/windows')
     expect(source).not.toContain('src/features/windows')
-    expect(source).toContain("import './SelectionActionPill.scss'")
+    expect(source).toMatch(/import ['"]\.\/SelectionActionPill\.scss['"]/)
   })
 })

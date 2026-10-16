@@ -7,7 +7,9 @@
       v-if="hasOverflow"
       ref="previousControl"
       class="ti-horizontal-action-scroller__control ti-horizontal-action-scroller__control--previous"
-      :class="{ 'ti-horizontal-action-scroller__control--inactive': !canScrollPrevious }"
+      :class="{
+        'ti-horizontal-action-scroller__control--inactive': !canScrollPrevious,
+      }"
       type="button"
       :aria-label="previousLabel"
       :aria-hidden="canScrollPrevious ? undefined : 'true'"
@@ -36,7 +38,9 @@
       v-if="hasOverflow"
       ref="nextControl"
       class="ti-horizontal-action-scroller__control ti-horizontal-action-scroller__control--next"
-      :class="{ 'ti-horizontal-action-scroller__control--inactive': !canScrollNext }"
+      :class="{
+        'ti-horizontal-action-scroller__control--inactive': !canScrollNext,
+      }"
       type="button"
       :aria-label="nextLabel"
       :aria-hidden="canScrollNext ? undefined : 'true'"
@@ -53,126 +57,141 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, onUpdated, ref } from 'vue'
-import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js'
-import './HorizontalActionScroller.scss'
+import {
+  computed,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  onUpdated,
+  ref,
+} from "vue";
+import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n.js";
+import "./HorizontalActionScroller.scss";
 
 const { ariaLabel } = defineProps({
   ariaLabel: {
     type: String,
-    required: true
-  }
-})
+    required: true,
+  },
+});
 
-const viewport = ref(null)
-const previousControl = ref(null)
-const nextControl = ref(null)
-const hasOverflow = ref(false)
-const canScrollPrevious = ref(false)
-const canScrollNext = ref(false)
+const viewport = ref(null);
+const previousControl = ref(null);
+const nextControl = ref(null);
+const hasOverflow = ref(false);
+const canScrollPrevious = ref(false);
+const canScrollNext = ref(false);
 
-const { t } = useUnifiedI18n()
-const previousLabel = computed(() => t('horizontal_action_scroller_previous'))
-const nextLabel = computed(() => t('horizontal_action_scroller_next'))
+const { t } = useUnifiedI18n();
+const previousLabel = computed(() => t("horizontal_action_scroller_previous"));
+const nextLabel = computed(() => t("horizontal_action_scroller_next"));
 
-const EPSILON = 1
-let resizeObserver = null
-let animationFrameId = null
-let hasInitializedEndPosition = false
+const EPSILON = 1;
+let resizeObserver = null;
+let animationFrameId = null;
+let hasInitializedEndPosition = false;
 
 const updateScrollState = () => {
-  const element = viewport.value
-  if (!element) return
+  const element = viewport.value;
+  if (!element) return;
 
-  const nextHasOverflow = element.scrollWidth > element.clientWidth + EPSILON
-  const maximumScrollLeft = element.scrollWidth - element.clientWidth
-  const nextCanScrollPrevious = nextHasOverflow && element.scrollLeft > EPSILON
-  const nextCanScrollNext = nextHasOverflow && maximumScrollLeft - element.scrollLeft > EPSILON
-  const previousBecameInactive = canScrollPrevious.value && !nextCanScrollPrevious
-  const nextBecameInactive = canScrollNext.value && !nextCanScrollNext
-  const focusedControl = document.activeElement
-  const focusTarget = previousBecameInactive && focusedControl === previousControl.value
-    ? nextControl
-    : nextBecameInactive && focusedControl === nextControl.value
-      ? previousControl
-      : null
+  const nextHasOverflow = element.scrollWidth > element.clientWidth + EPSILON;
+  const maximumScrollLeft = element.scrollWidth - element.clientWidth;
+  const nextCanScrollPrevious = nextHasOverflow && element.scrollLeft > EPSILON;
+  const nextCanScrollNext =
+    nextHasOverflow && maximumScrollLeft - element.scrollLeft > EPSILON;
+  const previousBecameInactive =
+    canScrollPrevious.value && !nextCanScrollPrevious;
+  const nextBecameInactive = canScrollNext.value && !nextCanScrollNext;
+  const focusedControl = document.activeElement;
+  const focusTarget =
+    previousBecameInactive && focusedControl === previousControl.value
+      ? nextControl
+      : nextBecameInactive && focusedControl === nextControl.value
+        ? previousControl
+        : null;
 
-  if (hasOverflow.value !== nextHasOverflow) hasOverflow.value = nextHasOverflow
-  if (canScrollPrevious.value !== nextCanScrollPrevious) canScrollPrevious.value = nextCanScrollPrevious
-  if (canScrollNext.value !== nextCanScrollNext) canScrollNext.value = nextCanScrollNext
+  if (hasOverflow.value !== nextHasOverflow)
+    hasOverflow.value = nextHasOverflow;
+  if (canScrollPrevious.value !== nextCanScrollPrevious)
+    canScrollPrevious.value = nextCanScrollPrevious;
+  if (canScrollNext.value !== nextCanScrollNext)
+    canScrollNext.value = nextCanScrollNext;
 
   if (focusTarget) {
     nextTick(() => {
       if (focusTarget.value && !focusTarget.value.disabled) {
-        focusTarget.value.focus()
+        focusTarget.value.focus();
       } else {
-        focusedControl.blur()
+        focusedControl.blur();
       }
-    })
+    });
   }
-}
+};
 
 const scheduleScrollStateUpdate = () => {
-  if (animationFrameId !== null) return
+  if (animationFrameId !== null) return;
 
   animationFrameId = requestAnimationFrame(() => {
-    animationFrameId = null
-    updateScrollState()
-  })
-}
+    animationFrameId = null;
+    updateScrollState();
+  });
+};
 
 const scroll = (direction) => {
   viewport.value?.scrollBy({
     left: direction * viewport.value.clientWidth * 0.8,
-    behavior: 'smooth'
-  })
-}
+    behavior: "smooth",
+  });
+};
 
 const scrollToEnd = async () => {
-  const element = viewport.value
-  if (!element) return
+  const element = viewport.value;
+  if (!element) return;
 
   if (!hasInitializedEndPosition) {
-    hasInitializedEndPosition = true
+    hasInitializedEndPosition = true;
 
     if (animationFrameId !== null) {
-      cancelAnimationFrame(animationFrameId)
-      animationFrameId = null
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
     }
 
-    element.scrollLeft = element.scrollWidth
-    updateScrollState()
-    await nextTick()
-    element.scrollLeft = element.scrollWidth
+    element.scrollLeft = element.scrollWidth;
+    updateScrollState();
+    await nextTick();
+    element.scrollLeft = element.scrollWidth;
   } else {
-    element.scrollLeft = element.scrollWidth
+    element.scrollLeft = element.scrollWidth;
   }
 
-  scheduleScrollStateUpdate()
-}
+  scheduleScrollStateUpdate();
+};
 
-defineExpose({ scrollToEnd })
+defineExpose({ scrollToEnd });
 
 onMounted(async () => {
-  await nextTick()
-  const element = viewport.value
-  if (!element) return
+  await nextTick();
+  const element = viewport.value;
+  if (!element) return;
 
-  element.addEventListener('scroll', scheduleScrollStateUpdate, { passive: true })
+  element.addEventListener("scroll", scheduleScrollStateUpdate, {
+    passive: true,
+  });
 
-  if ('ResizeObserver' in window) {
-    resizeObserver = new ResizeObserver(scheduleScrollStateUpdate)
-    resizeObserver.observe(element)
+  if ("ResizeObserver" in window) {
+    resizeObserver = new ResizeObserver(scheduleScrollStateUpdate);
+    resizeObserver.observe(element);
   }
 
-  scheduleScrollStateUpdate()
-})
+  scheduleScrollStateUpdate();
+});
 
-onUpdated(scheduleScrollStateUpdate)
+onUpdated(scheduleScrollStateUpdate);
 
 onUnmounted(() => {
-  viewport.value?.removeEventListener('scroll', scheduleScrollStateUpdate)
-  resizeObserver?.disconnect()
-  if (animationFrameId !== null) cancelAnimationFrame(animationFrameId)
-})
+  viewport.value?.removeEventListener("scroll", scheduleScrollStateUpdate);
+  resizeObserver?.disconnect();
+  if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+});
 </script>
