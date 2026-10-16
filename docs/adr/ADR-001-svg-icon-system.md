@@ -76,7 +76,7 @@ Standardize on **CSS Mask** as the rendering technique for all monochrome UI ico
 
 - **Single color only.** Multicolor/brand icons (provider logos, extension icon) must continue using `<img>` with PNG.
 - **`?url` suffix required.** All SVG imports for monochrome icons must use `?url` to resolve to a public URL. This is a Vite convention that contributors must learn.
-- **`viewBox` required.** SVG files missing a `viewBox` attribute (like `capture.svg`) cannot be used with CSS Mask until fixed.
+- **`viewBox` required.** SVG files missing a `viewBox` attribute must be fixed before use with CSS Mask.
 - **Opacity becomes alpha.** `opacity` in SVG paths maps to alpha in the rendered mask — same visual result, but conceptually different.
 - **Root-`<svg>` transforms unreliable.** `transform` on the root `<svg>` element has undefined behavior in CSS Mask context in some browsers. SVGs relying on this (like the original `fit-page.svg`) must be fixed.
 

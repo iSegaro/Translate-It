@@ -39,15 +39,16 @@
         class="toolbar-button"
         :class="{ 'ti-active': isMouseHoverEnabled }"
         :title="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
+        :aria-label="isMouseHoverEnabled ? (t('mouse_hover_disable_label') || 'غیرفعال‌سازی ترجمه با ماوس') : (t('mouse_hover_enable_label') || 'فعال‌سازی ترجمه با ماوس')"
         @click="toggleMouseHover"
         @keydown.enter.prevent="toggleMouseHover"
         @keydown.space.prevent="toggleMouseHover"
       >
-        <img
+        <MaskIcon
           :src="mouseHoverIcon"
-          alt="Mouse Hover"
-          class="toolbar-icon"
-        >
+          class="toolbar-mask-icon"
+          :size="22"
+        />
       </button>
 
       <!-- Page Translation Button -->
@@ -68,15 +69,16 @@
         id="screenCaptureBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_SCREEN_CAPTURE_TOOLTIP')"
+        :aria-label="t('SIDEPANEL_SCREEN_CAPTURE_TOOLTIP')"
         @click="handleScreenCapture"
         @keydown.enter.prevent="handleScreenCapture"
         @keydown.space.prevent="handleScreenCapture"
       >
-        <img
+        <MaskIcon
           :src="captureIcon"
-          alt="Screen Capture"
-          class="toolbar-icon"
-        >
+          class="toolbar-mask-icon"
+          :size="22"
+        />
       </button>
 
       <div class="toolbar-separator" />
@@ -92,16 +94,17 @@
         id="historyBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_HISTORY_TOOLTIP')"
+        :aria-label="t('SIDEPANEL_HISTORY_TOOLTIP')"
         :class="{ 'ti-active': isHistoryVisible }"
         @click="handleHistoryClick"
         @keydown.enter.prevent="handleHistoryClick"
         @keydown.space.prevent="handleHistoryClick"
       >
-        <img
-          src="@/icons/ui/history.svg"
-          alt="History"
-          class="toolbar-icon"
-        >
+        <MaskIcon
+          :src="historyIcon"
+          class="toolbar-mask-icon"
+          :size="22"
+        />
       </button>
     </div>
     <div class="toolbar-group-bottom">
@@ -161,15 +164,16 @@
         id="settingsBtn"
         class="toolbar-button"
         :title="t('SIDEPANEL_SETTINGS_TITLE_ICON')"
+        :aria-label="t('SIDEPANEL_SETTINGS_TITLE_ICON')"
         @click="handleSettingsClick"
         @keydown.enter.prevent="handleSettingsClick"
         @keydown.space.prevent="handleSettingsClick"
       >
-        <img
+        <MaskIcon
           :src="settingsIcon"
-          alt="Settings"
-          class="toolbar-icon"
-        >
+          class="toolbar-mask-icon"
+          :size="22"
+        />
       </button>
     </div>
   </div>
@@ -294,6 +298,7 @@ const revertIcon = browser.runtime.getURL('icons/ui/revert.png')
 const mouseHoverIcon = browser.runtime.getURL('icons/ui/mouse-hover.png')
 const settingsIcon = browser.runtime.getURL('icons/ui/settings.png')
 const captureIcon = browser.runtime.getURL('icons/ui/capture.svg')
+const historyIcon = browser.runtime.getURL('icons/ui/history.svg')
 const subtitleIcon = browser.runtime.getURL('icons/ui/subtitle.svg')
 const pdfIcon = browser.runtime.getURL('icons/ui/pdf_viewer/pdf.png')
 

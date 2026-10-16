@@ -449,6 +449,32 @@ describe('ProviderSelector provider list contract', () => {
     errorHandler.handleError.mockReset()
   })
 
+  it('inverts only registered dark-theme icon providers in icon-only and split modes', async () => {
+    registry.providers.push(
+      { id: 'openrouter', name: 'OpenRouter', category: 'ai', icon: 'providers/openrouter.svg', supported: true, features: ['translation'] },
+      { id: 'requesty', name: 'Requesty', category: 'ai', icon: 'providers/requesty.svg', supported: true, features: ['translation'] },
+      { id: 'webai', name: 'WebAI', category: 'ai', icon: 'providers/webai.svg', supported: true, features: ['translation'] },
+    )
+    const invertedIds = new Set(['deepl', 'openai', 'openrouter', 'requesty', 'webai'])
+    const providerIds = [...invertedIds, 'googlev2', 'gemini']
+
+    for (const mode of ['icon-only', 'split']) {
+      for (const id of providerIds) {
+        const { wrapper, container } = await attachSelector({ mode, modelValue: id })
+        try {
+          const icon = wrapper.find(mode === 'icon-only'
+            ? '.ti-provider-icon-only'
+            : '.ti-translate-main-area .ti-api-provider-icon')
+          expect(icon.exists(), `${mode} icon for ${id}`).toBe(true)
+          expect(icon.classes().includes('ti-invert-dark')).toBe(invertedIds.has(id))
+        } finally {
+          wrapper.unmount()
+          container.remove()
+        }
+      }
+    }
+  })
+
   it('groups six providers by registry category in Traditional, AI, Local order, preserving manifest order', async () => {
     const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
     try {

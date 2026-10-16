@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   settings: null,
   sendMessage: vi.fn(),
   showVisualFeedback: vi.fn(),
+  toggleMouseHover: vi.fn(),
   findProviderById: vi.fn(() => ({ features: ['bulk'] }))
 }))
 
@@ -36,7 +37,7 @@ vi.mock('@/features/translation/composables/useTranslationModes.js', () => ({
 }))
 
 vi.mock('@/features/mouse-hover/composables/useMouseHoverToggle.js', () => ({
-  useMouseHoverToggle: () => ({ isMouseHoverEnabled: ref(false), toggleMouseHover: vi.fn() })
+  useMouseHoverToggle: () => ({ isMouseHoverEnabled: ref(false), toggleMouseHover: mocks.toggleMouseHover })
 }))
 
 vi.mock('@/features/translation/stores/translation.js', () => ({
@@ -122,6 +123,7 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
   let navHistory
   let navFragment
   let wrapper
+  let originalOpenOptionsPage
 
   /** Drain the read chain: query → GET → confirm-query → apply. */
   const drain = async () => {
@@ -153,6 +155,9 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     }
     mocks.sendMessage = vi.fn().mockResolvedValue({})
     mocks.showVisualFeedback.mockReset()
+    mocks.toggleMouseHover.mockReset()
+    originalOpenOptionsPage = globalThis.browser.runtime.openOptionsPage
+    globalThis.browser.runtime.openOptionsPage = vi.fn().mockResolvedValue(undefined)
     globalThis.browser.tabs.query = vi.fn(async () => [TAB])
     globalThis.browser.tabs.sendMessage = vi.fn(async () => reply('hidden'))
     tabsActivated = makeEvent()
@@ -173,6 +178,8 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     vi.useRealTimers()
     delete document.visibilityState
     delete globalThis.browser.webNavigation
+    if (originalOpenOptionsPage === undefined) delete globalThis.browser.runtime.openOptionsPage
+    else globalThis.browser.runtime.openOptionsPage = originalOpenOptionsPage
   })
 
   // ── Structure / order ──────────────────────────────────────────────────
@@ -193,6 +200,59 @@ describe('SidepanelToolbar Desktop FAB toggle', () => {
     ])
     // Both groups keep the shared row contract.
     for (const button of lower) expect(button.classes()).toContain('toolbar-button')
+  })
+
+  it('renders decorative accessible mask icons on the four migrated rail actions', async () => {
+    await mountToolbar()
+    const findMaskButton = (part) => wrapper.findAll('button.toolbar-button').find((button) => {
+      const icon = button.findComponent(MaskIcon)
+      return icon.exists() && icon.props('src').includes(part)
+    })
+    const buttons = [
+      findMaskButton('mouse-hover'),
+      wrapper.get('#screenCaptureBtn'),
+      wrapper.get('#historyBtn'),
+      wrapper.get('#settingsBtn')
+    ]
+
+    for (const button of buttons) {
+      const icon = button.findComponent(MaskIcon)
+      expect(button.element.tagName).toBe('BUTTON')
+      expect(button.attributes('aria-label')).toBeTruthy()
+      expect(button.attributes('aria-label')).toBe(button.attributes('title'))
+      expect(icon.classes()).toContain('toolbar-mask-icon')
+      expect(icon.props('size')).toBe(22)
+      expect(icon.attributes('aria-hidden')).toBe('true')
+    }
+
+    expect(wrapper.get('#pdfBtn img').attributes('src')).toContain('pdf_viewer/pdf.png')
+    expect(wrapper.get('#subtitleBtn img').attributes('src')).toContain('subtitle.svg')
+  })
+
+  it('activates each migrated rail action once for click, Enter, and Space', async () => {
+    await mountToolbar()
+    const findMaskButton = (part) => wrapper.findAll('button.toolbar-button').find((button) => {
+      const icon = button.findComponent(MaskIcon)
+      return icon.exists() && icon.props('src').includes(part)
+    })
+    const actions = [
+      { button: findMaskButton('mouse-hover'), count: () => mocks.toggleMouseHover.mock.calls.length },
+      {
+        button: wrapper.get('#screenCaptureBtn'),
+        count: () => mocks.sendMessage.mock.calls.filter(([message]) =>
+          message.action === MessageActions.START_SCREEN_CAPTURE).length
+      },
+      { button: wrapper.get('#historyBtn'), count: () => wrapper.emitted('historyToggle')?.length || 0 },
+      { button: wrapper.get('#settingsBtn'), count: () => globalThis.browser.runtime.openOptionsPage.mock.calls.length }
+    ]
+
+    for (const { button, count } of actions) {
+      await button.trigger('click')
+      await button.trigger('keydown', { key: 'Enter' })
+      await button.trigger('keydown', { key: ' ' })
+      await drain()
+      expect(count()).toBe(3)
+    }
   })
 
   it('renders the glyph as a MaskIcon sized to the rail, without .toolbar-icon', async () => {
