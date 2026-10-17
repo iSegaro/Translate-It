@@ -100,8 +100,8 @@ describe('TranslationWindowToolbar.vue', () => {
     expect(wrapper.find('.ti-detected-language-label').text()).toBe('English');
     expect(wrapper.find('.ti-action-btn[title="window_close"]').exists()).toBe(true);
     expect(wrapper.find('.ti-action-btn[title*="dock"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="translation-window-history-previous"]').element.disabled).toBe(true);
-    expect(wrapper.find('[data-testid="translation-window-history-next"]').element.disabled).toBe(false);
+    expect(wrapper.find('[data-testid="translation-window-history-previous"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="translation-window-history-next"]').exists()).toBe(false);
   });
 
   it('emits toolbar events exactly once', async () => {
@@ -138,8 +138,9 @@ describe('TranslationWindowToolbar.vue', () => {
     await wrapper.find('.ti-action-btn[title="window_close"]').trigger('click');
     expect(wrapper.emitted('close')).toEqual([[]]);
 
-    await wrapper.find('[data-testid="translation-window-history-next"]').trigger('click');
-    expect(wrapper.emitted('history-navigate')).toEqual([['next']]);
+    expect(wrapper.find('[data-testid="translation-window-toolbar-provider-selector"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="translation-window-history-previous"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="translation-window-history-next"]').exists()).toBe(false);
   });
 
   it('keeps provider dedupe state isolated between toolbar instances', () => {

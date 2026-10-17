@@ -59,17 +59,59 @@
         :provider-selector-is-global="false"
         :provider-selector-allow-set-default="true"
         :provider-selector-only-configured="true"
-        :history-index="props.historyIndex"
-        :history-length="props.historyLength"
-        :history-previous-title="t('window_history_previous')"
-        :history-next-title="t('window_history_next')"
         @provider-change="handleProviderChange"
         @toggle-pin="togglePin"
         @copy="handleCopy"
         @toggle-original="toggleShowOriginal"
-        @history-navigate="navigateHistory"
         @close="handleClose"
       />
+    </div>
+
+    <div
+      v-if="props.historyLength > 1"
+      class="ti-window-history-subheader"
+      :class="`ti-window-history-subheader-${shellTheme}`"
+      data-testid="translation-window-history-subheader"
+      @mousedown.stop
+      @touchstart.stop
+      @click.stop
+    >
+      <div class="ti-window-history-controls">
+        <IconButton
+          icon="arrow-next.svg"
+          type="toolbar"
+          mask
+          class="ti-window-history-button ti-window-history-previous"
+          :title="t('window_history_previous')"
+          :alt="t('window_history_previous')"
+          :disabled="props.historyIndex <= 0"
+          data-testid="translation-window-history-previous"
+          @click="navigateHistory('previous')"
+        />
+        <span
+          class="ti-window-history-counter"
+          data-testid="translation-window-history-counter"
+        >{{ props.historyIndex + 1 }} / {{ props.historyLength }}</span>
+        <IconButton
+          icon="arrow-next.svg"
+          type="toolbar"
+          mask
+          class="ti-window-history-button ti-window-history-next"
+          :title="t('window_history_next')"
+          :alt="t('window_history_next')"
+          :disabled="props.historyIndex < 0 || props.historyIndex >= props.historyLength - 1"
+          data-testid="translation-window-history-next"
+          @click="navigateHistory('next')"
+        />
+      </div>
+      <span
+        class="ti-window-history-divider"
+        aria-hidden="true"
+      />
+      <span
+        class="ti-window-history-provider"
+        data-testid="translation-window-history-provider"
+      >{{ activeHistoryProvider }}</span>
     </div>
 
     <div class="ti-window-body">
@@ -139,6 +181,8 @@ import { useSettingsStore } from '@/features/settings/stores/settings.js';
 import { TranslationMode } from '@/shared/config/config.js';
 import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown.js';
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
+import { getProviderById } from '@/core/provider-registry.js';
+import IconButton from '@/components/shared/IconButton.vue';
 
 // Import adjacent SCSS
 import './TranslationWindow.scss';
@@ -163,6 +207,7 @@ const props = defineProps({
   sourceLanguage: { type: String, default: 'auto' },
   historyIndex: { type: Number, default: -1 },
   historyLength: { type: Number, default: 0 },
+  historyProvider: { type: String, default: '' },
   detectedSourceLanguage: { type: String, default: undefined },
   provider: { type: String, default: '' },
   translationMode: { type: String, default: null }
@@ -190,6 +235,10 @@ const resolveShellTheme = () => {
 };
 
 const shellTheme = computed(() => resolveShellTheme());
+const activeHistoryProvider = computed(() => {
+  const provider = props.historyProvider || props.provider;
+  return getProviderById(provider)?.name || provider || '';
+});
 
 // Pinned and Docked states
 const isPinned = ref(settings.getSetting('WINDOW_IS_PINNED', false));

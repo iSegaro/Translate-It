@@ -66,7 +66,7 @@ To improve performance and eliminate UI flicker, the system now updates existing
 ## Selection Window Source and History
 
 - **Editable source**: The window's original-source field accepts edits without changing page content. Enter confirms a changed, nonblank source; Shift+Enter adds a newline; Escape rolls back the draft. Enter during IME composition does not submit. A failed edited-source translation remains retryable with that edited source.
-- **Successful snapshots**: Results are kept in window-local memory with source, translated text, provider, languages, and mode. Toolbar previous/next navigation restores a snapshot without calling the translation API or changing global provider preferences. Repeating the current snapshot is deduplicated; a successful translation after navigating backward creates a branch and drops the forward history. Failures do not add snapshots.
+- **Successful snapshots**: Results are kept in window-local memory with source, translated text, provider, languages, and mode. The history sub-header's previous/next navigation restores a snapshot without calling the translation API or changing global provider preferences. Repeating the current snapshot is deduplicated; a successful translation after navigating backward creates a branch and drops the forward history. Failures do not add snapshots.
 - **Window lifetime**: A confirmed source change, newer request, or history navigation invalidates older work; cancellation or closing the window prevents stale results from updating it. Pinned and docked windows reuse their current state and history. History is not persisted.
 
 ## Event-Based Communication

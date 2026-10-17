@@ -29,10 +29,20 @@ describe('useWindowsManager history snapshot metadata', () => {
       initialTranslatedText: 'result',
       detectedSourceLanguage: 'fr',
       mode: 'dictionary',
+      provider: 'interactive-provider',
+      historyProvider: 'snapshot-provider',
     });
 
     eventBus.emit(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, {
       id: 'window-1',
+      provider: 'prospective-provider',
+    });
+
+    expect(manager.translationWindows.value[0].historyProvider).toBe('snapshot-provider');
+
+    eventBus.emit(WINDOWS_MANAGER_EVENTS.UPDATE_WINDOW, {
+      id: 'window-1',
+      historyProvider: 'new-snapshot-provider',
       selectedText: 'source',
       initialTranslatedText: 'restored result',
       detectedSourceLanguage: null,
@@ -47,6 +57,7 @@ describe('useWindowsManager history snapshot metadata', () => {
       mode: null,
       historyIndex: 0,
       historyLength: 2,
+      historyProvider: 'new-snapshot-provider',
     });
     manager.cleanupEventListeners();
   });

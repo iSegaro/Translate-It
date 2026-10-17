@@ -320,6 +320,25 @@ describe('WindowsManager', () => {
       expect(windowsManager.translationHandler.cancelAllTranslations).not.toHaveBeenCalled();
     });
 
+    it('includes the selected history snapshot provider in navigation updates', () => {
+      const entry = { sourceText: 'source', translatedText: 'result', provider: 'snapshot-provider' };
+      windowsManager.state.translationHistory = [entry];
+      windowsManager.state.historyIndex = -1;
+      windowsManager.state.navigateHistory = vi.fn(() => {
+        windowsManager.state.historyIndex = 0;
+        return entry;
+      });
+
+      windowsManager._navigateTranslationHistory('window-1', 'next');
+
+      expect(mockWindowsManagerEvents.updateWindow).toHaveBeenCalledWith('window-1', expect.objectContaining({
+        provider: 'snapshot-provider',
+        historyProvider: 'snapshot-provider',
+        historyIndex: 0,
+        historyLength: 1,
+      }));
+    });
+
     it('cleans DisplayManager delayed activation before destroy', async () => {
       const displayManager = windowsManager.displayManager;
       const cleanupSpy = vi.spyOn(displayManager, 'cleanup');

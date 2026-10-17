@@ -300,6 +300,83 @@ describe('TranslationWindow.vue', () => {
     expect(wrapper.find('.ti-window-source-input').isVisible()).toBe(false);
   });
 
+  it('shows history only for multiple snapshots, between the header and body', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    const findHistory = () => wrapper.find('[data-testid="translation-window-history-subheader"]');
+
+    expect(findHistory().exists()).toBe(false);
+    await wrapper.setProps({ historyLength: 1, historyIndex: 0 });
+    expect(findHistory().exists()).toBe(false);
+    await wrapper.setProps({ historyLength: 12, historyIndex: 9, provider: 'deepl', historyProvider: 'googlev2' });
+
+    const subheader = findHistory();
+    expect(subheader.exists()).toBe(true);
+    const rootChildren = wrapper.find('.translation-window').element.children;
+    expect(rootChildren[Array.from(rootChildren).indexOf(subheader.element) - 1]).toBe(
+      wrapper.find('.ti-window-header').element
+    );
+    expect(rootChildren[Array.from(rootChildren).indexOf(subheader.element) + 1]).toBe(
+      wrapper.find('.ti-window-body').element
+    );
+    expect(subheader.find('.ti-window-history-divider').exists()).toBe(true);
+    expect(subheader.find('[data-testid="translation-window-history-counter"]').text()).toBe('10 / 12');
+    expect(subheader.find('[data-testid="translation-window-history-provider"]').text()).toBe('Google Translate');
+    expect(wrapper.findComponent({ name: 'ProviderSelector' }).props('modelValue')).toBe('deepl');
+
+    await wrapper.setProps({ historyProvider: 'deepl', historyIndex: 10 });
+    expect(subheader.find('[data-testid="translation-window-history-provider"]').text()).toBe('DeepL Translate');
+    expect(subheader.find('[data-testid="translation-window-history-counter"]').text()).toBe('11 / 12');
+    expect(wrapper.find('[data-testid="translation-window-toolbar-provider-selector"]').exists()).toBe(true);
+  });
+
+  it('navigates history in both directions and disables the boundary buttons', async () => {
+    const host = document.createElement('div');
+    host.dir = 'rtl';
+    document.body.append(host);
+    const wrapper = mount(TranslationWindow, {
+      props: { ...baseProps, historyIndex: 1, historyLength: 3 },
+      attachTo: host,
+    });
+    const previous = wrapper.find('[data-testid="translation-window-history-previous"]');
+    const next = wrapper.find('[data-testid="translation-window-history-next"]');
+    expect(previous.element.compareDocumentPosition(next.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(previous.attributes('aria-label')).toBe('window_history_previous');
+    expect(next.attributes('aria-label')).toBe('window_history_next');
+    expect(previous.element.disabled).toBe(false);
+    expect(next.element.disabled).toBe(false);
+
+    await previous.trigger('click');
+    await next.trigger('click');
+    expect(pageEventBus.emit).toHaveBeenNthCalledWith(1, 'translation-window-history-navigate', {
+      id: 'window-1', direction: 'previous',
+    });
+    expect(pageEventBus.emit).toHaveBeenNthCalledWith(2, 'translation-window-history-navigate', {
+      id: 'window-1', direction: 'next',
+    });
+
+    await wrapper.setProps({ historyIndex: 0 });
+    expect(previous.element.disabled).toBe(true);
+    expect(next.element.disabled).toBe(false);
+    await wrapper.setProps({ historyIndex: 2 });
+    expect(previous.element.disabled).toBe(false);
+    expect(next.element.disabled).toBe(true);
+    wrapper.unmount();
+    host.remove();
+  });
+
+  it('keeps the history counter width and isolates its direction', async () => {
+    const { readFileSync } = await import('node:fs');
+    const styles = readFileSync('src/features/windows/components/TranslationWindow.scss', 'utf8');
+    const counterStyles = styles.match(/\.ti-window-history-counter\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(counterStyles).toMatch(/(?:min-width|width)\s*:\s*7ch/);
+    expect(counterStyles).toMatch(/direction\s*:\s*ltr/);
+    expect(counterStyles).toMatch(/unicode-bidi\s*:\s*isolate/);
+    const subheaderStyles = styles.match(/\.ti-window-history-subheader\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(subheaderStyles).not.toMatch(/justify-content\s*:\s*space-between/);
+    expect(subheaderStyles).toMatch(/justify-content\s*:\s*(?:flex-start|start)/);
+    expect(styles).toMatch(/&:dir\(rtl\)[\s\S]*?history[^{}]*previous[^{}]*\{\s*transform:\s*none[\s\S]*?history[^{}]*\{\s*transform:\s*rotate\(180deg\)/);
+  });
+
   it('confirms changed source text on Enter, preserves Shift+Enter, and restores on Escape', async () => {
     const wrapper = mount(TranslationWindow, { props: baseProps });
     const editor = wrapper.find('.ti-window-source-input');

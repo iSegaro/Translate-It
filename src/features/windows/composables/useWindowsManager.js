@@ -55,7 +55,8 @@ export function useWindowsManager() {
       provider: detail.provider || '',
       mode: detail.mode || null,
       historyIndex: detail.historyIndex ?? -1,
-      historyLength: detail.historyLength ?? 0
+      historyLength: detail.historyLength ?? 0,
+      historyProvider: detail.historyProvider || ''
     };
 
     if (existingWindowIndex >= 0) {

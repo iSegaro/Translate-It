@@ -200,6 +200,7 @@ export class WindowsManager extends ResourceTracker {
       selectedText: entry.sourceText,
       historyIndex: this.state.historyIndex,
       historyLength: this.state.translationHistory.length,
+      historyProvider: entry.provider || '',
     };
   }
 

@@ -143,29 +143,4 @@
       opacity: 1 !important;
     }
   }
-
-  .ti-window-history-button {
-    width: 28px !important;
-    height: 28px !important;
-    flex: 0 0 28px !important;
-
-    &[disabled] {
-      opacity: 0.4 !important;
-      cursor: not-allowed !important;
-    }
-  }
-
-  .ti-window-history-previous .ti-toolbar-icon {
-    transform: rotate(180deg);
-  }
-
-  &:dir(rtl) {
-    .ti-window-history-previous .ti-toolbar-icon {
-      transform: none;
-    }
-
-    .ti-window-history-button:not(.ti-window-history-previous) .ti-toolbar-icon {
-      transform: rotate(180deg);
-    }
-  }
 }
