@@ -7,7 +7,7 @@
   overflow: visible !important;
 
   &:has(.ti-target-language-label, .ti-detected-language-label) {
-    column-gap: 8px;
+    column-gap: 4px;
   }
 
   &.light {
@@ -47,14 +47,14 @@
     gap: 8px !important;
     overflow: visible !important;
     min-width: 0 !important;
-    flex-shrink: 0 !important;
+    flex: 0 0 auto !important;
   }
 
   .ti-header-close {
     display: flex !important;
     align-items: center !important;
     gap: 4px !important;
-    flex: 0 1 auto !important;
+    flex: 1 1 auto !important;
     justify-content: flex-end !important;
     min-width: 0 !important;
     overflow: visible !important;
