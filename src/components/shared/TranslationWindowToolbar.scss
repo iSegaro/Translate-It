@@ -6,6 +6,10 @@
   min-width: 0 !important;
   overflow: visible !important;
 
+  &:has(.ti-target-language-label, .ti-detected-language-label) {
+    column-gap: 8px;
+  }
+
   &.light {
     .ti-action-btn,
     .ti-smart-tts-btn,
@@ -49,7 +53,7 @@
   .ti-header-close {
     display: flex !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 4px !important;
     flex: 0 1 auto !important;
     justify-content: flex-end !important;
     min-width: 0 !important;
@@ -71,6 +75,7 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     border: 1px solid rgba(0, 0, 0, 0.05) !important;
     max-width: 80px !important;
+    min-width: 0;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     flex-shrink: 1 !important;
