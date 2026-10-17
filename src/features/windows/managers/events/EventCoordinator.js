@@ -111,6 +111,11 @@ export class EventCoordinator {
       this.facade._selectionClearHandler = () => {
         if (this.state.isVisible || this.state.isIconMode) {
           if (this.state.isPinned) return;
+          this.logger.debug('Window dismissal requested', {
+            path: 'selection-clear',
+            isVisible: this.state.isVisible,
+            isIconMode: this.state.isIconMode,
+          });
           this.facade.dismiss(false);
         }
       };
@@ -423,6 +428,10 @@ export class EventCoordinator {
     )
       return;
     if (this.state.hasActiveElements) {
+      this.logger.debug('Window dismissal requested', {
+        path: 'cross-frame-click',
+        hasActiveElements: this.state.hasActiveElements,
+      });
       await this.facade.dismiss(true);
     }
   }
@@ -457,6 +466,11 @@ export class EventCoordinator {
     const hasStoredMobileText =
       this.facade.displayManager.shouldUseMobileUI() && this.state.originalText;
     if (this.state.hasActiveElements || hasStoredMobileText) {
+      this.logger.debug('Window dismissal requested', {
+        path: 'outside-click',
+        hasActiveElements: this.state.hasActiveElements,
+        hasStoredMobileText: !!hasStoredMobileText,
+      });
       await this.facade.dismiss(true);
     }
   }

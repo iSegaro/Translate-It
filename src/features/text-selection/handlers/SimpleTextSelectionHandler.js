@@ -8,6 +8,7 @@ import ElementDetectionService from '@/shared/services/ElementDetectionService.j
 import { settingsManager } from '@/shared/managers/SettingsManager.js';
 import { INPUT_TYPES } from '@/shared/constants/detection.js';
 import { SelectionTranslationMode } from '@/shared/config/config.js';
+import { COMBINED_SELECTORS } from '@/shared/services/ElementDetectionConfig.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.TEXT_SELECTION, 'SimpleTextSelectionHandler');
 
@@ -63,6 +64,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     this.isDragging = false;
     this.mouseDownTime = 0;
     this.lastMouseUpEvent = null;
+
+    // Diagnostic metadata captured synchronously during mouseup dispatch
+    // (composedPath() is unreliable once dispatch has finished).
+    this._lastMouseUpDiagnostics = null;
 
     // Simplified triple-click + drag support
     this.lastTripleClickTime = 0;
@@ -505,7 +510,8 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
         }
 
         // No text selected, check if user clicked inside translation window
-        if (this.isClickInsideTranslationWindow()) {
+        const insideTranslationWindow = this.isClickInsideTranslationWindow();
+        if (insideTranslationWindow) {
           logger.debug('Click inside translation window, not dismissing');
           return;
         }
@@ -518,11 +524,18 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
 
         // Skip dismissal during Shift+Click operations
         if (this.shiftKeyPressed) {
+          logger.debug('Shift+Click in progress with no text selected, skipping dismissal');
           return;
         }
 
         // No text selected and click outside translation window, dismiss
         if (this.selectionManager) {
+          logger.debug('Empty selection dismissing window', {
+            preservationActive: this._isPreservationActive(),
+            isDragging: this.isDragging,
+            shiftPressed: this.shiftKeyPressed,
+            insideTranslationWindow,
+          });
           this.selectionManager.dismissWindow();
         }
         return;
@@ -1016,6 +1029,10 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
   handleMouseUp(event) {
     this.lastMouseEventTime = Date.now();
     this.lastMouseUpEvent = event; // Store for translation window detection
+    this._lastMouseUpDiagnostics = {
+      timestamp: this.lastMouseEventTime,
+      composedPathHasUi: this._classifyComposedPath(event)
+    };
 
     // Update modifier states from mouse event (Sync both TRUE and FALSE states)
     this.ctrlKeyPressed = event.ctrlKey || event.metaKey;
@@ -1151,16 +1168,30 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
    * Check if the last click was inside a translation window
    */
   isClickInsideTranslationWindow() {
-    if (!this.lastMouseUpEvent) return false;
+    const lastMouseUp = this.lastMouseUpEvent;
+    if (!lastMouseUp) {
+      logger.debug('Inside-window check: no mouseup event recorded');
+      return false;
+    }
+
+    // Diagnostic only: target element type (no page content), mouseup age, and
+    // the composed-path classification captured during mouseup dispatch.
+    const diagnostics = this._lastMouseUpDiagnostics;
+    const mouseUpAgeMs = diagnostics?.timestamp ? Date.now() - diagnostics.timestamp : null;
+    const targetTag = lastMouseUp.target?.tagName ?? null;
+    const composedPathHasUi = diagnostics ? diagnostics.composedPathHasUi : null;
 
     // Use ElementDetectionService to check if click is on UI element
     try {
-      const uiElement = this.elementDetection.getClickedUIElement(this.lastMouseUpEvent);
+      const uiElement = this.elementDetection.getClickedUIElement(lastMouseUp);
+      logger.debug('Inside-window check', {
+        hasLastMouseUp: true,
+        mouseUpAgeMs,
+        targetTag,
+        uiElementType: uiElement?.type ?? null,
+        composedPathHasUi,
+      });
       if (uiElement) {
-        logger.debug('Click detected inside UI element', {
-          elementType: uiElement.type,
-          elementTag: uiElement.element?.tagName
-        });
         return true;
       }
 
@@ -1173,6 +1204,33 @@ export class SimpleTextSelectionHandler extends ResourceTracker {
     }
 
     return false;
+  }
+
+  /**
+   * Classify the event's composed path synchronously during dispatch.
+   * Diagnostic only and side-effect-free: uses direct Element.matches()
+   * against the shared UI_ELEMENTS selector instead of
+   * ElementDetectionService, so the detection cache is never populated.
+   * Returns whether any path node is extension UI, or null when the path
+   * cannot be classified. Stores no DOM nodes.
+   */
+  _classifyComposedPath(event) {
+    try {
+      if (typeof event?.composedPath !== 'function') return null;
+      const path = event.composedPath();
+      if (!Array.isArray(path)) return null;
+      return path.some((node) => {
+        try {
+          return node instanceof Element
+            && typeof node.matches === 'function'
+            && node.matches(COMBINED_SELECTORS.UI_ELEMENTS);
+        } catch {
+          return false;
+        }
+      });
+    } catch {
+      return null;
+    }
   }
 
   /**
