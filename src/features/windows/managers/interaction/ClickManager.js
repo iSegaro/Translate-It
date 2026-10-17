@@ -521,6 +521,10 @@ export class ClickManager extends ResourceTracker {
    */
   cleanup() {
     this.removeOutsideClickListener();
+    window.removeEventListener('pointerdown', this._onWindowPointerDown, { capture: true });
+    window.removeEventListener('pointercancel', this._onWindowPointerCancel, { capture: true });
+    window.removeEventListener('click', this._onWindowCaptureClick, { capture: true });
+    document.removeEventListener('click', this._handleOutsideClick, { capture: true });
     this.onOutsideClick = null;
     this.onIconClick = null;
     this._armedGesture = null;
