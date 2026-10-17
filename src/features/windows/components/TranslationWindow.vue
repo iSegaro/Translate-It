@@ -124,8 +124,10 @@
             <textarea
               v-show="showOriginal && !isLoading"
               :id="`translation-window-source-${props.id}`"
+              ref="sourceTextarea"
               v-model="sourceDraft"
               class="ti-window-source-input"
+              :class="{ 'ti-window-source-overflow': sourceHasOverflow }"
               :aria-label="t('window_edit_source')"
               :lang="props.sourceLanguage !== 'auto' ? props.sourceLanguage : undefined"
               dir="auto"
@@ -301,6 +303,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  sourceResizeObserver?.disconnect();
+  sourceResizeObserver = null;
+
   if (removeSystemThemeListener) {
     removeSystemThemeListener();
     removeSystemThemeListener = null;
@@ -341,6 +346,9 @@ const currentSize = ref(props.initialSize);
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
 const sourceDraft = ref(props.selectedText);
+const sourceTextarea = ref(null);
+const sourceHasOverflow = ref(false);
+let sourceResizeObserver = null;
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
 
 // Check if current translation is in dictionary mode
@@ -400,6 +408,37 @@ const handleProviderChange = (newProvider) => {
 };
 
 const showOriginal = ref(false);
+const updateSourceOverflow = (textarea = sourceTextarea.value) => {
+  if (textarea && sourceTextarea.value === textarea) {
+    sourceHasOverflow.value = textarea.scrollHeight > textarea.clientHeight;
+  }
+};
+
+watch([sourceDraft, showOriginal, isLoading], () => {
+  nextTick(updateSourceOverflow);
+});
+
+watch(sourceTextarea, (textarea) => {
+  sourceResizeObserver?.disconnect();
+  sourceResizeObserver = null;
+
+  if (!textarea) {
+    sourceHasOverflow.value = false;
+    return;
+  }
+
+  updateSourceOverflow();
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(() => {
+      if (sourceTextarea.value === textarea && sourceResizeObserver === observer) {
+        updateSourceOverflow(textarea);
+      }
+    });
+    sourceResizeObserver = observer;
+    observer.observe(textarea);
+  }
+}, { flush: 'post' });
+
 const currentWidth = computed(() => currentSize.value === 'small' ? 28 : null);
 const currentHeight = computed(() => currentSize.value === 'small' ? 28 : null);
 
@@ -487,6 +526,9 @@ onMounted(async () => {
   } catch (error) {
     console.warn('[TranslationWindow] Failed to load lazy styles:', error);
   }
+
+  await nextTick();
+  updateSourceOverflow();
 
   requestAnimationFrame(() => {
     isVisible.value = true;

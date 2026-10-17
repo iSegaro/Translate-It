@@ -200,7 +200,7 @@
     min-height: 1.45em !important;
     max-height: 150px !important;
     resize: none !important;
-    overflow-y: auto !important;
+    overflow-y: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
@@ -214,6 +214,10 @@
     line-height: inherit !important;
     unicode-bidi: plaintext !important;
     field-sizing: content !important;
+
+    &.ti-window-source-overflow {
+      overflow-y: auto !important;
+    }
 
     &:focus-visible {
       box-shadow: 0 2px 0 rgba(59, 130, 246, 0.65) !important;
@@ -253,8 +257,6 @@
     border-bottom: 1px dashed var(--color-border, #e8e8e8) !important;
     font-size: 0.9em !important;
     opacity: 0.8 !important;
-    max-height: 150px !important;
-    overflow-y: auto !important;
   }
 
   .ti-window-translation-display {

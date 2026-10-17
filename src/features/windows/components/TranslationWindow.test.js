@@ -6,6 +6,20 @@ import { pageEventBus } from '@/core/PageEventBus.js';
 import { DismissalManager } from '@/features/windows/managers/dismissal/DismissalManager.js';
 
 let currentMediaQueryList = null;
+let sourceResizeObservers = [];
+
+class MockResizeObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.observe = vi.fn();
+    this.disconnect = vi.fn();
+    sourceResizeObservers.push(this);
+  }
+
+  trigger() {
+    this.callback();
+  }
+}
 
 const createSettingsStore = () => {
   const store = reactive({
@@ -223,6 +237,8 @@ describe('TranslationWindow.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     trackedDisposers.length = 0;
+    sourceResizeObservers = [];
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
     vi.stubGlobal('requestAnimationFrame', (cb) => cb());
     globalThis.__mockSettingsStore = createSettingsStore();
     currentMediaQueryList = createMediaQueryList(false);
@@ -375,6 +391,151 @@ describe('TranslationWindow.vue', () => {
     expect(subheaderStyles).not.toMatch(/justify-content\s*:\s*space-between/);
     expect(subheaderStyles).toMatch(/justify-content\s*:\s*(?:flex-start|start)/);
     expect(styles).toMatch(/&:dir\(rtl\)[\s\S]*?history[^{}]*previous[^{}]*\{\s*transform:\s*none[\s\S]*?history[^{}]*\{\s*transform:\s*rotate\(180deg\)/);
+  });
+
+  it('keeps the source textarea as the only bounded original-text scrollport', async () => {
+    const { readFileSync } = await import('node:fs');
+    const styles = readFileSync('src/features/windows/components/TranslationWindow.scss', 'utf8');
+    const originalTextStyles = styles.match(/\.ti-original-text\s*\{([^}]*)\}/)?.[1] ?? '';
+    const sourceInputStyles = styles.match(/\.ti-window-source-input\s*\{([^}]*)\}/)?.[1] ?? '';
+
+    expect(originalTextStyles).not.toMatch(/(?:max-height|overflow-y)\s*:/);
+    expect(sourceInputStyles).toMatch(/max-height\s*:\s*150px/);
+    expect(sourceInputStyles).toMatch(/overflow-y\s*:\s*hidden/);
+    expect(sourceInputStyles).toMatch(/&\.ti-window-source-overflow\s*\{\s*overflow-y\s*:\s*auto/);
+  });
+
+  it('measures newline, wrapping, cap, and textarea resize overflow', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    const editor = wrapper.find('.ti-window-source-input').element;
+    const sourceInput = wrapper.find('.ti-window-source-input');
+    const setMetrics = (clientHeight, scrollHeight) => {
+      Object.defineProperties(editor, {
+        clientHeight: { configurable: true, value: clientHeight },
+        scrollHeight: { configurable: true, value: scrollHeight },
+      });
+    };
+
+    setMetrics(40, 40);
+    await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+    const resizeObserver = sourceResizeObservers[0];
+    expect(sourceInput.classes()).not.toContain('ti-window-source-overflow');
+    expect(resizeObserver.observe).toHaveBeenCalledWith(editor);
+
+    // Mocked dimensions represent two explicit lines exceeding one line of height.
+    setMetrics(40, 60);
+    await sourceInput.setValue('first line\nsecond line');
+    expect(sourceInput.classes()).toContain('ti-window-source-overflow');
+
+    // A single wrapped line also exceeds the available client height.
+    setMetrics(40, 80);
+    await sourceInput.setValue('a long source line that wraps');
+    expect(sourceInput.classes()).toContain('ti-window-source-overflow');
+
+    // The textarea remains capped at 150px; content beyond that cap scrolls.
+    setMetrics(150, 151);
+    resizeObserver.trigger();
+    await nextTick();
+    expect(sourceInput.classes()).toContain('ti-window-source-overflow');
+
+    // Reflow after resizing can fit the same text, then overflow again.
+    setMetrics(130, 130);
+    resizeObserver.trigger();
+    await nextTick();
+    expect(sourceInput.classes()).not.toContain('ti-window-source-overflow');
+    setMetrics(150, 151);
+    resizeObserver.trigger();
+    await nextTick();
+    expect(sourceInput.classes()).toContain('ti-window-source-overflow');
+
+    wrapper.unmount();
+    expect(resizeObserver.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it('remeasures source and history changes and hides then restores overflow state', async () => {
+    const wrapper = mount(TranslationWindow, {
+      props: { ...baseProps, historyIndex: 0, historyLength: 2 },
+    });
+    const editor = wrapper.find('.ti-window-source-input').element;
+    Object.defineProperties(editor, {
+      clientHeight: { configurable: true, value: 50 },
+      scrollHeight: { configurable: true, value: 70 },
+    });
+    await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+    expect(wrapper.find('.ti-window-source-input').classes()).toContain('ti-window-source-overflow');
+
+    Object.defineProperty(editor, 'scrollHeight', { configurable: true, value: 50 });
+    await wrapper.find('.ti-window-source-input').setValue('edited source');
+    expect(wrapper.find('.ti-window-source-input').classes()).not.toContain('ti-window-source-overflow');
+
+    Object.defineProperty(editor, 'scrollHeight', { configurable: true, value: 70 });
+    await wrapper.setProps({ historyIndex: 1, selectedText: 'history source' });
+    await flushPromises();
+    expect(wrapper.find('.ti-window-source-input').classes()).toContain('ti-window-source-overflow');
+
+    Object.defineProperty(editor, 'scrollHeight', { configurable: true, value: 50 });
+    await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+    expect(wrapper.find('.ti-window-source-input').classes()).not.toContain('ti-window-source-overflow');
+    await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+    expect(wrapper.find('.ti-window-source-input').classes()).not.toContain('ti-window-source-overflow');
+    wrapper.unmount();
+  });
+
+  it('attaches and replaces the resize observer as the textarea ref appears and disappears', async () => {
+    const wrapper = mount(TranslationWindow, {
+      props: { ...baseProps, initialSize: 'small' },
+    });
+
+    expect(wrapper.find('.ti-window-source-input').exists()).toBe(false);
+    expect(sourceResizeObservers).toHaveLength(0);
+
+    await wrapper.setProps({ initialSize: 'normal' });
+    const firstEditor = wrapper.find('.ti-window-source-input').element;
+    expect(sourceResizeObservers).toHaveLength(1);
+    const firstObserver = sourceResizeObservers[0];
+    expect(firstObserver.observe).toHaveBeenCalledTimes(1);
+    expect(firstObserver.observe).toHaveBeenCalledWith(firstEditor);
+
+    Object.defineProperties(firstEditor, {
+      clientHeight: { configurable: true, value: 40 },
+      scrollHeight: { configurable: true, value: 60 },
+    });
+    firstObserver.trigger();
+    await nextTick();
+    expect(wrapper.find('.ti-window-source-input').classes()).toContain('ti-window-source-overflow');
+
+    await wrapper.setProps({ initialSize: 'small' });
+    expect(wrapper.find('.ti-window-source-input').exists()).toBe(false);
+    expect(firstObserver.disconnect).toHaveBeenCalledOnce();
+    firstObserver.trigger();
+
+    await wrapper.setProps({ initialSize: 'normal' });
+    const secondEditor = wrapper.find('.ti-window-source-input').element;
+    expect(secondEditor).not.toBe(firstEditor);
+    expect(sourceResizeObservers).toHaveLength(2);
+    const secondObserver = sourceResizeObservers[1];
+    expect(secondObserver).not.toBe(firstObserver);
+    expect(secondObserver.observe).toHaveBeenCalledTimes(1);
+    expect(secondObserver.observe).toHaveBeenCalledWith(secondEditor);
+    Object.defineProperties(secondEditor, {
+      clientHeight: { configurable: true, value: 40 },
+      scrollHeight: { configurable: true, value: 40 },
+    });
+    await nextTick();
+    expect(wrapper.find('.ti-window-source-input').classes()).not.toContain('ti-window-source-overflow');
+
+    Object.defineProperty(firstEditor, 'scrollHeight', { configurable: true, value: 100 });
+    firstObserver.trigger();
+    await nextTick();
+    expect(wrapper.find('.ti-window-source-input').classes()).not.toContain('ti-window-source-overflow');
+
+    Object.defineProperty(secondEditor, 'scrollHeight', { configurable: true, value: 60 });
+    secondObserver.trigger();
+    await nextTick();
+    expect(wrapper.find('.ti-window-source-input').classes()).toContain('ti-window-source-overflow');
+
+    wrapper.unmount();
+    expect(secondObserver.disconnect).toHaveBeenCalledOnce();
   });
 
   it('confirms changed source text on Enter, preserves Shift+Enter, and restores on Escape', async () => {
