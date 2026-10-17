@@ -59,7 +59,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import './DeepLApiSettings.scss'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/features/settings/stores/settings.js'
@@ -113,6 +113,26 @@ const formalityMessage = computed(() => formalitySupport.value === 'unsupported'
   : formalitySupport.value === 'unknown'
     ? t('deepl_formality_unverified')
     : t('deepl_formality_description') || 'Control the formality level of translations. Some languages may not support all options.')
+
+// Metadata refresh independent of the primary provider: the formality UI
+// works from DeepL credentials even while another provider is selected. The
+// store owns identity/TTL/cancellation; failed refreshes leave it untouched.
+const requestDeepLLanguageCatalog = () => {
+  if (!getDeepLEligibleKeys(deeplApiKey.value, deeplApiTier.value).length) return
+  const refreshed = settingsStore.refreshDeepLLanguageCapabilities?.({ forProvider: ProviderRegistryIds.DEEPL })
+  refreshed?.catch?.(() => { /* a failed refresh leaves the store state untouched */ })
+}
+
+watch([
+  deeplApiKey,
+  deeplApiTier,
+  () => settingsStore.settings?.PROXY_ENABLED,
+  () => settingsStore.settings?.PROXY_TYPE,
+  () => settingsStore.settings?.PROXY_HOST,
+  () => settingsStore.settings?.PROXY_PORT,
+  () => settingsStore.settings?.PROXY_USERNAME,
+  () => settingsStore.settings?.PROXY_PASSWORD,
+], requestDeepLLanguageCatalog, { immediate: true })
 
 // Test keys functionality
 const testingKeys = ref(false)

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { ref } from 'vue'
-import { reactive } from 'vue'
+import { reactive, nextTick } from 'vue'
 import LanguageSelector from './LanguageSelector.vue'
-import { getDeepLLanguageIdentity, normalizeDeepLLanguageCatalog } from '@/features/translation/providers/DeepLLanguageDiscovery.js'
+import { DEEPL_LANGUAGE_CATALOG_TTL_MS, getDeepLLanguageIdentity, normalizeDeepLLanguageCatalog } from '@/features/translation/providers/DeepLLanguageDiscovery.js'
 import { utilsFactory } from '@/utils/UtilsFactory.js'
 
 const mockStoreState = vi.hoisted(() => ({ store: null }))
@@ -22,13 +22,21 @@ const { mockUseSelectElementTranslation } = vi.hoisted(() => ({
   }))
 }))
 
-const setDeepLCatalog = (languages) => {
+const setDeepLCatalog = (languages, overrides = {}) => {
   mockStoreState.store.deepLLanguageCapabilities = {
     status: 'ready',
     identity: getDeepLLanguageIdentity('test-key', 'free'),
     fetchedAt: Date.now(),
+    ...overrides,
     catalog: normalizeDeepLLanguageCatalog(languages)
   }
+}
+
+// Under fake timers flushPromises would hang; Vue flushes on microtasks, so
+// two nextTicks settle watch callbacks and re-renders deterministically.
+const flushWatchers = async () => {
+  await nextTick()
+  await nextTick()
 }
 
 const asymmetricDeepLLanguages = () => [
@@ -250,6 +258,57 @@ describe('LanguageSelector', () => {
     await flushPromises()
     expect(wrapper.find('.ti-language-control-group--target select option[value="fr-CA"]').text()).toContain('deepl_beta_label')
     expect(wrapper.find('.ti-language-control-group--source select option[value="en-GB"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('refreshes after a batched proxy draft correction and recovers DeepL list and swap state', async () => {
+    mockStoreState.store.settings = {
+      ...mockStoreState.store.settings,
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'http',
+      PROXY_HOST: 'broken.saved.proxy',
+      PROXY_PORT: 1,
+      PROXY_USERNAME: '',
+      PROXY_PASSWORD: '',
+    }
+    mockStoreState.store.deepLLanguageCapabilities = {
+      status: 'error', identity: null, catalog: null, fetchedAt: null,
+    }
+    mockStoreState.store.refreshDeepLLanguageCapabilities.mockImplementation(({ forProvider }) => {
+      if (forProvider === 'deepl' && mockStoreState.store.settings.PROXY_HOST === 'corrected.draft.proxy') {
+        mockStoreState.store.deepLLanguageCapabilities = {
+          status: 'ready',
+          identity: getDeepLLanguageIdentity('test-key', 'free'),
+          fetchedAt: Date.now(),
+          catalog: normalizeDeepLLanguageCatalog([
+            { lang: 'en', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: {} },
+            { lang: 'fa', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'beta', features: {} },
+          ]),
+        }
+      }
+      return Promise.resolve()
+    })
+
+    const wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'fa' })
+    await flushPromises()
+    expect(wrapper.text()).toContain('deepl_languages_unavailable')
+    mockStoreState.store.refreshDeepLLanguageCapabilities.mockClear()
+
+    Object.assign(mockStoreState.store.settings, {
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'http',
+      PROXY_HOST: 'corrected.draft.proxy',
+      PROXY_PORT: 8443,
+      PROXY_USERNAME: 'draft-user',
+      PROXY_PASSWORD: 'draft-password',
+    })
+    await flushWatchers()
+    await flushPromises()
+
+    expect(mockStoreState.store.refreshDeepLLanguageCapabilities).toHaveBeenCalledTimes(1)
+    expect(mockStoreState.store.refreshDeepLLanguageCapabilities).toHaveBeenCalledWith({ forProvider: 'deepl' })
+    expect(wrapper.find('.ti-language-control-group--target option[value="fa"]').text()).toContain('deepl_beta_label')
+    expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
     wrapper.unmount()
   })
 
@@ -495,6 +554,103 @@ describe('LanguageSelector', () => {
     expect(wrapper.emitted('update:targetLanguage')).toBeUndefined()
   })
 
+  it('reflects the TTL boundary proactively and recovers after a successful refresh', async () => {
+    let wrapper
+    vi.useFakeTimers()
+    try {
+      setDeepLCatalog(asymmetricDeepLLanguages())
+      wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'de' })
+      await flushWatchers()
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
+      expect(wrapper.find('.ti-language-status').exists()).toBe(false)
+
+      // Cross the TTL boundary: without any store change the swap degrades ...
+      vi.advanceTimersByTime(DEEPL_LANGUAGE_CATALOG_TTL_MS + 1)
+      await flushWatchers()
+      expect(mockStoreState.store.refreshDeepLLanguageCapabilities).toHaveBeenCalledWith({ forProvider: 'deepl' })
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('.ti-language-status').text()).toContain('deepl_languages_unavailable')
+
+      // ... and re-enables only with a fresh, direction-valid catalog.
+      setDeepLCatalog(asymmetricDeepLLanguages())
+      await flushWatchers()
+      expect(wrapper.find('.ti-language-status').exists()).toBe(false)
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
+    } finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps the DeepL swap disabled when the expiry-triggered refresh fails', async () => {
+    let wrapper
+    vi.useFakeTimers()
+    try {
+      mockStoreState.store.refreshDeepLLanguageCapabilities = vi.fn().mockRejectedValue(new Error('offline'))
+      setDeepLCatalog(asymmetricDeepLLanguages())
+      wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'de' })
+      await flushWatchers()
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
+
+      vi.advanceTimersByTime(DEEPL_LANGUAGE_CATALOG_TTL_MS + 1)
+      await flushWatchers()
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('.ti-language-status').text()).toContain('deepl_languages_unavailable')
+    } finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('disables the DeepL swap at exactly the TTL boundary and re-enables only after a fresh result', async () => {
+    let wrapper
+    vi.useFakeTimers()
+    try {
+      setDeepLCatalog(asymmetricDeepLLanguages())
+      wrapper = mountSelector({ provider: 'deepl', sourceLanguage: 'en', targetLanguage: 'de' })
+      await flushWatchers()
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
+
+      // age === TTL exactly: the store rule treats it as expired, so the
+      // button must never show enabled while the handler would reject.
+      vi.advanceTimersByTime(DEEPL_LANGUAGE_CATALOG_TTL_MS)
+      await flushWatchers()
+      expect(mockStoreState.store.refreshDeepLLanguageCapabilities).toHaveBeenCalledWith({ forProvider: 'deepl' })
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('.ti-language-status').text()).toContain('deepl_languages_unavailable')
+
+      setDeepLCatalog(asymmetricDeepLLanguages())
+      await flushWatchers()
+      expect(wrapper.find('.ti-language-status').exists()).toBe(false)
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
+    } finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not refresh or degrade on DeepL catalog expiry for unrelated providers', async () => {
+    let wrapper
+    vi.useFakeTimers()
+    try {
+      mockStoreState.store.deepLLanguageCapabilities = {
+        status: 'ready',
+        identity: getDeepLLanguageIdentity('test-key', 'free'),
+        fetchedAt: Date.now() - DEEPL_LANGUAGE_CATALOG_TTL_MS,
+        catalog: []
+      }
+      wrapper = mountSelector({ provider: 'google', sourceLanguage: 'en', targetLanguage: 'fr' })
+      await flushWatchers()
+      vi.advanceTimersByTime(DEEPL_LANGUAGE_CATALOG_TTL_MS * 2)
+      await flushWatchers()
+      expect(mockStoreState.store.refreshDeepLLanguageCapabilities).not.toHaveBeenCalled()
+      expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
+    } finally {
+      wrapper?.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('preserves unrelated-provider swap behavior without DeepL metadata', async () => {
     const wrapper = mountSelector({ provider: 'google', sourceLanguage: 'en', targetLanguage: 'fr' })
     expect(wrapper.get('.ti-swap-button').attributes('disabled')).toBeUndefined()
@@ -503,6 +659,25 @@ describe('LanguageSelector', () => {
     expect(wrapper.emitted('update:sourceLanguage')).toEqual([['fr']])
     expect(wrapper.emitted('update:targetLanguage')).toEqual([['en']])
     expect(wrapper.emitted('swap-languages')).toEqual([[{ newSource: 'en', newTarget: 'fr' }]])
+  })
+
+  it('does not request DeepL metadata for an unrelated provider when proxy drafts change', async () => {
+    const wrapper = mountSelector({ provider: 'google', sourceLanguage: 'en', targetLanguage: 'fr' })
+    await flushPromises()
+    expect(mockStoreState.store.refreshDeepLLanguageCapabilities).not.toHaveBeenCalled()
+
+    Object.assign(mockStoreState.store.settings, {
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'http',
+      PROXY_HOST: 'corrected.draft.proxy',
+      PROXY_PORT: 8443,
+      PROXY_USERNAME: 'draft-user',
+      PROXY_PASSWORD: 'draft-password',
+    })
+    await flushWatchers()
+
+    expect(mockStoreState.store.refreshDeepLLanguageCapabilities).not.toHaveBeenCalled()
+    wrapper.unmount()
   })
 
   it('emits swapped values and both language updates for an allowed pair', async () => {

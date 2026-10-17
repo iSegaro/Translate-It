@@ -786,7 +786,9 @@ const validateLanguages = async (showFeedback = false) => {
   // 1. Standard language validation
   const isValid = await validate(sourceLanguage.value, targetLanguage.value)
   if (!isValid) {
-    if (showFeedback) {
+    // Replace a currently shown DeepL conflict so the displayed error tracks
+    // the input; never surface unsolicited standard errors otherwise.
+    if (showFeedback || validationErrorKey.value.startsWith('validation_deepl_')) {
       validationErrorKey.value = getFirstError('sourceLanguage') || getFirstError('targetLanguage') || ''
     }
     return false

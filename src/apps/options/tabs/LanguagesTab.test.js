@@ -634,4 +634,56 @@ describe('LanguagesTab.vue - DeepL language metadata', () => {
     const target = dropdownProps(wrapper, 'TARGET_LANGUAGE').languages;
     expect(target.map(language => language.code)).toEqual(['en', 'fa', 'de']);
   });
+
+  it('replaces a shown DeepL error with the standard error on invalid change, and clears on repair', async () => {
+    // Store conflict mirrors the real rule: target 'fa' is unsupported.
+    mockValidateSettings.mockImplementation(() => (
+      mockSettingsStore.settings.TARGET_LANGUAGE === 'fa'
+        ? { isValid: false, errors: ['validation_deepl_target_language_unsupported:fa'] }
+        : { isValid: true, errors: [] }
+    ));
+    const wrapper = mountTab();
+    await flushPromises();
+
+    // Save-feedback path shows the DeepL conflict first
+    window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+      detail: { field: 'languages', focus: 'target' }
+    }));
+    await flushPromises();
+    expect(dropdownProps(wrapper, 'TARGET_LANGUAGE').error).toBe('validation_deepl_target_language_unsupported');
+
+    // Same-language change is standard-invalid, but arrives WITHOUT explicit
+    // feedback: the displayed DeepL error must not remain stale.
+    mockSettingsStore.updateSettingLocally('TARGET_LANGUAGE', 'de');
+    mockSettingsStore.updateSettingLocally('SOURCE_LANGUAGE', 'de');
+    await nextTick();
+    await flushPromises();
+
+    const banner = wrapper.find('.validation-error .error-message');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toBe('validation_same_languages');
+    expect(dropdownProps(wrapper, 'TARGET_LANGUAGE').error).toBe('');
+
+    // Repairing the pair clears the displayed error
+    mockSettingsStore.updateSettingLocally('SOURCE_LANGUAGE', 'en');
+    await nextTick();
+    await flushPromises();
+    expect(mockSettingsStore.isSettingsValid).toBe(true);
+  });
+
+  it('shows no unsolicited standard errors when validation runs without feedback', async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(wrapper.find('.validation-error').exists()).toBe(false);
+
+    // Same-language change without prior errors and without feedback: no
+    // standard error is surfaced, only Save feedback shows one.
+    mockSettingsStore.updateSettingLocally('TARGET_LANGUAGE', 'de');
+    mockSettingsStore.updateSettingLocally('SOURCE_LANGUAGE', 'de');
+    await nextTick();
+    await flushPromises();
+    expect(wrapper.find('.validation-error').exists()).toBe(false);
+    expect(dropdownProps(wrapper, 'SOURCE_LANGUAGE').error).toBe('');
+    expect(dropdownProps(wrapper, 'TARGET_LANGUAGE').error).toBe('');
+  });
 });

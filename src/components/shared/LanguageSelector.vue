@@ -327,6 +327,13 @@ const targetLanguage = computed({
 });
 
 const providerInfo = computed(() => findProviderById(props.provider));
+
+// Reactive TTL clock so freshness degrades as the snapshot ages even without
+// a store change; the expiry tick also requests fresh capabilities so the
+// swap state can recover without trusting stale results.
+const catalogClock = ref(Date.now());
+let catalogExpiryTimer = null;
+
 const isDeepLLanguageCatalogFresh = () => {
   if (!props.provider?.toLowerCase().includes('deepl')) return false;
   const capabilities = settingsStore.deepLLanguageCapabilities;
@@ -337,7 +344,9 @@ const isDeepLLanguageCatalogFresh = () => {
     eligibleIdentities = new Set(getDeepLEligibleKeys(settingsStore.settings?.DEEPL_API_KEY || '', settingsStore.settings?.DEEPL_API_TIER)
       .map(key => getDeepLLanguageIdentity(key, settingsStore.settings?.DEEPL_API_TIER)));
   } catch { return false; }
-  const age = capabilities?.fetchedAt == null ? Infinity : Date.now() - capabilities.fetchedAt;
+  // max(reactive clock, Date.now()) keeps the clock as a TTL-expiry dependency
+  // while a freshly fetched snapshot (never older than now) reads age 0.
+  const age = capabilities?.fetchedAt == null ? Infinity : Math.max(catalogClock.value, Date.now()) - capabilities.fetchedAt;
   return capabilities?.status === 'ready' && eligibleIdentities.has(capabilities.identity) && age >= 0 && age < DEEPL_LANGUAGE_CATALOG_TTL_MS;
 };
 const hasFreshDeepLCatalog = computed(isDeepLLanguageCatalogFresh);
@@ -347,13 +356,48 @@ const deepLLanguageStatus = computed(() => {
     ? 'deepl_languages_loading'
     : 'deepl_languages_unavailable';
 });
-watch(() => [props.provider, settingsStore.settings?.DEEPL_API_KEY, settingsStore.settings?.DEEPL_API_TIER], () => {
+const requestDeepLLanguageCatalog = () => {
   if (!props.provider?.toLowerCase().includes('deepl') || !settingsStore.refreshDeepLLanguageCapabilities) return;
   try {
     getDeepLLanguageIdentity(settingsStore.settings?.DEEPL_API_KEY || '', settingsStore.settings?.DEEPL_API_TIER);
-    settingsStore.refreshDeepLLanguageCapabilities({ forProvider: props.provider });
+    const refreshed = settingsStore.refreshDeepLLanguageCapabilities({ forProvider: props.provider });
+    refreshed?.catch?.(() => { /* a failed refresh leaves the store state untouched */ });
   } catch { /* no request without a configured, tier-eligible key */ }
-}, { immediate: true });
+};
+const scheduleDeepLCatalogExpiryCheck = () => {
+  if (catalogExpiryTimer) { clearTimeout(catalogExpiryTimer); catalogExpiryTimer = null; }
+  const capabilities = settingsStore.deepLLanguageCapabilities;
+  const age = capabilities?.fetchedAt == null ? Infinity : Date.now() - capabilities.fetchedAt;
+  if (capabilities?.status !== 'ready' || age < 0 || age >= DEEPL_LANGUAGE_CATALOG_TTL_MS) return;
+  // Fires exactly when age reaches TTL: the store rule treats age >= TTL as
+  // expired, so no window exists where the button renders enabled while the
+  // handler would reject.
+  catalogExpiryTimer = setTimeout(() => {
+    catalogExpiryTimer = null;
+    catalogClock.value = Date.now();
+    requestDeepLLanguageCatalog();
+  }, DEEPL_LANGUAGE_CATALOG_TTL_MS - age);
+};
+
+watch(() => [
+  props.provider,
+  settingsStore.settings?.DEEPL_API_KEY,
+  settingsStore.settings?.DEEPL_API_TIER,
+  settingsStore.settings?.PROXY_ENABLED,
+  settingsStore.settings?.PROXY_TYPE,
+  settingsStore.settings?.PROXY_HOST,
+  settingsStore.settings?.PROXY_PORT,
+  settingsStore.settings?.PROXY_USERNAME,
+  settingsStore.settings?.PROXY_PASSWORD,
+], requestDeepLLanguageCatalog, { immediate: true });
+watch(() => settingsStore.deepLLanguageCapabilities, scheduleDeepLCatalogExpiryCheck, { deep: true });
+onMounted(scheduleDeepLCatalogExpiryCheck);
+onUnmounted(() => {
+  if (catalogExpiryTimer) {
+    clearTimeout(catalogExpiryTimer);
+    catalogExpiryTimer = null;
+  }
+});
 const hasAutoDetect = computed(() =>
   providerInfo.value?.features?.includes("autoDetect"),
 );

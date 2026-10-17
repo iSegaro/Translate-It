@@ -1441,6 +1441,108 @@ describe('Settings Store', () => {
       expect(deepLLanguageDiscoveryMocks.fetch).toHaveBeenCalledTimes(1);
     });
 
+    it('refreshes DeepL with the current draft proxy without persisting it, and discards results after proxy edits', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de' });
+      Object.assign(store.settings, {
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'corrected.draft.proxy',
+        PROXY_PORT: 8443,
+        PROXY_USERNAME: 'draft-user',
+        PROXY_PASSWORD: 'draft-secret',
+      });
+      let resolveDiscovery;
+      deepLLanguageDiscoveryMocks.fetchFailover.mockReturnValueOnce(
+        new Promise(resolve => { resolveDiscovery = resolve; }),
+      );
+
+      const refresh = store.refreshDeepLLanguageCapabilities();
+      await vi.waitFor(() => expect(deepLLanguageDiscoveryMocks.fetchFailover).toHaveBeenCalledTimes(1));
+      expect(deepLLanguageDiscoveryMocks.fetchFailover.mock.calls[0][0].proxySettings).toEqual({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'corrected.draft.proxy',
+        PROXY_PORT: 8443,
+        PROXY_USERNAME: 'draft-user',
+        PROXY_PASSWORD: 'draft-secret',
+      });
+      expect(storageManager.set).not.toHaveBeenCalled();
+
+      // A proxy draft edit aborts and invalidates the in-flight Options
+      // refresh; a late response from the old route cannot become ready.
+      store.settings.PROXY_HOST = 'newer.draft.proxy';
+      resolveDiscovery({
+        catalog: [entry('en'), entry('de')],
+        identity: deepLLanguageDiscoveryMocks.identity('test-key', 'free'),
+        fetchedAt: Date.now(),
+      });
+      await refresh;
+
+      expect(store.deepLLanguageCapabilities.status).toBe('idle');
+      expect(store.validateSettings().errors).toContain('validation_deepl_languages_unverified');
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('validates and saves DeepL with corrected draft proxy while persisted proxy stays broken until Save', async () => {
+      const persisted = {
+        ...getPersistedDefaultSettings(),
+        TRANSLATION_API: 'deepl',
+        DEEPL_API_KEY: 'test-key',
+        DEEPL_API_TIER: 'free',
+        SOURCE_LANGUAGE: 'en',
+        TARGET_LANGUAGE: 'de',
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'broken.saved.proxy',
+        PROXY_PORT: 1,
+        PROXY_USERNAME: '',
+        PROXY_PASSWORD: '',
+      };
+      storageManager.get.mockResolvedValue(persisted);
+      storageManager.set.mockImplementation(async snapshot => {
+        Object.assign(persisted, snapshot);
+        return true;
+      });
+
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.settings.PROXY_HOST).toBe('broken.saved.proxy');
+
+      store.updateSettingLocally('PROXY_HOST', 'corrected.draft.proxy');
+      store.updateSettingLocally('PROXY_PORT', 8443);
+      deepLLanguageDiscoveryMocks.fetchFailover.mockResolvedValueOnce({
+        catalog: [entry('en'), entry('de')],
+        identity: deepLLanguageDiscoveryMocks.identity('test-key', 'free'),
+        fetchedAt: Date.now(),
+      });
+
+      await store.refreshDeepLLanguageCapabilities();
+
+      expect(deepLLanguageDiscoveryMocks.fetchFailover).toHaveBeenCalledWith(expect.objectContaining({
+        apiKey: 'test-key',
+        apiTier: 'free',
+        proxySettings: expect.objectContaining({
+          PROXY_HOST: 'corrected.draft.proxy',
+          PROXY_PORT: 8443,
+        }),
+      }));
+      expect(store.validateSettings()).toMatchObject({ isValid: true, errors: [] });
+      expect(persisted.PROXY_HOST).toBe('broken.saved.proxy');
+      expect(storageManager.set).not.toHaveBeenCalled();
+
+      await store.saveAllSettings();
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(persisted.PROXY_HOST).toBe('corrected.draft.proxy');
+      expect(persisted.PROXY_PORT).toBe(8443);
+
+      // This test models a local persisted snapshot; restore shared storage
+      // mocks so subsequent store tests keep their own storage behavior.
+      storageManager.get.mockReset().mockResolvedValue({});
+      storageManager.set.mockReset().mockResolvedValue(true);
+    });
+
     it('blocks an expired snapshot without using stale metadata in validation', async () => {
       const store = useSettingsStore();
       setupDeepL(store, { source: 'en', target: 'de' });

@@ -18,6 +18,23 @@ import {
   SupersededDeepLLanguageDiscoveryError,
 } from './DeepLLanguageDiscovery.js'
 
+const proxyDiscoveryMocks = vi.hoisted(() => ({
+  fetch: vi.fn(),
+  persisted: vi.fn(async () => ({ enabled: false, type: 'http', host: '', port: 8080, auth: { username: '', password: '' } })),
+}))
+
+vi.mock('@/shared/proxy/ProxyManager.js', () => ({ proxyManager: { fetch: proxyDiscoveryMocks.fetch } }))
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  resolveProxyConfig: (...args) => proxyDiscoveryMocks.persisted(...args),
+  resolveProxyConfigFromSettings: (settings = {}) => ({
+    enabled: Boolean(settings.PROXY_ENABLED),
+    type: settings.PROXY_TYPE || 'http',
+    host: settings.PROXY_HOST || '',
+    port: settings.PROXY_PORT || 8080,
+    auth: { username: settings.PROXY_USERNAME || '', password: settings.PROXY_PASSWORD || '' },
+  }),
+}))
+
 const payload = [
   { lang: 'EN', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: { formality: { status: 'stable' } } },
   { lang: 'PT-BR', name: 'Portuguese (Brazilian)', usable_as_source: true, usable_as_target: true, status: 'beta', features: {} },
@@ -33,6 +50,8 @@ const response = (data = payload, ok = true, status = 200) => ({
 
 afterEach(() => {
   clearDeepLLanguageCatalogCache()
+  proxyDiscoveryMocks.fetch.mockReset()
+  proxyDiscoveryMocks.persisted.mockClear()
   vi.useRealTimers()
 })
 
@@ -525,5 +544,53 @@ describe('DeepL language discovery', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
     expect(getCachedDeepLLanguageCatalog('slow-key')).toBeNull()
     expect(getCachedDeepLLanguageCatalog('next-key')).toBeNull()
+  })
+
+  it('keeps same-key requests with different proxy routes separate and isolates caller aborts', async () => {
+    let resolveDraftRoute
+    const draftResponse = new Promise(resolve => { resolveDraftRoute = resolve })
+    proxyDiscoveryMocks.fetch.mockImplementation((_url, _options, proxyConfig) => (
+      proxyConfig.host === 'draft.proxy.test'
+        ? draftResponse
+        : Promise.resolve(response(payload.slice(0, 1)))
+    ))
+    const savedProxy = {
+      enabled: true,
+      type: 'http',
+      host: 'saved.proxy.test',
+      port: 8000,
+      auth: { username: 'saved-user', password: 'saved-password' },
+    }
+    proxyDiscoveryMocks.persisted.mockResolvedValue(savedProxy)
+    const draftSettings = {
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'socks',
+      PROXY_HOST: 'draft.proxy.test',
+      PROXY_PORT: 1080,
+      PROXY_USERNAME: 'draft-user',
+      PROXY_PASSWORD: 'draft-password',
+    }
+    const draftController = new AbortController()
+
+    const draftPending = fetchDeepLLanguageCatalog({ apiKey: 'same-key', proxySettings: draftSettings, signal: draftController.signal })
+    const savedPending = fetchDeepLLanguageCatalog({ apiKey: 'same-key', fetchFn: undefined })
+    await expect(savedPending).resolves.toMatchObject({ catalog: expect.any(Array) })
+
+    expect(proxyDiscoveryMocks.fetch).toHaveBeenCalledTimes(2)
+    expect(proxyDiscoveryMocks.fetch.mock.calls[0][2]).toEqual({
+      enabled: true,
+      type: 'socks',
+      host: 'draft.proxy.test',
+      port: 1080,
+      auth: { username: 'draft-user', password: 'draft-password' },
+    })
+    expect(proxyDiscoveryMocks.fetch.mock.calls[1][2]).toEqual(savedProxy)
+    expect(proxyDiscoveryMocks.fetch.mock.calls[0][2]).not.toBe(draftSettings)
+
+    draftController.abort()
+    await expect(draftPending).rejects.toMatchObject({ name: 'AbortError' })
+    resolveDraftRoute(response())
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(getCachedDeepLLanguageCatalog('same-key')).toMatchObject({ catalog: expect.any(Array) })
   })
 })

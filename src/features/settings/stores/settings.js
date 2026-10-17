@@ -134,12 +134,28 @@ export const useSettingsStore = defineStore('settings', () => {
   watch(() => [
     settings.value.DEEPL_API_KEY,
     settings.value.DEEPL_API_TIER,
+    settings.value.PROXY_ENABLED,
+    settings.value.PROXY_TYPE,
+    settings.value.PROXY_HOST,
+    settings.value.PROXY_PORT,
+    settings.value.PROXY_USERNAME,
+    settings.value.PROXY_PASSWORD,
   ], invalidateDeepLLanguageCapabilities, { flush: 'sync' })
 
   const refreshDeepLLanguageCapabilities = async ({ forProvider } = {}) => {
     const provider = forProvider === undefined ? settings.value.TRANSLATION_API : forProvider
     const tier = settings.value.DEEPL_API_TIER === 'pro' ? 'pro' : 'free'
     const configuredKeys = settings.value.DEEPL_API_KEY || ''
+    // Snapshot the current Options draft; discovery makes its own detached
+    // canonical copy and never persists draft proxy credentials.
+    const proxySettings = {
+      PROXY_ENABLED: settings.value.PROXY_ENABLED,
+      PROXY_TYPE: settings.value.PROXY_TYPE,
+      PROXY_HOST: settings.value.PROXY_HOST,
+      PROXY_PORT: settings.value.PROXY_PORT,
+      PROXY_USERNAME: settings.value.PROXY_USERNAME,
+      PROXY_PASSWORD: settings.value.PROXY_PASSWORD,
+    }
 
     // Explicit mode consumers can request DeepL without changing the primary
     // provider. Other providers do not invalidate a usable DeepL snapshot.
@@ -210,6 +226,7 @@ export const useSettingsStore = defineStore('settings', () => {
           apiKey: configuredKeys,
           apiTier: tier,
           signal: controller.signal,
+          proxySettings,
         })
         // The snapshot carries the succeeding key's identity after failover,
         // so staleness is membership in the current eligible identities.

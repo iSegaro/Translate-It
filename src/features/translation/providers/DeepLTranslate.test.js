@@ -971,6 +971,37 @@ describe('DeepLTranslateProvider response contract', () => {
       .resolves.toEqual(['translated @@SUB_TOKEN@@text']);
   });
 
+  it('preserves literal XML-looking text on the plain-text path', async () => {
+    deepLLanguageDiscoveryMock.fetch.mockRejectedValue(new Error('offline'));
+    const source = '< > & &amp; &lt; &gt; &#38; &#x26; mixed\u0001 text';
+    vi.spyOn(provider, '_executeRequest').mockImplementation(async options => {
+      expect(options.fetchOptions.body.getAll('text')).toEqual(['< > & &amp; &lt; &gt; &#38; &#x26; mixed text']);
+      expect(options.fetchOptions.body.has('tag_handling')).toBe(false);
+      return options.extractResponse({ translations: [{ text: 'literal <br/> &lt; &amp;' }] });
+    });
+
+    await expect(provider._translateChunk([source], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+      .resolves.toEqual(['literal <br/> &lt; &amp;']);
+  });
+
+  it('escapes original text and restores placeholders in generated XML mode', async () => {
+    deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
+    vi.spyOn(provider, '_executeRequest').mockImplementation(async options => {
+      expect(options.fetchOptions.body.getAll('text')).toEqual([
+        'before &lt; &amp;amp; &gt; <x id="SUB_TOKEN" /><br id="SUB_NL_LINE" />after',
+      ]);
+      expect(options.fetchOptions.body.get('tag_handling')).toBe('xml');
+      return options.extractResponse({ translations: [{
+        text: 'translated &lt; &amp;amp; <x id="SUB_TOKEN" /><br id="SUB_NL_LINE" /> text',
+      }] });
+    });
+
+    await expect(provider._translateChunk(
+      ['before < &amp; > @@SUB_TOKEN@@@@SUB_NL_LINE@@after'],
+      'en', 'fa', 'selection', null, 0, 1, 0, 1, {},
+    )).resolves.toEqual(['translated < &amp; @@SUB_TOKEN@@@@SUB_NL_LINE@@text']);
+  });
+
   it('rejects XML placeholder corruption without returning source text', async () => {
     deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
     vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) =>

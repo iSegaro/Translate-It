@@ -117,6 +117,12 @@ watch(() => [
   settingsStore.settings.TRANSLATION_API,
   settingsStore.settings.DEEPL_API_KEY,
   settingsStore.settings.DEEPL_API_TIER,
+  settingsStore.settings.PROXY_ENABLED,
+  settingsStore.settings.PROXY_TYPE,
+  settingsStore.settings.PROXY_HOST,
+  settingsStore.settings.PROXY_PORT,
+  settingsStore.settings.PROXY_USERNAME,
+  settingsStore.settings.PROXY_PASSWORD,
 ], scheduleDeepLLanguageRefresh, { immediate: true })
 
 onBeforeUnmount(() => clearTimeout(deepLLanguageRefreshTimer))

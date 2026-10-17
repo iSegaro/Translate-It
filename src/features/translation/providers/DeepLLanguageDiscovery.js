@@ -1,5 +1,5 @@
 import { proxyManager } from '@/shared/proxy/ProxyManager.js'
-import { resolveProxyConfig } from '@/shared/proxy/ProxySettings.js'
+import { resolveProxyConfig, resolveProxyConfigFromSettings } from '@/shared/proxy/ProxySettings.js'
 import { ApiKeyManager } from '@/features/translation/providers/ApiKeyManager.js'
 import { apiKeyFingerprint, throwIfAborted } from './modelDiscoveryUtils.js'
 
@@ -106,6 +106,25 @@ function cloneCatalog(catalog) {
 
 function cloneSnapshot(snapshot) {
   return { ...snapshot, catalog: cloneCatalog(snapshot.catalog) }
+}
+
+function cloneProxyConfig(config) {
+  return {
+    enabled: Boolean(config?.enabled),
+    type: config?.type || 'http',
+    host: config?.host || '',
+    port: config?.port || 8080,
+    auth: {
+      username: config?.auth?.username || '',
+      password: config?.auth?.password || '',
+    },
+  }
+}
+
+function getProxyRoutingFingerprint(config) {
+  // Hash canonical config including auth, so equivalent routing coalesces
+  // without exposing proxy credentials in the in-flight map key.
+  return apiKeyFingerprint(JSON.stringify(config))
 }
 
 /**
@@ -305,9 +324,9 @@ async function runSharedDeepLDiscovery(entry) {
       fetchFn
         ? fetchFn(url, options)
         : (async () => {
-          const proxyConfig = await resolveProxyConfig()
+          const proxyConfig = entry.proxyConfig
           throwIfAborted(sharedSignal)
-          return proxyManager.fetch(url, options, proxyConfig)
+          return proxyManager.fetch(url, options, cloneProxyConfig(proxyConfig))
         })(),
       sharedSignal,
     )
@@ -330,16 +349,16 @@ async function runSharedDeepLDiscovery(entry) {
     const catalog = normalizeDeepLLanguageCatalog(data)
 
     // Never serve or cache a response nobody waits for or that was cleared.
-    if (inFlightDiscoveries.get(entry.identity) !== entry || entry.subscribers.size === 0) {
+    if (inFlightDiscoveries.get(entry.inFlightKey) !== entry || entry.subscribers.size === 0) {
       throw new SupersededDeepLLanguageDiscoveryError()
     }
 
     const snapshot = { catalog, identity: entry.identity, fetchedAt: entry.now() }
     catalogCache.set(entry.identity, snapshot)
-    inFlightDiscoveries.delete(entry.identity)
+    inFlightDiscoveries.delete(entry.inFlightKey)
     return snapshot
   } catch (error) {
-    if (inFlightDiscoveries.get(entry.identity) === entry) inFlightDiscoveries.delete(entry.identity)
+    if (inFlightDiscoveries.get(entry.inFlightKey) === entry) inFlightDiscoveries.delete(entry.inFlightKey)
     throw error
   }
 }
@@ -354,8 +373,8 @@ function attachToSharedDiscovery(entry, { signal, timeoutMs }) {
       if (signal && subscriber.onAbort) signal.removeEventListener('abort', subscriber.onAbort)
       entry.subscribers.delete(subscriber)
       // Cancel the shared network work only once nobody remains subscribed.
-      if (entry.subscribers.size === 0 && inFlightDiscoveries.get(entry.identity) === entry) {
-        inFlightDiscoveries.delete(entry.identity)
+      if (entry.subscribers.size === 0 && inFlightDiscoveries.get(entry.inFlightKey) === entry) {
+        inFlightDiscoveries.delete(entry.inFlightKey)
         entry.sharedController.abort(new DOMException('Aborted', 'AbortError'))
       }
       reject(error)
@@ -403,6 +422,7 @@ export async function fetchDeepLLanguageCatalog({
   now = Date.now,
   timeoutMs = DEEPL_LANGUAGE_DISCOVERY_TIMEOUT_MS,
   signal,
+  proxySettings,
 } = {}) {
   const configuredKey = typeof apiKey === 'string' ? apiKey : ''
   const tier = normalizedTier(apiTier)
@@ -416,15 +436,27 @@ export async function fetchDeepLLanguageCatalog({
   const cached = getCachedDeepLLanguageCatalog(key, tier, now())
   if (cached) return cached
 
+  // Resolve/copy routing before joining an in-flight request. Requests with
+  // the same credential but different draft/saved proxies must not coalesce.
+  const proxyConfig = proxySettings === undefined
+    ? cloneProxyConfig(fetchFn
+      ? { enabled: false, type: 'http', host: '', port: 8080, auth: { username: '', password: '' } }
+      : await resolveProxyConfig())
+    : cloneProxyConfig(resolveProxyConfigFromSettings(proxySettings))
+  if (signal) throwIfAborted(signal)
+  const inFlightKey = `${identity}:${getProxyRoutingFingerprint(proxyConfig)}`
+
   // Equivalent credential/tier callers share one network request so a
   // concurrent refresh cannot supersede a runtime capability lookup.
-  const existing = inFlightDiscoveries.get(identity)
+  const existing = inFlightDiscoveries.get(inFlightKey)
   if (existing) return attachToSharedDiscovery(existing, { signal, timeoutMs })
 
   const entry = {
     identity,
+    inFlightKey,
     tier,
     key,
+    proxyConfig,
     fetchFn,
     now,
     sharedController: new AbortController(),
@@ -435,7 +467,7 @@ export async function fetchDeepLLanguageCatalog({
   // A shared rejection with zero remaining subscribers is already reported
   // per caller; keep it from surfacing as unhandled.
   entry.sharedPromise.catch(() => {})
-  inFlightDiscoveries.set(identity, entry)
+  inFlightDiscoveries.set(inFlightKey, entry)
   return attachToSharedDiscovery(entry, { signal, timeoutMs })
 }
 
@@ -458,6 +490,7 @@ export async function fetchDeepLLanguageCatalogWithKeyFailover({
   now = Date.now,
   timeoutMs = DEEPL_LANGUAGE_DISCOVERY_TIMEOUT_MS,
   signal,
+  proxySettings,
 } = {}) {
   const configuredKeys = typeof apiKey === 'string' ? apiKey : ''
   const tier = normalizedTier(apiTier)
@@ -476,7 +509,7 @@ export async function fetchDeepLLanguageCatalogWithKeyFailover({
   for (const key of keys) {
     if (signal) throwIfAborted(signal)
     try {
-      return await fetchDeepLLanguageCatalog({ apiKey: key, apiTier: tier, fetchFn, now, timeoutMs, signal })
+      return await fetchDeepLLanguageCatalog({ apiKey: key, apiTier: tier, fetchFn, now, timeoutMs, signal, proxySettings })
     } catch (error) {
       if (Number(error?.statusCode) === 401) {
         lastAuthError = error

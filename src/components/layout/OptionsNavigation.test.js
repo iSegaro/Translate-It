@@ -555,6 +555,32 @@ describe('OptionsNavigation.vue - DeepL beta language validation (#321)', () => 
     }
   };
 
+  it('refreshes DeepL metadata when a proxy field in the draft changes', async () => {
+    vi.useFakeTimers();
+    mockSettingsStore.settings = {
+      TRANSLATION_API: 'deepl',
+      DEEPL_API_KEY: 'draft-key',
+      DEEPL_API_TIER: 'free',
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'http',
+      PROXY_HOST: 'broken.saved.proxy',
+      MODE_PROVIDERS: {},
+      PROMPT_TEMPLATE: 'original valid template $_{SOURCE} $_{TARGET} $_{TEXT}'
+    };
+    const wrapper = mountNavigation();
+
+    await vi.advanceTimersByTimeAsync(300);
+    mockRefreshDeepLLanguageCapabilities.mockClear();
+
+    mockSettingsStore.settings.PROXY_HOST = 'corrected.draft.proxy';
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(mockRefreshDeepLLanguageCapabilities).toHaveBeenCalled();
+    wrapper.unmount();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     currentRouteName.value = 'providers';

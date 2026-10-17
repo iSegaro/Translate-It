@@ -324,7 +324,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       logger.debug(`[DeepL] Filtered ${chunkTexts.length - validTexts.length} empty/whitespace texts`);
     }
 
-    const sanitizeText = (text) => {
+    const sanitizeText = (text, escapeXml = true) => {
       const originalLength = text.length;
       let sanitized = text
         .replace(ZERO_WIDTH_PATTERN, '')  // Zero-width characters
@@ -334,14 +334,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // CRITICAL: Escape XML special characters BEFORE adding XML markers
       // This prevents "not well-formed (invalid token)" errors when tag_handling=xml
       // Order matters: escape & first, then < and >
-      sanitized = sanitized
-        .replace(/&/g, '&amp;')           // Must be first to avoid double-escaping
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      if (escapeXml) {
+        sanitized = sanitized
+          .replace(/&/g, '&amp;')           // Must be first to avoid double-escaping
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
 
       // Log if sanitization removed any characters
       if (sanitized.length !== originalLength) {
-        logger.debug(`[DeepL] Sanitization processed ${originalLength} char text (removed special chars, escaped XML)`);
+        logger.debug(`[DeepL] Sanitization processed ${originalLength} char text`);
       }
 
       return sanitized;
@@ -383,9 +385,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
     logger.info(`[DeepL] Starting translation: ${validTexts.join('').length} chars, ${validTexts.length} segments (filtered from ${chunkTexts.length})`);
 
-    // Build request body with valid texts only (with text markers for newlines)
+    const hasGeneratedXmlMarkup = textsToTranslate.some(text => GENERATED_XML_MARKUP_PATTERN.test(text));
+
+    // Plain-text requests must preserve literal XML-looking text. XML mode
+    // uses the escaped, marker-prepared variant above.
     const requestBody = new URLSearchParams();
-    textsToTranslate.forEach(text => requestBody.append('text', text));
 
     // DeepL uses empty source_lang for auto-detection
     if (sl && sl !== '') {
@@ -435,7 +439,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     // We MUST NOT use 'ignore_tags' for <x> or <n1> because DeepL's engine often completely deletes
     // empty ignored tags (which causes the translated output to lose SRT tags and newlines).
     // By simply enabling XML mode, DeepL treats them as structural elements and preserves them perfectly.
-    const hasGeneratedXmlMarkup = textsToTranslate.some(text => GENERATED_XML_MARKUP_PATTERN.test(text));
     if (hasGeneratedXmlMarkup) {
       if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
       let tagHandlingCapability = 'unknown';
@@ -473,6 +476,9 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
         textCount: validTexts.length
       });
     }
+
+    (hasGeneratedXmlMarkup ? textsToTranslate : validTexts.map(text => sanitizeText(text, false)))
+      .forEach(text => requestBody.append('text', text));
 
     // 1. Prepare rich context (Environmental + Compact History)
     // DeepL context is free and significantly improves quality for related segments.
@@ -571,20 +577,20 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
           // Restore ALL newlines using the unified NewlineManager
           const restoredTranslations = validTranslations.map(translation => {
-            // Step 0: Restore standard <br/> tags back to newlines
-            let restored = translation.replace(/<br\s*\/?>/gi, '\n');
+            let restored = translation;
 
-            // Step 1: Restore newlines from markers (fallback)
-            restored = NewlineManager.restore(restored);
+            if (hasGeneratedXmlMarkup) {
+              // Restore standard <br/> tags back to newlines and markers.
+              restored = restored.replace(/<br\s*\/?>/gi, '\n');
+              restored = NewlineManager.restore(restored);
 
-            // Step 2: Unescape XML entities back to original characters
-            restored = unescapeXML(restored);
+              // Unescape XML entities back to original characters.
+              restored = unescapeXML(restored);
 
-            // Step 3: Restore SubtitleTextProtector tokens.
-            // Restore newline tokens (which were sent as <br id="...">)
-            restored = restored.replace(/<br\s+id\s*=\s*["']SUB_NL_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/br>\s*)?/gi, '@@SUB_NL_$1@@');
-            // Restore other tokens (which were sent as <x id="...">)
-            restored = restored.replace(/<x\s+id\s*=\s*["']SUB_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/x>\s*)?/gi, '@@SUB_$1@@');
+              // Restore SubtitleTextProtector tokens.
+              restored = restored.replace(/<br\s+id\s*=\s*["']SUB_NL_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/br>\s*)?/gi, '@@SUB_NL_$1@@');
+              restored = restored.replace(/<x\s+id\s*=\s*["']SUB_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/x>\s*)?/gi, '@@SUB_$1@@');
+            }
 
             return restored;
           });
