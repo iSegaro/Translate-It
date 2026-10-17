@@ -420,14 +420,31 @@ export class EventCoordinator {
 
   /**
    * Handle cross-frame outside click
+   *
+   * `message` is the MessageEvent (or the bare payload from direct tests)
+   * whose data carries the relay payload built by MessageRouter
+   * broadcastOutsideClick, including the bounded gesture identity fields
+   * `pointerId` and `fromCrossDocumentGesture`. Absent fields degrade to
+   * `pointerId: null / fromCrossDocumentGesture: undefined`, which never
+   * suppresses.
    */
-  async _handleCrossFrameOutsideClick() {
+  async _handleCrossFrameOutsideClick(message) {
     if (
       window.__TRANSLATION_WINDOW_IS_DRAGGING === true ||
       window.__TRANSLATION_WINDOW_JUST_DRAGGED === true
     )
       return;
     if (window.__TRANSLATION_WINDOW_IS_RESIZING === true) return;
+    // A gesture that started inside the window may complete inside an iframe:
+    // the origin document may never observe the completing click, so decide
+    // from the relay's bounded gesture identity, not from any ignore-next
+    // fallback. Legacy managers without the resolve API keep dismissal.
+    const data = message?.data ?? message ?? {};
+    const decision = this.clickManager.resolveCrossFrameOutsideClick?.({
+      pointerId: data?.pointerId ?? null,
+      fromCrossDocumentGesture: data?.fromCrossDocumentGesture,
+    });
+    if (decision?.suppress === true) return;
     if (this.state.hasActiveElements) {
       this.logger.debug('Window dismissal requested', {
         path: 'cross-frame-click',

@@ -439,6 +439,295 @@ describe('ClickManager', () => {
     });
   });
 
+  describe('Gesture completion protection', () => {
+    const attachGestureHandlers = () => {
+      // ResourceTracker is mocked in this file, so attach the production
+      // handlers directly with their real capture semantics.
+      window.addEventListener('pointerdown', clickManager._onWindowPointerDown, { capture: true });
+      window.addEventListener('pointercancel', clickManager._onWindowPointerCancel, { capture: true });
+      window.addEventListener('click', clickManager._onWindowCaptureClick, { capture: true });
+      document.addEventListener('click', clickManager._handleOutsideClick, { capture: true });
+      return () => {
+        window.removeEventListener('pointerdown', clickManager._onWindowPointerDown, { capture: true });
+        window.removeEventListener('pointercancel', clickManager._onWindowPointerCancel, { capture: true });
+        window.removeEventListener('click', clickManager._onWindowCaptureClick, { capture: true });
+        document.removeEventListener('click', clickManager._handleOutsideClick, { capture: true });
+      };
+    };
+
+    const attachDismissalConsumer = () => {
+      const facade = {};
+      const dismissalManager = new DismissalManager(facade, {
+        state: { isIconMode: false, isVisible: true, isPinned: false },
+        crossFrameManager: mockCrossFrameManager,
+        translationHandler: null,
+        tts: null
+      });
+      const dismissSpy = vi.spyOn(dismissalManager, 'dismiss').mockResolvedValue(undefined);
+      dismissalManager._addDismissListener();
+      return {
+        dismissSpy,
+        remove: () => {
+          document.removeEventListener('click', facade._dismissHandler, { capture: false });
+          document.removeEventListener('keydown', facade._escapeKeyHandler, { capture: false });
+        }
+      };
+    };
+
+    const makePointerEvent = (type, { composedPath = [], pointerId = 1 } = {}) => {
+      const event = new Event(type, { bubbles: true, composed: true });
+      Object.defineProperty(event, 'pointerId', { value: pointerId });
+      Object.defineProperty(event, 'composedPath', { value: () => composedPath });
+      return event;
+    };
+
+    const setupDom = () => {
+      const host = document.createElement('div');
+      const windowEl = document.createElement('div');
+      windowEl.className = 'ti-window';
+      const inner = document.createElement('button');
+      windowEl.appendChild(inner);
+      host.appendChild(windowEl);
+      document.body.appendChild(host);
+      const outsideTarget = document.createElement('div');
+      document.body.appendChild(outsideTarget);
+      return { host, windowEl, inner, outsideTarget };
+    };
+
+    it('does not dismiss when a window-press gesture completes outside in the same document', () => {
+      const { windowEl, inner, outsideTarget } = setupDom();
+      const detach = attachGestureHandlers();
+      const dismissal = attachDismissalConsumer();
+
+      try {
+        // Press inside the window: composedPath contains the window root.
+        const pressPath = [inner, windowEl, document.body, document.documentElement, document, window];
+        inner.dispatchEvent(makePointerEvent('pointerdown', { composedPath: pressPath, pointerId: 7 }));
+        outsideTarget.dispatchEvent(new Event('pointerup', { bubbles: true }));
+
+        // The completing click outside the window.
+        const completionClick = new MouseEvent('click', { bubbles: true });
+        outsideTarget.dispatchEvent(completionClick);
+
+        expect(clickManager._armedGesture?.completed).toBe(true);
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+        expect(completionClick.__translateItGestureCompletion).toBe(windowEl);
+        expect(mockHandlers.onOutsideClick).not.toHaveBeenCalled();
+        expect(dismissal.dismissSpy).not.toHaveBeenCalled();
+      } finally {
+        detach();
+        dismissal.remove();
+      }
+    });
+
+    it('dismisses the independent click that follows a completed gesture', () => {
+      const { windowEl, inner, outsideTarget } = setupDom();
+      const detach = attachGestureHandlers();
+      const dismissal = attachDismissalConsumer();
+
+      try {
+        inner.dispatchEvent(makePointerEvent('pointerdown', { composedPath: [inner, windowEl], pointerId: 1 }));
+        outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(mockHandlers.onOutsideClick).not.toHaveBeenCalled();
+        expect(dismissal.dismissSpy).not.toHaveBeenCalled();
+
+        // Independent click (fresh pointer sequence): window capture clears
+        // the arm before document capture evaluates dismissal.
+        const independentClick = new MouseEvent('click', { bubbles: true });
+        outsideTarget.dispatchEvent(independentClick);
+
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+        expect(independentClick.__translateItGestureCompletion).toBeUndefined();
+        expect(mockHandlers.onOutsideClick).toHaveBeenCalledTimes(1);
+        expect(dismissal.dismissSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        detach();
+        dismissal.remove();
+      }
+    });
+
+    it('dismisses a keyboard-style click with no armed pointerdown', () => {
+      const { outsideTarget } = setupDom();
+      const detach = attachGestureHandlers();
+      const dismissal = attachDismissalConsumer();
+
+      try {
+        outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+        expect(mockHandlers.onOutsideClick).toHaveBeenCalledTimes(1);
+        expect(dismissal.dismissSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        detach();
+        dismissal.remove();
+      }
+    });
+
+    it('arms through an open shadow root path and ignores presses outside the window root', () => {
+      const { windowEl } = setupDom();
+      const detach = attachGestureHandlers();
+
+      try {
+        // Shadow retargeting: press inside an open shadow root whose
+        // composedPath contains the window root element.
+        const shadowHost = document.createElement('div');
+        document.body.appendChild(shadowHost);
+        const shadowChild = document.createElement('span');
+        const shadowPath = [shadowChild, windowEl, shadowHost, document.body, document.documentElement, document, window];
+        clickManager._onWindowPointerDown(makePointerEvent('pointerdown', { composedPath: shadowPath, pointerId: 1 }));
+        expect(clickManager.isGestureProtectionActive()).toBe(true);
+        expect(clickManager._armedGesture.windowEl).toBe(windowEl);
+
+        // A press whose composed path does not contain the window root
+        // (icon toolbar of the broad UI host) does not arm.
+        const iconToolbar = document.createElement('div');
+        iconToolbar.className = 'pdf-windows-host__toolbar';
+        clickManager._onWindowPointerDown(makePointerEvent('pointerdown', { composedPath: [iconToolbar, shadowHost], pointerId: 2 }));
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+      } finally {
+        detach();
+      }
+    });
+
+    it('replaces the armed state when a second pointer presses down', () => {
+      const { windowEl, inner, outsideTarget } = setupDom();
+      const detach = attachGestureHandlers();
+
+      try {
+        inner.dispatchEvent(makePointerEvent('pointerdown', { composedPath: [inner, windowEl], pointerId: 1 }));
+        // A second pointer also pressing inside the window replaces the arm.
+        inner.dispatchEvent(makePointerEvent('pointerdown', { composedPath: [inner, windowEl], pointerId: 2 }));
+
+        // The replaced arm tracks the second pointer: cancelling the first
+        // does not clear it, cancelling the second does.
+        outsideTarget.dispatchEvent(makePointerEvent('pointercancel', { composedPath: [outsideTarget], pointerId: 1 }));
+        expect(clickManager.isGestureProtectionActive()).toBe(true);
+
+        outsideTarget.dispatchEvent(makePointerEvent('pointercancel', { composedPath: [outsideTarget], pointerId: 2 }));
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+      } finally {
+        detach();
+      }
+    });
+
+    it('clears the arm on pointercancel and on clearGestureFor for the owning window', () => {
+      const { windowEl, inner, outsideTarget } = setupDom();
+      const detach = attachGestureHandlers();
+
+      try {
+        inner.dispatchEvent(makePointerEvent('pointerdown', { composedPath: [inner, windowEl], pointerId: 3 }));
+        expect(clickManager.isGestureProtectionActive()).toBe(true);
+
+        outsideTarget.dispatchEvent(makePointerEvent('pointercancel', { composedPath: [outsideTarget], pointerId: 3 }));
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+
+        // clearGestureFor only clears the arm that owns that window element.
+        inner.dispatchEvent(makePointerEvent('pointerdown', { composedPath: [inner, windowEl], pointerId: 4 }));
+        clickManager.clearGestureFor(document.createElement('div'));
+        expect(clickManager.isGestureProtectionActive()).toBe(true);
+        clickManager.clearGestureFor(windowEl);
+        expect(clickManager.isGestureProtectionActive()).toBe(false);
+      } finally {
+        detach();
+      }
+    });
+  });
+
+  describe('Cross-frame outside-click resolution', () => {
+    const armPending = (pointerId = 1) => {
+      const windowEl = document.createElement('div');
+      windowEl.className = 'ti-window';
+      const press = new Event('pointerdown', { bubbles: true });
+      Object.defineProperty(press, 'pointerId', { value: pointerId });
+      Object.defineProperty(press, 'composedPath', { value: () => [windowEl] });
+      clickManager._onWindowPointerDown(press);
+      return windowEl;
+    };
+
+    const completeArm = () => {
+      clickManager._onWindowCaptureClick(new MouseEvent('click', { bubbles: true }));
+      expect(clickManager._armedGesture?.completed).toBe(true);
+    };
+
+    it('returns { suppress: false } without state change when no arm exists', () => {
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 1, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+      expect(clickManager._armedGesture).toBeNull();
+    });
+
+    it('suppresses once and clears a pending arm for a matching cross-document relay', () => {
+      armPending(1);
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 1, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: true });
+      expect(clickManager._armedGesture).toBeNull();
+
+      // The arm is gone: a follow-up relay cannot suppress again.
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 1, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+    });
+
+    it('keeps a pending arm and does not suppress independent remote clicks', () => {
+      armPending(1);
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 2, fromCrossDocumentGesture: false }))
+        .toEqual({ suppress: false });
+      expect(clickManager.isGestureProtectionActive()).toBe(true);
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 3, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+      expect(clickManager.isGestureProtectionActive()).toBe(true);
+    });
+
+    it('keeps a pending arm for a flagged relay without a pointerId', () => {
+      armPending(1);
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: null, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+      expect(clickManager.isGestureProtectionActive()).toBe(true);
+    });
+
+    it('keeps a pending arm for a legacy payload without identity fields', () => {
+      armPending(1);
+
+      expect(clickManager.resolveCrossFrameOutsideClick({})).toEqual({ suppress: false });
+      expect(clickManager.isGestureProtectionActive()).toBe(true);
+    });
+
+    it('clears a stale completed arm so an independent remote click dismisses immediately', () => {
+      armPending(1);
+      completeArm();
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 2, fromCrossDocumentGesture: false }))
+        .toEqual({ suppress: false });
+      expect(clickManager._armedGesture).toBeNull();
+      // No arm: a second independent relay cannot suppress either.
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 3, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+    });
+
+    it('clears a stale completed arm for a flagged relay with a mismatching pid', () => {
+      armPending(1);
+      completeArm();
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 2, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+      expect(clickManager._armedGesture).toBeNull();
+    });
+
+    it('suppresses exactly once a duplicate relay of the completed gesture', () => {
+      armPending(1);
+      completeArm();
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 1, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: true });
+      expect(clickManager._armedGesture).toBeNull();
+
+      expect(clickManager.resolveCrossFrameOutsideClick({ pointerId: 1, fromCrossDocumentGesture: true }))
+        .toEqual({ suppress: false });
+    });
+  });
+
   describe('Icon Click Handling', () => {
     it('should setup icon click handler', () => {
       const icon = document.createElement('div');

@@ -889,6 +889,23 @@ describe('TranslationWindow.vue', () => {
       window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
     });
 
+    it('clears gesture protection for this window root on unmount', () => {
+      const clearGestureFor = vi.fn();
+      window.windowsManagerInstance = {
+        state: { setPinned: vi.fn(), setDockMode: vi.fn() },
+        clickManager: { clearGestureFor },
+      };
+
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      const windowRoot = wrapper.find('.ti-window').element;
+      expect(windowRoot).toBeTruthy();
+
+      wrapper.unmount();
+
+      expect(clearGestureFor).toHaveBeenCalledTimes(1);
+      expect(clearGestureFor).toHaveBeenCalledWith(windowRoot);
+    });
+
     it('stops resizing when a touch is cancelled', async () => {
       const wrapper = mountDocked();
       const handle = wrapper.find('.ti-dock-resize-handle');

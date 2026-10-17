@@ -289,6 +289,13 @@ export class DismissalManager {
       if (this.facade._isInShiftClickOperation || window.translateItShiftClickOperation) return;
       if (event.button !== 0) return;
 
+      // Skip dismissal for a click marked as the completion of a pointer
+      // gesture that started inside the translation window (press inside,
+      // release outside). The mark is set only by ClickManager's window
+      // capture handler on that one completion click, so its presence is a
+      // sufficient identity check here (no per-window context is available).
+      if (event.__translateItGestureCompletion) return;
+
       const target = event.target;
       const vueUIHostMain = document.getElementById(UI_HOST_IDS.MAIN);
       const vueUIHostIframe = document.getElementById(UI_HOST_IDS.IFRAME);

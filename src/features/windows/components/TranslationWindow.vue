@@ -164,7 +164,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch, nextTick } from 'vue';
 import { injectStylesToShadowRoot } from '@/utils/ui/styleInjector.js';
 import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
@@ -318,6 +318,16 @@ onUnmounted(() => {
   window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
 
   systemThemeMediaQuery = null;
+});
+
+// Gesture protection teardown runs before unmount, while the template ref
+// still holds this window's root element (Vue nulls template refs during
+// unmount, before onUnmounted hooks run).
+onBeforeUnmount(() => {
+  const windowsManager = window.windowsManagerInstance;
+  if (windowsManager?.clickManager && windowElement.value) {
+    windowsManager.clickManager.clearGestureFor(windowElement.value);
+  }
 });
 
 const togglePin = () => {
