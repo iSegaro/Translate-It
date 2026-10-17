@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { nextTick, reactive, ref } from 'vue';
 import TranslationWindow from './TranslationWindow.vue';
 import { pageEventBus } from '@/core/PageEventBus.js';
+import { DismissalManager } from '@/features/windows/managers/dismissal/DismissalManager.js';
 
 let currentMediaQueryList = null;
 
@@ -114,7 +115,12 @@ vi.mock('@/composables/core/useResourceTracker.js', () => ({
       element.addEventListener(event, handler, options);
       trackedDisposers.push(() => element.removeEventListener(event, handler));
     }),
-    trackTimeout: vi.fn(),
+    trackTimeout: vi.fn((callback, delay) => {
+      // Functional stub: runs with fake or real timers and stays cleanable.
+      const timeoutId = setTimeout(callback, delay);
+      trackedDisposers.push(() => clearTimeout(timeoutId));
+      return timeoutId;
+    }),
   }),
 }));
 
@@ -433,6 +439,217 @@ describe('TranslationWindow.vue', () => {
       Object.defineProperty(event, 'touches', { value: [{ clientX, clientY: 100 }] });
       document.dispatchEvent(event);
     };
+
+    const dispatchMouseOnDocument = (type, clientX) => {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'clientX', { value: clientX });
+      document.dispatchEvent(event);
+    };
+
+    it('suppresses only the completion click of a mouse resize ending outside the window', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      const markerAtDocumentCapture = vi.fn(() => window.__TRANSLATION_WINDOW_JUST_RESIZED);
+      const markerAtDocumentBubble = vi.fn(() => window.__TRANSLATION_WINDOW_JUST_RESIZED);
+      document.addEventListener('click', markerAtDocumentCapture, { capture: true });
+
+      // mousedown on the resize handle starts a protected resize session
+      await handle.trigger('mousedown', { clientX: 100, clientY: 100 });
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+
+      // Mouse released outside the window: the browser then fires a click
+      // targeting HTML, which must not dismiss the docked window.
+      dispatchMouseOnDocument('mousemove', 150);
+      await nextTick();
+      dispatchMouseOnDocument('mouseup', 150);
+      await nextTick();
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(false);
+
+      // Protection is active through the completion click (no new pointerdown
+      // has happened between mouseup and the click).
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+      // This consumer registers after mouseup but before the completion click;
+      // window capture must add cleanup behind it for this dispatch.
+      document.addEventListener('click', markerAtDocumentBubble);
+      document.dispatchEvent(new MouseEvent('click'));
+      expect(markerAtDocumentCapture).toHaveReturnedWith(true);
+      expect(markerAtDocumentBubble).toHaveReturnedWith(true);
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+      // The next pointerdown starts an independent interaction: dismissal is
+      // immediate (marker already cleared, listener disarmed).
+      document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+      document.removeEventListener('click', markerAtDocumentCapture, { capture: true });
+      document.removeEventListener('click', markerAtDocumentBubble);
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+    });
+
+    it('does not let an earlier click event clear a newer resize session marker', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+
+      // Resize A completes outside and its click is bound at window capture.
+      handle.element.dispatchEvent(new MouseEvent('mousedown', {
+        bubbles: true, clientX: 100, clientY: 100,
+      }));
+      dispatchMouseOnDocument('mouseup', 150);
+      const startResizeBOnCapture = () => {
+        document.removeEventListener('click', startResizeBOnCapture, { capture: true });
+        handle.element.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true, clientX: 100, clientY: 100,
+        }));
+        dispatchMouseOnDocument('mouseup', 160);
+      };
+      document.addEventListener('click', startResizeBOnCapture, { capture: true, once: true });
+      document.dispatchEvent(new MouseEvent('click'));
+
+      // The completion event for A cannot clear B's newly generated token.
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+
+      // B's own click reaches document bubble and clears synchronously.
+      document.dispatchEvent(new MouseEvent('click'));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+    });
+
+    it('keeps protection when a target stops propagation, then clears on pointerdown', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      await handle.trigger('mousedown', { clientX: 100, clientY: 100 });
+      dispatchMouseOnDocument('mouseup', 150);
+
+      const target = document.createElement('button');
+      document.body.append(target);
+      target.addEventListener('click', (event) => event.stopPropagation(), { once: true });
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+
+      // The next independent interaction disarms the missed bubble cleanup.
+      document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+      const markerOnNextClick = vi.fn(() => window.__TRANSLATION_WINDOW_JUST_RESIZED);
+      document.addEventListener('click', markerOnNextClick);
+      document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(markerOnNextClick).toHaveReturnedWith(false);
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+      document.removeEventListener('click', markerOnNextClick);
+      target.remove();
+
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+    });
+
+    it('keeps rapid resize sessions independent: each protects only its own completion click', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+
+      await handle.trigger('mousedown', { clientX: 100, clientY: 100 });
+      dispatchMouseOnDocument('mouseup', 150);
+      await nextTick();
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+
+      // Starting the next session fires a pointerdown first (real browser
+      // ordering): the previous marker is cleared before the new session begins.
+      document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+      await handle.trigger('mousedown', { clientX: 100, clientY: 100 });
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+      dispatchMouseOnDocument('mouseup', 160);
+      await nextTick();
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(false);
+
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+    });
+
+    it('applies the same event-scoped protection when a mouse resize ends inside the window', async () => {
+      // attachTo: document so a mouseup on the window element really
+      // bubbles to the document-level stop listener (browser ordering).
+      globalThis.__mockSettingsStore.settings.WINDOW_DOCK_MODE = 'left';
+      globalThis.__mockSettingsStore.settings.WINDOW_DOCKED_WIDTH = 350;
+      const wrapper = mount(TranslationWindow, { props: baseProps, attachTo: document.body });
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      await handle.trigger('mousedown', { clientX: 100, clientY: 100 });
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+
+      // mouseup dispatched from inside the window element (bubbles to document)
+      wrapper.find('.translation-window').element.dispatchEvent(
+        new MouseEvent('mouseup', { bubbles: true })
+      );
+      await nextTick();
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(false);
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+
+      // No stale protection: a new interaction clears it without any click.
+      document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+    });
+
+    it('clears resize protection on touch cancellation so an outside click dismisses', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      const facade = { _isInShiftClickOperation: false };
+      const dismissalManager = new DismissalManager(facade, {
+        state: { isIconMode: false, isVisible: true, isPinned: false },
+      });
+      const dismissSpy = vi.spyOn(dismissalManager, 'dismiss').mockResolvedValue(undefined);
+      dismissalManager._addDismissListener();
+
+      await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+
+      dispatchTouchOnDocument('touchcancel', 150);
+      await nextTick();
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(false);
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+      expect(globalThis.__mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledWith(
+        'WINDOW_DOCKED_WIDTH',
+        expect.any(Number)
+      );
+
+      // No pointerdown occurs between cancellation and this unrelated click.
+      document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(dismissSpy).toHaveBeenCalledOnce();
+
+      // Unmount clears the protection flags and capture listeners.
+      document.removeEventListener('click', facade._dismissHandler, { capture: false });
+      document.removeEventListener('keydown', facade._escapeKeyHandler, { capture: false });
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+    });
+
+    it('clears resize dismissal protection when unmounted during an active resize', async () => {
+      const wrapper = mountDocked();
+      const handle = wrapper.find('.ti-dock-resize-handle');
+      await handle.trigger('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+
+      wrapper.unmount();
+      trackedDisposers.forEach((cleanupFn) => cleanupFn());
+
+      // No persistent global state may survive the component.
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(false);
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+      // No stale capture or bubble listeners survive unmount.
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+      document.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+      document.dispatchEvent(new MouseEvent('click'));
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+    });
 
     it('stops resizing when a touch is cancelled', async () => {
       const wrapper = mountDocked();

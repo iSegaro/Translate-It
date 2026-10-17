@@ -427,6 +427,7 @@ export class EventCoordinator {
       window.__TRANSLATION_WINDOW_JUST_DRAGGED === true
     )
       return;
+    if (window.__TRANSLATION_WINDOW_IS_RESIZING === true) return;
     if (this.state.hasActiveElements) {
       this.logger.debug('Window dismissal requested', {
         path: 'cross-frame-click',
@@ -443,7 +444,9 @@ export class EventCoordinator {
     if (this.state.shouldPreventDismissal) return;
     if (
       window.__TRANSLATION_WINDOW_IS_DRAGGING === true ||
-      window.__TRANSLATION_WINDOW_JUST_DRAGGED === true
+      window.__TRANSLATION_WINDOW_JUST_DRAGGED === true ||
+      window.__TRANSLATION_WINDOW_IS_RESIZING === true ||
+      window.__TRANSLATION_WINDOW_JUST_RESIZED === true
     )
       return;
 

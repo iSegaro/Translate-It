@@ -285,6 +285,7 @@ export class DismissalManager {
       if (!this.state.isIconMode && !this.state.isVisible) return;
       if (this.state.isPinned) return;
       if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) return;
+      if (window.__TRANSLATION_WINDOW_IS_RESIZING === true || window.__TRANSLATION_WINDOW_JUST_RESIZED === true) return;
       if (this.facade._isInShiftClickOperation || window.translateItShiftClickOperation) return;
       if (event.button !== 0) return;
 

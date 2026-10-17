@@ -247,6 +247,89 @@ describe("EventCoordinator relay sink ownership", () => {
   });
 });
 
+describe("EventCoordinator cross-frame outside-click resize handling", () => {
+  let facade;
+  let coordinator;
+  let state;
+  let handlers;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPageEventBus.reset();
+    window.__TRANSLATION_WINDOW_IS_DRAGGING = false;
+    window.__TRANSLATION_WINDOW_JUST_DRAGGED = false;
+    window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+    window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+    state = { hasActiveElements: true };
+    facade = {
+      dismiss: vi.fn().mockResolvedValue(undefined),
+      displayManager: { shouldUseMobileUI: vi.fn(() => false) },
+    };
+    coordinator = new EventCoordinator(facade, {
+      state,
+      crossFrameManager: {
+        isTopFrame: true,
+        setEventHandlers: vi.fn((registered) => { handlers = registered; }),
+      },
+      translationHandler: {},
+      errorHandler: {},
+      clickManager: { setHandlers: vi.fn() },
+      themeManager: {},
+      positionCalculator: {},
+    });
+    coordinator.setup();
+  });
+
+  afterEach(() => {
+    coordinator.cleanup();
+    mockPageEventBus.reset();
+    getTextSelectionWindowRelay().destroy();
+    window.__TRANSLATION_WINDOW_IS_DRAGGING = false;
+    window.__TRANSLATION_WINDOW_JUST_DRAGGED = false;
+    window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+    window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+    vi.restoreAllMocks();
+  });
+
+  it("dismisses an independent cross-frame click after resize completion", async () => {
+    window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+
+    await handlers.onOutsideClick();
+
+    expect(facade.dismiss).toHaveBeenCalledWith(true);
+    expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+  });
+
+  it("leaves local resize-completion protection intact when a cross-frame click arrives first", async () => {
+    window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+
+    await handlers.onOutsideClick();
+    await coordinator._handleOutsideClick();
+
+    expect(facade.dismiss).toHaveBeenCalledTimes(1);
+    expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+  });
+
+  it("ignores cross-frame clicks during an active resize", async () => {
+    window.__TRANSLATION_WINDOW_IS_RESIZING = true;
+
+    await handlers.onOutsideClick();
+
+    expect(facade.dismiss).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["dragging", "__TRANSLATION_WINDOW_IS_DRAGGING"],
+    ["just dragged", "__TRANSLATION_WINDOW_JUST_DRAGGED"],
+  ])("preserves cross-frame click protection when %s", async (_label, flag) => {
+    window[flag] = true;
+
+    await handlers.onOutsideClick();
+
+    expect(facade.dismiss).not.toHaveBeenCalled();
+  });
+});
+
 describe("EventCoordinator PageEventBus listener ownership", () => {
   let coordinators;
 

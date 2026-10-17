@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ClickManager } from './ClickManager.js';
+import { DismissalManager } from '../dismissal/DismissalManager.js';
 import { UI_HOST_IDS } from '@/shared/constants/ui.js';
 import { WindowsConfig } from "../core/WindowsConfig.js";
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
@@ -49,6 +50,12 @@ vi.mock('@/shared/config/constants.js', () => ({
   UI_HOST_IDS: {
     MAIN: 'translate-it-ui-host',
     IFRAME: 'translate-it-ui-host-iframe'
+  },
+  TTS_ENGINES: { EDGE: 'edge' },
+  MOBILE_CONSTANTS: { FAB: { SIDE: { RIGHT: 'right', LEFT: 'left' } }, UI_MODE: { AUTO: 'auto', MOBILE: 'mobile', DESKTOP: 'desktop' } },
+  TRANSLATION_HTML: {
+    ICON_ID: 'translation-icon',
+    WINDOW_CLASS: 'translation-window'
   }
 }));
 
@@ -88,6 +95,9 @@ describe('ClickManager', () => {
     
     // Reset global state
     window.__TRANSLATION_WINDOW_IS_DRAGGING = false;
+    window.__TRANSLATION_WINDOW_JUST_DRAGGED = false;
+    window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+    window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
     window.textSelectionManager = null;
   });
 
@@ -194,6 +204,41 @@ describe('ClickManager', () => {
       expect(shouldDismiss).toBe(false);
     });
 
+    it('should NOT dismiss while a docked window resize is active', () => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const event = { target };
+
+      window.__TRANSLATION_WINDOW_IS_RESIZING = true;
+      expect(clickManager._shouldDismissOnOutsideClick(event)).toBe(false);
+      // Active-resize state belongs to the component; the decision is read-only.
+      expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+    });
+
+    it('should ignore the resize completion click without consuming the marker', () => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const event = { target };
+
+      // The click that completes the resize is suppressed read-only: the
+      // marker must survive this decision so the bubble-phase consumer
+      // (DismissalManager) ignores the same click too.
+      window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+      expect(clickManager._shouldDismissOnOutsideClick(event)).toBe(false);
+      expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+    });
+
+    it('should dismiss an independent outside click once the marker is cleared', () => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const event = { target };
+
+      window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+      expect(clickManager._shouldDismissOnOutsideClick(event)).toBe(true);
+    });
+
     it('should trigger onOutsideClick handler when it should dismiss', () => {
       // Mock _shouldDismissOnOutsideClick to return true
       vi.spyOn(clickManager, '_shouldDismissOnOutsideClick').mockReturnValue(true);
@@ -202,6 +247,195 @@ describe('ClickManager', () => {
       clickManager._handleOutsideClick(event);
       
       expect(mockHandlers.onOutsideClick).toHaveBeenCalledWith(event);
+    });
+  });
+
+  describe('Resize completion click coordination', () => {
+    const setupDismissalConsumers = () => {
+      const facade = {};
+      const dismissalManager = new DismissalManager(facade, {
+        state: { isIconMode: false, isVisible: true, isPinned: false },
+        crossFrameManager: mockCrossFrameManager,
+        translationHandler: null,
+        tts: null
+      });
+      const dismissSpy = vi.spyOn(dismissalManager, 'dismiss').mockResolvedValue(undefined);
+      dismissalManager._addDismissListener();
+      return { facade, dismissSpy };
+    };
+
+    const setupClickManagerCapture = () => {
+      // ResourceTracker is mocked in this file, so attach the production
+      // handler directly with its real capture phase.
+      document.addEventListener('click', clickManager._handleOutsideClick, { capture: true });
+    };
+
+    const armResizeCompletionCleanup = () => {
+      let completionClick = null;
+      const clearMarker = () => {
+        window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+        window.removeEventListener('click', bindCompletionClick, { capture: true });
+        document.removeEventListener('click', clearAfterCompletionClick);
+        document.removeEventListener('pointerdown', clearOnNextPointerDown, { capture: true });
+      };
+      const clearAfterCompletionClick = (event) => {
+        if (event === completionClick) clearMarker();
+      };
+      const bindCompletionClick = (event) => {
+        if (completionClick === null) {
+          completionClick = event;
+          document.addEventListener('click', clearAfterCompletionClick);
+        } else if (event !== completionClick) {
+          // Match the component's persistent window listener: a later click
+          // also clears protection if the completion click never reached
+          // document bubble and no pointerdown occurred.
+          clearMarker();
+        }
+      };
+      const clearOnNextPointerDown = () => clearMarker();
+
+      // Match the component: bind the completion event at window capture, then
+      // defer marker cleanup to document bubble after all click consumers.
+      window.addEventListener('click', bindCompletionClick, { capture: true });
+      // If completion-click propagation is interrupted, the next interaction
+      // still clears protection before its click is evaluated.
+      document.addEventListener('pointerdown', clearOnNextPointerDown, { capture: true, once: true });
+      return () => {
+        window.removeEventListener('click', bindCompletionClick, { capture: true });
+        document.removeEventListener('click', clearAfterCompletionClick);
+        document.removeEventListener('pointerdown', clearOnNextPointerDown, { capture: true });
+      };
+    };
+
+    const removeDismissalConsumers = (facade) => {
+      document.removeEventListener('click', clickManager._handleOutsideClick, { capture: true });
+      document.removeEventListener('click', facade._dismissHandler);
+      document.removeEventListener('keydown', facade._escapeKeyHandler);
+    };
+
+    it('ignores the completion click in both consumers, then immediately dismisses after pointerdown and click', () => {
+      document.body.innerHTML = '';
+      window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+
+      setupClickManagerCapture();
+      const { facade, dismissSpy } = setupDismissalConsumers();
+      const outsideTarget = document.createElement('div');
+      document.body.appendChild(outsideTarget);
+      const completionClick = new MouseEvent('click', { bubbles: true });
+      const disarmResizeCompletionCleanup = armResizeCompletionCleanup();
+
+      try {
+        outsideTarget.dispatchEvent(completionClick);
+
+        expect(mockHandlers.onOutsideClick).not.toHaveBeenCalled();
+        expect(dismissSpy).not.toHaveBeenCalled();
+        // Synchronous document-bubble cleanup follows both consumers.
+        expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+
+        outsideTarget.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(mockHandlers.onOutsideClick).toHaveBeenCalledTimes(1);
+        expect(dismissSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        disarmResizeCompletionCleanup();
+        removeDismissalConsumers(facade);
+        window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+      }
+    });
+
+    it('keeps protection visible to a dismissal listener added after resize is armed', () => {
+      document.body.innerHTML = '';
+      window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+
+      setupClickManagerCapture();
+      const disarmResizeCompletionCleanup = armResizeCompletionCleanup();
+      const { facade, dismissSpy } = setupDismissalConsumers();
+      const outsideTarget = document.createElement('div');
+      document.body.appendChild(outsideTarget);
+
+      try {
+        outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(mockHandlers.onOutsideClick).not.toHaveBeenCalled();
+        expect(dismissSpy).not.toHaveBeenCalled();
+        expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+      } finally {
+        disarmResizeCompletionCleanup();
+        removeDismissalConsumers(facade);
+        window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+      }
+    });
+
+    it('clears protection on the next pointerdown if completion-click propagation is interrupted', () => {
+      document.body.innerHTML = '';
+      window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+
+      const { facade, dismissSpy } = setupDismissalConsumers();
+      const outsideTarget = document.createElement('div');
+      document.body.appendChild(outsideTarget);
+      const completionClick = new MouseEvent('click', { bubbles: true });
+      outsideTarget.addEventListener('click', (event) => {
+        if (event === completionClick) event.stopPropagation();
+      });
+      setupClickManagerCapture();
+      const disarmResizeCompletionCleanup = armResizeCompletionCleanup();
+
+      try {
+        outsideTarget.dispatchEvent(completionClick);
+
+        expect(mockHandlers.onOutsideClick).not.toHaveBeenCalled();
+        expect(dismissSpy).not.toHaveBeenCalled();
+        expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+
+        outsideTarget.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+        outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(mockHandlers.onOutsideClick).toHaveBeenCalledTimes(1);
+        expect(dismissSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        disarmResizeCompletionCleanup();
+        removeDismissalConsumers(facade);
+        window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+      }
+    });
+
+    it('clears interrupted completion protection on a later click without pointerdown', () => {
+      document.body.innerHTML = '';
+      window.__TRANSLATION_WINDOW_IS_RESIZING = false;
+      window.__TRANSLATION_WINDOW_JUST_RESIZED = true;
+
+      const { facade, dismissSpy } = setupDismissalConsumers();
+      const outsideTarget = document.createElement('div');
+      document.body.appendChild(outsideTarget);
+      const completionClick = new MouseEvent('click', { bubbles: true });
+      outsideTarget.addEventListener('click', (event) => {
+        if (event === completionClick) event.stopPropagation();
+      });
+      setupClickManagerCapture();
+      const disarmResizeCompletionCleanup = armResizeCompletionCleanup();
+
+      try {
+        outsideTarget.dispatchEvent(completionClick);
+
+        expect(mockHandlers.onOutsideClick).not.toHaveBeenCalled();
+        expect(dismissSpy).not.toHaveBeenCalled();
+        expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
+
+        outsideTarget.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(false);
+        expect(mockHandlers.onOutsideClick).toHaveBeenCalledTimes(1);
+        expect(dismissSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        disarmResizeCompletionCleanup();
+        removeDismissalConsumers(facade);
+        window.__TRANSLATION_WINDOW_JUST_RESIZED = false;
+      }
     });
   });
 

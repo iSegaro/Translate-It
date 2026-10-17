@@ -141,10 +141,23 @@ export class ClickManager extends ResourceTracker {
     // Skip if currently dragging or just finished dragging a translation window
     // This prevents accidental dismissal after fast drag operations where the click
     // event might register outside the window due to cursor overshoot.
-    if (window.__TRANSLATION_WINDOW_IS_DRAGGING === true || window.__TRANSLATION_WINDOW_JUST_DRAGGED === true) {
-      this.logger.debug('Skipping outside click check due to active or recent window dragging', {
+    // Resize protection is event-scoped and read-only here: the just-resized
+    // marker stays set through the whole completion-click dispatch so the
+    // bubble-phase consumer (DismissalManager) ignores the same click too.
+    // It is cleared by the component after dispatch or on the next pointerdown.
+    const isDraggingWindow =
+      window.__TRANSLATION_WINDOW_IS_DRAGGING === true ||
+      window.__TRANSLATION_WINDOW_JUST_DRAGGED === true;
+    const isResizingWindow =
+      window.__TRANSLATION_WINDOW_IS_RESIZING === true ||
+      window.__TRANSLATION_WINDOW_JUST_RESIZED === true;
+
+    if (isDraggingWindow || isResizingWindow) {
+      this.logger.debug('Skipping outside click check due to active or recent window interaction', {
         isDragging: window.__TRANSLATION_WINDOW_IS_DRAGGING,
-        justDragged: window.__TRANSLATION_WINDOW_JUST_DRAGGED
+        justDragged: window.__TRANSLATION_WINDOW_JUST_DRAGGED,
+        isResizing: window.__TRANSLATION_WINDOW_IS_RESIZING,
+        justResized: window.__TRANSLATION_WINDOW_JUST_RESIZED
       });
       return false;
     }
