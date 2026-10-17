@@ -48,6 +48,16 @@ const response = (data = payload, ok = true, status = 200) => ({
   json: vi.fn().mockResolvedValue(data),
 })
 
+const deferred = () => {
+  let resolve
+  let reject
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, resolve, reject }
+}
+
 afterEach(() => {
   clearDeepLLanguageCatalogCache()
   proxyDiscoveryMocks.fetch.mockReset()
@@ -384,6 +394,125 @@ describe('DeepL language discovery', () => {
       const snapshot = await longPending
       expect(snapshot.catalog).toHaveLength(4)
       expect(getCachedDeepLLanguageCatalog('key').catalog).toHaveLength(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('times out an unresolved persisted proxy read at the original deadline', async () => {
+    vi.useFakeTimers()
+    try {
+      const proxyRead = deferred()
+      proxyDiscoveryMocks.persisted.mockReturnValue(proxyRead.promise)
+      const pending = fetchDeepLLanguageCatalog({ apiKey: 'proxy-timeout-key', timeoutMs: 1000 })
+      const expectedFailure = expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+
+      await vi.advanceTimersByTimeAsync(1000)
+      await expectedFailure
+      expect(proxyDiscoveryMocks.fetch).not.toHaveBeenCalled()
+      expect(getCachedDeepLLanguageCatalog('proxy-timeout-key')).toBeNull()
+
+      // A late storage result is consumed but cannot start a request.
+      proxyRead.resolve({ enabled: true, type: 'http', host: 'late.proxy', port: 80, auth: {} })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(proxyDiscoveryMocks.fetch).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('aborts promptly during proxy resolution and ignores that caller late result while a same-route caller succeeds', async () => {
+    const proxyReads = []
+    proxyDiscoveryMocks.persisted.mockImplementation(() => {
+      const read = deferred()
+      proxyReads.push(read)
+      return read.promise
+    })
+    proxyDiscoveryMocks.fetch.mockResolvedValue(response(payload.slice(0, 1)))
+    const firstController = new AbortController()
+
+    const first = fetchDeepLLanguageCatalog({ apiKey: 'proxy-abort-key', signal: firstController.signal })
+    const second = fetchDeepLLanguageCatalog({ apiKey: 'proxy-abort-key' })
+    const firstExpectation = expect(first).rejects.toMatchObject({ name: 'AbortError' })
+    firstController.abort()
+    await firstExpectation
+
+    const sameProxy = {
+      enabled: true,
+      type: 'http',
+      host: 'same.proxy',
+      port: 8000,
+      auth: { username: '', password: '' },
+    }
+    proxyReads[0].resolve(sameProxy)
+    proxyReads[1].resolve(sameProxy)
+    const snapshot = await second
+
+    expect(snapshot.catalog).toHaveLength(1)
+    expect(proxyDiscoveryMocks.fetch).toHaveBeenCalledTimes(1)
+    expect(proxyDiscoveryMocks.fetch.mock.calls[0][2]).toEqual(sameProxy)
+    expect(getCachedDeepLLanguageCatalog('proxy-abort-key').catalog).toHaveLength(1)
+  })
+
+  it('uses only the remaining caller deadline after proxy resolution', async () => {
+    vi.useFakeTimers()
+    try {
+      const proxyRead = deferred()
+      const network = deferred()
+      proxyDiscoveryMocks.persisted.mockReturnValue(proxyRead.promise)
+      proxyDiscoveryMocks.fetch.mockReturnValue(network.promise)
+      const pending = fetchDeepLLanguageCatalog({ apiKey: 'remaining-budget-key', timeoutMs: 1000 })
+      const expectedFailure = expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+
+      await vi.advanceTimersByTimeAsync(400)
+      proxyRead.resolve({ enabled: true, type: 'http', host: 'partial.proxy', port: 80, auth: {} })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(proxyDiscoveryMocks.fetch).toHaveBeenCalledTimes(1)
+
+      await vi.advanceTimersByTimeAsync(599)
+      expect(getCachedDeepLLanguageCatalog('remaining-budget-key')).toBeNull()
+      await vi.advanceTimersByTimeAsync(1)
+      await expectedFailure
+
+      network.resolve(response())
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(getCachedDeepLLanguageCatalog('remaining-budget-key')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not reset the original timeout when failover advances after a 401', async () => {
+    vi.useFakeTimers()
+    try {
+      const firstNetwork = deferred()
+      const secondNetwork = deferred()
+      const fetchFn = vi.fn()
+        .mockReturnValueOnce(firstNetwork.promise)
+        .mockReturnValueOnce(secondNetwork.promise)
+      const pending = fetchDeepLLanguageCatalogWithKeyFailover({
+        apiKey: 'first-timeout-key\nsecond-timeout-key',
+        fetchFn,
+        timeoutMs: 1000,
+      })
+      const expectedFailure = expect(pending).rejects.toMatchObject({ name: 'TimeoutError' })
+
+      await vi.advanceTimersByTimeAsync(700)
+      firstNetwork.resolve(response(null, false, 401))
+      await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2))
+      await vi.advanceTimersByTimeAsync(299)
+      expect(getCachedDeepLLanguageCatalog('second-timeout-key')).toBeNull()
+      await vi.advanceTimersByTimeAsync(1)
+      await expectedFailure
+
+      secondNetwork.resolve(response())
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(getCachedDeepLLanguageCatalog('first-timeout-key')).toBeNull()
+      expect(getCachedDeepLLanguageCatalog('second-timeout-key')).toBeNull()
     } finally {
       vi.useRealTimers()
     }

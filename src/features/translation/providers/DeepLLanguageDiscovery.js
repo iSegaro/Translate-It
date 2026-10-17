@@ -306,11 +306,47 @@ function raceWithSharedAbort(promise, sharedSignal) {
   ])
 }
 
+function createTimeoutError() {
+  return new DOMException('Timed out', 'TimeoutError')
+}
+
+function getRemainingTimeoutMs(startedAt, timeoutMs) {
+  return Math.max(0, timeoutMs - (Date.now() - startedAt))
+}
+
+/** Race setup work (notably persisted proxy settings) against this caller's deadline. */
+function raceWithCallerDeadline(promise, signal, timeoutMs) {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+  if (timeoutMs <= 0) return Promise.reject(createTimeoutError())
+
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const cleanup = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+    }
+    const settle = (callback, value) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      callback(value)
+    }
+    const onAbort = () => settle(reject, signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    const timer = setTimeout(() => settle(reject, createTimeoutError()), timeoutMs)
+    signal?.addEventListener('abort', onAbort, { once: true })
+    Promise.resolve(promise).then(
+      value => settle(resolve, value),
+      error => settle(reject, error),
+    )
+  })
+}
+
 async function runSharedDeepLDiscovery(entry) {
   const { sharedController, key, tier, fetchFn } = entry
   const sharedSignal = sharedController.signal
   try {
     throwIfAborted(sharedSignal)
+    if (Date.now() >= entry.deadlineAt) throw createTimeoutError()
     const url = DEEPL_LANGUAGE_URLS[tier]
     const options = {
       method: 'GET',
@@ -436,20 +472,23 @@ export async function fetchDeepLLanguageCatalog({
   const cached = getCachedDeepLLanguageCatalog(key, tier, now())
   if (cached) return cached
 
+  const startedAt = Date.now()
   // Resolve/copy routing before joining an in-flight request. Requests with
   // the same credential but different draft/saved proxies must not coalesce.
   const proxyConfig = proxySettings === undefined
     ? cloneProxyConfig(fetchFn
       ? { enabled: false, type: 'http', host: '', port: 8080, auth: { username: '', password: '' } }
-      : await resolveProxyConfig())
+      : await raceWithCallerDeadline(resolveProxyConfig(), signal, timeoutMs))
     : cloneProxyConfig(resolveProxyConfigFromSettings(proxySettings))
   if (signal) throwIfAborted(signal)
+  const remainingTimeoutMs = getRemainingTimeoutMs(startedAt, timeoutMs)
+  if (remainingTimeoutMs <= 0) throw createTimeoutError()
   const inFlightKey = `${identity}:${getProxyRoutingFingerprint(proxyConfig)}`
 
   // Equivalent credential/tier callers share one network request so a
   // concurrent refresh cannot supersede a runtime capability lookup.
   const existing = inFlightDiscoveries.get(inFlightKey)
-  if (existing) return attachToSharedDiscovery(existing, { signal, timeoutMs })
+  if (existing) return attachToSharedDiscovery(existing, { signal, timeoutMs: remainingTimeoutMs })
 
   const entry = {
     identity,
@@ -459,6 +498,7 @@ export async function fetchDeepLLanguageCatalog({
     proxyConfig,
     fetchFn,
     now,
+    deadlineAt: Date.now() + remainingTimeoutMs,
     sharedController: new AbortController(),
     sharedPromise: null,
     subscribers: new Set(),
@@ -468,7 +508,7 @@ export async function fetchDeepLLanguageCatalog({
   // per caller; keep it from surfacing as unhandled.
   entry.sharedPromise.catch(() => {})
   inFlightDiscoveries.set(inFlightKey, entry)
-  return attachToSharedDiscovery(entry, { signal, timeoutMs })
+  return attachToSharedDiscovery(entry, { signal, timeoutMs: remainingTimeoutMs })
 }
 
 /**
@@ -492,6 +532,7 @@ export async function fetchDeepLLanguageCatalogWithKeyFailover({
   signal,
   proxySettings,
 } = {}) {
+  const startedAt = Date.now()
   const configuredKeys = typeof apiKey === 'string' ? apiKey : ''
   const tier = normalizedTier(apiTier)
   const keys = getDeepLEligibleKeys(configuredKeys, tier)
@@ -508,8 +549,10 @@ export async function fetchDeepLLanguageCatalogWithKeyFailover({
   let lastAuthError = null
   for (const key of keys) {
     if (signal) throwIfAborted(signal)
+    const remainingTimeoutMs = getRemainingTimeoutMs(startedAt, timeoutMs)
+    if (remainingTimeoutMs <= 0) throw createTimeoutError()
     try {
-      return await fetchDeepLLanguageCatalog({ apiKey: key, apiTier: tier, fetchFn, now, timeoutMs, signal, proxySettings })
+      return await fetchDeepLLanguageCatalog({ apiKey: key, apiTier: tier, fetchFn, now, timeoutMs: remainingTimeoutMs, signal, proxySettings })
     } catch (error) {
       if (Number(error?.statusCode) === 401) {
         lastAuthError = error
