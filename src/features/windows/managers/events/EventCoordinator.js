@@ -61,6 +61,8 @@ export class EventCoordinator {
       this.facade._retryRequestHandler = this._handleRetryRequest.bind(this);
       this.facade._changeProviderRequestHandler =
         this._handleChangeProviderRequest.bind(this);
+      this.facade._historyNavigateHandler = (detail) => this._handleHistoryNavigate(detail);
+      this.facade._confirmSourceHandler = (detail) => this._handleConfirmSource(detail);
 
       pageEventBus.on(
         WINDOWS_MANAGER_EVENTS.ICON_CLICKED,
@@ -78,8 +80,11 @@ export class EventCoordinator {
         "translation-window-change-provider",
         this.facade._changeProviderRequestHandler,
       );
+      pageEventBus.on("translation-window-history-navigate", this.facade._historyNavigateHandler);
+      pageEventBus.on("translation-window-confirm-source", this.facade._confirmSourceHandler);
 
-      this.facade._dismissRequestHandler = () => {
+      this.facade._dismissRequestHandler = (detail) => {
+        if (detail?.id && this.state.activeWindowId && detail.id !== this.state.activeWindowId) return;
         if (this.facade._isIconToWindowTransition) {
           return;
         }
@@ -161,6 +166,14 @@ export class EventCoordinator {
         );
         this.facade._changeProviderRequestHandler = null;
       }
+      if (this.facade._historyNavigateHandler) {
+        pageEventBus.off("translation-window-history-navigate", this.facade._historyNavigateHandler);
+        this.facade._historyNavigateHandler = null;
+      }
+      if (this.facade._confirmSourceHandler) {
+        pageEventBus.off("translation-window-confirm-source", this.facade._confirmSourceHandler);
+        this.facade._confirmSourceHandler = null;
+      }
 
       if (this.facade._dismissRequestHandler) {
         pageEventBus.off(
@@ -241,7 +254,8 @@ export class EventCoordinator {
    */
   async _handleRetryRequest(detail) {
     const windowId = detail.id || this.state.activeWindowId;
-    const textToTranslate = detail.text || this.state.originalText;
+    if (this.state.activeWindowId && windowId !== this.state.activeWindowId) return;
+    const textToTranslate = this.state.originalText;
 
     if (!windowId || !textToTranslate) return;
 
@@ -256,7 +270,7 @@ export class EventCoordinator {
         textToTranslate,
         windowId,
       );
-      if (!translationResult) return;
+      if (!translationResult || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(translationResult._requestId))) return;
 
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
@@ -265,7 +279,10 @@ export class EventCoordinator {
         initialTranslatedText: translationResult.translatedText,
         sourceLanguage: translationResult.sourceLanguage || "auto",
         detectedSourceLanguage: translationResult.sourceLanguage,
+        targetLanguage: translationResult.targetLanguage,
+        mode: translationResult.mode,
         provider: translationResult.provider,
+        ...(this.facade._historyUpdate?.(this.state.translationHistory?.[this.state.historyIndex]) || {}),
       });
     } catch (error) {
       const presentation = await getSelectionWindowErrorPresentation(
@@ -273,7 +290,7 @@ export class EventCoordinator {
         "windows-translation",
         this.errorHandler,
       );
-      if (!presentation) return;
+      if (!presentation || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(error._requestId))) return;
 
       const { errorInfo } = presentation;
       const fallbackProvider = this.translationHandler.getEffectiveProvider(
@@ -298,6 +315,7 @@ export class EventCoordinator {
    */
   async _handleChangeProviderRequest(detail) {
     const windowId = detail.id || this.state.activeWindowId;
+    if (this.state.activeWindowId && windowId !== this.state.activeWindowId) return;
     const newProvider = detail.provider;
     const textToTranslate = this.state.originalText;
 
@@ -315,8 +333,9 @@ export class EventCoordinator {
       const translationResult = await this.facade._startTranslationProcess(
         textToTranslate,
         windowId,
+        { provider: newProvider },
       );
-      if (!translationResult) return;
+      if (!translationResult || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(translationResult._requestId))) return;
 
       WindowsManagerEvents.updateWindow(windowId, {
         isLoading: false,
@@ -326,7 +345,9 @@ export class EventCoordinator {
         sourceLanguage: translationResult.sourceLanguage || "auto",
         detectedSourceLanguage: translationResult.sourceLanguage,
         targetLanguage: translationResult.targetLanguage,
+        mode: translationResult.mode,
         provider: translationResult.provider,
+        ...(this.facade._historyUpdate?.(this.state.translationHistory?.[this.state.historyIndex]) || {}),
       });
     } catch (error) {
       const presentation = await getSelectionWindowErrorPresentation(
@@ -334,7 +355,7 @@ export class EventCoordinator {
         "windows-translation-retry",
         this.errorHandler,
       );
-      if (!presentation) return;
+      if (!presentation || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(error._requestId))) return;
 
       const { errorInfo } = presentation;
       WindowsManagerEvents.updateWindow(windowId, {
@@ -346,6 +367,48 @@ export class EventCoordinator {
         needsSettings: errorInfo.needsSettings,
         initialTranslatedText: errorInfo.message,
         provider: newProvider,
+      });
+    }
+  }
+
+  _handleHistoryNavigate(detail) {
+    if (!detail?.id || !['previous', 'next'].includes(detail.direction)) return;
+    if (this.state.activeWindowId && detail.id !== this.state.activeWindowId) return;
+    this.facade._navigateTranslationHistory(detail.id, detail.direction);
+  }
+
+  async _handleConfirmSource(detail) {
+    const text = detail?.text;
+    const windowId = detail?.id || this.state.activeWindowId;
+    if (this.state.activeWindowId && windowId !== this.state.activeWindowId) return;
+    if (!windowId || typeof text !== 'string' || !text.trim()) return;
+    if (text === this.state.originalText) return;
+    this.state.setOriginalText(text);
+    WindowsManagerEvents.updateWindow(windowId, {
+      isLoading: true, isError: false, initialTranslatedText: '', selectedText: text,
+    });
+    try {
+      const result = await this.facade._startTranslationProcess(text, windowId);
+      if (!result || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(result._requestId))) return;
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false, isStreaming: false, isError: false,
+        initialTranslatedText: result.translatedText,
+        sourceLanguage: result.sourceLanguage || 'auto',
+        detectedSourceLanguage: result.sourceLanguage,
+        targetLanguage: result.targetLanguage,
+        provider: result.provider,
+        mode: result.mode,
+        ...(this.facade._historyUpdate?.(this.state.translationHistory?.[this.state.historyIndex]) || {}),
+      });
+    } catch (error) {
+      const presentation = await getSelectionWindowErrorPresentation(error, 'windows-translation', this.errorHandler);
+      if (!presentation || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(error._requestId))) return;
+      const { errorInfo } = presentation;
+      WindowsManagerEvents.updateWindow(windowId, {
+        isLoading: false, isStreaming: false, isError: true,
+        errorType: errorInfo.type, canRetry: errorInfo.canRetry,
+        needsSettings: errorInfo.needsSettings, initialTranslatedText: errorInfo.message,
+        provider: this.state.provider,
       });
     }
   }
@@ -487,6 +550,9 @@ export class EventCoordinator {
 
       const windowId = `translation-window-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+      this.state.clearTranslationHistory();
+      this.state.setActiveWindowId(windowId);
+
       WindowsManagerEvents.showWindow({
         id: windowId,
         selectedText: data.selectedText,
@@ -502,7 +568,7 @@ export class EventCoordinator {
       this.facade
         ._startTranslationProcess(data.selectedText, windowId)
         .then((result) => {
-          if (result) {
+          if (result && (!this.facade._isCurrentTranslation || this.facade._isCurrentTranslation(result._requestId))) {
             WindowsManagerEvents.updateWindow(windowId, {
               initialSize: "normal",
               isLoading: false,
@@ -511,6 +577,7 @@ export class EventCoordinator {
               detectedSourceLanguage: result.sourceLanguage,
               targetLanguage: result.targetLanguage,
               provider: result.provider,
+              ...this.facade._historyUpdate?.(this.state.translationHistory?.[this.state.historyIndex]),
             });
           }
         })
@@ -520,7 +587,7 @@ export class EventCoordinator {
             "windows-translation",
             this.errorHandler,
           );
-          if (!presentation) return;
+          if (!presentation || (this.facade._isCurrentTranslation && !this.facade._isCurrentTranslation(error._requestId))) return;
 
           const { errorInfo } = presentation;
           WindowsManagerEvents.updateWindow(windowId, {

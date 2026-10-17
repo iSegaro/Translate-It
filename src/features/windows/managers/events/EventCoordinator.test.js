@@ -317,6 +317,8 @@ describe("EventCoordinator PageEventBus listener ownership", () => {
       ["translation-window-speak", facade._speakRequestHandler],
       ["translation-window-retry", facade._retryRequestHandler],
       ["translation-window-change-provider", facade._changeProviderRequestHandler],
+      ["translation-window-history-navigate", facade._historyNavigateHandler],
+      ["translation-window-confirm-source", facade._confirmSourceHandler],
       [WINDOWS_MANAGER_EVENTS.DISMISS_WINDOW, facade._dismissRequestHandler],
       [WINDOWS_MANAGER_EVENTS.DISMISS_ICON, facade._dismissRequestHandler],
       [SELECTION_EVENTS.GLOBAL_SELECTION_TRIGGER, facade._selectionTriggerHandler],
@@ -420,6 +422,8 @@ describe("EventCoordinator iframe window creation error boundary", () => {
       setTranslationCancelled: vi.fn(),
       setIconMode: vi.fn(),
       setVisible: vi.fn(),
+      clearTranslationHistory: vi.fn(),
+      setActiveWindowId: vi.fn(),
     };
     crossFrameManager = {
       isTopFrame: true,
@@ -467,6 +471,8 @@ describe("EventCoordinator iframe window creation error boundary", () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
 
     expect(facade._startTranslationProcess).toHaveBeenCalled();
+    expect(state.clearTranslationHistory).toHaveBeenCalledTimes(1);
+    expect(state.setActiveWindowId).toHaveBeenCalledWith(expect.any(String));
     expect(mockShowWindow).toHaveBeenCalled();
     expect(mockGetPresentation).toHaveBeenCalledWith(
       canonicalError,
@@ -501,6 +507,22 @@ describe("EventCoordinator iframe window creation error boundary", () => {
     await new Promise((resolve) => setTimeout(resolve, 25));
 
     expect(mockGetPresentation).toHaveBeenCalled();
+    expect(mockUpdateWindow).not.toHaveBeenCalled();
+  });
+
+  it("does not display a stale cross-frame translation result", async () => {
+    facade._startTranslationProcess.mockResolvedValue({
+      _requestId: 1, translatedText: "stale", provider: "provider",
+    });
+    facade._isCurrentTranslation = vi.fn(() => false);
+
+    await coordinator._handleWindowCreationRequest({
+      selectedText: "selected text",
+      position: { x: 10, y: 20 },
+      frameId: "frame-1",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
     expect(mockUpdateWindow).not.toHaveBeenCalled();
   });
 });
@@ -611,6 +633,8 @@ describe("EventCoordinator retry error boundary", () => {
     facade._startTranslationProcess.mockResolvedValue({
       translatedText: "translated text",
       sourceLanguage: "en",
+      targetLanguage: "it",
+      mode: "selection",
       provider: "fallback-provider",
     });
 
@@ -625,9 +649,32 @@ describe("EventCoordinator retry error boundary", () => {
         isStreaming: false,
         isError: false,
         initialTranslatedText: "translated text",
+        targetLanguage: "it",
+        mode: "selection",
         provider: "fallback-provider",
       }),
     ]);
+  });
+
+  it("publishes current history navigation metadata on retry success", async () => {
+    state.translationHistory = [{ sourceText: "restored source" }, { sourceText: "newer source" }];
+    state.historyIndex = 0;
+    facade._historyUpdate = vi.fn((entry) => ({
+      selectedText: entry.sourceText,
+      historyIndex: state.historyIndex,
+      historyLength: state.translationHistory.length,
+    }));
+    facade._startTranslationProcess.mockResolvedValue({
+      translatedText: "retried result", provider: "provider", targetLanguage: "it", mode: "selection",
+    });
+
+    await coordinator._handleRetryRequest({ id: "window-1" });
+
+    expect(mockUpdateWindow.mock.calls[1][1]).toMatchObject({
+      selectedText: "restored source",
+      historyIndex: 0,
+      historyLength: 2,
+    });
   });
 });
 
@@ -757,5 +804,49 @@ describe("EventCoordinator provider-change error boundary", () => {
         provider: "new-provider",
       }),
     ]);
+  });
+});
+
+describe("EventCoordinator committed source", () => {
+  it("keeps edited whitespace verbatim and retry uses the committed source", async () => {
+    const state = {
+      activeWindowId: "window-1",
+      originalText: "meaningful text",
+      translationHistory: [],
+      historyIndex: -1,
+      setOriginalText(text) { this.originalText = text; },
+    };
+    const facade = {
+      _startTranslationProcess: vi.fn().mockResolvedValue({
+        translatedText: "translated", provider: "provider", sourceLanguage: "en", targetLanguage: "fa",
+      }),
+    };
+    const coordinator = new EventCoordinator(facade, {
+      state,
+      crossFrameManager: { isTopFrame: true },
+      translationHandler: {},
+      errorHandler: {},
+      clickManager: {},
+      themeManager: {},
+    });
+
+    const edited = " meaningful text\n";
+    await coordinator._handleConfirmSource({ id: "window-1", text: edited });
+    expect(state.originalText).toBe(edited);
+    expect(facade._startTranslationProcess).toHaveBeenCalledWith(edited, "window-1");
+
+    facade._startTranslationProcess.mockClear();
+    await coordinator._handleRetryRequest({ id: "window-1", text: "stale UI text" });
+    expect(facade._startTranslationProcess).toHaveBeenCalledWith(edited, "window-1");
+  });
+
+  it("ignores empty and whitespace-only source confirmations", async () => {
+    const state = { activeWindowId: "window-1", originalText: "source" };
+    const facade = { _startTranslationProcess: vi.fn() };
+    const coordinator = new EventCoordinator(facade, {
+      state, crossFrameManager: {}, translationHandler: {}, errorHandler: {}, clickManager: {}, themeManager: {},
+    });
+    await coordinator._handleConfirmSource({ id: "window-1", text: "  \n " });
+    expect(facade._startTranslationProcess).not.toHaveBeenCalled();
   });
 });

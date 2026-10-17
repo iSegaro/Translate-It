@@ -110,6 +110,31 @@
           />
         </svg>
       </button>
+
+      <IconButton
+        v-if="historyLength > 1"
+        icon="arrow-next.svg"
+        type="toolbar"
+        mask
+        class="ti-window-history-button ti-window-history-previous"
+        :title="historyPreviousTitle"
+        :alt="historyPreviousTitle"
+        :disabled="historyIndex <= 0"
+        data-testid="translation-window-history-previous"
+        @click="emit('history-navigate', 'previous')"
+      />
+      <IconButton
+        v-if="historyLength > 1"
+        icon="arrow-next.svg"
+        type="toolbar"
+        mask
+        class="ti-window-history-button"
+        :title="historyNextTitle"
+        :alt="historyNextTitle"
+        :disabled="historyIndex < 0 || historyIndex >= historyLength - 1"
+        data-testid="translation-window-history-next"
+        @click="emit('history-navigate', 'next')"
+      />
     </div>
 
     <div class="ti-header-close">
@@ -160,6 +185,7 @@ import { ref } from "vue";
 import "./TranslationWindowToolbar.scss";
 import ProviderSelector from "@/components/shared/ProviderSelector.vue";
 import TTSButton from "@/components/shared/TTSButton.vue";
+import IconButton from "@/components/shared/IconButton.vue";
 
 defineOptions({
   name: "TranslationWindowToolbar",
@@ -179,6 +205,10 @@ defineProps({
   copyTitle: { type: String, default: "" },
   originalTitle: { type: String, default: "" },
   closeTitle: { type: String, default: "" },
+  historyIndex: { type: Number, default: -1 },
+  historyLength: { type: Number, default: 0 },
+  historyPreviousTitle: { type: String, default: "" },
+  historyNextTitle: { type: String, default: "" },
   showProviderSelector: { type: Boolean, default: true },
   showPinButton: { type: Boolean, default: true },
   showCopyButton: { type: Boolean, default: true },
@@ -204,6 +234,7 @@ const emit = defineEmits([
   "provider-change",
   "toggle-pin",
   "toggle-original",
+  "history-navigate",
   "tts-started",
   "tts-stopped",
   "tts-error",

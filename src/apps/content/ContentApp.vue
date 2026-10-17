@@ -44,6 +44,8 @@
         :detected-source-language="window.detectedSourceLanguage"
         :provider="window.provider"
         :translation-mode="window.mode"
+        :history-index="window.historyIndex"
+        :history-length="window.historyLength"
         @close="onTranslationWindowClose"
         @speak="onTranslationWindowSpeak"
       />

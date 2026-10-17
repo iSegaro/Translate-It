@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { nextTick, reactive, ref } from 'vue';
 import TranslationWindow from './TranslationWindow.vue';
+import { pageEventBus } from '@/core/PageEventBus.js';
 
 let currentMediaQueryList = null;
 
@@ -288,6 +289,89 @@ describe('TranslationWindow.vue', () => {
     expect(wrapper.find('.ti-action-btn[title="window_show_original"]').exists()).toBe(true);
     expect(wrapper.find('.ti-detected-language-label').text()).toBe('English');
     expect(wrapper.find('.ti-action-btn[title="window_close"]').exists()).toBe(true);
+    expect(wrapper.findAll('.ti-window-source-input')).toHaveLength(1);
+    expect(wrapper.find('.ti-window-source-input').element.value).toBe('expressions');
+    expect(wrapper.find('.ti-window-source-input').isVisible()).toBe(false);
+  });
+
+  it('confirms changed source text on Enter, preserves Shift+Enter, and restores on Escape', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    const editor = wrapper.find('.ti-window-source-input');
+    expect(editor.attributes('dir')).toBe('auto');
+    await editor.setValue('  edited source  ');
+    await editor.trigger('keydown', { key: 'Enter' });
+    expect(pageEventBus.emit).toHaveBeenCalledWith('translation-window-confirm-source', {
+      id: 'window-1', text: '  edited source  ',
+    });
+
+    pageEventBus.emit.mockClear();
+    await editor.trigger('keydown', { key: 'Enter', shiftKey: true });
+    expect(pageEventBus.emit).not.toHaveBeenCalled();
+    await editor.trigger('keydown', { key: 'Escape' });
+    expect(editor.element.value).toBe('expressions');
+    expect(pageEventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('does not confirm unchanged, whitespace-only, or composing Enter and exposes bounded history', async () => {
+    const wrapper = mount(TranslationWindow, {
+      props: { ...baseProps, historyIndex: 0, historyLength: 2 },
+    });
+    const editor = wrapper.find('.ti-window-source-input');
+    await editor.trigger('keydown', { key: 'Enter' });
+    await editor.setValue('   ');
+    await editor.trigger('keydown', { key: 'Enter' });
+    await editor.setValue('changed');
+    await editor.trigger('keydown', { key: 'Enter', isComposing: true });
+    expect(pageEventBus.emit).not.toHaveBeenCalledWith('translation-window-confirm-source', expect.anything());
+    const previous = wrapper.find('[data-testid="translation-window-history-previous"]');
+    const next = wrapper.find('[data-testid="translation-window-history-next"]');
+    expect(previous.element.disabled).toBe(true);
+    expect(next.element.disabled).toBe(false);
+    await next.trigger('click');
+    expect(pageEventBus.emit).toHaveBeenCalledWith('translation-window-history-navigate', {
+      id: 'window-1', direction: 'next',
+    });
+  });
+
+  it('shows and hides the only source editor with Show/Hide Original and suppresses history when hidden', async () => {
+    const wrapper = mount(TranslationWindow, {
+      props: { ...baseProps, historyIndex: 0, historyLength: 2 },
+    });
+    expect(wrapper.find('.ti-original-text-wrapper').classes()).not.toContain('is-expanded');
+    await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+    expect(wrapper.find('.ti-original-text-wrapper').classes()).toContain('is-expanded');
+    await wrapper.find('[data-testid="translation-window-history-next"]').trigger('click');
+    expect(pageEventBus.emit).toHaveBeenCalledWith('translation-window-history-navigate', {
+      id: 'window-1', direction: 'next',
+    });
+
+    pageEventBus.emit.mockClear();
+    await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+    expect(wrapper.find('.ti-original-text-wrapper').classes()).not.toContain('is-expanded');
+    expect(wrapper.findAll('.ti-window-source-input')).toHaveLength(1);
+    expect(wrapper.find('[data-testid="translation-window-history-next"]').exists()).toBe(true);
+    expect(pageEventBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('resets the draft on source/history changes but not unrelated result changes', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    const editor = wrapper.find('.ti-window-source-input');
+    await editor.setValue('local edit');
+    await wrapper.setProps({ initialTranslatedText: 'another translation' });
+    expect(editor.element.value).toBe('local edit');
+    await wrapper.setProps({ historyIndex: 1, selectedText: baseProps.selectedText });
+    expect(editor.element.value).toBe(baseProps.selectedText);
+    await editor.setValue('another local edit');
+    await wrapper.setProps({ selectedText: 'restored source' });
+    expect(editor.element.value).toBe('restored source');
+  });
+
+  it('discards a draft when the parent reports confirmation failure', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    const editor = wrapper.find('.ti-window-source-input');
+    await editor.setValue('unconfirmed source');
+    await wrapper.setProps({ isError: true });
+    expect(editor.element.value).toBe('expressions');
   });
 
   it('uses system theme for auto mode and updates without remounting', async () => {

@@ -45,6 +45,15 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
   },
 }));
 
+vi.mock('@/components/shared/IconButton.vue', () => ({
+  default: {
+    name: 'IconButton',
+    inheritAttrs: true,
+    props: ['icon', 'title', 'alt'],
+    template: '<button v-bind="$attrs" :title="title" :aria-label="alt"></button>',
+  },
+}));
+
 describe('TranslationWindowToolbar.vue', () => {
   const baseProps = {
     provider: 'googlev2',
@@ -66,6 +75,10 @@ describe('TranslationWindowToolbar.vue', () => {
     providerSelectorAllowSetDefault: true,
     providerSelectorOnlyConfigured: true,
     providerSelectorRequiredFeature: 'translation',
+    historyIndex: 0,
+    historyLength: 2,
+    historyPreviousTitle: 'Previous',
+    historyNextTitle: 'Next',
   };
 
   it('renders the shared window controls and labels', () => {
@@ -87,6 +100,8 @@ describe('TranslationWindowToolbar.vue', () => {
     expect(wrapper.find('.ti-detected-language-label').text()).toBe('English');
     expect(wrapper.find('.ti-action-btn[title="window_close"]').exists()).toBe(true);
     expect(wrapper.find('.ti-action-btn[title*="dock"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="translation-window-history-previous"]').element.disabled).toBe(true);
+    expect(wrapper.find('[data-testid="translation-window-history-next"]').element.disabled).toBe(false);
   });
 
   it('emits toolbar events exactly once', async () => {
@@ -122,6 +137,9 @@ describe('TranslationWindowToolbar.vue', () => {
 
     await wrapper.find('.ti-action-btn[title="window_close"]').trigger('click');
     expect(wrapper.emitted('close')).toEqual([[]]);
+
+    await wrapper.find('[data-testid="translation-window-history-next"]').trigger('click');
+    expect(wrapper.emitted('history-navigate')).toEqual([['next']]);
   });
 
   it('keeps provider dedupe state isolated between toolbar instances', () => {

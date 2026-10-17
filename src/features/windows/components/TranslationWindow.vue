@@ -59,10 +59,15 @@
         :provider-selector-is-global="false"
         :provider-selector-allow-set-default="true"
         :provider-selector-only-configured="true"
+        :history-index="props.historyIndex"
+        :history-length="props.historyLength"
+        :history-previous-title="t('window_history_previous')"
+        :history-next-title="t('window_history_next')"
         @provider-change="handleProviderChange"
         @toggle-pin="togglePin"
         @copy="handleCopy"
         @toggle-original="toggleShowOriginal"
+        @history-navigate="navigateHistory"
         @close="handleClose"
       />
     </div>
@@ -74,7 +79,19 @@
       >
         <div class="ti-original-text-section">
           <div class="ti-original-text">
-            {{ originalText }}
+            <textarea
+              v-show="showOriginal && !isLoading"
+              :id="`translation-window-source-${props.id}`"
+              v-model="sourceDraft"
+              class="ti-window-source-input"
+              :aria-label="t('window_edit_source')"
+              :lang="props.sourceLanguage !== 'auto' ? props.sourceLanguage : undefined"
+              dir="auto"
+              rows="1"
+              @mousedown.stop
+              @touchstart.stop
+              @keydown="handleSourceKeydown"
+            />
           </div>
         </div>
       </div>
@@ -144,6 +161,8 @@ const props = defineProps({
   initialSize: { type: String, default: 'normal' }, 
   targetLanguage: { type: String, default: 'auto' }, 
   sourceLanguage: { type: String, default: 'auto' },
+  historyIndex: { type: Number, default: -1 },
+  historyLength: { type: Number, default: 0 },
   detectedSourceLanguage: { type: String, default: undefined },
   provider: { type: String, default: '' },
   translationMode: { type: String, default: null }
@@ -266,6 +285,7 @@ const isVisible = ref(false);
 const currentSize = ref(props.initialSize); 
 const translatedText = computed(() => props.isError ? '' : props.initialTranslatedText);
 const originalText = ref(props.selectedText);
+const sourceDraft = ref(props.selectedText);
 const errorMessage = computed(() => props.isError ? props.initialTranslatedText : '');
 
 // Check if current translation is in dictionary mode
@@ -288,11 +308,13 @@ const detectedLanguageName = computed(() => {
 });
 
 // Watch for prop changes to sync internal state
-watch(() => props.selectedText, (newText) => {
-  if (newText) {
-    logger.debug('selectedText updated:', newText);
-    originalText.value = newText;
-  }
+watch(() => [props.selectedText, props.historyIndex], ([newText]) => {
+  originalText.value = newText;
+  sourceDraft.value = newText;
+});
+
+watch(() => props.isError, (isError) => {
+  if (isError) sourceDraft.value = originalText.value;
 });
 
 watch(() => props.sourceLanguage, (newLang) => {
@@ -426,7 +448,27 @@ onMounted(async () => {
 });
 
 const handleClose = () => emit('close', props.id);
-const toggleShowOriginal = () => { showOriginal.value = !showOriginal.value; };
+const toggleShowOriginal = () => {
+  if (showOriginal.value) document.activeElement?.blur?.();
+  showOriginal.value = !showOriginal.value;
+};
+
+const navigateHistory = (direction) => {
+  pageEventBus.emit('translation-window-history-navigate', { id: props.id, direction });
+};
+
+const handleSourceKeydown = (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    sourceDraft.value = originalText.value;
+    return;
+  }
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  if (!sourceDraft.value.trim() || sourceDraft.value === originalText.value) return;
+  pageEventBus.emit('translation-window-confirm-source', { id: props.id, text: sourceDraft.value });
+};
 
 // Resize logic for docked mode
 const isResizing = ref(false);
