@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import ElementDetectionService from '@/shared/services/ElementDetectionService.js';
 import { SimpleTextSelectionHandler } from './SimpleTextSelectionHandler.js';
 
@@ -102,5 +102,204 @@ describe('SimpleTextSelectionHandler diagnostic capture', () => {
     handler.isClickInsideTranslationWindow();
 
     expect(ElementDetectionService.isUIElement).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Regression tests for the floating Translation Window Body click dismissal bug.
+ *
+ * An inside-Body click clears the page selection, and the debounced
+ * selectionchange processing runs with an empty selection. Dismissal must not
+ * happen when the pointer interaction began inside extension UI, even when the
+ * mouseup is not yet recorded (or never reaches the bubble-phase listener
+ * because it is stopped inside the UI's shadow DOM). A genuine outside
+ * interaction must still dismiss immediately.
+ */
+describe('SimpleTextSelectionHandler body-click dismissal regression', () => {
+  let getSelectionSpy;
+
+  const uiBody = Object.assign(document.createElement('div'), { className: 'translation-window' });
+  const uiHeader = document.createElement('div');
+  uiHeader.setAttribute('data-translation-window', '');
+
+  function makePointerEvent(path) {
+    const event = new Event('pointerdown', { bubbles: true, composed: true });
+    event.composedPath = () => path;
+    return event;
+  }
+
+  function setupEmptySelection() {
+    handler.isActive = true;
+    handler.selectionManager = { dismissWindow: vi.fn() };
+    handler.lastMouseUpEvent = null;
+    handler.lastMouseEventTime = 0;
+    handler.isDragging = false;
+    handler.shiftKeyPressed = false;
+    getSelectionSpy = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => '' });
+  }
+
+  afterEach(() => {
+    if (getSelectionSpy) getSelectionSpy.mockRestore();
+    handler._lastUiPointerInteraction = null;
+  });
+
+  const handler = new SimpleTextSelectionHandler();
+
+  it('does not dismiss on Body-first click with empty-selection processing before mouseup', async () => {
+    setupEmptySelection();
+
+    // Pointer interaction begins inside the window Body; the mouseup has not
+    // been recorded yet (processing runs first / mouseup never arrives).
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss after header interaction followed by Body click', async () => {
+    setupEmptySelection();
+
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiHeader]));
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).not.toHaveBeenCalled();
+  });
+
+  it('dismisses immediately on a genuine outside interaction despite a stale inside-UI mouseup', async () => {
+    setupEmptySelection();
+
+    // Stale mouseup from an earlier inside-UI interaction (the bug scenario:
+    // 3293 ms old at dismissal time).
+    const staleMouseUp = new MouseEvent('mouseup', { bubbles: true });
+    handler.lastMouseUpEvent = staleMouseUp;
+    handler.lastMouseEventTime = Date.now() - 3293;
+
+    // Recent pointerdown clearly outside extension UI refutes the stale record.
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div')]));
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('still dismisses on keyboard-driven selection clearing with stale interaction context', async () => {
+    setupEmptySelection();
+
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    // Context has expired (no fresh pointer interaction); keyboard clearing
+    // must behave exactly as before.
+    handler._lastUiPointerInteraction.timestamp = Date.now() - 5000;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores interaction context once the bounded window has expired', async () => {
+    setupEmptySelection();
+
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    handler._lastUiPointerInteraction.timestamp = Date.now() - 1500;
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies pointerdown originating inside a shadow DOM host via the capture listener', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const inner = document.createElement('div');
+    inner.className = 'translation-window';
+    shadowRoot.appendChild(inner);
+
+    handler.setupEventListeners();
+    try {
+      inner.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+      expect(handler._lastUiPointerInteraction).toEqual({
+        insideUi: true,
+        timestamp: expect.any(Number)
+      });
+    } finally {
+      handler._removeDOMListeners();
+      host.remove();
+    }
+  });
+
+  it('removes the capture-phase pointerdown listener on cleanup (no leaks)', () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener');
+    try {
+      handler._removeDOMListeners();
+      expect(removeSpy).toHaveBeenCalledWith(
+        'pointerdown',
+        handler.handleUiPointerDownCapture,
+        { capture: true }
+      );
+    } finally {
+      removeSpy.mockRestore();
+    }
+  });
+
+  function makeKeyEvent(path) {
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
+    event.composedPath = () => path;
+    return event;
+  }
+
+  it('dismisses when keyboard interaction outside the UI clears the selection within the window', async () => {
+    setupEmptySelection();
+
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    // Keyboard interaction originates outside extension UI, inside the 1s window
+    handler.handleKeyDown(makeKeyEvent([document.createElement('div'), document.body]));
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the window when keyboard interaction originates inside the UI (source textarea editing)', async () => {
+    setupEmptySelection();
+
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    // Typing in the source textarea inside the window must not invalidate context
+    handler.handleKeyDown(makeKeyEvent([document.createElement('textarea'), uiBody]));
+    await handler.processSelection();
+
+    expect(handler.selectionManager.dismissWindow).not.toHaveBeenCalled();
+  });
+
+  it('clears interaction context on deactivation and reactivation starts fresh', async () => {
+    handler.isActive = true;
+    handler.selectionManager = { dismissWindow: vi.fn(), cleanup: vi.fn() };
+    handler.handleUiPointerDownCapture(makePointerEvent([document.createElement('div'), uiBody]));
+    expect(handler._lastUiPointerInteraction).not.toBeNull();
+
+    try {
+      await handler.deactivate();
+      expect(handler._lastUiPointerInteraction).toBeNull();
+
+      // Stale state while inactive must also be dropped by reactivation
+      handler._lastUiPointerInteraction = { insideUi: true, timestamp: Date.now() };
+      await handler.activate();
+      expect(handler._lastUiPointerInteraction).toBeNull();
+    } finally {
+      // Real lifecycle cleanup: removes DOM listeners, settings subscriptions
+      // and tracked resources registered by activate(). Never substitute
+      // manual state resets for deactivate().
+      await handler.deactivate();
+    }
+
+    // The capture-phase pointerdown listener must be gone after deactivate():
+    // a pointerdown from inside UI no longer records interaction context.
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const inner = document.createElement('div');
+    inner.className = 'translation-window';
+    shadowRoot.appendChild(inner);
+
+    inner.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+    expect(handler._lastUiPointerInteraction).toBeNull();
+    host.remove();
   });
 });
