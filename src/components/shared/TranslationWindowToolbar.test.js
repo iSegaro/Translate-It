@@ -1,7 +1,35 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import TranslationWindowToolbar from './TranslationWindowToolbar.vue';
 import { readFileSync } from 'node:fs';
+
+let resizeObservers;
+class MockResizeObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.elements = new Set();
+    this.disconnect = vi.fn(() => this.elements.clear());
+    this.observe = vi.fn((element) => this.elements.add(element));
+    this.unobserve = vi.fn((element) => this.elements.delete(element));
+    resizeObservers.push(this);
+  }
+}
+
+beforeEach(() => {
+  resizeObservers = [];
+  vi.stubGlobal('ResizeObserver', MockResizeObserver);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+const setLabelDimensions = (element, { scrollWidth, clientWidth }) => {
+  Object.defineProperties(element, {
+    scrollWidth: { configurable: true, value: scrollWidth },
+    clientWidth: { configurable: true, value: clientWidth },
+  });
+};
 
 vi.mock('@/components/shared/ProviderSelector.vue', () => ({
   default: {
@@ -126,6 +154,60 @@ describe('TranslationWindowToolbar.vue', () => {
     expect(styles).toMatch(/&:has\(\.ti-target-language-label, \.ti-detected-language-label\)\s*\{[^}]*column-gap:\s*4px/);
     expect(styles).toMatch(/\.ti-target-language-label,[\s\S]*?\.ti-detected-language-label\s*\{[^}]*min-width:\s*0/);
     expect(styles).toMatch(/\.ti-action-btn,[\s\S]*?width:\s*28px[\s\S]*?flex:\s*0 0 28px/);
+  });
+
+  it('adds and removes independent native titles as labels truncate, change, and appear', async () => {
+    const wrapper = mount(TranslationWindowToolbar, {
+      props: baseProps,
+      attrs: { dir: 'rtl' },
+    });
+    const target = wrapper.find('.ti-target-language-label').element;
+    const detected = wrapper.find('.ti-detected-language-label').element;
+    setLabelDimensions(target, { scrollWidth: 120, clientWidth: 50 });
+    setLabelDimensions(detected, { scrollWidth: 50, clientWidth: 50 });
+    const observer = resizeObservers[0];
+    observer.callback();
+    await wrapper.vm.$nextTick();
+
+    expect(target.title).toBe('Persian');
+    expect(detected.hasAttribute('title')).toBe(false);
+    expect(observer.observe).toHaveBeenCalledWith(target);
+    expect(observer.observe).toHaveBeenCalledWith(detected);
+
+    setLabelDimensions(target, { scrollWidth: 51, clientWidth: 50 });
+    setLabelDimensions(detected, { scrollWidth: 80, clientWidth: 50 });
+    observer.callback();
+    await wrapper.vm.$nextTick();
+    expect(target.hasAttribute('title')).toBe(false);
+    expect(detected.title).toBe('English');
+
+    setLabelDimensions(target, { scrollWidth: 120, clientWidth: 50 });
+    await wrapper.setProps({ targetLanguageLabel: 'Persian (updated)' });
+    await wrapper.vm.$nextTick();
+    expect(target.title).toBe('Persian (updated)');
+
+    await wrapper.setProps({ detectedLanguageLabel: '' });
+    expect(observer.unobserve).toHaveBeenCalledWith(detected);
+    await wrapper.setProps({ detectedLanguageLabel: 'French' });
+    const reappeared = wrapper.find('.ti-detected-language-label').element;
+    setLabelDimensions(reappeared, { scrollWidth: 90, clientWidth: 50 });
+    observer.callback();
+    await wrapper.vm.$nextTick();
+    expect(reappeared.title).toBe('French');
+    expect(observer.observe).toHaveBeenCalledWith(reappeared);
+
+    wrapper.unmount();
+    expect(observer.disconnect).toHaveBeenCalledOnce();
+  });
+
+  it('does not prevent label pointer or mouse events from bubbling', async () => {
+    const wrapper = mount(TranslationWindowToolbar, { props: baseProps });
+    const bubbled = vi.fn();
+    wrapper.element.addEventListener('mousedown', bubbled);
+    wrapper.element.addEventListener('pointerdown', bubbled);
+    await wrapper.find('.ti-target-language-label').trigger('mousedown');
+    await wrapper.find('.ti-target-language-label').trigger('pointerdown');
+    expect(bubbled).toHaveBeenCalledTimes(2);
   });
 
   it('emits toolbar events exactly once', async () => {
