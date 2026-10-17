@@ -34,7 +34,7 @@
     <div
       v-if="dockMode !== 'none'"
       class="ti-dock-resize-handle"
-      @mousedown.stop="startResize"
+      @mousedown.prevent.stop="startResize"
       @touchstart.stop="startResize"
     />
 

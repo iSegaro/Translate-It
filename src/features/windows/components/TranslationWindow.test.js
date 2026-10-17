@@ -829,8 +829,20 @@ describe('TranslationWindow.vue', () => {
       globalThis.__mockSettingsStore.settings.WINDOW_DOCKED_WIDTH = 350;
       const wrapper = mount(TranslationWindow, { props: baseProps, attachTo: document.body });
       const handle = wrapper.find('.ti-dock-resize-handle');
-      await handle.trigger('mousedown', { clientX: 100, clientY: 100 });
+      const mousedown = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 100,
+        clientY: 100,
+      });
+      handle.element.dispatchEvent(mousedown);
+      expect(mousedown.defaultPrevented).toBe(true);
       expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(true);
+      expect(document.body.style.userSelect).toBe('none');
+
+      dispatchMouseOnDocument('mousemove', 150);
+      await nextTick();
+      expect(wrapper.find('.translation-window').attributes('style')).toContain('width: 400px');
 
       // mouseup dispatched from inside the window element (bubbles to document)
       wrapper.find('.translation-window').element.dispatchEvent(
@@ -838,6 +850,7 @@ describe('TranslationWindow.vue', () => {
       );
       await nextTick();
       expect(window.__TRANSLATION_WINDOW_IS_RESIZING).toBe(false);
+      expect(document.body.style.userSelect).toBe('');
       expect(window.__TRANSLATION_WINDOW_JUST_RESIZED).toBe(true);
 
       // No stale protection: a new interaction clears it without any click.
