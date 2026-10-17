@@ -21,6 +21,18 @@ class MockResizeObserver {
   }
 }
 
+const findResizeObserverFor = (element) =>
+  sourceResizeObservers.find((observer) =>
+    observer.observe.mock.calls.some(([observedElement]) => observedElement === element),
+  );
+
+const findTextareaResizeObservers = () =>
+  sourceResizeObservers.filter((observer) =>
+    observer.observe.mock.calls.some(([element]) =>
+      element.matches?.('.ti-window-source-input'),
+    ),
+  );
+
 const createSettingsStore = () => {
   const store = reactive({
     settings: {
@@ -418,7 +430,8 @@ describe('TranslationWindow.vue', () => {
 
     setMetrics(40, 40);
     await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
-    const resizeObserver = sourceResizeObservers[0];
+    const resizeObserver = findResizeObserverFor(editor);
+    expect(resizeObserver).toBeDefined();
     expect(sourceInput.classes()).not.toContain('ti-window-source-overflow');
     expect(resizeObserver.observe).toHaveBeenCalledWith(editor);
 
@@ -487,12 +500,13 @@ describe('TranslationWindow.vue', () => {
     });
 
     expect(wrapper.find('.ti-window-source-input').exists()).toBe(false);
-    expect(sourceResizeObservers).toHaveLength(0);
+    expect(findTextareaResizeObservers()).toHaveLength(0);
 
     await wrapper.setProps({ initialSize: 'normal' });
     const firstEditor = wrapper.find('.ti-window-source-input').element;
-    expect(sourceResizeObservers).toHaveLength(1);
-    const firstObserver = sourceResizeObservers[0];
+    expect(findTextareaResizeObservers()).toHaveLength(1);
+    const firstObserver = findResizeObserverFor(firstEditor);
+    expect(firstObserver).toBeDefined();
     expect(firstObserver.observe).toHaveBeenCalledTimes(1);
     expect(firstObserver.observe).toHaveBeenCalledWith(firstEditor);
 
@@ -512,8 +526,9 @@ describe('TranslationWindow.vue', () => {
     await wrapper.setProps({ initialSize: 'normal' });
     const secondEditor = wrapper.find('.ti-window-source-input').element;
     expect(secondEditor).not.toBe(firstEditor);
-    expect(sourceResizeObservers).toHaveLength(2);
-    const secondObserver = sourceResizeObservers[1];
+    expect(findTextareaResizeObservers()).toHaveLength(2);
+    const secondObserver = findResizeObserverFor(secondEditor);
+    expect(secondObserver).toBeDefined();
     expect(secondObserver).not.toBe(firstObserver);
     expect(secondObserver.observe).toHaveBeenCalledTimes(1);
     expect(secondObserver.observe).toHaveBeenCalledWith(secondEditor);

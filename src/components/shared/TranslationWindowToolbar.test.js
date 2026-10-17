@@ -153,6 +153,8 @@ describe('TranslationWindowToolbar.vue', () => {
     expect(styles).toMatch(/\.ti-header-close\s*\{[^}]*flex:\s*1 1 auto\s*!important/);
     expect(styles).toMatch(/&:has\(\.ti-target-language-label, \.ti-detected-language-label\)\s*\{[^}]*column-gap:\s*4px/);
     expect(styles).toMatch(/\.ti-target-language-label,[\s\S]*?\.ti-detected-language-label\s*\{[^}]*min-width:\s*0/);
+    expect(styles).toMatch(/\.ti-target-language-label,[\s\S]*?\.ti-detected-language-label\s*\{[^}]*max-width:\s*80px/);
+    expect(styles).toMatch(/\.ti-window\.is-docked \.ti-header-close\s*\{[\s\S]*?\.ti-target-language-label,[\s\S]*?\.ti-detected-language-label\s*\{[^}]*max-width:\s*none\s*;/);
     expect(styles).toMatch(/\.ti-action-btn,[\s\S]*?width:\s*28px[\s\S]*?flex:\s*0 0 28px/);
   });
 

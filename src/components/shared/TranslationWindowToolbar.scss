@@ -74,7 +74,7 @@
     opacity: 0.9 !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     border: 1px solid rgba(0, 0, 0, 0.05) !important;
-    max-width: 80px !important;
+    max-width: 80px;
     min-width: 0;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -147,5 +147,12 @@
     .ti-tts-icon {
       opacity: 1 !important;
     }
+  }
+}
+
+.ti-window.is-docked .ti-header-close {
+  .ti-target-language-label,
+  .ti-detected-language-label {
+    max-width: none;
   }
 }
