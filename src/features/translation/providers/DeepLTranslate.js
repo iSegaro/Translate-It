@@ -4,7 +4,6 @@ import {
   getDeeplApiKeysAsync,
   getDeeplApiTierAsync,
   getDeeplFormalityAsync,
-  getDeeplBetaLanguagesEnabledAsync,
   getDeeplFreeApiUrlAsync,
   getDeeplProApiUrlAsync
 } from "@/shared/config/config.js";
@@ -14,17 +13,21 @@ import { TRANSLATION_CONSTANTS } from "@/shared/config/translationConstants.js";
 import { LanguageSwappingService } from "@/features/translation/providers/LanguageSwappingService.js";
 import { AUTO_DETECT_VALUE } from "@/shared/constants/core.js";
 import { 
-  getProviderLanguageCode,
-  PROVIDER_LANGUAGE_MAPPINGS
+  getProviderLanguageCode
 } from "@/shared/config/languageConstants.js";
 import { ProviderNames } from "@/features/translation/providers/ProviderConstants.js";
 import { getTextInfo } from "./utils/TraditionalTextProcessor.js";
+import { fetchDeepLLanguageCatalogWithKeyFailover, matchDeepLFormality, matchDeepLTagHandling } from './DeepLLanguageDiscovery.js';
 import { matchErrorToType, isFatalError, isProviderRequestSizeError } from '@/shared/error-management/ErrorMatcher.js';
 import { ErrorTypes } from '@/shared/error-management/ErrorTypes.js';
+import { createOperationAbortError } from './utils/ProviderRequestEngine.js';
 import { NewlineManager } from '@/features/translation/utils/NewlineManager.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.PROVIDERS, 'DeepLTranslate');
 const DEEPL_SOURCE_CHINESE_VARIANTS = new Set(['zh', 'zh-cn', 'zh-tw', 'zh-hans', 'zh-hant']);
+// Generated subtitle/newline markup that requires DeepL XML mode to survive
+// translation: <x id="..."/> placeholders and <br> sentence boundaries.
+const GENERATED_XML_MARKUP_PATTERN = /<(?:x|br)\s[^>]*\/?>|<br\s*\/?>/i;
 
 export class DeepLTranslateProvider extends BaseTranslateProvider {
   static type = "translate";
@@ -75,6 +78,14 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
   }
 
   /**
+   * All configured keys for capability discovery, so a dead first key can
+   * fail over to the next eligible key (401-only) instead of blocking.
+   */
+  _getCapabilityDiscoveryKeys(apiKey, apiKeys) {
+    return Array.isArray(apiKeys) && apiKeys.length > 0 ? apiKeys.join('\n') : apiKey;
+  }
+
+  /**
    * Get configuration using project's existing config system
    * Uses StorageManager's built-in caching and config.js helpers
    */
@@ -99,7 +110,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // Configuration loaded successfully
       logger.info(`[DeepL] Using tier: ${normalizedTier}`);
 
-      return { apiKey, apiTier: normalizedTier, apiUrl };
+      return { apiKey, apiTier: normalizedTier, apiUrl, apiKeys };
     } catch (error) {
       logger.error(`[DeepL] Error loading configuration:`, error);
       throw error;
@@ -112,11 +123,11 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @returns {string} DeepL source language code
    */
   _getSourceLangCode(lang) {
-    const normalized = LanguageSwappingService._normalizeLangValue(lang);
+    const normalized = LanguageSwappingService._normalizeLangValue(lang).replace(/_/g, '-');
     if (normalized === AUTO_DETECT_VALUE) return ''; // DeepL auto-detect uses empty string
     if (DEEPL_SOURCE_CHINESE_VARIANTS.has(normalized)) return 'ZH';
 
-    return getProviderLanguageCode(normalized, 'DEEPL');
+    return this._getDeepLLanguageCode(normalized);
   }
 
   /**
@@ -125,11 +136,25 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
    * @returns {string} DeepL target language code
    */
   _getTargetLangCode(lang) {
-    const normalized = LanguageSwappingService._normalizeLangValue(lang);
+    const normalized = LanguageSwappingService._normalizeLangValue(lang).replace(/_/g, '-');
     if (normalized === AUTO_DETECT_VALUE) return '';
     if (normalized === 'zh-cn' || normalized === 'zh-hans') return 'ZH-HANS';
     if (normalized === 'zh-tw' || normalized === 'zh-hant') return 'ZH-HANT';
 
+    return this._getDeepLLanguageCode(normalized);
+  }
+
+  _getDeepLLanguageCode(normalized) {
+    // Keep validated v3 BCP47 variants intact (for example en-US and pt-BR).
+    if (normalized.includes('-') && !['zh-cn', 'zh-tw'].includes(normalized)) {
+      const mappedCode = getProviderLanguageCode(normalized, 'DEEPL');
+      if (mappedCode !== normalized) return mappedCode;
+      try {
+        return Intl.getCanonicalLocales(normalized)[0];
+      } catch {
+        return normalized;
+      }
+    }
     return getProviderLanguageCode(normalized, 'DEEPL');
   }
 
@@ -237,7 +262,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     const tl = this._getTargetLangCode(targetLang);
 
     // Get configuration and validate API key
-    const { apiKey, apiUrl, apiTier } = await this._getConfig();
+    const { apiKey, apiUrl, apiTier, apiKeys } = await this._getConfig();
 
     // Validate configuration
     this._validateConfig(
@@ -299,7 +324,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       logger.debug(`[DeepL] Filtered ${chunkTexts.length - validTexts.length} empty/whitespace texts`);
     }
 
-    const sanitizeText = (text) => {
+    const sanitizeText = (text, escapeXml = true) => {
       const originalLength = text.length;
       let sanitized = text
         .replace(ZERO_WIDTH_PATTERN, '')  // Zero-width characters
@@ -309,14 +334,16 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       // CRITICAL: Escape XML special characters BEFORE adding XML markers
       // This prevents "not well-formed (invalid token)" errors when tag_handling=xml
       // Order matters: escape & first, then < and >
-      sanitized = sanitized
-        .replace(/&/g, '&amp;')           // Must be first to avoid double-escaping
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      if (escapeXml) {
+        sanitized = sanitized
+          .replace(/&/g, '&amp;')           // Must be first to avoid double-escaping
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      }
 
       // Log if sanitization removed any characters
       if (sanitized.length !== originalLength) {
-        logger.debug(`[DeepL] Sanitization processed ${originalLength} char text (removed special chars, escaped XML)`);
+        logger.debug(`[DeepL] Sanitization processed ${originalLength} char text`);
       }
 
       return sanitized;
@@ -356,32 +383,13 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       textCount: validTexts.length
     });
 
-    // Get beta languages setting
-    let betaLanguagesEnabled = await getDeeplBetaLanguagesEnabledAsync();
+    logger.info(`[DeepL] Starting translation: ${validTexts.join('').length} chars, ${validTexts.length} segments (filtered from ${chunkTexts.length})`);
 
-    // Auto-detect: if source or target language is a beta language, enable beta languages
-    // Check if sl is a beta language
-    const sourceIsBeta = sl && sl !== '' &&
-      !PROVIDER_LANGUAGE_MAPPINGS.DEEPL[sourceLang.toLowerCase()] &&
-      PROVIDER_LANGUAGE_MAPPINGS.DEEPL_BETA[sourceLang.toLowerCase()];
+    const hasGeneratedXmlMarkup = textsToTranslate.some(text => GENERATED_XML_MARKUP_PATTERN.test(text));
 
-    // Check if tl is a beta language
-    const targetIsBeta = tl &&
-      !PROVIDER_LANGUAGE_MAPPINGS.DEEPL[targetLang.toLowerCase()] &&
-      PROVIDER_LANGUAGE_MAPPINGS.DEEPL_BETA[targetLang.toLowerCase()];
-
-    // Auto-enable beta languages if needed
-    if (sourceIsBeta || targetIsBeta) {
-      betaLanguagesEnabled = true;
-      logger.info(`[DeepL] Auto-enabling beta languages for ${sourceIsBeta ? 'source' : ''}${sourceIsBeta && targetIsBeta ? ' and ' : ''}${targetIsBeta ? 'target' : ''} language`);
-    }
-
-    // Add key info log for translation start
-    logger.info(`[DeepL] Starting translation: ${validTexts.join('').length} chars, ${validTexts.length} segments (filtered from ${chunkTexts.length}), beta languages: ${betaLanguagesEnabled}`);
-
-    // Build request body with valid texts only (with text markers for newlines)
+    // Plain-text requests must preserve literal XML-looking text. XML mode
+    // uses the escaped, marker-prepared variant above.
     const requestBody = new URLSearchParams();
-    textsToTranslate.forEach(text => requestBody.append('text', text));
 
     // DeepL uses empty source_lang for auto-detection
     if (sl && sl !== '') {
@@ -389,32 +397,88 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     }
     requestBody.append('target_lang', tl);
 
-    // Add formality parameter (not supported for beta languages)
+    // DeepL accepts preference-style values universally, while strict formality
+    // values require confirmed target capability from the v3 language catalog.
     const formality = await getDeeplFormalityAsync() || 'default';
-    if (formality !== 'default' && !betaLanguagesEnabled) {
+    const strictFormality = formality === 'more' || formality === 'less';
+    let canSendFormality = formality === 'prefer_more' || formality === 'prefer_less';
+    if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
+    if (strictFormality && apiKey) {
+      try {
+        const { catalog } = await fetchDeepLLanguageCatalogWithKeyFailover({
+          apiKey: this._getCapabilityDiscoveryKeys(apiKey, apiKeys),
+          apiTier,
+          signal: abortController?.signal,
+        });
+        canSendFormality = matchDeepLFormality(catalog, targetLang) === 'supported';
+      } catch {
+        if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
+        // Capability discovery is optional; translation should proceed without strict formality.
+      }
+    }
+    if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
+    if (formality !== 'default' && canSendFormality) {
       requestBody.append('formality', formality);
     }
 
-    // Add beta languages parameter if enabled
-    if (betaLanguagesEnabled) {
-      requestBody.append('enable_beta_languages', '1');
-    }
-
+    // XML capability gating: per official docs, tag_handling is a
+    // source-and-target feature, so it must be confirmed on BOTH the source
+    // and target language records (GET /v3/languages?resource=translate_text
+    // &include=beta). Without tag_handling support DeepL translates tags as
+    // regular text, so omitting tag_handling when generated <x>/<br> markup
+    // is present is NOT a safe fallback — it would corrupt placeholders and
+    // newline structure. Fail fast with LANGUAGE_PAIR_NOT_SUPPORTED instead
+    // of translating as plain text. Narrow exception: texts with zero
+    // generated <x>/<br> markup need no XML mode, so they take the
+    // plain-text path without tag_handling even when capability metadata is
+    // unavailable (fetch failure returns unknown) — nothing can be
+    // corrupted. Metadata fetch failure with markup present also fails fast,
+    // since correctness cannot be guaranteed.
     // CRITICAL: Add XML tag handling parameters
     // This enables DeepL's native XML tag preservation.
     // We MUST NOT use 'ignore_tags' for <x> or <n1> because DeepL's engine often completely deletes
     // empty ignored tags (which causes the translated output to lose SRT tags and newlines).
     // By simply enabling XML mode, DeepL treats them as structural elements and preserves them perfectly.
-    requestBody.append('tag_handling', 'xml');
-    
-    // IMPORTANT: Force DeepL to treat <n1>, <n2>, and <br> as hard sentence splits.
-    // This prevents DeepL from artificially moving newline markers to the beginning or end of a translation block.
-    requestBody.append('splitting_tags', 'n1,n2,br');
+    if (hasGeneratedXmlMarkup) {
+      if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
+      let tagHandlingCapability = 'unknown';
+      try {
+        const { catalog } = await fetchDeepLLanguageCatalogWithKeyFailover({
+          apiKey: this._getCapabilityDiscoveryKeys(apiKey, apiKeys),
+          apiTier,
+          signal: abortController?.signal,
+        });
+        tagHandlingCapability = matchDeepLTagHandling(catalog, sourceLang, targetLang);
+      } catch {
+        if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
+        tagHandlingCapability = 'unknown';
+      }
+      if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
+      if (tagHandlingCapability !== 'supported') {
+        const capabilityError = new Error(
+          `DeepL XML tag handling is not available for this language pair (capability: ${tagHandlingCapability})`,
+        );
+        capabilityError.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
+        throw capabilityError;
+      }
+      requestBody.append('tag_handling', 'xml');
 
-    logger.debug('[DeepL] XML tag handling enabled', {
-      tag_handling: 'xml',
-      splitting_tags: 'n1,n2,br'
-    });
+      // IMPORTANT: Force DeepL to treat <n1>, <n2>, and <br> as hard sentence splits.
+      // This prevents DeepL from artificially moving newline markers to the beginning or end of a translation block.
+      requestBody.append('splitting_tags', 'n1,n2,br');
+
+      logger.debug('[DeepL] XML tag handling enabled', {
+        tag_handling: 'xml',
+        splitting_tags: 'n1,n2,br'
+      });
+    } else {
+      logger.debug('[DeepL] Plain-text path: no generated XML markup, omitting tag_handling', {
+        textCount: validTexts.length
+      });
+    }
+
+    (hasGeneratedXmlMarkup ? textsToTranslate : validTexts.map(text => sanitizeText(text, false)))
+      .forEach(text => requestBody.append('text', text));
 
     // 1. Prepare rich context (Environmental + Compact History)
     // DeepL context is free and significantly improves quality for related segments.
@@ -443,7 +507,6 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
       totalChars: this._calculateTraditionalCharCount(validTexts),
       sourceLang: sl || 'auto',
       targetLang: tl,
-      betaLanguages: betaLanguagesEnabled,
       hasXMLPlaceholders,
       hasContext: !!richContext
     });
@@ -451,6 +514,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
     const originalCharCount = chunkTexts.reduce((s, t) => s + getTextInfo(t).length, 0);
 
     try {
+      if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
       const result = await this._executeRequest({
         url: apiUrl,
         fetchOptions: {
@@ -513,20 +577,20 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
           // Restore ALL newlines using the unified NewlineManager
           const restoredTranslations = validTranslations.map(translation => {
-            // Step 0: Restore standard <br/> tags back to newlines
-            let restored = translation.replace(/<br\s*\/?>/gi, '\n');
+            let restored = translation;
 
-            // Step 1: Restore newlines from markers (fallback)
-            restored = NewlineManager.restore(restored);
+            if (hasGeneratedXmlMarkup) {
+              // Restore standard <br/> tags back to newlines and markers.
+              restored = restored.replace(/<br\s*\/?>/gi, '\n');
+              restored = NewlineManager.restore(restored);
 
-            // Step 2: Unescape XML entities back to original characters
-            restored = unescapeXML(restored);
+              // Unescape XML entities back to original characters.
+              restored = unescapeXML(restored);
 
-            // Step 3: Restore SubtitleTextProtector tokens.
-            // Restore newline tokens (which were sent as <br id="...">)
-            restored = restored.replace(/<br\s+id\s*=\s*["']SUB_NL_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/br>\s*)?/gi, '@@SUB_NL_$1@@');
-            // Restore other tokens (which were sent as <x id="...">)
-            restored = restored.replace(/<x\s+id\s*=\s*["']SUB_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/x>\s*)?/gi, '@@SUB_$1@@');
+              // Restore SubtitleTextProtector tokens.
+              restored = restored.replace(/<br\s+id\s*=\s*["']SUB_NL_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/br>\s*)?/gi, '@@SUB_NL_$1@@');
+              restored = restored.replace(/<x\s+id\s*=\s*["']SUB_([A-Za-z0-9_]+)["']\s*\/?>\s*(?:<\/x>\s*)?/gi, '@@SUB_$1@@');
+            }
 
             return restored;
           });
@@ -581,6 +645,7 @@ export class DeepLTranslateProvider extends BaseTranslateProvider {
 
       return finalResult;
     } catch (error) {
+      if (abortController?.signal?.aborted) throw createOperationAbortError(abortController.signal);
       if (this._isUnsupportedLanguageError(error)) {
         error.type = ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED;
         throw error;

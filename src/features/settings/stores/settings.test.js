@@ -15,6 +15,23 @@ import {
   listDesktopFabExclusions,
   DESKTOP_FAB_EXCLUSIONS_EXPORT_KEY,
 } from '@/features/desktop-fab/desktopFabExclusions.js';
+import { MissingDeepLLanguageKeyError } from '@/features/translation/providers/DeepLLanguageDiscovery.js';
+
+const deepLLanguageDiscoveryMocks = vi.hoisted(() => ({
+  fetch: vi.fn(),
+  fetchFailover: vi.fn(),
+  identity: vi.fn(),
+}));
+
+vi.mock('@/features/translation/providers/DeepLLanguageDiscovery.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    fetchDeepLLanguageCatalog: (...args) => deepLLanguageDiscoveryMocks.fetch(...args),
+    fetchDeepLLanguageCatalogWithKeyFailover: (...args) => deepLLanguageDiscoveryMocks.fetchFailover(...args),
+    getDeepLLanguageIdentity: (...args) => deepLLanguageDiscoveryMocks.identity(...args),
+  };
+});
 
 // Mock Dependencies
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
@@ -65,6 +82,22 @@ describe('Settings Store', () => {
       success: true,
       state: { ids: [], revision: 1 }
     });
+    deepLLanguageDiscoveryMocks.fetch.mockReset();
+    deepLLanguageDiscoveryMocks.fetchFailover.mockReset();
+    deepLLanguageDiscoveryMocks.fetchFailover.mockImplementation(
+      (options) => deepLLanguageDiscoveryMocks.fetch(options),
+    );
+    deepLLanguageDiscoveryMocks.identity.mockImplementation((keys, tier = 'free') => {
+      const selected = String(keys || '').split('\n').map(key => key.trim()).filter(Boolean)
+        .find(key => tier !== 'pro' || !key.endsWith(':fx'));
+      if (!selected) throw new MissingDeepLLanguageKeyError();
+      return `${tier}:${selected}`;
+    });
+    deepLLanguageDiscoveryMocks.fetch.mockImplementation(async ({ apiKey, apiTier }) => ({
+      catalog: [],
+      identity: deepLLanguageDiscoveryMocks.identity(apiKey, apiTier),
+      fetchedAt: Date.now(),
+    }));
   });
 
   const getStorageChangeListener = async (store) => {
@@ -995,6 +1028,28 @@ describe('Settings Store', () => {
       expect(storageManager.remove).not.toHaveBeenCalled();
     });
 
+    it('removes the legacy DeepL beta flag from imported state and storage', async () => {
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        TRANSLATION_API: 'google',
+        DEEPL_BETA_LANGUAGES_ENABLED: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({
+        updates: {},
+        removals: ['DEEPL_BETA_LANGUAGES_ENABLED'],
+        logs: [],
+      });
+      const store = useSettingsStore();
+
+      await store.importSettings({ _exported: true, DEEPL_BETA_LANGUAGES_ENABLED: false });
+
+      expect(store.settings.THEME).toBe('dark');
+      expect(store.settings.TRANSLATION_API).toBe('google');
+      expect(store.settings).not.toHaveProperty('DEEPL_BETA_LANGUAGES_ENABLED');
+      expect(storageManager.remove).toHaveBeenCalledWith(expect.arrayContaining(['DEEPL_BETA_LANGUAGES_ENABLED']));
+      expect(storageManager.set.mock.calls.every(([snapshot]) => !Object.hasOwn(snapshot, 'DEEPL_BETA_LANGUAGES_ENABLED'))).toBe(true);
+    });
+
     it('importSettings should remove obsolete endpoint overrides returned by migrations', async () => {
       secureStorage.processImportedSettings.mockResolvedValueOnce({
         THEME: 'dark',
@@ -1268,6 +1323,384 @@ describe('Settings Store', () => {
       
       const result = store.validateSettings();
       expect(result.errors).toContain('prompt:PROMPT_SUBTITLE_USER:validation_prompt_template_missing_placeholders');
+    });
+  });
+
+  describe('DeepL capability validation', () => {
+    const entry = (lang, status = 'stable', source = true, target = true) => ({
+      lang, normalizedTag: lang.toLowerCase(), name: lang,
+      usableAsSource: source, usableAsTarget: target, status,
+      isBeta: status === 'beta', metadataValid: true, catalogComplete: true,
+      features: { formalityStatus: null, formalitySupport: 'unknown' },
+    });
+    const setupDeepL = (store, { source = 'en', target = 'fa', provider = 'deepl', key = 'test-key', tier = 'free' } = {}) => {
+      Object.assign(store.settings, {
+        TRANSLATION_API: provider,
+        DEEPL_API_KEY: key,
+        DEEPL_API_TIER: tier,
+        SOURCE_LANGUAGE: source,
+        TARGET_LANGUAGE: target,
+      });
+    };
+    const setCatalog = async (store, catalog, fetchedAt = Date.now()) => {
+      const identity = deepLLanguageDiscoveryMocks.identity(store.settings.DEEPL_API_KEY, store.settings.DEEPL_API_TIER);
+      deepLLanguageDiscoveryMocks.fetch.mockResolvedValueOnce({ catalog, identity, fetchedAt });
+      await store.refreshDeepLLanguageCapabilities();
+    };
+
+    it('allows a supported beta language even if the legacy beta flag is false', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'fa' });
+      await setCatalog(store, [entry('en'), entry('de'), entry('fa', 'beta')]);
+
+      Object.defineProperty(store.settings, 'DEEPL_BETA_LANGUAGES_ENABLED', {
+        configurable: true,
+        enumerable: true,
+        get: vi.fn(() => false),
+      });
+      const result = store.validateSettings();
+      expect(result.errors.filter(e => e.includes('deepl'))).toHaveLength(0);
+      expect(Object.getOwnPropertyDescriptor(store.settings, 'DEEPL_BETA_LANGUAGES_ENABLED').get).not.toHaveBeenCalled();
+    });
+
+    it('uses direction flags and preserves exact BCP47 variants in errors', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'zh_TW', target: 'zh-Hans' });
+      await setCatalog(store, [entry('zh-TW', 'stable', false, true), entry('zh-Hans', 'stable', true, false)]);
+
+      const result = store.validateSettings();
+      expect(result.errors).toContain('validation_deepl_source_language_unsupported:zh_TW');
+      expect(result.errors).toContain('validation_deepl_target_language_unsupported:zh-Hans');
+    });
+
+    it('accepts legacy zh-cn target when the catalog exposes zh-Hans', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'zh-cn' });
+      await setCatalog(store, [entry('en'), entry('zh-Hans')]);
+
+      expect(store.validateSettings().errors.filter(error => error.includes('deepl'))).toHaveLength(0);
+    });
+
+    it('accepts ZH_CN target after normalization without changing the saved value', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'ZH_CN' });
+      await setCatalog(store, [entry('en'), entry('zh-Hans')]);
+
+      expect(store.validateSettings().errors.filter(error => error.includes('deepl'))).toHaveLength(0);
+      expect(store.settings.TARGET_LANGUAGE).toBe('ZH_CN');
+    });
+
+    it('accepts legacy zh-tw source when the catalog exposes zh', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'zh-tw', target: 'en' });
+      await setCatalog(store, [entry('zh'), entry('en')]);
+
+      expect(store.validateSettings().errors.filter(error => error.includes('deepl'))).toHaveLength(0);
+    });
+
+    it('rejects legacy zh-tw target if its resolved zh-Hant entry is unusable', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'zh-tw' });
+      await setCatalog(store, [entry('en'), entry('zh-Hant', 'stable', false, false)]);
+
+      expect(store.validateSettings().errors).toContain('validation_deepl_target_language_unsupported:zh-tw');
+    });
+
+    it('keeps pt distinct from pt-BR when validating a saved target', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'pt' });
+      await setCatalog(store, [entry('en'), entry('pt-BR')]);
+
+      expect(store.validateSettings().errors).toContain('validation_deepl_target_language_unsupported:pt');
+    });
+
+    it('accepts pt_BR against pt-BR without changing the saved value', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'pt_BR' });
+      await setCatalog(store, [entry('en'), entry('pt-BR')]);
+
+      expect(store.validateSettings().errors.filter(error => error.includes('deepl'))).toHaveLength(0);
+      expect(store.settings.TARGET_LANGUAGE).toBe('pt_BR');
+    });
+
+    it('allows auto-detect source and valid standard languages', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'auto', target: 'de' });
+      await setCatalog(store, [entry('de')]);
+      expect(store.validateSettings().errors.filter(e => e.includes('deepl'))).toHaveLength(0);
+    });
+
+    it('blocks save synchronously as unverified without fresh matching metadata', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de' });
+      deepLLanguageDiscoveryMocks.fetch.mockRejectedValueOnce(new TypeError('offline'));
+      await store.refreshDeepLLanguageCapabilities();
+
+      expect(store.deepLLanguageCapabilities.status).toBe('error');
+      expect(store.validateSettings().errors).toContain('validation_deepl_languages_unverified');
+      expect(deepLLanguageDiscoveryMocks.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes DeepL with the current draft proxy without persisting it, and discards results after proxy edits', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de' });
+      Object.assign(store.settings, {
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'corrected.draft.proxy',
+        PROXY_PORT: 8443,
+        PROXY_USERNAME: 'draft-user',
+        PROXY_PASSWORD: 'draft-secret',
+      });
+      let resolveDiscovery;
+      deepLLanguageDiscoveryMocks.fetchFailover.mockReturnValueOnce(
+        new Promise(resolve => { resolveDiscovery = resolve; }),
+      );
+
+      const refresh = store.refreshDeepLLanguageCapabilities();
+      await vi.waitFor(() => expect(deepLLanguageDiscoveryMocks.fetchFailover).toHaveBeenCalledTimes(1));
+      expect(deepLLanguageDiscoveryMocks.fetchFailover.mock.calls[0][0].proxySettings).toEqual({
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'corrected.draft.proxy',
+        PROXY_PORT: 8443,
+        PROXY_USERNAME: 'draft-user',
+        PROXY_PASSWORD: 'draft-secret',
+      });
+      expect(storageManager.set).not.toHaveBeenCalled();
+
+      // A proxy draft edit aborts and invalidates the in-flight Options
+      // refresh; a late response from the old route cannot become ready.
+      store.settings.PROXY_HOST = 'newer.draft.proxy';
+      resolveDiscovery({
+        catalog: [entry('en'), entry('de')],
+        identity: deepLLanguageDiscoveryMocks.identity('test-key', 'free'),
+        fetchedAt: Date.now(),
+      });
+      await refresh;
+
+      expect(store.deepLLanguageCapabilities.status).toBe('idle');
+      expect(store.validateSettings().errors).toContain('validation_deepl_languages_unverified');
+      expect(storageManager.set).not.toHaveBeenCalled();
+    });
+
+    it('validates and saves DeepL with corrected draft proxy while persisted proxy stays broken until Save', async () => {
+      const persisted = {
+        ...getPersistedDefaultSettings(),
+        TRANSLATION_API: 'deepl',
+        DEEPL_API_KEY: 'test-key',
+        DEEPL_API_TIER: 'free',
+        SOURCE_LANGUAGE: 'en',
+        TARGET_LANGUAGE: 'de',
+        PROXY_ENABLED: true,
+        PROXY_TYPE: 'http',
+        PROXY_HOST: 'broken.saved.proxy',
+        PROXY_PORT: 1,
+        PROXY_USERNAME: '',
+        PROXY_PASSWORD: '',
+      };
+      storageManager.get.mockResolvedValue(persisted);
+      storageManager.set.mockImplementation(async snapshot => {
+        Object.assign(persisted, snapshot);
+        return true;
+      });
+
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.settings.PROXY_HOST).toBe('broken.saved.proxy');
+
+      store.updateSettingLocally('PROXY_HOST', 'corrected.draft.proxy');
+      store.updateSettingLocally('PROXY_PORT', 8443);
+      deepLLanguageDiscoveryMocks.fetchFailover.mockResolvedValueOnce({
+        catalog: [entry('en'), entry('de')],
+        identity: deepLLanguageDiscoveryMocks.identity('test-key', 'free'),
+        fetchedAt: Date.now(),
+      });
+
+      await store.refreshDeepLLanguageCapabilities();
+
+      expect(deepLLanguageDiscoveryMocks.fetchFailover).toHaveBeenCalledWith(expect.objectContaining({
+        apiKey: 'test-key',
+        apiTier: 'free',
+        proxySettings: expect.objectContaining({
+          PROXY_HOST: 'corrected.draft.proxy',
+          PROXY_PORT: 8443,
+        }),
+      }));
+      expect(store.validateSettings()).toMatchObject({ isValid: true, errors: [] });
+      expect(persisted.PROXY_HOST).toBe('broken.saved.proxy');
+      expect(storageManager.set).not.toHaveBeenCalled();
+
+      await store.saveAllSettings();
+
+      expect(storageManager.set).toHaveBeenCalledTimes(1);
+      expect(persisted.PROXY_HOST).toBe('corrected.draft.proxy');
+      expect(persisted.PROXY_PORT).toBe(8443);
+
+      // This test models a local persisted snapshot; restore shared storage
+      // mocks so subsequent store tests keep their own storage behavior.
+      storageManager.get.mockReset().mockResolvedValue({});
+      storageManager.set.mockReset().mockResolvedValue(true);
+    });
+
+    it('blocks an expired snapshot without using stale metadata in validation', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de' });
+      await setCatalog(store, [entry('en'), entry('de')], Date.now() - 300001);
+
+      expect(store.validateSettings().errors).toContain('validation_deepl_languages_unverified');
+      expect(deepLLanguageDiscoveryMocks.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps missing credentials on the provider-config path without discovery', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de', key: '' });
+
+      const state = await store.refreshDeepLLanguageCapabilities();
+      const result = store.validateSettings();
+      expect(state.status).toBe('missing-key');
+      expect(deepLLanguageDiscoveryMocks.fetch).not.toHaveBeenCalled();
+      expect(result.errors).toContain('ERRORS_API_CONFIG_INVALID');
+      expect(result.errors).not.toContain('validation_deepl_languages_unverified');
+    });
+
+    it('treats a Pro tier with only a :fx key as provider configuration invalid', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de', key: 'free-key:fx', tier: 'pro' });
+
+      const state = await store.refreshDeepLLanguageCapabilities();
+      const result = store.validateSettings();
+      expect(state.status).toBe('missing-key');
+      expect(deepLLanguageDiscoveryMocks.fetch).not.toHaveBeenCalled();
+      expect(result.errors).toContain('ERRORS_API_CONFIG_INVALID');
+      expect(result.errors).not.toContain('validation_deepl_languages_unverified');
+    });
+
+    it('fails over Options refresh past an invalid first key and validates the succeeding identity', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de', key: 'bad-key\ngood-key' });
+      // Mirror the production 401-only iteration over the per-key mock.
+      deepLLanguageDiscoveryMocks.fetchFailover.mockImplementation(async ({ apiKey, apiTier, signal }) => {
+        const keys = String(apiKey || '').split('\n').map(key => key.trim()).filter(Boolean)
+          .filter(key => apiTier !== 'pro' || !key.endsWith(':fx'));
+        let lastError = null;
+        for (const key of keys) {
+          try {
+            return await deepLLanguageDiscoveryMocks.fetch({ apiKey: key, apiTier, signal });
+          } catch (error) {
+            if (Number(error?.statusCode) === 401) { lastError = error; continue; }
+            throw error;
+          }
+        }
+        throw lastError;
+      });
+      const authError = Object.assign(new Error('DeepL language discovery failed (401)'), { statusCode: 401 });
+      deepLLanguageDiscoveryMocks.fetch.mockImplementation(async ({ apiKey, apiTier }) => {
+        if (apiKey === 'bad-key') throw authError;
+        return {
+          catalog: [entry('en'), entry('de')],
+          identity: deepLLanguageDiscoveryMocks.identity(apiKey, apiTier),
+          fetchedAt: Date.now(),
+        };
+      });
+
+      const state = await store.refreshDeepLLanguageCapabilities();
+
+      expect(state.status).toBe('ready');
+      expect(state.identity).toBe(deepLLanguageDiscoveryMocks.identity('good-key', 'free'));
+      expect(deepLLanguageDiscoveryMocks.fetch.mock.calls.map(call => call[0].apiKey)).toEqual(['bad-key', 'good-key']);
+      expect(store.validateSettings().errors.filter(error => error.includes('deepl'))).toHaveLength(0);
+    });
+
+    it('reports fetch failure when every configured key returns 401', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de', key: 'bad-1\nbad-2' });
+      deepLLanguageDiscoveryMocks.fetchFailover.mockImplementation(async ({ apiKey, apiTier, signal }) => {
+        const keys = String(apiKey || '').split('\n').map(key => key.trim()).filter(Boolean);
+        let lastError = null;
+        for (const key of keys) {
+          try {
+            return await deepLLanguageDiscoveryMocks.fetch({ apiKey: key, apiTier, signal });
+          } catch (error) {
+            if (Number(error?.statusCode) === 401) { lastError = error; continue; }
+            throw error;
+          }
+        }
+        throw lastError;
+      });
+      deepLLanguageDiscoveryMocks.fetch.mockRejectedValue(
+        Object.assign(new Error('DeepL language discovery failed (401)'), { statusCode: 401 }),
+      );
+
+      const state = await store.refreshDeepLLanguageCapabilities();
+
+      expect(state.status).toBe('error');
+      expect(deepLLanguageDiscoveryMocks.fetch).toHaveBeenCalledTimes(2);
+      expect(store.validateSettings().errors).toContain('validation_deepl_languages_unverified');
+    });
+
+    it('invalidates a ready snapshot on credential or tier edits and ignores stale responses', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { source: 'en', target: 'de' });
+      await setCatalog(store, [entry('en'), entry('de')]);
+      expect(store.validateSettings().errors.filter(e => e.includes('deepl'))).toHaveLength(0);
+      store.deepLLanguageCapabilities.fetchedAt = Date.now() - 300000;
+
+      let resolveOld;
+      deepLLanguageDiscoveryMocks.fetch.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+      const oldRefresh = store.refreshDeepLLanguageCapabilities();
+      store.settings.DEEPL_API_KEY = 'new-key';
+      store.settings.DEEPL_API_TIER = 'pro';
+      expect(store.deepLLanguageCapabilities.status).toBe('idle');
+      const identity = deepLLanguageDiscoveryMocks.identity('new-key', 'pro');
+      deepLLanguageDiscoveryMocks.fetch.mockResolvedValueOnce({ catalog: [entry('en'), entry('de')], identity, fetchedAt: Date.now() });
+      await store.refreshDeepLLanguageCapabilities();
+      resolveOld({ catalog: [entry('fa', 'beta')], identity: deepLLanguageDiscoveryMocks.identity('test-key', 'free'), fetchedAt: Date.now() });
+      await oldRefresh;
+
+      expect(store.deepLLanguageCapabilities.identity).toBe(identity);
+      expect(store.validateSettings().errors.filter(e => e.includes('deepl'))).toHaveLength(0);
+    });
+
+    it('does not persist capability snapshots and supports explicit DeepL refresh under another primary provider', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { provider: 'google' });
+      const identity = deepLLanguageDiscoveryMocks.identity('test-key', 'free');
+      deepLLanguageDiscoveryMocks.fetch.mockResolvedValueOnce({
+        catalog: [entry('en'), entry('fa', 'beta')], identity, fetchedAt: Date.now(),
+      });
+      const result = await store.refreshDeepLLanguageCapabilities({ forProvider: 'deepl' });
+      expect(result.status).toBe('ready');
+      expect(store.settings.TRANSLATION_API).toBe('google');
+      store.settings.SOURCE_LANGUAGE = 'tl';
+      store.settings.TARGET_LANGUAGE = 'de';
+      expect(store.validateSettings().errors.some(error => error.includes('deepl'))).toBe(false);
+
+      const callsBeforeOtherProvider = deepLLanguageDiscoveryMocks.fetch.mock.calls.length;
+      await store.refreshDeepLLanguageCapabilities({ forProvider: 'google' });
+      await store.refreshDeepLLanguageCapabilities();
+      expect(deepLLanguageDiscoveryMocks.fetch).toHaveBeenCalledTimes(callsBeforeOtherProvider);
+      expect(store.deepLLanguageCapabilities.status).toBe('ready');
+
+      // A selector can consume this ready catalog for its own DeepL source or
+      // target control, without changing primary-provider save validation.
+      expect(store.deepLLanguageCapabilities.catalog).toEqual(expect.arrayContaining([
+        expect.objectContaining({ normalizedTag: 'en' }),
+        expect.objectContaining({ normalizedTag: 'fa', status: 'beta' }),
+      ]));
+
+      await store.saveAllSettings();
+      expect(storageManager.set.mock.calls.at(-1)[0]).not.toHaveProperty('deepLLanguageCapabilities');
+    });
+
+    it('does not perform an explicit DeepL refresh for missing credentials', async () => {
+      const store = useSettingsStore();
+      setupDeepL(store, { provider: 'google', key: '' });
+
+      const result = await store.refreshDeepLLanguageCapabilities({ forProvider: 'deepl' });
+      expect(result.status).toBe('missing-key');
+      expect(deepLLanguageDiscoveryMocks.fetch).not.toHaveBeenCalled();
+      expect(store.settings.TRANSLATION_API).toBe('google');
     });
   });
 

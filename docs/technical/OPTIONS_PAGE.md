@@ -24,6 +24,7 @@ Most other configurations are buffered in the local state and require the user t
 - **Translation Providers**: API keys, model selections, and provider-specific URLs.
 - **Custom Provider List**: The Providers-tab checkbox stages the enabled state independently. When enabled, Manage List opens a drawer where Done stages only the ordered provider IDs; closing without Done discards that opening's list edits. The main Save button persists both settings. Disabling the list preserves its saved order for later use.
 - **Languages**: Source and Target language preferences.
+- **DeepL language validation**: When DeepL is the current global primary provider, its language choices are checked against fresh v3 language metadata. Beta languages are marked with a localized **Beta** suffix; a selection that is unsupported or cannot be verified is preserved for visibility, but Save is blocked until it is resolved. If metadata cannot be fetched (including while offline), Save remains blocked; missing credentials link to Providers for configuration. There is no Enable Beta Languages setting. The legacy setting is removed safely during migration and settings import.
 - **Activation Modes**: Enabling/disabling Select Element, Text Selection, or Whole Page translation.
 - **Advanced Settings**: Proxy configurations, exclusion lists, and debug mode.
 - **Prompt Templates**: Custom templates for AI-based translation providers.

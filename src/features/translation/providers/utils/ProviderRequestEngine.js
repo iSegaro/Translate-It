@@ -116,7 +116,7 @@ function shouldFailoverApiKey(provider, error) {
   }
 }
 
-function createOperationAbortError(signal) {
+export function createOperationAbortError(signal) {
   const isUserAbort = signal?.reason === 'user-cancelled' || signal?.reason === 'user_cancelled';
   const error = new Error(isUserAbort ? 'Translation cancelled by user' : 'Translation operation aborted');
   error.name = 'AbortError';

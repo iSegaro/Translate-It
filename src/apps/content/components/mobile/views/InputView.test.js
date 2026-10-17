@@ -70,7 +70,6 @@ vi.mock('@/components/shared/LanguageSelector.vue', () => ({
       'targetLanguage',
       'provider',
       'compact',
-      'beta',
       'showDefaultActions',
       'defaultActionsEnabled',
       'sourceIsSavedDefault',
@@ -205,7 +204,6 @@ describe('InputView', () => {
       isDarkTheme: false,
       isInitialized: false,
       settings: {
-        DEEPL_BETA_LANGUAGES_ENABLED: false,
         SOURCE_LANGUAGE: 'auto',
         TARGET_LANGUAGE: 'en',
         TRANSLATION_API: 'google'

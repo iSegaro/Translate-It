@@ -10,11 +10,52 @@ const deeplConfigMocks = vi.hoisted(() => ({
   getApiKeys: vi.fn(),
   getApiTier: vi.fn(),
   getFormality: vi.fn(),
-  getBetaLanguagesEnabled: vi.fn(),
   getFreeApiUrl: vi.fn(),
   getProApiUrl: vi.fn(),
   getAIContextEnabled: vi.fn(),
   getAIHistoryEnabled: vi.fn(),
+}));
+const deepLLanguageDiscoveryMock = vi.hoisted(() => ({ fetch: vi.fn(), fetchFailover: vi.fn() }));
+const deepLDiscoveryActual = vi.hoisted(() => ({ current: null }));
+
+vi.mock('./DeepLLanguageDiscovery.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  deepLDiscoveryActual.current = actual;
+  return {
+  fetchDeepLLanguageCatalog: deepLLanguageDiscoveryMock.fetch,
+  fetchDeepLLanguageCatalogWithKeyFailover: (...args) => deepLLanguageDiscoveryMock.fetchFailover(...args),
+  matchDeepLFormality: (catalog, tag) => {
+    const normalizedTag = tag.toLowerCase().replace(/_/g, '-');
+    const resolvedTag = normalizedTag === 'zh-cn' ? 'zh-hans' : normalizedTag;
+    return catalog.find(entry => entry.normalizedTag === resolvedTag)?.features?.formalitySupport ?? 'unknown';
+  },
+  matchDeepLTagHandling: (catalog, sourceTag, targetTag) => {
+    const normalize = (tag) => String(tag ?? '').toLowerCase().replace(/_/g, '-').trim();
+    const isAutoSource = !normalize(sourceTag) || normalize(sourceTag) === 'auto';
+    const check = (tag, direction) => {
+      const normalizedTag = normalize(tag);
+      const resolvedTag = normalizedTag === 'zh-cn'
+        ? (direction === 'source' ? 'zh' : 'zh-hans')
+        : normalizedTag === 'zh-tw'
+          ? (direction === 'source' ? 'zh' : 'zh-hant')
+          : normalizedTag;
+      const entry = catalog.find(item => item.normalizedTag === resolvedTag);
+      if (!entry) return 'unknown';
+      if (entry.metadataValid === false) return 'unknown';
+      return entry.features?.tagHandlingSupport ?? 'unknown';
+    };
+    const targetResult = check(targetTag, 'target');
+    if (isAutoSource) return targetResult;
+    const sourceResult = check(sourceTag, 'source');
+    if (sourceResult === 'supported' && targetResult === 'supported') return 'supported';
+    if (sourceResult === 'unknown' || targetResult === 'unknown') return 'unknown';
+    return 'unsupported';
+  },
+  };
+});
+
+vi.mock('@/shared/proxy/ProxySettings.js', () => ({
+  resolveProxyConfig: vi.fn(async () => ({})),
 }));
 
 vi.mock('@/shared/config/config.js', async (importOriginal) => {
@@ -24,7 +65,6 @@ vi.mock('@/shared/config/config.js', async (importOriginal) => {
     getDeeplApiKeysAsync: deeplConfigMocks.getApiKeys,
     getDeeplApiTierAsync: deeplConfigMocks.getApiTier,
     getDeeplFormalityAsync: deeplConfigMocks.getFormality,
-    getDeeplBetaLanguagesEnabledAsync: deeplConfigMocks.getBetaLanguagesEnabled,
     getDeeplFreeApiUrlAsync: deeplConfigMocks.getFreeApiUrl,
     getDeeplProApiUrlAsync: deeplConfigMocks.getProApiUrl,
     getAIContextTranslationEnabledAsync: deeplConfigMocks.getAIContextEnabled,
@@ -66,6 +106,12 @@ const createMalformedJsonResponse = () => {
   return createResponse();
 };
 
+const tagCatalog = (sourceSupport = 'supported', targetSupport = 'supported') => ([
+  { normalizedTag: 'en', metadataValid: true, status: 'stable', usableAsSource: true, usableAsTarget: true, features: { tagHandlingSupport: sourceSupport } },
+  { normalizedTag: 'fa', metadataValid: true, status: 'stable', usableAsSource: true, usableAsTarget: true, features: { tagHandlingSupport: targetSupport } },
+  { normalizedTag: 'de', metadataValid: true, status: 'stable', usableAsSource: true, usableAsTarget: true, features: { tagHandlingSupport: 'supported' } },
+]);
+
 describe('DeepLTranslateProvider response contract', () => {
   let provider;
 
@@ -74,7 +120,9 @@ describe('DeepLTranslateProvider response contract', () => {
     deeplConfigMocks.getApiKeys.mockReset().mockResolvedValue(['key']);
     deeplConfigMocks.getApiTier.mockReset().mockResolvedValue('free');
     deeplConfigMocks.getFormality.mockReset().mockResolvedValue('default');
-    deeplConfigMocks.getBetaLanguagesEnabled.mockReset().mockResolvedValue(false);
+    deepLLanguageDiscoveryMock.fetch.mockReset();
+    deepLLanguageDiscoveryMock.fetchFailover.mockReset()
+      .mockImplementation((options) => deepLLanguageDiscoveryMock.fetch(options));
     deeplConfigMocks.getFreeApiUrl.mockReset().mockResolvedValue('https://api-free.deepl.test/translate');
     deeplConfigMocks.getProApiUrl.mockReset().mockResolvedValue('https://api.deepl.test/translate');
     deeplConfigMocks.getAIContextEnabled.mockReset().mockResolvedValue(false);
@@ -131,7 +179,11 @@ describe('DeepLTranslateProvider response contract', () => {
     it.each([
       ['zh', 'ZH'],
       ['zh-cn', 'ZH-HANS'],
+      ['ZH_CN', 'ZH-HANS'],
       ['zh-tw', 'ZH-HANT'],
+      ['en-US', 'en-US'],
+      ['pt-BR', 'PT-BR'],
+      ['pt_BR', 'PT-BR'],
     ])('maps Chinese target %s to %s in the request body', async (targetLang, expectedTarget) => {
       await runWithRuntime(['key'], 'free', async () => {
         proxyFetch.mockResolvedValue(createJsonResponse(200, { translations: [{ text: 'translated' }] }, 'OK'));
@@ -178,6 +230,136 @@ describe('DeepLTranslateProvider response contract', () => {
     });
   });
 
+  describe('formality', () => {
+    const supportedCatalog = [{ normalizedTag: 'de', features: { formalitySupport: 'supported' } }];
+
+    const runFormality = async (preference, catalogResult, target = 'de') => {
+      deeplConfigMocks.getFormality.mockResolvedValue(preference);
+      if (catalogResult instanceof Error) deepLLanguageDiscoveryMock.fetch.mockRejectedValue(catalogResult);
+      else deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: catalogResult });
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async params => {
+        capturedBody = params.fetchOptions.body;
+        return params.extractResponse({ translations: [{ text: 'translated' }] });
+      });
+      await provider._translateChunk(['source'], 'en', target, 'selection', null, 0, 1, 0, 1, {});
+      return capturedBody;
+    };
+    let capturedBody;
+
+    it('sends strict values only for a confirmed target, including beta targets', async () => {
+      const body = await runFormality('more', [{ ...supportedCatalog[0], normalizedTag: 'ace' }], 'ace');
+      expect(body.get('formality')).toBe('more');
+      expect(deepLLanguageDiscoveryMock.fetch).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'key', apiTier: 'free' }));
+    });
+
+    it('resolves saved zh-cn target alias for strict formality and preserves source zh-tw mapping', async () => {
+      const catalog = [{ normalizedTag: 'zh-hans', features: { formalitySupport: 'supported' } }];
+      deeplConfigMocks.getFormality.mockResolvedValue('more');
+      deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog });
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async params => {
+        capturedBody = params.fetchOptions.body;
+        return params.extractResponse({ translations: [{ text: 'translated' }] });
+      });
+
+      await provider._translateChunk(['source'], 'ZH_TW', 'zh_cn', 'selection', null, 0, 1, 0, 1, {});
+
+      expect(capturedBody.get('source_lang')).toBe('ZH');
+      expect(capturedBody.get('target_lang')).toBe('ZH-HANS');
+      expect(capturedBody.get('formality')).toBe('more');
+      expect(capturedBody.has('enable_beta_languages')).toBe(false);
+    });
+
+    it.each([
+      ['unsupported', [{ normalizedTag: 'de', features: { formalitySupport: 'unsupported' } }]],
+      ['offline', new Error('offline')],
+    ])('omits strict formality when target capability is %s', async (_label, catalog) => {
+      const body = await runFormality('less', catalog);
+      expect(body.has('formality')).toBe(false);
+    });
+
+    it.each(['prefer_more', 'prefer_less'])('sends preference %s without capability lookup', async preference => {
+      const body = await runFormality(preference, new Error('offline'));
+      expect(body.get('formality')).toBe(preference);
+      expect(deepLLanguageDiscoveryMock.fetch).not.toHaveBeenCalled();
+    });
+
+    it('omits default formality and deprecated beta request parameter', async () => {
+      const body = await runFormality('default', new Error('offline'));
+      expect(body.has('formality')).toBe(false);
+      expect(body.has('enable_beta_languages')).toBe(false);
+    });
+
+    it.each([
+      ['user-cancelled', { type: ErrorTypes.USER_CANCELLED }],
+      ['document-replaced', { name: 'AbortError', operationAborted: true, cancellationReason: 'document-replaced' }],
+    ])('preserves %s cancellation while metadata discovery is pending', async (reason, expected) => {
+      deeplConfigMocks.getFormality.mockResolvedValue('more');
+      let resolveDiscovery;
+      deepLLanguageDiscoveryMock.fetch.mockReturnValue(new Promise(resolve => { resolveDiscovery = resolve; }));
+      const controller = new AbortController();
+      const request = provider._translateChunk(['source'], 'en', 'de', 'selection', controller, 0, 1, 0, 1, {});
+      await vi.waitFor(() => expect(deepLLanguageDiscoveryMock.fetch).toHaveBeenCalled());
+
+      controller.abort(reason);
+      resolveDiscovery({ catalog: supportedCatalog });
+
+      await expect(request).rejects.toMatchObject(expected);
+      expect(proxyFetch).not.toHaveBeenCalled();
+    });
+
+    it('prioritizes cancellation when metadata transport rejects with a network TypeError', async () => {
+      deeplConfigMocks.getFormality.mockResolvedValue('more');
+      const controller = new AbortController();
+      deepLLanguageDiscoveryMock.fetch.mockImplementation(async () => {
+        controller.abort('operation-abort');
+        throw new TypeError('Failed to fetch');
+      });
+
+      await expect(provider._translateChunk(['source'], 'en', 'de', 'selection', controller, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ name: 'AbortError', operationAborted: true, cancellationReason: 'operation-abort' });
+      expect(proxyFetch).not.toHaveBeenCalled();
+    });
+
+    it('omits strict formality after first-key discovery denial while translation failover succeeds', async () => {
+      deeplConfigMocks.getFormality.mockResolvedValue('more');
+      deepLLanguageDiscoveryMock.fetch.mockRejectedValue(new Error('discovery denied'));
+      await runWithRuntime(['bad-key', 'good-key'], 'free', async () => {
+        proxyFetch
+          .mockResolvedValueOnce(createJsonResponse(401, { detail: 'Invalid API key' }, 'Unauthorized'))
+          .mockResolvedValueOnce(createJsonResponse(200, { translations: [{ text: 'translated' }] }, 'OK'));
+
+        await expect(provider._translateChunk(['source'], 'en', 'de', 'selection', null, 0, 1, 0, 1, {}))
+          .resolves.toEqual(['translated']);
+        expect(proxyFetch).toHaveBeenCalledTimes(2);
+        expect(proxyFetch.mock.calls[0][1].body.has('formality')).toBe(false);
+        expect(proxyFetch.mock.calls[1][1].body.has('formality')).toBe(false);
+      });
+    });
+
+    it('sends strict formality on concurrent translations sharing one in-flight discovery', async () => {
+      deeplConfigMocks.getFormality.mockResolvedValue('more');
+      let resolveDiscovery;
+      const discoveryGate = new Promise(resolve => { resolveDiscovery = resolve; });
+      deepLLanguageDiscoveryMock.fetch.mockReturnValue(discoveryGate);
+      const bodies = [];
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async params => {
+        bodies.push(params.fetchOptions.body);
+        return params.extractResponse({ translations: [{ text: 'translated' }] });
+      });
+
+      const first = provider._translateChunk(['first'], 'en', 'de', 'selection', null, 0, 1, 0, 1, {});
+      const second = provider._translateChunk(['second'], 'en', 'de', 'selection', null, 0, 1, 0, 1, {});
+      await vi.waitFor(() => expect(deepLLanguageDiscoveryMock.fetch).toHaveBeenCalledTimes(2));
+      resolveDiscovery({ catalog: supportedCatalog });
+
+      await expect(first).resolves.toEqual(['translated']);
+      await expect(second).resolves.toEqual(['translated']);
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0].get('formality')).toBe('more');
+      expect(bodies[1].get('formality')).toBe('more');
+    });
+  });
+
   describe('runtime key policy', () => {
     it('selects first Pro-compatible key without changing endpoint tier', async () => {
       provider._getConfig.mockRestore();
@@ -188,6 +370,7 @@ describe('DeepLTranslateProvider response contract', () => {
         apiKey: 'pro-key-1',
         apiTier: 'pro',
         apiUrl: 'https://api.deepl.test/translate',
+        apiKeys: ['free-key:fx', 'pro-key-1', 'pro-key-2'],
       });
     });
 
@@ -777,8 +960,10 @@ describe('DeepLTranslateProvider response contract', () => {
   });
 
   it('accepts a response that preserves prepared XML placeholders', async () => {
+    deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
     vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) => {
       expect(options.fetchOptions.body.getAll('text')).toEqual(['before <x id="SUB_TOKEN" /> after']);
+      expect(options.fetchOptions.body.get('tag_handling')).toBe('xml');
       return options.extractResponse({ translations: [{ text: 'translated <x id="SUB_TOKEN" /> text' }] });
     });
 
@@ -786,12 +971,219 @@ describe('DeepLTranslateProvider response contract', () => {
       .resolves.toEqual(['translated @@SUB_TOKEN@@text']);
   });
 
+  it('preserves literal XML-looking text on the plain-text path', async () => {
+    deepLLanguageDiscoveryMock.fetch.mockRejectedValue(new Error('offline'));
+    const source = '< > & &amp; &lt; &gt; &#38; &#x26; mixed\u0001 text';
+    vi.spyOn(provider, '_executeRequest').mockImplementation(async options => {
+      expect(options.fetchOptions.body.getAll('text')).toEqual(['< > & &amp; &lt; &gt; &#38; &#x26; mixed text']);
+      expect(options.fetchOptions.body.has('tag_handling')).toBe(false);
+      return options.extractResponse({ translations: [{ text: 'literal <br/> &lt; &amp;' }] });
+    });
+
+    await expect(provider._translateChunk([source], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+      .resolves.toEqual(['literal <br/> &lt; &amp;']);
+  });
+
+  it('escapes original text and restores placeholders in generated XML mode', async () => {
+    deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
+    vi.spyOn(provider, '_executeRequest').mockImplementation(async options => {
+      expect(options.fetchOptions.body.getAll('text')).toEqual([
+        'before &lt; &amp;amp; &gt; <x id="SUB_TOKEN" /><br id="SUB_NL_LINE" />after',
+      ]);
+      expect(options.fetchOptions.body.get('tag_handling')).toBe('xml');
+      return options.extractResponse({ translations: [{
+        text: 'translated &lt; &amp;amp; <x id="SUB_TOKEN" /><br id="SUB_NL_LINE" /> text',
+      }] });
+    });
+
+    await expect(provider._translateChunk(
+      ['before < &amp; > @@SUB_TOKEN@@@@SUB_NL_LINE@@after'],
+      'en', 'fa', 'selection', null, 0, 1, 0, 1, {},
+    )).resolves.toEqual(['translated < &amp; @@SUB_TOKEN@@@@SUB_NL_LINE@@text']);
+  });
+
   it('rejects XML placeholder corruption without returning source text', async () => {
+    deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
     vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) =>
       options.extractResponse({ translations: [{ text: 'translated text without placeholder' }] })
     );
 
     await expect(provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
       .rejects.toMatchObject({ type: ErrorTypes.API_RESPONSE_INVALID });
+  });
+
+  describe('xml tag handling capability', () => {
+    const runMarkupTranslation = async (texts, source = 'en', target = 'fa') => {
+      let capturedBody;
+      const executeRequestSpy = vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) => {
+        capturedBody = options.fetchOptions.body;
+        return options.extractResponse({ translations: texts.map(() => ({ text: 'translated <x id="SUB_TOKEN" /> text' })) });
+      });
+      const result = await provider._translateChunk(texts, source, target, 'selection', null, 0, texts.length, 0, 1, {});
+      return { result, capturedBody, executeRequestSpy };
+    };
+
+    it('sends tag_handling=xml with splitting_tags for a supported pair', async () => {
+      deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
+
+      const { capturedBody } = await runMarkupTranslation(['before @@SUB_TOKEN@@ after']);
+
+      expect(deepLLanguageDiscoveryMock.fetch).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'key', apiTier: 'free' }));
+      expect(capturedBody.get('tag_handling')).toBe('xml');
+      expect(capturedBody.get('splitting_tags')).toBe('n1,n2,br');
+    });
+
+    it('sends tag_handling=xml for auto source with a supported target', async () => {
+      deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog() });
+      let capturedBody;
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) => {
+        capturedBody = options.fetchOptions.body;
+        return options.extractResponse({ translations: [{ text: 'translated <x id="SUB_TOKEN" /> text' }] });
+      });
+
+      await provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'auto', 'fa', 'selection', null, 0, 1, 0, 1, {});
+
+      expect(capturedBody.has('source_lang')).toBe(false);
+      expect(capturedBody.get('tag_handling')).toBe('xml');
+      expect(capturedBody.get('splitting_tags')).toBe('n1,n2,br');
+    });
+
+    it('omits xml params and throws LANGUAGE_PAIR_NOT_SUPPORTED for an unsupported target', async () => {
+      deepLLanguageDiscoveryMock.fetch.mockResolvedValue({ catalog: tagCatalog('supported', 'unsupported') });
+      const executeRequestSpy = vi.spyOn(provider, '_executeRequest');
+
+      await expect(provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED });
+
+      expect(executeRequestSpy).not.toHaveBeenCalled();
+    });
+
+    it('fails fast on unknown capability metadata instead of plain-text fallback', async () => {
+      deepLLanguageDiscoveryMock.fetch.mockResolvedValue({
+        catalog: [
+          { normalizedTag: 'en', features: {} },
+          { normalizedTag: 'fa', features: {} },
+        ],
+      });
+      const executeRequestSpy = vi.spyOn(provider, '_executeRequest');
+
+      await expect(provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED });
+
+      expect(executeRequestSpy).not.toHaveBeenCalled();
+    });
+
+    it('fails fast when capability metadata cannot be fetched for markup texts', async () => {
+      deepLLanguageDiscoveryMock.fetch.mockRejectedValue(new Error('offline'));
+      const executeRequestSpy = vi.spyOn(provider, '_executeRequest');
+
+      await expect(provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED });
+
+      expect(executeRequestSpy).not.toHaveBeenCalled();
+    });
+
+    it('allows the plain-text path without tag_handling when markup-free texts lack metadata', async () => {
+      deepLLanguageDiscoveryMock.fetch.mockRejectedValue(new Error('offline'));
+      let capturedBody;
+      vi.spyOn(provider, '_executeRequest').mockImplementation(async (options) => {
+        capturedBody = options.fetchOptions.body;
+        return options.extractResponse({ translations: [{ text: 'translated' }] });
+      });
+
+      await expect(provider._translateChunk(['plain source'], 'en', 'fa', 'selection', null, 0, 1, 0, 1, {}))
+        .resolves.toEqual(['translated']);
+
+      expect(capturedBody.has('tag_handling')).toBe(false);
+      expect(capturedBody.has('splitting_tags')).toBe(false);
+    });
+  });
+
+  describe('capability discovery key failover', () => {
+    const discoveryPayload = [
+      { lang: 'EN', name: 'English', usable_as_source: true, usable_as_target: true, status: 'stable', features: { tag_handling: {} } },
+      { lang: 'FA', name: 'Persian', usable_as_source: true, usable_as_target: true, status: 'stable', features: { tag_handling: {} } },
+      { lang: 'DE', name: 'German', usable_as_source: true, usable_as_target: true, status: 'stable', features: { formality: { status: 'stable' }, tag_handling: {} } },
+    ];
+    const discoveryCalls = () => proxyFetch.mock.calls.filter(([url]) => String(url).includes('/v3/languages'));
+    const translateCalls = () => proxyFetch.mock.calls.filter(([url]) => !String(url).includes('/v3/languages'));
+
+    const useRealFailover = () => {
+      deepLDiscoveryActual.current.clearDeepLLanguageCatalogCache();
+      deepLLanguageDiscoveryMock.fetchFailover.mockImplementation(
+        (options) => deepLDiscoveryActual.current.fetchDeepLLanguageCatalogWithKeyFailover(options),
+      );
+    };
+
+    it('fails over discovery past an invalid first key, sending XML and preserving formality', async () => {
+      deeplConfigMocks.getFormality.mockResolvedValue('more');
+      useRealFailover();
+
+      await runWithRuntime(['bad-key-1', 'good-key-1'], 'free', async ({ promoteKeySpy }) => {
+        provider._getConfig.mockResolvedValue({
+          apiKey: 'bad-key-1',
+          apiTier: 'free',
+          apiUrl: 'https://api.deepl.test',
+          apiKeys: ['bad-key-1', 'good-key-1'],
+        });
+        proxyFetch.mockImplementation(async (url, options) => {
+          if (String(url).includes('/v3/languages')) {
+            const auth = options?.headers?.Authorization;
+            if (auth === 'DeepL-Auth-Key bad-key-1') return { ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) };
+            if (auth === 'DeepL-Auth-Key good-key-1') return { ok: true, status: 200, json: async () => discoveryPayload };
+            throw new Error(`unexpected discovery authorization: ${auth}`);
+          }
+          const auth = options?.headers?.Authorization;
+          if (auth === 'DeepL-Auth-Key bad-key-1') return createJsonResponse(401, { detail: 'Invalid API key' }, 'Unauthorized');
+          if (auth === 'DeepL-Auth-Key good-key-1') {
+            return createJsonResponse(200, { translations: [{ text: 'translated <x id="SUB_TOKEN" /> text' }] }, 'OK');
+          }
+          throw new Error(`unexpected translate authorization: ${auth}`);
+        });
+
+        await expect(provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'en', 'de', 'selection', null, 0, 1, 0, 1, {}))
+          .resolves.toEqual(['translated @@SUB_TOKEN@@text']);
+
+        // Discovery probed the dead first key (401) then succeeded on the
+        // second key; the dead key cached nothing, the good key did.
+        expect(discoveryCalls().length).toBeGreaterThanOrEqual(2);
+        expect(discoveryCalls()[0][1].headers.Authorization).toBe('DeepL-Auth-Key bad-key-1');
+        expect(new Set(discoveryCalls().map(([, options]) => options.headers.Authorization))).toEqual(
+          new Set(['DeepL-Auth-Key bad-key-1', 'DeepL-Auth-Key good-key-1']),
+        );
+        expect(deepLDiscoveryActual.current.getCachedDeepLLanguageCatalog('bad-key-1')).toBeNull();
+        expect(deepLDiscoveryActual.current.getCachedDeepLLanguageCatalog('good-key-1').catalog).toHaveLength(3);
+
+        // Translation failed over the same way and sent both capabilities.
+        expect(translateCalls()).toHaveLength(2);
+        const sentBody = translateCalls().at(-1)[1].body;
+        expect(sentBody.get('formality')).toBe('more');
+        expect(sentBody.get('tag_handling')).toBe('xml');
+        expect(sentBody.get('splitting_tags')).toBe('n1,n2,br');
+        expect(promoteKeySpy).toHaveBeenCalledWith('DEEPL_API_KEY', 'good-key-1');
+      });
+    });
+
+    it('fails fast without translating when every discovery key returns 401', async () => {
+      useRealFailover();
+      provider._getConfig.mockResolvedValue({
+        apiKey: 'bad-key-1',
+        apiTier: 'free',
+        apiUrl: 'https://api.deepl.test',
+        apiKeys: ['bad-key-1', 'bad-key-2'],
+      });
+      proxyFetch.mockImplementation(async (url) => {
+        if (String(url).includes('/v3/languages')) return { ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) };
+        throw new Error('translate must not be called when capability discovery fails on all keys');
+      });
+
+      await expect(provider._translateChunk(['before @@SUB_TOKEN@@ after'], 'en', 'de', 'selection', null, 0, 1, 0, 1, {}))
+        .rejects.toMatchObject({ type: ErrorTypes.LANGUAGE_PAIR_NOT_SUPPORTED });
+
+      expect(discoveryCalls()).toHaveLength(2);
+      expect(translateCalls()).toHaveLength(0);
+      expect(deepLDiscoveryActual.current.getCachedDeepLLanguageCatalog('bad-key-1')).toBeNull();
+      expect(deepLDiscoveryActual.current.getCachedDeepLLanguageCatalog('bad-key-2')).toBeNull();
+    });
   });
 });

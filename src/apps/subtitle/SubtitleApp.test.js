@@ -45,7 +45,6 @@ vi.mock('@/features/settings/stores/settings.js', () => ({
       THEME: 'light',
       TRANSLATION_API: 'googlev2',
       TARGET_LANGUAGE: 'en',
-      DEEPL_BETA_LANGUAGES_ENABLED: false,
     },
     isDarkTheme: false,
     isInitialized: true,

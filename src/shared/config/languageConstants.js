@@ -332,26 +332,6 @@ export const PROVIDER_LANGUAGE_MAPPINGS = {
     'zh': 'ZH', 
     'zh-cn': 'ZH-HANS', 
     'zh-tw': 'ZH-HANT',
-    'ps': 'FA',
-    'ur': 'FA',
-    'mr': 'HI',
-    'ne': 'HI',
-  },
-
-  // DeepL Beta Languages (require enable_beta_languages parameter)
-  DEEPL_BETA: {
-    'ace': 'ACE', 'af': 'AF', 'sq': 'SQ', 'ar': 'AR', 'an': 'AN', 'hy': 'HY', 'as': 'AS', 
-    'ay': 'AY', 'az': 'AZ', 'ba': 'BA', 'eu': 'EU', 'be': 'BE', 'bn': 'BN', 'bho': 'BHO', 
-    'bs': 'BS', 'br': 'BR', 'my': 'MY', 'yue': 'YUE', 'ca': 'CA', 'ceb': 'CEB', 'hr': 'HR', 
-    'prs': 'PRS', 'eo': 'EO', 'gl': 'GL', 'ka': 'KA', 'gn': 'GN', 'gu': 'GU', 'ht': 'HT', 
-    'ha': 'HA', 'he': 'HE', 'hi': 'HI', 'ig': 'IG', 'ga': 'GA', 'jv': 'JV', 'pam': 'PAM', 
-    'kk': 'KK', 'gom': 'GOM', 'kmr': 'KMR', 'ckb': 'CKB', 'ky': 'KY', 'la': 'LA', 
-    'ln': 'LN', 'lmo': 'LMO', 'lb': 'LB', 'mk': 'MK', 'mai': 'MAI', 'mg': 'MG', 'ms': 'MS', 
-    'ml': 'ML', 'mt': 'MT', 'mi': 'MI', 'mr': 'HI', 'mn': 'MN', 'ne': 'HI', 'oc': 'OC', 
-    'om': 'OM', 'pag': 'PAG', 'ps': 'PS', 'fa': 'FA', 'pa': 'PA', 'qu': 'QU', 'sa': 'SA', 
-    'sr': 'SR', 'st': 'ST', 'scn': 'SCN', 'su': 'SU', 'sw': 'SW', 'tg': 'TG', 'ta': 'TA', 
-    'tt': 'TT', 'te': 'TE', 'ts': 'TS', 'tn': 'TN', 'tk': 'TK', 'ur': 'UR', 'uz': 'UZ', 
-    'vi': 'VI', 'cy': 'CY', 'wo': 'WO', 'xh': 'XH', 'yi': 'YI', 'zu': 'ZU'
   },
 
   // Vajehyab Dictionary - Persian, English, Arabic, Turkish
@@ -447,28 +427,12 @@ export const PROVIDER_SUPPORTED_LANGUAGES = {
     'es', 'sv', 'th', 'tr', 'uk', 'vi'
   ],
 
-  // DeepL - standard languages only (when beta is disabled)
+  // DeepL's static language list is retained for Options compatibility.
   deepl: [
     'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
     'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
     'sv', 'tr', 'uk', 'zh', 'zh-cn', 'zh-tw'
   ],
-
-  // DeepL with beta languages enabled
-  deepl_beta: [
-    // Standard languages
-    'bg', 'cs', 'da', 'de', 'el', 'en', 'es', 'et', 'fi', 'fr', 'hu', 'id', 'it',
-    'ja', 'ko', 'lt', 'lv', 'nb', 'nl', 'pl', 'pt', 'pt-br', 'ro', 'ru', 'sk', 'sl',
-    'zh', 'zh-cn', 'zh-tw',
-    // Beta languages (new extensive list)
-    'ace', 'af', 'an', 'as', 'ay', 'az', 'ba', 'be', 'bho', 'bn', 'br', 'bs', 'ca',
-    'ceb', 'ckb', 'cy', 'eo', 'eu', 'fa', 'ga', 'gl', 'gn', 'gom', 'gu', 'ha', 'hi',
-    'hr', 'ht', 'hy', 'ig', 'is', 'jv', 'ka', 'kk', 'kmr', 'ckb', 'ky', 'la',
-    'ln', 'lmo', 'lb', 'mk', 'mai', 'mg', 'ms', 'ml', 'mt', 'mi', 'mr', 'mn', 'ne', 'oc',
-    'om', 'pag', 'ps', 'fa', 'pa', 'qu', 'sa', 'sr', 'st', 'scn', 'su', 'sw', 'tg', 'ta',
-    'tt', 'te', 'ts', 'tn', 'tk', 'ur', 'uz', 'vi', 'cy', 'wo', 'xh', 'yue', 'yi', 'zu', 'om',
-    'pa', 'st', 'sn'
-    ],
 
     // Vajehyab - Persian dictionary service
     vajehyab: ['fa', 'en', 'ar', 'tr'],

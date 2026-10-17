@@ -37,6 +37,19 @@ describe('Settings Migrations', () => {
     expect(updates.CHANGELOG_URL).toBeUndefined();
   });
 
+  it('removes the retired DeepL beta toggle while preserving imported settings', async () => {
+    const { updates, removals } = await runSettingsMigrations({
+      THEME: 'dark',
+      DEEPL_API_TIER: 'pro',
+      DEEPL_BETA_LANGUAGES_ENABLED: false
+    });
+
+    expect(removals).toContain('DEEPL_BETA_LANGUAGES_ENABLED');
+    expect(updates.DEEPL_BETA_LANGUAGES_ENABLED).toBeUndefined();
+    expect(updates.THEME).toBeUndefined();
+    expect(updates.DEEPL_API_TIER).toBeUndefined();
+  });
+
   it('should add the missing Live Dubbing provider through canonical defaults', async () => {
     const { updates, logs } = await runSettingsMigrations({});
 

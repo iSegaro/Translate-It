@@ -135,6 +135,11 @@ The `BaseProvider.translate()` method delegates to the `ProviderCoordinator`, wh
 ### 3. Language Normalization
 Implement `convertLanguage(code)` in your provider class to map standard ISO codes to provider-specific codes (e.g., `fa` -> `farsi` for legacy APIs).
 
+### DeepL language metadata and formality
+DeepL language choices are validated using the [v3 languages endpoint](https://developers.deepl.com/docs/languages/using-the-languages-api), requested with `resource=translate_text&include=beta` for either Free or Pro credentials. Its source/target capability flags and status distinguish supported directions and beta languages. In Options, this metadata applies only while DeepL is the global primary provider; unsupported or unverifiable selections are preserved but cannot be saved until metadata verifies them. Translation requests continue to use the [v2 translate endpoint](https://developers.deepl.com/api-reference/translate/request-translation) and do not send the deprecated `enable_beta_languages` parameter.
+
+Formality preference values (`prefer_more` and `prefer_less`) can be sent without a catalog. Strict `more` or `less` values are sent only when fresh metadata verifies formality support for the selected target; otherwise they are omitted from the request, while the saved preference remains unchanged.
+
 ### 4. Segment Mapping (The "Split" Safety)
 If your provider merges multiple text segments into a single request, you **MUST** ensure they are split back correctly.
 - AI: Use `AIResponseParser.parseBatchResult`. `parseBatchResult(...)` also reports whether structured-response recovery is required, while the provider decides whether recovery is performed.

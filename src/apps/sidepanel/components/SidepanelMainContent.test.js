@@ -63,7 +63,6 @@ vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
 vi.mock('@/features/settings/stores/settings.js', () => ({
   useSettingsStore: () => ({
     settings: {
-      DEEPL_BETA_LANGUAGES_ENABLED: false,
     },
   }),
 }));
@@ -80,7 +79,6 @@ vi.mock('@/components/shared/LanguageSelector.vue', () => ({
       'targetLanguage',
       'provider',
       'lastKeyword',
-      'beta',
       'showDefaultActions',
       'defaultActionsEnabled',
       'sourceIsSavedDefault',

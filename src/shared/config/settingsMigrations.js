@@ -330,6 +330,13 @@ function runMainMigration(currentSettings, explicitSettingsKeys = null) {
 
   const removals = [];
 
+  // This retired toggle is not part of the canonical schema; remove it from
+  // existing storage and imported backups without affecting other settings.
+  if (Object.prototype.hasOwnProperty.call(currentSettings, 'DEEPL_BETA_LANGUAGES_ENABLED')) {
+    removals.push('DEEPL_BETA_LANGUAGES_ENABLED');
+    migrationLog.push('Removed obsolete setting: DEEPL_BETA_LANGUAGES_ENABLED');
+  }
+
   // Preserve the former shared value for Gemini only before new defaults are
   // added; OpenAI remains disabled unless its provider-specific value exists.
   migrateLiveDubbingOriginalTranscriptPreference(

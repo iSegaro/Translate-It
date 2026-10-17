@@ -1767,11 +1767,23 @@
   "deepl_formality_prefer_less": {
     "message": "ترجیح غیررسمی"
   },
-  "deepl_beta_languages_label": {
-    "message": "فعال‌سازی زبان‌های بتا"
+  "deepl_beta_label": {
+    "message": "بتا"
   },
-  "deepl_beta_languages_description": {
-    "message": "پشتیبانی از زبان‌های بتا را فعال کنید. زبان‌های بتا از تنظیمات رسمی بودن پشتیبانی نمی‌کنند."
+  "validation_deepl_languages_unverified": {
+    "message": "امکان تأیید زبان‌های DeepL وجود نداشت. اتصال اینترنت را بررسی کنید و دوباره ذخیره کنید."
+  },
+  "deepl_languages_loading": {
+    "message": "در حال بارگیری زبان‌های DeepL…"
+  },
+  "deepl_languages_unavailable": {
+    "message": "زبان‌های DeepL در دسترس نیستند. اتصال اینترنت را بررسی و دوباره تلاش کنید."
+  },
+  "deepl_formality_unavailable": {
+    "message": "تنظیمات رسمی‌بودن برای این زبان مقصد در دسترس نیست."
+  },
+  "deepl_formality_unverified": {
+    "message": "به‌دلیل در دسترس نبودن اطلاعات زبان‌های DeepL، امکان بررسی پشتیبانی از لحن رسمی برای این زبان مقصد وجود ندارد."
   },
   "custom_api_settings_title": {
     "message": "تنظیمات API سازگار با OpenAI"
@@ -2786,6 +2798,12 @@
   },
   "validation_same_languages": {
     "message": "زبان مبدا و مقصد نمی‌توانند یکی باشند."
+  },
+  "validation_deepl_source_language_unsupported": {
+    "message": "زبان مبدا {language} توسط DeepL پشتیبانی نمی‌شود."
+  },
+  "validation_deepl_target_language_unsupported": {
+    "message": "زبان مقصد {language} توسط DeepL پشتیبانی نمی‌شود."
   },
   "validation_api_key_empty": {
     "message": "کلید API برای {provider} نمی‌تواند خالی باشد."

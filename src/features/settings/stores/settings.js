@@ -13,9 +13,22 @@ import { MessageActions } from '@/shared/messaging/core/MessageActions.js'
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { getFirstMissingSetting } from '@/features/translation/utils/providerValidator.js'
+import {
+  DEEPL_LANGUAGE_CATALOG_TTL_MS,
+  fetchDeepLLanguageCatalogWithKeyFailover,
+  getCachedDeepLLanguageCatalog,
+  getDeepLEligibleKeys,
+  getDeepLLanguageIdentity,
+  matchDeepLLanguage,
+  MissingDeepLLanguageKeyError,
+  SupersededDeepLLanguageDiscoveryError,
+} from '@/features/translation/providers/DeepLLanguageDiscovery.js'
 import { getScopedLogger } from '@/shared/logging/logger.js';
 import { LOG_COMPONENTS } from '@/shared/logging/logConstants.js';
 const logger = getScopedLogger(LOG_COMPONENTS.SETTINGS, 'settings');
+
+export const DEEPL_SOURCE_UNSUPPORTED_ERROR = 'validation_deepl_source_language_unsupported';
+export const DEEPL_TARGET_UNSUPPORTED_ERROR = 'validation_deepl_target_language_unsupported';
 
 // --- Helpers ------------------------------------------------------------
 /**
@@ -98,6 +111,163 @@ export const useSettingsStore = defineStore('settings', () => {
   const isInitialized = ref(false)
   const isSaving = ref(false)
   const isSettingsValid = ref(true) // Global validation state for options UI
+
+  // Volatile capability snapshot: deliberately separate from `settings` so
+  // catalogs can never enter persisted/exported settings.
+  const deepLLanguageCapabilities = ref({
+    status: 'idle', identity: null, catalog: null, fetchedAt: null, error: null
+  })
+  let deepLLanguageRequest = null
+  let deepLLanguageRequestVersion = 0
+
+  const invalidateDeepLLanguageCapabilities = () => {
+    deepLLanguageRequestVersion += 1
+    deepLLanguageRequest?.controller.abort()
+    deepLLanguageRequest = null
+    deepLLanguageCapabilities.value = {
+      status: 'idle', identity: null, catalog: null, fetchedAt: null, error: null
+    }
+  }
+
+  // Invalidate immediately on every draft/load/import/reset credential or
+  // tier change; the Options navigation owns debounced network refreshes.
+  watch(() => [
+    settings.value.DEEPL_API_KEY,
+    settings.value.DEEPL_API_TIER,
+    settings.value.PROXY_ENABLED,
+    settings.value.PROXY_TYPE,
+    settings.value.PROXY_HOST,
+    settings.value.PROXY_PORT,
+    settings.value.PROXY_USERNAME,
+    settings.value.PROXY_PASSWORD,
+  ], invalidateDeepLLanguageCapabilities, { flush: 'sync' })
+
+  const refreshDeepLLanguageCapabilities = async ({ forProvider } = {}) => {
+    const provider = forProvider === undefined ? settings.value.TRANSLATION_API : forProvider
+    const tier = settings.value.DEEPL_API_TIER === 'pro' ? 'pro' : 'free'
+    const configuredKeys = settings.value.DEEPL_API_KEY || ''
+    // Snapshot the current Options draft; discovery makes its own detached
+    // canonical copy and never persists draft proxy credentials.
+    const proxySettings = {
+      PROXY_ENABLED: settings.value.PROXY_ENABLED,
+      PROXY_TYPE: settings.value.PROXY_TYPE,
+      PROXY_HOST: settings.value.PROXY_HOST,
+      PROXY_PORT: settings.value.PROXY_PORT,
+      PROXY_USERNAME: settings.value.PROXY_USERNAME,
+      PROXY_PASSWORD: settings.value.PROXY_PASSWORD,
+    }
+
+    // Explicit mode consumers can request DeepL without changing the primary
+    // provider. Other providers do not invalidate a usable DeepL snapshot.
+    if (provider !== ProviderRegistryIds.DEEPL) {
+      return deepLLanguageCapabilities.value
+    }
+
+    if (getFirstMissingSetting(ProviderRegistryIds.DEEPL, settings.value)) {
+      invalidateDeepLLanguageCapabilities()
+      deepLLanguageCapabilities.value = {
+        status: 'missing-key', identity: null, catalog: null, fetchedAt: null, error: null
+      }
+      return deepLLanguageCapabilities.value
+    }
+
+    let identity
+    try {
+      identity = getDeepLLanguageIdentity(configuredKeys, tier)
+    } catch (error) {
+      if (error instanceof MissingDeepLLanguageKeyError) {
+        invalidateDeepLLanguageCapabilities()
+        deepLLanguageCapabilities.value = {
+          status: 'missing-key', identity: null, catalog: null, fetchedAt: null, error: null
+        }
+        return deepLLanguageCapabilities.value
+      }
+      throw error
+    }
+
+    const current = deepLLanguageCapabilities.value
+    const age = current.fetchedAt === null ? Infinity : Date.now() - current.fetchedAt
+    if (current.status === 'ready' && current.identity === identity
+      && age >= 0 && age < DEEPL_LANGUAGE_CATALOG_TTL_MS) {
+      return current
+    }
+    if (deepLLanguageRequest?.identity === identity) return deepLLanguageRequest.promise
+
+    // A failover success is cached under the succeeding key's identity, which
+    // differs from the first-key request identity: serve any fresh eligible
+    // cache entry before spending network work.
+    for (const eligibleKey of getDeepLEligibleKeys(configuredKeys, tier)) {
+      let cached = null
+      try {
+        cached = getCachedDeepLLanguageCatalog(eligibleKey, tier)
+      } catch {
+        cached = null
+      }
+      if (cached) {
+        deepLLanguageCapabilities.value = {
+          status: 'ready', identity: cached.identity, catalog: cached.catalog,
+          fetchedAt: cached.fetchedAt, error: null,
+        }
+        return deepLLanguageCapabilities.value
+      }
+    }
+
+    deepLLanguageRequest?.controller.abort()
+    const controller = new AbortController()
+    const requestVersion = ++deepLLanguageRequestVersion
+    deepLLanguageCapabilities.value = {
+      status: 'loading', identity, catalog: null, fetchedAt: null, error: null
+    }
+    const request = { identity, controller, version: requestVersion, promise: null }
+    deepLLanguageRequest = request
+    request.promise = (async () => {
+      try {
+        const snapshot = await fetchDeepLLanguageCatalogWithKeyFailover({
+          apiKey: configuredKeys,
+          apiTier: tier,
+          signal: controller.signal,
+          proxySettings,
+        })
+        // The snapshot carries the succeeding key's identity after failover,
+        // so staleness is membership in the current eligible identities.
+        const currentEligibleIdentities = new Set()
+        for (const eligibleKey of getDeepLEligibleKeys(settings.value.DEEPL_API_KEY || '', settings.value.DEEPL_API_TIER)) {
+          try {
+            currentEligibleIdentities.add(getDeepLLanguageIdentity(eligibleKey, settings.value.DEEPL_API_TIER))
+          } catch {
+            // Skip keys that lost eligibility mid-flight.
+          }
+        }
+        const stillCurrent = deepLLanguageRequest === request
+          && request.version === deepLLanguageRequestVersion
+          && currentEligibleIdentities.has(snapshot.identity)
+        if (!stillCurrent) return deepLLanguageCapabilities.value
+        deepLLanguageCapabilities.value = {
+          status: 'ready', identity: snapshot.identity, catalog: snapshot.catalog,
+          fetchedAt: snapshot.fetchedAt, error: null
+        }
+        return deepLLanguageCapabilities.value
+      } catch (error) {
+        if (deepLLanguageRequest !== request || request.version !== deepLLanguageRequestVersion) {
+          return deepLLanguageCapabilities.value
+        }
+        const status = error instanceof MissingDeepLLanguageKeyError ? 'missing-key' : 'error'
+        const errorType = error instanceof SupersededDeepLLanguageDiscoveryError
+          ? 'superseded'
+          : error?.name === 'AbortError'
+            ? 'aborted'
+            : 'fetch-failed'
+        deepLLanguageCapabilities.value = {
+          status, identity, catalog: null, fetchedAt: null,
+          error: status === 'error' ? errorType : null
+        }
+        return deepLLanguageCapabilities.value
+      } finally {
+        if (deepLLanguageRequest === request) deepLLanguageRequest = null
+      }
+    })()
+    return request.promise
+  }
   
   // Non-persisted UI state for the Options page
   const activeConfigProvider = ref(null)
@@ -167,6 +337,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const loadSettings = async () => {
     if (isInitialized.value) return settings.value;
     if (__loadInFlight) return __loadInFlight;
+    invalidateDeepLLanguageCapabilities()
     isLoading.value = true;
     __loadInFlight = (async () => {
       try {
@@ -398,6 +569,7 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const resetSettings = async () => {
     try {
+      invalidateDeepLLanguageCapabilities()
       const storedSettings = await storageManager.get(null)
       const keysToRemove = Object.keys(storedSettings || {})
         .filter(key => key !== 'COLLAPSED_PROVIDER_CATEGORIES')
@@ -465,6 +637,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const importSettings = async (importData, password = '') => {
     try {
       logger.info('[Import] Starting');
+      invalidateDeepLLanguageCapabilities()
 
       // Validate that importData is a valid JSON object and contains Translate-It signatures
       if (!importData || typeof importData !== 'object' || Array.isArray(importData)) {
@@ -638,6 +811,49 @@ export const useSettingsStore = defineStore('settings', () => {
     if (sLang && tLang && sLang !== 'auto' && sLang === tLang) {
       errors.push('validation_same_languages')
     }
+
+    // 1b. DeepL validation is synchronous and consumes only a fresh snapshot
+    // for the current draft identity; validation never starts network work.
+    if (settings.value.TRANSLATION_API === ProviderRegistryIds.DEEPL) {
+      const configuredKeys = settings.value.DEEPL_API_KEY || ''
+      const tier = settings.value.DEEPL_API_TIER === 'pro' ? 'pro' : 'free'
+      const missingKey = getFirstMissingSetting(ProviderRegistryIds.DEEPL, settings.value)
+      if (!missingKey) {
+        // Validation accepts a fresh snapshot for any currently eligible key,
+        // since capability discovery fails over to the first succeeding key.
+        const eligibleIdentities = new Set(
+          getDeepLEligibleKeys(configuredKeys, tier).map(key => getDeepLLanguageIdentity(key, tier)),
+        )
+        const capability = deepLLanguageCapabilities.value
+        const age = capability.fetchedAt === null ? Infinity : Date.now() - capability.fetchedAt
+        const isFresh = capability.status === 'ready'
+          && eligibleIdentities.has(capability.identity)
+          && age >= 0 && age < DEEPL_LANGUAGE_CATALOG_TTL_MS
+          && Array.isArray(capability.catalog)
+
+        if (eligibleIdentities.size === 0) {
+          errors.push('ERRORS_API_CONFIG_INVALID')
+        } else if (!isFresh) {
+          errors.push('validation_deepl_languages_unverified')
+        } else {
+          const checkLanguage = (language, direction, errorKey) => {
+            if (!language || (direction === 'source' && language === 'auto')) return
+            const match = matchDeepLLanguage(capability.catalog, language, direction)
+            if (match === 'unknown') {
+              if (!errors.includes('validation_deepl_languages_unverified')) {
+                errors.push('validation_deepl_languages_unverified')
+              }
+              return
+            }
+            if (match === 'unsupported') {
+              errors.push(`${errorKey}:${language}`)
+            }
+          }
+          checkLanguage(sLang, 'source', DEEPL_SOURCE_UNSUPPORTED_ERROR)
+          checkLanguage(tLang, 'target', DEEPL_TARGET_UNSUPPORTED_ERROR)
+        }
+      }
+    }
     
     // 2. Validate Global Translation Provider
     const apiProvider = settings.value.TRANSLATION_API;
@@ -771,6 +987,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * Required for setup-style Pinia stores to support $reset().
    */
   function $reset() {
+    invalidateDeepLLanguageCapabilities()
     settings.value = getDefaultSettings()
     dirtySettingVersions.clear()
     isInitialized.value = false
@@ -926,6 +1143,7 @@ export const useSettingsStore = defineStore('settings', () => {
   })
 
   const cleanupStoreResources = () => {
+    invalidateDeepLLanguageCapabilities()
     cleanupStorageListener()
     if (removeSystemThemeListener) {
       removeSystemThemeListener();
@@ -942,6 +1160,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isSaving,
     isSettingsValid,
     activeConfigProvider,
+    deepLLanguageCapabilities,
     
     // Getters
     isDarkTheme,
@@ -955,6 +1174,7 @@ export const useSettingsStore = defineStore('settings', () => {
     
     // Actions
     loadSettings,
+    refreshDeepLLanguageCapabilities,
     saveAllSettings,
     updateSettingLocally,
     setProviderCategoryCollapsed,

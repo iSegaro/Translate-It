@@ -27,6 +27,28 @@ function getProxyDefaults() {
 }
 
 /**
+ * Map either persisted-shape settings or a draft snapshot into detached
+ * request-local proxy config without reading or writing storage.
+ */
+export function resolveProxyConfigFromSettings(settings = {}) {
+  const defaults = getProxyDefaults()
+  const values = Object.fromEntries(
+    PROXY_SETTING_KEYS.map(key => [key, settings?.[key] ?? defaults[key]]),
+  )
+
+  return {
+    enabled: values.PROXY_ENABLED || false,
+    type: values.PROXY_TYPE || 'http',
+    host: values.PROXY_HOST || '',
+    port: values.PROXY_PORT || 8080,
+    auth: {
+      username: values.PROXY_USERNAME || '',
+      password: values.PROXY_PASSWORD || ''
+    }
+  }
+}
+
+/**
  * Load proxy configuration without exposing unrelated persisted settings.
  *
  * @returns {Promise<Object>} Proxy settings with canonical defaults applied.
@@ -61,15 +83,5 @@ export async function getProxySettingsAsync() {
  */
 export async function resolveProxyConfig() {
   const settings = await getProxySettingsAsync();
-
-  return {
-    enabled: settings.PROXY_ENABLED || false,
-    type: settings.PROXY_TYPE || 'http',
-    host: settings.PROXY_HOST || '',
-    port: settings.PROXY_PORT || 8080,
-    auth: {
-      username: settings.PROXY_USERNAME || '',
-      password: settings.PROXY_PASSWORD || ''
-    }
-  };
+  return resolveProxyConfigFromSettings(settings)
 }

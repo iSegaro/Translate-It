@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIG } from '@/shared/config/config.js';
 import { storageManager } from '@/shared/storage/core/StorageCore.js';
-import { getProxySettingsAsync, resolveProxyConfig, PROXY_SETTING_KEYS } from './ProxySettings.js';
+import { getProxySettingsAsync, resolveProxyConfig, resolveProxyConfigFromSettings, PROXY_SETTING_KEYS } from './ProxySettings.js';
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageManager: {
@@ -101,5 +101,45 @@ describe('getProxySettingsAsync', () => {
     expect(secondConfig).not.toBe(firstConfig);
     expect(secondConfig.auth).not.toBe(firstConfig.auth);
     expect(storageManager.get).toHaveBeenCalledWith(PROXY_SETTING_KEYS);
+  });
+
+  it('maps draft proxy settings to a detached config without reading or writing storage', () => {
+    const draft = {
+      PROXY_ENABLED: true,
+      PROXY_TYPE: 'socks',
+      PROXY_HOST: 'draft.proxy.test',
+      PROXY_PORT: 1080,
+      PROXY_USERNAME: 'draft-user',
+      PROXY_PASSWORD: 'draft-password',
+    };
+
+    const firstConfig = resolveProxyConfigFromSettings(draft);
+    const secondConfig = resolveProxyConfigFromSettings(draft);
+    draft.PROXY_HOST = 'mutated-after-snapshot.test';
+    draft.PROXY_PASSWORD = 'mutated-password';
+
+    expect(firstConfig).toEqual({
+      enabled: true,
+      type: 'socks',
+      host: 'draft.proxy.test',
+      port: 1080,
+      auth: { username: 'draft-user', password: 'draft-password' },
+    });
+    expect(firstConfig).not.toBe(secondConfig);
+    expect(firstConfig.auth).not.toBe(secondConfig.auth);
+    expect(storageManager.get).not.toHaveBeenCalled();
+  });
+
+  it('applies the persisted resolver defaults to incomplete draft settings', () => {
+    expect(resolveProxyConfigFromSettings({ PROXY_ENABLED: true })).toEqual({
+      enabled: true,
+      type: CONFIG.PROXY_TYPE || 'http',
+      host: CONFIG.PROXY_HOST || '',
+      port: CONFIG.PROXY_PORT || 8080,
+      auth: {
+        username: CONFIG.PROXY_USERNAME || '',
+        password: CONFIG.PROXY_PASSWORD || '',
+      },
+    });
   });
 });

@@ -79,7 +79,6 @@
           v-model:target-language="targetLang"
           compact
           :provider="currentProvider"
-          :beta="settingsStore.settings.DEEPL_BETA_LANGUAGES_ENABLED"
           show-default-actions
           :default-actions-enabled="isReady"
           :source-is-saved-default="sourceIsSavedDefault"

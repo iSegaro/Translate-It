@@ -56,6 +56,7 @@ describe('getPersistedDefaultSettings', () => {
     expect(defaults.DEEPSEEK_MODEL_SOURCE).toBe('legacy');
     expect(defaults.DEEPSEEK_THINKING_MODE).toBe(CONFIG.DEEPSEEK_THINKING_MODE);
     expect(defaults.DEEPSEEK_MODELS).toEqual(CONFIG.DEEPSEEK_MODELS);
+    expect(defaults).not.toHaveProperty('DEEPL_BETA_LANGUAGES_ENABLED');
     expect(defaults.OPENROUTER_API_MODEL).toBe(CONFIG.OPENROUTER_API_MODEL);
     expect(defaults.OPENROUTER_MODEL_SOURCE).toBe('legacy');
     expect(defaults.OPENROUTER_MODELS).toEqual(CONFIG.OPENROUTER_MODELS);

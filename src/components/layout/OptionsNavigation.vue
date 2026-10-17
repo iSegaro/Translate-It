@@ -90,12 +90,42 @@ import { getFirstMissingSetting } from '@/features/translation/utils/providerVal
 import { PROMPT_REGISTRY } from '@/shared/config/PromptRegistry.js'
 import { storageManager } from '@/shared/storage/core/StorageCore.js'
 import { CONFIG } from '@/shared/config/config.js'
+import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
+import { getDeepLLanguageIdentity, MissingDeepLLanguageKeyError } from '@/features/translation/providers/DeepLLanguageDiscovery.js'
 
 const logger = getScopedLogger(LOG_COMPONENTS.UI, 'OptionsNavigation')
 
 const { t, locale } = useUnifiedI18n()
 const settingsStore = useSettingsStore()
 const router = useRouter()
+let deepLLanguageRefreshTimer = null
+
+const scheduleDeepLLanguageRefresh = () => {
+  clearTimeout(deepLLanguageRefreshTimer)
+  deepLLanguageRefreshTimer = null
+  const settings = settingsStore.settings
+  if (settings.TRANSLATION_API !== ProviderRegistryIds.DEEPL
+    || getFirstMissingSetting(ProviderRegistryIds.DEEPL, settings)
+    || typeof settingsStore.refreshDeepLLanguageCapabilities !== 'function') return
+  deepLLanguageRefreshTimer = setTimeout(() => {
+    deepLLanguageRefreshTimer = null
+    settingsStore.refreshDeepLLanguageCapabilities()
+  }, 300)
+}
+
+watch(() => [
+  settingsStore.settings.TRANSLATION_API,
+  settingsStore.settings.DEEPL_API_KEY,
+  settingsStore.settings.DEEPL_API_TIER,
+  settingsStore.settings.PROXY_ENABLED,
+  settingsStore.settings.PROXY_TYPE,
+  settingsStore.settings.PROXY_HOST,
+  settingsStore.settings.PROXY_PORT,
+  settingsStore.settings.PROXY_USERNAME,
+  settingsStore.settings.PROXY_PASSWORD,
+], scheduleDeepLLanguageRefresh, { immediate: true })
+
+onBeforeUnmount(() => clearTimeout(deepLLanguageRefreshTimer))
 
 const navRoot = ref(null)
 const tabViewport = ref(null)
@@ -404,9 +434,31 @@ const performPartialSave = async (errors) => {
   }
 }
 
+// Validation errors may carry a payload after ':' (DeepL errors append the
+// offending language code). Split it off for i18n lookup and pass it as the
+// {language} placeholder. prompt:-prefixed errors are handled separately.
+const translateValidationError = (error) => {
+  if (!error) return ''
+  const separatorIndex = error.indexOf(':')
+  if (separatorIndex === -1) return t(error)
+  const baseKey = error.slice(0, separatorIndex)
+  const payload = error.slice(separatorIndex + 1)
+  if (baseKey.startsWith('validation_deepl_') && baseKey.includes('language') && payload) {
+    return t(baseKey, { language: payload })
+  }
+  return t(error)
+}
+
 // Save all settings
 const saveAllSettings = async () => {
   logger.debug('Save All Settings clicked!')
+
+  // Ensure Save validates against a current draft-key/tier catalog. The store
+  // returns without networking for other providers or missing credentials.
+  if (settingsStore.settings.TRANSLATION_API === ProviderRegistryIds.DEEPL
+    && typeof settingsStore.refreshDeepLLanguageCapabilities === 'function') {
+    await settingsStore.refreshDeepLLanguageCapabilities()
+  }
   
   // 1. Validate all critical settings before proceeding
   const validation = settingsStore.validateSettings()
@@ -427,7 +479,7 @@ const saveAllSettings = async () => {
         const subError = parts.length >= 3 ? parts[2] : 'validation_prompt_template_empty'
         statusMessage.value = t(subError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
       } else {
-        statusMessage.value = t(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
+        statusMessage.value = translateValidationError(firstError) || t('OPTIONS_STATUS_VALIDATION_FAILED') || 'Please fix errors before saving'
       }
       
       setTimeout(() => {
@@ -437,7 +489,18 @@ const saveAllSettings = async () => {
 
       // Check if it's a provider configuration error
       const globalProvider = settingsStore.settings.TRANSLATION_API;
-      const missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
+      let missingKey = getFirstMissingSetting(globalProvider, settingsStore.settings);
+      if (!missingKey
+        && globalProvider === ProviderRegistryIds.DEEPL
+        && settingsStore.settings.DEEPL_API_TIER === 'pro'
+        && validation.errors.includes('ERRORS_API_CONFIG_INVALID')) {
+        try {
+          getDeepLLanguageIdentity(settingsStore.settings.DEEPL_API_KEY || '', 'pro')
+        } catch (error) {
+          if (error instanceof MissingDeepLLanguageKeyError) missingKey = 'DEEPL_API_KEY'
+          else throw error
+        }
+      }
       
       if (missingKey) {
         // Redirect to providers tab with highlight parameter if not already there
@@ -475,11 +538,16 @@ const saveAllSettings = async () => {
 
       // Handle language validation errors
       if (validation.errors.some(e => e.includes('language'))) {
+        // Tell the languages tab which dropdown failed so it can highlight it
+        const firstLanguageError = validation.errors.find(e => e.includes('language'))
+        const focus = firstLanguageError && firstLanguageError.startsWith('validation_deepl_target_language_')
+          ? 'target'
+          : 'source'
         if (router.currentRoute.value.name !== 'languages') {
           await router.push({ name: 'languages' })
         }
-        window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', { 
-          detail: { field: 'languages' } 
+        window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+          detail: { field: 'languages', focus }
         }))
         return
       }

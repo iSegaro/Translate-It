@@ -291,6 +291,10 @@ describe('Config Module', () => {
       expect(CONFIG.GEMINI_THINKING_MODE).toBe('default');
     });
 
+    it('should not expose the removed DeepL beta language toggle', () => {
+      expect(CONFIG).not.toHaveProperty('DEEPL_BETA_LANGUAGES_ENABLED');
+    });
+
     it('getApiKeyAsync should return value from storage', async () => {
       storageManager.get.mockResolvedValue({ API_KEY: 'secret-key' });
       const apiKey = await getApiKeyAsync();
