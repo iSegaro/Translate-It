@@ -36,6 +36,11 @@ async function validateFirefoxExtension() {
     }
     logInfo('Firefox build directory found')
     console.log(`└─ Path: ${FIREFOX_BUILD_DIR}\n`)
+
+    const compilerArtifacts = findContentScriptCompilerArtifacts(FIREFOX_BUILD_DIR)
+    if (compilerArtifacts.length) {
+      throw new Error(`Vue runtime compiler code found in Firefox content-script bundle(s): ${compilerArtifacts.join(', ')}`)
+    }
     
     // Step 2: Validate manifest
     logStep('Validating manifest.json...')
@@ -108,17 +113,18 @@ async function validateFirefoxExtension() {
     const verbose = process.argv.includes('--verbose')
     console.log('├─ VALIDATION RESULTS:')
     console.log(`├─   Errors:   ${effectiveErrors}${ignoredErrors ? ` (${ignoredErrors} ignored)` : ''}`)
-    console.log(`├─   Warnings: ${report.warnings} (${classification.known} known, ${classification.new.length} new)`)
+    console.log(`├─   Warnings: ${report.warnings} (${classification.known} known, ${classification.new.length + classification.ambiguous.length} new)`)
     console.log(`├─   Notices:  ${report.notices}`)
     if (verbose) {
       for (const item of classification.knownItems) console.log(`· KNOWN ${item.code} ${item.file}: ${item.message}`)
     }
     for (const item of classification.new) console.log(`⚠️ NEW ${item.code} ${item.file}: ${item.message}`)
-    for (const item of classification.missing) console.log(`ℹ️ Known baseline absent: ${item.file} | ${item.messagePrefix} expected ${item.expected}, observed ${item.observed}`)
+    for (const item of classification.ambiguous) console.log(`⚠️ AMBIGUOUS ${item.code} ${item.file}: ${item.message} (source identity unavailable)`)
+    for (const item of classification.missing) console.log(`ℹ️ Known baseline absent: ${item.file} | ${item.message} expected ${item.expected}, observed ${item.observed}`)
     for (const item of report.errorItems.filter(item => !IGNORED_ERROR_CODES.includes(item.code))) {
       console.log(`❌ ERROR ${item.code || 'UNKNOWN'}${item.file ? ` ${item.file}` : ''}${item.line != null ? `:${item.line}${item.column != null ? `:${item.column}` : ''}` : ''}: ${item.message || ''}`)
     }
-    if (classification.new.length === 0 && classification.missing.length === 0) {
+    if (classification.new.length === 0 && classification.ambiguous.length === 0 && classification.missing.length === 0) {
       console.log('ℹ️ Known warnings match the reviewed baseline; this is not a safety assessment')
     }
     const ignoredErrorExit = exitStatus === 1 && !exitSignal && !spawnError && effectiveErrors === 0 && ignoredErrors > 0 && report.errorItems.every(item => IGNORED_ERROR_CODES.includes(item.code))
@@ -270,22 +276,53 @@ function classifyWarnings(warnings, baseline) {
   const remaining = baseline.map(item => ({ ...item, observed: 0 }))
   const knownItems = []
   const newItems = []
+  const ambiguousItems = []
   for (const warning of warnings) {
     const file = normalizeLinterFile(warning.file)
     const message = String(warning.message || '')
-    const match = remaining.find(item => item.code === warning.code && item.file === file && message.startsWith(item.messagePrefix) && item.observed < item.count)
+    const match = remaining.find(item => item.code === warning.code && item.file === file && message === item.message &&
+      item.observed < item.count &&
+      (warning.sourceIdentity == null || item.sources.includes(warning.sourceIdentity)) &&
+      (warning.sourceIdentity != null || item.sources.length === 1))
     const detail = { ...warning, file, message }
     if (match) {
       match.observed++
       knownItems.push(detail)
-    } else newItems.push(detail)
+    } else {
+      const ambiguous = remaining.find(item => item.code === warning.code && item.file === file && message === item.message &&
+        item.sources.length > 1 && item.observed < item.count && warning.sourceIdentity == null)
+      if (ambiguous) {
+        ambiguous.observed++
+        ambiguousItems.push(detail)
+      } else newItems.push(detail)
+    }
   }
   return {
     known: knownItems.length,
     knownItems,
     new: newItems,
+    ambiguous: ambiguousItems,
     missing: remaining.filter(item => item.observed < item.count).map(item => ({ ...item, expected: item.count, observed: item.observed }))
   }
+}
+
+function findContentScriptCompilerArtifacts(buildDir) {
+  const entryNames = new Set(['index-main.js', 'index-iframe.js'])
+  const compilerSignature = /new\s+Function\s*\(\s*([`'"\[]\s*Vue\b|\[\s*[`'"\[]\s*Vue\b)|registerRuntimeCompiler|compileToFunction/
+  const matches = []
+
+  function scan(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const entryPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) scan(entryPath)
+      else if (entryNames.has(entry.name) && compilerSignature.test(fs.readFileSync(entryPath, 'utf8'))) {
+        matches.push(path.relative(buildDir, entryPath).replaceAll('\\', '/'))
+      }
+    }
+  }
+
+  scan(buildDir)
+  return matches
 }
 
 function normalizeLinterFile(file) {

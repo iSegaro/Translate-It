@@ -18,12 +18,12 @@ function warning({ code, message, file }) {
 function fixtureWarnings(entries = baseline) {
   return entries.flatMap(entry => Array.from({ length: entry.count }, () => warning({
     code: entry.code,
-    message: entry.messagePrefix + (entry.messagePrefix.startsWith('Error in no-unsanitized') ? ' https://example.invalid/versioned-suffix' : ''),
+    message: entry.message,
     file: entry.file
   })))
 }
 
-function run(warnings, { errors = 0, notices = 0, raw, errorCodes, linterExitCode = 0, linterSignal, linterStderr = '', linterErrorMessage, verbose = false } = {}) {
+function run(warnings, { errors = 0, notices = 0, raw, errorCodes, linterExitCode = 0, linterSignal, linterStderr = '', linterErrorMessage, verbose = false, entryBundle, entryName = 'index-main.js' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'firefox-warning-test-'))
   tempDirs.push(dir)
   const build = path.join(dir, 'build')
@@ -33,6 +33,7 @@ function run(warnings, { errors = 0, notices = 0, raw, errorCodes, linterExitCod
     browser_specific_settings: { gecko: { id: 'fixture@example.invalid' } }
   }))
   fs.writeFileSync(path.join(build, 'bundle.js'), 'fixture')
+  if (entryBundle != null) fs.writeFileSync(path.join(build, entryName), entryBundle)
   const errorItems = Array.from({ length: errors }, (_, index) => ({ code: errorCodes?.[index] ?? 'UNEXPECTED_ERROR', message: 'Fixture error', file: 'src/fixture.js', line: 12, column: 4 }))
   const noticeItems = Array.from({ length: notices }, () => ({ code: 'FIXTURE_NOTICE', message: 'Fixture notice' }))
   const output = raw ?? JSON.stringify({
@@ -76,35 +77,41 @@ function run(warnings, { errors = 0, notices = 0, raw, errorCodes, linterExitCod
 }
 
 describe('Firefox known warning inventory', () => {
-  it('summarizes the 16-item baseline without printing known warning details by default', () => {
+  it('summarizes the 14-item inventory and does not call ambiguous source matches known', () => {
     const result = run(fixtureWarnings())
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Warnings: 16 (16 known, 0 new)')
+    expect(result.stdout).toContain('Warnings: 14 (8 known, 6 new)')
+    expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(6)
     expect(result.stdout).not.toContain('· KNOWN ')
-    for (const item of baseline) {
-      expect(result.stdout).not.toContain(item.code)
-      expect(result.stdout).not.toContain(item.file)
-      expect(result.stdout).not.toContain(item.messagePrefix)
-    }
-    expect(result.stdout).toContain('ℹ️ Known warnings match the reviewed baseline; this is not a safety assessment')
+    expect(result.stdout).not.toContain('Known warnings match the reviewed baseline')
   })
 
   it('reports an unknown warning as new and keeps its details visible', () => {
     const item = warning({ code: 'UNEXPECTED_CODE', message: 'Unexpected warning detail', file: 'new.js' })
     const result = run([...fixtureWarnings(), item])
-    expect(result.stdout).toContain('Warnings: 17 (16 known, 1 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
 
   it('classifies an occurrence beyond a known count as new', () => {
     const known = fixtureWarnings()
     const result = run([...known, { ...known[0] }])
-    expect(result.stdout).toContain('Warnings: 17 (16 known, 1 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
+  })
+
+  it('classifies ambiguous occurrences beyond their reviewed count as new', () => {
+    const entry = baseline.find(item => item.file === 'core/core-shared.js')
+    const item = warning({ code: entry.code, message: entry.message, file: entry.file })
+    const result = run(Array.from({ length: entry.count + 1 }, () => ({ ...item })))
+
+    expect(result.stdout).toContain('Warnings: 4 (0 known, 4 new)')
+    expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(entry.count)
+    expect(result.stdout.match(/⚠️ NEW/g)).toHaveLength(1)
   })
 
   it('reports known warnings that are absent without pretending they were seen', () => {
     const result = run(fixtureWarnings(baseline.slice(1)))
-    expect(result.stdout).toContain('Warnings: 14 (14 known, 0 new)')
+    expect(result.stdout).toContain('Warnings: 12 (6 known, 6 new)')
     expect(result.stdout).toContain('expected 2, observed 0')
   })
 
@@ -112,7 +119,7 @@ describe('Firefox known warning inventory', () => {
     const warnings = fixtureWarnings()
     warnings.push({ ...warnings[0], file: 'unlisted.js' })
     const result = run(warnings)
-    expect(result.stdout).toContain('Warnings: 17 (16 known, 1 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
     expect(result.stdout).toContain('unlisted.js')
   })
 
@@ -140,7 +147,7 @@ describe('Firefox known warning inventory', () => {
     const result = run(fixtureWarnings(), { errors: 1, notices: 3 })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('Errors:   1')
-    expect(result.stdout).toContain('Warnings: 16')
+    expect(result.stdout).toContain('Warnings: 14')
     expect(result.stdout).toContain('Notices:  3')
   })
 
@@ -224,7 +231,7 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: 'UNEXPECTED_CODE', message: 'Unexpected warning detail', file: 'new.js' })
     const result = run([...fixtureWarnings(), item], { verbose: true })
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Warnings: 17 (16 known, 1 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
     expect(result.stdout).toContain('· KNOWN ')
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
@@ -235,6 +242,42 @@ describe('Firefox known warning inventory', () => {
     expect(result.stdout).toContain('├─   Extension ID: fixture@example.invalid')
     expect(result.stdout).toContain('└─ Manifest validation completed\n\n')
     expect(result.stdout).toContain('└─ Package size within limits\n\n')
+  })
+
+  it.each([
+    ['Function constructor', 'const compile = new Function("Vue", "return Vue")', 'index-main.js'],
+    ['runtime compiler registration', 'registerRuntimeCompiler(compileToFunction)', 'index-iframe.js'],
+    ['compiler function', 'const compile = compileToFunction(template)', 'index-main.js']
+  ])('rejects Vue %s in a Firefox content-script entry', (_kind, entryBundle, entryName) => {
+    const result = run([], { entryBundle, entryName })
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain(`Vue runtime compiler code found in Firefox content-script bundle(s): ${entryName}`)
+  })
+
+  it('does not confuse regenerator-runtime Function usage with the Vue compiler', () => {
+    const result = run([], { entryBundle: 'return Function("r", "return function() {}")' })
+    expect(result.status).toBe(0)
+  })
+
+  it('does not identify an ambiguous warning as known even with an unmatched source identity', () => {
+    const row = baseline.find(item => item.file === 'core/core-shared.js')
+    const item = warning({ code: row.code, message: row.message, file: row.file })
+    item.sourceIdentity = 'unreviewed-source'
+    const result = run([item])
+    expect(result.stdout).toContain('Warnings: 1 (0 known, 1 new)')
+    expect(result.stdout).toContain('⚠️ NEW UNSAFE_VAR_ASSIGNMENT core/core-shared.js')
+  })
+
+  it('requires a supplied source identity to match the reviewed source', () => {
+    const row = baseline.find(item => item.file === 'assets/ocr/worker.min.js')
+    const item = warning({ code: row.code, message: row.message, file: row.file })
+    item.sourceIdentity = row.sources[0]
+    const reviewed = run([item])
+    expect(reviewed.stdout).toContain('Warnings: 1 (1 known, 0 new)')
+
+    item.sourceIdentity = 'different-library'
+    const unreviewed = run([item])
+    expect(unreviewed.stdout).toContain('Warnings: 1 (0 known, 1 new)')
   })
 
   it('formats the summary status and terminates the box without a separator or redundant success line', () => {

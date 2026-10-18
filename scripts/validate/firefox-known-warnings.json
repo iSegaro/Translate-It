@@ -1,14 +1,74 @@
 [
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Unsafe assignment to innerHTML", "file": "vendor/vue-core.js", "count": 2, "note": "previously-reviewed; not safe" },
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Error in no-unsanitized: Unexpected callable.", "file": "vendor/vue-core.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "DANGEROUS_EVAL", "messagePrefix": "The Function constructor is eval.", "file": "assets/ocr/worker.min.js", "count": 2, "note": "previously-reviewed; not safe" },
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Unsafe assignment to innerHTML", "file": "vendor/vendor.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Unsafe call to import for argument 0", "file": "vendor/vendor.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "DANGEROUS_EVAL", "messagePrefix": "The Function constructor is eval.", "file": "vendor/vendor.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "DANGEROUS_EVAL", "messagePrefix": "The Function constructor is eval.", "file": "src/core/background/index.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "DANGEROUS_EVAL", "messagePrefix": "The Function constructor is eval.", "file": "src/core/content-scripts/index-iframe.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Unsafe call to import for argument 0", "file": "pdf.worker.mjs", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Unsafe assignment to innerHTML", "file": "src/core/content-scripts/index-main.js", "count": 3, "note": "previously-reviewed; not safe" },
-  { "code": "UNSAFE_VAR_ASSIGNMENT", "messagePrefix": "Error in no-unsanitized: Unexpected callable.", "file": "src/core/content-scripts/index-main.js", "count": 1, "note": "previously-reviewed; not safe" },
-  { "code": "DANGEROUS_EVAL", "messagePrefix": "The Function constructor is eval.", "file": "src/core/content-scripts/index-main.js", "count": 1, "note": "previously-reviewed; not safe" }
+  {
+    "code": "DANGEROUS_EVAL",
+    "message": "The Function constructor is eval.",
+    "file": "assets/ocr/worker.min.js",
+    "count": 2,
+    "sources": ["Tesseract OCR worker"],
+    "note": "Third-party Tesseract worker uses generated code; inventory only, not a safety assessment."
+  },
+  {
+    "code": "UNSAFE_VAR_ASSIGNMENT",
+    "message": "Unsafe call to import for argument 0",
+    "file": "vendor/vendor.js",
+    "count": 1,
+    "sources": ["PDF.js worker loading"],
+    "note": "PDF.js dynamic worker loading; inventory only."
+  },
+  {
+    "code": "DANGEROUS_EVAL",
+    "message": "The Function constructor is eval.",
+    "file": "vendor/vendor.js",
+    "count": 1,
+    "sources": ["regenerator-runtime"],
+    "note": "Third-party regenerator-runtime generated-code helper; inventory only."
+  },
+  {
+    "code": "UNSAFE_VAR_ASSIGNMENT",
+    "message": "Unsafe assignment to innerHTML",
+    "file": "core/core-shared.js",
+    "count": 3,
+    "sources": ["Vue renderer", "DOMPurify", "Iconify"],
+    "note": "Three observed locations in this bundle. Across both content bundles, attribution is Vue renderer (2), DOMPurify (2), and Iconify (2), but addons-linter locations in minified output cannot reliably identify the source or per-bundle allocation. Iconify issue #353 remains unresolved. Inventory is not a safety assessment."
+  },
+  {
+    "code": "DANGEROUS_EVAL",
+    "message": "The Function constructor is eval.",
+    "file": "src/core/background/index.js",
+    "count": 1,
+    "sources": ["regenerator-runtime"],
+    "note": "Third-party regenerator-runtime generated-code helper; inventory only."
+  },
+  {
+    "code": "DANGEROUS_EVAL",
+    "message": "The Function constructor is eval.",
+    "file": "src/core/content-scripts/index-iframe.js",
+    "count": 1,
+    "sources": ["regenerator-runtime"],
+    "note": "Third-party regenerator-runtime generated-code helper; inventory only."
+  },
+  {
+    "code": "UNSAFE_VAR_ASSIGNMENT",
+    "message": "Unsafe call to import for argument 0",
+    "file": "pdf.worker.mjs",
+    "count": 1,
+    "sources": ["PDF.js worker"],
+    "note": "PDF.js worker dynamic import; inventory only."
+  },
+  {
+    "code": "UNSAFE_VAR_ASSIGNMENT",
+    "message": "Unsafe assignment to innerHTML",
+    "file": "src/core/content-scripts/index-main.js",
+    "count": 3,
+    "sources": ["Vue renderer", "DOMPurify", "Iconify"],
+    "note": "Three observed locations in this bundle. Across both content bundles, attribution is Vue renderer (2), DOMPurify (2), and Iconify (2), but addons-linter locations in minified output cannot reliably identify the source or per-bundle allocation. Iconify issue #353 remains unresolved. Inventory is not a safety assessment."
+  },
+  {
+    "code": "DANGEROUS_EVAL",
+    "message": "The Function constructor is eval.",
+    "file": "src/core/content-scripts/index-main.js",
+    "count": 1,
+    "sources": ["regenerator-runtime"],
+    "note": "Third-party regenerator-runtime generated-code helper; inventory only."
+  }
 ]
