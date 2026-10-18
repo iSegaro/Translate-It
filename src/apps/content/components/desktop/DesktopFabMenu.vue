@@ -419,7 +419,15 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
+import {
+  ref,
+  computed,
+  nextTick,
+  getCurrentInstance,
+  onMounted,
+  onUnmounted,
+  watch,
+} from "vue";
 import { injectStylesToShadowRoot } from "@/utils/ui/styleInjector.js";
 import { useUnifiedI18n } from "@/composables/shared/useUnifiedI18n";
 import { MessageActions } from "@/shared/messaging/core/MessageActions.js";
@@ -476,7 +484,24 @@ const mobileStore = useMobileStore();
 const settingsStore = useSettingsStore();
 const { t } = useUnifiedI18n();
 const { handleError } = useErrorHandler();
-const tracker = useResourceTracker("desktop-fab-menu");
+let isUnmounted = false;
+const animationFrameOwnerId = getCurrentInstance().uid;
+const tracker = useResourceTracker(`desktop-fab-menu-${animationFrameOwnerId}`);
+let animationFrameId = 0;
+const scheduleTimeout = (callback, delay) =>
+  tracker.trackTimeout(() => {
+    if (!isUnmounted) callback();
+  }, delay);
+const scheduleAnimationFrame = (callback) => {
+  const frameId = requestAnimationFrame(() => {
+    if (!isUnmounted) callback();
+  });
+  tracker.trackResource(
+    `desktop-fab-menu-${animationFrameOwnerId}-frame-${++animationFrameId}`,
+    () => cancelAnimationFrame(frameId),
+  );
+  return frameId;
+};
 const tts = useTTSSmart();
 const { isMouseHoverEnabled, toggleMouseHover } = useMouseHoverToggle();
 const exclusionChecker = ExclusionChecker.getInstance();
@@ -510,6 +535,7 @@ const allowedFeatures = ref({
 
 const updateAllowedFeatures = async () => {
   const status = await exclusionChecker.getFeatureStatus();
+  if (isUnmounted) return;
   if (status.initialized) {
     allowedFeatures.value.selectElement =
       status.features.selectElement?.allowed ?? true;
@@ -1425,10 +1451,11 @@ const stopDrag = (e) => {
   }
 
   // Use a slightly longer delay to ensure ghost clicks are swallowed
-  setTimeout(async () => {
+  scheduleTimeout(async () => {
+    if (isUnmounted) return;
     isDragging.value = false;
     // Small extra delay for wasDragged to ensure toggleMenu doesn't fire
-    setTimeout(() => {
+    scheduleTimeout(() => {
       wasDragged.value = false;
     }, 150);
 
@@ -1441,7 +1468,7 @@ const stopDrag = (e) => {
     }
 
     // Restart fade timer after drag ends
-    startFadeTimer(false);
+    if (!isUnmounted) startFadeTimer(false);
   }, 100);
 };
 
@@ -1450,15 +1477,18 @@ onMounted(async () => {
   try {
     const { fabUiStyles } =
       await import("@/core/content-scripts/chunks/lazy-styles.js");
+    if (isUnmounted) return;
     if (fabUiStyles && injectStylesToShadowRoot) {
       injectStylesToShadowRoot(fabUiStyles, "vue-fab-specific-styles");
     }
   } catch (error) {
+    if (isUnmounted) return;
     console.warn("[DesktopFabMenu] Failed to load lazy styles:", error);
   }
 
   try {
     const position = await getDesktopFabPositionAsync();
+    if (isUnmounted) return;
     if (position) {
       if (position.y !== undefined && position.y !== -1) {
         userPreferredY.value = position.y;
@@ -1470,19 +1500,23 @@ onMounted(async () => {
 
     // Initial check for allowed features
     await updateAllowedFeatures();
+    if (isUnmounted) return;
 
     // Listen for settings and exclusion changes to re-evaluate allowed features
     tracker.trackResource(
-      "exclusion-sync",
+      `exclusion-sync-${animationFrameOwnerId}`,
       pageEventBus.on("FEATURE_STATUS_CHANGED", updateAllowedFeatures),
     );
     tracker.trackResource(
-      "exclusion-re-sync",
+      `exclusion-re-sync-${animationFrameOwnerId}`,
       pageEventBus.on("sync-interaction-listeners", updateAllowedFeatures),
     );
   } catch (err) {
+    if (isUnmounted) return;
     logger.info("Failed to load FAB state:", err);
   }
+
+  if (isUnmounted) return;
 
   tracker.addEventListener(window, "resize", updateViewport);
   tracker.addEventListener(window, "scroll", updateViewport, { passive: true });
@@ -1498,20 +1532,20 @@ onMounted(async () => {
   });
 
   // Settle position before showing to prevent jumps
-  setTimeout(() => {
+  scheduleTimeout(() => {
     isReady.value = true;
 
     // Settling pixel position on first mount if not already set
     // We do this in a double requestAnimationFrame or nextTick to ensure the DOM is ready
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+    scheduleAnimationFrame(() => {
+      scheduleAnimationFrame(() => {
         if (verticalPos.value === -1 && fabContainerRef.value) {
           const rect = fabContainerRef.value.getBoundingClientRect();
           verticalPos.value = rect.top;
           userPreferredY.value = rect.top;
         }
 
-        setTimeout(() => {
+        scheduleTimeout(() => {
           isPositioning.value = false;
         }, 150);
       });
@@ -1530,6 +1564,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  isUnmounted = true;
   emit("presence", false);
   logger.debug(
     "[DesktopFabMenu] Unmounting - performing owner-aware TTS cleanup",
