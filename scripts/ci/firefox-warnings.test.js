@@ -80,7 +80,7 @@ describe('Firefox known warning inventory', () => {
   it('summarizes the 14-item inventory and does not call ambiguous source matches known', () => {
     const result = run(fixtureWarnings())
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Warnings: 14 (8 known, 6 new)')
+    expect(result.stdout).toContain('Warnings: 14 (8 known, 6 ambiguous, 0 new)')
     expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(6)
     expect(result.stdout).not.toContain('· KNOWN ')
     expect(result.stdout).not.toContain('Known warnings match the reviewed baseline')
@@ -89,14 +89,14 @@ describe('Firefox known warning inventory', () => {
   it('reports an unknown warning as new and keeps its details visible', () => {
     const item = warning({ code: 'UNEXPECTED_CODE', message: 'Unexpected warning detail', file: 'new.js' })
     const result = run([...fixtureWarnings(), item])
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
 
   it('classifies an occurrence beyond a known count as new', () => {
     const known = fixtureWarnings()
     const result = run([...known, { ...known[0] }])
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
   })
 
   it('classifies ambiguous occurrences beyond their reviewed count as new', () => {
@@ -104,14 +104,14 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: entry.code, message: entry.message, file: entry.file })
     const result = run(Array.from({ length: entry.count + 1 }, () => ({ ...item })))
 
-    expect(result.stdout).toContain('Warnings: 4 (0 known, 4 new)')
+    expect(result.stdout).toContain('Warnings: 4 (0 known, 3 ambiguous, 1 new)')
     expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(entry.count)
     expect(result.stdout.match(/⚠️ NEW/g)).toHaveLength(1)
   })
 
   it('reports known warnings that are absent without pretending they were seen', () => {
     const result = run(fixtureWarnings(baseline.slice(1)))
-    expect(result.stdout).toContain('Warnings: 12 (6 known, 6 new)')
+    expect(result.stdout).toContain('Warnings: 12 (6 known, 6 ambiguous, 0 new)')
     expect(result.stdout).toContain('expected 2, observed 0')
   })
 
@@ -119,7 +119,7 @@ describe('Firefox known warning inventory', () => {
     const warnings = fixtureWarnings()
     warnings.push({ ...warnings[0], file: 'unlisted.js' })
     const result = run(warnings)
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
     expect(result.stdout).toContain('unlisted.js')
   })
 
@@ -231,7 +231,7 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: 'UNEXPECTED_CODE', message: 'Unexpected warning detail', file: 'new.js' })
     const result = run([...fixtureWarnings(), item], { verbose: true })
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 7 new)')
+    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
     expect(result.stdout).toContain('· KNOWN ')
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
@@ -264,7 +264,7 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: row.code, message: row.message, file: row.file })
     item.sourceIdentity = 'unreviewed-source'
     const result = run([item])
-    expect(result.stdout).toContain('Warnings: 1 (0 known, 1 new)')
+    expect(result.stdout).toContain('Warnings: 1 (0 known, 0 ambiguous, 1 new)')
     expect(result.stdout).toContain('⚠️ NEW UNSAFE_VAR_ASSIGNMENT core/core-shared.js')
   })
 
@@ -273,11 +273,11 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: row.code, message: row.message, file: row.file })
     item.sourceIdentity = row.sources[0]
     const reviewed = run([item])
-    expect(reviewed.stdout).toContain('Warnings: 1 (1 known, 0 new)')
+    expect(reviewed.stdout).toContain('Warnings: 1 (1 known, 0 ambiguous, 0 new)')
 
     item.sourceIdentity = 'different-library'
     const unreviewed = run([item])
-    expect(unreviewed.stdout).toContain('Warnings: 1 (0 known, 1 new)')
+    expect(unreviewed.stdout).toContain('Warnings: 1 (0 known, 0 ambiguous, 1 new)')
   })
 
   it('formats the summary status and terminates the box without a separator or redundant success line', () => {

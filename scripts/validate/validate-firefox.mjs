@@ -113,7 +113,7 @@ async function validateFirefoxExtension() {
     const verbose = process.argv.includes('--verbose')
     console.log('├─ VALIDATION RESULTS:')
     console.log(`├─   Errors:   ${effectiveErrors}${ignoredErrors ? ` (${ignoredErrors} ignored)` : ''}`)
-    console.log(`├─   Warnings: ${report.warnings} (${classification.known} known, ${classification.new.length + classification.ambiguous.length} new)`)
+    console.log(`├─   Warnings: ${report.warnings} (${classification.known} known, ${classification.ambiguous.length} ambiguous, ${classification.new.length} new)`)
     console.log(`├─   Notices:  ${report.notices}`)
     if (verbose) {
       for (const item of classification.knownItems) console.log(`· KNOWN ${item.code} ${item.file}: ${item.message}`)
