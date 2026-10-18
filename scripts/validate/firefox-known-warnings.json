@@ -29,7 +29,7 @@
     "file": "core/core-shared.js",
     "count": 3,
     "sources": ["Vue renderer", "DOMPurify", "Iconify"],
-    "note": "Three observed locations in this bundle. Across both content bundles, attribution is Vue renderer (2), DOMPurify (2), and Iconify (2), but addons-linter locations in minified output cannot reliably identify the source or per-bundle allocation. Iconify issue #353 remains unresolved. Inventory is not a safety assessment."
+    "note": "Three observed locations in this bundle. Across both content bundles, attribution is Vue renderer (2), DOMPurify (2), and Iconify (2), but addons-linter locations in minified output cannot reliably identify the source or per-bundle allocation. Iconify SVG handling remains an unresolved security risk. Inventory is not a safety assessment."
   },
   {
     "code": "DANGEROUS_EVAL",
@@ -61,7 +61,7 @@
     "file": "src/core/content-scripts/index-main.js",
     "count": 3,
     "sources": ["Vue renderer", "DOMPurify", "Iconify"],
-    "note": "Three observed locations in this bundle. Across both content bundles, attribution is Vue renderer (2), DOMPurify (2), and Iconify (2), but addons-linter locations in minified output cannot reliably identify the source or per-bundle allocation. Iconify issue #353 remains unresolved. Inventory is not a safety assessment."
+    "note": "Three observed locations in this bundle. Across both content bundles, attribution is Vue renderer (2), DOMPurify (2), and Iconify (2), but addons-linter locations in minified output cannot reliably identify the source or per-bundle allocation. Iconify SVG handling remains an unresolved security risk. Inventory is not a safety assessment."
   },
   {
     "code": "DANGEROUS_EVAL",

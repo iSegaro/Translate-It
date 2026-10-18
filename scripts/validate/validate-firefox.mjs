@@ -119,7 +119,14 @@ async function validateFirefoxExtension() {
       for (const item of classification.knownItems) console.log(`· KNOWN ${item.code} ${item.file}: ${item.message}`)
     }
     for (const item of classification.new) console.log(`⚠️ NEW ${item.code} ${item.file}: ${item.message}`)
-    for (const item of classification.ambiguous) console.log(`⚠️ AMBIGUOUS ${item.code} ${item.file}: ${item.message} (source identity unavailable)`)
+    if (classification.ambiguous.length > 0) {
+      if (verbose) {
+        for (const item of classification.ambiguous) console.log(`⚠️ AMBIGUOUS ${item.code} ${item.file}: ${item.message} (source identity unavailable)`)
+      } else {
+        console.log(`ℹ️ ${classification.ambiguous.length} reviewed warning occurrences with unverified source identity.`)
+        console.log('   Details: --verbose | Iconify risk remains unresolved.')
+      }
+    }
     for (const item of classification.missing) console.log(`ℹ️ Known baseline absent: ${item.file} | ${item.message} expected ${item.expected}, observed ${item.observed}`)
     for (const item of report.errorItems.filter(item => !IGNORED_ERROR_CODES.includes(item.code))) {
       console.log(`❌ ERROR ${item.code || 'UNKNOWN'}${item.file ? ` ${item.file}` : ''}${item.line != null ? `:${item.line}${item.column != null ? `:${item.column}` : ''}` : ''}: ${item.message || ''}`)

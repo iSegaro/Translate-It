@@ -81,7 +81,9 @@ describe('Firefox known warning inventory', () => {
     const result = run(fixtureWarnings())
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('Warnings: 14 (8 known, 6 ambiguous, 0 new)')
-    expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(6)
+    expect(result.stdout).toContain('ℹ️ 6 reviewed warning occurrences with unverified source identity.')
+    expect(result.stdout).toContain('Details: --verbose | Iconify risk remains unresolved.')
+    expect(result.stdout).not.toContain('⚠️ AMBIGUOUS')
     expect(result.stdout).not.toContain('· KNOWN ')
     expect(result.stdout).not.toContain('Known warnings match the reviewed baseline')
   })
@@ -102,7 +104,7 @@ describe('Firefox known warning inventory', () => {
   it('classifies ambiguous occurrences beyond their reviewed count as new', () => {
     const entry = baseline.find(item => item.file === 'core/core-shared.js')
     const item = warning({ code: entry.code, message: entry.message, file: entry.file })
-    const result = run(Array.from({ length: entry.count + 1 }, () => ({ ...item })))
+    const result = run(Array.from({ length: entry.count + 1 }, () => ({ ...item })), { verbose: true })
 
     expect(result.stdout).toContain('Warnings: 4 (0 known, 3 ambiguous, 1 new)')
     expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(entry.count)
@@ -233,6 +235,7 @@ describe('Firefox known warning inventory', () => {
     expect(result.status).toBe(0)
     expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
     expect(result.stdout).toContain('· KNOWN ')
+    expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(6)
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
 
