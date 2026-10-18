@@ -202,6 +202,7 @@ const { createSetting } = useTabSettings(settingsStore, logger)
 const { validatePromptTemplate: validate, getFirstError, getFirstErrorTranslated, clearErrors } = useValidation()
 const { highlightElement } = useHighlightManager()
 const { promptExamples, loadingExamples, generateExamples } = usePromptPreview(logger)
+let validationFeedbackHighlightTimer
 
 // Prompt Classification from Registry
 const editablePrompts = Object.values(PROMPT_REGISTRY).filter(p => p.editable)
@@ -304,7 +305,9 @@ const handleValidationFeedback = (e) => {
     validatePrompt(true);
     
     // Focus and highlight logic
-    setTimeout(() => {
+    clearTimeout(validationFeedbackHighlightTimer)
+    validationFeedbackHighlightTimer = setTimeout(() => {
+      validationFeedbackHighlightTimer = undefined
       highlightElement(currentPromptKey.value);
     }, 400);
   }
@@ -324,6 +327,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('options-trigger-validation-feedback', handleValidationFeedback);
   window.removeEventListener('options-settings-saved', handleSettingsSaved);
+  clearTimeout(validationFeedbackHighlightTimer)
 })
 
 // Validation function
