@@ -158,17 +158,3 @@ export function configureVueForCSP(app) {
   logger.debug('Vue app configured for CSP compatibility');
   return app;
 }
-
-/**
- * Create a Vue app with CSP configuration
- * Convenience function that combines createApp with CSP configuration
- *
- * @param {Object} component - Vue component
- * @param {Object} props - Component props
- * @returns {Object} - Configured Vue app instance
- */
-export function createVueApp(component, props = {}) {
-  const { createApp } = require('vue');
-  const app = createApp(component, props);
-  return configureVueForCSP(app);
-}
