@@ -15,15 +15,31 @@ const { artifactPrefix, displayName } = projectNaming.getProjectNames(pkg.name)
 
 const CHROME_BUILD_DIR = path.join(rootDir, `dist/chrome/${artifactPrefix}-v${pkg.version}`)
 const TEMP_ARTIFACTS_DIR = path.join(rootDir, 'temp/validation/chrome')
+const TEMP_VALIDATION_DIR = path.dirname(TEMP_ARTIFACTS_DIR)
+const TEMP_DIR = path.dirname(TEMP_VALIDATION_DIR)
+
+function cleanupTempArtifacts() {
+  fs.rmSync(TEMP_ARTIFACTS_DIR, { recursive: true, force: true })
+  for (const dir of [TEMP_VALIDATION_DIR, TEMP_DIR]) {
+    try {
+      if (fs.readdirSync(dir).length === 0) fs.rmdirSync(dir)
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTEMPTY' && error.code !== 'EEXIST') throw error
+    }
+  }
+}
 
 /**
  * Validate Chrome extension build
  */
 async function validateChromeExtension() {
+  let results
+  let summaryReady = false
+  let cleanupError
   try {
     console.log(createBox('🕸 CHROME EXTENSION VALIDATOR') + '\n')
     
-    const results = {
+    results = {
       errors: 0,
       warnings: 0,
       notices: 0
@@ -183,12 +199,30 @@ async function validateChromeExtension() {
       console.log('└─ Package size within limits\n')
     }
     
-    // Cleanup
-    if (fs.existsSync(TEMP_ARTIFACTS_DIR)) {
-      fs.rmSync(TEMP_ARTIFACTS_DIR, { recursive: true, force: true })
-    }
+    summaryReady = true
     
-    // Final summary
+  } catch (error) {
+    console.log(createErrorBox('🕸 CHROME VALIDATION FAILED') + '\n')
+    const horizontalLine = '═'.repeat(64)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText(`❌ Error: ${error.message.slice(0, 51)}`)}║`)
+    console.log(`╠${horizontalLine}╣`)
+    console.log(`║${centerText('Please fix the above issues and run validation again.')}║`)
+    console.log(`╚${horizontalLine}╝\n`)
+    
+    logError('Chrome validation failed:', error.message)
+    process.exitCode = 1
+  } finally {
+    try {
+      cleanupTempArtifacts()
+    } catch (error) {
+      cleanupError = error
+      logError('Chrome validation cleanup failed:', error.message)
+    }
+  }
+
+  if (summaryReady) {
+    if (cleanupError) results.errors++
     console.log('╔════════════════════════════════════════════════════════════════╗')
     console.log(`║${centerText('🕸 CHROME VALIDATION SUMMARY')}║`)
     console.log('╠════════════════════════════════════════════════════════════════╣')
@@ -199,28 +233,9 @@ async function validateChromeExtension() {
     console.log(`║${centerText(`Notices:  ${results.notices.toString().padStart(3, ' ')}`)}║`)
     console.log(emptyBoxLine())
     console.log('╚════════════════════════════════════════════════════════════════╝\n')
-    
-    if (results.errors > 0) {
-      process.exit(1)
-    }
-    
-  } catch (error) {
-    // Cleanup on error
-    if (fs.existsSync(TEMP_ARTIFACTS_DIR)) {
-      fs.rmSync(TEMP_ARTIFACTS_DIR, { recursive: true, force: true })
-    }
-    
-    console.log(createErrorBox('🕸 CHROME VALIDATION FAILED') + '\n')
-    const horizontalLine = '═'.repeat(64)
-    console.log(`╠${horizontalLine}╣`)
-    console.log(`║${centerText(`❌ Error: ${error.message.slice(0, 51)}`)}║`)
-    console.log(`╠${horizontalLine}╣`)
-    console.log(`║${centerText('Please fix the above issues and run validation again.')}║`)
-    console.log(`╚${horizontalLine}╝\n`)
-    
-    logError('Chrome validation failed:', error.message)
-    process.exit(1)
   }
+
+  if (cleanupError || results?.errors > 0) process.exitCode = 1
 }
 
 function printCommandError(error) {

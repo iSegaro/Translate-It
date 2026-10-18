@@ -25,7 +25,7 @@ function createWorkspace() {
   fs.writeFileSync(path.join(workspace, 'scripts', 'shared', 'logger.mjs'), `
 export const logStep = message => console.log(message)
 export const logSuccess = message => console.log('✅ ' + message)
-export const logError = message => console.log('❌ ' + message)
+export const logError = (message, details) => console.log('❌ ' + message + (details ? '\\n   ' + details : ''))
 export const logInfo = message => console.log('ℹ  ' + message)
 `)
   fs.copyFileSync(path.join(root, 'scripts', 'shared', 'project-names.cjs'), path.join(workspace, 'scripts', 'shared', 'project-names.cjs'))
@@ -75,6 +75,27 @@ if (process.argv[2] === '--version') {
 
 function run(script, workspace, args = []) {
   return spawnSync(process.execPath, [script, ...args], {
+    cwd: workspace,
+    env: { ...process.env },
+    encoding: 'utf8',
+  })
+}
+
+function runChromeWithCleanupFailure(workspace) {
+  const preload = path.join(tempDir, 'cleanup-failure.cjs')
+  fs.writeFileSync(preload, `
+const fs = require('node:fs')
+const path = require('node:path')
+const { syncBuiltinESMExports } = require('node:module')
+const originalRmSync = fs.rmSync
+const target = path.resolve(process.cwd(), 'temp/validation/chrome')
+fs.rmSync = function (filePath, ...args) {
+  if (path.resolve(filePath) === target) throw new Error('distinctive cleanup failure')
+  return originalRmSync.call(this, filePath, ...args)
+}
+syncBuiltinESMExports()
+`)
+  return spawnSync(process.execPath, ['--require', preload, 'scripts/validate/validate-chrome.mjs'], {
     cwd: workspace,
     env: { ...process.env },
     encoding: 'utf8',
@@ -144,6 +165,7 @@ describe('validation output', () => {
     expect(text).not.toContain('├─ ✅')
     expect(text).not.toContain('Ready for Web Store')
     expect(text).not.toContain('submission')
+    expect(fs.existsSync(path.join(workspace, 'temp'))).toBe(false)
   })
 
   it('fails when web-ext is available but its validation command fails', () => {
@@ -152,12 +174,77 @@ describe('validation output', () => {
 
     const result = run('scripts/validate/validate-chrome.mjs', workspace)
     const text = result.stdout + result.stderr
-    expect(result.status).not.toBe(0)
+    expect(result.status).toBe(1)
     expect(text).toContain('web-ext validation failed')
     expect(text).toContain('Status: ❌ FAILED')
     expect(text).not.toContain('Status: ✅ PASSED')
     expect(text).toContain('distinctive build stderr')
     expect(text).toContain('distinctive build stdout')
+    expect(fs.existsSync(path.join(workspace, 'temp', 'validation', 'chrome'))).toBe(false)
+    expect(fs.existsSync(path.join(workspace, 'temp'))).toBe(false)
+  })
+
+  it('preserves unrelated temp files while removing Chrome artifacts and empty parent directories', () => {
+    const { workspace } = createWorkspace()
+    installWebExt(workspace, { buildExit: 9 })
+    const tempDir = path.join(workspace, 'temp')
+    const validationDir = path.join(tempDir, 'validation')
+    fs.mkdirSync(validationDir, { recursive: true })
+    fs.writeFileSync(path.join(tempDir, 'keep.txt'), 'temp')
+    fs.writeFileSync(path.join(validationDir, 'keep.txt'), 'validation')
+
+    const result = run('scripts/validate/validate-chrome.mjs', workspace)
+
+    expect(result.status).toBe(1)
+    expect(fs.existsSync(path.join(validationDir, 'chrome'))).toBe(false)
+    expect(fs.readFileSync(path.join(tempDir, 'keep.txt'), 'utf8')).toBe('temp')
+    expect(fs.readFileSync(path.join(validationDir, 'keep.txt'), 'utf8')).toBe('validation')
+  })
+
+  it('cleans Chrome artifacts when an unexpected validation error reaches the top-level catch', () => {
+    const { workspace, buildDir } = createWorkspace()
+    fs.writeFileSync(path.join(buildDir, 'manifest.json'), '{')
+    const artifactsDir = path.join(workspace, 'temp', 'validation', 'chrome')
+    fs.mkdirSync(artifactsDir, { recursive: true })
+    fs.writeFileSync(path.join(artifactsDir, 'partial.zip'), 'partial')
+
+    const result = run('scripts/validate/validate-chrome.mjs', workspace)
+    const text = result.stdout + result.stderr
+
+    expect(result.status).toBe(1)
+    expect(text).toContain('CHROME VALIDATION FAILED')
+    expect(text).toContain('Error:')
+    expect(fs.existsSync(path.join(workspace, 'temp'))).toBe(false)
+  })
+
+  it('reports cleanup failure instead of a successful validation summary', () => {
+    const { workspace } = createWorkspace()
+    installWebExt(workspace)
+
+    const result = runChromeWithCleanupFailure(workspace)
+    const text = result.stdout + result.stderr
+
+    expect(result.status).toBe(1)
+    expect(text).toContain('Chrome validation cleanup failed:')
+    expect(text).toContain('distinctive cleanup failure')
+    expect(text).toContain('Status: ❌ FAILED')
+    expect(text).not.toContain('Status: ✅ PASSED')
+  })
+
+  it('preserves the validation error when cleanup also fails', () => {
+    const { workspace, buildDir } = createWorkspace()
+    fs.rmSync(path.join(buildDir, 'manifest.json'))
+
+    const result = runChromeWithCleanupFailure(workspace)
+    const text = result.stdout + result.stderr
+
+    expect(result.status).toBe(1)
+    expect(text).toContain('CHROME VALIDATION FAILED')
+    expect(text).toContain('manifest.json not found in Chrome build')
+    expect(text).toContain('Chrome validation failed:')
+    expect(text).toContain('Chrome validation cleanup failed:')
+    expect(text).toContain('distinctive cleanup failure')
+    expect(text).not.toContain('Status: ✅ PASSED')
   })
 
   it('warns and skips web-ext only when the optional package is missing', () => {
