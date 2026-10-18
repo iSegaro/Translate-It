@@ -83,13 +83,7 @@ const fetchChangelog = async () => {
     // Configure marked options
     const markedOptions = {
       breaks: false,
-      gfm: true,
-      smartLists: true,
-      smartypants: false,
-      tables: true,
-      headerIds: false,
-      mangle: false,
-      sanitize: false
+      gfm: true
     }
 
     let html = marked(markdown, markedOptions)
