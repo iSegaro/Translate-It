@@ -5,8 +5,10 @@ import fs from 'fs-extra'
 import { resolve } from 'path'
 import { generateValidatedManifest } from '../manifest-generator.js'
 import pkg from '../../package.json' with { type: 'json' };
+import projectNaming from '../../scripts/shared/project-names.cjs'
 
-const baseOutDir = `dist/firefox/Translate-It-v${pkg.version}`;
+const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
+const baseOutDir = `dist/firefox/${artifactPrefix}-v${pkg.version}`;
 
 // Import production config for production builds
 let productionConfig = null;

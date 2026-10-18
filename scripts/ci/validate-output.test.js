@@ -4,8 +4,11 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
+import projectNaming from '../shared/project-names.cjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+const { artifactPrefix } = projectNaming.getProjectNames(packageJson.name)
 let tempDir
 
 afterEach(() => {
@@ -18,13 +21,14 @@ function createWorkspace() {
   const workspace = path.join(tempDir, 'workspace with spaces')
   fs.mkdirSync(path.join(workspace, 'scripts', 'validate'), { recursive: true })
   fs.mkdirSync(path.join(workspace, 'scripts', 'shared'), { recursive: true })
-  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ name: 'translate-it', version: '1.0.0' }))
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ name: packageJson.name, version: '1.0.0' }))
   fs.writeFileSync(path.join(workspace, 'scripts', 'shared', 'logger.mjs'), `
 export const logStep = message => console.log(message)
 export const logSuccess = message => console.log('✅ ' + message)
 export const logError = message => console.log('❌ ' + message)
 export const logInfo = message => console.log('ℹ  ' + message)
 `)
+  fs.copyFileSync(path.join(root, 'scripts', 'shared', 'project-names.cjs'), path.join(workspace, 'scripts', 'shared', 'project-names.cjs'))
   fs.writeFileSync(path.join(workspace, 'scripts', 'shared', 'box-utils.mjs'), `
 export const createBox = value => value
 export const createErrorBox = value => value
@@ -36,7 +40,7 @@ export const formatFileSize = value => String(value)
   for (const file of ['validate-chrome.mjs', 'validate-all.mjs', 'validate-production-bundle.mjs']) {
     fs.copyFileSync(path.join(root, 'scripts', 'validate', file), path.join(workspace, 'scripts', 'validate', file))
   }
-  const buildDir = path.join(workspace, 'dist', 'chrome', 'Translate-It-v1.0.0')
+  const buildDir = path.join(workspace, 'dist', 'chrome', `${artifactPrefix}-v1.0.0`)
   fs.mkdirSync(buildDir, { recursive: true })
   fs.writeFileSync(path.join(buildDir, 'manifest.json'), JSON.stringify({
     manifest_version: 3,

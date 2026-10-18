@@ -7,13 +7,15 @@ import { fileURLToPath } from 'url'
 import { BuildReporter } from '../shared/build-reporter.mjs'
 import { logStep, logError } from '../shared/logger.mjs'
 import { formatPackageSize } from '../shared/box-utils.mjs'
+import projectNaming from '../shared/project-names.cjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
+const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
-const FIREFOX_BUILD_DIR = `dist/firefox/Translate-It-v${pkg.version}`
-const FIREFOX_ZIP_PATH = `dist/firefox/Translate-It-v${pkg.version}.zip`
+const FIREFOX_BUILD_DIR = `dist/firefox/${artifactPrefix}-v${pkg.version}`
+const FIREFOX_ZIP_PATH = `dist/firefox/${artifactPrefix}-v${pkg.version}.zip`
 
 /**
  * Build Firefox extension with Vue

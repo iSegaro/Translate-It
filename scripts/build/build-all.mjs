@@ -6,6 +6,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logError } from '../shared/logger.mjs'
 import { centerText, createBox, createSuccessBox, createErrorBox, formatDuration } from '../shared/box-utils.mjs'
+import projectNaming from '../shared/project-names.cjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
@@ -135,9 +136,10 @@ async function buildAll() {
     // Copy packages to Publish directory
     const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
     const version = pkg.version
+    const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
-    const chromeZip = path.join(rootDir, `dist/chrome/Translate-It-v${version}.zip`)
-    const firefoxZip = path.join(rootDir, `dist/firefox/Translate-It-v${version}.zip`)
+    const chromeZip = path.join(rootDir, `dist/chrome/${artifactPrefix}-v${version}.zip`)
+    const firefoxZip = path.join(rootDir, `dist/firefox/${artifactPrefix}-v${version}.zip`)
 
     const missingZips = [chromeZip, firefoxZip].filter(zipPath => !fs.existsSync(zipPath))
     if (missingZips.length > 0) {
@@ -152,12 +154,12 @@ async function buildAll() {
 
     const chromeCopied = fs.existsSync(chromeZip)
     if (chromeCopied) {
-      fs.copyFileSync(chromeZip, path.join(publishDir, `Translate-It-v${version}-for-Chrome.zip`))
+      fs.copyFileSync(chromeZip, path.join(publishDir, `${artifactPrefix}-v${version}-for-Chrome.zip`))
     }
     
     const firefoxCopied = fs.existsSync(firefoxZip)
     if (firefoxCopied) {
-      fs.copyFileSync(firefoxZip, path.join(publishDir, `Translate-It-v${version}-for-Firefox.zip`))
+      fs.copyFileSync(firefoxZip, path.join(publishDir, `${artifactPrefix}-v${version}-for-Firefox.zip`))
     }
     
     // Step 4: Success summary
@@ -167,8 +169,8 @@ async function buildAll() {
     console.log('\n╔' + horizontalLine + '╗')
     console.log(`║${centerText('✅ ALL BUILDS COMPLETED')}║`)
     console.log(`╠${horizontalLine}╣`)
-    if (chromeCopied) console.log(`║${centerText(`Chrome ZIP: dist/Publish/Translate-It-v${version}-for-Chrome.zip`)}║`)
-    if (firefoxCopied) console.log(`║${centerText(`Firefox ZIP: dist/Publish/Translate-It-v${version}-for-Firefox.zip`)}║`)
+    if (chromeCopied) console.log(`║${centerText(`Chrome ZIP: dist/Publish/${artifactPrefix}-v${version}-for-Chrome.zip`)}║`)
+    if (firefoxCopied) console.log(`║${centerText(`Firefox ZIP: dist/Publish/${artifactPrefix}-v${version}-for-Firefox.zip`)}║`)
     if (!chromeCopied && !firefoxCopied) console.log(`║${centerText('No browser ZIPs were copied to dist/Publish/')}║`)
     console.log(`╠${horizontalLine}╣`)
     console.log(`║${centerText(`⏱️ Total build time: ${duration}`)}║`)
