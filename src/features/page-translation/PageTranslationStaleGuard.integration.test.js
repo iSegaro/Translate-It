@@ -93,9 +93,12 @@ const settings = {
   attributesToTranslate: ['title'],
 };
 
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+
 describe('PageTranslationBridge stale settlement integration', () => {
   let bridge;
   let originalUrl;
+  let fontComputedStyleSpy;
 
   beforeEach(() => {
     originalUrl = window.location.href;
@@ -108,6 +111,8 @@ describe('PageTranslationBridge stale settlement integration', () => {
   afterEach(() => {
     bridge.cleanup();
     window.history.replaceState(null, '', originalUrl);
+    fontComputedStyleSpy?.mockRestore();
+    fontComputedStyleSpy = null;
   });
 
   const startDeferredTranslation = async (options = {}) => {
@@ -548,6 +553,10 @@ describe('PageTranslationBridge stale settlement integration', () => {
   );
 
   it('preserves original text and refreshes hover and font ownership across SPA routes', async () => {
+    fontComputedStyleSpy = vi.spyOn(window, 'getComputedStyle').mockImplementation((element, pseudo) => {
+      if (pseudo) return { content: 'none' };
+      return nativeGetComputedStyle(element, pseudo);
+    });
     document.body.innerHTML = '<p style="font-family: serif">Original source</p>';
     const owner = document.body.firstChild;
     const node = owner.firstChild;

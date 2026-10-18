@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,12 @@ const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const runnerSource = readFileSync(join(root, 'scripts/dev/android-runner.mjs'), 'utf8');
 
 describe('Firefox Android development runner', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('preserves CLI, environment, and auto-detection precedence', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls = [];
     const exec = command => {
       calls.push(command);
@@ -20,6 +25,7 @@ describe('Firefox Android development runner', () => {
     expect(resolveDevice({ args: [], env: { ANDROID_DEVICE: 'env-device' }, exec })).toBe('env-device');
     expect(resolveDevice({ args: [], env: {}, exec })).toBe('auto-device');
     expect(calls).toEqual(['adb devices']);
+    expect(log).toHaveBeenCalledWith('Auto-detected device: auto-device');
   });
 
   it('prefers a connected USB device over network devices during auto-detection', () => {
@@ -30,31 +36,28 @@ describe('Firefox Android development runner', () => {
   it('fails actionably without a usable device and never builds, contacts the old fallback, or web-ext', async () => {
     const calls = [];
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    try {
-      const status = await runAndroid({
-        args: ['--build'],
-        env: {},
-        exec: command => {
-          calls.push(command);
-          return 'List of devices attached\n';
-        },
-        exists: () => true,
-      });
-      expect(status).toBe(1);
-      expect(calls).toEqual(['adb devices']);
-      expect(calls.some(command => command === 'pnpm run dev:firefox')).toBe(false);
-      expect(calls.join(' ')).not.toContain('192.168.240.112:5555');
-      expect(calls.some(command => command.startsWith('web-ext '))).toBe(false);
-      expect(log.mock.calls.flat().join(' ')).toContain('Connect one via USB, set ANDROID_DEVICE, or pass --device=<id>');
-      expect(runnerSource).not.toContain('192.168.240.112:5555');
-    } finally {
-      log.mockRestore();
-    }
+    const status = await runAndroid({
+      args: ['--build'],
+      env: {},
+      exec: command => {
+        calls.push(command);
+        return 'List of devices attached\n';
+      },
+      exists: () => true,
+    });
+    expect(status).toBe(1);
+    expect(calls).toEqual(['adb devices']);
+    expect(calls.some(command => command === 'pnpm run dev:firefox')).toBe(false);
+    expect(calls.join(' ')).not.toContain('192.168.240.112:5555');
+    expect(calls.some(command => command.startsWith('web-ext '))).toBe(false);
+    expect(log.mock.calls.flat().join(' ')).toContain('Connect one via USB, set ANDROID_DEVICE, or pass --device=<id>');
+    expect(runnerSource).not.toContain('192.168.240.112:5555');
   });
 
   it('preserves dev:android build and web-ext deployment while watch:android skips the build', async () => {
     expect(packageJson.scripts['dev:android']).toBe('node scripts/dev/android-runner.mjs --build');
     expect(packageJson.scripts['watch:android']).toBe('node scripts/dev/android-runner.mjs');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls = [];
     const status = await runAndroid({
       args: ['--build', '--device=cli-device'],
@@ -77,9 +80,13 @@ describe('Firefox Android development runner', () => {
       'adb -s cli-device shell pm list packages org.mozilla',
       'web-ext run -t firefox-android --source-dir "dist/firefox/Translate-It-v1.22.0" --android-device "cli-device" --firefox-apk="org.mozilla.fenix"',
     ]);
+    expect(log.mock.calls.flat().join(' ')).toContain('Building Firefox extension for Android...');
+    expect(log.mock.calls.flat().join(' ')).toContain('Firefox build completed');
+    expect(log.mock.calls.flat().join(' ')).toContain('Using Firefox package: org.mozilla.fenix');
   });
 
   it('skips the build without --build but still deploys to Firefox Android', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const calls = [];
     const status = await runAndroid({
       args: ['--device=cli-device'],
@@ -102,5 +109,7 @@ describe('Firefox Android development runner', () => {
       'adb -s cli-device shell pm list packages org.mozilla',
       'web-ext run -t firefox-android --source-dir "dist/firefox/Translate-It-v1.22.0" --android-device "cli-device" --firefox-apk="org.mozilla.fenix"',
     ]);
+    expect(log.mock.calls.flat().join(' ')).toContain('Starting Android deployment on device: cli-device...');
+    expect(log.mock.calls.flat().join(' ')).not.toContain('Building Firefox extension for Android...');
   });
 });
