@@ -62,7 +62,7 @@ const version = tag.slice(1);
 const date = `${dayText} ${monthName} ${yearText}`;
 const repository = 'https://github.com/Translate-It-App/Translate-It';
 const customNotes = [
-  `#### 🌍 Translate It ${tag} – Released on ${date}`,
+  `Released on ${date}`,
   '',
   '<div align="center">',
   '',

@@ -3,9 +3,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import projectNaming from '../shared/project-names.cjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+const { artifactPrefix } = projectNaming.getProjectNames(packageJson.name);
 
 const productionMarkers = [
   'Vitest mocker',
@@ -34,7 +36,7 @@ function getJavaScriptFiles(directory) {
 
 const failures = [];
 for (const browser of ['chrome', 'firefox']) {
-  const buildDir = path.join(rootDir, 'dist', browser, `Translate-It-v${packageJson.version}`);
+  const buildDir = path.join(rootDir, 'dist', browser, `${artifactPrefix}-v${packageJson.version}`);
   if (!fs.existsSync(buildDir)) {
     failures.push(`${browser}: missing production build directory ${path.relative(rootDir, buildDir)}`);
     continue;

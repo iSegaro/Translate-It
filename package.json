@@ -1,6 +1,6 @@
 {
   "name": "translate-it",
-  "version": "1.23.0",
+  "version": "1.24.0",
   "type": "module",
   "description": "Translator for selected text, web pages, PDFs, subtitles, images, and live dubbing, with traditional and AI providers.",
   "scripts": {
@@ -83,7 +83,8 @@
     "vitest": "^4.1.5",
     "vue-eslint-parser": "^10.4.0",
     "vue-i18n": "^11.3.0",
-    "web-ext": "^10.1.0"
+    "web-ext": "^10.1.0",
+    "yauzl": "^3.4.0"
   },
   "dependencies": {
     "@iconify/vue": "^5.0.0",

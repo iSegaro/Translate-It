@@ -2,6 +2,8 @@
 // Dynamic manifest generation for cross-browser compatibility
 
 import pkg from '../package.json' with { type: 'json' };
+import projectNaming from '../scripts/shared/project-names.cjs'
+const { displayName } = projectNaming.getProjectNames(pkg.name)
 
 /**
  * Generate browser-specific manifest
@@ -137,7 +139,7 @@ function generateChromeManifest(baseManifest) {
     // Chrome action (popup)
     action: {
       default_popup: 'src/html/popup.html',
-      default_title: 'Translate It',
+      default_title: displayName,
       default_icon: {
         16: 'icons/extension/extension_icon_16.png',
         32: 'icons/extension/extension_icon_32.png',

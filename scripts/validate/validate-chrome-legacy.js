@@ -2,13 +2,15 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const pkg = require('../package.json');
+const { getProjectNames } = require('../shared/project-names.cjs');
 
 /**
  * Chrome Extension Validation Script
  * Combines web-ext validation with custom Chrome-specific checks
  */
 
-const CHROME_BUILD_DIR = `./dist/chrome/Translate-It-v${pkg.version}/`;
+const { artifactPrefix } = getProjectNames(pkg.name);
+const CHROME_BUILD_DIR = `./dist/chrome/${artifactPrefix}-v${pkg.version}/`;
 const TEMP_ARTIFACTS_DIR = './temp/chrome-validation';
 
 async function validateChromeExtension() {

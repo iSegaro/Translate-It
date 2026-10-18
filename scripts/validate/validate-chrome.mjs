@@ -6,12 +6,14 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logError, logInfo } from '../shared/logger.mjs'
 import { createBox, createErrorBox, centerText, emptyBoxLine, formatPackageSize, formatFileSize } from '../shared/box-utils.mjs'
+import projectNaming from '../shared/project-names.cjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
+const { artifactPrefix, displayName } = projectNaming.getProjectNames(pkg.name)
 
-const CHROME_BUILD_DIR = path.join(rootDir, `dist/chrome/Translate-It-v${pkg.version}`)
+const CHROME_BUILD_DIR = path.join(rootDir, `dist/chrome/${artifactPrefix}-v${pkg.version}`)
 const TEMP_ARTIFACTS_DIR = path.join(rootDir, 'temp/validation/chrome')
 
 /**
@@ -262,7 +264,7 @@ function getDirectoryStats(dirPath) {
  */
 async function substituteMessages(obj) {
   const processed = JSON.parse(JSON.stringify(obj))
-  const extensionName = pkg.name === 'translate-it' ? 'Translate It' : pkg.name
+  const extensionName = displayName
 
   function substituteValue(value) {
     if (typeof value === 'string') {

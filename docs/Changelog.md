@@ -1,8 +1,14 @@
-#### Unreleased
+#### v1.24.0 – Released on October 18, 2026
 
 ##### Added
 
-- Added a customizable [Provider List](#/providers?highlight=CUSTOM_PROVIDER_LIST) in Settings to organize and easily access your preferred translation providers.
+- Added a customizable [Provider List](#/providers?highlight=CUSTOM_PROVIDER_LIST) to organize your favorite translation providers.
+- Added source text editing and translation history navigation to the Translation Window.
+
+##### Fixed
+
+- Fixed several major and minor issues affecting translation reliability, Select Element, Revert, and Mouse on Hover.
+- Improved DeepL language compatibility and Translation Window stability. 
 
 ---
 

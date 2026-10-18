@@ -3,6 +3,11 @@ import { shallowMount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import ActivationTab from './ActivationTab.vue';
 
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn() }),
+}));
+
 const mocks = vi.hoisted(() => ({
   settingRefs: {},
   settingsStore: {
@@ -84,7 +89,11 @@ describe('ActivationTab Desktop FAB exclusions', () => {
         },
         BaseButton: { template: '<button v-bind="$attrs"><slot/></button>' },
         BaseCheckbox: { props: ['modelValue', 'label'], template: '<label>{{ label }}</label>' },
-        BaseSelect: { template: '<select/>' },
+        BaseSelect: {
+          props: ['modelValue', 'options', 'disabled'],
+          emits: ['update:modelValue'],
+          template: '<select :value="modelValue" :disabled="disabled" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label || option.name }}</option></select>',
+        },
         BaseRange: { template: '<input/>' },
         BaseRadio: { props: ['label'], template: '<span>{{ label }}</span>' },
         Transition: { template: '<div><slot/></div>' },

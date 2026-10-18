@@ -7,13 +7,15 @@ import { fileURLToPath } from 'url'
 import { BuildReporter } from '../shared/build-reporter.mjs'
 import { logStep, logError } from '../shared/logger.mjs'
 import { formatPackageSize } from '../shared/box-utils.mjs'
+import projectNaming from '../shared/project-names.cjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
+const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
-const CHROME_BUILD_DIR = `dist/chrome/Translate-It-v${pkg.version}`
-const CHROME_ZIP_PATH = `dist/chrome/Translate-It-v${pkg.version}.zip`
+const CHROME_BUILD_DIR = `dist/chrome/${artifactPrefix}-v${pkg.version}`
+const CHROME_ZIP_PATH = `dist/chrome/${artifactPrefix}-v${pkg.version}.zip`
 
 /**
  * Build Chrome extension with Vue

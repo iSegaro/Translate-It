@@ -89,7 +89,8 @@ describe('development workflow qualification', () => {
     expect(ci).toContain("if: github.event_name == 'push' && github.ref == 'refs/heads/main'");
     expect(ci).toContain('name: translate-it-development-transport-${{ github.run_id }}-${{ github.run_attempt }}');
     expect(ci).toContain('retention-days: 1');
-    expect(ci).toContain('dist/Publish/Translate-It-v*-for-Chrome.zip\n            dist/Publish/Translate-It-v*-for-Firefox.zip');
+    expect(ci).toContain('dist/Publish/${{ steps.names.outputs.artifact_prefix }}-v*-for-Chrome.zip\n            dist/Publish/${{ steps.names.outputs.artifact_prefix }}-v*-for-Firefox.zip');
+    expect(ci).toContain('node scripts/shared/project-names.cjs artifact-prefix');
   });
 
   it('runs the workflow artifact qualification shell and accepts exactly one matching artifact', () => {

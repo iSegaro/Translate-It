@@ -42,6 +42,7 @@ const mockValidatePromptTemplate = vi.fn().mockResolvedValue(true);
 const mockGetFirstError = vi.fn();
 const mockGetFirstErrorTranslated = vi.fn();
 const mockClearErrors = vi.fn();
+const mockHighlightElement = vi.hoisted(() => vi.fn());
 
 vi.mock('@/core/validation.js', () => ({
   useValidation: () => ({
@@ -54,7 +55,7 @@ vi.mock('@/core/validation.js', () => ({
 
 vi.mock('../composables/useHighlightManager.js', () => ({
   useHighlightManager: () => ({
-    highlightElement: vi.fn()
+    highlightElement: mockHighlightElement
   })
 }));
 
@@ -388,6 +389,54 @@ describe('PromptTab', () => {
       expect(wrapper.vm.validationErrorKey).toBe('validation_prompt_template_empty');
     });
     expect(wrapper.vm.validationError).toBe('Template cannot be empty');
+  });
+
+  it('cancels pending validation feedback highlight on unmount', () => {
+    vi.useFakeTimers();
+    const originalWindow = globalThis.window;
+    globalThis.window = new EventTarget();
+
+    try {
+      const wrapper = mount(PromptTab);
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+        detail: { field: 'prompt', promptKey: 'PROMPT_TEMPLATE' }
+      }));
+      wrapper.unmount();
+
+      vi.advanceTimersByTime(400);
+      expect(mockHighlightElement).not.toHaveBeenCalled();
+    } finally {
+      globalThis.window = originalWindow;
+      vi.useRealTimers();
+    }
+  });
+
+  it('reschedules pending validation feedback highlight for the latest prompt', () => {
+    vi.useFakeTimers();
+    const originalWindow = globalThis.window;
+    globalThis.window = new EventTarget();
+
+    try {
+      const wrapper = mount(PromptTab);
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+        detail: { field: 'prompt', promptKey: 'PROMPT_TEMPLATE' }
+      }));
+      vi.advanceTimersByTime(200);
+      window.dispatchEvent(new CustomEvent('options-trigger-validation-feedback', {
+        detail: { field: 'prompt', promptKey: 'PROMPT_BASE_FIELD' }
+      }));
+
+      vi.advanceTimersByTime(399);
+      expect(mockHighlightElement).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(mockHighlightElement).toHaveBeenCalledTimes(1);
+      expect(mockHighlightElement).toHaveBeenCalledWith('PROMPT_BASE_FIELD');
+
+      wrapper.unmount();
+    } finally {
+      globalThis.window = originalWindow;
+      vi.useRealTimers();
+    }
   });
 
   it('does not clear prompt error on partial save / validation failure', async () => {

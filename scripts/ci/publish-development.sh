@@ -22,9 +22,11 @@ fi
 SOURCE_SHA=${SOURCE_SHA,,}
 
 publish_dir=${PUBLISH_DIR:?PUBLISH_DIR is required}
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+artifact_prefix=$(node "$script_dir/../shared/project-names.cjs" artifact-prefix)
 shopt -s nullglob
-chrome_inputs=("$publish_dir"/Translate-It-v*-for-Chrome.zip)
-firefox_inputs=("$publish_dir"/Translate-It-v*-for-Firefox.zip)
+chrome_inputs=("$publish_dir"/"$artifact_prefix"-v*-for-Chrome.zip)
+firefox_inputs=("$publish_dir"/"$artifact_prefix"-v*-for-Firefox.zip)
 if (( ${#chrome_inputs[@]} != 1 )) || [[ ! -f "${chrome_inputs[0]:-}" || -L "${chrome_inputs[0]:-}" ]]; then
   printf 'Error: expected exactly one regular versioned Chrome ZIP in %s.\n' "$publish_dir" >&2
   exit 1
@@ -34,8 +36,8 @@ if (( ${#firefox_inputs[@]} != 1 )) || [[ ! -f "${firefox_inputs[0]:-}" || -L "$
   exit 1
 fi
 
-chrome_public="$publish_dir/Translate-It-development-for-Chrome.zip"
-firefox_public="$publish_dir/Translate-It-development-for-Firefox.zip"
+chrome_public="$publish_dir/$artifact_prefix-development-for-Chrome.zip"
+firefox_public="$publish_dir/$artifact_prefix-development-for-Firefox.zip"
 cp -- "${chrome_inputs[0]}" "$chrome_public"
 cp -- "${firefox_inputs[0]}" "$firefox_public"
 [[ -f "$chrome_public" && ! -L "$chrome_public" && -f "$firefox_public" && ! -L "$firefox_public" ]] || {

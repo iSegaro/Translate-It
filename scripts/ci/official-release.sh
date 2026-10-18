@@ -3,7 +3,10 @@ set -euo pipefail
 
 command=${1:-}
 repo=${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}
-release_title="Translate It! ${RELEASE_TAG:-}"
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+artifact_prefix=$(node "$script_dir/../shared/project-names.cjs" artifact-prefix)
+display_name=$(node "$script_dir/../shared/project-names.cjs" display-name)
+release_title="${display_name}! ${RELEASE_TAG:-}"
 
 fail() {
   printf 'Error: %s\n' "$1" >&2
@@ -162,16 +165,16 @@ finalize_draft() {
   EXPECTED_SHA=${EXPECTED_SHA,,}
 
   shopt -s nullglob
-  chrome_inputs=("$publish_dir"/Translate-It-v*-for-Chrome.zip)
-  firefox_inputs=("$publish_dir"/Translate-It-v*-for-Firefox.zip)
+  chrome_inputs=("$publish_dir"/"$artifact_prefix"-v*-for-Chrome.zip)
+  firefox_inputs=("$publish_dir"/"$artifact_prefix"-v*-for-Firefox.zip)
   (( ${#chrome_inputs[@]} == 1 )) || fail "expected exactly one Chrome ZIP in $publish_dir."
   [[ -f "${chrome_inputs[0]}" && ! -L "${chrome_inputs[0]}" ]] || fail 'Chrome ZIP must be a regular file.'
   (( ${#firefox_inputs[@]} == 1 )) || fail "expected exactly one Firefox ZIP in $publish_dir."
   [[ -f "${firefox_inputs[0]}" && ! -L "${firefox_inputs[0]}" ]] || fail 'Firefox ZIP must be a regular file.'
   chrome_name=${chrome_inputs[0]##*/}
   firefox_name=${firefox_inputs[0]##*/}
-  [[ "$chrome_name" == "Translate-It-${RELEASE_TAG}-for-Chrome.zip" ]] || fail 'Chrome ZIP does not match RELEASE_TAG.'
-  [[ "$firefox_name" == "Translate-It-${RELEASE_TAG}-for-Firefox.zip" ]] || fail 'Firefox ZIP does not match RELEASE_TAG.'
+  [[ "$chrome_name" == "${artifact_prefix}-${RELEASE_TAG}-for-Chrome.zip" ]] || fail 'Chrome ZIP does not match RELEASE_TAG.'
+  [[ "$firefox_name" == "${artifact_prefix}-${RELEASE_TAG}-for-Firefox.zip" ]] || fail 'Firefox ZIP does not match RELEASE_TAG.'
 
   json=$(release_json) || fail 'could not read release by ID.'
   verify_release "$json" true || fail 'release ID, tag, or draft state does not match.'

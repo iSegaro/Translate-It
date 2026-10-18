@@ -145,14 +145,18 @@ describe('SidepanelMainContent.vue', () => {
       },
     });
 
-    const display = wrapper.findComponent({ name: 'TranslationDisplay' });
-    expect(display.exists()).toBe(true);
-    expect(display.props('mode')).toBe('sidepanel');
-    expect(display.props('lastTranslation')).toEqual(expect.objectContaining({
-      mode: TranslationMode.Dictionary_Translation,
-      sourceLanguage: 'en',
-      targetLanguage: 'fa',
-    }));
+    try {
+      const display = wrapper.findComponent({ name: 'TranslationDisplay' });
+      expect(display.exists()).toBe(true);
+      expect(display.props('mode')).toBe('sidepanel');
+      expect(display.props('lastTranslation')).toEqual(expect.objectContaining({
+        mode: TranslationMode.Dictionary_Translation,
+        sourceLanguage: 'en',
+        targetLanguage: 'fa',
+      }));
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   it('passes default action props and forwards star events', async () => {
@@ -162,19 +166,23 @@ describe('SidepanelMainContent.vue', () => {
       },
     });
 
-    const selector = wrapper.findComponent({ name: 'LanguageSelector' });
-    expect(selector.props('showDefaultActions')).not.toBe(false);
-    expect(selector.props('defaultActionsEnabled')).toBe(true);
-    expect(selector.props('sourceIsSavedDefault')).toBe(true);
-    expect(selector.props('targetIsSavedDefault')).toBe(true);
+    try {
+      const selector = wrapper.findComponent({ name: 'LanguageSelector' });
+      expect(selector.props('showDefaultActions')).not.toBe(false);
+      expect(selector.props('defaultActionsEnabled')).toBe(true);
+      expect(selector.props('sourceIsSavedDefault')).toBe(true);
+      expect(selector.props('targetIsSavedDefault')).toBe(true);
 
-    selector.vm.$emit('set-default-source');
-    selector.vm.$emit('set-default-target');
-    await Promise.resolve();
-    await Promise.resolve();
+      selector.vm.$emit('set-default-source');
+      selector.vm.$emit('set-default-target');
+      await Promise.resolve();
+      await Promise.resolve();
 
-    expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('en');
-    expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('fa');
+      expect(mockLanguageDefaults.setSourceLanguageAsDefault).toHaveBeenCalledWith('en');
+      expect(mockLanguageDefaults.setTargetLanguageAsDefault).toHaveBeenCalledWith('fa');
+    } finally {
+      wrapper.unmount();
+    }
   });
 
   it('keeps the accessible clear mask action in both 510px layout branches', async () => {
@@ -231,6 +239,82 @@ describe('SidepanelMainContent.vue', () => {
     }
   });
 
+  it('cancels delayed resize observer initialization on unmount', () => {
+    const previousResizeObserver = globalThis.ResizeObserver;
+    const ResizeObserverMock = vi.fn();
+    globalThis.ResizeObserver = ResizeObserverMock;
+    vi.useFakeTimers();
+
+    let wrapper;
+    try {
+      wrapper = mount(SidepanelMainContent, { props: { provider: '' } });
+      wrapper.unmount();
+      wrapper = null;
+
+      vi.advanceTimersByTime(100);
+      expect(ResizeObserverMock).not.toHaveBeenCalled();
+    } finally {
+      wrapper?.unmount();
+      vi.useRealTimers();
+      if (previousResizeObserver === undefined) delete globalThis.ResizeObserver;
+      else globalThis.ResizeObserver = previousResizeObserver;
+    }
+  });
+
+  it('disconnects the observer and cancels pending layout frames on unmount', () => {
+    const previousResizeObserver = globalThis.ResizeObserver;
+    const previousRequestAnimationFrame = globalThis.requestAnimationFrame;
+    const previousCancelAnimationFrame = globalThis.cancelAnimationFrame;
+    const observerCallbacks = [];
+    const frameCallbacks = new Map();
+    let nextFrameId = 1;
+    const disconnect = vi.fn();
+    vi.useFakeTimers();
+    globalThis.ResizeObserver = class {
+      constructor(callback) {
+        observerCallbacks.push(callback);
+      }
+      observe() {}
+      disconnect() {
+        disconnect();
+      }
+    };
+    globalThis.requestAnimationFrame = vi.fn((callback) => {
+      const frameId = nextFrameId++;
+      frameCallbacks.set(frameId, callback);
+      return frameId;
+    });
+    globalThis.cancelAnimationFrame = vi.fn();
+
+    let wrapper;
+    try {
+      wrapper = mount(SidepanelMainContent, { props: { provider: '' } });
+      vi.advanceTimersByTime(100);
+      observerCallbacks[0]();
+      observerCallbacks[0]();
+      expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(2);
+
+      wrapper.unmount();
+      wrapper = null;
+      expect(disconnect).toHaveBeenCalledTimes(1);
+      expect(globalThis.cancelAnimationFrame).toHaveBeenCalledWith(1);
+      expect(globalThis.cancelAnimationFrame).toHaveBeenCalledWith(2);
+
+      observerCallbacks[0]();
+      frameCallbacks.get(1)();
+      expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(2);
+    } finally {
+      wrapper?.unmount();
+      vi.useRealTimers();
+      if (previousResizeObserver === undefined) delete globalThis.ResizeObserver;
+      else globalThis.ResizeObserver = previousResizeObserver;
+      if (previousRequestAnimationFrame === undefined) delete globalThis.requestAnimationFrame;
+      else globalThis.requestAnimationFrame = previousRequestAnimationFrame;
+      if (previousCancelAnimationFrame === undefined) delete globalThis.cancelAnimationFrame;
+      else globalThis.cancelAnimationFrame = previousCancelAnimationFrame;
+    }
+  });
+
   it('passes public action capabilities and existing callbacks to TranslationDisplay', async () => {
     mockUnifiedTranslation.canRetry.value = true;
     mockUnifiedTranslation.canOpenSettings.value = false;
@@ -241,13 +325,17 @@ describe('SidepanelMainContent.vue', () => {
       },
     });
 
-    const display = wrapper.findComponent({ name: 'TranslationDisplay' });
-    expect(display.props('canRetry')).toBe(true);
-    expect(display.props('canOpenSettings')).toBe(false);
+    try {
+      const display = wrapper.findComponent({ name: 'TranslationDisplay' });
+      expect(display.props('canRetry')).toBe(true);
+      expect(display.props('canOpenSettings')).toBe(false);
 
-    await display.props('onRetry')();
-    expect(mockUnifiedTranslation.triggerTranslation).toHaveBeenCalledWith('en', 'fa', 'gemini');
-    expect(mockUnifiedTranslation.getRetryCallback).toHaveBeenCalledWith(expect.any(Function));
-    expect(mockUnifiedTranslation.getSettingsCallback).toHaveBeenCalledTimes(1);
+      await display.props('onRetry')();
+      expect(mockUnifiedTranslation.triggerTranslation).toHaveBeenCalledWith('en', 'fa', 'gemini');
+      expect(mockUnifiedTranslation.getRetryCallback).toHaveBeenCalledWith(expect.any(Function));
+      expect(mockUnifiedTranslation.getSettingsCallback).toHaveBeenCalledTimes(1);
+    } finally {
+      wrapper.unmount();
+    }
   });
 });

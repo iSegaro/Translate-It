@@ -3,10 +3,12 @@ import { formatFileSize, formatPackageSize, formatDuration } from './box-utils.m
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import projectNaming from './project-names.cjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
+const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
 // Constants for box formatting
 const BOX_WIDTH = 66
@@ -126,7 +128,7 @@ export class BuildReporter {
     console.log(`├─ ${browserLine} ${browserValue}`)
 
     // Output Directory line
-    const outputValue = `dist/${this.browser}/Translate-It-v${pkg.version}/`
+    const outputValue = `dist/${this.browser}/${artifactPrefix}-v${pkg.version}/`
     const outputLine = this.padRight(`${outputLabel}:`, LABEL_WIDTH - 3)
     console.log(`├─ ${outputLine} ${outputValue}`)
 
