@@ -9,6 +9,7 @@ describe('Vitest configuration paths and discovery', () => {
     const root = resolve(import.meta.dirname, '../..')
 
     expect(test.root).toBe(root)
+    expect(test.clearMocks).toBe(false)
     expect(test.setupFiles).toEqual([resolve(root, 'tests/setup.js')])
     expect(test.coverage.reportsDirectory).toBe(resolve(root, 'tests/coverage'))
 

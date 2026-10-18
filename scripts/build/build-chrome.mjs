@@ -4,6 +4,7 @@ import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { createBrowserZip } from './browser-zip.mjs'
 import { BuildReporter } from '../shared/build-reporter.mjs'
 import { logStep, logError } from '../shared/logger.mjs'
 import { formatPackageSize } from '../shared/box-utils.mjs'
@@ -16,6 +17,13 @@ const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
 const CHROME_BUILD_DIR = `dist/chrome/${artifactPrefix}-v${pkg.version}`
 const CHROME_ZIP_PATH = `dist/chrome/${artifactPrefix}-v${pkg.version}.zip`
+
+export async function createChromeZip(
+  buildDir = path.join(rootDir, CHROME_BUILD_DIR),
+  zipPath = path.join(rootDir, CHROME_ZIP_PATH),
+) {
+  return createBrowserZip(buildDir, zipPath)
+}
 
 /**
  * Build Chrome extension with Vue
@@ -47,18 +55,7 @@ async function buildChromeExtension() {
     
     // Step 3: Create ZIP package
     logStep('Creating Chrome extension package...')
-    const archiver = await import('archiver')
-    const archive = archiver.default('zip', { zlib: { level: 9 } })
-    const output = fs.createWriteStream(path.join(rootDir, CHROME_ZIP_PATH))
-    
-    await new Promise((resolve, reject) => {
-      output.on('close', resolve)
-      archive.on('error', reject)
-      
-      archive.pipe(output)
-      archive.directory(path.join(rootDir, CHROME_BUILD_DIR), false)
-      archive.finalize()
-    })
+    await createChromeZip()
     
     const zipStats = fs.statSync(path.join(rootDir, CHROME_ZIP_PATH))
     const sizeStr = formatPackageSize(zipStats.size)
@@ -77,5 +74,7 @@ async function buildChromeExtension() {
   }
 }
 
-// Run build
-buildChromeExtension()
+// Run build when invoked directly
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  buildChromeExtension()
+}

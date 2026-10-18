@@ -3,7 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import archiver from "archiver";
+import { ZipArchive } from "archiver";
 import chalk from "chalk";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -111,7 +111,7 @@ export async function createSourceZip({ rootPath, outputDir }) {
   try {
     await new Promise((resolve, reject) => {
       const output = fs.createWriteStream(temporaryFilePath, { flags: "wx" });
-      const archive = archiver("zip", { zlib: { level: 9 } });
+      const archive = new ZipArchive({ zlib: { level: 9 } });
       let finalized = false;
       let closed = false;
       let settled = false;

@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { readViewerStateFromUrl, writeViewerStateToUrl } from './PdfViewerStateUrlAdapter.js'
 import { serializeViewerState } from './PdfViewerStateTransport.js'

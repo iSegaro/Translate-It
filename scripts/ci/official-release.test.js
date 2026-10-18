@@ -722,6 +722,17 @@ describe('official release helper', () => {
     expect(workflow).toMatch(/run-name:\s*Release \$\{\{ inputs\.version \}\}/);
     expect(workflow).not.toContain('Repository Variables');
     expect(workflow).not.toMatch(/run-name:[^\n]*v\d+\.\d+\.\d+/);
+    const setupPnpmStart = workflow.indexOf('      - name: Setup pnpm');
+    const setupNodeStart = workflow.indexOf('      - name: Setup Node.js');
+    expect(workflow.slice(setupPnpmStart, setupNodeStart)).not.toContain('version:');
+    const pnpmResolutionOrder = [
+      'name: Checkout default branch',
+      'name: Setup pnpm',
+      'name: Prepare draft release',
+      'name: Checkout release commit',
+    ].map(value => workflow.indexOf(value));
+    expect(pnpmResolutionOrder).toEqual([...pnpmResolutionOrder].sort((a, b) => a - b));
+    expect(scriptSource).toContain('checkout_sha,,}" == "$sha"');
     for (const permission of ['contents: write', 'id-token: write', 'attestations: write']) expect(workflow).toContain(permission);
     for (const pin of [
       'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',

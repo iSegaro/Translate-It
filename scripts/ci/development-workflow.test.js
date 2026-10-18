@@ -93,6 +93,22 @@ describe('development workflow qualification', () => {
     expect(ci).toContain('node scripts/shared/project-names.cjs artifact-prefix');
   });
 
+  it('uses packageManager for pnpm and checks peers before CI validation', () => {
+    const setupPnpm = ci.slice(ci.indexOf('      - name: Setup pnpm'), ci.indexOf('      - name: Setup Node.js'));
+    expect(setupPnpm).not.toContain('version:');
+
+    const order = [
+      'run: pnpm install --frozen-lockfile',
+      'run: pnpm peers check',
+      'run: pnpm run lint',
+      'run: pnpm run lint:styles',
+      'run: pnpm run test:run',
+      'run: pnpm run build',
+    ].map(value => ci.indexOf(value));
+    expect(order.every(index => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
   it('runs the workflow artifact qualification shell and accepts exactly one matching artifact', () => {
     expect(shellMatch).not.toBeNull();
     const result = runQualification({ ids: '5678' });

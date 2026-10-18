@@ -110,7 +110,7 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone upstream to build or explore the project; to contribute, clone your fork instead. Run setup from either clone:
+Install [**Node.js 22.22.2 or later in the 22.x line, Node.js 24.15.0 or later in the 24.x line, or Node.js 26+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone upstream to build or explore the project; to contribute, clone your fork instead. Run setup from either clone:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git
@@ -139,7 +139,7 @@ pnpm run build:chrome
 pnpm run build:firefox
 ```
 
-Development builds preserve console calls and skip production minification; production builds apply optimizations and create ZIP packages. Both build types use versioned output folders. At the current `package.json` version (1.23.0), these are `dist/chrome/Translate-It-v1.23.0/` and `dist/firefox/Translate-It-v1.23.0/`; the directory names change when the package version changes.
+Development builds preserve console calls and skip production minification; production builds apply optimizations and create ZIP packages. Both build types use versioned output folders: `dist/chrome/Translate-It-v<version>/` and `dist/firefox/Translate-It-v<version>/`, where `<version>` is read from `package.json`.
 
 To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**, selecting the Chrome output folder. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**, and select `manifest.json` inside the Firefox output folder.
 
