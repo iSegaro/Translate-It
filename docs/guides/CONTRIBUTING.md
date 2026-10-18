@@ -139,7 +139,7 @@ pnpm run build:chrome
 pnpm run build:firefox
 ```
 
-Development builds preserve console calls and skip production minification; production builds apply optimizations and create ZIP packages. Both build types use versioned output folders. At the current `package.json` version (1.23.0), these are `dist/chrome/Translate-It-v1.23.0/` and `dist/firefox/Translate-It-v1.23.0/`; the directory names change when the package version changes.
+Development builds preserve console calls and skip production minification; production builds apply optimizations and create ZIP packages. Both build types use versioned output folders: `dist/chrome/Translate-It-v<version>/` and `dist/firefox/Translate-It-v<version>/`, where `<version>` is read from `package.json`.
 
 To load a development build, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**, selecting the Chrome output folder. In Firefox, open `about:debugging` → **This Firefox** → **Load Temporary Add-on**, and select `manifest.json` inside the Firefox output folder.
 
