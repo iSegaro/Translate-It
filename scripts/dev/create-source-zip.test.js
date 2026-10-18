@@ -3,6 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import yauzl from "yauzl";
 import { createSourceZip } from "./create-source-zip.mjs";
 
 const requiredFiles = [
@@ -40,10 +41,32 @@ function fixture() {
   return { rootPath, outputDir };
 }
 
-function zipEntries(zipPath) {
-  return execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8" })
-    .trim()
-    .split("\n");
+function readZip(zipPath) {
+  return new Promise((resolve, reject) => {
+    const entries = [];
+    const contents = new Map();
+    yauzl.open(zipPath, { lazyEntries: true }, (error, zipfile) => {
+      if (error) return reject(error);
+
+      zipfile.on("error", reject);
+      zipfile.on("end", () => resolve({ entries, contents }));
+      zipfile.on("entry", (entry) => {
+        entries.push(entry.fileName);
+        zipfile.openReadStream(entry, (streamError, stream) => {
+          if (streamError) return reject(streamError);
+          const chunks = [];
+          stream.on("data", (chunk) => chunks.push(chunk));
+          stream.on("error", reject);
+          stream.on("end", () => {
+            contents.set(entry.fileName, Buffer.concat(chunks).toString("utf8"));
+            zipfile.readEntry();
+          });
+        });
+      });
+
+      zipfile.readEntry();
+    });
+  });
 }
 
 afterEach(() => {
@@ -63,27 +86,43 @@ describe("createSourceZip", () => {
     fs.writeFileSync(path.join(rootPath, "src", "feature.test.js"), "test");
     fs.writeFileSync(path.join(rootPath, "src", "feature.spec.js"), "spec");
     fs.writeFileSync(path.join(rootPath, "src", "tests", "case.js"), "test folder");
+    fs.writeFileSync(path.join(rootPath, "scripts", ".cache", "data"), "cache");
+    fs.writeFileSync(path.join(rootPath, "src", "dist", "bundle.js"), "generated");
+    fs.writeFileSync(path.join(rootPath, "src", ".env.local"), "secret");
+    fs.writeFileSync(path.join(rootPath, "src", "private.pem"), "secret");
     fs.writeFileSync(path.join(rootPath, "src", "feature.js"), "source content");
     execFileSync("git", ["init", "--quiet"], { cwd: rootPath });
     execFileSync("git", ["add", "--", "config", "scripts", "src"], { cwd: rootPath });
     fs.writeFileSync(path.join(rootPath, "src", "local-credentials.json"), "secret");
     fs.writeFileSync(path.join(rootPath, "src", "node_modules", "private", "secret.js"), "secret");
     fs.writeFileSync(path.join(rootPath, "scripts", ".git", "config"), "git");
-    fs.writeFileSync(path.join(rootPath, "scripts", ".cache", "data"), "cache");
-    fs.writeFileSync(path.join(rootPath, "src", "dist", "bundle.js"), "generated");
-    fs.writeFileSync(path.join(rootPath, "src", ".env.local"), "secret");
-    fs.writeFileSync(path.join(rootPath, "src", "private.pem"), "secret");
 
     const zipPath = await createSourceZip({ rootPath, outputDir });
-    const entries = zipEntries(zipPath);
+    const { entries, contents } = await readZip(zipPath);
+    const trackedForbiddenPaths = [
+      "src/feature.test.js",
+      "src/feature.spec.js",
+      "src/tests/case.js",
+      "scripts/.cache/data",
+      "src/dist/bundle.js",
+      "src/.env.local",
+      "src/private.pem",
+    ];
+    const trackedPaths = execFileSync("git", ["ls-files", "--", "config", "scripts", "src"], {
+      cwd: rootPath,
+      encoding: "utf8",
+    }).trim().split("\n");
 
+    expect(trackedPaths).toEqual(expect.arrayContaining(trackedForbiddenPaths));
+    expect(trackedPaths).not.toContain("src/local-credentials.json");
     expect(entries).toContain("pnpm-workspace.yaml");
     expect(entries).toContain("docs/Changelog.md");
     expect(entries).toContain("src/feature.js");
     expect(entries).not.toContain("src/local-credentials.json");
-    expect(execFileSync("unzip", ["-p", zipPath, "src/feature.js"], { encoding: "utf8" }))
-      .toBe("source content");
-    expect(entries.some((entry) => /(?:\.test|\.spec)\.js$/i.test(entry))).toBe(false);
+    expect(contents.get("src/feature.js")).toBe("source content");
+    for (const forbiddenPath of trackedForbiddenPaths) {
+      expect(entries).not.toContain(forbiddenPath);
+    }
     expect(entries.some((entry) => /(?:^|\/)(?:tests|node_modules|\.git|dist|\.cache)(?:\/|$)/.test(entry))).toBe(false);
     expect(entries.some((entry) => /(?:^|\/)\.env(?:\.|$)|\.(?:pem|key)$/i.test(entry))).toBe(false);
   });
@@ -154,7 +193,7 @@ describe("createSourceZip", () => {
     const zipPath = await createSourceZip({ rootPath, outputDir });
 
     expect(zipPath).toBe(artifact);
-    expect(zipEntries(artifact)).toContain("src/tracked.js");
+    expect((await readZip(artifact)).entries).toContain("src/tracked.js");
     expect(fs.readdirSync(outputDir)).toEqual(["Source-v1.2.3.zip"]);
   });
 
