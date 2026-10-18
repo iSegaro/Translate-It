@@ -47,6 +47,20 @@ function readZip(zipPath) {
   })
 }
 
+async function seedExistingZip(createZip, buildDir, zipPath) {
+  await createZip(buildDir, zipPath)
+  return fs.readFileSync(zipPath)
+}
+
+async function expectExistingZipPreserved(zipPath, originalBytes, error, expectedError) {
+  await expect(error).rejects.toBe(expectedError)
+  expect(fs.readFileSync(zipPath)).toEqual(originalBytes)
+  const { entries, contents } = await readZip(zipPath)
+  expect(entries).toEqual(expect.arrayContaining(['manifest.json', 'assets/app.js']))
+  expect(contents.get('manifest.json')).toBe('{"name":"fixture"}')
+  expect(fs.readdirSync(path.dirname(zipPath)).sort()).toEqual(['build', path.basename(zipPath)].sort())
+}
+
 afterEach(() => {
   vi.restoreAllMocks()
   for (const directory of temporaryDirectories.splice(0)) {
@@ -62,30 +76,34 @@ const browserZipHelpers = [
 describe.each(browserZipHelpers)('%s ZIP creation', (browser, createZip) => {
   it('creates a ZIP from the build directory', async () => {
     const { buildDir, zipPath } = fixture(browser.toLowerCase())
+    const originalBytes = await seedExistingZip(createZip, buildDir, zipPath)
+    fs.writeFileSync(path.join(buildDir, 'assets', 'app.js'), 'updated browser build contents')
 
     await createZip(buildDir, zipPath)
 
     const { entries, contents } = await readZip(zipPath)
     expect(entries).toEqual(expect.arrayContaining(['manifest.json', 'assets/app.js']))
+    expect(fs.readFileSync(zipPath)).not.toEqual(originalBytes)
     expect(contents.get('manifest.json')).toBe('{"name":"fixture"}')
-    expect(contents.get('assets/app.js')).toBe('browser build contents')
+    expect(contents.get('assets/app.js')).toBe('updated browser build contents')
+    expect(fs.readdirSync(path.dirname(zipPath)).sort()).toEqual(['build', path.basename(zipPath)].sort())
   })
 
-  it('rejects archive errors and removes the incomplete ZIP', async () => {
+  it('preserves an existing valid ZIP after archive errors', async () => {
     const { buildDir, zipPath } = fixture(browser.toLowerCase())
+    const originalBytes = await seedExistingZip(createZip, buildDir, zipPath)
     const archiveError = new Error('archive error')
     vi.spyOn(ZipArchive.prototype, 'finalize').mockImplementation(function () {
       this.emit('error', archiveError)
       return Promise.resolve()
     })
 
-    await expect(createZip(buildDir, zipPath)).rejects.toBe(archiveError)
-    expect(fs.existsSync(zipPath)).toBe(false)
-    expect(fs.readdirSync(path.dirname(zipPath))).toEqual(['build'])
+    await expectExistingZipPreserved(zipPath, originalBytes, createZip(buildDir, zipPath), archiveError)
   })
 
-  it('rejects output stream errors and removes the incomplete ZIP', async () => {
+  it('preserves an existing valid ZIP after output stream errors', async () => {
     const { buildDir, zipPath } = fixture(browser.toLowerCase())
+    const originalBytes = await seedExistingZip(createZip, buildDir, zipPath)
     const outputError = new Error('output stream error')
     const createWriteStream = fs.createWriteStream
     vi.spyOn(fs, 'createWriteStream').mockImplementation(function (...args) {
@@ -94,18 +112,24 @@ describe.each(browserZipHelpers)('%s ZIP creation', (browser, createZip) => {
       return output
     })
 
-    await expect(createZip(buildDir, zipPath)).rejects.toBe(outputError)
-    expect(fs.existsSync(zipPath)).toBe(false)
-    expect(fs.readdirSync(path.dirname(zipPath))).toEqual(['build'])
+    await expectExistingZipPreserved(zipPath, originalBytes, createZip(buildDir, zipPath), outputError)
   })
 
-  it('rejects finalize failures and removes the incomplete ZIP', async () => {
+  it('preserves an existing valid ZIP after finalize failures', async () => {
     const { buildDir, zipPath } = fixture(browser.toLowerCase())
+    const originalBytes = await seedExistingZip(createZip, buildDir, zipPath)
     const finalizeError = new Error('finalize rejected')
     vi.spyOn(ZipArchive.prototype, 'finalize').mockRejectedValue(finalizeError)
 
-    await expect(createZip(buildDir, zipPath)).rejects.toBe(finalizeError)
-    expect(fs.existsSync(zipPath)).toBe(false)
-    expect(fs.readdirSync(path.dirname(zipPath))).toEqual(['build'])
+    await expectExistingZipPreserved(zipPath, originalBytes, createZip(buildDir, zipPath), finalizeError)
+  })
+
+  it('preserves an existing valid ZIP when atomic replacement fails', async () => {
+    const { buildDir, zipPath } = fixture(browser.toLowerCase())
+    const originalBytes = await seedExistingZip(createZip, buildDir, zipPath)
+    const renameError = new Error('rename failed')
+    vi.spyOn(fs.promises, 'rename').mockRejectedValue(renameError)
+
+    await expectExistingZipPreserved(zipPath, originalBytes, createZip(buildDir, zipPath), renameError)
   })
 })
