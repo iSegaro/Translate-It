@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
-import { reactive, ref } from 'vue';
+import { mount as vueMount } from '@vue/test-utils';
+import { onBeforeUnmount, reactive, ref } from 'vue';
 import DesktopFabMenu from './DesktopFabMenu.vue';
 import { MessageActions } from '@/shared/messaging/core/MessageActions.js';
 import enMessages from '@/_locales/en/messages.json';
@@ -16,14 +16,67 @@ const mocks = vi.hoisted(() => {
     settingsStore: null,
     pageEventBus: {
       emit: vi.fn(),
-      on: vi.fn(() => vi.fn()),
+      subscriptions: new Set(),
+      on: vi.fn((event, handler) => {
+        const subscription = { event, handler };
+        mocks.pageEventBus.subscriptions.add(subscription);
+        subscription.cleanup = vi.fn(() => mocks.pageEventBus.subscriptions.delete(subscription));
+        return subscription.cleanup;
+      }),
     },
     sendMessage: vi.fn(),
     sendRegularMessage: vi.fn(),
     tracker: {
-      clearTimer: vi.fn(),
-      trackTimeout: vi.fn((callback) => setTimeout(callback, 0)),
-      trackResource: vi.fn(),
+      timers: new Set(),
+      resourceCleanups: new Set(),
+      resourceIds: new Map(),
+      groups: new Map(),
+      cleanedResourceIds: [],
+      cleanedGroups: [],
+      clearTimer: vi.fn((timerId) => {
+        clearTimeout(timerId);
+        mocks.tracker.timers.delete(timerId);
+      }),
+      trackTimeout: vi.fn((callback, delay) => {
+        const id = setTimeout(() => {
+          mocks.tracker.timers.delete(id);
+          callback();
+        }, delay);
+        mocks.tracker.timers.add(id);
+        return id;
+      }),
+      trackResource: vi.fn((id, cleanup) => {
+        if (mocks.tracker.resourceIds.has(id)) {
+          throw new Error(`Resource ID already registered: ${id}`);
+        }
+        mocks.tracker.resourceIds.set(id, cleanup);
+        mocks.tracker.resourceCleanups.add(cleanup);
+      }),
+      cleanupGroup: vi.fn((groupId) => {
+        const group = mocks.tracker.groups.get(groupId);
+        if (!group) return;
+        mocks.tracker.cleanedGroups.push(groupId);
+        group.timers.forEach((id) => {
+          clearTimeout(id);
+          mocks.tracker.timers.delete(id);
+        });
+        group.resourceCleanups.forEach((cleanup, id) => {
+          mocks.tracker.cleanedResourceIds.push(id);
+          cleanup();
+          mocks.tracker.resourceCleanups.delete(cleanup);
+          mocks.tracker.resourceIds.delete(id);
+        });
+        mocks.tracker.groups.delete(groupId);
+      }),
+      cleanup: vi.fn(() => {
+        [...mocks.tracker.groups.keys()].forEach((groupId) => {
+          mocks.tracker.cleanupGroup(groupId);
+        });
+        mocks.tracker.timers.forEach((id) => clearTimeout(id));
+        mocks.tracker.timers.clear();
+        mocks.tracker.resourceCleanups.forEach((cleanup) => cleanup());
+        mocks.tracker.resourceCleanups.clear();
+      }),
       addEventListener: vi.fn((target, type, handler) => {
         if (dragEvents.has(type)) target.addEventListener(type, handler);
       }),
@@ -40,7 +93,23 @@ const mocks = vi.hoisted(() => {
     addExclusion: vi.fn(),
     ttsStop: vi.fn().mockResolvedValue(undefined),
     storageManager: { set: vi.fn() },
+    getPosition: vi.fn().mockResolvedValue({ y: 100, side: 'right' }),
   };
+});
+
+const mountedWrappers = new Set();
+const mount = (...args) => {
+  const wrapper = vueMount(...args);
+  mountedWrappers.add(wrapper);
+  return wrapper;
+};
+
+afterEach(() => {
+  mountedWrappers.forEach((wrapper) => {
+    if (!wrapper.vm.$.isUnmounted) wrapper.unmount();
+  });
+  mountedWrappers.clear();
+  mocks.tracker.cleanup();
 });
 
 vi.mock('@/store/modules/mobile.js', () => ({
@@ -66,7 +135,30 @@ vi.mock('@/core/PageEventBus.js', () => ({
 }));
 
 vi.mock('@/composables/core/useResourceTracker', () => ({
-  useResourceTracker: () => mocks.tracker,
+  useResourceTracker: (groupId) => {
+    let group = mocks.tracker.groups.get(groupId);
+    if (!group) {
+      group = { timers: new Set(), resourceCleanups: new Map() };
+      mocks.tracker.groups.set(groupId, group);
+    }
+    onBeforeUnmount(() => mocks.tracker.cleanupGroup(groupId));
+    return {
+      ...mocks.tracker,
+      trackTimeout: (callback, delay) => {
+        const id = mocks.tracker.trackTimeout(callback, delay);
+        group.timers.add(id);
+        return id;
+      },
+      clearTimer: (id) => {
+        mocks.tracker.clearTimer(id);
+        group.timers.delete(id);
+      },
+      trackResource: (id, cleanup) => {
+        mocks.tracker.trackResource(id, cleanup);
+        group.resourceCleanups.set(id, cleanup);
+      },
+    };
+  },
 }));
 
 vi.mock('@/features/tts/composables/useTTSSmart.js', () => ({
@@ -118,7 +210,7 @@ vi.mock('@/features/exclusion/core/ExclusionChecker.js', () => ({
 vi.mock('@/shared/config/config.js', () => ({
   TranslationMode: { Page: 'page', Select_Element: 'select-element' },
   SelectionTranslationMode: { ON_FAB_CLICK: 'on-fab-click' },
-  getDesktopFabPositionAsync: vi.fn().mockResolvedValue({ y: 100, side: 'right' }),
+  getDesktopFabPositionAsync: (...args) => mocks.getPosition(...args),
 }));
 
 vi.mock('@/features/translation/providers/ProviderManifest.js', () => ({
@@ -170,6 +262,15 @@ vi.mock('@/shared/logging/logger.js', () => ({
 /** Shared component/store/transport state for every DesktopFabMenu mount. */
 const setupBaseMocks = () => {
   vi.clearAllMocks();
+  mocks.tracker.timers.forEach((id) => clearTimeout(id));
+  mocks.tracker.timers.clear();
+  mocks.tracker.resourceCleanups.forEach((cleanup) => cleanup());
+  mocks.tracker.resourceCleanups.clear();
+  mocks.tracker.resourceIds.clear();
+  mocks.tracker.groups.clear();
+  mocks.pageEventBus.subscriptions.clear();
+  mocks.tracker.cleanedResourceIds.length = 0;
+  mocks.tracker.cleanedGroups.length = 0;
   mocks.sendRegularMessage.mockResolvedValue({ success: true });
   mocks.translations = {};
   mocks.mouseHoverEnabled = ref(false);
@@ -207,6 +308,7 @@ const setupBaseMocks = () => {
     mocks.supportedHideScopes.has(scope) ? `desktop-fab-exclusion:v1:${scope}:key` : '');
   mocks.storageManager.set.mockReset();
   mocks.ttsStop.mockReset().mockResolvedValue(undefined);
+  mocks.getPosition.mockReset().mockResolvedValue({ y: 100, side: 'right' });
 };
 
 describe('DesktopFabMenu page command transport', () => {
@@ -1158,7 +1260,9 @@ describe('DesktopFabMenu hide toolbar and popover', () => {
     expect(types.filter((type) => type === 'resize').length).toBeGreaterThanOrEqual(2);
     expect(types.filter((type) => type === 'scroll').length).toBeGreaterThanOrEqual(2);
     expect(types).toContain('click');
-    expect(mocks.tracker.trackResource).toHaveBeenCalledWith('exclusion-sync', expect.any(Function));
+    expect(mocks.tracker.trackResource).toHaveBeenCalledWith(
+      expect.stringMatching(/^exclusion-sync-\d+$/), expect.any(Function),
+    );
 
     wrapper.unmount();
     expect(wrapper.emitted('presence')?.at(-1)).toEqual([false]);
@@ -1249,6 +1353,126 @@ describe('DesktopFabMenu dismissal cleanup and drag persistence', () => {
     expect(wrapper.emitted('presence')?.at(-1)).toEqual([false]);
   });
 
+  it('cancels queued mount timers and animation frames on unmount', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let nextFrameId = 42;
+    const queuedFrames = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      queuedFrames.push(callback);
+      return nextFrameId++;
+    });
+    const cancelRaf = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    try {
+      wrapper = mount(DesktopFabMenu);
+      await vi.waitFor(() => expect(mocks.tracker.addEventListener).toHaveBeenCalledWith(
+        window, 'resize', expect.any(Function),
+      ));
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(raf).toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      wrapper.unmount();
+      wrapper = null;
+      const trackedFrameCount = mocks.tracker.trackResource.mock.calls
+        .filter(([id]) => String(id).includes('-frame-')).length;
+      expect(trackedFrameCount).toBeGreaterThan(0);
+      expect(cancelRaf).toHaveBeenCalledTimes(trackedFrameCount);
+      const scheduledFrameCount = raf.mock.calls.length;
+      queuedFrames.at(-1)();
+      expect(raf).toHaveBeenCalledTimes(scheduledFrameCount);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      wrapper?.unmount();
+      wrapper = null;
+      raf.mockRestore();
+      cancelRaf.mockRestore();
+    }
+  });
+
+  it('keeps overlapping instances animation frame resources isolated', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    let nextFrameId = 100;
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => nextFrameId++);
+    const cancelRaf = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    let first;
+    let second;
+    try {
+      first = mount(DesktopFabMenu);
+      second = mount(DesktopFabMenu);
+      const [firstGroupId, secondGroupId] = [...mocks.tracker.groups.keys()];
+      expect(firstGroupId).not.toBe(secondGroupId);
+
+      await vi.waitFor(() => expect(mocks.tracker.addEventListener.mock.calls
+        .filter(([, type]) => type === 'resize')).toHaveLength(4));
+      expect(mocks.pageEventBus.on.mock.calls.map(([event]) => event).sort()).toEqual([
+        'FEATURE_STATUS_CHANGED',
+        'FEATURE_STATUS_CHANGED',
+        'sync-interaction-listeners',
+        'sync-interaction-listeners',
+      ]);
+      expect(mocks.pageEventBus.subscriptions.size).toBe(4);
+      await vi.advanceTimersByTimeAsync(100);
+
+      const frameResourceIds = (groupId) => [...mocks.tracker.groups.get(groupId).resourceCleanups.keys()]
+        .filter((id) => String(id).includes('-frame-'));
+      const groupResourceIds = (groupId) => [...mocks.tracker.groups.get(groupId).resourceCleanups.keys()];
+      const firstFrames = frameResourceIds(firstGroupId);
+      const secondFrames = frameResourceIds(secondGroupId);
+      expect(firstFrames.length).toBeGreaterThan(0);
+      expect(secondFrames.length).toBeGreaterThan(0);
+      expect(firstFrames).not.toEqual(expect.arrayContaining(secondFrames));
+      for (const [groupId, suffix] of [[firstGroupId, firstGroupId.split('-').at(-1)], [secondGroupId, secondGroupId.split('-').at(-1)]]) {
+        expect(groupResourceIds(groupId)).toContain(`exclusion-sync-${suffix}`);
+        expect(groupResourceIds(groupId)).toContain(`exclusion-re-sync-${suffix}`);
+      }
+
+      first.unmount();
+      expect(mocks.tracker.cleanedResourceIds.filter((id) => String(id).includes('-frame-')))
+        .toEqual(firstFrames);
+      expect(mocks.tracker.cleanedGroups).toEqual([firstGroupId]);
+      expect(mocks.tracker.groups.has(secondGroupId)).toBe(true);
+      expect(frameResourceIds(secondGroupId)).toEqual(secondFrames);
+      expect(cancelRaf).toHaveBeenCalledTimes(firstFrames.length);
+      expect(mocks.pageEventBus.subscriptions.size).toBe(2);
+      const secondSubscriptionCleanups = groupResourceIds(secondGroupId)
+        .filter((id) => String(id).startsWith('exclusion-'))
+        .map((id) => mocks.tracker.groups.get(secondGroupId).resourceCleanups.get(id));
+      expect([...mocks.pageEventBus.subscriptions].map(({ cleanup }) => cleanup))
+        .toEqual(expect.arrayContaining(secondSubscriptionCleanups));
+
+      second.unmount();
+      expect(cancelRaf).toHaveBeenCalledTimes(firstFrames.length + secondFrames.length);
+      expect(mocks.tracker.cleanedGroups).toEqual([firstGroupId, secondGroupId]);
+      expect(mocks.pageEventBus.subscriptions.size).toBe(0);
+      expect([...mocks.tracker.resourceIds.keys()]).toHaveLength(0);
+    } finally {
+      first?.unmount();
+      second?.unmount();
+      raf.mockRestore();
+      cancelRaf.mockRestore();
+    }
+  });
+
+  it('ignores async initialization that finishes after unmount', async () => {
+    let resolvePosition;
+    mocks.getPosition.mockImplementation(() => new Promise((resolve) => {
+      resolvePosition = resolve;
+    }));
+    wrapper = mount(DesktopFabMenu);
+    await vi.waitFor(() => expect(mocks.getPosition).toHaveBeenCalledOnce());
+
+    wrapper.unmount();
+    wrapper = null;
+    resolvePosition({ y: 200, side: 'left' });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(mocks.tracker.addEventListener).not.toHaveBeenCalled();
+    expect(mocks.tracker.trackResource).not.toHaveBeenCalled();
+    expect(mocks.tracker.trackTimeout).not.toHaveBeenCalled();
+  });
+
   it('persists DESKTOP_FAB_POSITION after a drag without touching any setting', async () => {
     wrapper = mount(DesktopFabMenu, { attachTo: document.body });
     wrapper.vm.isReady = true;
@@ -1285,5 +1509,48 @@ describe('DesktopFabMenu dismissal cleanup and drag persistence', () => {
     expect(mocks.settingsStore.settings.SHOW_DESKTOP_FAB).toBe(true);
     expect(mocks.settingsStore.settings.selectionTranslationMode).toBe('immediate');
     expect(wrapper.vm.isMenuOpen).toBe(false);
+  });
+
+  it('persists the released position if unmounted before delayed drag cleanup', async () => {
+    let rejectWrite;
+    mocks.storageManager.set.mockImplementation(() => new Promise((_, reject) => {
+      rejectWrite = reject;
+    }));
+    wrapper = mount(DesktopFabMenu, { attachTo: document.body });
+    wrapper.vm.isReady = true;
+    await wrapper.vm.$nextTick();
+    await vi.waitFor(() => expect(mocks.tracker.addEventListener).toHaveBeenCalledWith(
+      window, 'resize', expect.any(Function),
+    ));
+    wrapper.vm.verticalPos = 100;
+    await wrapper.vm.$nextTick();
+
+    wrapper.get('.desktop-fab-button').element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, button: 0, clientY: 150, clientX: 900 }),
+    );
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 300, clientX: 900 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 420, clientX: 900 }));
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    window.dispatchEvent(new MouseEvent('mouseup', { clientY: 420, clientX: 900 }));
+    expect(mocks.storageManager.set).toHaveBeenCalledOnce();
+    expect(mocks.storageManager.set).toHaveBeenCalledWith({
+      DESKTOP_FAB_POSITION: { side: 'right', y: 220 },
+    });
+
+    wrapper.vm.verticalPos = 333;
+    const { isDragging, wasDragged } = wrapper.vm;
+    wrapper.unmount();
+    wrapper = null;
+    await vi.advanceTimersByTimeAsync(300);
+
+    rejectWrite(new Error('storage unavailable'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(isDragging).toBe(true);
+    expect(wasDragged).toBe(true);
+    expect(mocks.storageManager.set).toHaveBeenCalledWith({
+      DESKTOP_FAB_POSITION: { side: 'right', y: 220 },
+    });
   });
 });

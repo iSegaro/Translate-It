@@ -55,9 +55,9 @@ vi.mock('./ApiKeyInput.vue', () => ({
 }))
 vi.mock('@/components/base/BaseInput.vue', () => ({
   default: {
-    props: ['id', 'label', 'modelValue', 'placeholder', 'type'],
+    props: ['id', 'label', 'modelValue', 'placeholder', 'type', 'dir'],
     emits: ['update:modelValue'],
-    template: '<label v-if="label" :for="id">{{ label }}</label><input :id="id" :type="type || \'text\'" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)">',
+    template: '<div><label v-if="label" :for="id">{{ label }}</label><input :id="id" :type="type || \'text\'" :dir="dir" :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)"></div>',
   },
 }))
 vi.mock('@/components/base/BaseSelect.vue', () => ({
