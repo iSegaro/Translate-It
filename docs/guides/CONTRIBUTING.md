@@ -110,7 +110,7 @@ We have a dedicated **[Translation Guide](./LOCALIZATION_GUIDE.md)** that explai
 
 ### Prerequisites
 
-Install [**Node.js 22.13.0 or later in the 22.x line, or Node.js 24+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone upstream to build or explore the project; to contribute, clone your fork instead. Run setup from either clone:
+Install [**Node.js 22.22.2 or later in the 22.x line, Node.js 24.15.0 or later in the 24.x line, or Node.js 26+**](https://nodejs.org/) and [**pnpm 12.11.2**](https://pnpm.io/) (the version pinned by the project and CI). Clone upstream to build or explore the project; to contribute, clone your fork instead. Run setup from either clone:
 
 ```bash
 git clone https://github.com/Translate-It-App/Translate-It.git

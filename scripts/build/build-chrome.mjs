@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process'
+import { ZipArchive } from 'archiver'
+import { randomUUID } from 'node:crypto'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -16,6 +18,69 @@ const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
 const CHROME_BUILD_DIR = `dist/chrome/${artifactPrefix}-v${pkg.version}`
 const CHROME_ZIP_PATH = `dist/chrome/${artifactPrefix}-v${pkg.version}.zip`
+
+export async function createChromeZip(
+  buildDir = path.join(rootDir, CHROME_BUILD_DIR),
+  zipPath = path.join(rootDir, CHROME_ZIP_PATH),
+) {
+  const temporaryZipPath = path.join(
+    path.dirname(zipPath),
+    `.${path.basename(zipPath)}.${randomUUID()}.tmp`,
+  )
+  const archive = new ZipArchive({ zlib: { level: 9 } })
+  const output = fs.createWriteStream(temporaryZipPath, { flags: 'wx' })
+
+  try {
+    await new Promise((resolve, reject) => {
+      let finalized = false
+      let closed = false
+      let settled = false
+
+      const fail = (error) => {
+        if (settled) return
+        settled = true
+        if (closed) reject(error)
+        else output.once('close', () => reject(error))
+        try {
+          archive.abort()
+        } catch {}
+        if (!closed) output.destroy()
+      }
+      const completeIfReady = () => {
+        if (finalized && closed && !settled) {
+          settled = true
+          resolve()
+        }
+      }
+
+      output.on('close', () => {
+        closed = true
+        completeIfReady()
+      })
+      output.on('error', fail)
+      archive.on('error', fail)
+      archive.on('warning', fail)
+
+      try {
+        archive.pipe(output)
+        archive.directory(buildDir, false)
+        archive.finalize().then(
+          () => {
+            finalized = true
+            completeIfReady()
+          },
+          fail,
+        )
+      } catch (error) {
+        fail(error)
+      }
+    })
+    await fs.promises.rename(temporaryZipPath, zipPath)
+  } catch (error) {
+    await fs.promises.rm(temporaryZipPath, { force: true })
+    throw error
+  }
+}
 
 /**
  * Build Chrome extension with Vue
@@ -47,18 +112,7 @@ async function buildChromeExtension() {
     
     // Step 3: Create ZIP package
     logStep('Creating Chrome extension package...')
-    const archiver = await import('archiver')
-    const archive = archiver.default('zip', { zlib: { level: 9 } })
-    const output = fs.createWriteStream(path.join(rootDir, CHROME_ZIP_PATH))
-    
-    await new Promise((resolve, reject) => {
-      output.on('close', resolve)
-      archive.on('error', reject)
-      
-      archive.pipe(output)
-      archive.directory(path.join(rootDir, CHROME_BUILD_DIR), false)
-      archive.finalize()
-    })
+    await createChromeZip()
     
     const zipStats = fs.statSync(path.join(rootDir, CHROME_ZIP_PATH))
     const sizeStr = formatPackageSize(zipStats.size)
@@ -77,5 +131,7 @@ async function buildChromeExtension() {
   }
 }
 
-// Run build
-buildChromeExtension()
+// Run build when invoked directly
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  buildChromeExtension()
+}
