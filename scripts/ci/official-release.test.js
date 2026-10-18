@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, delimiter, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBashEnvPreload } from './test-helpers.mjs';
+import projectNaming from '../shared/project-names.cjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const script = join(root, 'scripts/ci/official-release.sh');
@@ -15,11 +16,12 @@ const scriptSource = readFileSync(script, 'utf8');
 const releaseNotesSource = readFileSync(join(root, 'scripts/ci/release-notes.mjs'), 'utf8');
 const packageJson = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const version = packageJson.version;
+const { artifactPrefix, displayName } = projectNaming.getProjectNames(packageJson.name);
 const tag = `v${version}`;
-const releaseTitle = `Translate It! ${tag}`;
+const releaseTitle = `${displayName}! ${tag}`;
 const sha = 'a'.repeat(40);
-const chromeName = `Translate-It-${tag}-for-Chrome.zip`;
-const firefoxName = `Translate-It-${tag}-for-Firefox.zip`;
+const chromeName = `${artifactPrefix}-${tag}-for-Chrome.zip`;
+const firefoxName = `${artifactPrefix}-${tag}-for-Firefox.zip`;
 const generatedChanges = `## What's Changed\n\n* ci: fixture change\n* fix: fixture fix\n\n## New Contributors\n* @octocat made their first contribution in https://github.com/owner/repo/pull/1\n\n**Full Changelog**: https://github.com/owner/repo/compare/v1.19.0...${tag}`;
 
 function run({ command = 'prepare', releaseTag = tag, releaseId = '77', expectedSha = sha,
@@ -254,7 +256,7 @@ const releaseCreate = calls => calls.find(args => args[0] === 'api' && args.incl
 const releaseBody = calls => releaseCreate(calls)?.find(value => value.startsWith('body='))?.slice('body='.length);
 const expectedReleaseCreate = (calls, expectedTag = tag, expectedSha = sha) => [
   'api', '--method', 'POST', 'repos/owner/repo/releases', '-f', `tag_name=${expectedTag}`,
-  '-f', `name=Translate It! ${expectedTag}`, '-f', `target_commitish=${expectedSha}`,
+  '-f', `name=${displayName}! ${expectedTag}`, '-f', `target_commitish=${expectedSha}`,
   '-f', `body=${releaseBody(calls)}`, '-F', 'draft=true',
 ];
 const generatedNotesCall = calls => calls.find(args => args[0] === 'api' && args.includes('--method') && args.includes('POST') && args.includes('repos/owner/repo/releases/generate-notes'));
@@ -381,7 +383,9 @@ describe('official release helper', () => {
     const result = run({ changelog: changelogEntry(customItem), generatedBody: generatedChanges, vueJson: JSON.stringify([{ dependencies: { vue: { version: vueVersion } } }]) });
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
     const body = releaseBody(result.calls);
-    expect(body).toContain(`#### 🌍 Translate It ${tag} – Released on 04 October 2026`);
+    expect(body).toContain('Released on 04 October 2026');
+    expect(body.split('\n')[0]).toBe('Released on 04 October 2026');
+    expect(body).not.toContain(`#### 🌍 Translate It ${tag}`);
     expect(body).toContain('<div align="center">');
     const badgeUrls = [
       `https://img.shields.io/badge/version-${version}-blue.svg`,
@@ -714,8 +718,9 @@ describe('official release helper', () => {
     expect(workflow).toContain('name: Build and Prepare Official Release Draft');
     expect(workflow).not.toContain('Build and Publish Official Release');
     expect(workflow).toContain('name: Official Release');
-    expect(workflow).toContain('run-name: "Translate It! ${{ inputs.version }}"');
-    expect(workflow).toMatch(/run-name:\s*"Translate It! \$\{\{ inputs\.version \}\}"/);
+    expect(workflow).toContain('run-name: Release ${{ inputs.version }}');
+    expect(workflow).toMatch(/run-name:\s*Release \$\{\{ inputs\.version \}\}/);
+    expect(workflow).not.toContain('Repository Variables');
     expect(workflow).not.toMatch(/run-name:[^\n]*v\d+\.\d+\.\d+/);
     for (const permission of ['contents: write', 'id-token: write', 'attestations: write']) expect(workflow).toContain(permission);
     for (const pin of [
@@ -737,9 +742,9 @@ describe('official release helper', () => {
     expect(order.every(index => index >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(workflow).toContain('env:\n          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}\n        run: |');
-    expect(workflow).toContain('Translate-It-${RELEASE_TAG}-for-Chrome.zip');
-    expect(workflow).toContain('Translate-It-${RELEASE_TAG}-for-Firefox.zip');
-    expect(workflow).toContain('subject-path: |\n            dist/Publish/Translate-It-${{ steps.prepare.outputs.tag }}-for-Chrome.zip\n            dist/Publish/Translate-It-${{ steps.prepare.outputs.tag }}-for-Firefox.zip');
+    expect(workflow).toContain('${ARTIFACT_PREFIX}-${RELEASE_TAG}-for-Chrome.zip');
+    expect(workflow).toContain('${ARTIFACT_PREFIX}-${RELEASE_TAG}-for-Firefox.zip');
+    expect(workflow).toContain('subject-path: |\n            dist/Publish/${{ steps.names.outputs.artifact_prefix }}-${{ steps.prepare.outputs.tag }}-for-Chrome.zip\n            dist/Publish/${{ steps.names.outputs.artifact_prefix }}-${{ steps.prepare.outputs.tag }}-for-Firefox.zip');
     expect(workflow.trimEnd().endsWith('run: bash scripts/ci/official-release.sh finalize-draft')).toBe(true);
     expect(workflow).not.toContain('translate-it-development-transport');
     expect(workflow).not.toMatch(/PATCH[^\n]*untagged-/);
@@ -747,5 +752,16 @@ describe('official release helper', () => {
     expect(developmentWorkflow).toContain('workflows: [CI]');
     expect(scriptSource).not.toMatch(/gh\s+release\s+(upload|edit)/);
     expect(scriptSource).not.toContain('/releases/tags/');
+  });
+
+  it('derives package display and artifact names while preserving published compatibility values', () => {
+    expect(projectNaming.getProjectNames(packageJson.name)).toEqual({
+      packageName: 'translate-it',
+      artifactPrefix: 'Translate-It',
+      displayName: 'Translate It',
+    });
+    expect(releaseTitle).toBe(`Translate It! ${tag}`);
+    expect(chromeName).toBe(`Translate-It-${tag}-for-Chrome.zip`);
+    expect(firefoxName).toBe(`Translate-It-${tag}-for-Firefox.zip`);
   });
 });

@@ -1,6 +1,6 @@
 name: Official Release
 
-run-name: "Translate It! ${{ inputs.version }}"
+run-name: Release ${{ inputs.version }}
 
 on:
   workflow_dispatch:
@@ -55,6 +55,13 @@ jobs:
         with:
           ref: ${{ steps.prepare.outputs.sha }}
 
+      - name: Derive artifact prefix
+        id: names
+        run: |
+          ARTIFACT_PREFIX=$(node scripts/shared/project-names.cjs artifact-prefix)
+          echo "ARTIFACT_PREFIX=$ARTIFACT_PREFIX" >> "$GITHUB_ENV"
+          echo "artifact_prefix=$ARTIFACT_PREFIX" >> "$GITHUB_OUTPUT"
+
       - name: Verify checked out release commit
         env:
           EXPECTED_SHA: ${{ steps.prepare.outputs.sha }}
@@ -79,21 +86,21 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          chrome_zips=(dist/Publish/Translate-It-v*-for-Chrome.zip)
-          firefox_zips=(dist/Publish/Translate-It-v*-for-Firefox.zip)
+          chrome_zips=(dist/Publish/"${ARTIFACT_PREFIX}"-v*-for-Chrome.zip)
+          firefox_zips=(dist/Publish/"${ARTIFACT_PREFIX}"-v*-for-Firefox.zip)
           [[ ${#chrome_zips[@]} -eq 1 ]] || { printf 'Expected exactly one Chrome ZIP, found %s\n' "${#chrome_zips[@]}" >&2; exit 1; }
           [[ -f ${chrome_zips[0]} ]] || { printf 'Chrome ZIP is not a regular file: %s\n' "${chrome_zips[0]}" >&2; exit 1; }
-          [[ ${chrome_zips[0]} == "dist/Publish/Translate-It-${RELEASE_TAG}-for-Chrome.zip" ]] || { printf 'Chrome ZIP does not match %s.\n' "$RELEASE_TAG" >&2; exit 1; }
+          [[ ${chrome_zips[0]} == "dist/Publish/${ARTIFACT_PREFIX}-${RELEASE_TAG}-for-Chrome.zip" ]] || { printf 'Chrome ZIP does not match %s.\n' "$RELEASE_TAG" >&2; exit 1; }
           [[ ${#firefox_zips[@]} -eq 1 ]] || { printf 'Expected exactly one Firefox ZIP, found %s\n' "${#firefox_zips[@]}" >&2; exit 1; }
           [[ -f ${firefox_zips[0]} ]] || { printf 'Firefox ZIP is not a regular file: %s\n' "${firefox_zips[0]}" >&2; exit 1; }
-          [[ ${firefox_zips[0]} == "dist/Publish/Translate-It-${RELEASE_TAG}-for-Firefox.zip" ]] || { printf 'Firefox ZIP does not match %s.\n' "$RELEASE_TAG" >&2; exit 1; }
+          [[ ${firefox_zips[0]} == "dist/Publish/${ARTIFACT_PREFIX}-${RELEASE_TAG}-for-Firefox.zip" ]] || { printf 'Firefox ZIP does not match %s.\n' "$RELEASE_TAG" >&2; exit 1; }
 
       - name: Attest release ZIP files
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
-            dist/Publish/Translate-It-${{ steps.prepare.outputs.tag }}-for-Chrome.zip
-            dist/Publish/Translate-It-${{ steps.prepare.outputs.tag }}-for-Firefox.zip
+            dist/Publish/${{ steps.names.outputs.artifact_prefix }}-${{ steps.prepare.outputs.tag }}-for-Chrome.zip
+            dist/Publish/${{ steps.names.outputs.artifact_prefix }}-${{ steps.prepare.outputs.tag }}-for-Firefox.zip
 
       - name: Attach and verify Draft release
         env:

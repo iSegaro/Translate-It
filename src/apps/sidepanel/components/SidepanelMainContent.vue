@@ -250,6 +250,9 @@ const WIDE_LAYOUT_THRESHOLD = 510 // Minimum width for horizontal layout with Tr
 
 // Resize observer for responsive layout
 let resizeObserver = null
+let resizeObserverInitTimer = null
+let isUnmounted = false
+const pendingLayoutFrames = new Set()
 
 const checkLayout = () => {
   if (languageControlsRef.value) {
@@ -266,12 +269,18 @@ const checkLayout = () => {
 
 // Setup resize observer
 const setupResizeObserver = () => {
-  if (languageControlsRef.value && 'ResizeObserver' in window) {
+  if (!isUnmounted && languageControlsRef.value && 'ResizeObserver' in window) {
     resizeObserver = new ResizeObserver(() => {
+      if (isUnmounted) return
+
       // Use requestAnimationFrame to prevent ResizeObserver loop warnings
-      requestAnimationFrame(() => {
+      let frameId
+      frameId = requestAnimationFrame(() => {
+        pendingLayoutFrames.delete(frameId)
+        if (isUnmounted) return
         checkLayout()
       })
+      pendingLayoutFrames.add(frameId)
     })
     resizeObserver.observe(languageControlsRef.value)
 
@@ -282,6 +291,13 @@ const setupResizeObserver = () => {
 
 // Cleanup resize observer
 const cleanupResizeObserver = () => {
+  if (resizeObserverInitTimer !== null) {
+    clearTimeout(resizeObserverInitTimer)
+    resizeObserverInitTimer = null
+  }
+  pendingLayoutFrames.forEach(frameId => cancelAnimationFrame(frameId))
+  pendingLayoutFrames.clear()
+
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -380,12 +396,15 @@ onMounted(async () => {
 
   // Setup resize observer for responsive layout
   // Use setTimeout to ensure DOM is ready and initial width is calculated
-  setTimeout(() => {
+  resizeObserverInitTimer = setTimeout(() => {
+    resizeObserverInitTimer = null
+    if (isUnmounted) return
     setupResizeObserver()
   }, 100)
 });
 
 onUnmounted(() => {
+  isUnmounted = true
   cleanupResizeObserver()
 });
 </script>

@@ -5,10 +5,12 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { logStep, logSuccess, logError, logInfo } from '../shared/logger.mjs'
+import projectNaming from '../shared/project-names.cjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '../..')
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
+const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 
 /**
  * Detect connected Android devices via adb
@@ -91,7 +93,7 @@ export async function runAndroid({ args = process.argv.slice(2), env = process.e
 
     logStep(`Starting Android deployment on device: ${deviceId}...`)
     
-    const firefoxBuildDir = `dist/firefox/Translate-It-v${packageInfo.version}`
+    const firefoxBuildDir = `dist/firefox/${artifactPrefix}-v${packageInfo.version}`
     const buildPath = path.join(root, firefoxBuildDir)
     if (!exists(buildPath)) {
       logError(`Build directory not found: ${firefoxBuildDir}`)

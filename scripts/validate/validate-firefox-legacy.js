@@ -2,13 +2,15 @@ const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const pkg = require("../package.json");
+const { getProjectNames } = require("../shared/project-names.cjs");
 
 /**
  * Firefox Extension Validation Script
  * Enhanced validation with detailed reporting similar to Chrome validator
  */
 
-const FIREFOX_BUILD_DIR = `./dist/firefox/Translate-It-v${pkg.version}/`;
+const { artifactPrefix } = getProjectNames(pkg.name);
+const FIREFOX_BUILD_DIR = `./dist/firefox/${artifactPrefix}-v${pkg.version}/`;
 
 async function validateFirefoxExtension() {
   console.log(

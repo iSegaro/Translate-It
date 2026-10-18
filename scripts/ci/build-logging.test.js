@@ -6,8 +6,11 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { BuildReporter } from '../shared/build-reporter.mjs'
 import { formatDuration } from '../shared/box-utils.mjs'
+import projectNaming from '../shared/project-names.cjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+const { artifactPrefix } = projectNaming.getProjectNames(packageJson.name)
 const output = []
 let tempDir
 
@@ -24,9 +27,10 @@ function createAggregateWorkspace(version, children) {
   const sharedDir = path.join(workspace, 'scripts', 'shared')
   fs.mkdirSync(buildDir, { recursive: true })
   fs.mkdirSync(sharedDir, { recursive: true })
-  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ name: 'build-logging-test', version }))
+  fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ name: packageJson.name, version }))
   fs.copyFileSync(path.join(root, 'scripts', 'build', 'build-all.mjs'), path.join(buildDir, 'build-all.mjs'))
   fs.copyFileSync(path.join(root, 'scripts', 'shared', 'box-utils.mjs'), path.join(sharedDir, 'box-utils.mjs'))
+  fs.copyFileSync(path.join(root, 'scripts', 'shared', 'project-names.cjs'), path.join(sharedDir, 'project-names.cjs'))
   fs.writeFileSync(path.join(sharedDir, 'logger.mjs'), `export function logStep(message) { console.log(message) }\nexport function logError(message, details) { console.log(message); if (details) console.log(details) }\n`)
   for (const browser of ['chrome', 'firefox']) {
     const script = path.join(buildDir, `build-${browser}.mjs`)
@@ -80,7 +84,7 @@ describe('build terminal logging', () => {
       const text = output.join('\n')
 
       expect(stats).toEqual({ totalSize: 3, fileCount: 1 })
-      expect(text).toContain(`dist/${browser}/Translate-It-v`)
+      expect(text).toContain(`dist/${browser}/${artifactPrefix}-v`)
       expect(rows[0]).toContain('⚡ Vite compilation')
       expect(rows[0].startsWith('├─')).toBe(true)
       expect(rows[1]).toContain('· Vite compilation')
@@ -102,7 +106,7 @@ describe('build terminal logging', () => {
   it('copies both browser ZIPs and reports aggregate MM:SS without generating release notes', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'build-logging-duration-'))
     const version = '0.0.0-logging-test'
-    const zipScript = browser => `import fs from 'node:fs'; import path from 'node:path';\nconst version = '${version}';\nconst file = path.join('dist', '${browser}', 'Translate-It-v' + version + '.zip');\nfs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, '${browser}-zip');\n`
+    const zipScript = browser => `import fs from 'node:fs'; import path from 'node:path';\nconst version = '${version}';\nconst file = path.join('dist', '${browser}', '${artifactPrefix}-v' + version + '.zip');\nfs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, '${browser}-zip');\n`
     const workspace = createAggregateWorkspace(version, {
       chrome: zipScript('chrome'),
       firefox: zipScript('firefox'),
@@ -114,12 +118,12 @@ describe('build terminal logging', () => {
     })
 
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain(`Chrome ZIP: dist/Publish/Translate-It-v${version}-for-Chrome.zip`)
-    expect(result.stdout).toContain(`Firefox ZIP: dist/Publish/Translate-It-v${version}-for-Firefox.zip`)
+    expect(result.stdout).toContain(`Chrome ZIP: dist/Publish/${artifactPrefix}-v${version}-for-Chrome.zip`)
+    expect(result.stdout).toContain(`Firefox ZIP: dist/Publish/${artifactPrefix}-v${version}-for-Firefox.zip`)
     expect(result.stdout).toContain('⏱️ Total build time: 04:07')
     expect(result.stdout).not.toContain('Release notes:')
-    expect(fs.readFileSync(path.join(workspace, 'dist', 'Publish', `Translate-It-v${version}-for-Chrome.zip`), 'utf8')).toBe('chrome-zip')
-    expect(fs.readFileSync(path.join(workspace, 'dist', 'Publish', `Translate-It-v${version}-for-Firefox.zip`), 'utf8')).toBe('firefox-zip')
+    expect(fs.readFileSync(path.join(workspace, 'dist', 'Publish', `${artifactPrefix}-v${version}-for-Chrome.zip`), 'utf8')).toBe('chrome-zip')
+    expect(fs.readFileSync(path.join(workspace, 'dist', 'Publish', `${artifactPrefix}-v${version}-for-Firefox.zip`), 'utf8')).toBe('firefox-zip')
     expect(fs.existsSync(path.join(workspace, 'dist', 'Publish', 'release-notes.md'))).toBe(false)
   })
 
@@ -184,7 +188,7 @@ describe('build terminal logging', () => {
     expect(result.stdout).not.toContain('ALL BUILDS COMPLETED')
 
     // Case 2: only the Firefox browser ZIP is missing.
-    const chromeZip = path.join(workspace, 'dist', 'chrome', `Translate-It-v${version}.zip`)
+    const chromeZip = path.join(workspace, 'dist', 'chrome', `${artifactPrefix}-v${version}.zip`)
     fs.mkdirSync(path.dirname(chromeZip), { recursive: true })
     fs.writeFileSync(chromeZip, 'fake-chrome-zip')
     result = runAggregate(workspace)
