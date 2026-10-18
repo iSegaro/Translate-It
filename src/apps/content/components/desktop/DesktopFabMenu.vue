@@ -1450,8 +1450,17 @@ const stopDrag = (e) => {
     });
   }
 
+  const position = { side: side.value, y: verticalPos.value };
+  void (async () => {
+    try {
+      await storageManager.set({ DESKTOP_FAB_POSITION: position });
+    } catch (err) {
+      logger.info("Failed to save FAB state:", err);
+    }
+  })();
+
   // Use a slightly longer delay to ensure ghost clicks are swallowed
-  scheduleTimeout(async () => {
+  scheduleTimeout(() => {
     if (isUnmounted) return;
     isDragging.value = false;
     // Small extra delay for wasDragged to ensure toggleMenu doesn't fire
@@ -1459,13 +1468,7 @@ const stopDrag = (e) => {
       wasDragged.value = false;
     }, 150);
 
-    try {
-      userPreferredY.value = verticalPos.value;
-      const position = { side: side.value, y: verticalPos.value };
-      await storageManager.set({ DESKTOP_FAB_POSITION: position });
-    } catch (err) {
-      logger.info("Failed to save FAB state:", err);
-    }
+    userPreferredY.value = position.y;
 
     // Restart fade timer after drag ends
     if (!isUnmounted) startFadeTimer(false);

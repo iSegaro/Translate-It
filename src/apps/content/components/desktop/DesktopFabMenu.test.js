@@ -1510,4 +1510,47 @@ describe('DesktopFabMenu dismissal cleanup and drag persistence', () => {
     expect(mocks.settingsStore.settings.selectionTranslationMode).toBe('immediate');
     expect(wrapper.vm.isMenuOpen).toBe(false);
   });
+
+  it('persists the released position if unmounted before delayed drag cleanup', async () => {
+    let rejectWrite;
+    mocks.storageManager.set.mockImplementation(() => new Promise((_, reject) => {
+      rejectWrite = reject;
+    }));
+    wrapper = mount(DesktopFabMenu, { attachTo: document.body });
+    wrapper.vm.isReady = true;
+    await wrapper.vm.$nextTick();
+    await vi.waitFor(() => expect(mocks.tracker.addEventListener).toHaveBeenCalledWith(
+      window, 'resize', expect.any(Function),
+    ));
+    wrapper.vm.verticalPos = 100;
+    await wrapper.vm.$nextTick();
+
+    wrapper.get('.desktop-fab-button').element.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, button: 0, clientY: 150, clientX: 900 }),
+    );
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 300, clientX: 900 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { clientY: 420, clientX: 900 }));
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    window.dispatchEvent(new MouseEvent('mouseup', { clientY: 420, clientX: 900 }));
+    expect(mocks.storageManager.set).toHaveBeenCalledOnce();
+    expect(mocks.storageManager.set).toHaveBeenCalledWith({
+      DESKTOP_FAB_POSITION: { side: 'right', y: 220 },
+    });
+
+    wrapper.vm.verticalPos = 333;
+    const { isDragging, wasDragged } = wrapper.vm;
+    wrapper.unmount();
+    wrapper = null;
+    await vi.advanceTimersByTimeAsync(300);
+
+    rejectWrite(new Error('storage unavailable'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(isDragging).toBe(true);
+    expect(wasDragged).toBe(true);
+    expect(mocks.storageManager.set).toHaveBeenCalledWith({
+      DESKTOP_FAB_POSITION: { side: 'right', y: 220 },
+    });
+  });
 });
