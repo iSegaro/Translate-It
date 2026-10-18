@@ -110,6 +110,16 @@ function referencedPlaceholderNames(message) {
   return names;
 }
 
+function referencedBracePlaceholderNames(message) {
+  const names = new Set();
+  if (typeof message !== "string") return names;
+
+  for (const match of message.matchAll(/\{([A-Za-z0-9_]+)\}/g)) {
+    names.add(match[1]);
+  }
+  return names;
+}
+
 function validatePlaceholders(filePath, key, message, placeholders, errors) {
   if (!isPlainObject(placeholders)) {
     errors.push(`${filePath}: key "${key}" placeholders must be an object`);
@@ -200,20 +210,16 @@ function validateCatalogStructure(filePath, catalog, errors) {
       }
     }
 
-    if (Object.hasOwn(entry, "placeholders")) {
-      placeholderNames.set(
+    placeholderNames.set(
+      key,
+      validatePlaceholders(
+        filePath,
         key,
-        validatePlaceholders(
-          filePath,
-          key,
-          entry.message,
-          entry.placeholders,
-          errors,
-        ),
-      );
-    } else {
-      placeholderNames.set(key, new Map());
-    }
+        entry.message,
+        Object.hasOwn(entry, "placeholders") ? entry.placeholders : {},
+        errors,
+      ),
+    );
   }
 
   return placeholderNames;
@@ -246,6 +252,19 @@ function compareCatalogs(
 
   for (const key of referenceKeys) {
     if (!catalogKeySet.has(key)) continue;
+
+    const expectedBraceNames = [
+      ...referencedBracePlaceholderNames(referenceCatalog[key].message),
+    ].sort();
+    const actualBraceNames = [
+      ...referencedBracePlaceholderNames(catalog[key].message),
+    ].sort();
+    if (expectedBraceNames.join("\0") !== actualBraceNames.join("\0")) {
+      errors.push(
+        `${filePath}: key "${key}" brace placeholders must match the English reference ` +
+          `(expected: ${expectedBraceNames.join(", ") || "none"}; actual: ${actualBraceNames.join(", ") || "none"})`,
+      );
+    }
 
     const expected = referencePlaceholders.get(key) || new Map();
     const actual = placeholders.get(key) || new Map();

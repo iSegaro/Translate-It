@@ -175,4 +175,33 @@ describe("localization validation", () => {
       );
     });
   });
+
+  it("reports brace placeholders that differ from English", () => {
+    const english = {
+      greeting: { message: "Hello {name}, you have {count} messages" },
+    };
+    const invalid = {
+      greeting: { message: "Hello {name}, you have {total} messages" },
+    };
+
+    withFixture({ en: english, fa: invalid, ja: english }, (result) => {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        'key "greeting" brace placeholders must match the English reference (expected: count, name; actual: name, total)',
+      );
+    });
+  });
+
+  it("reports browser placeholders without definitions", () => {
+    const invalid = {
+      greeting: { message: "Hello $NAME$" },
+    };
+
+    withFixture({ en: invalid, fa: invalid, ja: invalid }, (result) => {
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        'key "greeting" message references undefined placeholder "name"',
+      );
+    });
+  });
 });
