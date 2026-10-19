@@ -86,6 +86,12 @@ export const useSettingsStore = defineStore('settings', () => {
   let providerCategoryIntentQueue = Promise.resolve()
   const dirtySettingVersions = new Map()
   let nextSettingEditVersion = 0
+  let windowShowOriginalEditVersion = 0
+  let windowShowOriginalWriteQueue = Promise.resolve()
+  let windowShowOriginalPendingWrites = 0
+  // Serializes durable-storage confirmation of WINDOW_SHOW_ORIGINAL
+  // notifications so out-of-order events cannot apply in reverse.
+  let windowShowOriginalSyncQueue = Promise.resolve()
   const apiKeySettingKeys = new Set([
     'API_KEY', 'OPENAI_API_KEY', 'OPENROUTER_API_KEY', 'REQUESTY_API_KEY',
     'DEEPSEEK_API_KEY', 'GEMINI_API_KEY', 'CUSTOM_API_KEY', 'DEEPL_API_KEY'
@@ -341,6 +347,7 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true;
     __loadInFlight = (async () => {
       try {
+        const windowShowOriginalVersionAtLoadStart = windowShowOriginalEditVersion
         const stored = await storageManager.get(null);
         const current = settings.value;
 
@@ -351,7 +358,8 @@ export const useSettingsStore = defineStore('settings', () => {
   
         // Merge settings from storage (after potential migrations)
         Object.keys(current).forEach(key => {
-          if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined) {
+          if (Object.prototype.hasOwnProperty.call(stored, key) && stored[key] !== undefined
+            && (key !== 'WINDOW_SHOW_ORIGINAL' || windowShowOriginalVersionAtLoadStart === windowShowOriginalEditVersion)) {
             if (key === 'EXCLUDED_SITES') {
               if (Array.isArray(stored[key])) current[key] = stored[key];
               else if (typeof stored[key] === 'object' && stored[key] !== null) current[key] = Object.values(stored[key]).filter(s => typeof s === 'string');
@@ -417,9 +425,17 @@ export const useSettingsStore = defineStore('settings', () => {
       // Write-boundary: persist canonical schema keys only, with live values.
       const savedSettingVersions = new Map(dirtySettingVersions)
       const snapshot = buildPersistedSnapshot(settings.value)
-      // This setting is mutated through the background serializer, never as a
-      // stale full-settings snapshot.
+      // These settings are never persisted through a full snapshot, so an
+      // unrelated save can never overwrite the live durable copy:
+      // - COLLAPSED_PROVIDER_CATEGORIES is owned by the background serializer.
+      // - WINDOW_SHOW_ORIGINAL is a window-owned preference; a snapshot taken
+      //   before a later toggle and committed after it would clobber the
+      //   newest value. Local changes persist through the dedicated write
+      //   queue (narrow toggles and explicit updates), external changes are
+      //   validated against durable storage, and importSettings restores the
+      //   key explicitly after Save.
       delete snapshot.COLLAPSED_PROVIDER_CATEGORIES
+      delete snapshot.WINDOW_SHOW_ORIGINAL
       await storageManager.set(snapshot);
       for (const [key, version] of savedSettingVersions) {
         if (dirtySettingVersions.get(key) === version) dirtySettingVersions.delete(key)
@@ -481,6 +497,25 @@ export const useSettingsStore = defineStore('settings', () => {
     })
   }
 
+  // Window-owned preference (`WINDOW_SHOW_ORIGINAL`): every local write for
+  // this key is serialized through one queue so overlapping writes can never
+  // commit out of order. The value is captured at enqueue time so each action
+  // persists its own intent; full snapshots never carry this key, and the
+  // explicit import restore enqueues behind pending narrow writes.
+  // Pending count: our queued write represents the latest local intent; a
+  // concurrently observed (possibly stale) storage notification for this key
+  // must not clobber it before the write commits.
+  const queueWindowShowOriginalWrite = (writeFactory) => {
+    windowShowOriginalPendingWrites += 1
+    const write = windowShowOriginalWriteQueue.catch(() => {}).then(writeFactory)
+    windowShowOriginalWriteQueue = write
+    void write.catch(() => {}).then(() => { windowShowOriginalPendingWrites -= 1 })
+    return write
+  }
+  const enqueueWindowShowOriginalWrite = (value) => (
+    queueWindowShowOriginalWrite(() => storageManager.set({ WINDOW_SHOW_ORIGINAL: value }))
+  )
+
   // Action to update a single setting and immediately persist it to storage
   const updateSettingAndPersist = async (key, value) => {
     try {
@@ -488,6 +523,7 @@ export const useSettingsStore = defineStore('settings', () => {
         throw new Error('Use setProviderCategoryCollapsed to update category state')
       }
       settings.value[key] = value // Update local state
+      if (key === 'WINDOW_SHOW_ORIGINAL') windowShowOriginalEditVersion += 1
       
       const updates = { [key]: value };
 
@@ -527,7 +563,11 @@ export const useSettingsStore = defineStore('settings', () => {
       // and the true return are unaffected.
       const filtered = buildPersistedSnapshot(updates)
       if (Object.keys(filtered).length === 0) return true
-      await storageManager.set(filtered)
+      if (key === 'WINDOW_SHOW_ORIGINAL') {
+        await enqueueWindowShowOriginalWrite(filtered.WINDOW_SHOW_ORIGINAL)
+      } else {
+        await storageManager.set(filtered)
+      }
       return true
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -553,9 +593,23 @@ export const useSettingsStore = defineStore('settings', () => {
       // An empty result skips the storage round-trip (set({}) writes nothing
       // and emits no events); local state and the true return are unaffected.
       const filtered = buildPersistedSnapshot(updates || {})
-      if (Object.keys(filtered).length === 0) return true
+      // Window-owned preference: an explicit multi-update for this key joins
+      // the same serialized queue as narrow toggles so it can never commit
+      // out of order over the latest preference.
+      let windowShowOriginalWrite = null
+      if (Object.prototype.hasOwnProperty.call(filtered, 'WINDOW_SHOW_ORIGINAL')) {
+        windowShowOriginalEditVersion += 1
+        windowShowOriginalWrite = enqueueWindowShowOriginalWrite(filtered.WINDOW_SHOW_ORIGINAL)
+        delete filtered.WINDOW_SHOW_ORIGINAL
+      }
+      if (Object.keys(filtered).length === 0) {
+        if (windowShowOriginalWrite) await windowShowOriginalWrite
+        return true
+      }
       await storageManager.set(filtered)
-      
+      // Keep "persisted before resolve" semantics for the window-owned key too.
+      if (windowShowOriginalWrite) await windowShowOriginalWrite
+
       return true
     } catch (error) {
       if (ExtensionContextManager.isContextError(error)) {
@@ -569,20 +623,66 @@ export const useSettingsStore = defineStore('settings', () => {
   
   const resetSettings = async () => {
     try {
-      invalidateDeepLLanguageCapabilities()
-      const storedSettings = await storageManager.get(null)
-      const keysToRemove = Object.keys(storedSettings || {})
-        .filter(key => key !== 'COLLAPSED_PROVIDER_CATEGORIES')
-      if (keysToRemove.length > 0) await storageManager.remove(keysToRemove)
       const defaults = getDefaultSettings();
+      // Window-owned preference: intent ordering is captured at Reset
+      // initiation — the reserved slot joins the serialized queue
+      // synchronously, so a toggle issued while Reset performs its async
+      // work lands after it (the toggle supersedes Reset), while an older
+      // pending toggle lands before it (Reset supersedes the toggle). The
+      // actual default write is gated behind the prerequisite storage
+      // operations: if they fail, the reservation is cancelled and the
+      // preference is left untouched while the queue keeps draining.
+      const windowShowOriginalEditAtReset = windowShowOriginalEditVersion
+      // Non-rejecting cancellation: the gate resolves with a cancellation
+      // sentinel instead of rejecting, so cancelling the reservation can
+      // never cause an unhandled rejection — even when an earlier queued
+      // write keeps the reserved slot from running yet.
+      const windowShowOriginalResetCancelledMarker = Symbol('window-show-original-reset-cancelled')
+      let proceedWindowShowOriginalReset
+      const windowShowOriginalResetGate = new Promise((resolve) => {
+        proceedWindowShowOriginalReset = resolve
+      })
+      const windowShowOriginalResetWrite = queueWindowShowOriginalWrite(async () => {
+        if (await windowShowOriginalResetGate === windowShowOriginalResetCancelledMarker) return false // Cancelled reservation: the preference is left untouched.
+        return storageManager.set({ WINDOW_SHOW_ORIGINAL: defaults.WINDOW_SHOW_ORIGINAL })
+      })
+      invalidateDeepLLanguageCapabilities()
+      let storedSettings
+      try {
+        storedSettings = await storageManager.get(null)
+        // WINDOW_SHOW_ORIGINAL is window-owned: broad reset writes must not
+        // bypass its serialized write queue, so its removal is deferred to
+        // the reserved default write above.
+        const keysToRemove = Object.keys(storedSettings || {})
+          .filter(key => key !== 'COLLAPSED_PROVIDER_CATEGORIES' && key !== 'WINDOW_SHOW_ORIGINAL')
+        if (keysToRemove.length > 0) await storageManager.remove(keysToRemove)
+      } catch (error) {
+        // Cancel the reserved default write without touching the preference.
+        // The gate fulfils with the cancellation sentinel (never rejects), so
+        // the queue slot releases and later toggles keep flowing; Reset's
+        // error propagates immediately without waiting behind pending writes.
+        proceedWindowShowOriginalReset(windowShowOriginalResetCancelledMarker)
+        throw error
+      }
+      proceedWindowShowOriginalReset(true)
+      // A toggle issued during Reset's async work owns the newest intent:
+      // keep its local value instead of letting the defaults replacement
+      // clobber it (storage settles the same way through the queue).
+      const newerWindowShowOriginalEdit = windowShowOriginalEditVersion !== windowShowOriginalEditAtReset
+      const newerWindowShowOriginalValue = settings.value.WINDOW_SHOW_ORIGINAL
       // Preserve reference to reactive object
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, defaults);
+      if (newerWindowShowOriginalEdit) settings.value.WINDOW_SHOW_ORIGINAL = newerWindowShowOriginalValue
       dirtySettingVersions.clear()
       // Persist canonical settings only; translation history is store-owned
       // feature data and is already cleared with storage above.
       const persistedDefaults = getPersistedDefaultSettings()
       delete persistedDefaults.COLLAPSED_PROVIDER_CATEGORIES
+      delete persistedDefaults.WINDOW_SHOW_ORIGINAL
+      // Keep "persisted before resolve" semantics: Reset resolves only after
+      // its queued default write settles.
+      await windowShowOriginalResetWrite
       await storageManager.set(persistedDefaults);
       await replaceProviderCategoryCollapseState([])
       return true;
@@ -749,6 +849,9 @@ export const useSettingsStore = defineStore('settings', () => {
       dirtySettingVersions.clear()
 
       await saveAllSettings();
+      // Explicit full-state import: restore the window-owned preference too,
+      // serialized behind queued narrow writes through the shared queue.
+      await enqueueWindowShowOriginalWrite(settings.value.WINDOW_SHOW_ORIGINAL)
       await replaceProviderCategoryCollapseState(importedCollapseIds)
       if (removals.length > 0) {
         try {
@@ -998,12 +1101,45 @@ export const useSettingsStore = defineStore('settings', () => {
   // Storage change listener
   let storageListener = null
 
+  // A storage notification carries no ordering evidence, so a delayed event
+  // from an already-superseded older write can arrive after our writes settle
+  // for this key. Confirm a differing value against durable storage before
+  // applying it: the notification is trusted only when it still matches what
+  // storage holds right now, otherwise it is dropped as a stale echo. Our own
+  // writes keep durable storage in sync, so legitimate external updates
+  // (which match durable storage) still apply.
+  const validateWindowShowOriginalNotification = (notifiedValue) => {
+    const operation = windowShowOriginalSyncQueue.then(async () => {
+      if (typeof notifiedValue !== 'boolean') return
+      if (notifiedValue === settings.value.WINDOW_SHOW_ORIGINAL) return
+      if (windowShowOriginalPendingWrites > 0) return
+      const stored = await storageManager.getFresh('WINDOW_SHOW_ORIGINAL')
+      if (stored?.WINDOW_SHOW_ORIGINAL !== notifiedValue) return
+      // New writes may have started while the confirmation was in flight.
+      if (windowShowOriginalPendingWrites > 0) return
+      settings.value.WINDOW_SHOW_ORIGINAL = notifiedValue
+    })
+    // Confirmation failures are swallowed in the chain itself: the last
+    // applied value is kept and later events re-validate from storage.
+    const settled = operation.catch(() => {})
+    windowShowOriginalSyncQueue = settled
+    return settled
+  }
+
   // Handle storage changes from other parts of extension
   const handleStorageChange = ({ key, newValue, oldValue }) => {
     if (key === 'COLLAPSED_PROVIDER_CATEGORIES') {
       const next = normalizeProviderCategoryCollapseState(newValue)
       const current = normalizeProviderCategoryCollapseState(settings.value.COLLAPSED_PROVIDER_CATEGORIES)
       if (next.revision > current.revision) settings.value.COLLAPSED_PROVIDER_CATEGORIES = next
+      return
+    }
+    if (key === 'WINDOW_SHOW_ORIGINAL') {
+      // While a queued write is still pending it represents the latest local
+      // intent: drop concurrently observed (possibly stale) notifications for
+      // this key before any durable-storage confirmation.
+      if (windowShowOriginalPendingWrites > 0) return
+      validateWindowShowOriginalNotification(newValue)
       return
     }
     // Keep local API-key/model-setting drafts until Save succeeds, while allowing

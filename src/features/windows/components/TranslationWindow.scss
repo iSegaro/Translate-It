@@ -259,6 +259,31 @@
     opacity: 0.8 !important;
   }
 
+  .ti-window-source-tts {
+    display: inline-flex !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    margin-top: 6px !important;
+    opacity: 0.72 !important;
+    transition: opacity 140ms ease !important;
+
+    &:hover,
+    &:focus-visible {
+      opacity: 1 !important;
+    }
+
+    &:focus-visible {
+      outline: 2px solid #3b82f6 !important;
+      outline-offset: 2px !important;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ti-window-source-tts {
+      transition: none !important;
+    }
+  }
+
   .ti-window-translation-display {
     flex: 1 !important;
     min-height: 80px !important;

@@ -40,6 +40,7 @@ const createSettingsStore = () => {
       WINDOW_IS_PINNED: false,
       WINDOW_DOCK_MODE: 'none',
       WINDOW_DOCKED_WIDTH: 350,
+      WINDOW_SHOW_ORIGINAL: false,
     },
     getSetting: vi.fn(),
     updateSettingAndPersist: vi.fn(),
@@ -120,9 +121,11 @@ vi.mock('@/composables/ui/usePositioning.js', () => ({
   },
 }));
 
+const { stopAllMock } = vi.hoisted(() => ({ stopAllMock: vi.fn().mockResolvedValue(undefined) }));
+
 vi.mock('@/features/tts/composables/useTTSSmart.js', () => ({
   useTTSSmart: () => ({
-    stopAll: vi.fn().mockResolvedValue(undefined),
+    stopAll: stopAllMock,
   }),
 }));
 
@@ -220,6 +223,7 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
     props: {
       text: { type: String, default: '' },
       language: { type: String, default: '' },
+      disabled: { type: Boolean, default: false },
       isDictionary: { type: Boolean, default: false },
     },
     template: '<button class="tts-button-stub" />',
@@ -277,6 +281,13 @@ describe('TranslationWindow.vue', () => {
     expect(display.props('lastTranslation')).toBeNull();
   });
 
+  it('does not issue an ID-less TTS stop during window cleanup', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+    wrapper.unmount();
+    expect(stopAllMock).not.toHaveBeenCalled();
+  });
+
   it('updates the open window shell when the settings theme changes', async () => {
     const wrapper = mount(TranslationWindow, {
       props: baseProps,
@@ -326,6 +337,30 @@ describe('TranslationWindow.vue', () => {
     expect(wrapper.findAll('.ti-window-source-input')).toHaveLength(1);
     expect(wrapper.find('.ti-window-source-input').element.value).toBe('expressions');
     expect(wrapper.find('.ti-window-source-input').isVisible()).toBe(false);
+  });
+
+  it('restores the original section from settings, persists toggles, and preserves an initialization-time choice', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+    expect(wrapper.find('.ti-original-text-wrapper').classes()).toContain('is-expanded');
+    expect(wrapper.find('.translation-window').attributes('style')).toBeDefined();
+    await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+    expect(globalThis.__mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledWith('WINDOW_SHOW_ORIGINAL', false);
+  });
+
+  it('uses translated header speech and latest source draft with explicit source language', async () => {
+    const wrapper = mount(TranslationWindow, { props: { ...baseProps, sourceLanguage: 'auto' } });
+    const buttons = wrapper.findAllComponents({ name: 'TTSButton' });
+    expect(buttons[0].props()).toMatchObject({ text: '表达方式', language: 'fa' });
+    await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+    const editor = wrapper.find('.ti-window-source-input');
+    await editor.setValue('edited source');
+    expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props()).toMatchObject({ text: 'edited source', language: 'auto' });
+    await editor.trigger('keydown', { key: 'Escape' });
+    expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props('text')).toBe('expressions');
+    await editor.setValue('   ');
+    expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props('disabled')).toBe(true);
   });
 
   it('shows history only for multiple snapshots, between the header and body', async () => {

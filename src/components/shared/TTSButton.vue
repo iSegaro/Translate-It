@@ -163,13 +163,6 @@ const isThisButtonActive = computed(() => {
 // The visual state for this specific button instance
 const effectiveState = computed(() => {
   // If this button is currently waiting for its own request to start
-  if (
-    tts.ttsState.value === "loading" &&
-    localTTSId.value?.startsWith("pending_")
-  ) {
-    return "loading";
-  }
-
   // If this button is active (playing or error), show the global TTS state
   if (isThisButtonActive.value) {
     return tts.ttsState.value;
@@ -260,25 +253,23 @@ const handleClick = async () => {
 
     // Use effectiveState to determine the action for this button
     switch (effectiveState.value) {
-      case "idle":
-        // Generate a temporary ID or use a marker to stay active during speak()
-        localTTSId.value = `pending_${Date.now()}`;
-
-        result = await tts.speak(props.text, props.language, {
+      case "idle": {
+        const speaking = tts.speak(props.text, props.language, {
           isDictionary: props.isDictionary,
         });
+        localTTSId.value = tts.currentTTSId.value;
+        result = await speaking;
 
-        if (result) {
-          // Sync with the actual ID from the store after success
-          localTTSId.value = tts.currentTTSId.value;
+        if (result && localTTSId.value === tts.currentTTSId.value) {
           emit("tts-started", { text: props.text, language: props.language });
         } else {
-          // Failure: we don't clear localTTSId yet, so isThisButtonActive can detect 'error' state
+          if (localTTSId.value === tts.currentTTSId.value) localTTSId.value = null;
           logger.debug(
             "[TTSButton] Speak failed, error state should be visible",
           );
         }
         break;
+      }
 
       case "loading":
       case "playing":
@@ -290,24 +281,26 @@ const handleClick = async () => {
         }
         break;
 
-      case "error":
+      case "error": {
         // Priority: Use speak() with current text instead of rigid retry()
         // This allows user to change text/language and try again
-        localTTSId.value = `pending_retry_${Date.now()}`;
-        result = await tts.speak(props.text, props.language, {
+        const retrying = tts.speak(props.text, props.language, {
           isDictionary: props.isDictionary,
         });
+        localTTSId.value = tts.currentTTSId.value;
+        result = await retrying;
 
-        if (result) {
-          localTTSId.value = tts.currentTTSId.value;
+        if (result && localTTSId.value === tts.currentTTSId.value) {
           emit("tts-started", { text: props.text, language: props.language });
-        } else {
+        } else if (localTTSId.value === tts.currentTTSId.value) {
+          localTTSId.value = null;
           emit(
             "tts-error",
             new Error(tts.errorMessage.value || "TTS retry failed"),
           );
         }
         break;
+      }
 
       default:
         logger.warn(

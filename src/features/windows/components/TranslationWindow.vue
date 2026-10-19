@@ -2,7 +2,7 @@
   <!-- Small loading window -->
   <div
     v-if="currentSize === 'small'"
-    v-show="!isFullscreen"
+    v-show="!isFullscreen && settingsReady"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host ti-loading-window"
     :class="[shellTheme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
@@ -21,7 +21,7 @@
   <!-- Normal translation window -->
   <div
     v-else
-    v-show="!isFullscreen"
+    v-show="!isFullscreen && settingsReady"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host normal-window ti-host-container"
     :class="[shellTheme, { 'visible': isVisible, 'is-dragging': isPositionDragging, 'is-pinned': isPinned, 'is-docked': dockMode !== 'none', [`dock-${dockMode}`]: dockMode !== 'none' }]"
@@ -138,6 +138,14 @@
               @keyup.stop
               @keypress.stop
             />
+            <TTSButton
+              v-if="showOriginal && !isLoading"
+              class="ti-window-source-tts"
+              :text="sourceDraft"
+              :language="props.sourceLanguage"
+              :disabled="!sourceDraft.trim()"
+              :is-dictionary="false"
+            />
           </div>
         </div>
       </div>
@@ -172,7 +180,6 @@ import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { WindowsConfig } from '@/features/windows/managers/core/WindowsConfig.js';
-import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
@@ -187,6 +194,7 @@ import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { getProviderById } from '@/core/provider-registry.js';
 import IconButton from '@/components/shared/IconButton.vue';
+import TTSButton from '@/components/shared/TTSButton.vue';
 
 // Import adjacent SCSS
 import './TranslationWindow.scss';
@@ -220,9 +228,9 @@ const props = defineProps({
 const emit = defineEmits(['close', 'speak']);
 useMessaging('content');
 
-const tts = useTTSSmart();
 const mobileStore = useMobileStore();
 const settings = useSettingsStore();
+const settingsReady = ref(false);
 const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, `TranslationWindow:${props.id}`);
 const tracker = useResourceTracker(`translation-window-${props.id}`);
 const systemThemeQuery = '(prefers-color-scheme: dark)';
@@ -400,10 +408,8 @@ watch(() => props.targetLanguage, (newLang) => {
   logger.debug('targetLanguage prop updated:', newLang);
 });
 
-const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
-
-const currentTTSText = computed(() => ttsMode.value === 'original' ? originalText.value || '' : translatedText.value || '');
-const currentTTSLang = computed(() => ttsMode.value === 'original' ? props.sourceLanguage : props.targetLanguage);
+const currentTTSText = computed(() => translatedText.value || '');
+const currentTTSLang = computed(() => props.targetLanguage);
 
 const getOriginalButtonTitle = computed(() => showOriginal.value ? t('window_hide_original') : t('window_show_original'));
 
@@ -420,6 +426,10 @@ const handleProviderChange = (newProvider) => {
 };
 
 const showOriginal = ref(false);
+let showOriginalRevision = 0;
+watch(() => settings.settings.WINDOW_SHOW_ORIGINAL, (value) => {
+  if (settingsReady.value && typeof value === 'boolean') showOriginal.value = value;
+});
 const updateSourceOverflow = (textarea = sourceTextarea.value) => {
   if (textarea && sourceTextarea.value === textarea) {
     sourceHasOverflow.value = textarea.scrollHeight > textarea.clientHeight;
@@ -529,6 +539,16 @@ const windowStyle = computed(() => {
 });
 
 onMounted(async () => {
+  const revisionAtLoad = showOriginalRevision;
+  try {
+    await settings.loadSettings?.();
+  } catch (error) {
+    logger.warn('Failed to load window settings:', error);
+  }
+  if (showOriginalRevision === revisionAtLoad && typeof settings.settings.WINDOW_SHOW_ORIGINAL === 'boolean') {
+    showOriginal.value = settings.settings.WINDOW_SHOW_ORIGINAL;
+  }
+  settingsReady.value = true;
   // Inject Windows-specific styles lazily
   try {
     const { windowsUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
@@ -551,15 +571,16 @@ onMounted(async () => {
   tracker.trackResource('resize-user-select', () => {
     document.body.style.userSelect = '';
   });
-  tracker.trackResource('tts-stop', () => {
-    tts.stopAll({ stopOnlyIfOwner: true }).catch(() => {});
-  });
 });
 
 const handleClose = () => emit('close', props.id);
 const toggleShowOriginal = () => {
+  showOriginalRevision += 1;
   if (showOriginal.value) document.activeElement?.blur?.();
   showOriginal.value = !showOriginal.value;
+  void settings.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', showOriginal.value).catch(error => {
+    logger.warn('Failed to persist WINDOW_SHOW_ORIGINAL:', error);
+  });
 };
 
 const navigateHistory = (direction) => {

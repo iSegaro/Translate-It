@@ -260,6 +260,7 @@ export const CONFIG = {
 
   SHOW_DESKTOP_FAB: true, // نمایش دکمه دسترسی سریع در دسکتاپ
   SHOW_MOBILE_FAB: true, // نمایش دکمه دسترسی سریع در موبایل
+  WINDOW_SHOW_ORIGINAL: false,
   WINDOW_IS_PINNED: false, // پنجره ترجمه پین شده باشد یا نه
   WINDOW_DOCK_MODE: 'none', // حالت چسبیدن پنجره (none, left, right)
   WINDOW_DOCKED_WIDTH: 300, // عرض پیش‌فرض پنجره در حالت چسبیده (باید بزرگتر از MIN_DOCKED_WIDTH باشد)
