@@ -571,6 +571,101 @@ describe('TranslationWindow.vue', () => {
     expect(pageEventBus.emit).not.toHaveBeenCalled();
   });
 
+  it('stops textarea keyboard events from bubbling without changing keydown behavior', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const wrapper = mount(TranslationWindow, { props: baseProps, attachTo: host });
+    const editor = wrapper.find('.ti-window-source-input').element;
+    const bubbledEvents = vi.fn();
+    const capturedEvents = vi.fn();
+    host.addEventListener('keydown', bubbledEvents);
+    host.addEventListener('keyup', bubbledEvents);
+    host.addEventListener('keypress', bubbledEvents);
+    host.addEventListener('keydown', capturedEvents, true);
+    host.addEventListener('keyup', capturedEvents, true);
+    host.addEventListener('keypress', capturedEvents, true);
+
+    const dispatchKey = (type, init = {}) => {
+      const event = new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
+      editor.dispatchEvent(event);
+      return event;
+    };
+
+    await wrapper.find('.ti-window-source-input').setValue('edited source');
+    const enter = dispatchKey('keydown', { key: 'Enter' });
+    const shiftEnter = dispatchKey('keydown', { key: 'Enter', shiftKey: true });
+    const composingEnter = dispatchKey('keydown', { key: 'Enter', isComposing: true });
+    const legacyComposingEnter = dispatchKey('keydown', { key: 'Enter', keyCode: 229 });
+    const escape = dispatchKey('keydown', { key: 'Escape' });
+    await nextTick();
+    dispatchKey('keyup', { key: 'Escape' });
+    dispatchKey('keypress', { key: 'a' });
+
+    expect(bubbledEvents).not.toHaveBeenCalled();
+    expect(enter.defaultPrevented).toBe(true);
+    expect(shiftEnter.defaultPrevented).toBe(false);
+    expect(composingEnter.defaultPrevented).toBe(false);
+    expect(legacyComposingEnter.defaultPrevented).toBe(false);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(editor.value).toBe('expressions');
+    expect(pageEventBus.emit).toHaveBeenCalledWith('translation-window-confirm-source', {
+      id: 'window-1', text: 'edited source',
+    });
+    expect(pageEventBus.emit).toHaveBeenCalledTimes(1);
+
+    bubbledEvents.mockClear();
+    capturedEvents.mockClear();
+    for (const key of [' ', 'a', '1', 'ArrowDown']) {
+      for (const type of ['keydown', 'keyup', 'keypress']) {
+        dispatchKey(type, { key });
+      }
+    }
+    expect(bubbledEvents).not.toHaveBeenCalled();
+    expect(capturedEvents).toHaveBeenCalledTimes(12);
+
+    const outsideInput = document.createElement('input');
+    host.append(outsideInput);
+    bubbledEvents.mockClear();
+    capturedEvents.mockClear();
+    for (const type of ['keydown', 'keyup', 'keypress']) {
+      outsideInput.dispatchEvent(new KeyboardEvent(type, { bubbles: true, key: 'Escape' }));
+    }
+    expect(bubbledEvents).toHaveBeenCalledTimes(3);
+    expect(capturedEvents).toHaveBeenCalledTimes(3);
+
+    host.removeEventListener('keydown', bubbledEvents);
+    host.removeEventListener('keyup', bubbledEvents);
+    host.removeEventListener('keypress', bubbledEvents);
+    host.removeEventListener('keydown', capturedEvents, true);
+    host.removeEventListener('keyup', capturedEvents, true);
+    host.removeEventListener('keypress', capturedEvents, true);
+    wrapper.unmount();
+    host.remove();
+  });
+
+  it('stops textarea keyboard events before they leave its ShadowRoot', async () => {
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    document.body.append(host);
+    const wrapper = mount(TranslationWindow, { props: baseProps, attachTo: shadowRoot });
+    const bubbledEvents = vi.fn();
+    shadowRoot.addEventListener('keydown', bubbledEvents);
+    shadowRoot.addEventListener('keyup', bubbledEvents);
+    shadowRoot.addEventListener('keypress', bubbledEvents);
+
+    for (const type of ['keydown', 'keyup', 'keypress']) {
+      wrapper.find('.ti-window-source-input').element.dispatchEvent(new KeyboardEvent(type, {
+        bubbles: true,
+        composed: true,
+        key: 'a',
+      }));
+    }
+
+    expect(bubbledEvents).not.toHaveBeenCalled();
+    wrapper.unmount();
+    host.remove();
+  });
+
   it('does not confirm unchanged, whitespace-only, or composing Enter and exposes bounded history', async () => {
     const wrapper = mount(TranslationWindow, {
       props: { ...baseProps, historyIndex: 0, historyLength: 2 },
