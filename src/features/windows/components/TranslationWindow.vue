@@ -134,7 +134,9 @@
               rows="1"
               @mousedown.stop
               @touchstart.stop
-              @keydown="handleSourceKeydown"
+              @keydown.stop="handleSourceKeydown"
+              @keyup.stop
+              @keypress.stop
             />
           </div>
         </div>
