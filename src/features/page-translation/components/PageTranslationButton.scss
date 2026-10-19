@@ -1,5 +1,9 @@
 @use "@/assets/styles/base/mixins" as *;
 
+:where(.page-translation-controls) .ti-page-translation-language-icon {
+  height: 1em !important;
+}
+
 /* ── Component root (own layout only — no child rules nested here) ──── */
 .page-translation-controls {
   position: relative !important;

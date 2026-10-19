@@ -44,6 +44,17 @@ function specificity(selector) {
 /* ── Zero-specificity boundary ─────────────────────────────────────── */
 
 describe('PageTranslationButton.scss :where() zero-specificity boundary', () => {
+  it('preserves the language mask 5:4 aspect ratio within PageTranslationButton', () => {
+    const { css } = compile()
+    const match = css.match(/:where\(\.page-translation-controls\) \.ti-page-translation-language-icon\s*\{([^}]*)\}/)
+    const component = readFileSync(resolve(here, 'PageTranslationButton.vue'), 'utf8')
+
+    expect(match).toBeTruthy()
+    expect(match[1]).toMatch(/height:\s*1em\s*!important/)
+    expect(component).toContain(':size="\'1.25em\'"')
+    expect(component).toContain('class="ti-page-translation-language-icon"')
+  })
+
   it('uses :where(.page-translation-controls) for .toolbar-icon (specificity 0,1,0)', () => {
     const { css } = compile()
     const match = css.match(/:where\(\.page-translation-controls\)\s+\.toolbar-icon\s*\{/)

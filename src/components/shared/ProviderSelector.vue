@@ -25,9 +25,10 @@
         @click="handleTranslate"
         @keydown="handleKeydown"
       >
-        <Icon
+        <MaskIcon
           v-if="loading"
-          icon="fa6-solid:square"
+          :src="stopIcon"
+          :size="10"
           class="ti-api-provider-icon ti-stop-icon"
         />
         <img
@@ -247,8 +248,9 @@
       :aria-label="configureProvidersLabel"
       @click.stop="openProvidersSettings"
     >
-      <Icon
-        icon="fa6-solid:gear"
+      <MaskIcon
+        :src="gearIcon"
+        :size="12"
         class="ti-compact-config-icon"
       />
     </button>
@@ -304,8 +306,9 @@
             @click="toggleCategoryCollapse(group)"
           >
             <span class="ti-dropdown-group-title">{{ group.header }}</span>
-            <Icon
-              icon="fa6-solid:chevron-down"
+            <MaskIcon
+              :src="chevronIcon"
+              :size="10"
               class="ti-provider-chevron"
               :class="{ 'is-expanded': !group.collapsed }"
             />
@@ -379,12 +382,9 @@
                   "
                   @click.stop="setAsGlobalDefault(item)"
                 >
-                  <Icon
-                    :icon="
-                      globalDefaultProvider === item.id
-                        ? 'fa6-solid:star'
-                        : 'fa6-regular:star'
-                    "
+                  <MaskIcon
+                    :src="globalDefaultProvider === item.id ? starIcon : starOutlineIcon"
+                    :size="14"
                     class="ti-star-icon"
                   />
                 </button>
@@ -415,10 +415,9 @@
             @click.stop="canSyncToBulk && toggleSync('page', $event)"
           >
             <div class="ti-sync-info">
-              <Icon
-                :icon="
-                  ephemeralSync.page ? 'fa6-solid:link' : 'fa6-solid:link-slash'
-                "
+              <MaskIcon
+                :src="ephemeralSync.page ? linkIcon : linkSlashIcon"
+                :size="10"
                 class="ti-sync-icon"
               />
               <span>{{ t("sync_page_label") || "Page Translate" }}</span>
@@ -448,12 +447,9 @@
             @click.stop="canSyncToBulk && toggleSync('element', $event)"
           >
             <div class="ti-sync-info">
-              <Icon
-                :icon="
-                  ephemeralSync.element
-                    ? 'fa6-solid:link'
-                    : 'fa6-solid:link-slash'
-                "
+              <MaskIcon
+                :src="ephemeralSync.element ? linkIcon : linkSlashIcon"
+                :size="10"
                 class="ti-sync-icon"
               />
               <span>{{ t("sync_element_label") || "Select Element" }}</span>
@@ -479,8 +475,9 @@
           @click.stop="openProvidersSettings"
         >
           <div class="ti-sync-info">
-            <Icon
-              icon="fa6-solid:gear"
+            <MaskIcon
+              :src="gearIcon"
+              :size="10"
               class="ti-sync-icon"
             />
             <span>{{ configureProvidersLabel }}</span>
@@ -515,7 +512,14 @@ import {
 import { openOptionsPage } from "@/core/helpers.js";
 import { isProviderConfigured } from "@/features/translation/utils/providerValidator.js";
 import IconButton from "./IconButton.vue";
-import { Icon } from "@iconify/vue";
+import MaskIcon from "@/components/shared/MaskIcon.vue";
+import stopIcon from "@/icons/ui/stop.svg?url";
+import gearIcon from "@/icons/ui/settings.svg?url";
+import chevronIcon from "@/icons/ui/dropdown-arrow.svg?url";
+import starIcon from "@/icons/ui/star.svg?url";
+import starOutlineIcon from "@/icons/ui/star-outline.svg?url";
+import linkIcon from "@/icons/ui/link.svg?url";
+import linkSlashIcon from "@/icons/ui/link-slash.svg?url";
 import browser from "webextension-polyfill";
 import ExtensionContextManager from "@/core/extensionContext.js";
 import { getScopedLogger } from "@/shared/logging/logger.js";

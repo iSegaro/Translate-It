@@ -42,8 +42,9 @@
             </template>
             <template v-else-if="item.data.status === 'translating'">
               <div class="cue-loading">
-                <v-icon
-                  icon="mdi:loading"
+                <MaskIcon
+                  :src="loadingIcon"
+                  :size="'1em'"
                   class="spin"
                 />
                 <span>{{ t('subtitle_translating', 'Translating...') }}</span>
@@ -51,7 +52,10 @@
             </template>
             <template v-else-if="item.data.status === 'failed'">
               <div class="cue-error">
-                <v-icon icon="mdi:alert-circle-outline" />
+                <MaskIcon
+                  :src="alertIcon"
+                  :size="'1em'"
+                />
                 <span>{{ item.data.warnings?.[0] || t('subtitle_error', 'Error') }}</span>
               </div>
             </template>
@@ -70,7 +74,9 @@
 <script setup>
 import { computed } from 'vue';
 import { useVirtualList } from '@vueuse/core';
-import { Icon as VIcon } from '@iconify/vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
+import alertIcon from '@/icons/ui/alert-circle.svg?url';
+import loadingIcon from '@/icons/ui/loading.svg?url';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { LanguageDetectionService } from '@/shared/services/LanguageDetectionService.js';
 

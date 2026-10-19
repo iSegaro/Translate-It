@@ -77,12 +77,12 @@ function run(warnings, { errors = 0, notices = 0, raw, errorCodes, linterExitCod
 }
 
 describe('Firefox known warning inventory', () => {
-  it('summarizes the 14-item inventory and does not call ambiguous source matches known', () => {
+  it('summarizes the 12-item inventory and does not call ambiguous source matches known', () => {
     const result = run(fixtureWarnings())
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Warnings: 14 (8 known, 6 ambiguous, 0 new)')
-    expect(result.stdout).toContain('ℹ️ 6 reviewed warning occurrences with unverified source identity.')
-    expect(result.stdout).toContain('Details: --verbose | Iconify risk remains unresolved.')
+    expect(result.stdout).toContain('Warnings: 12 (8 known, 4 ambiguous, 0 new)')
+    expect(result.stdout).toContain('ℹ️ 4 reviewed warning occurrences with unverified source identity.')
+    expect(result.stdout).toContain('Details: --verbose | Vue Renderer/DOMPurify source identity remains unverified.')
     expect(result.stdout).not.toContain('⚠️ AMBIGUOUS')
     expect(result.stdout).not.toContain('· KNOWN ')
     expect(result.stdout).not.toContain('Known warnings match the reviewed baseline')
@@ -91,14 +91,14 @@ describe('Firefox known warning inventory', () => {
   it('reports an unknown warning as new and keeps its details visible', () => {
     const item = warning({ code: 'UNEXPECTED_CODE', message: 'Unexpected warning detail', file: 'new.js' })
     const result = run([...fixtureWarnings(), item])
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
+    expect(result.stdout).toContain('Warnings: 13 (8 known, 4 ambiguous, 1 new)')
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
 
   it('classifies an occurrence beyond a known count as new', () => {
     const known = fixtureWarnings()
     const result = run([...known, { ...known[0] }])
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
+    expect(result.stdout).toContain('Warnings: 13 (8 known, 4 ambiguous, 1 new)')
   })
 
   it('classifies ambiguous occurrences beyond their reviewed count as new', () => {
@@ -106,14 +106,14 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: entry.code, message: entry.message, file: entry.file })
     const result = run(Array.from({ length: entry.count + 1 }, () => ({ ...item })), { verbose: true })
 
-    expect(result.stdout).toContain('Warnings: 4 (0 known, 3 ambiguous, 1 new)')
+    expect(result.stdout).toContain('Warnings: 3 (0 known, 2 ambiguous, 1 new)')
     expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(entry.count)
     expect(result.stdout.match(/⚠️ NEW/g)).toHaveLength(1)
   })
 
   it('reports known warnings that are absent without pretending they were seen', () => {
     const result = run(fixtureWarnings(baseline.slice(1)))
-    expect(result.stdout).toContain('Warnings: 12 (6 known, 6 ambiguous, 0 new)')
+    expect(result.stdout).toContain('Warnings: 10 (6 known, 4 ambiguous, 0 new)')
     expect(result.stdout).toContain('expected 2, observed 0')
   })
 
@@ -121,7 +121,7 @@ describe('Firefox known warning inventory', () => {
     const warnings = fixtureWarnings()
     warnings.push({ ...warnings[0], file: 'unlisted.js' })
     const result = run(warnings)
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
+    expect(result.stdout).toContain('Warnings: 13 (8 known, 4 ambiguous, 1 new)')
     expect(result.stdout).toContain('unlisted.js')
   })
 
@@ -149,7 +149,7 @@ describe('Firefox known warning inventory', () => {
     const result = run(fixtureWarnings(), { errors: 1, notices: 3 })
     expect(result.status).toBe(1)
     expect(result.stdout).toContain('Errors:   1')
-    expect(result.stdout).toContain('Warnings: 14')
+    expect(result.stdout).toContain('Warnings: 12')
     expect(result.stdout).toContain('Notices:  3')
   })
 
@@ -233,9 +233,9 @@ describe('Firefox known warning inventory', () => {
     const item = warning({ code: 'UNEXPECTED_CODE', message: 'Unexpected warning detail', file: 'new.js' })
     const result = run([...fixtureWarnings(), item], { verbose: true })
     expect(result.status).toBe(0)
-    expect(result.stdout).toContain('Warnings: 15 (8 known, 6 ambiguous, 1 new)')
+    expect(result.stdout).toContain('Warnings: 13 (8 known, 4 ambiguous, 1 new)')
     expect(result.stdout).toContain('· KNOWN ')
-    expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(6)
+    expect(result.stdout.match(/⚠️ AMBIGUOUS/g)).toHaveLength(4)
     expect(result.stdout).toContain('⚠️ NEW UNEXPECTED_CODE new.js: Unexpected warning detail')
   })
 

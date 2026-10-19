@@ -2,13 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { nextTick, reactive } from 'vue';
 import { mount } from '@vue/test-utils';
 import SubtitleProgressPanel from './SubtitleProgressPanel.vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({ t: (_key, fallback) => fallback })
-}));
-
-vi.mock('@iconify/vue', () => ({
-  Icon: { template: '<i />' }
 }));
 
 vi.mock('../presentation/SubtitleTranslationErrorPresenter.js', () => ({
@@ -45,6 +42,7 @@ describe('SubtitleProgressPanel terminal errors', () => {
 
     expect(wrapper.find('.error-msg').text()).toBe('Safe terminal error');
     expect(wrapper.text()).not.toContain('raw diagnostic');
+    expect(wrapper.findComponent(MaskIcon).props('src')).toMatch(/^data:image\/svg\+xml/);
   });
 
   it('does not render cancellation terminal errors', async () => {
