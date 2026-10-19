@@ -25,7 +25,10 @@
           class="report-link fade-in"
           :title="t('subtitle_report_issue', 'Report issue in the translation of this subtitle file')"
         >
-          <v-icon icon="mdi:github" />
+          <MaskIcon
+            :src="githubIcon"
+            :size="'1em'"
+          />
           <span class="report-label">{{ t('subtitle_report_issue', 'Report Issue') }}</span>
         </a>
         <ThemeSelector />
@@ -74,7 +77,10 @@
                     :title="t('configure_providers_tooltip', 'Configure Providers')"
                     @click="goToProviderSettings"
                   >
-                    <v-icon icon="mdi:cog" />
+                    <MaskIcon
+                      :src="gearIcon"
+                      :size="'1em'"
+                    />
                   </button>
                 </div>
               </div>
@@ -86,7 +92,10 @@
                 :disabled="!canTranslate"
                 @click="startJob"
               >
-                <v-icon icon="mdi:translate" />
+                <MaskIcon
+                  :src="translateIcon"
+                  :size="'1em'"
+                />
                 {{ t('subtitle_start_btn', 'Start Translation') }}
               </button>
             </div>
@@ -125,7 +134,10 @@
               class="primary-btn success"
               @click="handleDownload(currentFile.name)"
             >
-              <v-icon icon="mdi:download" />
+              <MaskIcon
+                :src="downloadIcon"
+                :size="'1em'"
+              />
               {{ t('subtitle_download_btn', 'Download Translated Subtitle') }}
             </button>
             <button
@@ -133,7 +145,10 @@
               class="secondary-btn fade-in"
               @click="reset"
             >
-              <v-icon icon="mdi:refresh" />
+              <MaskIcon
+                :src="refreshIcon"
+                :size="'1em'"
+              />
               {{ t('subtitle_another_file_btn', 'Translate Another File') }}
             </button>
           </div>
@@ -156,7 +171,10 @@
               class="secondary-btn"
               @click="cancelTranslation"
             >
-              <v-icon icon="mdi:close" />
+              <MaskIcon
+                :src="closeIcon"
+                :size="'1em'"
+              />
               {{ t('subtitle_cancel_btn', 'Cancel Job') }}
             </button>
           </div>
@@ -168,8 +186,9 @@
           class="step-error fade-in"
         >
           <div class="error-card">
-            <v-icon
-              icon="mdi:alert-circle-outline"
+            <MaskIcon
+              :src="alertIcon"
+              :size="'4rem'"
               class="error-icon"
             />
             <h3>{{ t('subtitle_error_title', 'Oops! Something went wrong') }}</h3>
@@ -208,7 +227,14 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
-import { Icon as VIcon } from '@iconify/vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
+import githubIcon from '@/icons/ui/github.svg?url';
+import gearIcon from '@/icons/ui/settings.svg?url';
+import translateIcon from '@/icons/ui/translate.svg?url';
+import downloadIcon from '@/icons/ui/download.svg?url';
+import refreshIcon from '@/icons/ui/retry.svg?url';
+import closeIcon from '@/icons/ui/close.svg?url';
+import alertIcon from '@/icons/ui/alert-circle.svg?url';
 import browser from 'webextension-polyfill';
 import SubtitleFileDropzone from '@/features/subtitle-translation/components/SubtitleFileDropzone.vue';
 import SubtitleProgressPanel from '@/features/subtitle-translation/components/SubtitleProgressPanel.vue';

@@ -17,7 +17,10 @@
     
     <div class="dropzone-content">
       <div class="icon-wrapper">
-        <v-icon :icon="modelValue ? 'mdi:file-check-outline' : 'mdi:cloud-upload-outline'" />
+        <MaskIcon
+          :src="modelValue ? fileCheckIcon : uploadIcon"
+          :size="'1em'"
+        />
       </div>
       
       <div
@@ -68,7 +71,9 @@
 
 <script setup>
 import { ref } from 'vue';
-import { Icon as VIcon } from '@iconify/vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
+import uploadIcon from '@/icons/ui/cloud-upload.svg?url';
+import fileCheckIcon from '@/icons/ui/file-check.svg?url';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 
 const { t } = useUnifiedI18n();

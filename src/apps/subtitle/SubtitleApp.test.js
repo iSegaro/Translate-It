@@ -4,6 +4,9 @@ import { mount, flushPromises } from '@vue/test-utils';
 import SubtitleApp from './SubtitleApp.vue';
 import { PublicTranslationErrorActions } from '@/shared/error-management/PublicTranslationError.js';
 import subtitleLogo from '@/icons/ui/subtitle.svg';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
+
+const decodeInlineSvg = (src) => decodeURIComponent(src.slice(src.indexOf(',') + 1));
 
 const { openOptionsPageMock, useSubtitleTranslationMock } = vi.hoisted(() => ({
   openOptionsPageMock: vi.fn(),
@@ -123,12 +126,6 @@ vi.mock('@/apps/options/components/ThemeSelector.vue', () => ({
   },
 }));
 
-vi.mock('@iconify/vue', () => ({
-  Icon: {
-    template: '<i />',
-  },
-}));
-
 describe('SubtitleApp', () => {
   let subtitleState;
 
@@ -185,6 +182,25 @@ describe('SubtitleApp', () => {
     expect(header.text()).not.toContain('mdi:closed-caption-outline');
     expect(header.find('.report-link').text()).toContain('Report Issue');
     expect(header.find('.header-actions').exists()).toBe(true);
+    const headerIcons = header.findAllComponents(MaskIcon).map(icon => icon.props('src'));
+    expect(headerIcons.some(src => src.startsWith('data:image/svg+xml'))).toBe(true);
+
+    wrapper.unmount();
+  });
+
+  it('uses the original local MDI translate glyph for the subtitle action', async () => {
+    const wrapper = mountSubtitleApp();
+    await wrapper.find('button.subtitle-dropzone-stub').trigger('click');
+    await flushPromises();
+    await nextTick();
+
+    const icon = wrapper.find('.primary-btn').findComponent(MaskIcon);
+    const svg = decodeInlineSvg(icon.props('src'));
+    expect(svg).toMatch(/viewBox=['"]0 0 24 24['"]/);
+    expect(svg).toContain('M12.87,15.07L10.33,12.56');
+    expect(svg).toContain('Apache License 2.0');
+    expect(icon.props('size')).toBe('1em');
+    expect(icon.attributes('aria-hidden')).toBe('true');
 
     wrapper.unmount();
   });

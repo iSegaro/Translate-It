@@ -4,6 +4,7 @@ import { reactive, ref } from 'vue'
 import { readFileSync } from 'node:fs'
 import { findProviderById } from '@/features/translation/providers/ProviderManifest.js'
 import { ProviderRegistryIds } from '@/features/translation/providers/ProviderConstants.js'
+import MaskIcon from '@/components/shared/MaskIcon.vue'
 
 const settingsStore = vi.hoisted(() => ({
   settings: null,
@@ -111,10 +112,6 @@ vi.mock('./IconButton.vue', () => ({
   default: { template: '<span class="mock-icon-button" />' },
 }))
 
-vi.mock('@iconify/vue', () => ({
-  Icon: { props: ['icon'], template: '<span class="mock-icon" :data-icon="icon" />' },
-}))
-
 vi.mock('webextension-polyfill', () => ({ default: {} }))
 
 vi.mock('@/core/extensionContext.js', () => ({
@@ -191,6 +188,10 @@ describe('ProviderSelector split mode', () => {
     await wrapper.setProps({ loading: true })
     expect(mainAction.attributes('aria-label')).toBe('Stop')
     expect(wrapper.find('.ti-translate-main-label').text()).toBe('Stop')
+    const stopIcon = wrapper.findComponent(MaskIcon)
+    expect(stopIcon.classes()).toContain('ti-stop-icon')
+    expect(stopIcon.props('src')).toMatch(/^data:image\/svg\+xml/)
+    expect(stopIcon.attributes('aria-hidden')).toBe('true')
 
     await mainAction.trigger('click')
     expect(wrapper.emitted('cancel')).toHaveLength(1)
@@ -832,6 +833,9 @@ describe('ProviderSelector provider list contract', () => {
     const { wrapper, container } = await attachSelector({ mode: 'button', modelValue: 'googlev2' })
     try {
       await wrapper.find('.ti-provider-button').trigger('click')
+      const maskSources = wrapper.findAllComponents(MaskIcon).map(icon => icon.props('src'))
+      expect(maskSources.length).toBeGreaterThan(0)
+      expect(maskSources.every(src => src.startsWith('data:image/svg+xml'))).toBe(true)
       const configureButton = wrapper.findAll('button').find((button) => button.text().includes('Configure Providers'))
       expect(configureButton).toBeTruthy()
       await configureButton.trigger('click')
@@ -1200,6 +1204,17 @@ describe('ProviderSelector provider list contract', () => {
     })
     try {
       await wrapper.find('.ti-provider-button').trigger('click')
+      const googleItem = () => wrapper.findAll('.ti-dropdown-item').find(item => item.text().includes('Google'))
+      const googleStar = () => googleItem().findComponent(MaskIcon).props('src')
+      const defaultStar = googleStar()
+      expect(defaultStar).toMatch(/^data:image\/svg\+xml/)
+      settingsStore.settings.TRANSLATION_API = 'deepl'
+      await wrapper.vm.$nextTick()
+      expect(googleStar()).not.toBe(defaultStar)
+      settingsStore.settings.TRANSLATION_API = 'googlev2'
+      await wrapper.vm.$nextTick()
+      expect(googleStar()).toBe(defaultStar)
+
       const deeplItem = wrapper.findAll('.ti-dropdown-item')[1]
       await deeplItem.find('.ti-set-default-btn').trigger('click')
       expect(settingsStore.updateSettingAndPersist).toHaveBeenCalledWith('TRANSLATION_API', 'deepl')
@@ -1233,7 +1248,9 @@ describe('ProviderSelector provider list contract', () => {
       expect(element.getAttribute('aria-pressed')).toBe('false')
       expect(page.getAttribute('title')).toBe('Page translation uses its configured provider, or falls back to the current or default provider.')
       expect(element.getAttribute('title')).toBe('Select Element translation uses its configured provider, or falls back to the current or default provider.')
-      expect(page.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link-slash')
+      const pageIcon = () => page.querySelector('.ti-sync-icon').getAttribute('style')
+      const initialPageIcon = pageIcon()
+      expect(initialPageIcon).toContain('data:image/svg+xml')
 
       page.focus()
       const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
@@ -1245,7 +1262,8 @@ describe('ProviderSelector provider list contract', () => {
       await wrapper.vm.$nextTick()
       expect(page.getAttribute('aria-pressed')).toBe('true')
       expect(page.getAttribute('title')).toBe('Page translation follows the provider selected here')
-      expect(page.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link')
+      expect(pageIcon()).toContain('data:image/svg+xml')
+      expect(pageIcon()).not.toBe(initialPageIcon)
       expect(document.activeElement).toBe(page)
       expect(document.body.querySelector('.ti-provider-dropdown-menu')).toBe(menu)
       expect(wrapper.find('.ti-provider-button').attributes('aria-expanded')).toBe('true')
@@ -1254,8 +1272,10 @@ describe('ProviderSelector provider list contract', () => {
       await wrapper.vm.$nextTick()
       expect(page.getAttribute('aria-pressed')).toBe('false')
       expect(page.getAttribute('title')).toBe('Page translation uses its configured provider, or falls back to the current or default provider.')
-      expect(page.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link-slash')
+      expect(pageIcon()).toBe(initialPageIcon)
 
+      const initialElementIcon = element.querySelector('.ti-sync-icon').getAttribute('style')
+      expect(initialElementIcon).toContain('data:image/svg+xml')
       element.focus()
       const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
       element.dispatchEvent(space)
@@ -1267,13 +1287,14 @@ describe('ProviderSelector provider list contract', () => {
       expect(element.getAttribute('aria-pressed')).toBe('true')
       expect(element.getAttribute('title')).toBe('Select Element translation follows the provider selected here')
       expect(document.activeElement).toBe(element)
+      expect(element.querySelector('.ti-sync-icon').getAttribute('style')).not.toBe(initialElementIcon)
       expect(menu.querySelector('.ti-configure-row')).toBeTruthy()
 
       element.click()
       await wrapper.vm.$nextTick()
       expect(element.getAttribute('aria-pressed')).toBe('false')
       expect(element.getAttribute('title')).toBe('Select Element translation uses its configured provider, or falls back to the current or default provider.')
-      expect(element.querySelector('.ti-sync-icon').getAttribute('data-icon')).toBe('fa6-solid:link-slash')
+      expect(element.querySelector('.ti-sync-icon').getAttribute('style')).toBe(initialElementIcon)
       expect(translationStore.ephemeralSync).toEqual({ page: false, element: false })
       expect(translationStore.selectedProvider).toBe('googlev2')
       expect(wrapper.emitted('provider-change')).toBeUndefined()

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import SubtitleViewer from './SubtitleViewer.vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
 
 vi.mock('@/composables/shared/useUnifiedI18n.js', () => ({
   useUnifiedI18n: () => ({ t: (_key, fallback) => fallback }),
@@ -32,5 +33,34 @@ describe('SubtitleViewer', () => {
     expect(wrapper.findAll('.cue-row')).toHaveLength(2);
     expect(wrapper.text()).toContain('Translated two');
     expect(wrapper.text()).toContain('Translated three');
+  });
+
+  it('renders a local alert mask icon for failed cues', async () => {
+    const wrapper = mount(SubtitleViewer, {
+      props: { cues: [{ id: 'failed', index: 1, text: 'Original', translatedText: '', startTime: '00:00', status: 'failed' }] },
+    });
+    Object.defineProperty(wrapper.element, 'clientHeight', { configurable: true, value: 400 });
+    Object.defineProperty(wrapper.element, 'offsetHeight', { configurable: true, value: 400 });
+    await wrapper.trigger('scroll');
+    await nextTick();
+
+    const icon = wrapper.findComponent(MaskIcon);
+    expect(icon.props('src')).toMatch(/^data:image\/svg\+xml/);
+    expect(icon.attributes('aria-hidden')).toBe('true');
+  });
+
+  it('renders a local spinning mask icon while a cue is translating', async () => {
+    const wrapper = mount(SubtitleViewer, {
+      props: { cues: [{ id: 'translating', index: 1, text: 'Original', translatedText: '', startTime: '00:00', status: 'translating' }] },
+    });
+    Object.defineProperty(wrapper.element, 'clientHeight', { configurable: true, value: 400 });
+    Object.defineProperty(wrapper.element, 'offsetHeight', { configurable: true, value: 400 });
+    await wrapper.trigger('scroll');
+    await nextTick();
+
+    const icon = wrapper.findComponent(MaskIcon);
+    expect(icon.classes()).toContain('spin');
+    expect(icon.props('src')).toMatch(/^data:image\/svg\+xml/);
+    expect(icon.attributes('aria-hidden')).toBe('true');
   });
 });

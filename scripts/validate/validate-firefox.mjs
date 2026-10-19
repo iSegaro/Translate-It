@@ -124,7 +124,7 @@ async function validateFirefoxExtension() {
         for (const item of classification.ambiguous) console.log(`⚠️ AMBIGUOUS ${item.code} ${item.file}: ${item.message} (source identity unavailable)`)
       } else {
         console.log(`ℹ️ ${classification.ambiguous.length} reviewed warning occurrences with unverified source identity.`)
-        console.log('   Details: --verbose | Iconify risk remains unresolved.')
+        console.log('   Details: --verbose | Vue Renderer/DOMPurify source identity remains unverified.')
       }
     }
     for (const item of classification.missing) console.log(`ℹ️ Known baseline absent: ${item.file} | ${item.message} expected ${item.expected}, observed ${item.observed}`)

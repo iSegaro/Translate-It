@@ -57,7 +57,7 @@ Standardize on **CSS Mask** as the rendering technique for all monochrome UI ico
 | **`vite-svg-loader`** | Requires a build plugin change; conflicts with `?url` imports used elsewhere in the project. |
 | **`<img src="...svg">`** | Cannot inherit `currentColor`; color must be hardcoded in the SVG fill. |
 | **SVG `<use>` references** | Cross-origin restrictions in extension contexts make external sprite sheets unreliable. |
-| **`@iconify`** | External dependency with versioning risk; existing usage is limited to 5 subtitle/provider files. |
+| **`@iconify`** | External dependency with versioning and remote-loading risk; not adopted. Former component usages have been replaced by local assets and `MaskIcon`. |
 | **Icon font (CSS `content`)** | No standard for monochrome custom icons; accessibility via CSS pseudo-elements is fragile. |
 
 ---

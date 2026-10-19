@@ -2,9 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { ref } from "vue";
 import PageTranslationButton from "./PageTranslationButton.vue";
+import MaskIcon from "@/components/shared/MaskIcon.vue";
 import enMessages from "../../../_locales/en/messages.json";
 import faMessages from "../../../_locales/fa/messages.json";
 import jaMessages from "../../../_locales/ja/messages.json";
+
+const decodeInlineSvg = (src) => decodeURIComponent(src.slice(src.indexOf(',') + 1));
 
 // Mock components
 vi.mock("@/components/base/BaseButton.vue", () => ({
@@ -20,13 +23,6 @@ vi.mock("@/components/base/LoadingSpinner.vue", () => ({
   default: {
     name: "LoadingSpinner",
     template: '<div class="spinner"></div>',
-  },
-}));
-
-vi.mock("@iconify/vue", () => ({
-  Icon: {
-    name: "Icon",
-    template: '<i class="icon"></i>',
   },
 }));
 
@@ -119,6 +115,14 @@ describe("PageTranslationButton.vue", () => {
     const wrapper = mount(PageTranslationButton);
     expect(wrapper.text()).toContain("page_translation_btn_translate");
     expect(wrapper.findComponent({ name: "BaseButton" }).exists()).toBe(true);
+    const icon = wrapper.findComponent(MaskIcon);
+    const svg = decodeInlineSvg(icon.props("src"));
+    expect(svg).toMatch(/viewBox=['"]0 0 640 512['"]/);
+    expect(svg).toContain('M0 128C0 92.7');
+    expect(svg).toContain('CC BY 4.0');
+    expect(icon.props("size")).toBe('1.25em');
+    expect(icon.classes()).toContain('ti-page-translation-language-icon');
+    expect(icon.attributes("aria-hidden")).toBe("true");
   });
 
   it("should call translatePage when button is clicked", async () => {

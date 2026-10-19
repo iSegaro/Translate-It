@@ -55,9 +55,11 @@
             class="toolbar-icon"
             alt="Translate"
           >
-          <Icon
+          <MaskIcon
             v-else
-            icon="fa6-solid:language"
+            :src="languageIcon"
+            :size="'1.25em'"
+            class="ti-page-translation-language-icon"
           />
         </div>
         <span v-if="!compact">{{ translateButtonText }}</span>
@@ -244,7 +246,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import BaseButton from '@/components/base/BaseButton.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
-import { Icon } from '@iconify/vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
+import languageIcon from '@/icons/ui/language.svg?url';
 import { usePageTranslation } from '../composables/usePageTranslation.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import PageTranslationStatus from '@/components/shared/PageTranslationStatus.vue';

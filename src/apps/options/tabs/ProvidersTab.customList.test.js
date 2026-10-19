@@ -77,10 +77,6 @@ vi.mock('@/components/shared/IconButton.vue', () => ({
   default: { template: '<span class="icon-button-stub"/>' },
 }));
 
-vi.mock('@iconify/vue', () => ({
-  Icon: { props: ['icon'], template: '<span class="icon-stub" :data-icon="icon"/>' },
-}));
-
 vi.mock('webextension-polyfill', () => ({ default: {} }));
 
 vi.mock('@/core/extensionContext.js', () => ({

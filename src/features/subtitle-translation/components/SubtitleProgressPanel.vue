@@ -27,8 +27,9 @@
       v-if="displayTerminalError"
       class="terminal-error-alert fade-in"
     >
-      <v-icon
-        icon="mdi:alert-circle"
+      <MaskIcon
+        :src="alertIcon"
+        :size="'1.25rem'"
         class="error-icon"
       />
       <div class="error-content">
@@ -76,7 +77,8 @@
 
 <script setup>
 import { ref, watch } from 'vue';
-import { Icon as VIcon } from '@iconify/vue';
+import MaskIcon from '@/components/shared/MaskIcon.vue';
+import alertIcon from '@/icons/ui/alert-circle.svg?url';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { presentSubtitleTranslationError } from '../presentation/SubtitleTranslationErrorPresenter.js';
 const { t } = useUnifiedI18n();
