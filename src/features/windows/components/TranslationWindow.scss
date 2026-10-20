@@ -228,26 +228,35 @@
   .ti-original-text-wrapper {
     display: grid !important;
     grid-template-rows: 0fr !important;
-    transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-                margin-bottom 0.3s ease,
-                opacity 0.2s ease !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
+    transition: grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1),
+                margin-bottom 250ms cubic-bezier(0.4, 0, 0.2, 1) !important;
     overflow: hidden !important;
     flex-shrink: 0 !important;
     margin-bottom: 0 !important;
 
     &.is-expanded {
       grid-template-rows: 1fr !important;
-      opacity: 1 !important;
-      visibility: visible !important;
       margin-bottom: 12px !important;
     }
 
+    // The section's v-show owns the final display:none. Its collapse/enter
+    // classes fade the content in lockstep with the wrapper's grid-row
+    // collapse — same 250ms duration and easing, so text and TTS button stay
+    // visually present for the whole closing transition.
     > .ti-original-text-section {
       min-height: 0 !important;
       padding: 0 !important;
       margin: 0 !important;
+
+      &.ti-original-collapse-enter-active,
+      &.ti-original-collapse-leave-active {
+        transition: opacity 250ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      &.ti-original-collapse-enter-from,
+      &.ti-original-collapse-leave-to {
+        opacity: 0 !important;
+      }
     }
   }
 
@@ -296,6 +305,19 @@
   @media (prefers-reduced-motion: reduce) {
     .ti-window-source-tts {
       transition: none !important;
+    }
+
+    // Collapse/fade still reach their final state (Vue resolves the
+    // transition immediately when no CSS transition is present).
+    .ti-original-text-wrapper {
+      transition: none !important;
+
+      > .ti-original-text-section {
+        &.ti-original-collapse-enter-active,
+        &.ti-original-collapse-leave-active {
+          transition: none !important;
+        }
+      }
     }
   }
 

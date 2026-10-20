@@ -119,41 +119,49 @@
     <div class="ti-window-body">
       <div
         class="ti-original-text-wrapper"
-        :class="{ 'is-expanded': showOriginal && !isLoading }"
+        :class="{ 'is-expanded': isOriginalSectionVisible }"
       >
-        <div class="ti-original-text-section">
-          <div class="ti-original-text">
-            <textarea
-              v-show="showOriginal && !isLoading"
-              :id="`translation-window-source-${props.id}`"
-              ref="sourceTextarea"
-              v-model="sourceDraft"
-              class="ti-window-source-input"
-              :class="{ 'ti-window-source-overflow': sourceHasOverflow }"
-              :aria-label="t('window_edit_source')"
-              :lang="props.sourceLanguage !== 'auto' ? props.sourceLanguage : undefined"
-              dir="auto"
-              rows="1"
-              @mousedown.stop
-              @touchstart.stop
-              @keydown.stop="handleSourceKeydown"
-              @keyup.stop
-              @keypress.stop
-            />
-            <TTSButton
-              v-if="showOriginal && !isLoading"
-              class="ti-window-source-tts"
-              size="sm"
-              variant="secondary"
-              :text="sourceDraft"
-              :language="props.sourceLanguage"
-              :disabled="!sourceDraft.trim()"
-              :is-dictionary="false"
-              :idle-tooltip="t('window_tts_speak_original')"
-              :playing-tooltip="t('window_tts_stop')"
-            />
+        <!-- One coordinated collapse: the section fades (leave/enter classes)
+             while the wrapper's grid row shrinks — the subtree stays mounted
+             and displayed for the whole leave phase. -->
+        <Transition name="ti-original-collapse">
+          <div
+            v-show="isOriginalSectionVisible"
+            :inert="!isOriginalSectionVisible || undefined"
+            class="ti-original-text-section"
+          >
+            <div class="ti-original-text">
+              <textarea
+                :id="`translation-window-source-${props.id}`"
+                ref="sourceTextarea"
+                v-model="sourceDraft"
+                class="ti-window-source-input"
+                :class="{ 'ti-window-source-overflow': sourceHasOverflow }"
+                :aria-label="t('window_edit_source')"
+                :lang="props.sourceLanguage !== 'auto' ? props.sourceLanguage : undefined"
+                dir="auto"
+                rows="1"
+                @mousedown.stop
+                @touchstart.stop
+                @keydown.stop="handleSourceKeydown"
+                @keyup.stop
+                @keypress.stop
+              />
+              <TTSButton
+                ref="sourceTTSButton"
+                class="ti-window-source-tts"
+                size="sm"
+                variant="secondary"
+                :text="sourceDraft"
+                :language="props.sourceLanguage"
+                :disabled="!sourceDraft.trim()"
+                :is-dictionary="false"
+                :idle-tooltip="t('window_tts_speak_original')"
+                :playing-tooltip="t('window_tts_stop')"
+              />
+            </div>
           </div>
-        </div>
+        </Transition>
       </div>
       <TranslationDisplay
         :content="translatedText"
@@ -435,6 +443,17 @@ const showOriginal = ref(false);
 let showOriginalRevision = 0;
 watch(() => settings.settings.WINDOW_SHOW_ORIGINAL, (value) => {
   if (settingsReady.value && typeof value === 'boolean') showOriginal.value = value;
+});
+
+// The original section stays mounted through the collapse transition, so the
+// implicit unmount-driven TTS stop no longer fires when Original hides.
+// Trigger the same owner-scoped stop (useTTSSmart's stop sends TTS_STOP with
+// stopOnlyIfOwner: true for this button's own request) the moment Original
+// becomes hidden — including hide-toggle, external settings, and loading.
+const sourceTTSButton = ref(null);
+const isOriginalSectionVisible = computed(() => showOriginal.value && !isLoading.value);
+watch(isOriginalSectionVisible, (visible) => {
+  if (!visible) void sourceTTSButton.value?.stop?.();
 });
 const updateSourceOverflow = (textarea = sourceTextarea.value) => {
   if (textarea && sourceTextarea.value === textarea) {
