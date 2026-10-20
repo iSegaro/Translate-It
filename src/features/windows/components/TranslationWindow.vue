@@ -158,6 +158,7 @@
                 :is-dictionary="false"
                 :idle-tooltip="t('window_tts_speak_original')"
                 :playing-tooltip="t('window_tts_stop')"
+                @tts-started="handleSourceTTSStarted"
               />
             </div>
           </div>
@@ -455,6 +456,21 @@ const isOriginalSectionVisible = computed(() => showOriginal.value && !isLoading
 watch(isOriginalSectionVisible, (visible) => {
   if (!visible) void sourceTTSButton.value?.stop?.();
 });
+
+// The source TTS button is disabled for a blank draft, so clearing the draft
+// while it speaks would leave playback running without a reachable Stop.
+// Stop the source-owned request (owner-scoped: only this button's own
+// request) as soon as the draft becomes blank; the translated/header TTS is
+// untouched.
+const stopSourceTTSWhenDraftIsBlank = () => {
+  if (sourceDraft.value.trim()) return;
+  void sourceTTSButton.value?.stop?.();
+};
+watch(sourceDraft, stopSourceTTSWhenDraftIsBlank);
+// A start that lands after the draft was cleared must be stopped as well.
+const handleSourceTTSStarted = () => {
+  stopSourceTTSWhenDraftIsBlank();
+};
 const updateSourceOverflow = (textarea = sourceTextarea.value) => {
   if (textarea && sourceTextarea.value === textarea) {
     sourceHasOverflow.value = textarea.scrollHeight > textarea.clientHeight;

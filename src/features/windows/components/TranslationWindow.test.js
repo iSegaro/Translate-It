@@ -1276,6 +1276,53 @@ describe('TranslationWindow.vue', () => {
     });
   });
 
+  describe('source TTS blank draft', () => {
+    const sourceTTSButton = (wrapper) => wrapper.findAllComponents({ name: 'TTSButton' })[1];
+
+    it('stops the source-owned request when the draft is cleared during playback', async () => {
+      globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      await flushPromises();
+
+      const editor = wrapper.find('.ti-window-source-input');
+      await editor.setValue('spoken source');
+      sourceTTSButton(wrapper).vm.$emit('tts-started', { text: 'spoken source', language: 'en' });
+      await nextTick();
+      expect(sourceTTSStopMock).not.toHaveBeenCalled();
+
+      // Clearing the draft disables the button, so the running request has to
+      // be stopped by the window itself.
+      await editor.setValue('   ');
+      await nextTick();
+      expect(sourceTTSStopMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops a source request that starts after the draft was already cleared', async () => {
+      globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      await flushPromises();
+
+      const editor = wrapper.find('.ti-window-source-input');
+      await editor.setValue('   ');
+      await nextTick();
+      const stopsWhileIdle = sourceTTSStopMock.mock.calls.length;
+
+      // The in-flight start lands after the draft was cleared: the playback
+      // must be stopped instead of running without a reachable Stop action.
+      sourceTTSButton(wrapper).vm.$emit('tts-started', { text: 'spoken source', language: 'en' });
+      await nextTick();
+      expect(sourceTTSStopMock.mock.calls.length).toBe(stopsWhileIdle + 1);
+    });
+
+    it('keeps a blank idle draft disabled and stops nothing', async () => {
+      const wrapper = mount(TranslationWindow, { props: { ...baseProps, selectedText: '' } });
+      await flushPromises();
+
+      expect(sourceTTSButton(wrapper).props('disabled')).toBe(true);
+      expect(sourceTTSStopMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe('original section collapse animation', () => {
     // jsdom has no CSS transitions, so Vue resolves the leave phase
     // immediately. The mid-transition contract is therefore asserted on the

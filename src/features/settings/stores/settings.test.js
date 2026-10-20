@@ -684,8 +684,12 @@ describe('Settings Store', () => {
 
         // The queued write reaches storage after a few microtask hops.
         await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+        // The dropped notification is reconciled against durable storage once
+        // the queue settles; our own write is the durable value there.
+        storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: true });
         resolveWrite(true);
         await pending;
+        await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalledWith('WINDOW_SHOW_ORIGINAL'));
         expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
 
         // Legitimate external synchronization resumes once pending writes settle;
@@ -696,6 +700,278 @@ describe('Settings Store', () => {
       } finally {
         storageManager.set.mockImplementation(async () => true);
       }
+    });
+
+    it('reconciles an external notification that was missed while a local write was pending', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      // Durable storage after our write and the other tab's commit holds false.
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: false });
+
+      try {
+        const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+
+        // Another tab commits false while our write is still queued: the
+        // notification is dropped for now, but it must not be lost.
+        onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        resolveWrite(true);
+        await pending;
+
+        // Once the queue settles the missed change is reconciled against
+        // durable storage.
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('keeps the local preference when a newer local toggle happens during the reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+
+      try {
+        const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+        onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+
+        resolveWrite(true);
+        await pending;
+        // The reconciliation is now reading durable storage.
+        await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+
+        // A newer local toggle owns the value while the reconciliation reads.
+        const newer = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await newer;
+
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('reconciles after a failed write so the local state does not stay divergent', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: false });
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true)).rejects.toThrow('storage failed');
+
+      // The write never landed, so the local state returns to the durable value.
+      await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+    });
+
+    // A reconciliation reads durable storage asynchronously; Reset and Import
+    // can change the preference while that read is in flight.
+    const startPausedReconciliation = async (store, onChange) => {
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+
+      const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+      await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+      resolveWrite(true);
+      await pending;
+      // The reconciliation is now reading durable storage.
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+      return resolveGet;
+    };
+
+    it('a Reset that changes the preference invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      try {
+        const resolveGet = await startPausedReconciliation(store, onChange);
+
+        // Reset applies its default preference while the read is paused.
+        await store.resetSettings();
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not resurrect the pre-Reset value.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('an Import that changes the preference invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+
+      try {
+        const resolveGet = await startPausedReconciliation(store, onChange);
+
+        // The import applies the backed-up preference while the read is paused.
+        await store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not resurrect the pre-import value.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a Reset cancelled before applying its preference keeps the in-flight reconciliation valid', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      try {
+        const resolveGet = await startPausedReconciliation(store, onChange);
+
+        // The Reset fails before it applies its preference, so it must not
+        // invalidate the pending reconciliation.
+        storageManager.get.mockRejectedValueOnce(new Error('storage read failed'));
+        await expect(store.resetSettings()).rejects.toThrow('storage read failed');
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // The reconciliation still applies the confirmed durable value.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: false });
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    // A Reset/Import is a newer preference intent even when it reapplies the
+    // same value, so an older in-flight reconciliation must not resurrect a
+    // stale durable read.
+    const startPausedReconciliationAtSameValue = async (store, onChange) => {
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+
+      // Re-persist the current value so a notification is missed while a write
+      // is pending and a reconciliation is requested.
+      const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+      await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: true, oldValue: false });
+      resolveWrite(true);
+      await pending;
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+      return resolveGet;
+    };
+
+    it('a same-value Reset invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      try {
+        const resolveGet = await startPausedReconciliationAtSameValue(store, onChange);
+
+        // Reset reapplies the same default value.
+        await store.resetSettings();
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not replace the re-applied preference.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a same-value Import invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      try {
+        const resolveGet = await startPausedReconciliationAtSameValue(store, onChange);
+
+        // The import reapplies the same backed-up value.
+        await store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not replace the re-applied preference.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    // A notification confirms itself against durable storage asynchronously; a
+    // Reset/Import that completes during that read owns the preference.
+    const startPausedNotificationValidation = async (store, onChange) => {
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: true, oldValue: false });
+      // The confirmation is now reading durable storage.
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+      return resolveGet;
+    };
+
+    it('rejects a stale notification that overlaps a successful Reset', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      const resolveGet = await startPausedNotificationValidation(store, onChange);
+
+      // A successful Reset reapplies the default preference.
+      await store.resetSettings();
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      // The stale confirmation must not replace the re-applied preference.
+      resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+    });
+
+    it('rejects a stale notification that overlaps a successful Import', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      const resolveGet = await startPausedNotificationValidation(store, onChange);
+
+      // A successful Import applies the backed-up preference.
+      await store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: false });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      // The stale confirmation must not replace the applied preference.
+      resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
     });
 
     it('ignores a delayed stale notification that arrives after all queued writes settle', async () => {

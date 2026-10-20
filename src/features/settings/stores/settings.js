@@ -509,7 +509,19 @@ export const useSettingsStore = defineStore('settings', () => {
     windowShowOriginalPendingWrites += 1
     const write = windowShowOriginalWriteQueue.catch(() => {}).then(writeFactory)
     windowShowOriginalWriteQueue = write
-    void write.catch(() => {}).then(() => { windowShowOriginalPendingWrites -= 1 })
+    void write.then(
+      () => {
+        windowShowOriginalPendingWrites -= 1
+        // A missed notification is reconciled once the queue settles.
+        runWindowShowOriginalReconciliation()
+      },
+      () => {
+        windowShowOriginalPendingWrites -= 1
+        // The write never landed: reconcile against durable storage so local
+        // state does not stay permanently divergent.
+        requestWindowShowOriginalReconciliation()
+      }
+    )
     return write
   }
   const enqueueWindowShowOriginalWrite = (value) => (
@@ -674,6 +686,12 @@ export const useSettingsStore = defineStore('settings', () => {
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, defaults);
       if (newerWindowShowOriginalEdit) settings.value.WINDOW_SHOW_ORIGINAL = newerWindowShowOriginalValue
+      // A Reset that applies its preference invalidates older in-flight
+      // reconciliations, which would otherwise apply a stale durable read.
+      // The reset is the newer intent even when the resulting value is
+      // unchanged, so the version always advances. A Reset cancelled before
+      // applying its preference never reaches this point.
+      windowShowOriginalEditVersion += 1
       dirtySettingVersions.clear()
       // Persist canonical settings only; translation history is store-owned
       // feature data and is already cleared with storage above.
@@ -846,6 +864,10 @@ export const useSettingsStore = defineStore('settings', () => {
       // We replace the entire settings object to ensure no stale old keys remain
       Object.keys(settings.value).forEach(k => delete settings.value[k]);
       Object.assign(settings.value, mergedSettings);
+      // An import that applies its preference invalidates older in-flight
+      // reconciliations, which would otherwise apply a stale durable read. The
+      // import is the newer intent even when the resulting value is unchanged.
+      windowShowOriginalEditVersion += 1
       dirtySettingVersions.clear()
 
       await saveAllSettings();
@@ -1109,6 +1131,11 @@ export const useSettingsStore = defineStore('settings', () => {
   // writes keep durable storage in sync, so legitimate external updates
   // (which match durable storage) still apply.
   const validateWindowShowOriginalNotification = (notifiedValue) => {
+    // The notification is only applied while the local intent is unchanged: a
+    // newer local intent (toggle, Reset, Import) that completes while the
+    // durable read is in flight owns the preference and must not be
+    // overwritten by the stale confirmation.
+    const intentVersion = windowShowOriginalEditVersion
     const operation = windowShowOriginalSyncQueue.then(async () => {
       if (typeof notifiedValue !== 'boolean') return
       if (notifiedValue === settings.value.WINDOW_SHOW_ORIGINAL) return
@@ -1117,10 +1144,47 @@ export const useSettingsStore = defineStore('settings', () => {
       if (stored?.WINDOW_SHOW_ORIGINAL !== notifiedValue) return
       // New writes may have started while the confirmation was in flight.
       if (windowShowOriginalPendingWrites > 0) return
+      // A newer local intent won while the confirmation was in flight.
+      if (windowShowOriginalEditVersion !== intentVersion) return
       settings.value.WINDOW_SHOW_ORIGINAL = notifiedValue
     })
     // Confirmation failures are swallowed in the chain itself: the last
     // applied value is kept and later events re-validate from storage.
+    const settled = operation.catch(() => {})
+    windowShowOriginalSyncQueue = settled
+    return settled
+  }
+
+  // A notification that arrives while a local write is pending is dropped so
+  // it cannot clobber the latest local intent — but a cross-tab change must
+  // not be lost. The version of the local intent at that moment is remembered
+  // and reconciled against fresh durable storage once the queue settles: the
+  // newest local edit always wins, and durable storage decides everything
+  // else (so stale echoes are ignored as well).
+  let windowShowOriginalReconcileVersion = -1
+
+  const requestWindowShowOriginalReconciliation = () => {
+    windowShowOriginalReconcileVersion = windowShowOriginalEditVersion
+    return runWindowShowOriginalReconciliation()
+  }
+
+  const runWindowShowOriginalReconciliation = () => {
+    if (windowShowOriginalReconcileVersion < 0) return
+    if (windowShowOriginalPendingWrites > 0) return
+    const expectedVersion = windowShowOriginalReconcileVersion
+    windowShowOriginalReconcileVersion = -1
+    const operation = windowShowOriginalSyncQueue.then(async () => {
+      if (windowShowOriginalPendingWrites > 0) return
+      // A newer local edit owns the value; its own write keeps storage in sync.
+      if (windowShowOriginalEditVersion !== expectedVersion) return
+      const stored = await storageManager.getFresh('WINDOW_SHOW_ORIGINAL')
+      if (windowShowOriginalPendingWrites > 0) return
+      if (windowShowOriginalEditVersion !== expectedVersion) return
+      const durable = stored?.WINDOW_SHOW_ORIGINAL
+      if (typeof durable !== 'boolean') return
+      if (durable === settings.value.WINDOW_SHOW_ORIGINAL) return
+      settings.value.WINDOW_SHOW_ORIGINAL = durable
+    })
     const settled = operation.catch(() => {})
     windowShowOriginalSyncQueue = settled
     return settled
@@ -1137,8 +1201,13 @@ export const useSettingsStore = defineStore('settings', () => {
     if (key === 'WINDOW_SHOW_ORIGINAL') {
       // While a queued write is still pending it represents the latest local
       // intent: drop concurrently observed (possibly stale) notifications for
-      // this key before any durable-storage confirmation.
-      if (windowShowOriginalPendingWrites > 0) return
+      // this key before any durable-storage confirmation. The dropped event is
+      // not lost — it is reconciled against durable storage once the queue
+      // settles (unless a newer local edit supersedes it).
+      if (windowShowOriginalPendingWrites > 0) {
+        requestWindowShowOriginalReconciliation()
+        return
+      }
       validateWindowShowOriginalNotification(newValue)
       return
     }
