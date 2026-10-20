@@ -11,6 +11,7 @@ dist/Publish/Translate-It-v*-for-Chrome.zip
 dist/Publish/Translate-It-v*-for-Firefox.zip
 temp/
 tests/coverage/
+.vitest/
 .claude/
 .agents/
 .antigravitycli/
