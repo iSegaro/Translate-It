@@ -15,6 +15,7 @@ describe('live dubbing tab lifecycle', () => {
     const coordinator = {
       handleTabRemoved: vi.fn().mockResolvedValue(undefined),
       handleTopLevelNavigation: vi.fn().mockResolvedValue(undefined),
+      invalidateMediaFrame: vi.fn(),
       handleCaptureStatusChanged: vi.fn().mockResolvedValue(undefined),
     };
     const unregister = registerLiveDubbingTabLifecycle({ browserAPI, coordinator });
@@ -32,6 +33,7 @@ describe('live dubbing tab lifecycle', () => {
     expect(coordinator.handleTopLevelNavigation).toHaveBeenCalledOnce();
     expect(coordinator.handleTopLevelNavigation).toHaveBeenCalledWith(7);
     expect(coordinator.handleCaptureStatusChanged).toHaveBeenCalledWith({ tabId: 7, status: 'stopped' });
+    expect(coordinator.invalidateMediaFrame).toHaveBeenCalledWith(7, 1, undefined);
 
     unregister();
     expect(browserAPI.tabs.onRemoved.removeListener).toHaveBeenCalledWith(removed);

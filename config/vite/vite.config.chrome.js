@@ -211,7 +211,7 @@ export default defineConfig({
     ...(baseConfig.plugins || []),
     fixExtensionPaths(),
     webExtension({
-      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/html/offscreen.html', 'src/html/subtitle.html', 'src/html/pdf.html'],
+      additionalInputs: ['src/core/content-scripts/index-iframe.js', 'src/features/live-dubbing/content/index-media-observer.js', 'src/html/offscreen.html', 'src/html/subtitle.html', 'src/html/pdf.html'],
       manifest: async () => {
           const manifest = generateValidatedManifest('chrome');
           manifest.background = {

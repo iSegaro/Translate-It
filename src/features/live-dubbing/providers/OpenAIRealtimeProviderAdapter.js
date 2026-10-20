@@ -39,6 +39,7 @@ const PROVIDER_ERROR_MESSAGES = Object.freeze({
   OPENAI_REALTIME_SETUP_CANCELLED: 'OpenAI Realtime setup was cancelled',
   OPENAI_REALTIME_SETUP_TIMEOUT: 'OpenAI Realtime setup timed out',
   OPENAI_REALTIME_REMOTE_TRACK_FAILED: 'OpenAI Realtime remote audio failed',
+  OPENAI_REALTIME_MEDIA_GATE_FAILED: 'OpenAI Realtime media gate failed',
 });
 const PROVIDER_ERROR_CODES = new Set(Object.keys(PROVIDER_ERROR_MESSAGES));
 
@@ -301,6 +302,7 @@ export class OpenAIRealtimeProviderAdapter {
     this.pendingStart = null;
     this.lastTelemetry = null;
     this.dubbedVolume = DEFAULT_DUBBED_VOLUME;
+    this.mediaGateOpen = true;
     this.log = options.logger || logger;
   }
 
@@ -323,8 +325,36 @@ export class OpenAIRealtimeProviderAdapter {
   setDubbedVolume(volume) {
     const normalized = normalizeDubbedVolume(volume);
     this.dubbedVolume = normalized;
-    this._applyDubbedVolume(this.session?.audioElement, { strict: true });
+    if (this.mediaGateOpen) this._applyDubbedVolume(this.session?.audioElement, { strict: true });
     return normalized;
+  }
+
+  /** Synchronously gates cloned input and local translated-audio playback. */
+  setMediaGateOpen(open) {
+    if (typeof open !== 'boolean') throw new TypeError('media gate state must be boolean');
+    this.mediaGateOpen = open;
+    const session = this.session;
+    if (!session || session.disposed) return;
+    try {
+      if (!open) {
+        let failure = null;
+        try { this._muteAndDetachOutput(session); } catch (error) { failure = error; }
+        for (const track of session.inputTracks) {
+          try { track.enabled = false; } catch (error) { failure ||= error; }
+        }
+        if (failure) throw failure;
+      } else {
+        if (session.remoteTrack) {
+          this._attachRemoteOutput(session, session.remoteTrack, session.remoteStream, session.isCurrent);
+        }
+        for (const track of session.inputTracks) track.enabled = true;
+      }
+    } catch {
+      const error = createProviderError('OPENAI_REALTIME_MEDIA_GATE_FAILED');
+      this._notifyError(error);
+      void this._cleanupSession(session);
+      throw error;
+    }
   }
 
   /**
@@ -398,6 +428,9 @@ export class OpenAIRealtimeProviderAdapter {
       dataChannel: null,
       audioElement: null,
       remoteTrack: null,
+      remoteStream: null,
+      inputTracks: [],
+      isCurrent: null,
       remoteTrackEnded: null,
       remoteAttachmentToken: null,
       sdpAbortController: createAbortController(),
@@ -418,6 +451,7 @@ export class OpenAIRealtimeProviderAdapter {
     const isCurrent = () => this.session === session
       && !session.disposed
       && session.generation === this.generation;
+    session.isCurrent = isCurrent;
     const setup = this._setup(session, isCurrent, tracks, connectionOptions, secret);
     const timeout = new Promise((_, reject) => {
       pendingStart.timer = setTimeout(
@@ -521,7 +555,19 @@ export class OpenAIRealtimeProviderAdapter {
     try {
       for (const track of tracks) {
         if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
-        peerConnection.addTrack(track, connectionOptions.sourceStream);
+        try {
+          const clone = track.clone?.();
+          if (!clone || clone === track || clone.kind !== 'audio' || clone.readyState === 'ended') {
+            throw new Error('audio track clone unavailable');
+          }
+          session.inputTracks.push(clone);
+          clone.enabled = this.mediaGateOpen;
+          const isolatedStream = this.mediaStreamFactory([clone]);
+          if (!isolatedStream) throw new Error('isolated media stream unavailable');
+          peerConnection.addTrack(clone, isolatedStream);
+        } catch {
+          throw createProviderError('OPENAI_REALTIME_MEDIA_GATE_FAILED');
+        }
       }
       const offer = await peerConnection.createOffer();
       if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
@@ -634,10 +680,29 @@ export class OpenAIRealtimeProviderAdapter {
     this._detachRemoteTrackListener(session);
     session.remoteAttachmentToken = attachmentToken;
     session.remoteTrack = event.track;
+    session.remoteStream = stream;
     const isAttachmentCurrent = () => isCurrent()
       && session.remoteAttachmentToken === attachmentToken
       && session.remoteTrack === event.track;
 
+    session.remoteTrackEnded = () => this._reportRuntimeFailure(
+      session,
+      isAttachmentCurrent,
+      createProviderError('OPENAI_REALTIME_REMOTE_TRACK_FAILED'),
+    );
+    try { event.track.addEventListener?.('ended', session.remoteTrackEnded, { once: true }); } catch {
+      this._reportRuntimeFailure(session, isAttachmentCurrent, createProviderError('OPENAI_REALTIME_REMOTE_TRACK_FAILED'));
+      return;
+    }
+    if (!this.mediaGateOpen) return;
+    this._attachRemoteOutput(session, event.track, stream, isCurrent, attachmentToken);
+  }
+
+  _attachRemoteOutput(session, track, stream, isCurrent, attachmentToken = session.remoteAttachmentToken) {
+    const isAttachmentCurrent = () => isCurrent()
+      && this.mediaGateOpen
+      && session.remoteAttachmentToken === attachmentToken
+      && session.remoteTrack === track;
     let element = session.audioElement;
     try {
       if (!element) element = this.audioElementFactory();
@@ -645,6 +710,7 @@ export class OpenAIRealtimeProviderAdapter {
       session.audioElement = element;
       element.autoplay = true;
       element.playsInline = true;
+      element.muted = false;
       element.srcObject = stream;
       // The stored dubbed volume wins over the element default on every
       // attachment (including replacement tracks reusing this element), and
@@ -652,12 +718,6 @@ export class OpenAIRealtimeProviderAdapter {
       // carries the latest level. Best effort: never throws, so transport
       // and playback-failure semantics below are unchanged.
       this._applyDubbedVolume(element);
-      session.remoteTrackEnded = () => this._reportRuntimeFailure(
-        session,
-        isAttachmentCurrent,
-        createProviderError('OPENAI_REALTIME_REMOTE_TRACK_FAILED'),
-      );
-      event.track.addEventListener?.('ended', session.remoteTrackEnded, { once: true });
       Promise.resolve(element.play()).then(
         () => {
           if (!isAttachmentCurrent() || session.playbackAccepted) return;
@@ -684,6 +744,17 @@ export class OpenAIRealtimeProviderAdapter {
         );
       }
     }
+  }
+
+  _muteAndDetachOutput(session) {
+    const element = session.audioElement;
+    if (!element) return;
+    let failure = null;
+    try { element.pause?.(); } catch (error) { failure = error; }
+    try { element.muted = true; } catch (error) { failure ||= error; }
+    try { element.srcObject = null; } catch (error) { failure ||= error; }
+    session.remoteAttachmentToken = ++this.attachmentToken;
+    if (failure) throw failure;
   }
 
   _detachRemoteTrackListener(session) {
@@ -817,6 +888,10 @@ export class OpenAIRealtimeProviderAdapter {
       }
     } catch { /* best effort */ }
     this._detachRemoteTrackListener(session);
+    for (const track of session.inputTracks || []) {
+      try { track.stop?.(); } catch { /* adapter-owned clone */ }
+    }
+    session.inputTracks = [];
     try {
       if (session.peerConnection) {
         session.peerConnection.ontrack = null;
@@ -834,6 +909,7 @@ export class OpenAIRealtimeProviderAdapter {
     session.peerConnection = null;
     session.audioElement = null;
     session.remoteAttachmentToken = null;
+    session.remoteStream = null;
     session.sdpAbortController = null;
     this.lastTelemetry = snapshotTelemetry(session.telemetry);
     if (this.session === session) this.session = null;

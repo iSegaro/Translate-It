@@ -220,6 +220,8 @@ export class PcmOutputPlayer {
     // Only an omitted volume defaults to full gain; explicit null and any
     // other invalid value throw the same RangeError as the setter.
     this.volume = normalizeVolume(options.volume === undefined ? DEFAULT_VOLUME : options.volume);
+    this.playbackMuted = false;
+    this.resetAckTimeoutMs = options.resetAckTimeoutMs ?? 1000;
 
     this.state = 'idle';
     this.context = null;
@@ -287,7 +289,7 @@ export class PcmOutputPlayer {
       // volume applies here, before resume/pump, so no audio can play
       // unattenuated first.
       this.gainNode = this.context.createGain();
-      this.gainNode.gain.value = this.volume;
+       this.gainNode.gain.value = this.playbackMuted ? 0 : this.volume;
       this.workletNode.connect(this.gainNode);
       this.gainNode.connect(this.context.destination);
       this._attachPort(this.workletNode.port, this.workletNode, generation);
@@ -335,6 +337,17 @@ export class PcmOutputPlayer {
 
   _handleWorkletMessage(event) {
     const data = event?.data || {};
+    if (data.type === 'reset-complete') {
+      const pending = this._pendingReset;
+      if (pending && data.epoch === pending.epoch
+        && data.resetGeneration === pending.resetGeneration) {
+        clearTimeout(pending.timer);
+        this._pendingReset = null;
+        pending.resolve();
+      }
+      return;
+    }
+    if (data.epoch !== undefined && data.epoch !== this.epoch) return;
     if (data.type === 'accepted' || data.type === 'rejected') {
       if (!this.inFlight || data.id !== this.inFlight.id) return;
       const item = this.inFlight;
@@ -461,15 +474,35 @@ export class PcmOutputPlayer {
     this.remoteQueuedSamples = 0;
     this.byteAccumulator.clear();
     this.metrics.epochResets += 1;
+    this.resetGeneration = (this.resetGeneration || 0) + 1;
     if (this.workletNode?.port) {
       try {
-        this.workletNode.port.postMessage({ type: 'reset', epoch: this.epoch });
+         this.workletNode.port.postMessage({ type: 'reset', epoch: this.epoch, resetGeneration: this.resetGeneration });
       } catch (error) {
         invokeCallback(this.onError, error);
       }
     }
     this._publishMetrics();
     return this.epoch;
+  }
+
+  resetEpochAndWait(epoch = this._nextEpoch()) {
+    this.resetEpoch(epoch);
+    if (!this.workletNode?.port || this.state !== 'running') return Promise.resolve();
+    if (this._pendingReset) {
+      clearTimeout(this._pendingReset.timer);
+      this._pendingReset.reject(createAudioError('OUTPUT_AUDIO_RESET_SUPERSEDED', 'Output reset was superseded'));
+    }
+    return new Promise((resolve, reject) => {
+      const resetGeneration = this.resetGeneration;
+      const timer = setTimeout(() => {
+        if (this._pendingReset?.resetGeneration !== resetGeneration) return;
+        this._pendingReset = null;
+        this.setPlaybackMuted(true);
+        reject(createAudioError('OUTPUT_AUDIO_RESET_TIMEOUT', 'Playback worklet reset acknowledgement timed out'));
+      }, this.resetAckTimeoutMs);
+      this._pendingReset = { epoch: this.epoch, resetGeneration, timer, resolve, reject };
+    });
   }
 
   clear() {
@@ -510,12 +543,19 @@ export class PcmOutputPlayer {
   setVolume(volume) {
     const normalized = normalizeVolume(volume);
     this.volume = normalized;
-    if (this.gainNode) this.gainNode.gain.value = normalized;
+    if (this.gainNode) this.gainNode.gain.value = this.playbackMuted ? 0 : normalized;
     return this.volume;
   }
 
   getVolume() {
     return this.volume;
+  }
+
+  setPlaybackMuted(muted) {
+    if (typeof muted !== 'boolean') throw new TypeError('muted must be a boolean');
+    this.playbackMuted = muted;
+    if (this.gainNode) this.gainNode.gain.value = muted ? 0 : this.volume;
+    return this.playbackMuted;
   }
 
   _nextEpoch() {
@@ -587,6 +627,11 @@ export class PcmOutputPlayer {
   }
 
   async stop() {
+    if (this._pendingReset) {
+      clearTimeout(this._pendingReset.timer);
+      this._pendingReset.reject(createAudioError('OUTPUT_AUDIO_STOPPED', 'Playback stopped before reset acknowledgement'));
+      this._pendingReset = null;
+    }
     this.generation += 1;
     await this._teardown();
     this.state = 'idle';

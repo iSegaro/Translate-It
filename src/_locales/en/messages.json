@@ -449,6 +449,48 @@
   "live_dubbing_volume_dubbed_label": {
     "message": "Dubbed Volume"
   },
+  "live_dubbing_media_paused": {
+    "message": "Paused"
+  },
+  "live_dubbing_media_reconnecting": {
+    "message": "Reconnecting…"
+  },
+  "live_dubbing_media_ready": {
+    "message": "Ready"
+  },
+  "live_dubbing_media_playing": {
+    "message": "Running"
+  },
+  "live_dubbing_media_retry_available": {
+    "message": "Retry available"
+  },
+  "live_dubbing_action_retry": {
+    "message": "Retry"
+  },
+  "live_dubbing_action_retrying": {
+    "message": "Retrying…"
+  },
+  "live_dubbing_action_retry_media_aria_label": {
+    "message": "Retry audio playback"
+  },
+  "live_dubbing_media_error_retry_exhausted": {
+    "message": "Audio could not recover. Retry to try again."
+  },
+  "live_dubbing_media_error_retry_state_unavailable": {
+    "message": "Audio state is unavailable. Retry to try again."
+  },
+  "live_dubbing_media_error_pause_failed": {
+    "message": "Audio could not be paused. Retry to try again."
+  },
+  "live_dubbing_media_error_resume_failed": {
+    "message": "Audio could not resume. Retry to try again."
+  },
+  "live_dubbing_media_error_rotation_failed": {
+    "message": "Audio could not reconnect. Retry to try again."
+  },
+  "live_dubbing_media_error_generic": {
+    "message": "Audio playback needs attention."
+  },
   "popup_more_actions_title": {
     "message": "More actions"
   },

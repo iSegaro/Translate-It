@@ -124,6 +124,7 @@ export class LiveDubbingAudioEngine {
     this.dubbedVolume = normalizeDubbedVolume(
       options.dubbedVolume !== undefined ? options.dubbedVolume : DEFAULT_DUBBED_VOLUME,
     );
+    this.playbackMuted = false;
 
     this.inputPipeline = null;
     this.outputPlayer = null;
@@ -325,6 +326,7 @@ export class LiveDubbingAudioEngine {
     // one. Players without setVolume keep their own gain. Never restarts or
     // recreates the player and never touches the original-audio monitor.
     player.setVolume?.(this.dubbedVolume);
+    player.setPlaybackMuted?.(this.playbackMuted);
     invokeCallback(this.callbacks.onOutputCreated, player);
     return player;
   }
@@ -433,6 +435,12 @@ export class LiveDubbingAudioEngine {
     this.dubbedVolume = normalized;
     this.outputPlayer?.setVolume?.(normalized);
     return normalized;
+  }
+
+  setPlaybackMuted(muted) {
+    if (typeof muted !== 'boolean') throw new TypeError('muted must be a boolean');
+    this.playbackMuted = muted;
+    return this.outputPlayer?.setPlaybackMuted?.(muted) ?? muted;
   }
 
   getDubbedVolume() {
@@ -591,6 +599,10 @@ export class LiveDubbingAudioEngine {
 
   resetEpoch(epoch) {
     return this.outputPlayer?.resetEpoch?.(epoch);
+  }
+
+  resetOutputEpochAndWait(epoch) {
+    return this.outputPlayer?.resetEpochAndWait?.(epoch) ?? Promise.resolve();
   }
 
   clearOutput() {

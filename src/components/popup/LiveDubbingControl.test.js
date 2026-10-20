@@ -109,6 +109,203 @@ describe('LiveDubbingControl', () => {
     })
   })
 
+  describe('authoritative media status', () => {
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' }
+    const running = (mediaState, mediaError = null, retryable = false) => ({
+      status: { status: 'RUNNING', sessionId: 'media-session', providerId: 'gemini', eventSequence: 1 },
+      media: { mediaState, mediaError, mediaSequence: 1, rotationId: null, retryable },
+      originalVolume: 0.4
+    })
+
+    it.each([
+      ['paused', 'Paused'],
+      ['reconnecting', 'Reconnecting…'],
+      ['ready', 'Ready'],
+      ['playing', 'Running']
+    ])('renders the authoritative %s label while retaining controls', async (mediaState, label) => {
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve(running(mediaState))
+        : Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 }))
+      const wrapper = await mountAndFlush()
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe(label)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.findAll('input[type="range"]')).toHaveLength(2)
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+    })
+
+    it('shows only safe media error guidance and Retry for error state', async () => {
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve(running('error', 'provider supplied unsafe secret', true))
+        : Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 }))
+      const wrapper = await mountAndFlush()
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Retry available')
+      expect(wrapper.text()).toContain('Audio playback needs attention. Retry to try again.')
+      expect(wrapper.text()).not.toContain('provider supplied unsafe secret')
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.findAll('input[type="range"]')).toHaveLength(2)
+    })
+
+    it('shows generic safe guidance without Retry for non-retryable media errors', async () => {
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve(running('error', 'LIVE_DUBBING_MEDIA_PAUSE_FAILED'))
+        : Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 }))
+      const wrapper = await mountAndFlush()
+      expect(wrapper.text()).toContain('Audio playback needs attention.')
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Error')
+      expect(wrapper.text()).not.toContain('Retry available')
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.findAll('input[type="range"]')).toHaveLength(2)
+    })
+
+    it('does not offer Retry when the authoritative retryable flag is missing', async () => {
+      const status = running('error', 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED')
+      delete status.media.retryable
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve(status)
+        : Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 }))
+      const wrapper = await mountAndFlush()
+      expect(wrapper.text()).toContain('Audio playback needs attention.')
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.findAll('input[type="range"]')).toHaveLength(2)
+      expect(wrapper.text()).not.toContain('LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED')
+    })
+
+    it.each(['media-first', 'query-first'])('keeps the newer status read when reads resolve out of order (%s)', async ordering => {
+      let resolveOlder
+      let reads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action !== 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 })
+        reads += 1
+        if (reads === 1) return Promise.resolve(running('playing'))
+        if (reads === 2) return new Promise(resolve => { resolveOlder = resolve })
+        return Promise.resolve(running('paused'))
+      })
+      const wrapper = await mountAndFlush()
+      if (ordering === 'media-first') {
+        runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'media-session' } }, sender)
+        await flushPromises(wrapper)
+        runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, sender)
+      } else {
+        runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, sender)
+        await flushPromises(wrapper)
+        runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'media-session' } }, sender)
+      }
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      resolveOlder(running('error', 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED', true))
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Paused')
+    })
+
+    it('sends a payload-free Retry, disables it in flight, and refreshes authoritative status', async () => {
+      let resolveRetry
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(running('error', 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED', true))
+        if (action === 'RETRY_LIVE_DUBBING_MEDIA') return new Promise(resolve => { resolveRetry = resolve })
+        return Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 })
+      })
+      const wrapper = await mountAndFlush()
+      await wrapper.find('button[aria-label="Retry audio"]').trigger('click')
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'RETRY_LIVE_DUBBING_MEDIA' })
+      expect(wrapper.find('button[aria-label="Retry audio"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.findAll('input[type="range"]')).toHaveLength(2)
+      resolveRetry({ success: true })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(sendMessage.mock.calls.filter(([message]) => message.action === 'GET_LIVE_DUBBING_STATUS')).toHaveLength(2)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+    })
+
+    it('keeps safe error state after retry failure', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(running('error', 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED', true))
+        if (action === 'RETRY_LIVE_DUBBING_MEDIA') return Promise.reject(new Error('raw provider payload'))
+        return Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 })
+      })
+      const wrapper = await mountAndFlush()
+      await wrapper.find('button[aria-label="Retry audio"]').trigger('click')
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(wrapper.text()).not.toContain('raw provider payload')
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+    })
+
+    it('reads media status after START adopts the new session', async () => {
+      let started = false
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(started
+          ? running('paused')
+          : { status: 'idle' })
+        if (action === 'START_LIVE_DUBBING') {
+          started = true
+          return Promise.resolve({ status: 'RUNNING', sessionId: 'media-session', providerId: 'gemini' })
+        }
+        return Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 })
+      })
+      const wrapper = await mountAndFlush()
+      await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Paused')
+      expect(sendMessage.mock.calls.filter(([m]) => m.action === 'GET_LIVE_DUBBING_STATUS')).toHaveLength(2)
+    })
+
+    it('clears media presentation when STOP authoritatively ends the session', async () => {
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve(running('error', 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED', true))
+        if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 })
+      })
+      const wrapper = await mountAndFlush()
+      await wrapper.find('button[aria-label="Stop live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Retry available')
+      expect(wrapper.text()).not.toContain('Audio playback needs attention')
+    })
+
+    it('does not carry an old media error into a replacement session', async () => {
+      let reads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          reads += 1
+          return Promise.resolve(reads === 1
+            ? running('error', 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED', true)
+            : { status: { status: 'RUNNING', sessionId: 'replacement-session', providerId: 'gemini' } })
+        }
+        return Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 })
+      })
+      const wrapper = await mountAndFlush()
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(true)
+      runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, sender)
+      await flushPromises(wrapper)
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Audio playback needs attention')
+    })
+
+    it('refreshes only for authorized matching-session media notifications', async () => {
+      sendMessage.mockImplementation(({ action }) => action === 'GET_LIVE_DUBBING_STATUS'
+        ? Promise.resolve(running('playing'))
+        : Promise.resolve({ originalVolume: 0.4, dubbedVolume: 0.8 }))
+      const wrapper = await mountAndFlush()
+      const initialReads = sendMessage.mock.calls.filter(([m]) => m.action === 'GET_LIVE_DUBBING_STATUS').length
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'other', mediaState: 'error', mediaError: 'SECRET' } }, sender)
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'media-session', mediaState: 'error', mediaError: 'SECRET' } }, { id: 'untrusted' })
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'media-session', mediaState: 'error', mediaError: 'SECRET' } }, sender)
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(sendMessage.mock.calls.filter(([m]) => m.action === 'GET_LIVE_DUBBING_STATUS')).toHaveLength(initialReads + 1)
+      expect(wrapper.text()).not.toContain('SECRET')
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Running')
+    })
+  })
+
   it('applies startDisabled only to START, not STOP or cleanup', async () => {
     const wrapper = await mountAndFlush({ startDisabled: true })
     const startButton = () => wrapper.find('button[aria-label="Start live dubbing"]')
@@ -2948,6 +3145,65 @@ describe('LiveDubbingControl', () => {
       }
     })
 
+    it('discards dubbed recovery status superseded by a later authoritative media read', async () => {
+      let resolveRecoveryStatus
+      let dubbedVolumeReads = 0
+      let statusReads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          statusReads += 1
+          if (statusReads === 1) return Promise.resolve({
+            ...runningStatus(),
+            media: { mediaState: 'playing', retryable: false }
+          })
+          if (statusReads === 2) return new Promise(resolve => { resolveRecoveryStatus = resolve })
+          return Promise.resolve({
+            ...runningStatus(),
+            media: { mediaState: 'paused', retryable: false }
+          })
+        }
+        if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+          return Promise.resolve({ success: true, originalVolume: 0.5 })
+        }
+        if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+          dubbedVolumeReads += 1
+          return Promise.resolve({ success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' })
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+
+      const wrapper = await mountAndFlush()
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      expect(statusReads).toBe(2)
+      expect(dubbedVolumeReads).toBe(1)
+
+      runtimeListener({
+        action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED',
+        data: { sessionId: 's1' }
+      }, { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      // The media notification's later status read is authoritative and must
+      // supersede the still-pending dubbed-volume recovery response.
+      expect(statusReads).toBe(3)
+      resolveRecoveryStatus({
+        status: 'idle',
+        media: { mediaState: 'error', retryable: true }
+      })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(wrapper.find('.ti-live-dubbing-control-status').text()).toBe('Paused')
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+      // The shared status-read fence does not alter the independent dubbed
+      // volume request generation or issue a recovery retry for a stale read.
+      expect(dubbedVolumeReads).toBe(1)
+      wrapper.unmount()
+    })
+
     it('lifecycle fence change recovers the dubbed watcher and discards old pending ops', async () => {
       vi.useFakeTimers()
       try {
@@ -4770,6 +5026,163 @@ describe('LiveDubbingControl', () => {
       expect(subtitlesNote(wrapper)).toBeUndefined()
       expect(wrapper.vm.subtitlesUnavailableBySession.get('session-B')).toBe(false)
       expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+    })
+
+    it('lets a later media status reconcile STOPPING over an older RUNNING lifecycle read', async () => {
+      let resolveLifecycle
+      let resolveMedia
+      const lifecycleGate = new Promise((resolve) => { resolveLifecycle = resolve })
+      const mediaGate = new Promise((resolve) => { resolveMedia = resolve })
+      let statusReads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          statusReads += 1
+          if (statusReads === 1) return Promise.resolve({ status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' } })
+          if (statusReads === 2) return lifecycleGate
+          return mediaGate
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+
+      runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, authorizedSender)
+      await flushPromises(wrapper)
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'session-A' } }, authorizedSender)
+      await flushPromises(wrapper)
+      expect(statusReads).toBe(3)
+
+      resolveMedia({ status: { status: 'STOPPING', sessionId: 'session-A', providerId: 'gemini' } })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      resolveLifecycle({ status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' } })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(wrapper.text()).not.toContain('Running')
+      expect(wrapper.text()).toContain('Stopping')
+    })
+
+    it('adopts replacement session B from a later media status and fences the older A lifecycle response', async () => {
+      let resolveLifecycle
+      let resolveMedia
+      const lifecycleGate = new Promise((resolve) => { resolveLifecycle = resolve })
+      const mediaGate = new Promise((resolve) => { resolveMedia = resolve })
+      let statusReads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          statusReads += 1
+          if (statusReads === 1) return Promise.resolve({ status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' } })
+          if (statusReads === 2) return lifecycleGate
+          return mediaGate
+        }
+        if (action === 'STOP_LIVE_DUBBING') return Promise.resolve({ status: 'idle' })
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+
+      runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, authorizedSender)
+      await flushPromises(wrapper)
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'session-A' } }, authorizedSender)
+      await flushPromises(wrapper)
+      resolveMedia({ status: { status: 'RUNNING', sessionId: 'session-B', providerId: 'gemini' } })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      resolveLifecycle({ status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' } })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      await wrapper.find('button[aria-label="Stop live dubbing"]').trigger('click')
+      await flushPromises(wrapper)
+      expect(sendMessage).toHaveBeenCalledWith({ action: 'STOP_LIVE_DUBBING', data: { sessionId: 'session-B' } })
+    })
+
+    it('does not attribute a mismatched session media DTO to the current session', async () => {
+      let resolveMedia
+      const mediaGate = new Promise((resolve) => { resolveMedia = resolve })
+      let statusReads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          statusReads += 1
+          if (statusReads === 1) return Promise.resolve({
+            status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' },
+            media: { mediaState: 'playing', retryable: false }
+          })
+          return mediaGate
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'session-A' } }, authorizedSender)
+      await flushPromises(wrapper)
+      resolveMedia({
+        status: { status: 'RUNNING', sessionId: 'session-B', providerId: 'gemini' },
+        media: { mediaState: 'error', retryable: true }
+      })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(wrapper.find('button[aria-label="Stop live dubbing"]').exists()).toBe(true)
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
+      expect(wrapper.vm.sessionId).toBe('session-A')
+      expect(wrapper.vm.media.mediaState).toBe('playing')
+    })
+
+    it('keeps lifecycle reconciliation required across overlapping media refreshes', async () => {
+      let resolveLifecycle
+      let resolveMediaA
+      let resolveMediaB
+      const lifecycleGate = new Promise((resolve) => { resolveLifecycle = resolve })
+      const mediaGateA = new Promise((resolve) => { resolveMediaA = resolve })
+      const mediaGateB = new Promise((resolve) => { resolveMediaB = resolve })
+      let statusReads = 0
+      sendMessage.mockImplementation(({ action }) => {
+        if (action === 'GET_LIVE_DUBBING_STATUS') {
+          statusReads += 1
+          if (statusReads === 1) return Promise.resolve({
+            status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' },
+            media: { mediaState: 'playing', retryable: false }
+          })
+          if (statusReads === 2) return lifecycleGate
+          if (statusReads === 3) return mediaGateA
+          return mediaGateB
+        }
+        return Promise.resolve({ status: 'idle' })
+      })
+      const wrapper = await mountAndFlush()
+
+      runtimeListener({ action: 'LIVE_DUBBING_TERMINAL_OUTCOME', data: {} }, authorizedSender)
+      await flushPromises(wrapper)
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'session-A' } }, authorizedSender)
+      await flushPromises(wrapper)
+      expect(statusReads).toBe(3)
+
+      resolveLifecycle({
+        status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' },
+        media: { mediaState: 'error', retryable: true }
+      })
+      await flushPromises(wrapper)
+      runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 'session-A' } }, authorizedSender)
+      await flushPromises(wrapper)
+      expect(statusReads).toBe(4)
+
+      resolveMediaB({
+        status: { status: 'STOPPING', sessionId: 'session-A', providerId: 'gemini' },
+        media: { mediaState: 'paused', retryable: false }
+      })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+      resolveMediaA({
+        status: { status: 'RUNNING', sessionId: 'session-A', providerId: 'gemini' },
+        media: { mediaState: 'error', retryable: true }
+      })
+      await flushPromises(wrapper)
+      await flushPromises(wrapper)
+
+      expect(wrapper.text()).toContain('Stopping')
+      expect(wrapper.text()).not.toContain('Running')
+      expect(wrapper.vm.media.mediaState).toBe('paused')
+      expect(wrapper.find('button[aria-label="Retry audio"]').exists()).toBe(false)
     })
   })
 })

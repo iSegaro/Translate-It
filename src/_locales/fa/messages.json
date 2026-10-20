@@ -449,6 +449,48 @@
   "live_dubbing_volume_dubbed_label": {
     "message": "صدای دوبله"
   },
+  "live_dubbing_media_paused": {
+    "message": "مکث‌شده"
+  },
+  "live_dubbing_media_reconnecting": {
+    "message": "در حال اتصال دوباره…"
+  },
+  "live_dubbing_media_ready": {
+    "message": "آماده"
+  },
+  "live_dubbing_media_playing": {
+    "message": "در حال پخش"
+  },
+  "live_dubbing_media_retry_available": {
+    "message": "تلاش دوباره در دسترس است"
+  },
+  "live_dubbing_action_retry": {
+    "message": "تلاش دوباره"
+  },
+  "live_dubbing_action_retrying": {
+    "message": "در حال تلاش دوباره…"
+  },
+  "live_dubbing_action_retry_media_aria_label": {
+    "message": "تلاش دوباره برای پخش صدا"
+  },
+  "live_dubbing_media_error_retry_exhausted": {
+    "message": "بازیابی صدا ممکن نشد. دوباره تلاش کنید."
+  },
+  "live_dubbing_media_error_retry_state_unavailable": {
+    "message": "وضعیت صدا در دسترس نیست. دوباره تلاش کنید."
+  },
+  "live_dubbing_media_error_pause_failed": {
+    "message": "مکث صدا ممکن نشد. دوباره تلاش کنید."
+  },
+  "live_dubbing_media_error_resume_failed": {
+    "message": "ازسرگیری پخش صدا ممکن نشد. دوباره تلاش کنید."
+  },
+  "live_dubbing_media_error_rotation_failed": {
+    "message": "اتصال دوباره صدا ممکن نشد. دوباره تلاش کنید."
+  },
+  "live_dubbing_media_error_generic": {
+    "message": "پخش صدا نیاز به بررسی دارد."
+  },
   "popup_more_actions_title": {
     "message": "اقدامات بیشتر"
   },

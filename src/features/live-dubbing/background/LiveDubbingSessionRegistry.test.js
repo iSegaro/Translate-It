@@ -88,6 +88,18 @@ describe('LiveDubbingSessionRegistry', () => {
     expect(registry.hasBootstrapSession('session-1')).toBe(false);
   });
 
+  it('claims a media bootstrap grant once and supports revocation', () => {
+    const registry = new LiveDubbingSessionRegistry();
+    const grant = { rotationId: 'rotation-1', mediaSequence: 1 };
+    expect(registry.reserveMediaBootstrapGrant('session-1', grant)).toBe(true);
+    expect(registry.reserveMediaBootstrapGrant('session-1', { rotationId: 'rotation-2' })).toBe(false);
+    expect(registry.claimMediaBootstrapGrant('session-1', candidate => candidate === grant)).toBe(grant);
+    expect(registry.claimMediaBootstrapGrant('session-1', () => true)).toBeNull();
+    expect(registry.reserveMediaBootstrapGrant('session-1', grant)).toBe(true);
+    expect(registry.revokeMediaBootstrapGrant('session-1')).toBe(true);
+    expect(registry.claimMediaBootstrapGrant('session-1', () => true)).toBeNull();
+  });
+
   it('supports independent cleanup through narrow collection APIs', () => {
     const registry = new LiveDubbingSessionRegistry();
     const state = {};

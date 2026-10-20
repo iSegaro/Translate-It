@@ -5,6 +5,8 @@ import {
   createOriginalVolumeMessage,
   createOriginalVolumeQueryMessage,
   createPrepareMessage,
+  createMediaGenerationMessage,
+  createMediaStateChangedMessage,
   normalizeLiveDubbingVolume,
   createLiveDubbingProviderDiagnostic,
   createLiveDubbingTranslatedTranscript,
@@ -219,6 +221,23 @@ describe('live dubbing Stage 2 contracts', () => {
     expect(createPrepareMessage(descriptor, { originalVolume: 'loud', dubbedVolume: 7 })).toMatchObject({
       data: { originalVolume: 0, dubbedVolume: 1 },
     });
+    expect(createPrepareMessage(descriptor, {}, { synchronizeMedia: true }).data.synchronizeMedia).toBe(true);
+  });
+
+  it('builds exact scalar media-generation messages and rejects invalid generations', () => {
+    const generation = {
+      sessionId: 'session-1', providerId: 'gemini', eventSequence: 4,
+      mediaSequence: 2, rotationId: 'rotation-2',
+    };
+    expect(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_RESUME, generation)).toEqual({
+      target: 'offscreen', action: LIVE_DUBBING_ACTIONS.MEDIA_RESUME, data: generation,
+    });
+    expect(createMediaStateChangedMessage(generation, 'playing').data).toMatchObject({
+      ...generation, mediaState: 'playing', mediaError: null,
+    });
+    expect(() => createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_COMMIT, {
+      ...generation, mediaSequence: 0,
+    })).toThrow(TypeError);
   });
 
   it('builds an exact original-volume query message without a volume payload', () => {

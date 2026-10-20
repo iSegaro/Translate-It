@@ -209,7 +209,7 @@ describe('PCM output primitives', () => {
     expect(player.getPendingByteCount()).toBe(1);
     player.resetEpoch(7);
     expect(player.getMetrics()).toMatchObject({ epoch: 7, queuedSamples: 0, pendingByteCount: 0 });
-    expect(fake.port.postMessage.mock.calls.at(-1)[0]).toEqual({ type: 'reset', epoch: 7 });
+    expect(fake.port.postMessage.mock.calls.at(-1)[0]).toMatchObject({ type: 'reset', epoch: 7 });
   });
 
   it('records underrun metrics, enforces only the explicit safety bound, and cleans up', async () => {
@@ -274,6 +274,62 @@ describe('PCM output primitives', () => {
     expect(player.getVolume()).toBe(0.5);
     expect(fake.gainNode.gain.value).toBe(0.5);
     expect(fake.context.createGain).toHaveBeenCalledOnce();
+  });
+
+  it('mutes playback synchronously without changing stored volume, including startup and volume updates', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      volume: 0.4,
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    player.setPlaybackMuted(true);
+    const starting = player.start();
+    await starting;
+    expect(fake.gainNode.gain.value).toBe(0);
+    expect(player.getVolume()).toBe(0.4);
+    player.setVolume(0.7);
+    expect(fake.gainNode.gain.value).toBe(0);
+    expect(player.getVolume()).toBe(0.7);
+    player.setPlaybackMuted(false);
+    expect(fake.gainNode.gain.value).toBe(0.7);
+  });
+
+  it('waits for matching reset acknowledgement and ignores stale chunks and metrics', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+    player.enqueuePcm16(pcmBytes(500));
+    const oldEnqueue = fake.port.postMessage.mock.calls[0][0];
+    const waiting = player.resetEpochAndWait(4);
+    expect(player.getMetrics()).toMatchObject({ epoch: 4, queuedSamples: 0, pendingByteCount: 0 });
+    fake.port.onmessage({ data: { type: 'accepted', id: oldEnqueue.id, epoch: 0, queuedSamples: 99 } });
+    fake.port.onmessage({ data: { type: 'metrics', epoch: 0, queuedSamples: 99 } });
+    expect(player.getMetrics().queuedSamples).toBe(0);
+    const reset = fake.port.postMessage.mock.calls.at(-1)[0];
+    fake.port.onmessage({ data: { type: 'reset-complete', epoch: 4, resetGeneration: reset.resetGeneration } });
+    await expect(waiting).resolves.toBeUndefined();
+  });
+
+  it('rejects reset wait on timeout or stop and remains muted on timeout', async () => {
+    const fake = createContext();
+    const player = new PcmOutputPlayer({
+      resetAckTimeoutMs: 5,
+      audioContextFactory: vi.fn(async () => fake.context),
+      audioWorkletNodeFactory: vi.fn(() => fake.node),
+    });
+    await player.start();
+    const waiting = player.resetEpochAndWait(1);
+    await expect(waiting).rejects.toMatchObject({ code: 'OUTPUT_AUDIO_RESET_TIMEOUT' });
+    expect(fake.gainNode.gain.value).toBe(0);
+
+    player.setPlaybackMuted(false);
+    const stoppedWait = player.resetEpochAndWait(2);
+    await player.stop();
+    await expect(stoppedWait).rejects.toMatchObject({ code: 'OUTPUT_AUDIO_STOPPED' });
   });
 
   it('mutes at 0 without stopping playback', async () => {

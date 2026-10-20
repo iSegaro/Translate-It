@@ -702,7 +702,7 @@ describe('offscreen live-dubbing control sender authorization', () => {
     const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
     const handle = vi.spyOn(liveDubbingController, 'handle');
 
-    for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_DISPOSE']) {
+    for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_MEDIA_PAUSE', 'LIVE_DUBBING_MEDIA_RESUME', 'LIVE_DUBBING_MEDIA_COMMIT', 'LIVE_DUBBING_DISPOSE']) {
       await expect(sendMessage(liveDubbingMessage(action, `ui-attack-${action}`), sender))
         .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
     }
@@ -721,7 +721,7 @@ describe('offscreen live-dubbing control sender authorization', () => {
       arbitraryDocumentSender,
     ];
     for (const sender of rejectedSenders) {
-      for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_DISPOSE']) {
+      for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_MEDIA_PAUSE', 'LIVE_DUBBING_MEDIA_RESUME', 'LIVE_DUBBING_MEDIA_COMMIT', 'LIVE_DUBBING_DISPOSE']) {
         await expect(sendMessage(liveDubbingMessage(action, `self-attack-${action}`), sender))
           .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
       }
@@ -797,7 +797,7 @@ describe('offscreen live-dubbing control sender authorization', () => {
 
     // chrome-extension://.../arbitrary.html appears in no allowlist or
     // denylist: rejection must come from its document metadata alone.
-    for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_DISPOSE']) {
+    for (const action of ['LIVE_DUBBING_PREPARE', 'LIVE_DUBBING_CONNECT_PROVIDER', 'LIVE_DUBBING_MEDIA_PAUSE', 'LIVE_DUBBING_DISPOSE']) {
       await expect(sendMessage(liveDubbingMessage(action, 'arbitrary-attack'), arbitraryDocumentSender))
         .resolves.toEqual({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
     }

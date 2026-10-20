@@ -106,6 +106,11 @@ class LiveDubbingPlaybackProcessor extends AudioWorkletProcessor {
       this.pending = [];
       this.pendingSamples = 0;
       this.ring.clear();
+      this.port.postMessage({
+        type: 'reset-complete',
+        epoch: this.epoch,
+        resetGeneration: message.resetGeneration,
+      });
       this.postMetrics();
       return;
     }
@@ -120,6 +125,7 @@ class LiveDubbingPlaybackProcessor extends AudioWorkletProcessor {
       this.port.postMessage({
         type: 'rejected',
         id: message.id,
+        epoch: this.epoch,
         code: 'OUTPUT_AUDIO_STALE_EPOCH',
         message: 'PCM chunk belongs to an older output epoch',
         queuedSamples: this.queuedSamples(),
@@ -132,6 +138,7 @@ class LiveDubbingPlaybackProcessor extends AudioWorkletProcessor {
       this.port.postMessage({
         type: 'rejected',
         id: message.id,
+        epoch: this.epoch,
         code: 'OUTPUT_AUDIO_INVALID_PCM',
         message: 'PCM chunk is empty or invalid',
         queuedSamples: this.queuedSamples(),
@@ -146,6 +153,7 @@ class LiveDubbingPlaybackProcessor extends AudioWorkletProcessor {
       this.port.postMessage({
         type: 'rejected',
         id: message.id,
+        epoch: this.epoch,
         code: 'OUTPUT_AUDIO_QUEUE_SAFETY_LIMIT',
         message: 'Playback queue safety limit reached',
         queuedSamples: this.queuedSamples(),
@@ -158,6 +166,7 @@ class LiveDubbingPlaybackProcessor extends AudioWorkletProcessor {
     this.port.postMessage({
       type: 'accepted',
       id: message.id,
+      epoch: this.epoch,
       queuedSamples: this.queuedSamples(),
     });
   }

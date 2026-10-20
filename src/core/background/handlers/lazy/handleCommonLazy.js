@@ -104,6 +104,46 @@ export async function handleLiveDubbingStopLazy(message, sender) {
     }
 }
 
+export async function handleLiveDubbingMediaObserverHelloLazy(message, sender) {
+    try {
+        const { handleLiveDubbingMediaObserverHello } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingMediaObserverHello(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing media observer handler:', error);
+        return { observe: false };
+    }
+}
+
+export async function handleLiveDubbingMediaObservationLazy(message, sender) {
+    try {
+        const { handleLiveDubbingMediaObservation } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingMediaObservation(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing media observation handler:', error);
+        return { success: true, ignored: true };
+    }
+}
+
+export async function handleLiveDubbingMediaStateChangedLazy(message, sender) {
+    try {
+        const { handleLiveDubbingMediaStateChanged } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingMediaStateChanged(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing media state handler:', error);
+        return { success: true, ignored: true };
+    }
+}
+
+export async function handleLiveDubbingRetryMediaLazy(message, sender) {
+    try {
+        const { handleLiveDubbingRetryMedia } = await import('@/features/live-dubbing/background/handlers.js');
+        return handleLiveDubbingRetryMedia(message, sender);
+    } catch (error) {
+        logger.error('Failed to load Live Dubbing media retry handler:', error);
+        return { success: false, error: 'LIVE_DUBBING_HANDLER_UNAVAILABLE' };
+    }
+}
+
 export async function handleLiveDubbingGetStatusLazy(message, sender) {
     try {
         const { handleLiveDubbingGetStatus } = await import('@/features/live-dubbing/background/handlers.js');
