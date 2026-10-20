@@ -260,21 +260,36 @@
   }
 
   .ti-window-source-tts {
-    display: inline-flex !important;
-    min-width: 40px !important;
-    min-height: 40px !important;
-    margin-top: 6px !important;
-    opacity: 0.72 !important;
-    transition: opacity 140ms ease !important;
+    inline-size: 26px !important;
+    block-size: 26px !important;
+    padding: 0 !important;
+    margin-block-start: 6px !important;
+    color: var(--color-text-secondary, #68717d) !important;
+    border-radius: 6px !important;
+    transition: background-color 140ms ease, border-color 140ms ease !important;
 
-    &:hover,
-    &:focus-visible {
-      opacity: 1 !important;
+    // Idle-only hover so shared playing/error borders stay untouched.
+    &.ti-tts-button--idle:hover:not(.ti-disabled) {
+      background-color: var(--color-background-hover, rgba(0, 0, 0, 0.08)) !important;
+      border-color: var(--color-border, rgba(0, 0, 0, 0.14)) !important;
     }
 
     &:focus-visible {
-      outline: 2px solid #3b82f6 !important;
+      outline: 2px solid var(--focus-color, var(--color-primary, #3b82f6)) !important;
       outline-offset: 2px !important;
+    }
+
+    &:focus:not(:focus-visible) {
+      outline: none !important;
+    }
+  }
+
+  &.dark .ti-window-source-tts {
+    color: var(--color-text-secondary, #b8c0ca) !important;
+
+    &.ti-tts-button--idle:hover:not(.ti-disabled) {
+      background-color: var(--color-background-hover, rgba(255, 255, 255, 0.1)) !important;
+      border-color: var(--color-border, rgba(255, 255, 255, 0.18)) !important;
     }
   }
 

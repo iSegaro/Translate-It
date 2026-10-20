@@ -133,6 +133,16 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Optional contextual tooltips. Empty keeps the default
+  // action_speak_text / action_stop_speaking wording (with language suffix).
+  idleTooltip: {
+    type: String,
+    default: "",
+  },
+  playingTooltip: {
+    type: String,
+    default: "",
+  },
 });
 
 // Emits
@@ -197,11 +207,11 @@ const buttonTitle = computed(() => {
 
   switch (effectiveState.value) {
     case "idle":
-      return t("action_speak_text") + langSuffix;
+      return props.idleTooltip || t("action_speak_text") + langSuffix;
     case "loading":
       return t("window_loading_alt");
     case "playing":
-      return t("action_stop_speaking") + langSuffix;
+      return props.playingTooltip || t("action_stop_speaking") + langSuffix;
     case "error":
       // Try to get localized message from errorType key
       if (tts.errorType.value) {

@@ -223,8 +223,12 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
     props: {
       text: { type: String, default: '' },
       language: { type: String, default: '' },
+      size: { type: String, default: '' },
+      variant: { type: String, default: '' },
       disabled: { type: Boolean, default: false },
       isDictionary: { type: Boolean, default: false },
+      idleTooltip: { type: String, default: '' },
+      playingTooltip: { type: String, default: '' },
     },
     template: '<button class="tts-button-stub" />',
   },
@@ -361,6 +365,35 @@ describe('TranslationWindow.vue', () => {
     expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props('text')).toBe('expressions');
     await editor.setValue('   ');
     expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props('disabled')).toBe(true);
+  });
+
+  it('uses the compact secondary variant for the source TTS button', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+
+    // DOM order: buttons[0] is the header (translation) TTS inside the toolbar,
+    // buttons[1] is the source TTS inside the original-text section.
+    const buttons = wrapper.findAllComponents({ name: 'TTSButton' });
+    expect(buttons).toHaveLength(2);
+    expect(buttons[1].props('size')).toBe('sm');
+    expect(buttons[1].props('variant')).toBe('secondary');
+  });
+
+  it('passes contextual speak/stop tooltips to the header and source TTS buttons', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+
+    const toolbar = wrapper.findComponent({ name: 'TranslationWindowToolbar' });
+    expect(toolbar.props('ttsIdleTooltip')).toBe('window_tts_speak_translation');
+    expect(toolbar.props('ttsPlayingTooltip')).toBe('window_tts_stop');
+
+    const [headerTTS, sourceTTS] = wrapper.findAllComponents({ name: 'TTSButton' });
+    expect(headerTTS.props('idleTooltip')).toBe('window_tts_speak_translation');
+    expect(headerTTS.props('playingTooltip')).toBe('window_tts_stop');
+    expect(sourceTTS.props('idleTooltip')).toBe('window_tts_speak_original');
+    expect(sourceTTS.props('playingTooltip')).toBe('window_tts_stop');
   });
 
   it('shows history only for multiple snapshots, between the header and body', async () => {

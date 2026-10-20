@@ -3061,19 +3061,19 @@
     "message": "読み上げるテキストがありません"
   },
   "window_tts_stop": {
-    "message": "読み上げを停止（クリックして停止）"
+    "message": "読み上げを停止"
   },
   "window_tts_speak_original": {
-    "message": "🔊 原文を読み上げ（現在のモード：原文）"
+    "message": "原文を読み上げ"
   },
   "window_tts_speak_translation": {
-    "message": "🔊 翻訳を読み上げ（現在のモード：翻訳）"
+    "message": "翻訳を読み上げ"
   },
   "window_show_original": {
-    "message": "原文を表示（スピーカーボタンで原文を読み上げ）"
+    "message": "原文を表示"
   },
   "window_hide_original": {
-    "message": "原文を非表示（TTSボタンは原文を読み上げます）"
+    "message": "原文を非表示"
   },
   "window_loading_alt": {
     "message": "読み込み中..."

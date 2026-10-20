@@ -51,6 +51,8 @@
         :is-dictionary="isDictionary"
         :tts-text="currentTTSText"
         :tts-language="currentTTSLang"
+        :tts-idle-tooltip="t('window_tts_speak_translation')"
+        :tts-playing-tooltip="t('window_tts_stop')"
         :detected-language-label="detectedLanguageName"
         :pin-title="isPinned ? t('window_unpin') : t('window_pin')"
         :copy-title="t('window_copy_translation')"
@@ -141,10 +143,14 @@
             <TTSButton
               v-if="showOriginal && !isLoading"
               class="ti-window-source-tts"
+              size="sm"
+              variant="secondary"
               :text="sourceDraft"
               :language="props.sourceLanguage"
               :disabled="!sourceDraft.trim()"
               :is-dictionary="false"
+              :idle-tooltip="t('window_tts_speak_original')"
+              :playing-tooltip="t('window_tts_stop')"
             />
           </div>
         </div>
