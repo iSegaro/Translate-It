@@ -40,6 +40,7 @@ const createSettingsStore = () => {
       WINDOW_IS_PINNED: false,
       WINDOW_DOCK_MODE: 'none',
       WINDOW_DOCKED_WIDTH: 350,
+      WINDOW_SHOW_ORIGINAL: false,
     },
     getSetting: vi.fn(),
     updateSettingAndPersist: vi.fn(),
@@ -120,9 +121,12 @@ vi.mock('@/composables/ui/usePositioning.js', () => ({
   },
 }));
 
+const { stopAllMock } = vi.hoisted(() => ({ stopAllMock: vi.fn().mockResolvedValue(undefined) }));
+const { sourceTTSStopMock } = vi.hoisted(() => ({ sourceTTSStopMock: vi.fn() }));
+
 vi.mock('@/features/tts/composables/useTTSSmart.js', () => ({
   useTTSSmart: () => ({
-    stopAll: vi.fn().mockResolvedValue(undefined),
+    stopAll: stopAllMock,
   }),
 }));
 
@@ -220,7 +224,17 @@ vi.mock('@/components/shared/TTSButton.vue', () => ({
     props: {
       text: { type: String, default: '' },
       language: { type: String, default: '' },
+      size: { type: String, default: '' },
+      variant: { type: String, default: '' },
+      disabled: { type: Boolean, default: false },
       isDictionary: { type: Boolean, default: false },
+      idleTooltip: { type: String, default: '' },
+      playingTooltip: { type: String, default: '' },
+    },
+    // The window calls the source button's owner-scoped stop when Original is
+    // hidden; the header button never triggers it.
+    methods: {
+      stop: sourceTTSStopMock,
     },
     template: '<button class="tts-button-stub" />',
   },
@@ -277,6 +291,13 @@ describe('TranslationWindow.vue', () => {
     expect(display.props('lastTranslation')).toBeNull();
   });
 
+  it('does not issue an ID-less TTS stop during window cleanup', async () => {
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+    wrapper.unmount();
+    expect(stopAllMock).not.toHaveBeenCalled();
+  });
+
   it('updates the open window shell when the settings theme changes', async () => {
     const wrapper = mount(TranslationWindow, {
       props: baseProps,
@@ -326,6 +347,59 @@ describe('TranslationWindow.vue', () => {
     expect(wrapper.findAll('.ti-window-source-input')).toHaveLength(1);
     expect(wrapper.find('.ti-window-source-input').element.value).toBe('expressions');
     expect(wrapper.find('.ti-window-source-input').isVisible()).toBe(false);
+  });
+
+  it('restores the original section from settings, persists toggles, and preserves an initialization-time choice', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+    expect(wrapper.find('.ti-original-text-wrapper').classes()).toContain('is-expanded');
+    expect(wrapper.find('.translation-window').attributes('style')).toBeDefined();
+    await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+    expect(globalThis.__mockSettingsStore.updateSettingAndPersist).toHaveBeenCalledWith('WINDOW_SHOW_ORIGINAL', false);
+  });
+
+  it('uses translated header speech and latest source draft with explicit source language', async () => {
+    const wrapper = mount(TranslationWindow, { props: { ...baseProps, sourceLanguage: 'auto' } });
+    const buttons = wrapper.findAllComponents({ name: 'TTSButton' });
+    expect(buttons[0].props()).toMatchObject({ text: '表达方式', language: 'fa' });
+    await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+    const editor = wrapper.find('.ti-window-source-input');
+    await editor.setValue('edited source');
+    expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props()).toMatchObject({ text: 'edited source', language: 'auto' });
+    await editor.trigger('keydown', { key: 'Escape' });
+    expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props('text')).toBe('expressions');
+    await editor.setValue('   ');
+    expect(wrapper.findAllComponents({ name: 'TTSButton' })[1].props('disabled')).toBe(true);
+  });
+
+  it('uses the compact secondary variant for the source TTS button', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+
+    // DOM order: buttons[0] is the header (translation) TTS inside the toolbar,
+    // buttons[1] is the source TTS inside the original-text section.
+    const buttons = wrapper.findAllComponents({ name: 'TTSButton' });
+    expect(buttons).toHaveLength(2);
+    expect(buttons[1].props('size')).toBe('sm');
+    expect(buttons[1].props('variant')).toBe('secondary');
+  });
+
+  it('passes contextual speak/stop tooltips to the header and source TTS buttons', async () => {
+    globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+    const wrapper = mount(TranslationWindow, { props: baseProps });
+    await flushPromises();
+
+    const toolbar = wrapper.findComponent({ name: 'TranslationWindowToolbar' });
+    expect(toolbar.props('ttsIdleTooltip')).toBe('window_tts_speak_translation');
+    expect(toolbar.props('ttsPlayingTooltip')).toBe('window_tts_stop');
+
+    const [headerTTS, sourceTTS] = wrapper.findAllComponents({ name: 'TTSButton' });
+    expect(headerTTS.props('idleTooltip')).toBe('window_tts_speak_translation');
+    expect(headerTTS.props('playingTooltip')).toBe('window_tts_stop');
+    expect(sourceTTS.props('idleTooltip')).toBe('window_tts_speak_original');
+    expect(sourceTTS.props('playingTooltip')).toBe('window_tts_stop');
   });
 
   it('shows history only for multiple snapshots, between the header and body', async () => {
@@ -1199,6 +1273,154 @@ describe('TranslationWindow.vue', () => {
       } finally {
         release();
       }
+    });
+  });
+
+  describe('source TTS blank draft', () => {
+    const sourceTTSButton = (wrapper) => wrapper.findAllComponents({ name: 'TTSButton' })[1];
+
+    it('stops the source-owned request when the draft is cleared during playback', async () => {
+      globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      await flushPromises();
+
+      const editor = wrapper.find('.ti-window-source-input');
+      await editor.setValue('spoken source');
+      sourceTTSButton(wrapper).vm.$emit('tts-started', { text: 'spoken source', language: 'en' });
+      await nextTick();
+      expect(sourceTTSStopMock).not.toHaveBeenCalled();
+
+      // Clearing the draft disables the button, so the running request has to
+      // be stopped by the window itself.
+      await editor.setValue('   ');
+      await nextTick();
+      expect(sourceTTSStopMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops a source request that starts after the draft was already cleared', async () => {
+      globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      await flushPromises();
+
+      const editor = wrapper.find('.ti-window-source-input');
+      await editor.setValue('   ');
+      await nextTick();
+      const stopsWhileIdle = sourceTTSStopMock.mock.calls.length;
+
+      // The in-flight start lands after the draft was cleared: the playback
+      // must be stopped instead of running without a reachable Stop action.
+      sourceTTSButton(wrapper).vm.$emit('tts-started', { text: 'spoken source', language: 'en' });
+      await nextTick();
+      expect(sourceTTSStopMock.mock.calls.length).toBe(stopsWhileIdle + 1);
+    });
+
+    it('keeps a blank idle draft disabled and stops nothing', async () => {
+      const wrapper = mount(TranslationWindow, { props: { ...baseProps, selectedText: '' } });
+      await flushPromises();
+
+      expect(sourceTTSButton(wrapper).props('disabled')).toBe(true);
+      expect(sourceTTSStopMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('original section collapse animation', () => {
+    // jsdom has no CSS transitions, so Vue resolves the leave phase
+    // immediately. The mid-transition contract is therefore asserted on the
+    // DOM that stays alive during the collapse (the content is no longer
+    // unmounted or hidden outright) plus the stylesheet contract asserted in
+    // TranslationWindowScss.test.js (coordinated 250ms fade + grid collapse).
+    const mountWithOriginalVisible = async () => {
+      globalThis.__mockSettingsStore.settings.WINDOW_SHOW_ORIGINAL = true;
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      await flushPromises();
+      return wrapper;
+    };
+
+    it('keeps the original content mounted through the collapse instead of removing it upfront', async () => {
+      const wrapper = await mountWithOriginalVisible();
+      const section = wrapper.find('.ti-original-text-section');
+      expect(section.exists()).toBe(true);
+      expect(wrapper.findAllComponents({ name: 'TTSButton' })).toHaveLength(2);
+
+      await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+      await nextTick();
+
+      // The collapse no longer unmounts the source TTS button nor drops the
+      // textarea: the content stays in the DOM and fades with the container.
+      expect(wrapper.find('.ti-original-text-section').exists()).toBe(true);
+      expect(wrapper.find('.ti-window-source-input').exists()).toBe(true);
+      expect(wrapper.findAllComponents({ name: 'TTSButton' })).toHaveLength(2);
+      expect(wrapper.find('.ti-original-text-wrapper').classes()).not.toContain('is-expanded');
+    });
+
+    it('hides the original content once the collapse transition completes', async () => {
+      const wrapper = await mountWithOriginalVisible();
+
+      await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+      await flushPromises();
+
+      const section = wrapper.find('.ti-original-text-section');
+      expect(section.exists()).toBe(true);
+      expect(section.element.style.display).toBe('none');
+      expect(wrapper.find('.ti-original-text-wrapper').classes()).not.toContain('is-expanded');
+    });
+
+    it('leaves no stale visibility or mounted state after rapid toggles', async () => {
+      const wrapper = await mountWithOriginalVisible();
+
+      await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+      await nextTick();
+      // Re-open before the collapse finished.
+      await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+      await nextTick();
+      await flushPromises();
+
+      const section = wrapper.find('.ti-original-text-section');
+      expect(wrapper.find('.ti-original-text-wrapper').classes()).toContain('is-expanded');
+      expect(section.element.style.display).not.toBe('none');
+      expect(section.classes()).not.toContain('ti-original-collapse-leave-active');
+      expect(section.attributes('inert')).toBeUndefined();
+      expect(wrapper.findAllComponents({ name: 'TTSButton' })).toHaveLength(2);
+    });
+
+    it('keeps the source draft intact across Original toggles', async () => {
+      const wrapper = await mountWithOriginalVisible();
+      const editor = wrapper.find('.ti-window-source-input');
+      await editor.setValue('edited source');
+
+      await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+      await flushPromises();
+      await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+      await flushPromises();
+
+      expect(wrapper.find('.ti-window-source-input').element.value).toBe('edited source');
+    });
+
+    it('marks the collapsed original section inert and clears it when expanded', async () => {
+      const wrapper = mount(TranslationWindow, { props: baseProps });
+      await flushPromises();
+
+      // Collapsed by default: hidden content must not be interactive.
+      expect(wrapper.find('.ti-original-text-section').attributes('inert')).toBe('true');
+
+      await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+      await flushPromises();
+
+      expect(wrapper.find('.ti-original-text-section').attributes('inert')).toBeUndefined();
+    });
+
+    it('stops the source TTS with the owner-scoped stop when Original is hidden', async () => {
+      const wrapper = await mountWithOriginalVisible();
+      expect(sourceTTSStopMock).not.toHaveBeenCalled();
+
+      await wrapper.find('.ti-action-btn[title="window_hide_original"]').trigger('click');
+      await flushPromises();
+      expect(sourceTTSStopMock).toHaveBeenCalledTimes(1);
+
+      // Expanding must not stop playback again.
+      await wrapper.find('.ti-action-btn[title="window_show_original"]').trigger('click');
+      await flushPromises();
+      expect(sourceTTSStopMock).toHaveBeenCalledTimes(1);
     });
   });
 });

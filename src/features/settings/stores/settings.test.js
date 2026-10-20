@@ -40,6 +40,7 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({
     set: vi.fn().mockResolvedValue(true),
     remove: vi.fn().mockResolvedValue(true),
     clear: vi.fn().mockResolvedValue(true),
+    getFresh: vi.fn().mockResolvedValue({}),
     on: vi.fn(),
     off: vi.fn()
   }
@@ -607,6 +608,916 @@ describe('Settings Store', () => {
       [...Object.keys(getPersistedDefaultSettings()), 'translationHistory'].sort()
     );
     expect(store.settings.translationHistory).toEqual([]);
+  });
+
+  describe('WINDOW_SHOW_ORIGINAL persistence', () => {
+    it('uses the false CONFIG default and restores its persisted value', async () => {
+      expect(CONFIG.WINDOW_SHOW_ORIGINAL).toBe(false);
+      expect(getPersistedDefaultSettings().WINDOW_SHOW_ORIGINAL).toBe(false);
+      storageManager.get.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: true });
+
+      const store = useSettingsStore();
+      await store.loadSettings();
+
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+    });
+
+    it('keeps a local preference update made while initial storage load is pending', async () => {
+      let resolveLoad;
+      storageManager.get.mockImplementationOnce(() => new Promise(resolve => { resolveLoad = resolve; }));
+      const store = useSettingsStore();
+      const loading = store.loadSettings();
+
+      await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+      resolveLoad({ WINDOW_SHOW_ORIGINAL: false });
+      await loading;
+
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+    });
+
+    it('serializes rapid writes in invocation order and leaves the latest preference in storage', async () => {
+      const store = useSettingsStore();
+      const writes = [];
+      const persisted = {};
+      storageManager.set.mockImplementation(settings => new Promise(resolve => {
+        writes.push({ settings, resolve: () => {
+          Object.assign(persisted, settings);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        const first = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        const second = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+        expect(writes[0].settings).toEqual({ WINDOW_SHOW_ORIGINAL: true });
+
+        writes[0].resolve();
+        await first;
+        await vi.waitFor(() => expect(writes).toHaveLength(2));
+        expect(writes[1].settings).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+        writes[1].resolve();
+        await second;
+
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        // Restore the resolving default or later suites hang on this mock.
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('ignores stale storage notifications while its queued write is pending', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+
+      try {
+        const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+
+        // A stale/older external notification observed while our write is
+        // queued must not overwrite the newer local preference.
+        onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // The queued write reaches storage after a few microtask hops.
+        await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+        // The dropped notification is reconciled against durable storage once
+        // the queue settles; our own write is the durable value there.
+        storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: true });
+        resolveWrite(true);
+        await pending;
+        await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalledWith('WINDOW_SHOW_ORIGINAL'));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Legitimate external synchronization resumes once pending writes settle;
+        // the notification is confirmed against durable storage before applying.
+        storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: false });
+        onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: true });
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('reconciles an external notification that was missed while a local write was pending', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      // Durable storage after our write and the other tab's commit holds false.
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: false });
+
+      try {
+        const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+
+        // Another tab commits false while our write is still queued: the
+        // notification is dropped for now, but it must not be lost.
+        onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        resolveWrite(true);
+        await pending;
+
+        // Once the queue settles the missed change is reconciled against
+        // durable storage.
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('keeps the local preference when a newer local toggle happens during the reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+
+      try {
+        const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+        onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+
+        resolveWrite(true);
+        await pending;
+        // The reconciliation is now reading durable storage.
+        await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+
+        // A newer local toggle owns the value while the reconciliation reads.
+        const newer = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await newer;
+
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('reconciles after a failed write so the local state does not stay divergent', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: false });
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true)).rejects.toThrow('storage failed');
+
+      // The write never landed, so the local state returns to the durable value.
+      await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+    });
+
+    it('falls back to the canonical default when a failed first write left no stored preference', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      // Durable storage has no entry for this key: the first write never landed.
+      storageManager.getFresh.mockResolvedValueOnce({});
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true)).rejects.toThrow('storage failed');
+
+      // The local state returns to the canonical default instead of keeping the
+      // intent that was never persisted.
+      await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+    });
+
+    // A reconciliation reads durable storage asynchronously; Reset and Import
+    // can change the preference while that read is in flight.
+    const startPausedReconciliation = async (store, onChange) => {
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+
+      const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+      await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+      resolveWrite(true);
+      await pending;
+      // The reconciliation is now reading durable storage.
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+      return resolveGet;
+    };
+
+    it('a Reset that changes the preference invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      try {
+        const resolveGet = await startPausedReconciliation(store, onChange);
+
+        // Reset applies its default preference while the read is paused.
+        await store.resetSettings();
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not resurrect the pre-Reset value.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('an Import that changes the preference invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+
+      try {
+        const resolveGet = await startPausedReconciliation(store, onChange);
+
+        // The import applies the backed-up preference while the read is paused.
+        await store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not resurrect the pre-import value.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a Reset cancelled before applying its preference keeps the in-flight reconciliation valid', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      try {
+        const resolveGet = await startPausedReconciliation(store, onChange);
+
+        // The Reset fails before it applies its preference, so it must not
+        // invalidate the pending reconciliation.
+        storageManager.get.mockRejectedValueOnce(new Error('storage read failed'));
+        await expect(store.resetSettings()).rejects.toThrow('storage read failed');
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // The reconciliation still applies the confirmed durable value.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: false });
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    // A Reset/Import is a newer preference intent even when it reapplies the
+    // same value, so an older in-flight reconciliation must not resurrect a
+    // stale durable read.
+    const startPausedReconciliationAtSameValue = async (store, onChange) => {
+      let resolveWrite;
+      storageManager.set.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve; }));
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+
+      // Re-persist the current value so a notification is missed while a write
+      // is pending and a reconciliation is requested.
+      const pending = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+      await vi.waitFor(() => expect(storageManager.set).toHaveBeenCalledTimes(1));
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: true, oldValue: false });
+      resolveWrite(true);
+      await pending;
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+      return resolveGet;
+    };
+
+    it('a same-value Reset invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      try {
+        const resolveGet = await startPausedReconciliationAtSameValue(store, onChange);
+
+        // Reset reapplies the same default value.
+        await store.resetSettings();
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not replace the re-applied preference.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a same-value Import invalidates an in-flight reconciliation', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      try {
+        const resolveGet = await startPausedReconciliationAtSameValue(store, onChange);
+
+        // The import reapplies the same backed-up value.
+        await store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: false });
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        // The stale read must not replace the re-applied preference.
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    // A notification confirms itself against durable storage asynchronously; a
+    // Reset/Import that completes during that read owns the preference.
+    const startPausedNotificationValidation = async (store, onChange) => {
+      let resolveGet;
+      storageManager.getFresh.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: true, oldValue: false });
+      // The confirmation is now reading durable storage.
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalled());
+      return resolveGet;
+    };
+
+    it('rejects a stale notification that overlaps a successful Reset', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      const resolveGet = await startPausedNotificationValidation(store, onChange);
+
+      // A successful Reset reapplies the default preference.
+      await store.resetSettings();
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      // The stale confirmation must not replace the re-applied preference.
+      resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+    });
+
+    it('rejects a stale notification that overlaps a successful Import', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: false,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      const resolveGet = await startPausedNotificationValidation(store, onChange);
+
+      // A successful Import applies the backed-up preference.
+      await store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: false });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+      // The stale confirmation must not replace the applied preference.
+      resolveGet({ WINDOW_SHOW_ORIGINAL: true });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+    });
+
+    it('ignores a delayed stale notification that arrives after all queued writes settle', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+      // Durable storage holds the newest committed preference.
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: true });
+
+      // A delayed notification from the superseded older write arrives late.
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalledWith('WINDOW_SHOW_ORIGINAL'));
+
+      await vi.waitFor(() => { expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true); });
+      // Keep the local preference even across following ticks.
+      await nextTick();
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+    });
+
+    it('applies a settled notification when it still matches durable storage', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+      // Another context commits false afterwards; the echoed notification matches
+      // durable storage, so it must apply despite transcending the write history.
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: false });
+
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: true });
+      await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+    });
+
+    it('rejects a stale full-snapshot notification when durable storage keeps the newest value', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+      await store.saveAllSettings(); // full save excludes this key; durable keeps the narrow-write value
+      // A delayed notification from an older occurrence arrives afterwards.
+      storageManager.getFresh.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: true });
+
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: false, oldValue: false });
+      await vi.waitFor(() => expect(storageManager.getFresh).toHaveBeenCalledTimes(1));
+
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+    });
+
+    it('does not apply a non-boolean or detached notification value for this key', async () => {
+      const store = useSettingsStore();
+      const onChange = await getStorageChangeListener(store);
+
+      await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+
+      // e.g. a storage.remove() emits newValue undefined for this key.
+      onChange({ key: 'WINDOW_SHOW_ORIGINAL', newValue: undefined, oldValue: true });
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      expect(storageManager.getFresh).not.toHaveBeenCalled();
+    });
+
+    it('unrelated full save excludes the window preference and cannot clobber a newer toggle committed out of order', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        // Full-snapshot save starts first but completes after the toggle.
+        const saving = store.saveAllSettings();
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+        expect(writes[0].snapshot).not.toHaveProperty('WINDOW_SHOW_ORIGINAL');
+
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(writes).toHaveLength(2));
+
+        // Toggle commits BEFORE the delayed full-snapshot save completes.
+        writes[1].resolve();
+        await toggle;
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        writes[0].resolve();
+        await saving;
+
+        // The late snapshot write carried no value for this key, so the newer
+        // committed preference survives in durable storage and locally.
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('explicit updateMultipleSettings for this key joins the queued order of narrow toggles', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        // Multi-update (false) is issued first; a narrow toggle (true) joins
+        // the same queue behind it. Completions are forced out of order.
+        const multi = store.updateMultipleSettings({ WINDOW_SHOW_ORIGINAL: false, THEME: 'dark' });
+        await vi.waitFor(() => expect(writes).toHaveLength(2));
+        expect(writes[0].snapshot).toEqual({ THEME: 'dark' });
+        expect(writes[1].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+
+        // The toggle applies locally and joins the queue behind the pending
+        // false key-write before that write has even settled.
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        writes[1].resolve(); // stale false reaches durable storage first
+        await vi.waitFor(() => expect(writes).toHaveLength(3));
+        expect(writes[2].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: true });
+
+        writes[0].resolve();
+        await multi;
+        writes[2].resolve(); // the queued toggle commits last and wins
+        await toggle;
+
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(persisted.THEME).toBe('dark');
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('resetSettings routes the window preference default through the serialized write queue after a pending toggle', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        // Pending toggle (true) issued first; Reset joins the queue behind it
+        // and must still win.
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+        expect(writes[0].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: true });
+
+        // The durable copy still holds the key, so broad removal must skip it.
+        storageManager.get.mockResolvedValueOnce({ WINDOW_SHOW_ORIGINAL: true, THEME: 'dark' });
+        const resetting = store.resetSettings();
+        await vi.waitFor(() => expect(storageManager.remove).toHaveBeenCalledWith(['THEME']));
+        expect(storageManager.remove.mock.calls.every(([keys]) => (
+          !(Array.isArray(keys)) || !keys.includes('WINDOW_SHOW_ORIGINAL')
+        ))).toBe(true);
+        // Reset already replaced local state with defaults while its queued
+        // write is still waiting behind the pending toggle.
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        writes[0].resolve(); // the older toggle commits first
+        await toggle;
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        await vi.waitFor(() => expect(writes).toHaveLength(2));
+        expect(writes[1].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+        writes[1].resolve(); // reset's queued default commits after the toggle and wins
+
+        await vi.waitFor(() => expect(writes).toHaveLength(3));
+        expect(writes[2]).not.toHaveProperty('snapshot.WINDOW_SHOW_ORIGINAL'); // defaults snapshot carries no value for this key
+        writes[2].resolve();
+        await resetting;
+
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(false);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('resetSettings queues its default before a newer toggle, which then wins', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        // Reset issues its queued default (false) first.
+        const resetting = store.resetSettings();
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+        expect(writes[0].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+
+        // A newer toggle applies locally and joins the queue behind the
+        // reset's still-pending default write.
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        writes[0].resolve(); // reset's default (false) commits; the defaults snapshot and the newer toggle's queued write dispatch afterwards
+        await vi.waitFor(() => expect(writes).toHaveLength(3));
+        expect(writes[1]).not.toHaveProperty('snapshot.WINDOW_SHOW_ORIGINAL'); // defaults snapshot carries no value for this key
+        expect(writes[2].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: true });
+
+        writes[1].resolve();
+        await resetting;
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(false);
+
+        writes[2].resolve(); // the newer toggle commits after the reset and wins
+        await toggle;
+
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a toggle issued while Reset awaits storageManager.get() supersedes Reset', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        // Reset reserves its queue slot synchronously but the default write
+        // stays gated behind the prerequisite storage read.
+        let resolveGet;
+        storageManager.get.mockImplementationOnce(() => new Promise((resolve) => { resolveGet = resolve; }));
+        const resetting = store.resetSettings();
+        expect(storageManager.set).not.toHaveBeenCalled();
+
+        // A newer toggle issued while Reset awaits the storage read queues
+        // behind the reservation and owns the newest intent.
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        resolveGet({ WINDOW_SHOW_ORIGINAL: true, THEME: 'dark' });
+        await vi.waitFor(() => expect(storageManager.remove).toHaveBeenCalledWith(['THEME']));
+        // Reset's delayed local defaults replacement must not clobber the toggle.
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Prerequisites succeeded: the reserved default write dispatches first.
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+        expect(writes[0].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+
+        writes[0].resolve(); // Reset's default commits; the gated toggle dispatches behind it
+        await vi.waitFor(() => expect(writes).toHaveLength(3));
+        // Dispatch order after the reserved write resolves: Reset's own
+        // continuation awaits the write promise directly, while the toggle's
+        // queued callback sits one microtask behind it.
+        expect(writes[1]).not.toHaveProperty('snapshot.WINDOW_SHOW_ORIGINAL'); // defaults snapshot carries no value for this key
+        expect(writes[2].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: true }); // the newer toggle's queued write
+
+        writes[1].resolve();
+        writes[2].resolve();
+        await Promise.all([resetting, toggle]);
+
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a toggle issued while Reset awaits storageManager.remove() supersedes Reset', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      try {
+        // Reset must encounter stored keys so its removal step actually runs;
+        // the reserved default write stays gated behind the removal.
+        storageManager.get.mockResolvedValueOnce({ THEME: 'dark' });
+        let resolveRemove;
+        storageManager.remove.mockImplementationOnce(() => new Promise((resolve) => { resolveRemove = resolve; }));
+        const resetting = store.resetSettings();
+        expect(storageManager.set).not.toHaveBeenCalled();
+
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // The removal reaches the storage mock after a few microtask hops.
+        await vi.waitFor(() => expect(storageManager.remove).toHaveBeenCalledWith(['THEME']));
+        resolveRemove();
+        // Reset's delayed local defaults replacement must not clobber the toggle.
+        await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true));
+
+        // Prerequisites succeeded: the reserved default write dispatches first.
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+        expect(writes[0].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+
+        writes[0].resolve(); // Reset's default commits; the gated toggle dispatches behind it
+        await vi.waitFor(() => expect(writes).toHaveLength(3));
+        // Dispatch order after the reserved write resolves: Reset's own
+        // continuation awaits the write promise directly, while the toggle's
+        // queued callback sits one microtask behind it.
+        expect(writes[1]).not.toHaveProperty('snapshot.WINDOW_SHOW_ORIGINAL'); // defaults snapshot carries no value for this key
+        expect(writes[2].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: true }); // the newer toggle's queued write
+
+        writes[1].resolve();
+        writes[2].resolve();
+        await Promise.all([resetting, toggle]);
+
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a failed Reset storage read cancels the reserved default write and keeps the preference', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      storageManager.set.mockImplementation((snapshot) => {
+        Object.assign(persisted, snapshot);
+        return Promise.resolve(true);
+      });
+
+      try {
+        // A committed user preference must survive a failed Reset untouched.
+        await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        const readError = new Error('storage read failed');
+        storageManager.get.mockRejectedValueOnce(readError);
+
+        await expect(store.resetSettings()).rejects.toBe(readError);
+
+        // The reserved default write was cancelled without any storage write.
+        expect(storageManager.set).toHaveBeenCalledTimes(1);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Subsequent toggles continue normally through the drained queue.
+        await expect(store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false)).resolves.toBe(true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a failed Reset storage removal cancels the reserved default write and keeps the preference', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      storageManager.set.mockImplementation((snapshot) => {
+        Object.assign(persisted, snapshot);
+        return Promise.resolve(true);
+      });
+
+      try {
+        // Reset must encounter stored keys so its removal step actually runs.
+        await store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        storageManager.get.mockResolvedValueOnce({ THEME: 'dark' });
+        const removeError = new Error('storage removal failed');
+        storageManager.remove.mockRejectedValueOnce(removeError);
+
+        await expect(store.resetSettings()).rejects.toBe(removeError);
+
+        // The reserved default write was cancelled without any storage write.
+        expect(storageManager.set).toHaveBeenCalledTimes(1);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Subsequent toggles continue normally through the drained queue.
+        await expect(store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false)).resolves.toBe(true);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(false);
+      } finally {
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a failed Reset read cancels its reserved write while an earlier toggle write stays pending', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      // Node surfaces unhandled rejections through this event; capture our slice.
+      const unhandledRejections = [];
+      const onUnhandledRejection = (reason) => unhandledRejections.push(reason);
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      try {
+        // The earlier toggle write stays pending and keeps the reserved slot
+        // from running, so a reject-on-cancel design would go unhandled.
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+
+        const readError = new Error('storage read failed');
+        storageManager.get.mockRejectedValueOnce(readError);
+        const resetting = store.resetSettings();
+
+        // Reset's failure propagates without waiting behind the pending write.
+        await expect(resetting).rejects.toBe(readError);
+        expect(writes).toHaveLength(1); // the cancelled slot dispatched nothing so far
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Release the earlier write: the cancelled slot must skip, not write.
+        writes[0].resolve();
+        await toggle;
+        expect(storageManager.set).toHaveBeenCalledTimes(1);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Subsequent toggles keep functioning through the drained queue.
+        const followUpToggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+        await vi.waitFor(() => expect(writes).toHaveLength(2));
+        expect(writes[1].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+        writes[1].resolve();
+        await expect(followUpToggle).resolves.toBe(true);
+
+        // A macro-task tick lets any unhandled rejection surface.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(unhandledRejections).toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection);
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('a failed Reset removal cancels its reserved write while an earlier toggle write stays pending', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      const persisted = {};
+      const writes = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        writes.push({ snapshot, resolve: () => {
+          Object.assign(persisted, snapshot);
+          resolve(true);
+        } });
+      }));
+
+      // Node surfaces unhandled rejections through this event; capture our slice.
+      const unhandledRejections = [];
+      const onUnhandledRejection = (reason) => unhandledRejections.push(reason);
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      try {
+        const toggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true);
+        await vi.waitFor(() => expect(writes).toHaveLength(1));
+
+        storageManager.get.mockResolvedValueOnce({ THEME: 'dark' });
+        const removeError = new Error('storage removal failed');
+        storageManager.remove.mockRejectedValueOnce(removeError);
+        const resetting = store.resetSettings();
+
+        await expect(resetting).rejects.toBe(removeError);
+        expect(writes).toHaveLength(1);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        writes[0].resolve();
+        await toggle;
+        expect(storageManager.set).toHaveBeenCalledTimes(1);
+        expect(persisted.WINDOW_SHOW_ORIGINAL).toBe(true);
+
+        // Subsequent toggles keep functioning through the drained queue.
+        const followUpToggle = store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', false);
+        expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+        await vi.waitFor(() => expect(writes).toHaveLength(2));
+        expect(writes[1].snapshot).toEqual({ WINDOW_SHOW_ORIGINAL: false });
+        writes[1].resolve();
+        await expect(followUpToggle).resolves.toBe(true);
+
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(unhandledRejections).toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection);
+        storageManager.set.mockImplementation(async () => true);
+      }
+    });
+
+    it('importSettings restores the window preference explicitly outside the full save', async () => {
+      secureStorage.processImportedSettings.mockResolvedValueOnce({
+        THEME: 'dark',
+        WINDOW_SHOW_ORIGINAL: true,
+      });
+      runSettingsMigrations.mockResolvedValueOnce({ updates: {}, removals: [], logs: [] });
+      const store = useSettingsStore();
+      const persisted = [];
+      storageManager.set.mockImplementation((snapshot) => new Promise((resolve) => {
+        persisted.push({ ...snapshot });
+        resolve(true);
+      }));
+
+      await expect(store.importSettings({ _exported: true, THEME: 'dark', WINDOW_SHOW_ORIGINAL: true })).resolves.toBe(true);
+
+      expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(true);
+      // The full-save snapshot carries no value for this key; the explicit
+      // queued restore writes the imported value afterwards.
+      expect(persisted[0]).not.toHaveProperty('WINDOW_SHOW_ORIGINAL');
+      expect(persisted.some((snapshot) => snapshot.WINDOW_SHOW_ORIGINAL === true)).toBe(true);
+    });
   });
 
   it('should include BILINGUAL_TRANSLATION_MODES.PDF with the CONFIG default', () => {
@@ -1707,14 +2618,21 @@ describe('Settings Store', () => {
   it('resetSettings should clear storage and restore defaults', async () => {
     const store = useSettingsStore();
     store.settings.THEME = 'dark';
-    
+
     await store.resetSettings();
     await nextTick();
-    
+
     expect(storageManager.clear).not.toHaveBeenCalled();
     const persistedDefaults = getPersistedDefaultSettings();
+    // Full-snapshot writes never carry serializer/window-owned keys; the
+    // window preference restores through its dedicated write queue instead.
     delete persistedDefaults.COLLAPSED_PROVIDER_CATEGORIES;
+    delete persistedDefaults.WINDOW_SHOW_ORIGINAL;
     expect(storageManager.set).toHaveBeenCalledWith(persistedDefaults);
+    expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false);
+    expect(storageManager.set.mock.calls.some(([snapshot]) => (
+      Object.hasOwn(snapshot, 'WINDOW_SHOW_ORIGINAL') && snapshot.WINDOW_SHOW_ORIGINAL === false
+    ))).toBe(true);
     expect(store.settings.THEME).toBe('auto');
     expect(store.settings.translationHistory).toEqual([]);
   });
@@ -1863,6 +2781,7 @@ describe('Settings Store', () => {
       });
       const persistedDefaults = getPersistedDefaultSettings();
       delete persistedDefaults.COLLAPSED_PROVIDER_CATEGORIES;
+      delete persistedDefaults.WINDOW_SHOW_ORIGINAL;
       expect(storageManager.set.mock.calls.at(-1)[0]).toEqual(persistedDefaults);
     });
 

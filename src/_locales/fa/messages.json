@@ -3059,19 +3059,19 @@
     "message": "متنی برای خواندن موجود نیست"
   },
   "window_tts_stop": {
-    "message": "توقف خواندن (برای توقف کلیک کنید)"
+    "message": "توقف خواندن"
   },
   "window_tts_speak_original": {
-    "message": "🔊 خواندن متن اصلی (حالت فعلی: متن اصلی)"
+    "message": "خواندن متن اصلی"
   },
   "window_tts_speak_translation": {
-    "message": "🔊 خواندن ترجمه (حالت فعلی: ترجمه)"
+    "message": "خواندن ترجمه"
   },
   "window_show_original": {
-    "message": "نمایش متن اصلی (سپس از دکمه بلندگو برای گوش دادن به متن اصلی استفاده کنید)"
+    "message": "نمایش متن اصلی"
   },
   "window_hide_original": {
-    "message": "مخفی کردن متن اصلی (دکمه TTS متن اصلی را می‌خواند)"
+    "message": "مخفی کردن متن اصلی"
   },
   "window_loading_alt": {
     "message": "در حال بارگذاری..."
