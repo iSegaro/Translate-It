@@ -641,6 +641,27 @@ describe('offscreen live-dubbing control sender authorization', () => {
     expect(track.stop).toHaveBeenCalledOnce();
   });
 
+  it('routes MEDIA_RESUME and MEDIA_COMMIT from the background service worker', async () => {
+    await loadOffscreen();
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    const { LIVE_DUBBING_ACTIONS } = await import('../features/live-dubbing/constants.js');
+    const handle = vi.spyOn(liveDubbingController, 'handle');
+
+    for (const action of [LIVE_DUBBING_ACTIONS.MEDIA_RESUME, LIVE_DUBBING_ACTIONS.MEDIA_COMMIT]) {
+      const data = {
+        sessionId: 'unknown-session',
+        providerId: 'gemini',
+        eventSequence: 0,
+        mediaSequence: 1,
+        rotationId: 'rotation-1',
+      };
+      await expect(sendMessage({ target: 'offscreen', action, data }, swSender))
+        .resolves.toEqual({ success: false, ignored: true });
+      expect(handle).toHaveBeenLastCalledWith({ action, data });
+    }
+    expect(handle).toHaveBeenCalledTimes(2);
+  });
+
   it('routes original-volume control only from the background service worker', async () => {
     await loadOffscreen();
     const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
