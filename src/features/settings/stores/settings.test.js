@@ -773,6 +773,20 @@ describe('Settings Store', () => {
       await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
     });
 
+    it('falls back to the canonical default when a failed first write left no stored preference', async () => {
+      const store = useSettingsStore();
+      await getStorageChangeListener(store);
+      // Durable storage has no entry for this key: the first write never landed.
+      storageManager.getFresh.mockResolvedValueOnce({});
+      storageManager.set.mockRejectedValueOnce(new Error('storage failed'));
+
+      await expect(store.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', true)).rejects.toThrow('storage failed');
+
+      // The local state returns to the canonical default instead of keeping the
+      // intent that was never persisted.
+      await vi.waitFor(() => expect(store.settings.WINDOW_SHOW_ORIGINAL).toBe(false));
+    });
+
     // A reconciliation reads durable storage asynchronously; Reset and Import
     // can change the preference while that read is in flight.
     const startPausedReconciliation = async (store, onChange) => {

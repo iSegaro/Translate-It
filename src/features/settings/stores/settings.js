@@ -1181,9 +1181,15 @@ export const useSettingsStore = defineStore('settings', () => {
       if (windowShowOriginalPendingWrites > 0) return
       if (windowShowOriginalEditVersion !== expectedVersion) return
       const durable = stored?.WINDOW_SHOW_ORIGINAL
-      if (typeof durable !== 'boolean') return
-      if (durable === settings.value.WINDOW_SHOW_ORIGINAL) return
-      settings.value.WINDOW_SHOW_ORIGINAL = durable
+      // A failed first write can leave durable storage without this key: the
+      // canonical default is the authoritative value in that case, so the local
+      // state does not keep an intent that was never persisted.
+      const resolved = durable === undefined || durable === null
+        ? getDefaultSettings().WINDOW_SHOW_ORIGINAL
+        : durable
+      if (typeof resolved !== 'boolean') return
+      if (resolved === settings.value.WINDOW_SHOW_ORIGINAL) return
+      settings.value.WINDOW_SHOW_ORIGINAL = resolved
     })
     const settled = operation.catch(() => {})
     windowShowOriginalSyncQueue = settled
