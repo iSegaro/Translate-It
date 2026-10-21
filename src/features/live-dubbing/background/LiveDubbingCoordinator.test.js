@@ -686,6 +686,72 @@ describe('Live Dubbing media observation authorization', () => {
     }
   });
 
+  it('keeps a final inventory valid across an unchanged fresh positive report', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
+      targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 123,
+      lastError: null, eventSequence: 1,
+    } });
+    const { coordinator, browserAPI } = harness;
+    const descriptor = await coordinator._readDescriptor();
+    coordinator.sessionRegistry.setSessionState(descriptor.sessionId, { descriptor, terminalRequested: false, media: {} });
+    coordinator.mediaObservation = { sessionId: descriptor.sessionId, token: 'session', frames: new Map([
+      ['0:doc', { token: 'old', revision: 0, playing: true }],
+    ]) };
+    coordinator.mediaFrameDocuments.set(0, 'doc');
+    let resolveFinal;
+    browserAPI.webNavigation.getAllFrames.mockResolvedValueOnce([{ frameId: 0, documentId: 'doc' }])
+      .mockImplementationOnce(() => new Promise(resolve => { resolveFinal = resolve; }));
+    browserAPI.tabs.sendMessage.mockResolvedValue(undefined);
+    const pending = coordinator._freshPlayingBarrier(descriptor, { cancelled: false });
+    for (let i = 0; i < 8 && !resolveFinal; i += 1) await Promise.resolve();
+    const frame = coordinator.mediaObservation.frames.get('0:doc');
+    await coordinator.handleMediaObservation({ data: { token: frame.token, revision: 1, playing: true } }, {
+      id: 'extension-id', tab: { id: 42 }, frameId: 0, documentId: 'doc', url: 'https://example.test',
+    });
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    await coordinator.handleMediaObservation({ data: { token: frame.token, revision: 2, playing: true } }, {
+      id: 'extension-id', tab: { id: 42 }, frameId: 0, documentId: 'doc', url: 'https://example.test',
+    });
+    resolveFinal([{ frameId: 0, documentId: 'doc' }]);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it('revalidates a final inventory superseded by an equivalent concurrent inventory', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
+      targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 123,
+      lastError: null, eventSequence: 1,
+    } });
+    const { coordinator, browserAPI } = harness;
+    const descriptor = await coordinator._readDescriptor();
+    coordinator.sessionRegistry.setSessionState(descriptor.sessionId, { descriptor, terminalRequested: false, media: {} });
+    coordinator.mediaObservation = { sessionId: descriptor.sessionId, token: 'session', frames: new Map([
+      ['0:doc', { token: 'old', revision: 0, playing: true }],
+    ]) };
+    coordinator.mediaFrameDocuments.set(0, 'doc');
+    let resolveFinal;
+    let resolveConcurrent;
+    browserAPI.webNavigation.getAllFrames.mockResolvedValueOnce([{ frameId: 0, documentId: 'doc' }])
+      .mockImplementationOnce(() => new Promise(resolve => { resolveFinal = resolve; }))
+      .mockImplementationOnce(() => new Promise(resolve => { resolveConcurrent = resolve; }))
+      .mockResolvedValue([{ frameId: 0, documentId: 'doc' }]);
+    browserAPI.tabs.sendMessage.mockResolvedValue(undefined);
+    const pending = coordinator._freshPlayingBarrier(descriptor, { cancelled: false });
+    for (let i = 0; i < 8 && !resolveFinal; i += 1) await Promise.resolve();
+    const frame = coordinator.mediaObservation.frames.get('0:doc');
+    await coordinator.handleMediaObservation({ data: { token: frame.token, revision: 1, playing: true } }, {
+      id: 'extension-id', tab: { id: 42 }, frameId: 0, documentId: 'doc', url: 'https://example.test',
+    });
+    for (let i = 0; i < 8 && !resolveFinal; i += 1) await Promise.resolve();
+    const concurrent = coordinator._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+    for (let i = 0; i < 8 && !resolveConcurrent; i += 1) await Promise.resolve();
+    resolveFinal([{ frameId: 0, documentId: 'doc' }]);
+    resolveConcurrent([{ frameId: 0, documentId: 'doc' }]);
+    await concurrent;
+    await expect(pending).resolves.toBe(true);
+  });
+
   it('uses the real Controller through Resume and Commit and sends PCM only after Commit', async () => {
     vi.useFakeTimers();
     try {
@@ -1053,6 +1119,35 @@ describe('Live Dubbing media observation authorization', () => {
     await expect(pending).resolves.toBe(false);
     expect(coordinator.mediaFrameDocuments.get(1)).toBe('new-doc');
     expect(coordinator.mediaObservation.frames.has('1:old-doc')).toBe(false);
+  });
+
+  it('does not apply an inventory response older than a newly authorized frame', async () => {
+    const { coordinator, browserAPI } = createHarness({ stored: {
+      sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
+      targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 123, lastError: null, eventSequence: 1,
+    } });
+    const descriptor = await coordinator._readDescriptor();
+    coordinator.mediaObservation = { sessionId: 'session-1', token: 'session-token', frames: new Map([
+      ['0:top-doc', { token: 'top-token', revision: 0, playing: true }],
+    ]) };
+    coordinator.mediaFrameDocuments.set(0, 'top-doc');
+    browserAPI.webNavigation.getFrame.mockResolvedValue({ documentId: 'new-frame-doc' });
+    let resolveInventory;
+    browserAPI.webNavigation.getAllFrames.mockImplementation(() => new Promise(resolve => { resolveInventory = resolve; }));
+    const pending = coordinator._reconcileMediaFrameInventory(42, descriptor);
+    await vi.waitFor(() => expect(resolveInventory).toEqual(expect.any(Function)));
+
+    const authorization = await coordinator.authorizeMediaObserver({
+      id: 'extension-id', tab: { id: 42 }, frameId: 1,
+      documentId: 'new-frame-doc', url: 'https://example.test/iframe',
+    });
+    expect(authorization.observe).toBe(true);
+    resolveInventory([{ frameId: 0, documentId: 'top-doc' }]);
+
+    await expect(pending).resolves.toBe(false);
+    expect(coordinator.mediaFrameDocuments.get(1)).toBe('new-frame-doc');
+    expect(coordinator.mediaObservation.frames.has('1:new-frame-doc')).toBe(true);
   });
 
   it('only applies the newest of concurrent frame inventory responses', async () => {

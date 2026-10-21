@@ -928,6 +928,7 @@ export class LiveDubbingCoordinator {
       if (this.mediaFrameDocuments.has(frameId)
         && this.mediaFrameDocuments.get(frameId) !== documentId) return { observe: false };
       this.mediaFrameDocuments.set(frameId, documentId);
+      this.mediaInventoryRequestId += 1;
     }
     if (this._isMediaSessionTerminal(descriptor.sessionId)
       || this.mediaRecoverySessions.has(descriptor.sessionId)
@@ -1265,6 +1266,18 @@ export class LiveDubbingCoordinator {
       Promise.resolve(promise).then(value => ({ value })),
       interruptPromise,
     ]);
+    const reconcileBarrierInventory = async () => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const requestId = this.mediaInventoryRequestId + 1;
+        const result = await withinDeadline(
+          this._reconcileMediaFrameInventory(descriptor.tabId, descriptor),
+        );
+        if (result === interrupted || barrier.cancelled || operation.cancelled
+          || media.barrier !== barrier || !this._isCurrentMediaDescriptor(descriptor)) return interrupted;
+        if (result.value === true || this.mediaInventoryRequestId === requestId || attempt === 1) return result;
+      }
+      return { value: false };
+    };
     media.barrier = barrier;
     for (const [, frame] of frames) {
       frame.token = this.uuid();
@@ -1274,9 +1287,7 @@ export class LiveDubbingCoordinator {
     this.mediaActivityRevision += 1;
     barrier.minimumRevision = -1;
     try {
-      const inventoryResult = await withinDeadline(
-        this._reconcileMediaFrameInventory(descriptor.tabId, descriptor),
-      );
+      const inventoryResult = await reconcileBarrierInventory();
       if (inventoryResult === interrupted || barrier.cancelled
         || media.barrier !== barrier || operation.cancelled
         || !this._isCurrentMediaDescriptor(descriptor)) return false;
@@ -1308,9 +1319,7 @@ export class LiveDubbingCoordinator {
         this._logMedia('debug', 'barrier', { stage: 'playing-report', outcome: 'not-playing' });
         return false;
       }
-      const finalInventory = await withinDeadline(
-        this._reconcileMediaFrameInventory(descriptor.tabId, descriptor),
-      );
+      const finalInventory = await reconcileBarrierInventory();
       if (finalInventory === interrupted || barrier.cancelled || operation.cancelled
         || !this._isCurrentMediaDescriptor(descriptor)) return false;
       if (media.barrier === barrier) media.barrier = null;
@@ -1521,7 +1530,6 @@ export class LiveDubbingCoordinator {
   }
 
   async _reconcileMediaFrameInventory(tabId, expectedDescriptor) {
-    const activityRevision = this.mediaActivityRevision;
     const requestId = ++this.mediaInventoryRequestId;
     let inventory;
     try {
@@ -1529,22 +1537,21 @@ export class LiveDubbingCoordinator {
       if (typeof getAllFrames !== 'function') throw new Error('frame inventory unavailable');
       inventory = await getAllFrames.call(this.browserAPI.webNavigation, { tabId });
     } catch {
-      if (activityRevision === this.mediaActivityRevision && requestId === this.mediaInventoryRequestId) {
+      if (requestId === this.mediaInventoryRequestId) {
         this._forgetMediaFrameInventory(expectedDescriptor);
       }
       return false;
     }
-    if (activityRevision !== this.mediaActivityRevision || requestId !== this.mediaInventoryRequestId) return false;
+    if (requestId !== this.mediaInventoryRequestId) return false;
     const current = await this._readDescriptor();
     if (this._storageReadFailed() || this._storageDescriptorInvalid()
       || !this._isSameDescriptorFence(current, expectedDescriptor)
       || this.mediaObservation.sessionId !== expectedDescriptor.sessionId
       || this._isMediaSessionTerminal(expectedDescriptor.sessionId)
-      || activityRevision !== this.mediaActivityRevision
       || requestId !== this.mediaInventoryRequestId) return false;
     if (!Array.isArray(inventory) || inventory.some(frame => !Number.isInteger(frame?.frameId)
       || frame.frameId < 0 || typeof frame.documentId !== 'string' || !frame.documentId)) {
-      if (activityRevision === this.mediaActivityRevision && requestId === this.mediaInventoryRequestId) {
+      if (requestId === this.mediaInventoryRequestId) {
         this._forgetMediaFrameInventory(expectedDescriptor);
       }
       return false;
