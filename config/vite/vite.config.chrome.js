@@ -9,6 +9,7 @@ import projectNaming from '../../scripts/shared/project-names.cjs'
 
 const { artifactPrefix } = projectNaming.getProjectNames(pkg.name)
 const baseOutDir = `dist/chrome/${artifactPrefix}-v${pkg.version}`;
+const watchDelay = Number(process.env.VITE_WATCH_DELAY || 0)
 
 // Import production config for production builds
 let productionConfig = null;
@@ -196,6 +197,7 @@ export default defineConfig({
   },
   build: {
     ...(finalConfig.build || {}),
+    watch: finalConfig.build?.watch ? { ...finalConfig.build.watch, buildDelay: watchDelay } : undefined,
     outDir: baseOutDir,
     rollupOptions: {
       ...(finalConfig.build?.rollupOptions || {}),
@@ -225,6 +227,7 @@ export default defineConfig({
         ...baseConfig,
         build: {
           ...baseConfig.build,
+          watch: baseConfig.build?.watch ? { ...baseConfig.build.watch, buildDelay: watchDelay } : undefined,
           outDir: baseOutDir,
           modulePreload: false,
           rollupOptions: {
@@ -257,6 +260,7 @@ export default defineConfig({
         ...baseConfig,
         build: {
           ...baseConfig.build,
+          watch: baseConfig.build?.watch ? { ...baseConfig.build.watch, buildDelay: watchDelay } : undefined,
           outDir: baseOutDir,
           emptyOutDir: false,
           rollupOptions: {
