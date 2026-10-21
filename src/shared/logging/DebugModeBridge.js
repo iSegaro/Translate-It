@@ -33,7 +33,7 @@ class DebugModeBridge {
   }
 
   /**
-   * Detect the current context (background, content script, popup, options)
+   * Detect the current context (background, content script, popup, options, offscreen)
    * @returns {string} Context name
    */
   detectContext() {
@@ -63,6 +63,9 @@ class DebugModeBridge {
         }
         if (url.includes('/sidepanel.html') || url.includes('sidepanel/')) {
           return 'sidepanel';
+        }
+        if (url.includes('/offscreen.html')) {
+          return 'offscreen';
         }
       }
 
@@ -318,8 +321,8 @@ class DebugModeBridge {
       this.currentDebugMode = newDebugMode;
       this.applyDebugMode(newDebugMode);
 
-      // Broadcast to other contexts (except background script to avoid loops)
-      if (this.context !== 'background') {
+      // Background owns broadcasts; offscreen applies local changes only.
+      if (this.context !== 'background' && this.context !== 'offscreen') {
         this.broadcastChange(MessageActions.DEBUG_MODE_CHANGED, { debugMode: newDebugMode });
       }
     }
@@ -337,7 +340,7 @@ class DebugModeBridge {
 
     this.applyComponentLogLevels(levels);
 
-    if (this.context !== 'background') {
+    if (this.context !== 'background' && this.context !== 'offscreen') {
       this.broadcastChange(MessageActions.COMPONENT_LOG_LEVELS_CHANGED, { levels });
     }
   }

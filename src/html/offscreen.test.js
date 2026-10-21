@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   mediaDevices: null,
   previousMediaDevices: undefined,
   hadMediaDevices: false,
+  bridgeInitialization: null,
 }));
 
 class FakeAudio {
@@ -50,8 +51,17 @@ class FakeUtterance {
   }
 }
 
-async function loadOffscreen({ mediaDevices = null } = {}) {
+async function loadOffscreen({ mediaDevices = null, loggingSettings = null } = {}) {
   vi.resetModules();
+  delete globalThis.__TRANSLATE_IT__;
+  if (loggingSettings) {
+    vi.doMock('@/shared/storage/core/StorageCore.js', () => ({
+      storageManager: {
+        get: vi.fn(async (defaults) => ({ ...defaults, ...loggingSettings })),
+        on: vi.fn(),
+      },
+    }));
+  }
   if (mediaDevices) {
     state.hadMediaDevices = 'mediaDevices' in navigator;
     state.previousMediaDevices = navigator.mediaDevices;
@@ -91,6 +101,12 @@ async function loadOffscreen({ mediaDevices = null } = {}) {
   globalThis.fetch = vi.fn();
   globalThis.URL.createObjectURL = vi.fn(() => `blob:test-${state.audios.length}`);
   globalThis.URL.revokeObjectURL = vi.fn();
+  const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+  const initialize = debugModeBridge.initialize.bind(debugModeBridge);
+  vi.spyOn(debugModeBridge, 'initialize').mockImplementation(() => {
+    state.bridgeInitialization = initialize();
+    return state.bridgeInitialization;
+  });
   await import('./offscreen.js');
 }
 
@@ -107,6 +123,16 @@ function terminalMessages() {
   return state.messages.filter(({ action }) => action === 'INTERNAL_TTS_CHUNK_FINISHED');
 }
 
+async function waitForBridgeInitialization(debugModeBridge) {
+  vi.useRealTimers();
+  try {
+    await state.bridgeInitialization;
+  } finally {
+    vi.useFakeTimers();
+  }
+  expect(debugModeBridge.isInitialized).toBe(true);
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   state.messages = [];
@@ -115,9 +141,10 @@ beforeEach(() => {
   state.utterances = [];
   state.lastUtterance = null;
   state.mediaDevices = null;
+  state.bridgeInitialization = null;
 });
 
-afterEach(() => {
+afterEach(async () => {
   vi.runOnlyPendingTimers();
   vi.useRealTimers();
   delete globalThis.chrome;
@@ -135,6 +162,13 @@ afterEach(() => {
     }
   }
   vi.restoreAllMocks();
+  vi.doUnmock('@/shared/storage/core/StorageCore.js');
+  const { setGlobalDebugOverride, setComponentLogLevel } = await import('../shared/logging/GlobalDebugState.js');
+  const { LOG_COMPONENTS } = await import('../shared/logging/logConstants.js');
+  const { safeConsole } = await import('../shared/logging/SafeConsole.js');
+  setGlobalDebugOverride(false);
+  setComponentLogLevel(LOG_COMPONENTS.LIVE_DUBBING, 1);
+  safeConsole.setEnabled(false);
 });
 
 describe('offscreen TTS terminal playback lifecycle', () => {
@@ -847,6 +881,60 @@ describe('offscreen logging contract', () => {
     })).resolves.toEqual({ success: true, message: 'Offscreen TTS ready' });
 
     expect(logSpy).not.toHaveBeenCalled();
+    expect(infoSpy).not.toHaveBeenCalled();
+    expect(debugSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows controller INFO/DEBUG diagnostics when debug mode and component level allow them', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await loadOffscreen({ loggingSettings: {
+      DEBUG_MODE: true,
+      COMPONENT_LOG_LEVELS: { LiveDubbing: 3 },
+    } });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await waitForBridgeInitialization(debugModeBridge);
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+
+    liveDubbingController.log.info('Live dubbing provider reconnected', { outcome: 'ready' });
+    liveDubbingController.log.debug('Live dubbing media resume started', { stage: 'reconnect' });
+
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Live dubbing provider reconnected'), { outcome: 'ready' });
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('Live dubbing media resume started'), { stage: 'reconnect' });
+  });
+
+  it('keeps controller INFO/DEBUG diagnostics quiet when logging settings disable them', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await loadOffscreen({ loggingSettings: {
+      DEBUG_MODE: false,
+      COMPONENT_LOG_LEVELS: { LiveDubbing: 1 },
+    } });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await waitForBridgeInitialization(debugModeBridge);
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+
+    liveDubbingController.log.info('Live dubbing provider reconnected', { outcome: 'ready' });
+    liveDubbingController.log.debug('Live dubbing media resume started', { stage: 'reconnect' });
+
+    expect(infoSpy).not.toHaveBeenCalled();
+    expect(debugSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps controller INFO/DEBUG quiet when the component level is WARN despite debug mode', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    await loadOffscreen({ loggingSettings: {
+      DEBUG_MODE: true,
+      COMPONENT_LOG_LEVELS: { LiveDubbing: 1 },
+    } });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await waitForBridgeInitialization(debugModeBridge);
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+
+    liveDubbingController.log.info('Live dubbing provider reconnected', { outcome: 'ready' });
+    liveDubbingController.log.debug('Live dubbing media resume started', { stage: 'reconnect' });
+
     expect(infoSpy).not.toHaveBeenCalled();
     expect(debugSpy).not.toHaveBeenCalled();
   });

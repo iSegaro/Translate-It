@@ -59,6 +59,73 @@ function createOriginalAudioContext() {
 }
 
 describe('LiveDubbingController', () => {
+  it.each([
+    ['provider_creation', 'provider_creation'],
+    ['media_gate', 'media_gate'],
+    ['provider_bootstrap', 'provider_bootstrap'],
+    ['provider_connection', 'provider_connection'],
+    ['audio_output_reset', 'audio_output_reset'],
+  ])('logs the actual %s failure stage without private values', async (failureStage, expectedStage) => {
+    const logger = { debug: vi.fn() };
+    const track = new FakeTrack();
+    let bootstrapCalls = 0;
+    const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}),
+      pauseInput: vi.fn(async () => {}), resumeInput: vi.fn(async () => {}) };
+    const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}),
+    };
+    let factoryCalls = 0;
+    const controller = new LiveDubbingController({
+      logger,
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      inputPipelineFactory: vi.fn(options => { inputPipeline.onFrame = options.onFrame; return inputPipeline; }),
+      outputPlayerFactory: vi.fn(() => outputPlayer),
+      requestBootstrap: vi.fn(async () => {
+        bootstrapCalls += 1;
+        if (failureStage === 'provider_bootstrap' && bootstrapCalls > 1) {
+          throw Object.assign(new Error('seed credential'), { code: 'SAFE_PROVIDER_CODE' });
+        }
+        return { success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: { token: 'seed credential' } };
+      }),
+      providerClientFactory: vi.fn(options => {
+        factoryCalls += 1;
+        if (failureStage === 'provider_creation' && factoryCalls > 1) {
+          throw Object.assign(new Error('seed stream ID'), { code: 'SAFE_PROVIDER_CODE' });
+        }
+        return { connect: vi.fn(async () => {
+          options.callbacks.onSetupComplete();
+          if (failureStage === 'provider_connection' && factoryCalls > 1) {
+            throw Object.assign(new Error('private response body'), { code: 'SAFE_PROVIDER_CODE' });
+          }
+        }), dispose: vi.fn(async () => {}) };
+      }),
+    });
+    controller.prepare('failure-session', 'gemini', 'fr', 0, { synchronizeMedia: true });
+    await controller.consume('failure-session', 'gemini', 'stream', 1);
+    await controller.connectProvider('failure-session', 'gemini', 'fr', 2);
+    const session = controller.currentSession;
+    await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
+    if (failureStage === 'media_gate') {
+      session.audioEngine.setPlaybackMuted = vi.fn(() => false);
+    }
+    if (failureStage === 'audio_output_reset') {
+      session.audioEngine.resetOutputEpochAndWait = vi.fn(async () => {
+        throw Object.assign(new Error('seed URL https://private.invalid'), { code: 'SAFE_PROVIDER_CODE' });
+      });
+    }
+    await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation');
+    const failures = logger.debug.mock.calls.filter(([message]) => message === 'Live dubbing media resume failed');
+    expect(failures).toEqual([expect.arrayContaining([
+      'Live dubbing media resume failed', expect.objectContaining({ stage: expectedStage,
+        errorCode: ['provider_bootstrap', 'media_gate'].includes(failureStage)
+          ? 'LIVE_DUBBING_MEDIA_RESUME_FAILED' : 'SAFE_PROVIDER_CODE' }),
+    ])]);
+    const serialized = JSON.stringify(failures);
+    for (const secret of ['private response body', 'seed transcript', 'seed URL', 'seed credential', 'seed stream ID']) {
+      expect(serialized).not.toContain(secret);
+    }
+    await controller.dispose(session.sessionId, session.providerId);
+  });
+
   it('does not require pipelines from nested audio options alone', () => {
     const controller = new LiveDubbingController({
       inputPipelineOptions: { audioWorkletNodeFactory: vi.fn() },
@@ -4071,6 +4138,7 @@ describe('LiveDubbingController media-stream audio path', () => {
 
   it('rebinds fresh providers while synchronized media stays gated until COMMIT', async () => {
     const track = new FakeTrack();
+    const logger = { debug: vi.fn(), info: vi.fn() };
     let callbacks = [];
     let deferInputResume = false;
     let releaseInputResume;
@@ -4087,6 +4155,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     };
     const providers = [];
     const controller = new LiveDubbingController({
+      logger,
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
       requestBootstrap: vi.fn(async () => ({ success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: {} })),
       inputPipelineFactory: vi.fn(options => { inputPipeline.onFrame = options.onFrame; return inputPipeline; }),
@@ -4111,6 +4180,10 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, ready: true, mediaSequence: 2, rotationId: 'rotation-2' });
+    expect(logger.debug).toHaveBeenCalledWith('Live dubbing media resume started',
+      expect.objectContaining({ stage: 'reconnect', mediaSequence: 2 }));
+    expect(logger.info).toHaveBeenCalledWith('Live dubbing provider reconnected',
+      expect.objectContaining({ outcome: 'ready', mediaSequence: 2 }));
     expect(controller.requestBootstrap).toHaveBeenCalledTimes(2);
     expect(controller.requestBootstrap.mock.calls[1][0].data).toMatchObject({
       sessionId: session.sessionId, eventSequence: session.eventSequence,
@@ -4129,6 +4202,12 @@ describe('LiveDubbingController media-stream audio path', () => {
 
     await expect(controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, playing: true });
+    expect(logger.debug).toHaveBeenCalledWith('Live dubbing media commit started',
+      expect.objectContaining({ stage: 'commit', mediaSequence: 2 }));
+    expect(logger.info).toHaveBeenCalledWith('Live dubbing media committed',
+      expect.objectContaining({ outcome: 'playing', mediaSequence: 2 }));
+    const diagnosticCalls = JSON.stringify([...logger.debug.mock.calls, ...logger.info.mock.calls]);
+    for (const secret of ['stream-secret', 'stale', 'rotation-2']) expect(diagnosticCalls).not.toContain(secret);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     expect(providers[1].sendAudio).toHaveBeenCalledOnce();
     expect(inputPipeline.resumeInput).toHaveBeenCalledOnce();

@@ -1723,6 +1723,8 @@ export class LiveDubbingController {
     session.mediaReadyGeneration = null;
     this._setMediaState(session, 'reconnecting');
     const generation = session.providerGeneration;
+    const mediaLogContext = { mediaSequence, providerGeneration: generation };
+    this.log?.debug?.('Live dubbing media resume started', { ...mediaLogContext, stage: 'reconnect' });
     const previousResume = session.mediaResumePromise;
       const currentRotation = () => this._mediaIdentityMatches(
         session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation,
@@ -1730,6 +1732,7 @@ export class LiveDubbingController {
     const task = (async () => {
       let client = null;
       let fatalGateFailure = false;
+      let failureStage = 'provider_generation_wait';
       const disposeStaleClient = async () => {
         if (client) {
           try {
@@ -1748,7 +1751,9 @@ export class LiveDubbingController {
           previousResume?.catch(() => {}),
         ]);
         if (!currentRotation()) return { success: false, ignored: true };
+        failureStage = 'provider_creation';
         client = await this._createProviderClient(session, generation, { forceFresh: true });
+        this.log?.debug?.('Live dubbing media resume stage', { ...mediaLogContext, stage: 'provider_created' });
         if (!currentRotation()) {
           return disposeStaleClient();
         }
@@ -1759,6 +1764,7 @@ export class LiveDubbingController {
         session.mediaResumeClient = client;
         session.providerShutdownPromise = null;
         session.mediaShutdownClient = null;
+        failureStage = 'media_gate';
         if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
           try {
             if (typeof client.setMediaGateOpen !== 'function' || client.setMediaGateOpen(false) === false) {
@@ -1768,7 +1774,10 @@ export class LiveDubbingController {
             fatalGateFailure = true;
             throw error;
           }
-          if (typeof client.setDubbedVolume === 'function') await client.setDubbedVolume(session.dubbedVolume);
+          if (typeof client.setDubbedVolume === 'function') {
+            failureStage = 'dubbed_volume_seed';
+            await client.setDubbedVolume(session.dubbedVolume);
+          }
         } else {
           if (session.inputPipeline?.inputPaused !== true) {
             if (typeof session.inputPipeline?.pauseInput !== 'function') {
@@ -1794,12 +1803,14 @@ export class LiveDubbingController {
           }
         }
         if (!currentRotation()) return disposeStaleClient();
+        failureStage = 'provider_bootstrap';
         let bootstrapWrapper = await this.requestProviderBootstrapForSession(session, { mediaSequence, rotationId });
         if (!currentRotation()) return disposeStaleClient();
         if (!bootstrapWrapper) throw new Error('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
         const options = { bootstrap: bootstrapWrapper.bootstrap, targetLanguage: bootstrapWrapper.targetLanguage };
         if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) options.sourceStream = session.stream;
         bootstrapWrapper = null;
+        failureStage = 'provider_connection';
         try {
           await client.connect(options);
         } finally {
@@ -1807,6 +1818,7 @@ export class LiveDubbingController {
         }
         if (!currentRotation()) return disposeStaleClient();
         if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          failureStage = 'audio_output_reset';
           const reset = session.audioEngine?.resetOutputEpochAndWait;
           if (typeof reset !== 'function') {
             fatalGateFailure = true;
@@ -1826,6 +1838,7 @@ export class LiveDubbingController {
         session.setupComplete = true;
         session.mediaReadyGeneration = generation;
         this._setMediaState(session, 'ready');
+        this.log?.info?.('Live dubbing provider reconnected', { ...mediaLogContext, outcome: 'ready' });
         return this._mediaResumeResponse(session);
       } catch (error) {
         if (client) {
@@ -1837,11 +1850,20 @@ export class LiveDubbingController {
           if (session.providerClient === client) session.providerClient = null;
         }
         if (!currentRotation()) return { success: false, ignored: true };
-        if (fatalGateFailure) return this._mediaRotationTerminalFailure(session, providerId);
+        if (fatalGateFailure) {
+          this.log?.debug?.('Live dubbing media resume failed', {
+            ...mediaLogContext, stage: failureStage, outcome: 'terminal',
+            errorCode: errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED'),
+          });
+          return this._mediaRotationTerminalFailure(session, providerId);
+        }
         session.providerGeneration = ++this.providerGeneration;
         session.setupComplete = false;
         session.mediaReadyGeneration = null;
         const code = errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED');
+        this.log?.debug?.('Live dubbing media resume failed', {
+          ...mediaLogContext, stage: failureStage, outcome: 'failed', errorCode: code,
+        });
         this._setMediaState(session, 'error', code);
         return { success: false, error: code, sessionId, providerId, eventSequence, mediaSequence, rotationId };
       }
@@ -1881,6 +1903,8 @@ export class LiveDubbingController {
     if (session.mediaReadyGeneration !== session.providerGeneration) return { success: false, ignored: true };
     if (session.mediaCommitPromise) return session.mediaCommitPromise;
     const generation = session.providerGeneration;
+    const mediaLogContext = { mediaSequence, providerGeneration: generation };
+    this.log?.debug?.('Live dubbing media commit started', { ...mediaLogContext, stage: 'commit' });
     const client = session.providerClient;
     const isCurrentCommit = () => this._mediaIdentityMatches(
       session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation,
@@ -1907,9 +1931,14 @@ export class LiveDubbingController {
         if (!isCurrentCommit()) return { success: false, ignored: true };
         session.mediaPaused = false;
         this._setMediaState(session, 'playing');
+        this.log?.info?.('Live dubbing media committed', { ...mediaLogContext, stage: 'playback', outcome: 'playing' });
         return { success: true, sessionId, providerId, eventSequence, mediaSequence, rotationId, playing: true };
-      } catch {
+      } catch (error) {
         if (!isCurrentCommit()) return { success: false, ignored: true };
+        this.log?.debug?.('Live dubbing media commit failed', {
+          ...mediaLogContext, stage: 'commit', outcome: 'failed',
+          errorCode: errorCode(error, 'LIVE_DUBBING_MEDIA_COMMIT_FAILED'),
+        });
         return this._mediaRotationTerminalFailure(session, providerId);
       }
     })();

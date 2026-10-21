@@ -18,6 +18,7 @@ import {
   LIVE_DUBBING_START_TIMEOUT,
   LIVE_DUBBING_STOP_TIMEOUT,
 } from '../constants.js';
+import { safeFailureCode } from '../contracts.js';
 
 function createHarness({ stored = null, outcome = null, streamId = 'stream-secret', statusResponse, documentExists, runtimeGateway = null, hasConfiguredCredentials = vi.fn(async () => true), supportsOffscreenDocument, volumePreferencesReader = null } = {}) {
   const storage = new Map(stored
@@ -162,6 +163,29 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
     hasConfiguredCredentials,
   };
 }
+
+describe('Live Dubbing media diagnostics', () => {
+  it('logs safe stage and failure-code context without harness secrets', () => {
+    const harness = createHarness();
+    harness.logger.debug = vi.fn();
+    harness.coordinator._logMedia('debug', 'retry-scheduled', {
+      attempt: 2, maxAttempts: 3, mediaSequence: 4, stage: 'media-resume-dispatch',
+      errorCode: safeFailureCode('MEDIA_RESUME'), retryDelayMs: 750,
+    });
+    const serialized = JSON.stringify(harness.logger.debug.mock.calls);
+    expect(harness.logger.warn).not.toHaveBeenCalled();
+    expect(serialized).toContain('media-resume-dispatch');
+    expect(serialized).toContain('LIVE_DUBBING_MEDIA_RESUME_FAILED');
+    expect(serialized).not.toContain('stream-secret');
+    expect(serialized).not.toContain('provider test secret');
+  });
+
+  it('does not require optional logger levels on injected loggers', () => {
+    const harness = createHarness();
+    expect(() => harness.coordinator._logMedia('debug', 'rotation', { attempt: 1 })).not.toThrow();
+    expect(() => harness.coordinator._logMedia('info', 'recovery', { outcome: 'success' })).not.toThrow();
+  });
+});
 
 describe('Live Dubbing media observation authorization', () => {
   it('publishes only a session hint and exposes the authoritative media DTO through GET_STATUS', async () => {

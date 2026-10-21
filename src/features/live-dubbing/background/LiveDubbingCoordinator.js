@@ -1055,6 +1055,10 @@ export class LiveDubbingCoordinator {
     return Boolean(this.sessionRegistry.getSessionState(sessionId)?.media?.barrier);
   }
 
+  _logMedia(level, event, fields = {}) {
+    this.log?.[level]?.(`Live dubbing media ${event}`, fields);
+  }
+
   _handleMediaDecision(descriptor, activity) {
     const media = this._mediaStateFor(descriptor);
     if (!media || !this._isCurrentMediaDescriptor(descriptor)) return;
@@ -1202,7 +1206,10 @@ export class LiveDubbingCoordinator {
   }
 
   async _freshPlayingBarrier(descriptor, operation) {
-    if (!this._isCurrentMediaDescriptor(descriptor) || operation.cancelled) return false;
+    if (!this._isCurrentMediaDescriptor(descriptor) || operation.cancelled) {
+      this._logMedia('debug', 'barrier', { stage: 'precondition', outcome: 'interrupted' });
+      return false;
+    }
     const media = this._mediaStateFor(descriptor);
     const frames = [...this.mediaObservation.frames.entries()];
     const barrier = {
@@ -1268,7 +1275,10 @@ export class LiveDubbingCoordinator {
         void this._confirmMediaEpisodeEnded(descriptor, media, endingEpisodeId);
         return false;
       }
-      if (reportResult.value !== true) return false;
+      if (reportResult.value !== true) {
+        this._logMedia('debug', 'barrier', { stage: 'playing-report', outcome: 'not-playing' });
+        return false;
+      }
       const finalInventory = await withinDeadline(
         this._reconcileMediaFrameInventory(descriptor.tabId, descriptor),
       );
@@ -1276,8 +1286,10 @@ export class LiveDubbingCoordinator {
         || !this._isCurrentMediaDescriptor(descriptor)) return false;
       if (media.barrier === barrier) media.barrier = null;
       const activity = this.getMediaActivity();
-      return finalInventory.value === true && activity.known && activity.playing
+      const passed = finalInventory.value === true && activity.known && activity.playing
         && this._isCurrentMediaDescriptor(descriptor) && !operation.cancelled;
+      this._logMedia('debug', 'barrier', { stage: 'final-inventory', outcome: passed ? 'passed' : 'failed' });
+      return passed;
     } finally {
       clearTimeout(deadlineTimer);
       if (media.barrier === barrier) media.barrier = null;
@@ -1294,11 +1306,14 @@ export class LiveDubbingCoordinator {
     const operation = { id: this.uuid(), cancelled: false };
     media.activeOperation = operation;
     media.episodeAttempts += 1;
+    this._logMedia('debug', 'rotation', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, stage: 'start' });
     this.mediaState = { mediaState: 'reconnecting', mediaSequence: media.mediaSequence, rotationId: null, mediaError: null };
     this._notifyMediaStatusChanged(descriptor);
+    let failureStage = 'barrier';
     try {
       if (!await this._freshPlayingBarrier(descriptor, operation)) throw new Error('MEDIA_BARRIER_FAILED');
       if (media.activeOperation !== operation || operation.cancelled) return;
+      failureStage = 'retry-state';
       await media.retryPersistence;
       if (operation.cancelled || media.activeOperation !== operation) return;
       if (!await this._queueMediaRetryStatePersistence(descriptor.sessionId, media)) {
@@ -1312,6 +1327,7 @@ export class LiveDubbingCoordinator {
         return;
       }
       if (operation.cancelled || media.activeOperation !== operation) return;
+      failureStage = 'media-grant';
       const generation = {
         sessionId: descriptor.sessionId, providerId: descriptor.providerId,
         eventSequence: descriptor.eventSequence, mediaSequence: media.mediaSequence + 1,
@@ -1333,19 +1349,30 @@ export class LiveDubbingCoordinator {
         descriptor: cloneDescriptor(descriptor), state: this.sessionRegistry.getSessionState(descriptor.sessionId),
       };
       if (!this.sessionRegistry.reserveMediaBootstrapGrant(descriptor.sessionId, grant)) throw new Error('MEDIA_GRANT_BUSY');
+      failureStage = 'media-resume-dispatch';
+      this._logMedia('debug', 'dispatch', { stage: failureStage, mediaSequence: generation.mediaSequence });
       const ready = await this._sendOffscreen(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_RESUME, generation));
+      failureStage = 'media-resume-ack';
+      const resumeAcked = ready?.success === true && ready.sessionId === generation.sessionId
+        && ready.providerId === generation.providerId && ready.eventSequence === generation.eventSequence
+        && ready.mediaSequence === generation.mediaSequence && ready.rotationId === generation.rotationId
+        && ready.ready === true;
+      this._logMedia('debug', 'ack', { stage: 'media-resume', outcome: resumeAcked ? 'success' : 'failed', mediaSequence: generation.mediaSequence });
       if (operation.cancelled || media.activeOperation !== operation
-        || !this._isCurrentMediaDescriptor(descriptor) || ready?.success !== true
-        || ready.sessionId !== generation.sessionId || ready.providerId !== generation.providerId
-        || ready.eventSequence !== generation.eventSequence || ready.mediaSequence !== generation.mediaSequence
-        || ready.rotationId !== generation.rotationId || ready.ready !== true) throw new Error('MEDIA_RESUME_FAILED');
+        || !this._isCurrentMediaDescriptor(descriptor) || !resumeAcked) throw new Error('MEDIA_RESUME_FAILED');
+      failureStage = 'commit-barrier';
       if (!await this._freshPlayingBarrier(descriptor, operation)) throw new Error('MEDIA_COMMIT_BARRIER_FAILED');
       if (operation.cancelled || media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor)) return;
+      failureStage = 'media-commit-dispatch';
+      this._logMedia('debug', 'dispatch', { stage: failureStage, mediaSequence: generation.mediaSequence });
       const committed = await this._sendOffscreen(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_COMMIT, generation));
-      if (committed?.success !== true || committed.sessionId !== generation.sessionId
-        || committed.providerId !== generation.providerId || committed.eventSequence !== generation.eventSequence
-        || committed.mediaSequence !== generation.mediaSequence || committed.rotationId !== generation.rotationId
-        || committed.playing !== true || operation.cancelled || media.activeOperation !== operation) {
+      failureStage = 'media-commit-ack';
+      const commitAcked = committed?.success === true && committed.sessionId === generation.sessionId
+        && committed.providerId === generation.providerId && committed.eventSequence === generation.eventSequence
+        && committed.mediaSequence === generation.mediaSequence && committed.rotationId === generation.rotationId
+        && committed.playing === true;
+      this._logMedia('debug', 'ack', { stage: 'media-commit', outcome: commitAcked ? 'success' : 'failed', mediaSequence: generation.mediaSequence });
+      if (!commitAcked || operation.cancelled || media.activeOperation !== operation) {
         throw new Error('MEDIA_COMMIT_FAILED');
       }
       media.activeOperation = null;
@@ -1353,6 +1380,7 @@ export class LiveDubbingCoordinator {
       media.pausedSequenceAcked = null;
       this.mediaState = { mediaState: 'playing', mediaSequence: generation.mediaSequence, rotationId: generation.rotationId, mediaError: null };
       this._notifyMediaStatusChanged(descriptor);
+      this._logMedia('info', 'reconnected', { attempt: media.episodeAttempts, mediaSequence: generation.mediaSequence, outcome: 'success' });
     } catch {
       this.sessionRegistry.revokeMediaBootstrapGrant(descriptor.sessionId);
       if (media.activeOperation !== operation) return;
@@ -1363,13 +1391,16 @@ export class LiveDubbingCoordinator {
         return;
       }
       if (media.episodeAttempts >= 3) {
+        this._logMedia('warn', 'rotation-exhausted', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, stage: failureStage, errorCode: safeFailureCode(failureStage) });
         this._exhaustMediaEpisode(descriptor, media);
         return;
       }
+      const retryDelayMs = media.episodeAttempts === 1 ? 250 : 750;
+      this._logMedia('debug', 'retry-scheduled', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, retryDelayMs, stage: failureStage, errorCode: safeFailureCode(failureStage) });
       media.retryTimer = setTimeout(() => {
         media.retryTimer = null;
         if (media.desiredPlaying) void this._beginMediaRotation(descriptor, media);
-      }, media.episodeAttempts === 1 ? 250 : 750);
+      }, retryDelayMs);
     }
   }
 
@@ -3201,6 +3232,7 @@ export class LiveDubbingCoordinator {
   _beginWorkerMediaRecovery(descriptor) {
     const sessionId = descriptor?.sessionId;
     if (!sessionId) return;
+    this._logMedia('debug', 'recovery', { stage: 'start', outcome: 'pending' });
     this.mediaRecoverySessions.add(sessionId);
     let state = this.sessionRegistry.getSessionState(sessionId);
     if (!state) {
@@ -3643,6 +3675,7 @@ export class LiveDubbingCoordinator {
     media.episodeAttempts = persistedRetry.state?.attempts || 0;
     media.exhausted = status.mediaState === 'error'
       || persistedRetry.state?.exhausted === true || persistedRetry.failed;
+    this._logMedia('debug', 'recovery', { stage: 'retry-state-restored', outcome: media.exhausted ? 'exhausted' : 'ready', attempt: media.episodeAttempts, mediaSequence: status.mediaSequence });
 
     const mediaSequence = status.mediaSequence + 1;
     const operation = { id: this.uuid(), cancelled: false, kind: 'recovery-pause' };
@@ -3652,6 +3685,7 @@ export class LiveDubbingCoordinator {
       response = await this._sendOffscreen(createMediaPauseMessage(descriptor, mediaSequence));
     } catch {
       if (media.activeOperation === operation) media.activeOperation = null;
+      this._logMedia('debug', 'recovery', { stage: 'pause-dispatch', outcome: 'failed', mediaSequence });
       return false;
     }
     if (operation.cancelled || media.activeOperation !== operation
@@ -3660,7 +3694,10 @@ export class LiveDubbingCoordinator {
       || !this._isCurrentMediaDescriptor(descriptor)
       || response?.success !== true || response.sessionId !== descriptor.sessionId
       || response.providerId !== descriptor.providerId || response.eventSequence !== descriptor.eventSequence
-      || response.mediaSequence !== mediaSequence || response.paused !== true) return false;
+       || response.mediaSequence !== mediaSequence || response.paused !== true) {
+      this._logMedia('debug', 'recovery', { stage: 'pause-ack', outcome: 'failed', mediaSequence });
+      return false;
+    }
 
     media.activeOperation = null;
     media.mediaSequence = mediaSequence;
@@ -3679,6 +3716,7 @@ export class LiveDubbingCoordinator {
     this._notifyMediaStatusChanged(descriptor);
     this._startMediaObservationSession(descriptor);
     this._refreshMediaObservation(descriptor.tabId);
+    this._logMedia('info', 'recovery', { stage: 'complete', outcome: 'success', mediaSequence });
     return true;
   }
 

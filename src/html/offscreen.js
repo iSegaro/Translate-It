@@ -8,11 +8,14 @@ import {
 import { isAuthorizedOffscreenRouterSender, isAuthorizedLiveDubbingOffscreenControlSender } from '../features/live-dubbing/contracts.js';
 import { getScopedLogger } from '../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../shared/logging/logConstants.js';
+import { debugModeBridge } from '../shared/logging/DebugModeBridge.js';
 
 // Hybrid offscreen logger. INFO/DEBUG stay level-gated through the centralized
 // scoped logger (default WARN keeps normal runs quiet). WARN/ERROR intentionally
-// bypass SafeConsole via direct console calls: this document never initializes
-// DebugModeBridge, so SafeConsole starts disabled and would silently discard them.
+// bypass SafeConsole via direct console calls, preserving their visibility when
+// SafeConsole is disabled. Initialize asynchronously without delaying startup.
+void debugModeBridge.initialize();
+
 const gatedLogger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Offscreen');
 const logger = {
   debug: (...args) => gatedLogger.debug(...args),
