@@ -32,8 +32,12 @@ playback.
    `PREPARING_CAPTURE` descriptor to `storage.session`, acquires the
    provider-specific offscreen lease (`USER_MEDIA` + `AUDIO_PLAYBACK` for
    Gemini; OpenAI additionally requires `WEB_RTC`), and drives the
-   offscreen stages `PREPARE` → `CONSUME` → `CONNECT_PROVIDER`, ending in
-   `RUNNING`.
+   offscreen stages `PREPARE` → `CONSUME`. Successful synchronized capture
+   readiness commits `RUNNING` at event sequence 2. Offscreen STATUS at this
+   point reports `setupComplete: false` and no provider client; those are
+   offscreen session/status facts, not persisted descriptor fields. START does
+   not connect/bootstrap the provider or create a socket; provider readiness is
+   deferred until fresh playback observation admits the first `MEDIA_RESUME`.
 3. `stop()`, tab removal, top-level navigation, capture-track end, and
    provider terminal events all funnel into one idempotent terminal path:
    mark terminal → exact `DISPOSE` acknowledgement → release the exact lease
@@ -83,9 +87,22 @@ order:
    `LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED` result without creating a
    session or acquiring media resources. Only then create and persist the
    descriptor, acquire the exact lease, send `PREPARE`, obtain the one-time
-   stream id, send `CONSUME`, wait for capture/audio-path readiness, persist
-   `CONNECTING_PROVIDER`, and send `CONNECT_PROVIDER` for provider bootstrap and
-   setup before the final `RUNNING` commit.
+   stream id, and send `CONSUME` at event sequence 1. Successful synchronized
+   Controller capture/audio-path readiness then promotes the descriptor
+   directly to `RUNNING` at event sequence 2, atomically clearing the previous
+   outcome. Offscreen STATUS reports `setupComplete: false` and no provider
+   client at this point; these are session/status fields, not descriptor fields.
+   START sends no `CONNECT_PROVIDER`, bootstrap request, or provider factory/
+   socket work. After persistence, Background initializes media observation,
+   dispatches the initial `MEDIA_PAUSE` at media sequence 1, then refreshes
+   observer state. A playing decision received while that pause is pending is
+   retained, but cannot start a provider rotation until the exact pause
+   acknowledgement arrives. The pause physically quiesces capture/output as
+   required by the audio mode; OpenAI safely skips only the transport-mute
+   operation when no provider transport exists yet. A missing or invalid exact
+   pause acknowledgement blocks provider rotation/admission and is reported as
+   a bounded media error/exhaustion. Physical Controller gate/reset/shutdown
+   failures fail closed through session cleanup.
 
 The early rejection paths through provider, language, storage, busy,
 outcome-barrier, credential, cancellation, offscreen-capability, tab/capture,
@@ -119,6 +136,12 @@ progress, and media is in the error state with its retry budget exhausted
 boolean as the sole authorization gate for showing/enabling media Retry;
 `retryMedia()` revalidates the background state; on an accepted retry, the
 background clears/consumes the exhausted retry state.
+
+`RUNNING` means the exact session owns the active capture/audio path; it does
+not mean that a provider is connected, translated audio is playing, or that a
+paused/unknown media observation is silent. A capture-only START is successful
+when playback is paused or unknown and makes no provider connection until a
+fresh positive playing observation passes the media barriers.
 
 ### Volume sliders
 
@@ -291,7 +314,17 @@ authoritative read and includes the media DTO
 `{ mediaState, mediaSequence, rotationId, mediaError }`; the notification is
 not a media-state or error payload.
 
-On a valid non-playing or unknown decision, Background immediately requests a
+After successful capture readiness is persisted as synchronized `RUNNING` at
+event sequence 2, Background initializes observation and dispatches `MEDIA_PAUSE`
+at media sequence 1 before refreshing observer state. The exact pause
+acknowledgement is required before any provider rotation; a fresh playing
+observation arriving while the pause is pending is retained but cannot resume
+the provider yet. PCM mode pauses capture input and mutes/resets the output
+epoch; OpenAI has no client/transport to mute at this point, so only that
+transport mute is skipped. The capture fence and exact acknowledgement remain
+required.
+
+For subsequent valid non-playing or unknown decisions, Background requests a
 fenced `MEDIA_PAUSE` when the current media sequence is not already acknowledged
 as paused, and revokes any outstanding bootstrap grant. The pause uses a higher
 media sequence. Once that asynchronous request reaches the offscreen Controller,
@@ -299,25 +332,34 @@ its media-admission fence closes before teardown: PCM mode pauses capture input,
 mutes and resets the output epoch; media-stream mode closes its playback gate.
 The in-flight provider generation is invalidated and the provider client is
 shut down, while the Controller-owned capture session/stream is retained. Paused
-input is discarded rather than replayed. After a 200 ms positive debounce and
-fresh frame barriers before Resume and after READY, the Coordinator creates a
-new provider generation against the retained live capture stream. Its one-use
-bootstrap reservation is bound to the exact session/provider/event sequence,
-media sequence, rotation id, operation and session state; authorization is
-rechecked after the bootstrap await. The Controller admits input/output only
-after the matching COMMIT. The PCM wire framing remains ADR-018's fixed
+input is discarded rather than replayed. On the first fresh playing observation,
+the existing 200 ms positive debounce and fresh frame barrier admit one `MEDIA_RESUME`
+at media sequence 2. That resume obtains a one-use generation grant, performs
+provider bootstrap/setup and waits for READY, then requires a second fresh frame
+barrier before COMMIT. The grant is bound to the exact session/provider/event
+sequence, media sequence, rotation id, operation and session state;
+authorization is rechecked after the bootstrap await. The Controller admits
+input/output only after the matching COMMIT. The initial successful play creates
+one provider connection; provider shutdown/reconnection occurs only after an
+actual pause or failure, not merely because capture started. The PCM wire framing
+remains ADR-018's fixed
 16 kHz mono frames of 1600 samples (100 ms); this synchronization lane does not
 change that framing.
 
-Automatic media rotation is bounded to three attempts per confirmed continuous
-playing episode (250 ms then 750 ms retry delays). Retry identity and exhaustion
-are persisted for service-worker recovery; recovery re-reads exact synchronized
-offscreen STATUS, quiesces with PAUSE, and does not renew the budget from
-unknown observations. A trusted extension-UI retry is the explicit override after
-exhaustion. This lane does not provide a generic Translation cancellation or
-reconnect API. Capture loss and proven offscreen-runtime loss remain terminal
-lifecycle outcomes; a failed offscreen pause/reset fails closed through session
-cleanup rather than being treated as a successful media pause.
+Provider setup failures after successful START belong to the existing bounded
+media retry episode: three attempts per confirmed playing episode (250 ms then
+750 ms retry delays), with retry identity and exhaustion persisted for
+service-worker recovery. They do not roll back capture-only START or become a
+terminal provider error unless a fatal gate or cleanup failure requires it; a
+trusted extension-UI retry is the explicit override after exhaustion. Recovery
+re-reads exact synchronized offscreen STATUS, quiesces with PAUSE before
+re-observation, and does not renew the budget from unknown observations. This
+lane does not provide a generic Translation cancellation or reconnect API.
+Capture loss and proven offscreen-runtime loss remain terminal lifecycle
+outcomes; physical Controller gate/reset/shutdown failures fail closed through
+session cleanup rather than being treated as a successful media pause. A
+missing or invalid exact pause acknowledgement instead blocks rotation and is
+handled by the bounded media error/exhaustion path.
 
 The path from content observer through the service worker to offscreen is
 asynchronous: “immediate pause” means the fenced Pause is dispatched without
@@ -412,9 +454,13 @@ capture, PREPARE, or bootstrap; bootstrap services and adapters revalidate at
 their own boundaries.
 
 The one-time `LIVE_DUBBING_REQUEST_PROVIDER_BOOTSTRAP` request is authorized
-only for the exact active `CONNECTING_PROVIDER` session, provider, target
-language, and event sequence. Background selects the provider-specific
-bootstrap service and returns the provider-neutral DTO
+only for the exact active session, provider, target language, and event
+sequence, together with the matching one-use media-generation grant. In the
+normal synchronized path, the first request follows `MEDIA_RESUME` while the
+persisted descriptor remains `RUNNING`; capture-only START itself never requests
+bootstrap. The legacy unsynchronized Controller `CONNECT_PROVIDER` path remains
+available internally but is not the normal production startup path. Background
+selects the provider-specific bootstrap service and returns the provider-neutral DTO
 `{ success, providerId, targetLanguage, bootstrap }`. The generic Controller
 treats `bootstrap` as opaque; each adapter owns its local contract: Gemini
 receives `{ accessToken }` and connects to the constrained endpoint with
@@ -474,7 +520,10 @@ Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
 - **Bootstrap flow.** Background mints a constrained single-use token
   (`POST .../v1beta/auth_tokens` with `uses: 1` and the Live Translation
   model/config constraints) only after authorizing the one-time offscreen
-  bootstrap request against the persisted `CONNECTING_PROVIDER` fence. Minting
+  bootstrap request against the exact authorized session and provider-generation
+  fence. During synchronized playback this is the `RUNNING` descriptor plus its
+  one-use media-generation grant; no bootstrap is issued during capture-only
+  START. Minting
   advances to the next configured Gemini key only on key/project-plausible
   failures (invalid key, quota exhaustion, rate limiting, per
   `ApiKeyManager.shouldFailover`); network/proxy, serving (5xx), malformed
@@ -483,12 +532,18 @@ Model: `models/gemini-3.5-live-translate-preview` over WebSocket.
   facilities without reordering text-translation failover state. The token travels in one
   targeted response; the Controller clears its local wrapper before awaiting
   setup and never stores it. Background never places bootstrap data in
-  descriptors. A token or connection failure ends the session: there is no
-  running-session failover, reconnect, or resumption.
+  descriptors. A provider-generation token or connection failure enters the
+  bounded media retry policy after capture-only START; it does not trigger
+  cross-provider fallback, unbounded reconnect, or session resumption.
 - **Setup gate.** The audio path must be ready (`audioPathReady` — the PCM
-  input/output pipelines for Gemini, or the retained media stream for OpenAI)
-  and the descriptor persisted at `CONNECTING_PROVIDER` before bootstrap is issued;
-  `setupComplete` from the provider is required before `RUNNING`.
+  input/output pipelines for Gemini, or the retained media stream for OpenAI),
+  and the exact one-use media-generation grant must authorize provider bootstrap.
+  Normal synchronized setup occurs while the descriptor remains `RUNNING` with
+  event sequence 2. Offscreen STATUS `setupComplete` becomes true when provider
+  setup reaches READY and may precede COMMIT; the matching COMMIT then reopens
+  media admission after the second fresh barrier. `setupComplete` is an
+  offscreen session/status field, not a persisted descriptor field, and is not a
+  prerequisite for capture-only `RUNNING`.
 - **No pre-setup queue.** Frames arriving before setup are counted and
   dropped (`preSetupDroppedFrames`); nothing is buffered for later send.
 - **Streaming.** `realtimeInput.audio` carries base64 PCM declared as
@@ -681,9 +736,14 @@ session.
 
 ## Lifecycle States
 
-Public descriptor states: `PREPARING_CAPTURE` → `CONNECTING_PROVIDER` →
-`RUNNING` → `STOPPING`, plus terminal `ERROR`. `CAPTURING` is an
-offscreen-internal state and is never exposed as public `RUNNING`.
+Public descriptor states include `PREPARING_CAPTURE`, `CONNECTING_PROVIDER`,
+`RUNNING`, `STOPPING`, and terminal `ERROR`. In the normal synchronized path,
+START transitions from `PREPARING_CAPTURE` directly to `RUNNING`; provider
+setup and media rotations keep the descriptor `RUNNING`; the offscreen session's
+STATUS `setupComplete` field distinguishes provider readiness. `CONNECTING_PROVIDER` remains for legacy
+internal paths, not normal production startup. `CAPTURING` is an offscreen-
+internal state and is never exposed as public `RUNNING`. `RUNNING` denotes
+capture/audio ownership, not provider readiness or active playback.
 `STOPPING` blocks descriptor writes from any path except the owning
 terminal operation.
 
@@ -800,11 +860,15 @@ or descriptor adoption is performed for an uncertain owner.
   otherwise reconciliation returns a provider-identity-required failure and
   leaves the lease isolated. Unmatched stale leases are similarly resolved and
   cleaned after a valid active descriptor is recovered.
-- Running recovery adopts exact status only when it reports `active === true`,
-  `captureReady === true`, `audioPathReady === true`, and
-  `setupComplete === true`; it then persists `RUNNING` under the descriptor
-  identity/event-sequence fence. Cleanup failures remain
-  `cleanupPending`/retryable and do not release an uncertain lease.
+- Running recovery adopts exact synchronized status when it reports
+  `active === true`, `captureReady === true`, and `audioPathReady === true`.
+  This includes the valid capture-only offscreen STATUS (`setupComplete === false`
+  and no provider client); neither field is persisted in the descriptor. Before
+  re-observing media or admitting a provider generation,
+  recovery quiesces the session with an acknowledged PAUSE. Any RUNNING recovery
+  is persisted under the descriptor identity/event-sequence fence; cleanup
+  failures remain `cleanupPending`/retryable and do not release an uncertain
+  lease.
 
 ## Security
 
@@ -862,8 +926,9 @@ or descriptor adoption is performed for an uncertain owner.
   Keys, tokens, URLs, bootstrap data, PCM, stream ids, transcripts, and raw
   payloads never reach a logger. There are no routine telemetry logs.
   With Debug Mode enabled and the `LiveDubbing` component set to Debug,
-  single-line `Live dubbing timing` messages report START completion, provider
-  bootstrap/setup stages, resume readiness/commit, first-audio reception
+  single-line `Live dubbing timing` messages report START completion (capture/
+  audio readiness only), provider bootstrap/setup stages on the `resume`
+  operation, resume readiness/commit, first-audio reception
   (OpenAI's remote-track arrival), and playback acceptance. They contain only
   provider, operation, generation, stage, duration, and outcome. Durations use
   the emitting Background or Offscreen context's monotonic clock and must not be
@@ -942,28 +1007,35 @@ Provider Adapter → LiveDubbingController → Background Coordinator
 - Provider callbacks are fenced by current `sessionId`, `providerId`, and
   the active provider generation. Stale callbacks from a replaced or
   disposed session are rejected.
-- Provider `setupComplete` may arrive before Background commits the
-  authoritative `RUNNING` descriptor. During that window an early
-  transcript uses the reserved `session.eventSequence + 1` without
-  mutating the canonical `session.eventSequence`. The canonical sequence
-  advances exactly once when the normal `CONNECTING_PROVIDER` →
-  `RUNNING` transition commits. Background transiently reserves that exact
-  next sequence for the active session/provider bridge, so Original/Dubbed
-  Volume GET/SET commands issued publicly with the authoritative `N` are
-  forwarded internally at only the reserved `N+1` before the `RUNNING` write
-  settles. The public descriptor fence remains `N` throughout the bridge;
-  direct public `N+1` (or later) requests are rejected.
-- If the first internal `N` transport receives the exact ignored sequence
-  mismatch proving `RUNNING/N+1`, the Coordinator may install the same exact
-  reservation and replay that operation once at `N+1`. The replay is bounded
-  by the unchanged public fence and is never repeated for a second mismatch.
+- The normal synchronized path keeps the public descriptor at event sequence 2
+  and status `RUNNING` throughout provider rotations. `mediaSequence` and
+  `rotationId`, plus the one-use generation grant, fence each provider generation;
+  provider readiness does not advance the public event sequence.
+- The guarded volume reservation/reconciliation bridge applies across both
+  synchronized START (`PREPARING_CAPTURE` event 1 → `RUNNING` event 2) and the
+  legacy unsynchronized `CONNECTING_PROVIDER` event 2 → `RUNNING` event 3
+  transition. For Original/Dubbed Volume GET/SET, Background transiently
+  reserves the exact next sequence and forwards a request issued at the current
+  public fence `N` internally at only `N+1` while the `RUNNING` write settles;
+  direct public `N+1` (or later) requests remain rejected. If the first
+  internal `N` transport receives the exact ignored sequence mismatch proving
+  the next RUNNING fence, the Coordinator may install the same exact reservation
+  and replay that operation once at `N+1`. The replay is bounded by the
+  unchanged public fence and is never repeated for a second mismatch.
+- The legacy transition has an additional early-transcript rule: provider
+  `setupComplete` may arrive before Background commits its authoritative
+  `RUNNING` descriptor, and that early transcript can use the reserved
+  `session.eventSequence + 1` without mutating the canonical sequence. This
+  transcript exception applies only to the legacy `CONNECTING_PROVIDER` →
+  `RUNNING` event 2 → 3 transition; it is not part of synchronized START or
+  provider rotations, which keep public event sequence 2.
 - SET reconciliation uses separate monotonic Coordinator tokens for Original
   and Dubbed lanes; a newer same-lane SET suppresses an older replay, while
   the two lanes and replacement sessions remain independent.
-- The Coordinator accepts transcripts that match the current
-  `CONNECTING_PROVIDER` descriptor event sequence **or** the reserved next
-  sequence during this transition only; older or arbitrary sequences are
-  rejected.
+- The Coordinator accepts transcripts matching the current descriptor event
+  sequence. Only the legacy unsynchronized transition also accepts its reserved
+  next sequence for early provider transcripts; other stale or arbitrary
+  transcript sequences are rejected.
 - The volume reservation is transient Coordinator state, not part of the
   public descriptor. It is background-authorized only, and is cleared when
   the `RUNNING` write settles or startup/session termination/replacement

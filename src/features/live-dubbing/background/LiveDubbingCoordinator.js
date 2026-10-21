@@ -22,7 +22,6 @@ import {
   cloneDescriptor,
   createLiveDubbingDiagnostic,
   createLiveDubbingTerminalOutcome,
-  createLiveDubbingProviderDiagnostic,
   createLiveDubbingTranscriptClearMessage,
   createConsumeMessage,
   createDescriptor,
@@ -31,7 +30,6 @@ import {
   createOriginalVolumeMessage,
   createOriginalVolumeQueryMessage,
   normalizeLiveDubbingVolume,
-  createProviderConnectMessage,
   createPrepareMessage,
   createMediaGenerationMessage,
   createMediaPauseMessage,
@@ -2466,7 +2464,6 @@ export class LiveDubbingCoordinator {
     }
 
     let leaseAcquired = false;
-    let providerStartAttempted = false;
     try {
       sessionState.leasePromise = Promise.resolve(this.leaseManager.acquire({
         owner: LIVE_DUBBING_OWNER,
@@ -2549,70 +2546,22 @@ export class LiveDubbingCoordinator {
       }
       if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
 
-      // Stage 2 returns CONNECTING_PROVIDER only after capture and both local
-      // graphs exist. Persist that fence before the offscreen document asks
-      // background for the short-lived provider bootstrap.
-      const integratedPipelines = consumeResponse.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      const captureReady = consumeResponse.status === LIVE_DUBBING_STATUS.RUNNING
         && consumeResponse.captureReady === true
         && consumeResponse.audioPathReady === true
-        && consumeResponse.eventSequence === captureDescriptor.eventSequence;
-      let activeDescriptor = descriptor;
-      if (integratedPipelines) {
-        const connectingDescriptor = this._advance(
-          captureDescriptor,
-          LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
-          null,
-          captureDescriptor.eventSequence + 1,
-        );
-        if (!await this._writeDescriptor(
-          connectingDescriptor,
-          descriptor.sessionId,
-          captureDescriptor,
-        )) {
-          throw new Error('Live dubbing descriptor persistence failed');
-        }
-        sessionState.descriptor = connectingDescriptor;
-        if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
-
-        providerStartAttempted = true;
-        const providerResponse = await this._sendOffscreen(createProviderConnectMessage(connectingDescriptor));
-        this._latchProviderDiagnostic(sessionState, providerResponse?.providerDiagnostic);
-        const providerReady = isAcknowledgedForSession(
-          providerResponse,
-          'PROVIDER_READY',
-          descriptor.sessionId,
-          descriptor.providerId,
-        )
-          && providerResponse.status === LIVE_DUBBING_STATUS.RUNNING
-          && providerResponse.captureReady === true
-          && providerResponse.audioPathReady === true
-          && providerResponse.setupComplete === true
-          && providerResponse.eventSequence === connectingDescriptor.eventSequence + 1;
-        if (!providerReady) {
-          this._latchProviderDiagnostic(sessionState, createLiveDubbingProviderDiagnostic({
-            code: typeof providerResponse?.error === 'string'
-              ? providerResponse.error
-              : 'LIVE_DUBBING_PROVIDER_SETUP_FAILED',
-            terminalCategory: 'PROVIDER_SETUP_FAILED',
-            setupComplete: providerResponse?.setupComplete === true,
-          }));
-          throw new Error('Live dubbing provider setup failed');
-        }
-        if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
-        activeDescriptor = this._advance(
-          connectingDescriptor,
-          LIVE_DUBBING_STATUS.RUNNING,
-          null,
-          providerResponse.eventSequence,
-        );
-        if (!this._reserveVolumeEventSequence(
-          connectingDescriptor,
-          providerResponse.eventSequence,
-        )) {
-          throw new Error('Live dubbing volume sequence reservation failed');
-        }
-      } else {
+        && consumeResponse.setupComplete === false
+        && consumeResponse.eventSequence === captureDescriptor.eventSequence + 1;
+      if (!captureReady) {
         throw new Error('Live dubbing audio pipelines are not ready');
+      }
+      const activeDescriptor = this._advance(
+        captureDescriptor,
+        LIVE_DUBBING_STATUS.RUNNING,
+        null,
+        consumeResponse.eventSequence,
+      );
+      if (!this._reserveVolumeEventSequence(captureDescriptor, activeDescriptor.eventSequence)) {
+        throw new Error('Live dubbing volume sequence reservation failed');
       }
       try {
         if (!await this._writeDescriptor(
@@ -2632,8 +2581,8 @@ export class LiveDubbingCoordinator {
       }
       if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
       this._startMediaObservationSession(activeDescriptor);
+      this._handleMediaDecision(activeDescriptor, { known: false, playing: false });
       this._refreshMediaObservation(activeDescriptor.tabId);
-      this._handleMediaDecision(activeDescriptor, this.getMediaActivity());
       return { success: true, status: cloneDescriptor(activeDescriptor) };
     } catch (error) {
       this._clearVolumeEventSequenceReservation(descriptor.sessionId, descriptor.providerId);
@@ -2642,20 +2591,11 @@ export class LiveDubbingCoordinator {
         sessionState,
         error?.providerDiagnostic,
       );
-      if (providerStartAttempted && !providerDiagnostic && !sessionState.terminalRequested) {
-        providerDiagnostic = this._latchProviderDiagnostic(
-          sessionState,
-          createLiveDubbingProviderDiagnostic({
-            code: 'LIVE_DUBBING_PROVIDER_START_FAILED',
-            terminalCategory: 'PROVIDER_START_FAILED',
-          }),
-        );
-      }
       if (diagnostic) this.log.warn('Live dubbing capture failed', diagnostic);
       if (providerDiagnostic) {
         this.log.warn('Live dubbing provider startup failed', providerDiagnostic);
       }
-      const failureCode = this._classifyStartFailure({ error, providerDiagnostic, providerStartAttempted });
+      const failureCode = this._classifyStartFailure({ error, providerDiagnostic, providerStartAttempted: false });
       if (!sessionState.terminalRequested) {
         const failedBase = sessionState.descriptor || descriptor;
         const failedDescriptor = this._advance(failedBase, LIVE_DUBBING_STATUS.ERROR, failureCode);
@@ -3528,7 +3468,8 @@ export class LiveDubbingCoordinator {
       || state.descriptor?.providerId !== descriptor?.providerId
       || state.descriptor?.status !== descriptor?.status
       || state.descriptor?.eventSequence !== descriptor?.eventSequence
-      || descriptor?.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || ![LIVE_DUBBING_STATUS.PREPARING_CAPTURE, LIVE_DUBBING_STATUS.CONNECTING_PROVIDER]
+        .includes(descriptor?.status)
       || !Number.isSafeInteger(eventSequence)
       || eventSequence !== descriptor.eventSequence + 1) {
       return false;
@@ -3712,7 +3653,8 @@ export class LiveDubbingCoordinator {
       || state.terminalRequested
       || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
       || !this._isSameDescriptorFence(state.descriptor, current)
-      || current.status !== LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+      || ![LIVE_DUBBING_STATUS.PREPARING_CAPTURE, LIVE_DUBBING_STATUS.CONNECTING_PROVIDER]
+        .includes(current.status)
       || (setRequestLane
         && !this._isLatestVolumeSetRequestToken(state, setRequestLane, setRequestToken))) {
       return { response, transportDescriptor };
@@ -3733,7 +3675,8 @@ export class LiveDubbingCoordinator {
 
     const state = this.sessionRegistry.getSessionState(descriptor.sessionId);
     const reservation = state?.volumeEventSequenceReservation;
-    const isReservedBridge = descriptor.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
+    const isReservedBridge = [LIVE_DUBBING_STATUS.PREPARING_CAPTURE, LIVE_DUBBING_STATUS.CONNECTING_PROVIDER]
+      .includes(descriptor.status)
       && !state?.terminalRequested
       && state?.descriptor?.sessionId === descriptor.sessionId
       && state?.descriptor?.providerId === descriptor.providerId

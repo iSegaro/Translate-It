@@ -156,32 +156,28 @@ describe('LiveDubbingController', () => {
   ])('logs the actual %s failure stage without private values', async (failureStage, expectedStage) => {
     const logger = { debug: vi.fn() };
     const track = new FakeTrack();
-    let bootstrapCalls = 0;
     const inputPipeline = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}),
       pauseInput: vi.fn(async () => {}), resumeInput: vi.fn(async () => {}) };
     const outputPlayer = { start: vi.fn(async () => {}), stop: vi.fn(async () => {}),
     };
-    let factoryCalls = 0;
     const controller = new LiveDubbingController({
       logger,
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
       inputPipelineFactory: vi.fn(options => { inputPipeline.onFrame = options.onFrame; return inputPipeline; }),
       outputPlayerFactory: vi.fn(() => outputPlayer),
       requestBootstrap: vi.fn(async () => {
-        bootstrapCalls += 1;
-        if (failureStage === 'provider_bootstrap' && bootstrapCalls > 1) {
+        if (failureStage === 'provider_bootstrap') {
           throw Object.assign(new Error('seed credential'), { code: 'SAFE_PROVIDER_CODE' });
         }
         return { success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: { token: 'seed credential' } };
       }),
       providerClientFactory: vi.fn(options => {
-        factoryCalls += 1;
-        if (failureStage === 'provider_creation' && factoryCalls > 1) {
+        if (failureStage === 'provider_creation') {
           throw Object.assign(new Error('seed stream ID'), { code: 'SAFE_PROVIDER_CODE' });
         }
         return { connect: vi.fn(async () => {
           options.callbacks.onSetupComplete();
-          if (failureStage === 'provider_connection' && factoryCalls > 1) {
+          if (failureStage === 'provider_connection') {
             throw Object.assign(new Error('private response body'), { code: 'SAFE_PROVIDER_CODE' });
           }
         }), dispose: vi.fn(async () => {}) };
@@ -189,7 +185,6 @@ describe('LiveDubbingController', () => {
     });
     controller.prepare('failure-session', 'gemini', 'fr', 0, { synchronizeMedia: true });
     await controller.consume('failure-session', 'gemini', 'stream', 1);
-    await controller.connectProvider('failure-session', 'gemini', 'fr', 2);
     const session = controller.currentSession;
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     if (failureStage === 'media_gate') {
@@ -204,7 +199,7 @@ describe('LiveDubbingController', () => {
     const failures = logger.debug.mock.calls.filter(([message]) => message.startsWith('Live dubbing media resume failed'));
     const code = ['provider_bootstrap', 'media_gate'].includes(failureStage)
       ? 'LIVE_DUBBING_MEDIA_RESUME_FAILED' : 'SAFE_PROVIDER_CODE';
-    expect(failures).toEqual([[`Live dubbing media resume failed | mediaSequence=2 | providerGeneration=3 | stage=${expectedStage} | outcome=${failureStage === 'media_gate' || failureStage === 'audio_output_reset' ? 'terminal' : 'failed'} | errorCode=${code}`]]);
+    expect(failures).toEqual([[`Live dubbing media resume failed | mediaSequence=2 | providerGeneration=2 | stage=${expectedStage} | outcome=${failureStage === 'media_gate' || failureStage === 'audio_output_reset' ? 'terminal' : 'failed'} | errorCode=${code}`]]);
     const serialized = JSON.stringify(failures);
     expect(failures.every(call => call.length === 1 && typeof call[0] === 'string')).toBe(true);
     expect(serialized).not.toContain('[object Object]');
@@ -2945,6 +2940,30 @@ describe('LiveDubbingController media-stream audio path', () => {
     };
   }
 
+  it('stops capture-only synchronized media without creating or disposing a provider', async () => {
+    const track = new FakeTrack();
+    const providerClientFactory = vi.fn();
+    const controller = new LiveDubbingController({
+      mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
+      providerRegistry: { getAudioMode: vi.fn(() => LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) },
+      providerClientFactory,
+    });
+    controller.prepare('capture-only-stop', 'openai', 'en-US', 0, { synchronizeMedia: true });
+    const acquired = await controller.consume('capture-only-stop', 'openai', 'ephemeral-stream', 1);
+
+    expect(acquired).toMatchObject({
+      ack: 'MEDIA_ACQUIRED', status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 2,
+      captureReady: true, audioPathReady: true, setupComplete: false,
+    });
+    expect(controller.consume('capture-only-stop', 'openai', 'second-stream', 2))
+      .toMatchObject({ ack: 'MEDIA_ACQUIRED', status: LIVE_DUBBING_STATUS.RUNNING,
+        eventSequence: 2, setupComplete: false });
+    expect(providerClientFactory).not.toHaveBeenCalled();
+    await expect(controller.dispose('capture-only-stop', 'openai')).resolves.toMatchObject({ success: true });
+    expect(providerClientFactory).not.toHaveBeenCalled();
+    expect(track.stop).toHaveBeenCalledOnce();
+  });
+
   it('drives a media-stream provider without local pipelines', async () => {
     const inputPipelineFactory = vi.fn();
     const outputPlayerFactory = vi.fn();
@@ -4239,6 +4258,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     const track = new FakeTrack();
     const logger = { debug: vi.fn(), info: vi.fn() };
     let callbacks = [];
+    const notifyTranscript = vi.fn();
     let deferInputResume = false;
     let releaseInputResume;
     const inputResumeAck = new Promise(resolve => { releaseInputResume = resolve; });
@@ -4255,6 +4275,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     const providers = [];
     const controller = new LiveDubbingController({
       logger,
+      notifyTranscript,
       mediaDevices: { getUserMedia: vi.fn(async () => createStream(track)) },
       requestBootstrap: vi.fn(async () => ({ success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: {} })),
       inputPipelineFactory: vi.fn(options => { inputPipeline.onFrame = options.onFrame; return inputPipeline; }),
@@ -4271,43 +4292,39 @@ describe('LiveDubbingController media-stream audio path', () => {
     });
     controller.prepare('rotation-session', 'gemini', 'fr', 0, { synchronizeMedia: true });
     await controller.consume('rotation-session', 'gemini', 'stream-secret', 1);
-    await controller.connectProvider('rotation-session', 'gemini', 'fr', 2);
     const session = controller.currentSession;
     expect(session.mediaAdmissionClosed).toBe(true);
-    const oldCallbacks = callbacks[0];
-
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, ready: true, mediaSequence: 2, rotationId: 'rotation-2' });
     expect(logger.debug).toHaveBeenCalledWith(
-      'Live dubbing media resume started | mediaSequence=2 | providerGeneration=3 | stage=reconnect',
+      'Live dubbing media resume started | mediaSequence=2 | providerGeneration=2 | stage=reconnect',
     );
     expect(logger.info).toHaveBeenCalledWith(
-      'Live dubbing provider reconnected | mediaSequence=2 | providerGeneration=3 | outcome=ready',
+      'Live dubbing provider reconnected | mediaSequence=2 | providerGeneration=2 | outcome=ready',
     );
-    expect(controller.requestBootstrap).toHaveBeenCalledTimes(2);
-    expect(controller.requestBootstrap.mock.calls[1][0].data).toMatchObject({
+    expect(controller.requestBootstrap).toHaveBeenCalledTimes(1);
+    expect(controller.requestBootstrap.mock.calls[0][0].data).toMatchObject({
       sessionId: session.sessionId, eventSequence: session.eventSequence,
       mediaSequence: 2, rotationId: 'rotation-2',
     });
-    expect(providers).toHaveLength(2);
+    expect(providers).toHaveLength(1);
     expect(controller.status(session.sessionId, session.providerId, session.eventSequence)).toMatchObject({
       status: LIVE_DUBBING_STATUS.RUNNING, mediaState: 'ready', mediaSequence: 2,
       rotationId: 'rotation-2',
     });
-    oldCallbacks.onAudio(new Uint8Array([1]));
-    oldCallbacks.onTranslatedTranscript({ kind: 'translated', text: 'stale' });
+    const oldCallbacks = callbacks[0];
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     expect(outputPlayer.enqueuePcm16).not.toHaveBeenCalled();
-    expect(providers[1].sendAudio).not.toHaveBeenCalled();
+    expect(providers[0].sendAudio).not.toHaveBeenCalled();
 
     await expect(controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, playing: true });
     expect(logger.debug).toHaveBeenCalledWith(
-      'Live dubbing media commit started | mediaSequence=2 | providerGeneration=3 | stage=commit',
+      'Live dubbing media commit started | mediaSequence=2 | providerGeneration=2 | stage=commit',
     );
     expect(logger.info).toHaveBeenCalledWith(
-      'Live dubbing media committed | mediaSequence=2 | providerGeneration=3 | stage=playback | outcome=playing',
+      'Live dubbing media committed | mediaSequence=2 | providerGeneration=2 | stage=playback | outcome=playing',
     );
     const diagnosticCalls = JSON.stringify([...logger.debug.mock.calls, ...logger.info.mock.calls]);
     expect([...logger.debug.mock.calls, ...logger.info.mock.calls]
@@ -4315,15 +4332,30 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(diagnosticCalls).not.toContain('[object Object]');
     for (const secret of ['stream-secret', 'stale', 'rotation-2']) expect(diagnosticCalls).not.toContain(secret);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
-    expect(providers[1].sendAudio).toHaveBeenCalledOnce();
+    expect(providers[0].sendAudio).toHaveBeenCalledOnce();
     expect(inputPipeline.resumeInput).toHaveBeenCalledOnce();
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 3);
     await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 4, 'rotation-4');
+    await expect(controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 4, 'rotation-4'))
+      .resolves.toMatchObject({ success: true, playing: true });
+    expect(session.mediaAdmissionClosed).toBe(false);
+
+    const acceptedAudioBeforeStaleCallback = outputPlayer.enqueuePcm16.mock.calls.length;
+    const acceptedTranscriptsBeforeStaleCallback = notifyTranscript.mock.calls.length;
+    oldCallbacks.onAudio(new Uint8Array([1]));
+    oldCallbacks.onTranslatedTranscript({ kind: 'translated', text: 'stale' });
+    oldCallbacks.onOriginalTranscript({ kind: 'original', text: 'stale' });
+    await Promise.resolve();
+    expect(outputPlayer.enqueuePcm16).toHaveBeenCalledTimes(acceptedAudioBeforeStaleCallback);
+    expect(notifyTranscript).toHaveBeenCalledTimes(acceptedTranscriptsBeforeStaleCallback);
+
+    await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 5);
+    await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 6, 'rotation-6');
     deferInputResume = true;
     const staleCommit = controller.commitMedia(
-      session.sessionId, session.providerId, session.eventSequence, 4, 'rotation-4',
+      session.sessionId, session.providerId, session.eventSequence, 6, 'rotation-6',
     );
-    await vi.waitFor(() => expect(inputPipeline.resumeInput).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(inputPipeline.resumeInput).toHaveBeenCalledTimes(3));
     const unmuteCallsBeforeStop = outputPlayer.setPlaybackMuted.mock.calls.filter(([muted]) => muted === false).length;
     const stop = controller.dispose(session.sessionId, session.providerId);
     releaseInputResume();
@@ -4368,18 +4400,17 @@ describe('LiveDubbingController media-stream audio path', () => {
     });
     controller.prepare('openai-rotation', 'openai', 'en-US', 0, { synchronizeMedia: true });
     await controller.consume('openai-rotation', 'openai', 'stream-secret', 1);
-    await controller.connectProvider('openai-rotation', 'openai', 'en-US', 2);
     const session = controller.currentSession;
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'openai-2');
-    expect(gateCalls).toContainEqual([2, false]);
-    expect(gateCalls).not.toContainEqual([2, true]);
+    expect(gateCalls).toContainEqual([1, false]);
+    expect(gateCalls).not.toContainEqual([1, true]);
     await controller.setDubbedVolume(session.sessionId, session.providerId, 0.35, session.eventSequence);
     deferVolume = true;
     const staleCommit = controller.commitMedia(
       session.sessionId, session.providerId, session.eventSequence, 2, 'openai-2',
     );
-    await vi.waitFor(() => expect(providers[1].setDubbedVolume).toHaveBeenLastCalledWith(0.35));
+    await vi.waitFor(() => expect(providers[0].setDubbedVolume).toHaveBeenLastCalledWith(0.35));
     const supersedingPause = controller.pauseMedia(
       session.sessionId, session.providerId, session.eventSequence, 3,
     );
@@ -4391,13 +4422,13 @@ describe('LiveDubbingController media-stream audio path', () => {
     await expect(newerPause).resolves.toMatchObject({ success: true, paused: true, mediaSequence: 4 });
     releaseVolume();
     await expect(staleCommit).resolves.toMatchObject({ success: false, ignored: true });
-    expect(gateCalls).not.toContainEqual([2, true]);
+    expect(gateCalls).not.toContainEqual([1, true]);
 
     deferVolume = false;
     await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 5, 'openai-5');
     await controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 5, 'openai-5');
-    expect(providers[2].setDubbedVolume).toHaveBeenLastCalledWith(0.35);
-    expect(gateCalls).toContainEqual([3, true]);
+    expect(providers[1].setDubbedVolume).toHaveBeenLastCalledWith(0.35);
+    expect(gateCalls).toContainEqual([2, true]);
     expect(track.stop).not.toHaveBeenCalled();
     await controller.dispose(session.sessionId, session.providerId);
     expect(track.stop).toHaveBeenCalledOnce();
@@ -4408,8 +4439,8 @@ describe('LiveDubbingController media-stream audio path', () => {
     let callbacks;
     const requestBootstrap = vi.fn()
       .mockResolvedValueOnce({ success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: {} })
-      .mockResolvedValueOnce({ success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: {} })
       .mockResolvedValueOnce({ success: false })
+      .mockResolvedValueOnce({ success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: {} })
       .mockResolvedValueOnce({ success: true, providerId: 'gemini', targetLanguage: 'fr', bootstrap: {} });
     const inputPipeline = {
       start: vi.fn(async () => {}), stop: vi.fn(async () => {}),
@@ -4433,7 +4464,7 @@ describe('LiveDubbingController media-stream audio path', () => {
         const index = providers.length;
         const provider = {
           connect: vi.fn(async () => {
-            if (index === 1) throw new Error('provider setup rejected');
+            if (index === 0) throw new Error('provider setup rejected');
             options.callbacks.onSetupComplete();
           }),
           sendAudio: vi.fn(() => true), dispose: vi.fn(async () => {}),
@@ -4444,7 +4475,6 @@ describe('LiveDubbingController media-stream audio path', () => {
     });
     controller.prepare('mint-retry', 'gemini', 'fr', 0, { synchronizeMedia: true });
     await controller.consume('mint-retry', 'gemini', 'stream-secret', 1);
-    await controller.connectProvider('mint-retry', 'gemini', 'fr', 2);
     const session = controller.currentSession;
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'retry-2'))
@@ -4458,13 +4488,13 @@ describe('LiveDubbingController media-stream audio path', () => {
       action: LIVE_DUBBING_ACTIONS.MEDIA_STATE_CHANGED,
       data: expect.objectContaining({ mediaState: 'error', mediaError: 'LIVE_DUBBING_MEDIA_RESUME_FAILED' }),
     }));
-    expect(providers[1].dispose).toHaveBeenCalledOnce();
+    expect(providers[0].dispose).toHaveBeenCalledOnce();
 
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 3, 'retry-3'))
       .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_MEDIA_RESUME_FAILED' });
     expect(controller.currentSession).toBe(session);
     expect(track.stop).not.toHaveBeenCalled();
-    expect(providers[2].dispose).toHaveBeenCalledOnce();
+    expect(providers[1].dispose).toHaveBeenCalledOnce();
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 4, 'retry-4'))
       .resolves.toMatchObject({ success: true, ready: true, mediaSequence: 4 });
     await controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 4, 'retry-4');
@@ -4474,7 +4504,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 6, 'retry-6'))
       .resolves.toMatchObject({ success: false, error: 'LIVE_DUBBING_MEDIA_ROTATION_FAILED' });
     expect(controller.currentSession).toBeNull();
-    expect(providers[3].dispose).toHaveBeenCalledOnce();
+    expect(providers[2].dispose).toHaveBeenCalledOnce();
     expect(track.stop).toHaveBeenCalledOnce();
   });
 
@@ -4528,12 +4558,11 @@ describe('LiveDubbingController media-stream audio path', () => {
     });
     controller.prepare('pcm-real-commit', 'gemini', 'fr', 0, { synchronizeMedia: true });
     await controller.consume('pcm-real-commit', 'gemini', 'stream-secret', 1);
-    await controller.connectProvider('pcm-real-commit', 'gemini', 'fr', 2);
     const session = controller.currentSession;
     expect(session.audioEngine.outputPlayer).toBeInstanceOf(PcmOutputPlayer);
     expect(controller.status(session.sessionId, session.providerId, session.eventSequence)).toMatchObject({
       status: LIVE_DUBBING_STATUS.RUNNING,
-      setupComplete: true,
+      setupComplete: false,
       captureReady: true,
       synchronizeMedia: true,
       mediaState: 'paused',
@@ -4549,7 +4578,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(session.audioEngine.outputPlayer.playbackMuted).toBe(false);
     expect(gainNode.gain.value).toBe(session.dubbedVolume);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
-    expect(providers[1].sendAudio).toHaveBeenCalledOnce();
+    expect(providers[0].sendAudio).toHaveBeenCalledOnce();
     expect(track.stop).not.toHaveBeenCalled();
     await controller.dispose(session.sessionId, session.providerId);
     expect(track.stop).toHaveBeenCalledOnce();
@@ -4569,7 +4598,7 @@ describe('LiveDubbingController media-stream audio path', () => {
       }),
       controllerOptions: { requestBootstrap },
     });
-    controller.prepare('stop-during-mint', 'gemini', 'fr', 0, { synchronizeMedia: true });
+    controller.prepare('stop-during-mint', 'gemini', 'fr', 0, { synchronizeMedia: false });
     await controller.consume('stop-during-mint', 'gemini', 'stream-secret', 1);
     await controller.connectProvider('stop-during-mint', 'gemini', 'fr', 2);
     const session = controller.currentSession;
@@ -4605,7 +4634,7 @@ describe('LiveDubbingController media-stream audio path', () => {
         }),
       },
     });
-    controller.prepare('stop-during-factory', 'gemini', 'fr', 0, { synchronizeMedia: true });
+    controller.prepare('stop-during-factory', 'gemini', 'fr', 0, { synchronizeMedia: false });
     await controller.consume('stop-during-factory', 'gemini', 'stream-secret', 1);
     await controller.connectProvider('stop-during-factory', 'gemini', 'fr', 2);
     const session = controller.currentSession;
@@ -4648,7 +4677,7 @@ describe('LiveDubbingController media-stream audio path', () => {
         }),
       },
     });
-    controller.prepare('pause-during-openai-factory', 'openai', 'en-US', 0, { synchronizeMedia: true });
+    controller.prepare('pause-during-openai-factory', 'openai', 'en-US', 0, { synchronizeMedia: false });
     await controller.consume('pause-during-openai-factory', 'openai', 'stream-secret', 1);
     await controller.connectProvider('pause-during-openai-factory', 'openai', 'en-US', 2);
     const session = controller.currentSession;
@@ -4684,9 +4713,9 @@ describe('LiveDubbingController media-stream audio path', () => {
     const captureAck = new Promise((_, reject) => { rejectCapture = reject; });
     const inputPipeline = {
       start: vi.fn(async () => { inputPipeline.inputPaused = false; }), stop: vi.fn(async () => {}),
-      pauseInput: vi.fn(() => {
-        inputPipeline.inputPaused = true;
-        return ++pauseCalls === 3 ? captureAck : Promise.resolve();
+       pauseInput: vi.fn(() => {
+         inputPipeline.inputPaused = true;
+          return ++pauseCalls === 2 ? captureAck : Promise.resolve();
       }),
       resumeInput: vi.fn(async () => { inputPipeline.inputPaused = false; }),
     };
@@ -4712,17 +4741,16 @@ describe('LiveDubbingController media-stream audio path', () => {
     });
     controller.prepare('pause-during-resume', 'gemini', 'fr', 0, { synchronizeMedia: true });
     await controller.consume('pause-during-resume', 'gemini', 'stream-secret', 1);
-    await controller.connectProvider('pause-during-resume', 'gemini', 'fr', 2);
     const session = controller.currentSession;
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     inputPipeline.inputPaused = false;
     const resume = controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'resume-2');
-    await vi.waitFor(() => expect(inputPipeline.pauseInput).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(inputPipeline.pauseInput).toHaveBeenCalledTimes(2));
     const resetsBeforePause = outputPlayer.resetEpochAndWait.mock.calls.length;
     const firstPause = controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 3);
     const newerPause = controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 4);
     expect(newerPause).toBe(firstPause);
-    expect(inputPipeline.pauseInput).toHaveBeenCalledTimes(4);
+    expect(inputPipeline.pauseInput).toHaveBeenCalledTimes(3);
     expect(outputPlayer.resetEpochAndWait).toHaveBeenCalledTimes(resetsBeforePause + 1);
     expect(track.stop).not.toHaveBeenCalled();
     rejectCapture(new Error('superseded capture acknowledgement'));
@@ -4736,7 +4764,6 @@ describe('LiveDubbingController media-stream audio path', () => {
     expect(track.stop).not.toHaveBeenCalled();
     await controller.dispose(session.sessionId, session.providerId);
     expect(providers[0].dispose).toHaveBeenCalledOnce();
-    expect(providers[1].dispose).toHaveBeenCalledOnce();
     expect(track.stop).toHaveBeenCalledOnce();
   });
 

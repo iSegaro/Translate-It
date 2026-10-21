@@ -1157,6 +1157,10 @@ export class LiveDubbingController {
           status: IDLE_STATUS,
         };
       }
+      if (session.synchronizeMedia) {
+        session.eventSequence += 1;
+        session.status = LIVE_DUBBING_STATUS.RUNNING;
+      }
       session.capturePromise = null;
       return this._mediaAcquiredResponse(session);
     } catch (error) {
@@ -1224,6 +1228,11 @@ export class LiveDubbingController {
     session.outputPlayer = audioEngine.outputPlayer;
     session.pipelinesReady = readiness.inputPipelineReady && readiness.outputPipelineReady;
     session.audioPathReady = readiness.audioPathReady;
+    if (session.mediaAdmissionClosed
+      && session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
+      && session.audioEngine.setPlaybackMuted(true) === false) {
+      throw new Error('LIVE_DUBBING_OUTPUT_GATE_FAILED');
+    }
     if (this.pipelineRequired || session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
       session.status = LIVE_DUBBING_STATUS.CONNECTING_PROVIDER;
     }
@@ -1628,14 +1637,15 @@ export class LiveDubbingController {
       const muteTarget = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
         ? client
         : (engine || output);
-      const mute = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
-        ? muteTarget?.setMediaGateOpen
-        : muteTarget?.setPlaybackMuted;
-      if (typeof mute !== 'function') throw new Error('Media mute primitive unavailable');
-      const muted = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
-        ? mute.call(muteTarget, false)
-        : mute.call(muteTarget, true);
-      if (muted === false) throw new Error('Media playback mute failed');
+      if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+        if (client && (typeof client.setMediaGateOpen !== 'function' || client.setMediaGateOpen(false) === false)) {
+          throw new Error('Media playback mute failed');
+        }
+      } else {
+        const mute = muteTarget?.setPlaybackMuted;
+        if (typeof mute !== 'function') throw new Error('Media mute primitive unavailable');
+        if (mute.call(muteTarget, true) === false) throw new Error('Media playback mute failed');
+      }
     } catch {
       return this._failClosedMediaPause(session, providerId);
     }
@@ -2546,6 +2556,7 @@ export class LiveDubbingController {
       eventSequence: session.eventSequence,
       captureReady: Boolean(session.stream),
       ...this._audioReadiness(session),
+      ...(session.synchronizeMedia ? { setupComplete: session.setupComplete } : {}),
     };
   }
 
