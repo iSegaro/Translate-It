@@ -36,6 +36,49 @@ describe('LifecycleManager translation text routing', () => {
     registerHandlerMock.mockClear()
   })
 
+  it('registers lazy debug handlers before listening while bridge import is deferred', async () => {
+    let releaseImport
+    const importGate = new Promise((resolve) => { releaseImport = resolve })
+    const mappedHandler = vi.fn(() => 'handled')
+    const settingsHandler = vi.fn(async () => ({ DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {} }))
+    vi.doMock('@/shared/logging/DebugModeBridge.js', async () => {
+      await importGate
+      return { debugModeBridge: { getHandlerMappings: () => ({
+        OFFSCREEN_LOGGING_SETTINGS_GET: settingsHandler,
+        DEBUG_MODE_CHANGED: mappedHandler,
+        COMPONENT_LOG_LEVELS_CHANGED: mappedHandler,
+      }) } }
+    })
+    const manager = new LifecycleManager()
+    manager.initializebrowserAPI = vi.fn().mockResolvedValue(undefined)
+    manager.initializeTranslationEngine = vi.fn().mockResolvedValue(undefined)
+    manager.initializeDynamicIconManager = vi.fn().mockResolvedValue(undefined)
+    manager.initializeErrorHandlers = vi.fn().mockResolvedValue(undefined)
+    manager.preloadFeatures = vi.fn().mockResolvedValue(undefined)
+    manager.refreshContextMenus = vi.fn().mockResolvedValue(undefined)
+    manager.initializeTTSVoiceCache = vi.fn()
+    manager.messageHandler.listen = vi.fn(() => {
+      for (const action of ['OFFSCREEN_LOGGING_SETTINGS_GET', 'DEBUG_MODE_CHANGED', 'COMPONENT_LOG_LEVELS_CHANGED']) {
+        expect(registeredHandlers.get(action)).toEqual(expect.any(Function))
+      }
+    })
+    const initialize = manager.initialize()
+    expect(manager.messageHandler.listen).toHaveBeenCalledOnce()
+    const args = [{ action: 'OFFSCREEN_LOGGING_SETTINGS_GET' }, { id: 'sender' }, vi.fn()]
+    let settled = false
+    const dispatched = registeredHandlers.get('OFFSCREEN_LOGGING_SETTINGS_GET')(...args)
+      .then((result) => { settled = true; return result })
+    await Promise.resolve()
+    expect(mappedHandler).not.toHaveBeenCalled()
+    expect(settingsHandler).not.toHaveBeenCalled()
+    expect(settled).toBe(false)
+    releaseImport()
+    await initialize
+    await expect(dispatched).resolves.toEqual({ DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {} })
+    expect(settingsHandler).toHaveBeenCalledWith(...args)
+    vi.doUnmock('@/shared/logging/DebugModeBridge.js')
+  })
+
   it('routes enum and legacy actions through the same handler without duplicate registration', () => {
     const manager = new LifecycleManager()
     manager.registerMessageHandlers()

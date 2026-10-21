@@ -39,6 +39,18 @@ function sanitizeLoggingSettings(settings = {}, partial = false) {
   return sanitized;
 }
 
+function readInitialLoggingSettings(response) {
+  if (!response || typeof response !== 'object' || Array.isArray(response)
+    || (Object.getPrototypeOf(response) !== Object.prototype && Object.getPrototypeOf(response) !== null)
+    || Object.hasOwn(response, 'success') || Object.hasOwn(response, 'error')
+    || typeof response.DEBUG_MODE !== 'boolean'
+    || !response.COMPONENT_LOG_LEVELS || typeof response.COMPONENT_LOG_LEVELS !== 'object'
+    || Array.isArray(response.COMPONENT_LOG_LEVELS)) {
+    throw new Error('OFFSCREEN_LOGGING_SETTINGS_INVALID');
+  }
+  return sanitizeLoggingSettings(response);
+}
+
 /**
  * DebugModeBridge class manages the connection between DEBUG_MODE setting
  * and the logging system across all extension contexts
@@ -51,6 +63,10 @@ class DebugModeBridge {
     this.storageListener = null;
     this.messageListener = null;
     this.offscreenSettingRevisions = { DEBUG_MODE: 0, COMPONENT_LOG_LEVELS: 0 };
+    this.offscreenInitializationPromise = null;
+    this.offscreenRetryTimeout = null;
+    this.offscreenRetryWaitResolve = null;
+    this.offscreenInitializationGeneration = 0;
   }
 
   /**
@@ -60,10 +76,9 @@ class DebugModeBridge {
   detectContext() {
     try {
       // Check if we're in background script
-      if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest()) {
-        if (typeof window === 'undefined' || !window.location?.href) {
-          return 'background';
-        }
+      const hasWindowUrl = Boolean(globalThis.window?.location?.href);
+      if (!hasWindowUrl && typeof chrome !== 'undefined' && chrome.runtime?.getManifest?.()) {
+        return 'background';
       }
 
       // Check if we're in content script
@@ -100,27 +115,62 @@ class DebugModeBridge {
    * Initialize the DebugModeBridge
    * @returns {Promise<boolean>} Whether initialization was successful
    */
-  async initialize() {
+  initialize() {
     if (this.isInitialized) {
-      return true;
+      return Promise.resolve(true);
     }
 
-    try {
-      if (this.context === 'offscreen') {
-        const requestRevisions = { ...this.offscreenSettingRevisions };
-        const response = await chrome.runtime.sendMessage({ action: MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET });
-        const settings = sanitizeLoggingSettings(response);
-        if (this.offscreenSettingRevisions.DEBUG_MODE === requestRevisions.DEBUG_MODE) {
-          this.currentDebugMode = settings.DEBUG_MODE;
-          await this.applyDebugMode(settings.DEBUG_MODE);
-        }
-        if (this.offscreenSettingRevisions.COMPONENT_LOG_LEVELS === requestRevisions.COMPONENT_LOG_LEVELS) {
-          await this.applyComponentLogLevels(settings.COMPONENT_LOG_LEVELS);
-        }
-        this.isInitialized = true;
-        return true;
-      }
+    if (this.context === 'offscreen') return this.initializeOffscreen();
 
+    return this.initializeFromStorage();
+  }
+
+  initializeOffscreen() {
+    if (this.offscreenInitializationPromise) return this.offscreenInitializationPromise;
+
+    const requestRevisions = { ...this.offscreenSettingRevisions };
+    const generation = this.offscreenInitializationGeneration;
+    const initialization = (async () => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (generation !== this.offscreenInitializationGeneration) return false;
+        try {
+          const response = await chrome.runtime.sendMessage({ action: MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET });
+          if (generation !== this.offscreenInitializationGeneration) return false;
+          const settings = readInitialLoggingSettings(response);
+          if (this.offscreenSettingRevisions.DEBUG_MODE === requestRevisions.DEBUG_MODE) {
+            this.currentDebugMode = settings.DEBUG_MODE;
+            await this.applyDebugMode(settings.DEBUG_MODE);
+          }
+          if (this.offscreenSettingRevisions.COMPONENT_LOG_LEVELS === requestRevisions.COMPONENT_LOG_LEVELS) {
+            await this.applyComponentLogLevels(settings.COMPONENT_LOG_LEVELS);
+          }
+          if (generation !== this.offscreenInitializationGeneration) return false;
+          this.isInitialized = true;
+          return true;
+        } catch {
+          if (attempt < 2) {
+            await new Promise((resolve) => {
+              this.offscreenRetryWaitResolve = resolve;
+              this.offscreenRetryTimeout = setTimeout(() => {
+                this.offscreenRetryTimeout = null;
+                this.offscreenRetryWaitResolve = null;
+                resolve();
+              }, 50);
+            });
+          }
+        }
+      }
+      return false;
+    })();
+    this.offscreenInitializationPromise = initialization;
+    void initialization.then(() => {
+      if (this.offscreenInitializationPromise === initialization) this.offscreenInitializationPromise = null;
+    });
+    return initialization;
+  }
+
+  async initializeFromStorage() {
+    try {
       // Get current debug mode from storage
       const debugMode = await this.getDebugModeFromStorage();
       this.currentDebugMode = debugMode;
@@ -133,7 +183,7 @@ class DebugModeBridge {
       await this.applyComponentLogLevels(componentLogLevels);
 
       // Set up listeners for real-time updates
-      if (this.context !== 'offscreen') this.setupStorageListener();
+      this.setupStorageListener();
 
       this.isInitialized = true;
 
@@ -144,8 +194,8 @@ class DebugModeBridge {
       });
 
       return true;
-    } catch (error) {
-      logger.error('Initialization failed:', error);
+    } catch {
+      logger.error('Initialization failed');
       return false;
     }
   }
@@ -333,7 +383,7 @@ class DebugModeBridge {
           const result = await storageManager.get({ DEBUG_MODE: false, COMPONENT_LOG_LEVELS: {} });
           return sanitizeLoggingSettings(result);
         } catch {
-          return { DEBUG_MODE: false, COMPONENT_LOG_LEVELS: {} };
+          return { success: false, error: 'OFFSCREEN_LOGGING_SETTINGS_UNAVAILABLE' };
         }
       },
       [MessageActions.DEBUG_MODE_CHANGED]: (message) => {
@@ -477,6 +527,11 @@ class DebugModeBridge {
    */
   cleanup() {
     try {
+      this.offscreenInitializationGeneration++;
+      if (this.offscreenRetryTimeout !== null) clearTimeout(this.offscreenRetryTimeout);
+      this.offscreenRetryTimeout = null;
+      this.offscreenRetryWaitResolve?.();
+      this.offscreenRetryWaitResolve = null;
       // Remove storage listener
       if (this.storageListener && typeof browser !== 'undefined' && browser.storage?.onChanged) {
         browser.storage.onChanged.removeListener(this.storageListener);
