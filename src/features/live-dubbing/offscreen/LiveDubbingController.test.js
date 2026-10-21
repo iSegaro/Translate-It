@@ -113,13 +113,13 @@ describe('LiveDubbingController', () => {
       });
     }
     await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation');
-    const failures = logger.debug.mock.calls.filter(([message]) => message === 'Live dubbing media resume failed');
-    expect(failures).toEqual([expect.arrayContaining([
-      'Live dubbing media resume failed', expect.objectContaining({ stage: expectedStage,
-        errorCode: ['provider_bootstrap', 'media_gate'].includes(failureStage)
-          ? 'LIVE_DUBBING_MEDIA_RESUME_FAILED' : 'SAFE_PROVIDER_CODE' }),
-    ])]);
+    const failures = logger.debug.mock.calls.filter(([message]) => message.startsWith('Live dubbing media resume failed'));
+    const code = ['provider_bootstrap', 'media_gate'].includes(failureStage)
+      ? 'LIVE_DUBBING_MEDIA_RESUME_FAILED' : 'SAFE_PROVIDER_CODE';
+    expect(failures).toEqual([[`Live dubbing media resume failed | mediaSequence=2 | providerGeneration=3 | stage=${expectedStage} | outcome=${failureStage === 'media_gate' || failureStage === 'audio_output_reset' ? 'terminal' : 'failed'} | errorCode=${code}`]]);
     const serialized = JSON.stringify(failures);
+    expect(failures.every(call => call.length === 1 && typeof call[0] === 'string')).toBe(true);
+    expect(serialized).not.toContain('[object Object]');
     for (const secret of ['private response body', 'seed transcript', 'seed URL', 'seed credential', 'seed stream ID']) {
       expect(serialized).not.toContain(secret);
     }
@@ -4180,10 +4180,12 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.pauseMedia(session.sessionId, session.providerId, session.eventSequence, 1);
     await expect(controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, ready: true, mediaSequence: 2, rotationId: 'rotation-2' });
-    expect(logger.debug).toHaveBeenCalledWith('Live dubbing media resume started',
-      expect.objectContaining({ stage: 'reconnect', mediaSequence: 2 }));
-    expect(logger.info).toHaveBeenCalledWith('Live dubbing provider reconnected',
-      expect.objectContaining({ outcome: 'ready', mediaSequence: 2 }));
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Live dubbing media resume started | mediaSequence=2 | providerGeneration=3 | stage=reconnect',
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      'Live dubbing provider reconnected | mediaSequence=2 | providerGeneration=3 | outcome=ready',
+    );
     expect(controller.requestBootstrap).toHaveBeenCalledTimes(2);
     expect(controller.requestBootstrap.mock.calls[1][0].data).toMatchObject({
       sessionId: session.sessionId, eventSequence: session.eventSequence,
@@ -4202,11 +4204,16 @@ describe('LiveDubbingController media-stream audio path', () => {
 
     await expect(controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, playing: true });
-    expect(logger.debug).toHaveBeenCalledWith('Live dubbing media commit started',
-      expect.objectContaining({ stage: 'commit', mediaSequence: 2 }));
-    expect(logger.info).toHaveBeenCalledWith('Live dubbing media committed',
-      expect.objectContaining({ outcome: 'playing', mediaSequence: 2 }));
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Live dubbing media commit started | mediaSequence=2 | providerGeneration=3 | stage=commit',
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      'Live dubbing media committed | mediaSequence=2 | providerGeneration=3 | stage=playback | outcome=playing',
+    );
     const diagnosticCalls = JSON.stringify([...logger.debug.mock.calls, ...logger.info.mock.calls]);
+    expect([...logger.debug.mock.calls, ...logger.info.mock.calls]
+      .every(call => call.length === 1 && typeof call[0] === 'string')).toBe(true);
+    expect(diagnosticCalls).not.toContain('[object Object]');
     for (const secret of ['stream-secret', 'stale', 'rotation-2']) expect(diagnosticCalls).not.toContain(secret);
     inputPipeline.onFrame({ buffer: new ArrayBuffer(2), sampleCount: 1, sampleRate: 16_000 });
     expect(providers[1].sendAudio).toHaveBeenCalledOnce();

@@ -165,19 +165,48 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
 }
 
 describe('Live Dubbing media diagnostics', () => {
-  it('logs safe stage and failure-code context without harness secrets', () => {
+  it('logs allowlisted diagnostic fields as one readable string', () => {
     const harness = createHarness();
     harness.logger.debug = vi.fn();
     harness.coordinator._logMedia('debug', 'retry-scheduled', {
       attempt: 2, maxAttempts: 3, mediaSequence: 4, stage: 'media-resume-dispatch',
-      errorCode: safeFailureCode('MEDIA_RESUME'), retryDelayMs: 750,
+      errorCode: safeFailureCode('media-resume-dispatch'), retryDelayMs: 750,
     });
-    const serialized = JSON.stringify(harness.logger.debug.mock.calls);
+    expect(harness.logger.debug).toHaveBeenCalledOnce();
+    expect(harness.logger.debug).toHaveBeenCalledWith(
+      'Live dubbing media retry-scheduled | attempt=2 | maxAttempts=3 | mediaSequence=4 | stage=media-resume-dispatch | retryDelayMs=750 | errorCode=LIVE_DUBBING_MEDIA-RESUME-DISPATCH_FAILED',
+    );
+    const logged = harness.logger.debug.mock.calls[0].join(' ');
     expect(harness.logger.warn).not.toHaveBeenCalled();
-    expect(serialized).toContain('media-resume-dispatch');
-    expect(serialized).toContain('LIVE_DUBBING_MEDIA_RESUME_FAILED');
-    expect(serialized).not.toContain('stream-secret');
-    expect(serialized).not.toContain('provider test secret');
+    expect(logged).not.toContain('[object Object]');
+    expect(logged).not.toContain('stream-secret');
+    expect(logged).not.toContain('provider test secret');
+  });
+
+  it('omits unknown, malformed, and object-valued fields', () => {
+    const harness = createHarness();
+    harness.logger.debug = vi.fn();
+    harness.coordinator._logMedia('debug', 'rotation', {
+      attempt: -1,
+      stage: { secret: 'stream-secret' },
+      outcome: 'provider test secret',
+      privateValue: 'provider test secret',
+      errorCode: 'provider test secret',
+    });
+    expect(harness.logger.debug).toHaveBeenCalledWith('Live dubbing media rotation');
+    expect(harness.logger.debug.mock.calls[0].join(' ')).not.toContain('[object Object]');
+    expect(harness.logger.debug.mock.calls[0].join(' ')).not.toContain('secret');
+  });
+
+  it('preserves WARN level for exhausted media retries', () => {
+    const harness = createHarness();
+    harness.coordinator._logMedia('warn', 'rotation-exhausted', {
+      attempt: 3, maxAttempts: 3, stage: 'barrier', errorCode: safeFailureCode('MEDIA_BARRIER'),
+    });
+
+    expect(harness.logger.warn).toHaveBeenCalledWith(
+      'Live dubbing media rotation-exhausted | attempt=3 | maxAttempts=3 | stage=barrier | errorCode=LIVE_DUBBING_MEDIA_BARRIER_FAILED',
+    );
   });
 
   it('does not require optional logger levels on injected loggers', () => {

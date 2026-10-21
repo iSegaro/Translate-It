@@ -70,6 +70,29 @@ const NON_PROVIDER_SETUP_TERMINAL_CATEGORIES = new Set([
   'OUTPUT_PIPELINE_ERROR',
 ]);
 
+const MEDIA_LOG_EVENTS = new Set([
+  'rotation', 'barrier', 'dispatch', 'ack', 'reconnected', 'retry-scheduled',
+  'rotation-exhausted', 'recovery',
+]);
+const MEDIA_LOG_STAGES = new Set([
+  'precondition', 'playing-report', 'final-inventory', 'start', 'barrier',
+  'retry-state', 'media-grant', 'media-resume-dispatch', 'media-resume-ack',
+  'commit-barrier', 'media-commit-dispatch', 'media-commit-ack', 'media-resume',
+  'media-commit', 'retry-state-restored', 'pause-dispatch', 'pause-ack', 'complete',
+]);
+const MEDIA_LOG_OUTCOMES = new Set([
+  'interrupted', 'not-playing', 'passed', 'failed', 'success', 'pending', 'exhausted', 'ready',
+]);
+const MEDIA_LOG_FIELDS = [
+  ['attempt', (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000],
+  ['maxAttempts', (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000],
+  ['mediaSequence', (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000],
+  ['stage', (value) => MEDIA_LOG_STAGES.has(value)],
+  ['outcome', (value) => MEDIA_LOG_OUTCOMES.has(value)],
+  ['retryDelayMs', (value) => Number.isFinite(value) && Number.isSafeInteger(value) && value >= 0 && value <= 60_000],
+  ['errorCode', (value) => typeof value === 'string' && /^LIVE_DUBBING_[A-Z0-9_-]{1,80}_FAILED$/.test(value)],
+];
+
 export { LIVE_DUBBING_CLEAR_OUTCOMES };
 
 function createCaptureStageFailure(stage, error, diagnostic = null) {
@@ -1056,7 +1079,13 @@ export class LiveDubbingCoordinator {
   }
 
   _logMedia(level, event, fields = {}) {
-    this.log?.[level]?.(`Live dubbing media ${event}`, fields);
+    if (!MEDIA_LOG_EVENTS.has(event)) return;
+    const details = MEDIA_LOG_FIELDS.flatMap(([key, isValid]) => {
+      const value = fields?.[key];
+      if (!isValid(value)) return [];
+      return [`${key}=${value}`];
+    });
+    this.log?.[level]?.(`Live dubbing media ${event}${details.length ? ` | ${details.join(' | ')}` : ''}`);
   }
 
   _handleMediaDecision(descriptor, activity) {

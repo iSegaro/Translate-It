@@ -284,6 +284,26 @@ function errorCode(error, fallback) {
     : fallback;
 }
 
+const MEDIA_DIAGNOSTIC_STAGES = new Set([
+  'reconnect', 'provider_created', 'provider_generation_wait', 'provider_creation', 'provider_bootstrap', 'provider_connection',
+  'audio_output_reset', 'media_gate', 'dubbed_volume_seed', 'commit', 'playback',
+]);
+const MEDIA_DIAGNOSTIC_OUTCOMES = new Set(['ready', 'failed', 'terminal', 'playing']);
+
+function formatMediaDiagnostic(message, fields = {}) {
+  const segments = [];
+  for (const key of ['mediaSequence', 'providerGeneration']) {
+    const value = fields[key];
+    if (Number.isSafeInteger(value) && value >= 0) segments.push(`${key}=${value}`);
+  }
+  if (MEDIA_DIAGNOSTIC_STAGES.has(fields.stage)) segments.push(`stage=${fields.stage}`);
+  if (MEDIA_DIAGNOSTIC_OUTCOMES.has(fields.outcome)) segments.push(`outcome=${fields.outcome}`);
+  if (typeof fields.errorCode === 'string' && SAFE_ERROR_CODE.test(fields.errorCode)) {
+    segments.push(`errorCode=${fields.errorCode}`);
+  }
+  return segments.length ? `${message} | ${segments.join(' | ')}` : message;
+}
+
 function hasAudioContext(options) {
   return Boolean(
     options.audioContextFactory
@@ -1724,7 +1744,7 @@ export class LiveDubbingController {
     this._setMediaState(session, 'reconnecting');
     const generation = session.providerGeneration;
     const mediaLogContext = { mediaSequence, providerGeneration: generation };
-    this.log?.debug?.('Live dubbing media resume started', { ...mediaLogContext, stage: 'reconnect' });
+    this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume started', { ...mediaLogContext, stage: 'reconnect' }));
     const previousResume = session.mediaResumePromise;
       const currentRotation = () => this._mediaIdentityMatches(
         session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation,
@@ -1753,7 +1773,9 @@ export class LiveDubbingController {
         if (!currentRotation()) return { success: false, ignored: true };
         failureStage = 'provider_creation';
         client = await this._createProviderClient(session, generation, { forceFresh: true });
-        this.log?.debug?.('Live dubbing media resume stage', { ...mediaLogContext, stage: 'provider_created' });
+        this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume stage', {
+          ...mediaLogContext, stage: 'provider_created',
+        }));
         if (!currentRotation()) {
           return disposeStaleClient();
         }
@@ -1838,7 +1860,9 @@ export class LiveDubbingController {
         session.setupComplete = true;
         session.mediaReadyGeneration = generation;
         this._setMediaState(session, 'ready');
-        this.log?.info?.('Live dubbing provider reconnected', { ...mediaLogContext, outcome: 'ready' });
+        this.log?.info?.(formatMediaDiagnostic('Live dubbing provider reconnected', {
+          ...mediaLogContext, outcome: 'ready',
+        }));
         return this._mediaResumeResponse(session);
       } catch (error) {
         if (client) {
@@ -1851,19 +1875,19 @@ export class LiveDubbingController {
         }
         if (!currentRotation()) return { success: false, ignored: true };
         if (fatalGateFailure) {
-          this.log?.debug?.('Live dubbing media resume failed', {
+          this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume failed', {
             ...mediaLogContext, stage: failureStage, outcome: 'terminal',
             errorCode: errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED'),
-          });
+          }));
           return this._mediaRotationTerminalFailure(session, providerId);
         }
         session.providerGeneration = ++this.providerGeneration;
         session.setupComplete = false;
         session.mediaReadyGeneration = null;
         const code = errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED');
-        this.log?.debug?.('Live dubbing media resume failed', {
+        this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume failed', {
           ...mediaLogContext, stage: failureStage, outcome: 'failed', errorCode: code,
-        });
+        }));
         this._setMediaState(session, 'error', code);
         return { success: false, error: code, sessionId, providerId, eventSequence, mediaSequence, rotationId };
       }
@@ -1904,7 +1928,9 @@ export class LiveDubbingController {
     if (session.mediaCommitPromise) return session.mediaCommitPromise;
     const generation = session.providerGeneration;
     const mediaLogContext = { mediaSequence, providerGeneration: generation };
-    this.log?.debug?.('Live dubbing media commit started', { ...mediaLogContext, stage: 'commit' });
+    this.log?.debug?.(formatMediaDiagnostic('Live dubbing media commit started', {
+      ...mediaLogContext, stage: 'commit',
+    }));
     const client = session.providerClient;
     const isCurrentCommit = () => this._mediaIdentityMatches(
       session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation,
@@ -1931,14 +1957,16 @@ export class LiveDubbingController {
         if (!isCurrentCommit()) return { success: false, ignored: true };
         session.mediaPaused = false;
         this._setMediaState(session, 'playing');
-        this.log?.info?.('Live dubbing media committed', { ...mediaLogContext, stage: 'playback', outcome: 'playing' });
+        this.log?.info?.(formatMediaDiagnostic('Live dubbing media committed', {
+          ...mediaLogContext, stage: 'playback', outcome: 'playing',
+        }));
         return { success: true, sessionId, providerId, eventSequence, mediaSequence, rotationId, playing: true };
       } catch (error) {
         if (!isCurrentCommit()) return { success: false, ignored: true };
-        this.log?.debug?.('Live dubbing media commit failed', {
+        this.log?.debug?.(formatMediaDiagnostic('Live dubbing media commit failed', {
           ...mediaLogContext, stage: 'commit', outcome: 'failed',
           errorCode: errorCode(error, 'LIVE_DUBBING_MEDIA_COMMIT_FAILED'),
-        });
+        }));
         return this._mediaRotationTerminalFailure(session, providerId);
       }
     })();
