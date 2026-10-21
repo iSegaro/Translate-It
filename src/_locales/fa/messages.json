@@ -392,6 +392,9 @@
   "live_dubbing_offscreen_lost_error": {
     "message": "دوبله زنده به‌طور غیرمنتظره متوقف شد. دوباره آن را شروع کنید."
   },
+  "live_dubbing_media_observer_reload_required": {
+    "message": "این برگه را دوباره بارگذاری کنید و دوبله زنده را دوباره امتحان کنید."
+  },
   "live_dubbing_action_start": {
     "message": "شروع"
   },

@@ -1,11 +1,16 @@
 import { LIVE_DUBBING_ACTIONS } from '../constants.js';
+import { walkOpenShadowTree } from '../../../utils/dom/walkOpenShadowTree.js';
 
 const { MEDIA_OBSERVER_HELLO: HELLO, MEDIA_OBSERVATION: OBSERVATION,
   MEDIA_OBSERVER_REFRESH: REFRESH, MEDIA_OBSERVER_STOP: STOP } = LIVE_DUBBING_ACTIONS;
+const installedDocumentsKey = Symbol.for('translate-it.live-dubbing.media-observer.documents');
+const installedDocuments = globalThis[installedDocumentsKey] || (globalThis[installedDocumentsKey] = new WeakMap());
 
 /** Install the per-frame, consent-gated media playback observer. */
 export function installMediaObserver({ runtime = globalThis.chrome?.runtime, document = globalThis.document } = {}) {
   if (!runtime?.sendMessage || !document) return () => {};
+  const existingCleanup = installedDocuments.get(document);
+  if (existingCleanup) return existingCleanup;
 
   let epoch = 0;
   let token;
@@ -15,6 +20,15 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
   let observer;
   let armed = false;
   const media = new Set();
+  const shadowRoots = new Set();
+  const mediaEvents = ['play', 'playing', 'pause', 'ended', 'volumechange'];
+
+  const listenToShadowRoot = (root) => {
+    if (shadowRoots.has(root)) return;
+    shadowRoots.add(root);
+    for (const eventName of mediaEvents) root.addEventListener(eventName, onMediaEvent, true);
+    observer?.observe(root, { childList: true, subtree: true });
+  };
 
   const disarm = () => {
     epoch += 1;
@@ -26,6 +40,10 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
     document.removeEventListener('pause', onMediaEvent, true);
     document.removeEventListener('ended', onMediaEvent, true);
     document.removeEventListener('volumechange', onMediaEvent, true);
+    for (const root of shadowRoots) {
+      for (const eventName of mediaEvents) root.removeEventListener(eventName, onMediaEvent, true);
+    }
+    shadowRoots.clear();
     media.clear();
     playing = false;
     token = undefined;
@@ -56,7 +74,10 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
 
   const collect = () => {
     for (const element of media) if (!element.isConnected) media.delete(element);
-    for (const element of document.querySelectorAll('audio, video')) media.add(element);
+    walkOpenShadowTree(document, (element) => {
+      if (element.matches('audio, video')) media.add(element);
+      if (element.shadowRoot) listenToShadowRoot(element.shadowRoot);
+    });
   };
 
   const readPlaying = () => {
@@ -119,6 +140,7 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
         }
       });
       observer.observe(document.documentElement, { childList: true, subtree: true });
+      collect();
     }
     token = response.token;
     sessionToken = response.sessionToken;
@@ -145,9 +167,11 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
       runtime.onMessage?.removeListener(onMessage);
       document.defaultView?.removeEventListener('pagehide', onPageHide);
       document.defaultView?.removeEventListener('pageshow', onPageShow);
+      if (installedDocuments.get(document) === onPageHide) installedDocuments.delete(document);
     }
   };
 
+  installedDocuments.set(document, onPageHide);
   runtime.onMessage?.addListener(onMessage);
   document.defaultView?.addEventListener('pagehide', onPageHide);
   document.defaultView?.addEventListener('pageshow', onPageShow);

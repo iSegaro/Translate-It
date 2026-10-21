@@ -132,7 +132,10 @@ function createHarness({ stored = null, outcome = null, streamId = 'stream-secre
     },
     webNavigation: {
       getFrame: vi.fn(async () => ({ documentId: 'current-doc' })),
-      getAllFrames: vi.fn(async () => [{ frameId: 0, documentId: 'current-doc' }]),
+      getAllFrames: vi.fn(async () => [{ frameId: 0, documentId: 'current-doc', url: 'https://example.test' }]),
+    },
+    scripting: {
+      executeScript: vi.fn(async () => {}),
     },
   };
   const chromeAPI = {
@@ -804,8 +807,8 @@ describe('Live Dubbing media observation authorization', () => {
       });
 
       const frames = [
-        { frameId: 0, documentId: 'top-doc' },
-        { frameId: 1, documentId: 'iframe-doc' },
+        { frameId: 0, documentId: 'top-doc', url: 'https://example.test' },
+        { frameId: 1, documentId: 'iframe-doc', url: 'https://example.test/frame' },
       ];
       harness.browserAPI.webNavigation.getFrame.mockImplementation(async ({ frameId }) => ({
         documentId: frames.find(frame => frame.frameId === frameId)?.documentId,
@@ -878,6 +881,7 @@ describe('Live Dubbing media observation authorization', () => {
         url: 'https://example.test',
       };
       harness.browserAPI.tabs.sendMessage.mockResolvedValue(undefined); // lose REFRESH; no unload/pagehide arrives from the removed iframe
+      frames.splice(1); // Browser inventory confirms the iframe is actually gone.
       await harness.coordinator.handleMediaObservation({ data: {
         token: topState.token,
         revision: (revisions.get(0) || 0) + 1,
@@ -1090,8 +1094,9 @@ describe('Live Dubbing media observation authorization', () => {
     await coordinator.handleMediaObservation({ data: { token: iframe.token, revision: 0, playing: true } }, sender(1, 'removed-frame-doc'));
     expect(coordinator.getMediaActivity()).toMatchObject({ known: true, playing: true });
     browserAPI.webNavigation.getAllFrames.mockResolvedValue([
-      { frameId: 0, documentId: 'top-doc' }, { frameId: 1, documentId: 'removed-frame-doc' },
+      { frameId: 0, documentId: 'top-doc' },
     ]);
+    browserAPI.webNavigation.getFrame.mockResolvedValue({ documentId: 'removed-frame-doc' });
     await coordinator.handleMediaObservation({ data: { token: top.token, revision: 0, playing: false, frameStructureChanged: true } }, sender(0, 'top-doc'));
     expect(browserAPI.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 42 });
     expect(coordinator.getMediaActivity()).toMatchObject({ known: true, playing: false });
@@ -1099,6 +1104,95 @@ describe('Live Dubbing media observation authorization', () => {
     const freshIframe = await coordinator.authorizeMediaObserver(sender(1, 'removed-frame-doc'));
     await coordinator.handleMediaObservation({ data: { token: freshIframe.token, revision: 0, playing: true } }, sender(1, 'removed-frame-doc'));
     expect(coordinator.getMediaActivity()).toMatchObject({ known: true, playing: true });
+  });
+
+  it('preserves reports for same-identity frames across a structure-change inventory', async () => {
+    const { coordinator, browserAPI } = createHarness({ stored: {
+      sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
+      targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 123, lastError: null, eventSequence: 1,
+    } });
+    const sender = (frameId, documentId) => ({ id: 'extension-id', tab: { id: 42 }, frameId, documentId, url: 'https://example.test' });
+    coordinator.mediaFrameDocuments.set(0, 'top-doc');
+    coordinator.mediaFrameDocuments.set(1, 'child-doc');
+    const top = await coordinator.authorizeMediaObserver(sender(0, 'top-doc'));
+    const child = await coordinator.authorizeMediaObserver(sender(1, 'child-doc'));
+    await coordinator.handleMediaObservation({ data: { token: top.token, revision: 0, playing: false } }, sender(0, 'top-doc'));
+    await coordinator.handleMediaObservation({ data: { token: child.token, revision: 0, playing: true } }, sender(1, 'child-doc'));
+    browserAPI.webNavigation.getAllFrames.mockResolvedValue([
+      { frameId: 0, documentId: 'top-doc' }, { frameId: 1, documentId: 'child-doc' },
+    ]);
+
+    await coordinator.handleMediaObservation({ data: {
+      token: top.token, revision: 1, playing: false, frameStructureChanged: true,
+    } }, sender(0, 'top-doc'));
+
+    expect(coordinator.mediaFrameDocuments).toEqual(new Map([[0, 'top-doc'], [1, 'child-doc']]));
+    expect(coordinator.mediaObservation.frames.get('1:child-doc')).toMatchObject({
+      token: child.token, revision: 0, playing: true,
+    });
+    expect(coordinator.getMediaActivity()).toMatchObject({ known: true, playing: true });
+  });
+
+  it('does not mark acknowledged failed-generation cleanup as pause failure after source pause', async () => {
+    const harness = createHarness({ stored: {
+      sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
+      targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 123, lastError: null, eventSequence: 1,
+    } });
+    const { coordinator } = harness;
+    const descriptor = await coordinator._readDescriptor();
+    const media = {
+      mediaSequence: 1, pausedSequenceAcked: 1, episodeAttempts: 0,
+      activeOperation: null, barrier: null, desiredPlaying: true,
+      exhausted: false, committed: false,
+    };
+    coordinator.sessionRegistry.setSessionState(descriptor.sessionId, { descriptor, terminalRequested: false, media });
+    coordinator._freshPlayingBarrier = vi.fn(async () => true);
+    let resolveCleanupPause;
+    let resolveSourcePause;
+    coordinator._sendOffscreen = vi.fn(message => {
+      if (message.action === LIVE_DUBBING_ACTIONS.MEDIA_RESUME) return Promise.resolve({ success: false });
+      if (message.action === LIVE_DUBBING_ACTIONS.MEDIA_PAUSE && message.data.mediaSequence === 3) {
+        return new Promise(resolve => { resolveCleanupPause = resolve; });
+      }
+      if (message.action === LIVE_DUBBING_ACTIONS.MEDIA_PAUSE && message.data.mediaSequence === 4) {
+        return new Promise(resolve => { resolveSourcePause = resolve; });
+      }
+      if (message.action === LIVE_DUBBING_ACTIONS.MEDIA_PAUSE) return Promise.resolve({
+        success: true, sessionId: message.data.sessionId, providerId: message.data.providerId,
+        eventSequence: message.data.eventSequence, mediaSequence: message.data.mediaSequence, paused: true,
+      });
+      return Promise.resolve({ success: true });
+    });
+
+    const rotation = coordinator._beginMediaRotation(descriptor, media);
+    for (let i = 0; i < 20 && !resolveCleanupPause; i += 1) await Promise.resolve();
+    expect(resolveCleanupPause).toEqual(expect.any(Function));
+    media.desiredPlaying = false;
+    const sourcePause = coordinator._pauseForMedia(descriptor, media);
+    const sourcePauseOperation = media.activeOperation;
+    for (let i = 0; i < 20 && !resolveSourcePause; i += 1) await Promise.resolve();
+    expect(resolveSourcePause).toEqual(expect.any(Function));
+    resolveCleanupPause({
+      success: true, sessionId: descriptor.sessionId, providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence, mediaSequence: 3, paused: true,
+    });
+    await rotation;
+
+    expect(media.pauseFailed).not.toBe(true);
+    expect(media.exhausted).toBe(false);
+    expect(media.activeOperation).toBe(sourcePauseOperation);
+    expect(media.pausedSequenceAcked).toBeNull();
+
+    resolveSourcePause({
+      success: true, sessionId: descriptor.sessionId, providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence, mediaSequence: 4, paused: true,
+    });
+    await sourcePause;
+    expect(media.activeOperation).toBeNull();
+    expect(media.pausedSequenceAcked).toBe(4);
+    expect(coordinator.mediaState).toMatchObject({ mediaState: 'paused', mediaSequence: 4 });
   });
 
   it('does not apply an inventory response after a newer frame commit', async () => {
@@ -2807,6 +2901,7 @@ describe('LiveDubbingCoordinator', () => {
     const platformSendMessage = harness.browserAPI.runtime.sendMessage;
     const gateway = {
       supportsTabCapture: vi.fn(() => true),
+      injectMediaObserverForTab: vi.fn(async () => ({ success: true, injectedFrameCount: 1 })),
       sendMessage: vi.fn(message => platformSendMessage(message)),
       getMediaStreamId: vi.fn(async tabId => {
         expect(tabId).toBe(42);
@@ -2829,6 +2924,7 @@ describe('LiveDubbingCoordinator', () => {
 
     expect(result).toMatchObject({ success: true, status: { tabId: 42 } });
     expect(gateway.supportsTabCapture).toHaveBeenCalledOnce();
+    expect(gateway.injectMediaObserverForTab).toHaveBeenCalledWith(42);
     expect(gateway.getActiveTab).toHaveBeenCalledOnce();
     expect(gateway.getMediaStreamId).toHaveBeenCalledWith(42);
     expect(gateway.sendMessage.mock.calls.map(([message]) => message.action)).toEqual([
@@ -3130,6 +3226,57 @@ describe('LiveDubbingCoordinator', () => {
     resolveCredentials(true);
 
     await expect(start).resolves.toEqual({ success: false, error: 'LIVE_DUBBING_START_CANCELLED' });
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('requires the media observer before creating a Live Dubbing session', async () => {
+    const harness = createHarness();
+    const injectMediaObserverForTab = vi.fn(async () => ({ success: false, injectedFrameCount: 0 }));
+    harness.coordinator.runtimeGateway.injectMediaObserverForTab = injectMediaObserverForTab;
+
+    await expect(harness.coordinator.start({ data: { targetLanguage: 'en' } }, {})).resolves.toEqual({
+      success: false,
+      error: 'LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED',
+      reloadRequired: true,
+      retryable: true,
+    });
+    expect(injectMediaObserverForTab).toHaveBeenCalledWith(42);
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+    expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the runtime gateway cannot inject the media observer', async () => {
+    const harness = createHarness();
+    harness.coordinator.runtimeGateway.injectMediaObserverForTab = undefined;
+
+    await expect(harness.coordinator.start({ data: { targetLanguage: 'en' } }, {})).resolves.toMatchObject({
+      success: false,
+      error: 'LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED',
+      reloadRequired: true,
+      retryable: true,
+    });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
+    expect(harness.manager.acquire).not.toHaveBeenCalled();
+    expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
+  });
+
+  it('cancels a start removed while media observer injection is pending', async () => {
+    const harness = createHarness();
+    let resolveInjection;
+    const injectMediaObserverForTab = vi.fn(() => new Promise(resolve => { resolveInjection = resolve; }));
+    harness.coordinator.runtimeGateway.injectMediaObserverForTab = injectMediaObserverForTab;
+    const start = harness.coordinator.start({ data: { targetLanguage: 'en' } }, { tab: { id: 42 } });
+    while (!resolveInjection) await Promise.resolve();
+
+    await harness.coordinator.handleTabRemoved(42);
+    resolveInjection({ success: true, injectedFrameCount: 1 });
+
+    await expect(start).resolves.toEqual({ success: false, error: 'LIVE_DUBBING_START_CANCELLED' });
+    expect(harness.storage.has(LIVE_DUBBING_STORAGE_KEY)).toBe(false);
     expect(harness.manager.acquire).not.toHaveBeenCalled();
     expect(harness.chromeAPI.tabCapture.getMediaStreamId).not.toHaveBeenCalled();
     expect(harness.browserAPI.runtime.sendMessage).not.toHaveBeenCalled();

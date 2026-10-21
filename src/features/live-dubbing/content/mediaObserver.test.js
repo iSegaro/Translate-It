@@ -34,6 +34,48 @@ describe('live dubbing media observer', () => {
     document.body.replaceChildren();
   });
 
+  it('does not install duplicate observers for the same document', async () => {
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'once', sessionToken: 'once-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const firstCleanup = installMediaObserver({ runtime, document });
+    const secondCleanup = installMediaObserver({ runtime, document });
+    cleanup = firstCleanup;
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+    expect(secondCleanup).toBe(firstCleanup);
+  });
+
+  it('does not duplicate installation after the module is re-evaluated', async () => {
+    const listeners = new Set();
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'reloaded', sessionToken: 'reloaded-session' }
+        : undefined),
+      onMessage: {
+        addListener: vi.fn((listener) => listeners.add(listener)),
+        removeListener: vi.fn((listener) => listeners.delete(listener)),
+      },
+    };
+    const addDocumentListener = vi.spyOn(document, 'addEventListener');
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+
+    vi.resetModules();
+    const { installMediaObserver: reloadedInstall } = await import('./mediaObserver.js');
+    const secondCleanup = reloadedInstall({ runtime, document });
+    await Promise.resolve();
+
+    expect(runtime.sendMessage.mock.calls.filter(([message]) => message.action === MEDIA_OBSERVER_HELLO)).toHaveLength(1);
+    expect(runtime.onMessage.addListener).toHaveBeenCalledTimes(1);
+    expect(listeners.size).toBe(1);
+    expect(addDocumentListener.mock.calls.filter(([name]) => ['play', 'playing', 'pause', 'ended', 'volumechange'].includes(name))).toHaveLength(5);
+    expect(secondCleanup).toBe(cleanup);
+    addDocumentListener.mockRestore();
+  });
+
   it('waits for authorization, reports only aggregate playback, and refreshes snapshots', async () => {
     const messages = [];
     const listeners = new Set();
@@ -69,6 +111,53 @@ describe('live dubbing media observer', () => {
     await vi.waitFor(() => expect(messages.at(-1).data.token).toBe('second'));
     expect(messages.at(-1).data.revision).toBe(3);
     expect(Object.keys(messages.at(-1).data).sort()).toEqual(['playing', 'revision', 'token']);
+  });
+
+  it('includes playing media in a pre-existing open shadow root in the authorized snapshot', async () => {
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'shadow-token', sessionToken: 'shadow-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const media = document.createElement('video');
+    setPlayback(media, true);
+    shadow.append(media);
+    document.body.append(host);
+
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data).toEqual({
+      token: 'shadow-token', revision: 1, playing: true,
+    });
+  });
+
+  it('tracks media added to an open shadow root and listens for its playback events', async () => {
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'shadow-token', sessionToken: 'shadow-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({ mode: 'open' });
+    document.body.append(host);
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+
+    const media = document.createElement('audio');
+    setPlayback(media, false);
+    shadow.append(media);
+    await Promise.resolve();
+    await Promise.resolve();
+    setPlayback(media, true);
+    media.dispatchEvent(new Event('playing'));
+    expect(runtime.sendMessage).toHaveBeenCalledTimes(3);
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data).toEqual({
+      token: 'shadow-token', revision: 2, playing: true,
+    });
   });
 
   it('disarms on STOP and observes newly inserted media while authorized', async () => {

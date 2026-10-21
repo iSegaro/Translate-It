@@ -386,6 +386,10 @@ const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = 
   }
   const hardcoded = {
     LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
+    LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED: t(
+      'live_dubbing_media_observer_reload_required',
+      'Reload this tab and try Live Dubbing again.'
+    ),
     INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.'
   }
   return hardcoded[error] || (typeof error === 'string' && error ? error : fallback)
@@ -636,6 +640,7 @@ const captureCurrentFence = () => {
  */
 const refreshLifecycleForVolume = async () => {
   const generation = operationGeneration
+  pendingLifecycleReads.set(generation, (pendingLifecycleReads.get(generation) || 0) + 1)
   const statusRead = ++mediaRefreshGeneration.value
   const subtitlesSnapshot = captureSubtitlesSnapshot()
   try {
@@ -648,6 +653,10 @@ const refreshLifecycleForVolume = async () => {
   } catch {
     if (generation !== operationGeneration) return false
     return false
+  } finally {
+    const pending = pendingLifecycleReads.get(generation) - 1
+    if (pending) pendingLifecycleReads.set(generation, pending)
+    else pendingLifecycleReads.delete(generation)
   }
 }
 
@@ -659,6 +668,7 @@ const refreshLifecycleForVolume = async () => {
  */
 const refreshLifecycleForDubbedVolume = async () => {
   const generation = operationGeneration
+  pendingLifecycleReads.set(generation, (pendingLifecycleReads.get(generation) || 0) + 1)
   const statusRead = ++mediaRefreshGeneration.value
   const subtitlesSnapshot = captureSubtitlesSnapshot()
   try {
@@ -670,6 +680,10 @@ const refreshLifecycleForDubbedVolume = async () => {
   } catch {
     if (generation !== operationGeneration) return false
     return false
+  } finally {
+    const pending = pendingLifecycleReads.get(generation) - 1
+    if (pending) pendingLifecycleReads.set(generation, pending)
+    else pendingLifecycleReads.delete(generation)
   }
 }
 

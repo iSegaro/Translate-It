@@ -77,16 +77,21 @@ order:
    an exception returns `LIVE_DUBBING_UNSUPPORTED`. If the method is absent, the
    prior behavior is preserved.
 6. Resolve the authoritative tab, recheck pending cancellation, and verify tab
-   capture support. Only then create and persist the descriptor, acquire the
-   exact lease, send `PREPARE`, obtain the one-time stream id, send `CONSUME`,
-   wait for capture/audio-path readiness, persist `CONNECTING_PROVIDER`, and
-   send `CONNECT_PROVIDER` for provider bootstrap and setup before the final
-   `RUNNING` commit.
+   capture support. Before creating the descriptor, inject the consent-gated
+   Media Observer into the tab's injectable frames. If frame enumeration or
+   injection fails, START returns the retryable
+   `LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED` result without creating a
+   session or acquiring media resources. Only then create and persist the
+   descriptor, acquire the exact lease, send `PREPARE`, obtain the one-time
+   stream id, send `CONSUME`, wait for capture/audio-path readiness, persist
+   `CONNECTING_PROVIDER`, and send `CONNECT_PROVIDER` for provider bootstrap and
+   setup before the final `RUNNING` commit.
 
 The early rejection paths through provider, language, storage, busy,
-outcome-barrier, credential, cancellation, and offscreen-capability checks
-occur before the descriptor write, lease acquisition, tab stream id, offscreen
-stage message, or media resource creation. Cancellation is also rechecked after
+outcome-barrier, credential, cancellation, offscreen-capability, tab/capture,
+and media-observer-injection checks occur before the descriptor write, lease
+acquisition, tab stream id, offscreen stage message, or media resource
+creation. Cancellation is also rechecked after
 descriptor persistence and between setup stages. A cancellation after
 resources are acquired enters the fenced terminal cleanup path and clears only
 after exact cleanup/lease settlement (or the proven-absence release path);

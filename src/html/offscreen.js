@@ -52,6 +52,7 @@ const OFFSCREEN_ALLOWED_ACTIONS = new Set([
   'OCR_PROCESS',
   'GENERATE_COMPOSITE_ICON',
   'GENERATE_SIMPLE_OVERLAY_ICON',
+  'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
 ]);
 
 function isAuthorizedOffscreenMessage(message, sender) {
@@ -315,8 +316,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
     return false;
   }
-  if (!isAuthorizedOffscreenMessage(message, sender)) {
+  if (!isAuthorizedOffscreenMessage(message, sender)
+    || (message.action === 'OFFSCREEN_LOGGING_SETTINGS_UPDATED'
+      && !isAuthorizedLiveDubbingOffscreenControlSender(sender, globalThis.chrome))) {
     sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    return false;
+  }
+
+  if (message.action === 'OFFSCREEN_LOGGING_SETTINGS_UPDATED') {
+    const settings = message.data || {};
+    if (typeof settings.DEBUG_MODE === 'boolean') {
+      debugModeBridge.handleDebugModeChange(settings.DEBUG_MODE);
+    }
+    if (settings.COMPONENT_LOG_LEVELS && typeof settings.COMPONENT_LOG_LEVELS === 'object') {
+      debugModeBridge.handleComponentLogLevelsChange(settings.COMPONENT_LOG_LEVELS);
+    }
+    sendResponse?.({ success: true });
     return false;
   }
 

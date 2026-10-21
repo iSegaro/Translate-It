@@ -80,6 +80,27 @@ describe('LiveDubbingControl', () => {
     Object.assign(mockI18nMap, mockI18nSnapshot)
   })
 
+  it('shows reload guidance when the media observer cannot be injected', async () => {
+    mockI18nMap.live_dubbing_media_observer_reload_required = 'Reload guidance from i18n.'
+    sendMessage.mockImplementation(({ action }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') return Promise.resolve({ status: 'idle' })
+      if (action === 'START_LIVE_DUBBING') return Promise.resolve({
+        success: false,
+        error: 'LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED',
+        reloadRequired: true,
+        retryable: true
+      })
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = await mountAndFlush()
+    await wrapper.find('button[aria-label="Start live dubbing"]').trigger('click')
+    await flushPromises(wrapper)
+
+    expect(wrapper.text()).toContain('Reload guidance from i18n.')
+    expect(wrapper.find('button[aria-label="Start live dubbing"]').exists()).toBe(true)
+  })
+
   it('disables waveform animation for reduced-motion users', () => {
     const reducedMotionRule = liveDubbingControlScss.match(
       /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?animation:\s*none;/
@@ -2712,6 +2733,61 @@ describe('LiveDubbingControl', () => {
     // B's volume resolves the slider — not stuck at dash
     expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('65%')
     expect(wrapper.find('#ti-live-dubbing-volume').attributes('disabled')).toBeUndefined()
+  })
+
+  it('adopts lifecycle when media refresh supersedes a pending volume recovery read', async () => {
+    let resolveOldOriginalVolume
+    let resolveRecoveryStatus
+    let statusCalls = 0
+    const originalVolumeRequests = []
+    sendMessage.mockImplementation(({ action, data }) => {
+      if (action === 'GET_LIVE_DUBBING_STATUS') {
+        statusCalls += 1
+        if (statusCalls === 2) return new Promise(resolve => { resolveRecoveryStatus = resolve })
+        if (statusCalls === 3) return Promise.resolve({
+          status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 2 },
+          media: { state: 'ready' }
+        })
+        return Promise.resolve({
+          status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 }
+        })
+      }
+      if (action === 'GET_LIVE_DUBBING_ORIGINAL_VOLUME') {
+        originalVolumeRequests.push(data)
+        if (data.eventSequence === 1) {
+          return new Promise(resolve => { resolveOldOriginalVolume = resolve })
+        }
+        return Promise.resolve({ success: true, originalVolume: 0.6 })
+      }
+      if (action === 'GET_LIVE_DUBBING_DUBBED_VOLUME') {
+        return Promise.resolve({ success: false, error: 'LIVE_DUBBING_SESSION_MISMATCH' })
+      }
+      return Promise.resolve({ status: 'idle' })
+    })
+
+    const wrapper = await mountAndFlush()
+    await flushPromises(wrapper)
+    expect(statusCalls).toBe(2) // Dubbed-volume recovery is pending.
+
+    runtimeListener({ action: 'LIVE_DUBBING_MEDIA_STATUS_CHANGED', data: { sessionId: 's1' } }, {
+      id: 'extension-id', url: 'chrome-extension://extension-id/'
+    })
+    await flushPromises(wrapper)
+    await flushPromises(wrapper)
+
+    expect(originalVolumeRequests.some(request => request.eventSequence === 2)).toBe(true)
+    expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('60%')
+
+    // The original fence's in-flight response cannot overwrite the adopted B volume.
+    resolveOldOriginalVolume({ success: true, originalVolume: 0.9 })
+    await flushPromises(wrapper)
+    await flushPromises(wrapper)
+    expect(wrapper.find('.ti-live-dubbing-control-volume-value').text()).toBe('60%')
+    resolveRecoveryStatus({
+      status: { status: 'RUNNING', sessionId: 's1', providerId: 'gemini', eventSequence: 1 }
+    })
+    await flushPromises(wrapper)
+    wrapper.unmount()
   })
 
   it('mismatch recovery discovers fence A→B: B query failure does not restore A confirmed', async () => {

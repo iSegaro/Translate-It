@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   previousMediaDevices: undefined,
   hadMediaDevices: false,
   bridgeInitialization: null,
+  loggingResponse: null,
 }));
 
 class FakeAudio {
@@ -51,7 +52,7 @@ class FakeUtterance {
   }
 }
 
-async function loadOffscreen({ mediaDevices = null, loggingSettings = null } = {}) {
+async function loadOffscreen({ mediaDevices = null, loggingSettings = null, context = null } = {}) {
   vi.resetModules();
   delete globalThis.__TRANSLATE_IT__;
   if (loggingSettings) {
@@ -77,6 +78,9 @@ async function loadOffscreen({ mediaDevices = null, loggingSettings = null } = {
       getURL: (path = '') => `chrome-extension://extension-id/${path}`,
       sendMessage: vi.fn((message) => {
         state.messages.push(message);
+        if (message.action === 'OFFSCREEN_LOGGING_SETTINGS_GET') {
+          return Promise.resolve(state.loggingResponse);
+        }
         return Promise.resolve();
       }),
       onMessage: {
@@ -102,6 +106,7 @@ async function loadOffscreen({ mediaDevices = null, loggingSettings = null } = {
   globalThis.URL.createObjectURL = vi.fn(() => `blob:test-${state.audios.length}`);
   globalThis.URL.revokeObjectURL = vi.fn();
   const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+  if (context) debugModeBridge.context = context;
   const initialize = debugModeBridge.initialize.bind(debugModeBridge);
   vi.spyOn(debugModeBridge, 'initialize').mockImplementation(() => {
     state.bridgeInitialization = initialize();
@@ -142,6 +147,7 @@ beforeEach(() => {
   state.lastUtterance = null;
   state.mediaDevices = null;
   state.bridgeInitialization = null;
+  state.loggingResponse = null;
 });
 
 afterEach(async () => {
@@ -868,6 +874,79 @@ describe('offscreen live-dubbing control sender authorization', () => {
 });
 
 describe('offscreen logging contract', () => {
+  it('gets logging preferences over runtime only and applies allowed component settings', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const storageGet = vi.fn().mockRejectedValue(new Error('offscreen storage is unavailable'));
+    vi.doMock('@/shared/storage/core/StorageCore.js', () => ({
+      storageManager: { get: storageGet, on: vi.fn() },
+    }));
+    delete globalThis.browser;
+    state.loggingResponse = {
+      DEBUG_MODE: true,
+      COMPONENT_LOG_LEVELS: { LiveDubbing: 3, UnknownComponent: 3, Core: 99 },
+      API_KEY: 'must-not-cross-context',
+    };
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await waitForBridgeInitialization(debugModeBridge);
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'OFFSCREEN_LOGGING_SETTINGS_GET' });
+    expect(chrome.runtime.sendMessage.mock.calls.find(([message]) => message.action === 'OFFSCREEN_LOGGING_SETTINGS_GET')[0]).not.toHaveProperty('keys');
+    expect(storageGet).not.toHaveBeenCalled();
+    liveDubbingController.log.info('background preference enabled INFO');
+    liveDubbingController.log.debug('background preference enabled DEBUG');
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('background preference enabled INFO'));
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('background preference enabled DEBUG'));
+  });
+
+  it('applies only authorized targeted runtime settings updates', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    state.loggingResponse = { DEBUG_MODE: false, COMPONENT_LOG_LEVELS: { LiveDubbing: 3 } };
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await waitForBridgeInitialization(debugModeBridge);
+    const authorizedBackground = { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' };
+    const { getComponentLogLevel } = await import('../shared/logging/GlobalDebugState.js');
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+
+    expect(state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { DEBUG_MODE: true },
+    }, authorizedBackground, vi.fn())).toBe(false);
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
+    await vi.waitFor(() => expect(getComponentLogLevel('LiveDubbing')).toBe(3));
+    liveDubbingController.log.info('debug-only update retains component level');
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('debug-only update retains component level'));
+
+    infoSpy.mockClear();
+    state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { COMPONENT_LOG_LEVELS: { LiveDubbing: 1 } },
+    }, authorizedBackground, vi.fn());
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
+    await vi.waitFor(() => expect(getComponentLogLevel('LiveDubbing')).toBe(1));
+    liveDubbingController.log.info('level-only update retains debug mode');
+    expect(infoSpy).not.toHaveBeenCalled();
+
+    const popupResponse = vi.fn();
+    expect(state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { DEBUG_MODE: false, COMPONENT_LOG_LEVELS: { LiveDubbing: 3 } },
+    }, {
+      id: 'extension-id',
+      url: 'chrome-extension://extension-id/src/html/popup.html',
+      documentId: 'popup-doc',
+    }, popupResponse)).toBe(false);
+    expect(popupResponse).toHaveBeenCalledWith({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
+    expect(getComponentLogLevel('LiveDubbing')).toBe(1);
+  });
+
   it('keeps ordinary INFO/DEBUG activity out of normal test output', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});

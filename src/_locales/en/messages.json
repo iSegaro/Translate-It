@@ -392,6 +392,9 @@
   "live_dubbing_offscreen_lost_error": {
     "message": "Live Dubbing stopped unexpectedly. Start it again."
   },
+  "live_dubbing_media_observer_reload_required": {
+    "message": "Reload this tab and try Live Dubbing again."
+  },
   "live_dubbing_action_start": {
     "message": "Start"
   },

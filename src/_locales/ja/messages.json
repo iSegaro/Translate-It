@@ -392,6 +392,9 @@
   "live_dubbing_offscreen_lost_error": {
     "message": "ライブ吹き替えが予期せず停止しました。もう一度開始してください。"
   },
+  "live_dubbing_media_observer_reload_required": {
+    "message": "このタブを再読み込みして、ライブ吹き替えをもう一度お試しください。"
+  },
   "live_dubbing_action_start": {
     "message": "開始"
   },

@@ -981,22 +981,11 @@ export class LiveDubbingCoordinator {
     state.playing = data.playing;
     this.mediaActivityRevision += 1;
     if (data.frameStructureChanged === true) {
-      const reportingKey = key;
-      const barrier = this._mediaStateFor(descriptor)?.barrier;
-      let retiredOtherFrames = false;
-      for (const existingKey of this.mediaObservation.frames.keys()) {
-        if (existingKey === reportingKey) continue;
-        this.mediaObservation.frames.delete(existingKey);
-        this.mediaFrameDocuments.delete(Number(existingKey.slice(0, existingKey.indexOf(':'))));
-        barrier?.expectedFrames.delete(existingKey);
-        barrier?.reports.delete(existingKey);
-        retiredOtherFrames = true;
-      }
-      if (retiredOtherFrames) {
-        this.mediaActivityRevision += 1;
-        this.mediaInventoryRequestId += 1;
-      }
+      this.mediaInventoryRequestId += 1;
+      this._refreshMediaObservation(descriptor.tabId);
+      await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
     }
+    if (this.mediaObservation.frames.get(key) !== state) return { success: true };
     this._onFreshMediaReport(descriptor, state, key);
     if (!this._hasActiveMediaBarrier(descriptor.sessionId)) {
       const activity = this.getMediaActivity();
@@ -1005,10 +994,6 @@ export class LiveDubbingCoordinator {
       if (data.playing === false && activity.known && !activity.playing && media?.episodeId) {
         void this._confirmMediaEpisodeEnded(descriptor, media, media.episodeId);
       }
-    }
-    if (data.frameStructureChanged === true) {
-      this._refreshMediaObservation(descriptor.tabId);
-      await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
     }
     return { success: true };
   }
@@ -1424,10 +1409,14 @@ export class LiveDubbingCoordinator {
       if (media.activeOperation !== operation) return;
       media.activeOperation = null;
       if (!media.desiredPlaying || !this._isCurrentMediaDescriptor(descriptor)) return;
-      if (operation.generation && !await this._disposeFailedMediaGeneration(descriptor, media, operation)) {
+      if (operation.generation && !await this._disposeFailedMediaGeneration(descriptor, media)) {
+        if (operation.cancelled || !media.desiredPlaying || media.activeOperation !== null
+          || !this._isCurrentMediaDescriptor(descriptor)) return;
         this._markMediaPauseFailure(descriptor, media);
         return;
       }
+      if (operation.cancelled || !media.desiredPlaying || media.activeOperation !== null
+        || !this._isCurrentMediaDescriptor(descriptor)) return;
       if (media.episodeAttempts >= 3) {
         this._logMedia('warn', 'rotation-exhausted', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, stage: failureStage, errorCode: safeFailureCode(failureStage) });
         this._exhaustMediaEpisode(descriptor, media);
@@ -1442,20 +1431,21 @@ export class LiveDubbingCoordinator {
     }
   }
 
-  async _disposeFailedMediaGeneration(descriptor, media, operation) {
+  async _disposeFailedMediaGeneration(descriptor, media) {
     const mediaSequence = ++media.mediaSequence;
     media.pauseSequence = mediaSequence;
     const pause = { mediaSequence, cancelled: false, kind: 'pause' };
     media.activeOperation = pause;
     try {
       const response = await this._sendOffscreen(createMediaPauseMessage(descriptor, mediaSequence));
-      if (operation.cancelled || !media.desiredPlaying || media.activeOperation !== pause
-        || !this._isCurrentMediaDescriptor(descriptor)) return false;
       const acknowledged = response?.success === true && response.sessionId === descriptor.sessionId
         && response.providerId === descriptor.providerId && response.eventSequence === descriptor.eventSequence
         && response.mediaSequence === mediaSequence && response.paused === true;
-      media.activeOperation = null;
-      if (acknowledged) media.pausedSequenceAcked = mediaSequence;
+      if (!this._isCurrentMediaDescriptor(descriptor)) return false;
+      if (media.activeOperation === pause) {
+        media.activeOperation = null;
+        if (acknowledged) media.pausedSequenceAcked = mediaSequence;
+      }
       return acknowledged;
     } catch {
       if (media.activeOperation === pause) media.activeOperation = null;
@@ -2317,6 +2307,24 @@ export class LiveDubbingCoordinator {
 
     if (!this.runtimeGateway.supportsTabCapture()) {
       return { success: false, error: 'TAB_CAPTURE_UNAVAILABLE' };
+    }
+
+    let observerInjection;
+    try {
+      observerInjection = await this.runtimeGateway.injectMediaObserverForTab(tab.id);
+    } catch {
+      observerInjection = null;
+    }
+    if (pendingStart.terminalRequested) {
+      return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
+    }
+    if (observerInjection?.success !== true) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED',
+        reloadRequired: true,
+        retryable: true,
+      };
     }
 
     const descriptor = createDescriptor({
