@@ -3103,19 +3103,19 @@
     "message": "No text available for speech"
   },
   "window_tts_stop": {
-    "message": "Stop speaking (Click to stop)"
+    "message": "Stop reading"
   },
   "window_tts_speak_original": {
-    "message": "🔊 Speak ORIGINAL text (Current mode: Orginal)"
+    "message": "Read original"
   },
   "window_tts_speak_translation": {
-    "message": "🔊 Speak TRANSLATION (Current mode: Translation)"
+    "message": "Read translation"
   },
   "window_show_original": {
-    "message": "Show Original Text (Then use speaker button to listen to original)"
+    "message": "Show original"
   },
   "window_hide_original": {
-    "message": "Hide Original Text (TTS button now speaks original text)"
+    "message": "Hide original"
   },
   "window_loading_alt": {
     "message": "Loading..."

@@ -75,6 +75,8 @@
         :text="ttsText"
         :language="ttsLanguage"
         :is-dictionary="isDictionary"
+        :idle-tooltip="ttsIdleTooltip"
+        :playing-tooltip="ttsPlayingTooltip"
         size="sm"
         variant="secondary"
         class="ti-smart-tts-btn"
@@ -177,6 +179,9 @@ const props = defineProps({
   isDictionary: { type: Boolean, default: false },
   ttsText: { type: String, default: "" },
   ttsLanguage: { type: String, default: "" },
+  // Optional contextual TTS tooltips; empty keeps TTSButton defaults.
+  ttsIdleTooltip: { type: String, default: "" },
+  ttsPlayingTooltip: { type: String, default: "" },
   targetLanguageLabel: { type: String, default: "" },
   detectedLanguageLabel: { type: String, default: "" },
   pinTitle: { type: String, default: "" },

@@ -2,7 +2,7 @@
   <!-- Small loading window -->
   <div
     v-if="currentSize === 'small'"
-    v-show="!isFullscreen"
+    v-show="!isFullscreen && settingsReady"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host ti-loading-window"
     :class="[shellTheme, { 'visible': isVisible, 'is-dragging': isPositionDragging }]"
@@ -21,7 +21,7 @@
   <!-- Normal translation window -->
   <div
     v-else
-    v-show="!isFullscreen"
+    v-show="!isFullscreen && settingsReady"
     ref="windowElement"
     class="ti-window translation-window aiwc-selection-popup-host normal-window ti-host-container"
     :class="[shellTheme, { 'visible': isVisible, 'is-dragging': isPositionDragging, 'is-pinned': isPinned, 'is-docked': dockMode !== 'none', [`dock-${dockMode}`]: dockMode !== 'none' }]"
@@ -51,6 +51,8 @@
         :is-dictionary="isDictionary"
         :tts-text="currentTTSText"
         :tts-language="currentTTSLang"
+        :tts-idle-tooltip="t('window_tts_speak_translation')"
+        :tts-playing-tooltip="t('window_tts_stop')"
         :detected-language-label="detectedLanguageName"
         :pin-title="isPinned ? t('window_unpin') : t('window_pin')"
         :copy-title="t('window_copy_translation')"
@@ -117,29 +119,50 @@
     <div class="ti-window-body">
       <div
         class="ti-original-text-wrapper"
-        :class="{ 'is-expanded': showOriginal && !isLoading }"
+        :class="{ 'is-expanded': isOriginalSectionVisible }"
       >
-        <div class="ti-original-text-section">
-          <div class="ti-original-text">
-            <textarea
-              v-show="showOriginal && !isLoading"
-              :id="`translation-window-source-${props.id}`"
-              ref="sourceTextarea"
-              v-model="sourceDraft"
-              class="ti-window-source-input"
-              :class="{ 'ti-window-source-overflow': sourceHasOverflow }"
-              :aria-label="t('window_edit_source')"
-              :lang="props.sourceLanguage !== 'auto' ? props.sourceLanguage : undefined"
-              dir="auto"
-              rows="1"
-              @mousedown.stop
-              @touchstart.stop
-              @keydown.stop="handleSourceKeydown"
-              @keyup.stop
-              @keypress.stop
-            />
+        <!-- One coordinated collapse: the section fades (leave/enter classes)
+             while the wrapper's grid row shrinks — the subtree stays mounted
+             and displayed for the whole leave phase. -->
+        <Transition name="ti-original-collapse">
+          <div
+            v-show="isOriginalSectionVisible"
+            :inert="!isOriginalSectionVisible || undefined"
+            class="ti-original-text-section"
+          >
+            <div class="ti-original-text">
+              <textarea
+                :id="`translation-window-source-${props.id}`"
+                ref="sourceTextarea"
+                v-model="sourceDraft"
+                class="ti-window-source-input"
+                :class="{ 'ti-window-source-overflow': sourceHasOverflow }"
+                :aria-label="t('window_edit_source')"
+                :lang="props.sourceLanguage !== 'auto' ? props.sourceLanguage : undefined"
+                dir="auto"
+                rows="1"
+                @mousedown.stop
+                @touchstart.stop
+                @keydown.stop="handleSourceKeydown"
+                @keyup.stop
+                @keypress.stop
+              />
+              <TTSButton
+                ref="sourceTTSButton"
+                class="ti-window-source-tts"
+                size="sm"
+                variant="secondary"
+                :text="sourceDraft"
+                :language="props.sourceLanguage"
+                :disabled="!sourceDraft.trim()"
+                :is-dictionary="false"
+                :idle-tooltip="t('window_tts_speak_original')"
+                :playing-tooltip="t('window_tts_stop')"
+                @tts-started="handleSourceTTSStarted"
+              />
+            </div>
           </div>
-        </div>
+        </Transition>
       </div>
       <TranslationDisplay
         :content="translatedText"
@@ -172,7 +195,6 @@ import { pageEventBus, WINDOWS_MANAGER_EVENTS } from '@/core/PageEventBus.js';
 import { useUnifiedI18n } from '@/composables/shared/useUnifiedI18n.js';
 import { usePositioning } from '@/composables/ui/usePositioning.js';
 import { WindowsConfig } from '@/features/windows/managers/core/WindowsConfig.js';
-import { useTTSSmart } from '@/features/tts/composables/useTTSSmart.js';
 import TranslationWindowToolbar from '@/components/shared/TranslationWindowToolbar.vue';
 import TranslationDisplay from '@/components/shared/TranslationDisplay.vue';
 import LoadingSpinner from '@/components/base/LoadingSpinner.vue';
@@ -187,6 +209,7 @@ import { SimpleMarkdown, ExtractionStrategy } from '@/shared/utils/text/markdown
 import { getLanguageNameFromCode } from '@/shared/config/languageConstants.js';
 import { getProviderById } from '@/core/provider-registry.js';
 import IconButton from '@/components/shared/IconButton.vue';
+import TTSButton from '@/components/shared/TTSButton.vue';
 
 // Import adjacent SCSS
 import './TranslationWindow.scss';
@@ -220,9 +243,9 @@ const props = defineProps({
 const emit = defineEmits(['close', 'speak']);
 useMessaging('content');
 
-const tts = useTTSSmart();
 const mobileStore = useMobileStore();
 const settings = useSettingsStore();
+const settingsReady = ref(false);
 const logger = getScopedLogger(LOG_COMPONENTS.WINDOWS, `TranslationWindow:${props.id}`);
 const tracker = useResourceTracker(`translation-window-${props.id}`);
 const systemThemeQuery = '(prefers-color-scheme: dark)';
@@ -400,10 +423,8 @@ watch(() => props.targetLanguage, (newLang) => {
   logger.debug('targetLanguage prop updated:', newLang);
 });
 
-const ttsMode = computed(() => showOriginal.value ? 'original' : 'translated');
-
-const currentTTSText = computed(() => ttsMode.value === 'original' ? originalText.value || '' : translatedText.value || '');
-const currentTTSLang = computed(() => ttsMode.value === 'original' ? props.sourceLanguage : props.targetLanguage);
+const currentTTSText = computed(() => translatedText.value || '');
+const currentTTSLang = computed(() => props.targetLanguage);
 
 const getOriginalButtonTitle = computed(() => showOriginal.value ? t('window_hide_original') : t('window_show_original'));
 
@@ -420,6 +441,36 @@ const handleProviderChange = (newProvider) => {
 };
 
 const showOriginal = ref(false);
+let showOriginalRevision = 0;
+watch(() => settings.settings.WINDOW_SHOW_ORIGINAL, (value) => {
+  if (settingsReady.value && typeof value === 'boolean') showOriginal.value = value;
+});
+
+// The original section stays mounted through the collapse transition, so the
+// implicit unmount-driven TTS stop no longer fires when Original hides.
+// Trigger the same owner-scoped stop (useTTSSmart's stop sends TTS_STOP with
+// stopOnlyIfOwner: true for this button's own request) the moment Original
+// becomes hidden — including hide-toggle, external settings, and loading.
+const sourceTTSButton = ref(null);
+const isOriginalSectionVisible = computed(() => showOriginal.value && !isLoading.value);
+watch(isOriginalSectionVisible, (visible) => {
+  if (!visible) void sourceTTSButton.value?.stop?.();
+});
+
+// The source TTS button is disabled for a blank draft, so clearing the draft
+// while it speaks would leave playback running without a reachable Stop.
+// Stop the source-owned request (owner-scoped: only this button's own
+// request) as soon as the draft becomes blank; the translated/header TTS is
+// untouched.
+const stopSourceTTSWhenDraftIsBlank = () => {
+  if (sourceDraft.value.trim()) return;
+  void sourceTTSButton.value?.stop?.();
+};
+watch(sourceDraft, stopSourceTTSWhenDraftIsBlank);
+// A start that lands after the draft was cleared must be stopped as well.
+const handleSourceTTSStarted = () => {
+  stopSourceTTSWhenDraftIsBlank();
+};
 const updateSourceOverflow = (textarea = sourceTextarea.value) => {
   if (textarea && sourceTextarea.value === textarea) {
     sourceHasOverflow.value = textarea.scrollHeight > textarea.clientHeight;
@@ -529,6 +580,16 @@ const windowStyle = computed(() => {
 });
 
 onMounted(async () => {
+  const revisionAtLoad = showOriginalRevision;
+  try {
+    await settings.loadSettings?.();
+  } catch (error) {
+    logger.warn('Failed to load window settings:', error);
+  }
+  if (showOriginalRevision === revisionAtLoad && typeof settings.settings.WINDOW_SHOW_ORIGINAL === 'boolean') {
+    showOriginal.value = settings.settings.WINDOW_SHOW_ORIGINAL;
+  }
+  settingsReady.value = true;
   // Inject Windows-specific styles lazily
   try {
     const { windowsUiStyles } = await import('@/core/content-scripts/chunks/lazy-styles.js');
@@ -551,15 +612,16 @@ onMounted(async () => {
   tracker.trackResource('resize-user-select', () => {
     document.body.style.userSelect = '';
   });
-  tracker.trackResource('tts-stop', () => {
-    tts.stopAll({ stopOnlyIfOwner: true }).catch(() => {});
-  });
 });
 
 const handleClose = () => emit('close', props.id);
 const toggleShowOriginal = () => {
+  showOriginalRevision += 1;
   if (showOriginal.value) document.activeElement?.blur?.();
   showOriginal.value = !showOriginal.value;
+  void settings.updateSettingAndPersist('WINDOW_SHOW_ORIGINAL', showOriginal.value).catch(error => {
+    logger.warn('Failed to persist WINDOW_SHOW_ORIGINAL:', error);
+  });
 };
 
 const navigateHistory = (direction) => {

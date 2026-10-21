@@ -14,6 +14,6 @@ Check an accepted ADR's implementation/adoption status before comparing it with 
 - Follow applicable contracts and accepted ADRs. Preserve the established architecture and repository conventions; do not infer ownership from a feature's name or documentation alone.
 - Keep changes within the requested scope and preserve existing behavior unless a behavior change is explicitly required. Prefer the smallest clear solution; avoid speculative abstractions and unrelated cleanup.
 - Reuse existing dependencies and configuration patterns. Use the repository's pnpm tooling. Do not migrate Vite configuration from JavaScript to TypeScript or use APIs/configuration from newer major dependency versions unless explicitly requested.
-- Add or update focused tests for behavior changes. Run the relevant checks and report what was run and any failures or skips.
+- Add or update focused tests for behavior changes. Run relevant checks, using `pnpm test:run [FILE_PATH]` (optionally followed by additional test file paths) for focused Vitest execution. Report what was run and any failures or skips.
 - Update documentation when a change materially changes behavior, guarantees, ownership, or architecture—not for routine implementation details. Keep comments, JSDoc, and structured logs accurate when modifying the logic they describe.
 - Use brainstorming or clarification only when requirements, scope, behavior, or intended direction are genuinely unclear; do not delay a well-specified task.
