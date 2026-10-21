@@ -102,6 +102,107 @@ describe('OpenAIRealtimeBootstrapService', () => {
     });
   });
 
+  it('logs separate preference, key retrieval, and client-secret request timings only in debug mode', async () => {
+    let now = 0;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const { service } = createService({
+      logger,
+      originalTranscriptEnabled: vi.fn(async () => { now += 4; return false; }),
+      keys: ['private-key'],
+      fetchImpl: vi.fn(async () => { now += 6; return okMint('private-secret'); }),
+    });
+    service.performanceNow = () => now++;
+
+    await expect(service.mintClientSecret('en', { mediaSequence: 77 })).resolves.toBe('private-secret');
+
+    const logs = logger.debug.mock.calls.map(([line]) => line);
+    expect(logs.map(line => line.match(/stage=([^ ]+)/)?.[1])).toEqual([
+      'original_transcript_setting', 'eligible_keys', 'client_secret_http_request',
+    ]);
+    expect(logs.every(line => !line.includes('private-key') && !line.includes('private-secret'))).toBe(true);
+    expect(logs.every(line => line.includes('generation=77'))).toBe(true);
+
+    const disabledLogger = { isDebugEnabled: () => false, debug: vi.fn() };
+    const disabled = createService({ logger: disabledLogger });
+    await disabled.service.mintClientSecret('en');
+    expect(disabledLogger.debug).not.toHaveBeenCalled();
+  });
+
+  it('attributes a rejected mint request to the request stage without logging request data', async () => {
+    let now = 0;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const { service } = createService({
+      logger,
+      originalTranscriptEnabled: vi.fn().mockResolvedValue(false),
+      keys: ['private-api-key'],
+      fetchImpl: vi.fn(async () => { throw new Error('private request body'); }),
+    });
+    service.performanceNow = () => now++;
+
+    await expect(service.mintClientSecret('en')).resolves.toBeNull();
+    const logs = logger.debug.mock.calls.map(([line]) => line);
+    const requestTiming = logs.find(line => line.includes('stage=client_secret_http_request'));
+    expect(requestTiming).toContain('outcome=failure');
+    expect(logs.join('\n')).not.toContain('private-api-key');
+    expect(logs.join('\n')).not.toContain('private request body');
+  });
+
+  it('logs each failed and successful failover request with its own attempt and duration', async () => {
+    let now = 0;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const fetchImpl = vi.fn()
+      .mockImplementationOnce(async () => {
+        now += 7;
+        return failMint(401, openAIError({ message: 'private response body text' }));
+      })
+      .mockImplementationOnce(async () => { now += 13; return okMint('private-client-secret'); });
+    const { service } = createService({
+      logger,
+      keys: ['private-first-key', 'private-second-key'],
+      fetchImpl,
+    });
+    service.performanceNow = () => now;
+
+    await expect(service.mintClientSecret('en')).resolves.toBe('private-client-secret');
+
+    const requests = logger.debug.mock.calls.map(([line]) => line)
+      .filter(line => line.includes('stage=client_secret_http_request'));
+    expect(requests).toHaveLength(2);
+    expect(requests[0]).toContain('attempt=1');
+    expect(requests[0]).toContain('durationMs=7');
+    expect(requests[0]).toContain('outcome=failure');
+    expect(requests[1]).toContain('attempt=2');
+    expect(requests[1]).toContain('durationMs=13');
+    expect(requests[1]).toContain('outcome=success');
+    expect(logger.debug.mock.calls.map(([line]) => line).join('\n'))
+      .not.toMatch(/private-first-key|private-second-key|private-client-secret|private response body text|gpt-realtime-translate/);
+  });
+
+  it('keeps concurrent mint timing labels local and marks credential validation without a media generation', async () => {
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const { service } = createService({ logger });
+    let now = 0;
+    service.performanceNow = () => now++;
+
+    await Promise.all([
+      service.mintClientSecret('en', { mediaSequence: 101 }),
+      service.mintClientSecret('fr', { mediaSequence: 202 }),
+    ]);
+
+    const requestLogs = logger.debug.mock.calls.map(([line]) => line)
+      .filter(line => line.includes('stage=client_secret_http_request'));
+    expect(requestLogs).toHaveLength(2);
+    expect(requestLogs.map(line => line.match(/generation=(\d+)/)?.[1]).sort()).toEqual(['101', '202']);
+    expect(requestLogs.every(line => line.includes('attempt=1'))).toBe(true);
+
+    logger.debug.mockClear();
+    await service.validateCredential('private-draft-key', 'en');
+    const validationLogs = logger.debug.mock.calls.map(([line]) => line);
+    expect(validationLogs.every(line => line.includes('operation=credential_validation'))).toBe(true);
+    expect(validationLogs.every(line => line.includes('generation=none'))).toBe(true);
+    expect(validationLogs.join('\n')).not.toContain('private-draft-key');
+  });
+
   it('retains input transcription when Original subtitles are enabled', async () => {
     const read = vi.fn().mockResolvedValue(true);
     const { service, calls } = createService({ originalTranscriptEnabled: read });
@@ -246,9 +347,12 @@ describe('OpenAIRealtimeBootstrapService', () => {
     resolveProxyConfig.mockResolvedValue(config);
     proxyManager.fetch.mockResolvedValue(okMint('ek_proxy_secret'));
     const directFetch = vi.spyOn(globalThis, 'fetch');
+    let now = 0;
+    const debug = vi.fn();
     const service = new OpenAIRealtimeBootstrapService({
       getKeysImpl: async () => ['key-1'],
-      logger: { debug: () => {}, warn: () => {}, error: () => {} },
+      logger: { isDebugEnabled: () => true, debug, warn: () => {}, error: () => {} },
+      performanceNow: () => now++,
     });
 
     await expect(service.mintClientSecret('en')).resolves.toBe('ek_proxy_secret');
@@ -257,5 +361,8 @@ describe('OpenAIRealtimeBootstrapService', () => {
     expect(proxyManager.fetch.mock.calls[0][2]).toBe(config);
     expect(proxyManager.fetch.mock.calls[0]).toHaveLength(3);
     expect(directFetch).not.toHaveBeenCalled();
+    expect(debug.mock.calls.map(([line]) => line.match(/stage=([^ ]+)/)?.[1])).toEqual([
+      'original_transcript_setting', 'eligible_keys', 'proxy_config_resolution', 'client_secret_http_request',
+    ]);
   });
 });

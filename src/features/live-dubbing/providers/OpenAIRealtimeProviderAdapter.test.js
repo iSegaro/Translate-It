@@ -139,11 +139,39 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     expect(logs).toEqual([
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=peer_created | durationMs=0 | outcome=success',
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=offer_created | durationMs=0 | outcome=success',
-      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=sdp_exchange | durationMs=0 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=sdp_http_exchange | durationMs=0 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=remote_sdp_apply | durationMs=0 | outcome=success',
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=transport_ready | durationMs=0 | outcome=success',
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=first_audio_received | durationMs=10 | outcome=success',
     ]);
     expect(logs.every(line => !line.includes('private-stream') && !line.includes('replacement-stream'))).toBe(true);
+  });
+
+  it('attributes answer application failures separately and suppresses diagnostics after cancellation', async () => {
+    const logger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
+    const peerConnection = new FakePeerConnection();
+    peerConnection.setRemoteDescription.mockRejectedValueOnce(new Error('private SDP failure'));
+    const failed = createHarness({ peerConnection, logger, performanceNow: () => 10 });
+    await expect(failed.connect()).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED' });
+    const failedLogs = logger.debug.mock.calls.map(([line]) => line);
+    expect(failedLogs.find(line => line.includes('stage=sdp_http_exchange'))).toContain('outcome=success');
+    expect(failedLogs.find(line => line.includes('stage=remote_sdp_apply'))).toContain('outcome=failure');
+    expect(failedLogs.join('\n')).not.toContain('private SDP failure');
+    expect(failedLogs.join('\n')).not.toContain('answer-sdp');
+
+    const pending = createDeferred();
+    const cancelLogger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
+    const cancelled = createHarness({
+      logger: cancelLogger,
+      fetchImpl: vi.fn(() => pending.promise),
+      performanceNow: () => 10,
+    });
+    const connect = cancelled.connect();
+    while (!cancelled.fetchImpl.mock.calls.length) await Promise.resolve();
+    await cancelled.adapter.dispose();
+    await expect(connect).rejects.toMatchObject({ code: 'OPENAI_REALTIME_SETUP_CANCELLED' });
+    expect(cancelLogger.debug.mock.calls.map(([line]) => line)
+      .some(line => line.includes('stage=sdp_http_exchange'))).toBe(false);
   });
 
   it('completes WebRTC SDP setup using isolated clones of source audio tracks', async () => {

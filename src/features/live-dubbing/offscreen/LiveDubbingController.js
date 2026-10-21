@@ -2011,6 +2011,9 @@ export class LiveDubbingController {
           }
         }
         if (!isCurrentCommit()) return { success: false, ignored: true };
+        if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          try { client?.markMediaCommitted?.(); } catch { /* provider timing hook is best effort */ }
+        }
         session.mediaPaused = false;
         this._setMediaState(session, 'playing');
         this.log?.info?.(formatMediaDiagnostic('Live dubbing media committed', {

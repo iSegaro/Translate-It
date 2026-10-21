@@ -375,9 +375,12 @@ export class OpenAIRealtimeProviderAdapter {
 
   _logTiming(session, stage, startedAt, outcome) {
     try {
-      if (this.log?.isDebugEnabled?.() !== true || !Number.isFinite(startedAt)) return;
+      if (!session?.isCurrent?.() || this.log?.isDebugEnabled?.() !== true || !Number.isFinite(startedAt)) return;
+      session.timing.loggedStages ||= new Set();
+      if (session.timing.loggedStages.has(stage)) return;
       const now = this.performanceNow();
       if (!Number.isFinite(now)) return;
+      session.timing.loggedStages.add(stage);
       this.log.debug(`Live dubbing timing | provider=openai | operation=${session.timing.operation} | generation=${session.timing.generation} | stage=${stage} | durationMs=${Math.max(0, Math.round(now - startedAt))} | outcome=${outcome}`);
     } catch { /* timing diagnostics are best effort */ }
   }
@@ -442,7 +445,8 @@ export class OpenAIRealtimeProviderAdapter {
     const session = {
       generation,
       timing: { operation: this.timingOperation, generation: this.timingGeneration ?? generation,
-        startedAt: this.timingStartedAt ?? this._timingNow(), peerStartedAt: null, offerStartedAt: null, sdpStartedAt: null,
+        startedAt: this.timingStartedAt ?? this._timingNow(), peerStartedAt: null, offerStartedAt: null,
+        sdpStartedAt: null, remoteAnswerStartedAt: null,
         firstAudioLogged: false },
       disposed: false,
       peerConnection: null,
@@ -502,9 +506,10 @@ export class OpenAIRealtimeProviderAdapter {
       this._clearPending(pendingStart);
       if (!cancelled) {
         const failedStage = session.timing.transportStartedAt !== undefined ? 'transport_ready'
-          : session.timing.sdpStartedAt !== null ? 'sdp_exchange'
+          : session.timing.remoteAnswerStartedAt !== null ? 'remote_sdp_apply'
+            : session.timing.sdpStartedAt !== null ? 'sdp_http_exchange'
             : session.timing.offerStartedAt !== null ? 'offer_created' : 'peer_created';
-        const failedAt = session.timing.transportStartedAt ?? session.timing.sdpStartedAt
+        const failedAt = session.timing.transportStartedAt ?? session.timing.remoteAnswerStartedAt ?? session.timing.sdpStartedAt
           ?? session.timing.offerStartedAt ?? session.timing.peerStartedAt ?? session.timing.startedAt;
         this._logTiming(session, failedStage, failedAt,
           error?.code === 'OPENAI_REALTIME_SETUP_CANCELLED' ? 'cancelled' : 'failure');
@@ -612,28 +617,58 @@ export class OpenAIRealtimeProviderAdapter {
       this._logTiming(session, 'offer_created', session.timing.offerStartedAt, 'success');
 
       session.timing.sdpStartedAt = this._timingNow();
-      const response = await this.fetchImpl(OPENAI_REALTIME_TRANSLATIONS_CALLS_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${secret}`,
-          'Content-Type': 'application/sdp',
-        },
-        body: offerSdp,
-        signal: session.sdpAbortController?.signal,
-      });
-      if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
+      let response;
+      try {
+        response = await this.fetchImpl(OPENAI_REALTIME_TRANSLATIONS_CALLS_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secret}`,
+            'Content-Type': 'application/sdp',
+          },
+          body: offerSdp,
+          signal: session.sdpAbortController?.signal,
+        });
+      } catch (error) {
+        this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt,
+          isCurrent() ? 'failure' : 'cancelled');
+        throw error;
+      }
+      if (!isCurrent()) {
+        this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt, 'cancelled');
+        throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
+      }
       if (!response || response.ok !== true) {
+        this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt, 'failure');
         throw createProviderError('OPENAI_REALTIME_SDP_EXCHANGE_FAILED');
       }
-      const answerSdp = await response.text();
-      if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
+      let answerSdp;
+      try {
+        answerSdp = await response.text();
+      } catch (error) {
+        this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt,
+          isCurrent() ? 'failure' : 'cancelled');
+        throw error;
+      }
+      if (!isCurrent()) {
+        this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt, 'cancelled');
+        throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
+      }
       if (typeof answerSdp !== 'string' || !answerSdp.trim()) {
+        this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt, 'failure');
         throw createProviderError('OPENAI_REALTIME_SDP_EXCHANGE_FAILED');
       }
-      await peerConnection.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      this._logTiming(session, 'sdp_http_exchange', session.timing.sdpStartedAt, 'success');
+      session.timing.remoteAnswerStartedAt = this._timingNow();
+      try {
+        await peerConnection.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      } catch (error) {
+        this._logTiming(session, 'remote_sdp_apply', session.timing.remoteAnswerStartedAt,
+          error?.code === 'OPENAI_REALTIME_SETUP_CANCELLED' || !isCurrent() ? 'cancelled' : 'failure');
+        throw error;
+      }
       if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
       session.telemetry.answerApplied = true;
-      this._logTiming(session, 'sdp_exchange', session.timing.sdpStartedAt, 'success');
+      this._logTiming(session, 'remote_sdp_apply', session.timing.remoteAnswerStartedAt, 'success');
       // SDP success alone never completes setup: the translations transport
       // is only viable once the oai-events channel is open (which transitively
       // proves ICE/DTLS/SCTP connectivity). Remote audio is opportunistic —

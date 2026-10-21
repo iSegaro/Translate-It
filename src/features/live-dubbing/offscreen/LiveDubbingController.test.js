@@ -4284,6 +4284,7 @@ describe('LiveDubbingController media-stream audio path', () => {
         callbacks.push(options.callbacks);
         const provider = {
           connect: vi.fn(async () => options.callbacks.onSetupComplete()),
+          markMediaCommitted: vi.fn(),
           sendAudio: vi.fn(() => true), dispose: vi.fn(async () => {}),
         };
         providers.push(provider);
@@ -4320,6 +4321,7 @@ describe('LiveDubbingController media-stream audio path', () => {
 
     await expect(controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 2, 'rotation-2'))
       .resolves.toMatchObject({ success: true, playing: true });
+    expect(providers[0].markMediaCommitted).toHaveBeenCalledOnce();
     expect(logger.debug).toHaveBeenCalledWith(
       'Live dubbing media commit started | mediaSequence=2 | providerGeneration=2 | stage=commit',
     );
@@ -4338,6 +4340,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     await controller.resumeMedia(session.sessionId, session.providerId, session.eventSequence, 4, 'rotation-4');
     await expect(controller.commitMedia(session.sessionId, session.providerId, session.eventSequence, 4, 'rotation-4'))
       .resolves.toMatchObject({ success: true, playing: true });
+    expect(providers[1].markMediaCommitted).toHaveBeenCalledOnce();
     expect(session.mediaAdmissionClosed).toBe(false);
 
     const acceptedAudioBeforeStaleCallback = outputPlayer.enqueuePcm16.mock.calls.length;
@@ -4361,6 +4364,7 @@ describe('LiveDubbingController media-stream audio path', () => {
     releaseInputResume();
     await expect(staleCommit).resolves.toMatchObject({ success: false, ignored: true });
     await expect(stop).resolves.toMatchObject({ success: true, disposed: true });
+    expect(providers[2].markMediaCommitted).not.toHaveBeenCalled();
     expect(outputPlayer.setPlaybackMuted.mock.calls.filter(([muted]) => muted === false).length)
       .toBe(unmuteCallsBeforeStop);
     expect(providers[0].dispose).toHaveBeenCalledOnce();

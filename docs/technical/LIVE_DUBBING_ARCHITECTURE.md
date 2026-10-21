@@ -928,11 +928,20 @@ or descriptor adoption is performed for an uncertain owner.
   With Debug Mode enabled and the `LiveDubbing` component set to Debug,
   single-line `Live dubbing timing` messages report START completion (capture/
   audio readiness only), provider bootstrap/setup stages on the `resume`
-  operation, resume readiness/commit, first-audio reception
-  (OpenAI's remote-track arrival), and playback acceptance. They contain only
-  provider, operation, generation, stage, duration, and outcome. Durations use
-  the emitting Background or Offscreen context's monotonic clock and must not be
-  compared across contexts; timing history is not persisted.
+  operation, resume readiness/commit, and playback acceptance. Gemini additionally
+  reports Media Commit→first successful PCM send and first successful send→first
+  translated audio received; dropped PCM is not a send milestone. OpenAI bootstrap
+  reports original-transcript setting read, eligible-key retrieval, proxy-config
+  resolution, and each client-secret HTTP request; its adapter reports SDP HTTP
+  exchange, remote SDP application, and transport viability as separate stage
+  durations. Durations are individual stage intervals, not cumulative operation
+  totals. Timing messages contain only provider, operation, generation, stage,
+  duration, and outcome (plus a numeric request-attempt discriminator when key
+  failover issues multiple mint requests). OpenAI bootstrap timing's generation
+  is the authorized media sequence; credential validation is labeled separately
+  and has no media generation. Durations use the emitting Background or Offscreen
+  context's monotonic clock and must not be compared across contexts; timing
+  history is not persisted.
 
 ## Runtime Integration
 

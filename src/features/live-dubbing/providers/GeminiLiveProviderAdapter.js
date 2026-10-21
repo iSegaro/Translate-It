@@ -337,6 +337,7 @@ export class GeminiLiveProviderAdapter {
     this._socketContext = null;
     this.phase = 'idle';
     this.generation = 0;
+    this.mediaTiming = null;
     this.setupState = null;
     this.metrics = {
       sentAudioChunks: 0,
@@ -415,6 +416,16 @@ export class GeminiLiveProviderAdapter {
 
     this.telemetry = createTelemetry();
     const generation = ++this.generation;
+    const mediaTiming = {
+      operation: this.timingOperation,
+      generation: this.timingGeneration ?? generation,
+      clientGeneration: generation,
+      commitAt: null,
+      firstInputAt: null,
+      inputSentLogged: false,
+      firstAudioLogged: false,
+    };
+    this.mediaTiming = mediaTiming;
     let resolveSetup;
     let rejectSetup;
     const promise = new Promise((resolve, reject) => {
@@ -423,7 +434,7 @@ export class GeminiLiveProviderAdapter {
     });
     this.setupState = {
       generation,
-      timing: { operation: this.timingOperation, generation: this.timingGeneration ?? generation,
+      timing: { operation: mediaTiming.operation, generation: mediaTiming.generation,
         connectStartedAt: this._timingNow(), wsOpenedAt: null },
       resolve: resolveSetup,
       reject: rejectSetup,
@@ -497,12 +508,14 @@ export class GeminiLiveProviderAdapter {
       this.metrics.sentAudioChunks += 1;
       this.metrics.sentAudioBytes += bytes.byteLength;
       this._markMilestone('firstInputSent');
+      this._markFirstCommittedInputSent();
       this._recordBufferedAmount();
       this.lastSendReason = null;
       return true;
     } catch {
       this.metrics.sendFailures += 1;
       this.lastSendReason = 'SEND_FAILED';
+      this._finishCommittedInputTiming('failure');
       const safeError = new GeminiLiveProtocolError(
         'GEMINI_LIVE_SEND_FAILED',
         'Gemini Live audio send failed',
@@ -534,6 +547,15 @@ export class GeminiLiveProviderAdapter {
 
   getTelemetry() {
     return safeTelemetrySnapshot(this.telemetry);
+  }
+
+  /** Mark the Controller's committed media gate using this adapter's clock. */
+  markMediaCommitted() {
+    const timing = this.mediaTiming;
+    if (!timing || timing.clientGeneration !== this.generation || !this._isReadySocket()) return false;
+    if (timing.commitAt !== null) return true;
+    timing.commitAt = this._timingNow();
+    return Number.isFinite(timing.commitAt);
   }
 
   _attachSocketHandlers(socket, generation, socketContext) {
@@ -885,7 +907,10 @@ export class GeminiLiveProviderAdapter {
     }
 
     if (!this._isCurrent(socket, generation)) return;
-    if (audioParts.length > 0) this._markMilestone('firstTranslatedAudioReceived');
+    if (audioParts.length > 0) {
+      this._markMilestone('firstTranslatedAudioReceived');
+      this._markFirstCommittedAudioReceived();
+    }
     for (const audio of audioParts) {
       this._emit(this.onAudio, audio.bytes);
       this._emitEvent({ type: 'audio' });
@@ -977,6 +1002,38 @@ export class GeminiLiveProviderAdapter {
     this._emitEvent({ type: 'error', error });
   }
 
+  _markFirstCommittedInputSent() {
+    const timing = this.mediaTiming;
+    if (!timing || timing.clientGeneration !== this.generation || timing.commitAt === null
+      || timing.inputSentLogged) return;
+    const sentAt = this._timingNow();
+    if (!Number.isFinite(sentAt)) return;
+    timing.inputSentLogged = true;
+    timing.firstInputAt = sentAt;
+    this._logTiming(timing, 'commit_to_first_input_sent', timing.commitAt, 'success');
+  }
+
+  _markFirstCommittedAudioReceived() {
+    const timing = this.mediaTiming;
+    if (!timing || timing.clientGeneration !== this.generation || timing.firstAudioLogged) return;
+    if (!Number.isFinite(timing.firstInputAt)) return;
+    timing.firstAudioLogged = true;
+    this._logTiming(timing, 'first_input_sent_to_first_audio_received', timing.firstInputAt, 'success');
+  }
+
+  _finishCommittedInputTiming(outcome) {
+    const timing = this.mediaTiming;
+    if (!timing || timing.clientGeneration !== this.generation) return;
+    if (Number.isFinite(timing.commitAt) && !timing.inputSentLogged) {
+      timing.inputSentLogged = true;
+      this._logTiming(timing, 'commit_to_first_input_sent', timing.commitAt, outcome);
+    }
+    if (Number.isFinite(timing.firstInputAt) && !timing.firstAudioLogged) {
+      timing.firstAudioLogged = true;
+      this._logTiming(timing, 'first_input_sent_to_first_audio_received', timing.firstInputAt, outcome);
+    }
+  }
+
   _timingNow() {
     try { return this.log?.isDebugEnabled?.() === true ? this.performanceNow() : null; } catch { return null; }
   }
@@ -1041,6 +1098,7 @@ export class GeminiLiveProviderAdapter {
     diagnosticCloseDetails = closeDetails,
   ) {
     if (this.generation !== generation || (!this._socket && !this.setupState)) return;
+    this._finishCommittedInputTiming(terminalCategory === 'CLIENT_CLOSE' ? 'cancelled' : 'failure');
     const socket = this._socket;
     const setup = this.setupState;
     if (setup) {
@@ -1055,6 +1113,7 @@ export class GeminiLiveProviderAdapter {
     // client and report the same terminal event a second time.
     this._socket = null;
     this._socketContext = null;
+    this.mediaTiming = null;
     this.phase = 'idle';
     this.generation += 1;
     this._markMilestone('cleanupStart');
