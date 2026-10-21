@@ -84,6 +84,10 @@ function createHarness({
   logger = { warn: vi.fn() },
   callbacks = {},
   setupTimeout = 100,
+  performanceNow,
+  timingOperation,
+  timingGeneration,
+  timingStartedAt,
 } = {}) {
   const audioTrack = createTrack();
   const videoTrack = createTrack('video');
@@ -98,6 +102,10 @@ function createHarness({
     mediaStreamFactory: tracks => ({ getAudioTracks: () => tracks }),
     logger,
     setupTimeout,
+    performanceNow,
+    timingOperation,
+    timingGeneration,
+    timingStartedAt,
     ...callbacks,
   });
   const connect = () => adapter.connect({
@@ -118,6 +126,26 @@ function createHarness({
 }
 
 describe('OpenAIRealtimeProviderAdapter', () => {
+  it('logs WebRTC setup stages and first remote audio once with the controller timing context', async () => {
+    let now = 10;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
+    const harness = createHarness({ logger, performanceNow: () => now,
+      timingOperation: 'resume', timingGeneration: 8, timingStartedAt: 0 });
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'private-stream' }] });
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'replacement-stream' }] });
+
+    const logs = logger.debug.mock.calls.map(([line]) => line);
+    expect(logs).toEqual([
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=peer_created | durationMs=0 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=offer_created | durationMs=0 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=sdp_exchange | durationMs=0 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=transport_ready | durationMs=0 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=first_audio_received | durationMs=10 | outcome=success',
+    ]);
+    expect(logs.every(line => !line.includes('private-stream') && !line.includes('replacement-stream'))).toBe(true);
+  });
+
   it('completes WebRTC SDP setup using isolated clones of source audio tracks', async () => {
     const onSetupComplete = vi.fn();
     const harness = createHarness({ callbacks: { onSetupComplete } });

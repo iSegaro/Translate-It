@@ -304,6 +304,11 @@ export class OpenAIRealtimeProviderAdapter {
     this.dubbedVolume = DEFAULT_DUBBED_VOLUME;
     this.mediaGateOpen = true;
     this.log = options.logger || logger;
+    this.timingOperation = options.timingOperation === 'resume' ? 'resume' : 'start';
+    this.timingGeneration = Number.isSafeInteger(options.timingGeneration) && options.timingGeneration >= 0
+      ? options.timingGeneration
+      : null;
+    this.timingStartedAt = Number.isFinite(options.timingStartedAt) ? options.timingStartedAt : null;
   }
 
   get active() {
@@ -362,6 +367,19 @@ export class OpenAIRealtimeProviderAdapter {
    */
   getDubbedVolume() {
     return this.dubbedVolume;
+  }
+
+  _timingNow() {
+    try { return this.log?.isDebugEnabled?.() === true ? this.performanceNow() : null; } catch { return null; }
+  }
+
+  _logTiming(session, stage, startedAt, outcome) {
+    try {
+      if (this.log?.isDebugEnabled?.() !== true || !Number.isFinite(startedAt)) return;
+      const now = this.performanceNow();
+      if (!Number.isFinite(now)) return;
+      this.log.debug(`Live dubbing timing | provider=openai | operation=${session.timing.operation} | generation=${session.timing.generation} | stage=${stage} | durationMs=${Math.max(0, Math.round(now - startedAt))} | outcome=${outcome}`);
+    } catch { /* timing diagnostics are best effort */ }
   }
 
   /**
@@ -423,6 +441,9 @@ export class OpenAIRealtimeProviderAdapter {
     const pendingStart = { generation };
     const session = {
       generation,
+      timing: { operation: this.timingOperation, generation: this.timingGeneration ?? generation,
+        startedAt: this.timingStartedAt ?? this._timingNow(), peerStartedAt: null, offerStartedAt: null, sdpStartedAt: null,
+        firstAudioLogged: false },
       disposed: false,
       peerConnection: null,
       dataChannel: null,
@@ -467,6 +488,7 @@ export class OpenAIRealtimeProviderAdapter {
       await Promise.race([setup, timeout, cancellation]);
       if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
       session.telemetry.milestones.setupComplete = nowMs(this.performanceNow);
+      this._logTiming(session, 'transport_ready', session.timing.transportStartedAt, 'success');
       this._clearPending(pendingStart);
       session.cancelReject = null;
       this.onSetupComplete();
@@ -479,6 +501,13 @@ export class OpenAIRealtimeProviderAdapter {
       );
       this._clearPending(pendingStart);
       if (!cancelled) {
+        const failedStage = session.timing.transportStartedAt !== undefined ? 'transport_ready'
+          : session.timing.sdpStartedAt !== null ? 'sdp_exchange'
+            : session.timing.offerStartedAt !== null ? 'offer_created' : 'peer_created';
+        const failedAt = session.timing.transportStartedAt ?? session.timing.sdpStartedAt
+          ?? session.timing.offerStartedAt ?? session.timing.peerStartedAt ?? session.timing.startedAt;
+        this._logTiming(session, failedStage, failedAt,
+          error?.code === 'OPENAI_REALTIME_SETUP_CANCELLED' ? 'cancelled' : 'failure');
         this._notifyError(safeError);
         await this._cleanupSession(session);
       }
@@ -490,6 +519,7 @@ export class OpenAIRealtimeProviderAdapter {
   }
 
   async _setup(session, isCurrent, tracks, connectionOptions, secret) {
+    session.timing.peerStartedAt = this._timingNow();
     let peerConnection;
     try {
       peerConnection = await this.peerConnectionFactory();
@@ -511,6 +541,7 @@ export class OpenAIRealtimeProviderAdapter {
     }
 
     session.peerConnection = peerConnection;
+    this._logTiming(session, 'peer_created', session.timing.peerStartedAt, 'success');
     peerConnection.ontrack = event => this._handleRemoteTrack(session, event, isCurrent);
     peerConnection.onconnectionstatechange = () => this._handlePeerState(session, isCurrent);
     peerConnection.oniceconnectionstatechange = () => this._handlePeerState(session, isCurrent);
@@ -569,6 +600,7 @@ export class OpenAIRealtimeProviderAdapter {
           throw createProviderError('OPENAI_REALTIME_MEDIA_GATE_FAILED');
         }
       }
+      session.timing.offerStartedAt = this._timingNow();
       const offer = await peerConnection.createOffer();
       if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
       await peerConnection.setLocalDescription(offer);
@@ -577,7 +609,9 @@ export class OpenAIRealtimeProviderAdapter {
         throw createProviderError('OPENAI_REALTIME_SDP_EXCHANGE_FAILED');
       }
       session.telemetry.offerCreated = true;
+      this._logTiming(session, 'offer_created', session.timing.offerStartedAt, 'success');
 
+      session.timing.sdpStartedAt = this._timingNow();
       const response = await this.fetchImpl(OPENAI_REALTIME_TRANSLATIONS_CALLS_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -599,10 +633,12 @@ export class OpenAIRealtimeProviderAdapter {
       await peerConnection.setRemoteDescription({ type: 'answer', sdp: answerSdp });
       if (!isCurrent()) throw createProviderError('OPENAI_REALTIME_SETUP_CANCELLED');
       session.telemetry.answerApplied = true;
+      this._logTiming(session, 'sdp_exchange', session.timing.sdpStartedAt, 'success');
       // SDP success alone never completes setup: the translations transport
       // is only viable once the oai-events channel is open (which transitively
       // proves ICE/DTLS/SCTP connectivity). Remote audio is opportunistic —
       // silence yields no track — so it never gates viability.
+      session.timing.transportStartedAt = this._timingNow();
       await this._awaitTransportViable(session, isCurrent);
     } catch (error) {
       throw normalizeProviderError(error, 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED');
@@ -665,6 +701,10 @@ export class OpenAIRealtimeProviderAdapter {
     session.telemetry.remoteTracks += 1;
     if (session.telemetry.milestones.firstTranslatedAudioReceived === null) {
       session.telemetry.milestones.firstTranslatedAudioReceived = nowMs(this.performanceNow);
+    }
+    if (!session.timing.firstAudioLogged) {
+      session.timing.firstAudioLogged = true;
+      this._logTiming(session, 'first_audio_received', session.timing.startedAt, 'success');
     }
 
     let stream = event?.streams?.[0] || null;

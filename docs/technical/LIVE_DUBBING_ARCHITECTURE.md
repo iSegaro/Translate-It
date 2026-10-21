@@ -861,6 +861,13 @@ or descriptor adoption is performed for an uncertain owner.
   no-playback summary stays at debug so one session end is never logged twice.
   Keys, tokens, URLs, bootstrap data, PCM, stream ids, transcripts, and raw
   payloads never reach a logger. There are no routine telemetry logs.
+  With Debug Mode enabled and the `LiveDubbing` component set to Debug,
+  single-line `Live dubbing timing` messages report START completion, provider
+  bootstrap/setup stages, resume readiness/commit, first-audio reception
+  (OpenAI's remote-track arrival), and playback acceptance. They contain only
+  provider, operation, generation, stage, duration, and outcome. Durations use
+  the emitting Background or Offscreen context's monotonic clock and must not be
+  compared across contexts; timing history is not persisted.
 
 ## Runtime Integration
 

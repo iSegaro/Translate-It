@@ -59,6 +59,94 @@ function createOriginalAudioContext() {
 }
 
 describe('LiveDubbingController', () => {
+  it('emits generation-zero START timing independently from provider fencing', () => {
+    let now = 100;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const controller = new LiveDubbingController({ logger, performanceNow: () => now });
+    const session = { providerId: 'gemini', providerGeneration: 4,
+      timing: { operation: 'start', generation: 0, startedAt: 70 } };
+
+    controller._logOperationTiming(session, 'provider_ready', 'success', 3);
+    now = 101.6;
+    controller._logOperationTiming(session, 'provider_ready', 'success', 4);
+
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Live dubbing timing | provider=gemini | operation=start | generation=0 | stage=provider_ready | durationMs=32 | outcome=success',
+    );
+    expect(logger.debug.mock.calls[0]).toHaveLength(1);
+    expect(typeof logger.debug.mock.calls[0][0]).toBe('string');
+  });
+
+  it('does not read the clock or log timing unless component debug is enabled', () => {
+    const performanceNow = vi.fn(() => 10);
+    const logger = { isDebugEnabled: () => false, debug: vi.fn() };
+    const controller = new LiveDubbingController({ logger, performanceNow });
+    const session = { providerId: 'openai', providerGeneration: 2,
+      timing: { operation: 'start', generation: 0, startedAt: controller._timingNow() } };
+
+    controller._logOperationTiming(session, 'provider_ready', 'success', 2);
+
+    expect(performanceNow).not.toHaveBeenCalled();
+    expect(logger.debug).not.toHaveBeenCalled();
+  });
+
+  it('keeps consecutive resume timings generation-scoped across failure, cancellation, and stale completion', () => {
+    let now = 100;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const controller = new LiveDubbingController({ logger, performanceNow: () => now });
+    const session = { providerId: 'openai', providerGeneration: 5, mediaSequence: 11,
+      timing: { operation: 'resume', generation: 11, startedAt: 80 } };
+    expect(session.timing.generation).toBe(session.mediaSequence);
+
+    now = 110;
+    controller._logOperationTiming(session, 'provider_ready', 'failure', 5);
+    session.providerGeneration = 6;
+    session.mediaSequence = 12;
+    session.timing = { operation: 'resume', generation: session.mediaSequence, startedAt: 110 };
+    expect(session.timing.generation).toBe(session.mediaSequence);
+    now = 125;
+    controller._logOperationTiming(session, 'provider_ready', 'cancelled', 6);
+    controller._logOperationTiming(session, 'provider_ready', 'success', 5);
+    now = 130;
+    controller._logOperationTiming(session, 'provider_ready', 'success', 6);
+
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=openai | operation=resume | generation=11 | stage=provider_ready | durationMs=30 | outcome=failure'],
+      ['Live dubbing timing | provider=openai | operation=resume | generation=12 | stage=provider_ready | durationMs=15 | outcome=cancelled'],
+      ['Live dubbing timing | provider=openai | operation=resume | generation=12 | stage=provider_ready | durationMs=20 | outcome=success'],
+    ]);
+  });
+
+  it('logs Gemini first audio under the timing generation, not the provider fence', () => {
+    let now = 40;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const controller = new LiveDubbingController({ logger, performanceNow: () => now });
+    vi.spyOn(controller, '_isCurrentProvider').mockReturnValue(true);
+    vi.spyOn(controller, '_isCurrentSession').mockReturnValue(true);
+    vi.spyOn(controller, '_markMilestone').mockImplementation(() => {});
+    const session = {
+      providerId: 'gemini', providerGeneration: 9, setupComplete: true,
+      mediaAdmissionClosed: false, outputEpoch: 1, outputSequence: 0,
+      timing: { operation: 'resume', generation: 12, startedAt: 20 },
+      metrics: { outputChunks: 0, outputBytes: 0, outputSafetyDrops: 0 },
+      telemetry: { translatedAudioChunks: 0, outputSafetyDrops: 0 },
+      audioEngine: { enqueuePcm16: vi.fn(() => ({ accepted: true })) },
+    };
+
+    now = 61;
+    controller._handleProviderAudio(session, 9, new Uint8Array([1]));
+    now = 62;
+    controller._handlePlaybackAccepted(session, { accepted: false });
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    controller._handlePlaybackAccepted(session, { accepted: true });
+
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=12 | stage=first_audio_received | durationMs=41 | outcome=success'],
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=12 | stage=playback_accepted | durationMs=42 | outcome=success'],
+    ]);
+  });
+
   it.each([
     ['provider_creation', 'provider_creation'],
     ['media_gate', 'media_gate'],
@@ -343,6 +431,7 @@ describe('LiveDubbingController', () => {
     const track = new FakeTrack();
     const stream = createStream(track);
     const notify = vi.fn();
+    const logger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
     const clients = [];
     let providerCallbacks;
     const registry = {
@@ -358,6 +447,8 @@ describe('LiveDubbingController', () => {
       getAudioMode: vi.fn(() => LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM),
     };
     const controller = new LiveDubbingController({
+      logger,
+      performanceNow: () => 100,
       mediaDevices: { getUserMedia: vi.fn(async () => stream) },
       providerRegistry: registry,
       audioContextFactory: vi.fn(async () => {
@@ -398,6 +489,14 @@ describe('LiveDubbingController', () => {
       ack: 'PROVIDER_READY',
     });
     expect(controller.currentSession.status).toBe(LIVE_DUBBING_STATUS.RUNNING);
+    expect(controller.currentSession.timing.generation).toBe(0);
+    expect(registry.create.mock.calls.at(-1)[1]).toMatchObject({
+      timingOperation: 'start', timingGeneration: 0,
+    });
+    expect(logger.debug.mock.calls.filter(([line]) => line.startsWith('Live dubbing timing | '))).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=start | generation=0 | stage=bootstrap_request | durationMs=0 | outcome=success'],
+      ['Live dubbing timing | provider=gemini | operation=start | generation=0 | stage=provider_ready | durationMs=0 | outcome=success'],
+    ]);
 
     await controller.dispose('session-1', 'gemini');
     expect(track.stop).toHaveBeenCalledOnce();

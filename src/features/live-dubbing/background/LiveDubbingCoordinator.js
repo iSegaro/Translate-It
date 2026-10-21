@@ -199,6 +199,7 @@ export class LiveDubbingCoordinator {
       });
     this.leaseManager = options.leaseManager || offscreenRuntimeLeaseManager;
     this.now = options.now || (() => Date.now());
+    this.performanceNow = options.performanceNow || (() => globalThis.performance.now());
     this.uuid = options.uuid || defaultUuid;
     this.log = options.logger || logger;
     this.hasConfiguredCredentials = typeof options.hasConfiguredCredentials === 'function'
@@ -239,6 +240,9 @@ export class LiveDubbingCoordinator {
 
   start(message = {}, sender = {}) {
     const requestedProviderId = getStartProviderId(message);
+    const timing = this._beginTiming(
+      'start', isLiveDubbingProviderId(requestedProviderId) ? requestedProviderId : 'unknown',
+    );
     const pendingStart = {
       sessionId: this.uuid(),
       tabId: this._getPendingStartTabId(sender),
@@ -253,7 +257,34 @@ export class LiveDubbingCoordinator {
       () => this.sessionRegistry.deletePendingStart(pendingStart),
       () => this.sessionRegistry.deletePendingStart(pendingStart),
     );
-    return operation;
+    return operation.then(result => {
+      const outcome = result?.success === true ? 'success'
+        : result?.ignored === true ? 'stale'
+          : pendingStart.terminalRequested || result?.error === 'LIVE_DUBBING_START_CANCELLED' ? 'cancelled' : 'failure';
+      this._endTiming(timing, 'start_complete', outcome);
+      return result;
+    }, error => {
+      this._endTiming(timing, 'start_complete', pendingStart.terminalRequested ? 'cancelled' : 'failure');
+      throw error;
+    });
+  }
+
+  _beginTiming(operation, provider, generation) {
+    try {
+      if (this.log?.isDebugEnabled?.() !== true) return null;
+      if (operation === 'start') generation = 0;
+      const startedAt = this.performanceNow();
+      return Number.isFinite(startedAt) ? { operation, provider, generation, startedAt } : null;
+    } catch { return null; }
+  }
+
+  _endTiming(timing, stage, outcome) {
+    try {
+      if (!timing || this.log?.isDebugEnabled?.() !== true) return;
+      const duration = this.performanceNow() - timing.startedAt;
+      if (!Number.isFinite(duration)) return;
+      this.log.debug(`Live dubbing timing | provider=${timing.provider} | operation=${timing.operation} | generation=${timing.generation} | stage=${stage} | durationMs=${Math.max(0, Math.round(duration))} | outcome=${outcome}`);
+    } catch { /* timing diagnostics must not affect media control flow */ }
   }
 
   stop(message = {}) {
@@ -1092,6 +1123,7 @@ export class LiveDubbingCoordinator {
     media.desiredPlaying = playing;
     if (!playing) {
       media.committed = false;
+      media.resumeTiming = null;
       clearTimeout(media.debounceTimer);
       clearTimeout(media.retryTimer);
       media.debounceTimer = null;
@@ -1108,6 +1140,9 @@ export class LiveDubbingCoordinator {
     media.episodeId ||= this.uuid();
     if (media.committed) return;
     if (media.exhausted || media.activeOperation || media.debounceTimer || media.retryTimer) return;
+    if (!media.resumeTiming) {
+      media.resumeTiming = this._beginTiming('resume', descriptor.providerId, media.mediaSequence + 1);
+    }
     media.debounceTimer = setTimeout(() => {
       media.debounceTimer = null;
       if (media.desiredPlaying) void this._beginMediaRotation(descriptor, media);
@@ -1336,6 +1371,15 @@ export class LiveDubbingCoordinator {
       return;
     }
     if (media.pausedSequenceAcked !== media.mediaSequence || media.pauseFailed) return;
+    const timing = media.resumeTiming || this._beginTiming('resume', descriptor.providerId, media.mediaSequence + 1);
+    if (timing) timing.generation = media.mediaSequence + 1;
+    media.resumeTiming = null;
+    let providerReadyDispatched = false;
+    let commitDispatched = false;
+    let readyTimingLogged = false;
+    let commitTimingLogged = false;
+    let readyTimingOutcome = null;
+    let timingOutcome = 'pending';
     const operation = { id: this.uuid(), cancelled: false };
     media.activeOperation = operation;
     media.episodeAttempts += 1;
@@ -1350,6 +1394,8 @@ export class LiveDubbingCoordinator {
       await media.retryPersistence;
       if (operation.cancelled || media.activeOperation !== operation) return;
       if (!await this._queueMediaRetryStatePersistence(descriptor.sessionId, media)) {
+        timingOutcome = operation.cancelled ? 'cancelled'
+          : media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor) ? 'stale' : 'failure';
         media.activeOperation = null;
         media.exhausted = true;
         this.mediaState = {
@@ -1384,12 +1430,19 @@ export class LiveDubbingCoordinator {
       if (!this.sessionRegistry.reserveMediaBootstrapGrant(descriptor.sessionId, grant)) throw new Error('MEDIA_GRANT_BUSY');
       failureStage = 'media-resume-dispatch';
       this._logMedia('debug', 'dispatch', { stage: failureStage, mediaSequence: generation.mediaSequence });
+      providerReadyDispatched = true;
       const ready = await this._sendOffscreen(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_RESUME, generation));
       failureStage = 'media-resume-ack';
       const resumeAcked = ready?.success === true && ready.sessionId === generation.sessionId
         && ready.providerId === generation.providerId && ready.eventSequence === generation.eventSequence
         && ready.mediaSequence === generation.mediaSequence && ready.rotationId === generation.rotationId
         && ready.ready === true;
+      const readyOutcome = operation.cancelled ? 'cancelled'
+        : media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor) ? 'stale'
+          : resumeAcked ? 'success' : 'failure';
+      this._endTiming(timing, 'provider_ready', readyOutcome);
+      readyTimingLogged = true;
+      readyTimingOutcome = readyOutcome;
       this._logMedia('debug', 'ack', { stage: 'media-resume', outcome: resumeAcked ? 'success' : 'failed', mediaSequence: generation.mediaSequence });
       if (operation.cancelled || media.activeOperation !== operation
         || !this._isCurrentMediaDescriptor(descriptor) || !resumeAcked) throw new Error('MEDIA_RESUME_FAILED');
@@ -1398,23 +1451,41 @@ export class LiveDubbingCoordinator {
       if (operation.cancelled || media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor)) return;
       failureStage = 'media-commit-dispatch';
       this._logMedia('debug', 'dispatch', { stage: failureStage, mediaSequence: generation.mediaSequence });
+      commitDispatched = true;
       const committed = await this._sendOffscreen(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_COMMIT, generation));
       failureStage = 'media-commit-ack';
       const commitAcked = committed?.success === true && committed.sessionId === generation.sessionId
         && committed.providerId === generation.providerId && committed.eventSequence === generation.eventSequence
         && committed.mediaSequence === generation.mediaSequence && committed.rotationId === generation.rotationId
         && committed.playing === true;
+      const commitOutcome = operation.cancelled ? 'cancelled'
+        : media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor) ? 'stale'
+          : commitAcked ? 'success' : 'failure';
+      this._endTiming(timing, 'commit', commitOutcome);
+      commitTimingLogged = true;
       this._logMedia('debug', 'ack', { stage: 'media-commit', outcome: commitAcked ? 'success' : 'failed', mediaSequence: generation.mediaSequence });
       if (!commitAcked || operation.cancelled || media.activeOperation !== operation) {
         throw new Error('MEDIA_COMMIT_FAILED');
       }
       media.activeOperation = null;
       media.committed = true;
+      timingOutcome = 'success';
       media.pausedSequenceAcked = null;
       this.mediaState = { mediaState: 'playing', mediaSequence: generation.mediaSequence, rotationId: generation.rotationId, mediaError: null };
       this._notifyMediaStatusChanged(descriptor);
       this._logMedia('info', 'reconnected', { attempt: media.episodeAttempts, mediaSequence: generation.mediaSequence, outcome: 'success' });
     } catch {
+      timingOutcome = operation.cancelled ? 'cancelled'
+        : media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor) ? 'stale' : 'failure';
+      if (providerReadyDispatched && !readyTimingLogged) {
+        this._endTiming(timing, 'provider_ready', timingOutcome);
+        readyTimingLogged = true;
+        readyTimingOutcome = timingOutcome;
+      }
+      if (commitDispatched && !commitTimingLogged) {
+        this._endTiming(timing, 'commit', timingOutcome);
+        commitTimingLogged = true;
+      }
       this.sessionRegistry.revokeMediaBootstrapGrant(descriptor.sessionId);
       if (media.activeOperation !== operation) return;
       media.activeOperation = null;
@@ -1434,10 +1505,19 @@ export class LiveDubbingCoordinator {
       }
       const retryDelayMs = media.episodeAttempts === 1 ? 250 : 750;
       this._logMedia('debug', 'retry-scheduled', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, retryDelayMs, stage: failureStage, errorCode: safeFailureCode(failureStage) });
+      media.resumeTiming = this._beginTiming('resume', descriptor.providerId, media.mediaSequence + 1);
       media.retryTimer = setTimeout(() => {
         media.retryTimer = null;
         if (media.desiredPlaying) void this._beginMediaRotation(descriptor, media);
       }, retryDelayMs);
+    } finally {
+      const finalTimingOutcome = timingOutcome !== 'pending' ? timingOutcome
+        : operation.cancelled || !media.desiredPlaying ? 'cancelled'
+          : media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor) ? 'stale' : 'failure';
+      if (!providerReadyDispatched
+        || (readyTimingOutcome === 'success' && !commitDispatched && !commitTimingLogged)) {
+        this._endTiming(timing, 'resume_complete', finalTimingOutcome);
+      }
     }
   }
 

@@ -8,6 +8,8 @@ import {
   createLiveDubbingTranslatedTranscript,
   normalizeProviderTargetLanguage,
 } from '../contracts.js';
+import { getScopedLogger } from '../../../shared/logging/logger.js';
+import { LOG_COMPONENTS } from '../../../shared/logging/logConstants.js';
 
 export const GEMINI_LIVE_MODEL = 'models/gemini-3.5-live-translate-preview';
 export const GEMINI_LIVE_AUDIO_MIME_TYPE = 'audio/pcm;rate=16000';
@@ -29,6 +31,7 @@ export const GEMINI_LIVE_MAX_BUFFERED_AMOUNT = 64 * 1024;
 
 const OPEN_READY_STATE = 1;
 const NOOP = () => {};
+const logger = getScopedLogger(LOG_COMPONENTS.LIVE_DUBBING, 'GeminiLiveProviderAdapter');
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const TELEMETRY_MILESTONES = Object.freeze([
   'captureReady',
@@ -324,6 +327,11 @@ export class GeminiLiveProviderAdapter {
     this.onError = callbackFrom(options, callbacks, 'onError');
     this.onClose = callbackFrom(options, callbacks, 'onClose');
     this.performanceNow = performanceNow(options);
+    this.log = options.logger || logger;
+    this.timingOperation = options.timingOperation === 'resume' ? 'resume' : 'start';
+    this.timingGeneration = Number.isSafeInteger(options.timingGeneration) && options.timingGeneration >= 0
+      ? options.timingGeneration
+      : null;
 
     this._socket = null;
     this._socketContext = null;
@@ -415,6 +423,8 @@ export class GeminiLiveProviderAdapter {
     });
     this.setupState = {
       generation,
+      timing: { operation: this.timingOperation, generation: this.timingGeneration ?? generation,
+        connectStartedAt: this._timingNow(), wsOpenedAt: null },
       resolve: resolveSetup,
       reject: rejectSetup,
       timer: null,
@@ -530,6 +540,10 @@ export class GeminiLiveProviderAdapter {
     socket.onopen = () => {
       if (!this._isCurrent(socket, generation)) return;
       this.phase = 'open';
+      if (this.setupState?.generation === generation) {
+        this.setupState.timing.wsOpenedAt = this._timingNow();
+        this._logTiming(this.setupState.timing, 'ws_open', this.setupState.timing.connectStartedAt, 'success');
+      }
       this._markMilestone('wsOpen');
       this.setupState.timer = setTimeout(
         () => this._handleSetupTimeout(socket, generation),
@@ -678,6 +692,7 @@ export class GeminiLiveProviderAdapter {
         this.setupState = null;
         this.phase = 'ready';
         this._markMilestone('setupComplete');
+        this._logTiming(setup.timing, 'setup_complete', setup.timing.wsOpenedAt, 'success');
         setup.resolve();
         this._emit(this.onSetupComplete, 'setupComplete');
       }
@@ -962,6 +977,19 @@ export class GeminiLiveProviderAdapter {
     this._emitEvent({ type: 'error', error });
   }
 
+  _timingNow() {
+    try { return this.log?.isDebugEnabled?.() === true ? this.performanceNow() : null; } catch { return null; }
+  }
+
+  _logTiming(timing, stage, startedAt, outcome) {
+    try {
+      if (this.log?.isDebugEnabled?.() !== true || !Number.isFinite(startedAt)) return;
+      const now = this.performanceNow();
+      if (!Number.isFinite(now)) return;
+      this.log.debug(`Live dubbing timing | provider=gemini | operation=${timing.operation} | generation=${timing.generation} | stage=${stage} | durationMs=${Math.max(0, Math.round(now - startedAt))} | outcome=${outcome}`);
+    } catch { /* timing diagnostics are best effort */ }
+  }
+
   _markMilestone(name) {
     if (this.telemetry.milestones[name] !== null) return;
     let value = null;
@@ -1016,6 +1044,9 @@ export class GeminiLiveProviderAdapter {
     const socket = this._socket;
     const setup = this.setupState;
     if (setup) {
+      this._logTiming(setup.timing, setup.timing.wsOpenedAt === null ? 'ws_open' : 'setup_complete',
+        setup.timing.wsOpenedAt ?? setup.timing.connectStartedAt,
+        terminalCategory === 'CLIENT_CLOSE' ? 'cancelled' : 'failure');
       clearTimeout(setup.timer);
       this.setupState = null;
     }

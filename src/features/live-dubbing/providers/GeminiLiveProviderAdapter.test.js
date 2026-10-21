@@ -109,6 +109,25 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(client._socketContext).toEqual({ targetLanguage: 'zh-Hans' });
   });
 
+  it('logs generation-scoped websocket and setup timings as single safe strings', async () => {
+    let now = 10;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const client = createClient({ logger, performanceNow: () => now,
+      timingOperation: 'resume', timingGeneration: 12 });
+    const connection = client.connect({ bootstrap: { accessToken: 'short-lived-secret' }, targetLanguage: 'fr' });
+    const socket = FakeWebSocket.instances.at(-1);
+    now = 25;
+    socket.open();
+    now = 38;
+    socket.receive({ setupComplete: {} });
+    await connection;
+
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=12 | stage=ws_open | durationMs=15 | outcome=success'],
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=12 | stage=setup_complete | durationMs=13 | outcome=success'],
+    ]);
+  });
+
   it('accepts ArrayBuffer JSON for setupComplete', async () => {
     const client = createClient();
     const connection = client.connect({ bootstrap: { accessToken: 'short-lived-secret' }, targetLanguage: 'fr' });

@@ -350,12 +350,16 @@ describe('Live Dubbing media observation authorization', () => {
   it('debounces positive playback and uses one exact generation through READY and COMMIT', async () => {
     vi.useFakeTimers();
     try {
+      let now = 10;
+      const logger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
       const harness = createHarness({ stored: {
         sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
         targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 123,
         lastError: null, eventSequence: 1,
       } });
       const { coordinator } = harness;
+      coordinator.log = logger;
+      coordinator.performanceNow = () => now;
       const descriptor = await coordinator._readDescriptor();
       const state = { descriptor, terminalRequested: false, media: {
         mediaSequence: 7, pausedSequenceAcked: 7, episodeAttempts: 0, activeOperation: null, barrier: null,
@@ -373,6 +377,7 @@ describe('Live Dubbing media observation authorization', () => {
       coordinator._handleMediaDecision(descriptor, { known: true, playing: true });
       await vi.advanceTimersByTimeAsync(199);
       expect(coordinator._sendOffscreen).not.toHaveBeenCalled();
+      now = 210;
       await vi.advanceTimersByTimeAsync(1);
       expect(coordinator._sendOffscreen.mock.calls.map(([message]) => message.action)).toEqual([
         LIVE_DUBBING_ACTIONS.MEDIA_RESUME, LIVE_DUBBING_ACTIONS.MEDIA_COMMIT,
@@ -382,9 +387,200 @@ describe('Live Dubbing media observation authorization', () => {
       expect(resume).toMatchObject({ sessionId: 'session-1', eventSequence: 1, mediaSequence: 8 });
       expect(coordinator._freshPlayingBarrier).toHaveBeenCalledTimes(2);
       expect(coordinator.mediaState).toMatchObject({ mediaState: 'playing', mediaSequence: 8, rotationId: resume.rotationId });
+      expect(logger.debug.mock.calls.filter(([line]) => line.startsWith('Live dubbing timing | '))).toEqual([
+        ['Live dubbing timing | provider=gemini | operation=resume | generation=8 | stage=provider_ready | durationMs=200 | outcome=success'],
+        ['Live dubbing timing | provider=gemini | operation=resume | generation=8 | stage=commit | durationMs=200 | outcome=success'],
+      ]);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('emits generation-zero START timing for success, failure, and cancellation', async () => {
+    const logger = { isDebugEnabled: vi.fn(() => true), debug: vi.fn(), warn: vi.fn() };
+    const clock = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(125)
+      .mockReturnValueOnce(200).mockReturnValueOnce(240)
+      .mockReturnValueOnce(300).mockReturnValueOnce(360);
+    const successHarness = createHarness();
+    successHarness.coordinator.log = logger;
+    successHarness.coordinator.performanceNow = clock;
+    await expect(successHarness.coordinator.start({ data: { targetLanguage: 'en' } }, {}))
+      .resolves.toMatchObject({ success: true });
+
+    const failureHarness = createHarness();
+    failureHarness.coordinator.log = logger;
+    failureHarness.coordinator.performanceNow = clock;
+    await expect(failureHarness.coordinator.start({ data: { providerId: 'unknown', targetLanguage: 'en' } }, {}))
+      .resolves.toMatchObject({ success: false });
+
+    const cancellationHarness = createHarness();
+    cancellationHarness.coordinator.log = logger;
+    cancellationHarness.coordinator.performanceNow = clock;
+    let resolveInjection;
+    cancellationHarness.coordinator.runtimeGateway.injectMediaObserverForTab = vi.fn(
+      () => new Promise(resolve => { resolveInjection = resolve; }),
+    );
+    const start = cancellationHarness.coordinator.start({ data: { targetLanguage: 'en' } }, { tab: { id: 42 } });
+    while (!resolveInjection) await Promise.resolve();
+    await cancellationHarness.coordinator.handleTabRemoved(42);
+    resolveInjection({ success: true, injectedFrameCount: 1 });
+    await expect(start).resolves.toMatchObject({ error: 'LIVE_DUBBING_START_CANCELLED' });
+
+    expect(logger.debug.mock.calls.filter(([message]) => typeof message === 'string' && message.startsWith('Live dubbing timing | ')))
+      .toEqual([
+        ['Live dubbing timing | provider=gemini | operation=start | generation=0 | stage=start_complete | durationMs=25 | outcome=success'],
+        ['Live dubbing timing | provider=unknown | operation=start | generation=0 | stage=start_complete | durationMs=40 | outcome=failure'],
+        ['Live dubbing timing | provider=gemini | operation=start | generation=0 | stage=start_complete | durationMs=60 | outcome=cancelled'],
+      ]);
+  });
+
+  it('logs a terminal resume timing without READY or COMMIT when the initial media barrier fails', async () => {
+    const logger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
+    const clock = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(135);
+    const harness = createHarness({ stored: {
+      sessionId: 'barrier-failed-resume', tabId: 42, providerId: 'gemini', targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 1, lastError: null, eventSequence: 3,
+    } });
+    const { coordinator } = harness;
+    coordinator.log = logger;
+    coordinator.performanceNow = clock;
+    const descriptor = await coordinator._readDescriptor();
+    const media = {
+      mediaSequence: 3, pausedSequenceAcked: 3, episodeId: 'episode-1', episodeAttempts: 2,
+      retryTimer: null, debounceTimer: null, activeOperation: null, barrier: null,
+      desiredPlaying: true, exhausted: false, committed: false, retryPersistence: Promise.resolve(),
+    };
+    coordinator.sessionRegistry.setSessionState(descriptor.sessionId, {
+      descriptor, terminalRequested: false, media,
+    });
+    coordinator._freshPlayingBarrier = vi.fn(async () => false);
+    coordinator._sendOffscreen = vi.fn();
+    coordinator._exhaustMediaEpisode = vi.fn();
+
+    await coordinator._beginMediaRotation(descriptor, media);
+
+    expect(coordinator._sendOffscreen).not.toHaveBeenCalled();
+    expect(logger.debug.mock.calls.filter(([line]) => line.startsWith('Live dubbing timing | '))).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=4 | stage=resume_complete | durationMs=35 | outcome=failure'],
+    ]);
+  });
+
+  it('classifies retry-state persistence failure as a Resume failure rather than stale', async () => {
+    const logger = { isDebugEnabled: () => true, debug: vi.fn(), warn: vi.fn() };
+    const clock = vi.fn().mockReturnValueOnce(200).mockReturnValueOnce(245);
+    const harness = createHarness({ stored: {
+      sessionId: 'retry-persist-failed', tabId: 42, providerId: 'gemini', targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 1, lastError: null, eventSequence: 3,
+    } });
+    const { coordinator } = harness;
+    coordinator.log = logger;
+    coordinator.performanceNow = clock;
+    const descriptor = await coordinator._readDescriptor();
+    const media = {
+      mediaSequence: 6, pausedSequenceAcked: 6, episodeId: 'episode-1', episodeAttempts: 0,
+      retryTimer: null, debounceTimer: null, activeOperation: null, barrier: null,
+      desiredPlaying: true, exhausted: false, committed: false, retryPersistence: Promise.resolve(),
+    };
+    coordinator.sessionRegistry.setSessionState(descriptor.sessionId, {
+      descriptor, terminalRequested: false, media,
+    });
+    coordinator._freshPlayingBarrier = vi.fn(async () => true);
+    coordinator._queueMediaRetryStatePersistence = vi.fn(async () => false);
+    coordinator._sendOffscreen = vi.fn();
+
+    await coordinator._beginMediaRotation(descriptor, media);
+
+    expect(coordinator._queueMediaRetryStatePersistence).toHaveBeenCalledOnce();
+    expect(coordinator._sendOffscreen).not.toHaveBeenCalled();
+    expect(logger.debug.mock.calls.filter(([line]) => line.startsWith('Live dubbing timing | '))).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=7 | stage=resume_complete | durationMs=45 | outcome=failure'],
+    ]);
+  });
+
+  it('emits resume timing through READY and COMMIT and marks superseded completion stale', async () => {
+    const logger = { isDebugEnabled: vi.fn(() => true), debug: vi.fn(), warn: vi.fn() };
+    const clock = vi.fn().mockReturnValueOnce(500).mockReturnValueOnce(525).mockReturnValueOnce(560)
+      .mockReturnValueOnce(700).mockReturnValueOnce(740).mockReturnValueOnce(760);
+    const harness = createHarness({ stored: {
+      sessionId: 'timed-resume', tabId: 42, providerId: 'gemini', targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 1, lastError: null, eventSequence: 3,
+    } });
+    const { coordinator } = harness;
+    coordinator.log = logger;
+    coordinator.performanceNow = clock;
+    const descriptor = await coordinator._readDescriptor();
+    const media = {
+      mediaSequence: 7, pausedSequenceAcked: 7, episodeId: null, episodeAttempts: 0,
+      retryTimer: null, debounceTimer: null, activeOperation: null, barrier: null,
+      desiredPlaying: true, exhausted: false, committed: false, retryPersistence: Promise.resolve(),
+    };
+    coordinator.sessionRegistry.setSessionState(descriptor.sessionId, {
+      descriptor, terminalRequested: false, media,
+    });
+    coordinator._freshPlayingBarrier = vi.fn(async () => true);
+    coordinator._sendOffscreen = vi.fn(async message => ({
+      success: true, sessionId: message.data.sessionId, providerId: message.data.providerId,
+      eventSequence: message.data.eventSequence, mediaSequence: message.data.mediaSequence,
+      rotationId: message.data.rotationId,
+      ...(message.action === LIVE_DUBBING_ACTIONS.MEDIA_RESUME ? { ready: true } : { playing: true }),
+    }));
+
+    await coordinator._beginMediaRotation(descriptor, media);
+    expect(logger.debug.mock.calls.filter(([message]) => typeof message === 'string' && message.startsWith('Live dubbing timing | ')))
+      .toEqual([
+        ['Live dubbing timing | provider=gemini | operation=resume | generation=8 | stage=provider_ready | durationMs=25 | outcome=success'],
+        ['Live dubbing timing | provider=gemini | operation=resume | generation=8 | stage=commit | durationMs=60 | outcome=success'],
+      ]);
+    expect(media.committed).toBe(true);
+
+    const staleHarness = createHarness({ stored: {
+      sessionId: 'timed-stale-resume', tabId: 43, providerId: 'gemini', targetLanguage: 'en',
+      status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 1, lastError: null, eventSequence: 3,
+    } });
+    const stale = staleHarness.coordinator;
+    stale.log = logger;
+    stale.performanceNow = clock;
+    const staleTimingStart = logger.debug.mock.calls.filter(([message]) => typeof message === 'string'
+      && message.startsWith('Live dubbing timing | ')).length;
+    const staleDescriptor = await stale._readDescriptor();
+    const staleMedia = {
+      mediaSequence: 2, pausedSequenceAcked: 2, episodeId: null, episodeAttempts: 0,
+      retryTimer: null, debounceTimer: null, activeOperation: null, barrier: null,
+      desiredPlaying: true, exhausted: false, committed: false, retryPersistence: Promise.resolve(),
+    };
+    stale.sessionRegistry.setSessionState(staleDescriptor.sessionId, {
+      descriptor: staleDescriptor, terminalRequested: false, media: staleMedia,
+    });
+    stale._freshPlayingBarrier = vi.fn(async () => true);
+    let resolveResume;
+    stale._sendOffscreen = vi.fn(message => message.action === LIVE_DUBBING_ACTIONS.MEDIA_RESUME
+      ? new Promise(resolve => { resolveResume = () => resolve({
+        success: true, sessionId: message.data.sessionId, providerId: message.data.providerId,
+        eventSequence: message.data.eventSequence, mediaSequence: message.data.mediaSequence,
+        rotationId: message.data.rotationId, ready: true,
+      }); })
+      : Promise.resolve({ success: true, sessionId: message.data.sessionId,
+        providerId: message.data.providerId, eventSequence: message.data.eventSequence,
+        mediaSequence: message.data.mediaSequence, rotationId: message.data.rotationId, paused: true }));
+    const rotating = stale._beginMediaRotation(staleDescriptor, staleMedia);
+    while (!resolveResume) await Promise.resolve();
+    staleMedia.activeOperation = null;
+    resolveResume();
+    await rotating;
+    expect(logger.debug.mock.calls.filter(([message]) => typeof message === 'string'
+      && message.startsWith('Live dubbing timing | ')).slice(staleTimingStart)).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=3 | stage=provider_ready | durationMs=40 | outcome=stale'],
+    ]);
+  });
+
+  it('does not read the performance clock or emit timing when debug is disabled', async () => {
+    const logger = { isDebugEnabled: vi.fn(() => false), debug: vi.fn(), warn: vi.fn() };
+    const harness = createHarness();
+    harness.coordinator.log = logger;
+    harness.coordinator.performanceNow = vi.fn(() => { throw new Error('clock should not be read'); });
+    await harness.coordinator.start({ data: { providerId: 'unknown', targetLanguage: 'en' } }, {});
+    expect(harness.coordinator.performanceNow).not.toHaveBeenCalled();
+    expect(logger.debug).not.toHaveBeenCalled();
   });
 
   it('rotates fresh observation tokens and bounds failed generations to three attempts', async () => {
