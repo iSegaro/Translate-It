@@ -108,7 +108,17 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
       for (const node of addedNodes) addedRoots.add(node);
       for (const node of removedNodes) removedRoots.add(node);
     }
-    for (const node of addedRoots) if (node.nodeType === 1 && node.isConnected) discoverSubtree(node);
+    for (const node of addedRoots) {
+      if (node.nodeType !== 1 || !node.isConnected) continue;
+      let covered = false;
+      for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
+        if (addedRoots.has(ancestor)) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) discoverSubtree(node);
+    }
     for (const node of removedRoots) {
       if (node.nodeType !== 1) continue;
       walkOpenShadowTree(node, (element) => {

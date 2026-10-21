@@ -135,6 +135,51 @@ describe('live dubbing media observer', () => {
     });
   });
 
+  it('discovers playing media in a late-attached shadow root on authorized refresh', async () => {
+    const listeners = new Set();
+    const messages = [];
+    let authorizations = 0;
+    const runtime = {
+      sendMessage: vi.fn(async (message) => {
+        messages.push(message);
+        if (message.action === MEDIA_OBSERVER_HELLO) {
+          authorizations += 1;
+          return {
+            observe: true,
+            token: `refresh-${authorizations}`,
+            sessionToken: `session-${authorizations}`,
+          };
+        }
+      }),
+      onMessage: {
+        addListener: (listener) => listeners.add(listener),
+        removeListener: (listener) => listeners.delete(listener),
+      },
+    };
+
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(messages).toHaveLength(2));
+    expect(messages[1].data).toEqual({ token: 'refresh-1', revision: 1, playing: false });
+
+    const host = document.createElement('div');
+    document.body.append(host);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const root = host.attachShadow({ mode: 'open' });
+    const media = document.createElement('video');
+    setPlayback(media, true);
+    root.append(media);
+    media.dispatchEvent(new Event('playing'));
+    expect(messages).toHaveLength(2);
+
+    [...listeners][0]({ action: MEDIA_OBSERVER_REFRESH });
+    await vi.waitFor(() => expect(messages).toHaveLength(4));
+    expect(messages[2]).toEqual({ action: MEDIA_OBSERVER_HELLO });
+    expect(messages[3]).toEqual({
+      action: MEDIA_OBSERVATION,
+      data: { token: 'refresh-2', revision: 2, playing: true },
+    });
+  });
+
   it('tracks media added to an open shadow root and listens for its playback events', async () => {
     const runtime = {
       sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
@@ -182,17 +227,111 @@ describe('live dubbing media observer', () => {
       };
       return walker;
     });
-    cleanup = installMediaObserver({ runtime, document });
-    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
-    const initialVisits = visitedElements;
+    try {
+      cleanup = installMediaObserver({ runtime, document });
+      await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+      const initialVisits = visitedElements;
 
-    document.body.append(document.createElement('section'));
-    await vi.waitFor(() => expect(visitedElements).toBeGreaterThan(initialVisits));
+      document.body.append(document.createElement('section'));
+      await vi.waitFor(() => expect(visitedElements).toBeGreaterThan(initialVisits));
 
-    expect(initialVisits).toBe(1503);
-    expect(visitedElements - initialVisits).toBe(1);
-    expect(createTreeWalker).toHaveBeenCalledTimes(2);
-    createTreeWalker.mockRestore();
+      expect(initialVisits).toBe(1503);
+      expect(visitedElements - initialVisits).toBe(1);
+      expect(createTreeWalker).toHaveBeenCalledTimes(2);
+    } finally {
+      createTreeWalker.mockRestore();
+    }
+  });
+
+  it('walks overlapping added subtrees only once', async () => {
+    const observers = [];
+    class ControlledMutationObserver {
+      constructor(callback) { this.callback = callback; observers.push(this); }
+      observe(target) { this.target = target; }
+      disconnect() {}
+      takeRecords() { return []; }
+    }
+    vi.stubGlobal('MutationObserver', ControlledMutationObserver);
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'overlap-token', sessionToken: 'overlap-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const nativeCreateTreeWalker = document.createTreeWalker.bind(document);
+    let visitedElements = 0;
+    const createTreeWalker = vi.spyOn(document, 'createTreeWalker').mockImplementation((root, ...args) => {
+      const walker = nativeCreateTreeWalker(root, ...args);
+      if (root.nodeType === Node.ELEMENT_NODE) visitedElements += 1;
+      const nextNode = walker.nextNode.bind(walker);
+      walker.nextNode = () => {
+        const node = nextNode();
+        if (node) visitedElements += 1;
+        return node;
+      };
+      return walker;
+    });
+    try {
+      cleanup = installMediaObserver({ runtime, document });
+      await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+      const initialVisits = visitedElements;
+      const parent = document.createElement('div');
+      const child = document.createElement('section');
+      child.append(document.createElement('video'));
+      parent.append(child);
+      document.body.append(parent);
+      const documentObserver = observers.find(({ target }) => target === document.documentElement);
+
+      documentObserver.callback([
+        { addedNodes: [parent], removedNodes: [] },
+        { addedNodes: [child], removedNodes: [] },
+      ]);
+
+      expect(visitedElements - initialVisits).toBe(3);
+    } finally {
+      createTreeWalker.mockRestore();
+    }
+  });
+
+  it('keeps ancestor checks bounded for many sibling additions', async () => {
+    const observers = [];
+    class ControlledMutationObserver {
+      constructor(callback) { this.callback = callback; observers.push(this); }
+      observe(target) { this.target = target; }
+      disconnect() {}
+      takeRecords() { return []; }
+    }
+    vi.stubGlobal('MutationObserver', ControlledMutationObserver);
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'siblings-token', sessionToken: 'siblings-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const nativeCreateTreeWalker = document.createTreeWalker.bind(document);
+    let addedTreeWalks = 0;
+    const createTreeWalker = vi.spyOn(document, 'createTreeWalker').mockImplementation((root, ...args) => {
+      if (root.nodeType === Node.ELEMENT_NODE) addedTreeWalks += 1;
+      return nativeCreateTreeWalker(root, ...args);
+    });
+    const contains = vi.spyOn(Element.prototype, 'contains');
+
+    try {
+      cleanup = installMediaObserver({ runtime, document });
+      await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+      addedTreeWalks = 0;
+      const siblings = Array.from({ length: 300 }, () => document.createElement('div'));
+      document.body.append(...siblings);
+      const documentObserver = observers.find(({ target }) => target === document.documentElement);
+
+      documentObserver.callback([{ addedNodes: siblings, removedNodes: [] }]);
+
+      expect(addedTreeWalks).toBe(300);
+      expect(contains).not.toHaveBeenCalled();
+    } finally {
+      contains.mockRestore();
+      createTreeWalker.mockRestore();
+    }
   });
 
   it('discovers nested open shadow roots added after the initial snapshot', async () => {
