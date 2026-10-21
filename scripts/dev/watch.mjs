@@ -2,9 +2,10 @@ import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
-export function parseWatchArgs(args) {
+function parseWatchOptions(args) {
   let delay = 0
   let hasDelay = false
+  const viteArgs = []
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i]
@@ -17,19 +18,23 @@ export function parseWatchArgs(args) {
       }
       delay = Number(value)
     } else {
-      throw new Error(`Unknown watch option: ${arg}`)
+      viteArgs.push(arg)
     }
   }
 
-  return delay
+  return { delay, viteArgs }
+}
+
+export function parseWatchArgs(args) {
+  return parseWatchOptions(args).delay
 }
 
 export function runWatch(browser, args, { spawnChild = spawn, proc = process } = {}) {
   if (!['chrome', 'firefox'].includes(browser)) throw new Error(`Unknown browser: ${browser}`)
-  const delay = parseWatchArgs(args)
+  const { delay, viteArgs } = parseWatchOptions(args)
   const config = `config/vite/vite.config.${browser}.js`
   const vite = resolve('node_modules/vite/bin/vite.js')
-  const child = spawnChild(proc.execPath, [vite, 'build', '--config', config, '--watch'], {
+  const child = spawnChild(proc.execPath, [vite, 'build', '--config', config, '--watch', ...viteArgs], {
     stdio: 'inherit',
     env: { ...proc.env, NODE_ENV: 'development', VITE_WATCH_MODE: 'true', VITE_WATCH_DELAY: String(delay) }
   })
