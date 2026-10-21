@@ -31,6 +31,14 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
     shadowRoots.set(root, rootObserver);
   };
 
+  const discoverSubtree = (subtree) => {
+    walkOpenShadowTree(subtree, (element) => {
+      if (!element.isConnected) return;
+      if (element.matches('audio, video')) media.add(element);
+      if (element.shadowRoot) listenToShadowRoot(element.shadowRoot);
+    });
+  };
+
   const disarm = () => {
     epoch += 1;
     armed = false;
@@ -74,13 +82,10 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
     }
   };
 
-  const collect = () => {
+  const collect = (discoverDocument = false) => {
     let frameStructureChanged = false;
     for (const element of media) if (!element.isConnected) media.delete(element);
-    walkOpenShadowTree(document, (element) => {
-      if (element.matches('audio, video')) media.add(element);
-      if (element.shadowRoot) listenToShadowRoot(element.shadowRoot);
-    });
+    if (discoverDocument) discoverSubtree(document);
     for (const [root, rootObserver] of shadowRoots) {
       if (root.host.isConnected) continue;
       const pendingRecords = rootObserver.takeRecords();
@@ -96,8 +101,30 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
 
   function onMutations(records) {
     if (!armed) return;
-    const frameStructureChanged = records.some(({ removedNodes }) => [...removedNodes].some((node) =>
-      node.nodeType === 1 && (node.matches('iframe') || node.querySelector('iframe'))));
+    let frameStructureChanged = false;
+    const addedRoots = new Set();
+    const removedRoots = new Set();
+    for (const { addedNodes, removedNodes } of records) {
+      for (const node of addedNodes) addedRoots.add(node);
+      for (const node of removedNodes) removedRoots.add(node);
+    }
+    for (const node of addedRoots) {
+      if (node.nodeType !== 1 || !node.isConnected) continue;
+      let covered = false;
+      for (let ancestor = node.parentNode; ancestor; ancestor = ancestor.parentNode) {
+        if (addedRoots.has(ancestor)) {
+          covered = true;
+          break;
+        }
+      }
+      if (!covered) discoverSubtree(node);
+    }
+    for (const node of removedRoots) {
+      if (node.nodeType !== 1) continue;
+      walkOpenShadowTree(node, (element) => {
+        if (element.matches('iframe')) frameStructureChanged = true;
+      });
+    }
     const detachedFrameStructureChanged = collect();
     const nextPlaying = readPlaying();
     if (nextPlaying !== playing || frameStructureChanged || detachedFrameStructureChanged) {
@@ -126,7 +153,7 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
   }
 
   const snapshot = () => {
-    const frameStructureChanged = collect();
+    const frameStructureChanged = collect(true);
     playing = readPlaying();
     revision += 1;
     sendObservation(frameStructureChanged);

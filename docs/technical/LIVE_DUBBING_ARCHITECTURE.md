@@ -273,6 +273,13 @@ requires a current positive report from an inventoried document before a
 provider generation is admitted. Confirming an all-false episode end is
 stricter: every current inventoried document must provide a fresh false report.
 
+The content observer discovers existing open ShadowRoots during authorization
+snapshots and discovers roots on newly added subtrees incrementally. An open
+ShadowRoot attached later to an already-connected host is not reported by
+ordinary child-list mutations, so media in that root may remain undiscovered
+until an authorized refresh snapshot. Ordinary mutations do not trigger a
+full-document scan.
+
 Observer HELLO and report messages are checked against the running session and
 tab, browser sender/runtime/frame/document identity, the browser's current
 document id, and per-frame tokens/revisions. Frame replacement retires the old
