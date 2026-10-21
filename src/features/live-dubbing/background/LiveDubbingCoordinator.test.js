@@ -7088,6 +7088,77 @@ describe('LiveDubbingCoordinator', () => {
     }
   });
 
+  it('refreshes observers after a superseded inventory failure and recovers from a fresh report', async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = createHarness({ stored: {
+        sessionId: 'superseded-inventory', tabId: 42, providerId: 'gemini', targetLanguage: 'en',
+        status: LIVE_DUBBING_STATUS.RUNNING, startedAt: 1, lastError: null, eventSequence: 3,
+      } });
+      const descriptor = await harness.coordinator._readDescriptor();
+      const state = { descriptor, terminalRequested: false, media: {
+        mediaSequence: 1, pausedSequenceAcked: null, episodeId: null, episodeAttempts: 0,
+        retryTimer: null, debounceTimer: null, activeOperation: null, barrier: null,
+        desiredPlaying: true, exhausted: false, committed: false, retryPersistence: Promise.resolve(),
+      } };
+      harness.coordinator.sessionRegistry.setSessionState(descriptor.sessionId, state);
+      harness.coordinator.mediaObservation = { sessionId: descriptor.sessionId, token: 'session-token', frames: new Map([
+        ['0:current-doc', { token: 'old-token', revision: 1, playing: true }],
+      ]) };
+      harness.coordinator.mediaFrameDocuments.set(0, 'current-doc');
+      harness.coordinator._freshPlayingBarrier = vi.fn(async () => true);
+      harness.coordinator._sendOffscreen = vi.fn(async message => ({
+        success: true, sessionId: message.data.sessionId, providerId: message.data.providerId,
+        eventSequence: message.data.eventSequence, mediaSequence: message.data.mediaSequence,
+        rotationId: message.data.rotationId,
+        ...(message.action === LIVE_DUBBING_ACTIONS.MEDIA_PAUSE ? { paused: true }
+          : message.action === LIVE_DUBBING_ACTIONS.MEDIA_RESUME ? { ready: true }
+            : { playing: true }),
+      }));
+      let resolveSupersededInventory;
+      harness.browserAPI.webNavigation.getAllFrames
+        .mockImplementationOnce(() => new Promise(resolve => { resolveSupersededInventory = resolve; }))
+        .mockRejectedValueOnce(new Error('inventory unavailable'));
+
+      const superseded = harness.coordinator._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      const failed = harness.coordinator._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      await expect(failed).resolves.toBe(false);
+      expect(harness.coordinator.getMediaActivity().known).toBe(false);
+      expect(state.media.desiredPlaying).toBe(false);
+      expect(harness.browserAPI.tabs.sendMessage).toHaveBeenCalledWith(42, {
+        action: LIVE_DUBBING_ACTIONS.MEDIA_OBSERVER_REFRESH,
+      });
+
+      resolveSupersededInventory([{ frameId: 0, documentId: 'current-doc' }]);
+      await expect(superseded).resolves.toBe(false);
+      expect(harness.coordinator.mediaFrameDocuments.size).toBe(0);
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+      expect(state.media.pausedSequenceAcked).toBe(2);
+
+      const sender = {
+        id: 'extension-id', tab: { id: 42 }, frameId: 0,
+        documentId: 'current-doc', url: 'https://example.test',
+      };
+      const authorization = await harness.coordinator.authorizeMediaObserver(sender);
+      expect(authorization.observe).toBe(true);
+      expect(authorization.token).not.toBe('old-token');
+      await harness.coordinator.handleMediaObservation({ data: {
+        token: authorization.token, revision: 0, playing: true,
+      } }, sender);
+      expect(harness.coordinator.getMediaActivity()).toMatchObject({ known: true, playing: true });
+      expect(state.media.desiredPlaying).toBe(true);
+
+      await vi.advanceTimersByTimeAsync(200);
+      for (let i = 0; i < 12; i += 1) await Promise.resolve();
+      expect(harness.coordinator._sendOffscreen.mock.calls.map(([message]) => message.action))
+        .toContain(LIVE_DUBBING_ACTIONS.MEDIA_RESUME);
+      expect(state.media.committed).toBe(true);
+      expect(state.media.activeOperation).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not renew a three-attempt episode on unknown inventory or repeated worker wakes', async () => {
     vi.useFakeTimers();
     try {

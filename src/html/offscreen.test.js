@@ -129,12 +129,7 @@ function terminalMessages() {
 }
 
 async function waitForBridgeInitialization(debugModeBridge) {
-  vi.useRealTimers();
-  try {
-    await state.bridgeInitialization;
-  } finally {
-    vi.useFakeTimers();
-  }
+  await state.bridgeInitialization;
   expect(debugModeBridge.isInitialized).toBe(true);
 }
 

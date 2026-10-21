@@ -31,6 +31,7 @@ describe('live dubbing media observer', () => {
   let cleanup;
   afterEach(() => {
     cleanup?.();
+    vi.unstubAllGlobals();
     document.body.replaceChildren();
   });
 
@@ -224,6 +225,151 @@ describe('live dubbing media observer', () => {
     for (const root of detachedRoots) root.removeEventListener.mockRestore();
     observe.mockRestore();
     disconnect.mockRestore();
+  });
+
+  it('reports iframe removal queued in a shadow root before its detached host is collected', async () => {
+    const observers = [];
+    class ControlledMutationObserver {
+      constructor(callback) {
+        this.callback = callback;
+        this.records = [];
+        observers.push(this);
+      }
+      observe(target) { this.target = target; }
+      disconnect() {}
+      takeRecords() {
+        const records = this.records;
+        this.records = [];
+        return records;
+      }
+    }
+    vi.stubGlobal('MutationObserver', ControlledMutationObserver);
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'shadow-token', sessionToken: 'shadow-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const host = document.createElement('div');
+    const root = host.attachShadow({ mode: 'open' });
+    const frame = document.createElement('iframe');
+    root.append(frame);
+    const secondHost = document.createElement('div');
+    const secondRoot = secondHost.attachShadow({ mode: 'open' });
+    const secondFrame = document.createElement('iframe');
+    secondRoot.append(secondFrame);
+    document.body.append(host, secondHost);
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+
+    const rootObserver = observers.find(({ target }) => target === root);
+    const secondRootObserver = observers.find(({ target }) => target === secondRoot);
+    const documentObserver = observers.find(({ target }) => target === document.documentElement);
+    const takeRecords = vi.spyOn(ControlledMutationObserver.prototype, 'takeRecords');
+    rootObserver.records.push({ removedNodes: [frame] });
+    secondRootObserver.records.push({ removedNodes: [secondFrame] });
+    frame.remove();
+    secondFrame.remove();
+    host.remove();
+    secondHost.remove();
+    documentObserver.callback([{ removedNodes: [host, secondHost] }]);
+
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data).toEqual({
+      token: 'shadow-token', revision: 2, playing: false, frameStructureChanged: true,
+    });
+    expect(takeRecords).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports an iframe that remains inside a detached shadow root', async () => {
+    const observers = [];
+    class ControlledMutationObserver {
+      constructor(callback) {
+        this.callback = callback;
+        this.records = [];
+        observers.push(this);
+      }
+      observe(target) { this.target = target; }
+      disconnect() {}
+      takeRecords() {
+        const records = this.records;
+        this.records = [];
+        return records;
+      }
+    }
+    vi.stubGlobal('MutationObserver', ControlledMutationObserver);
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'shadow-token', sessionToken: 'shadow-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const host = document.createElement('div');
+    const root = host.attachShadow({ mode: 'open' });
+    const frame = document.createElement('iframe');
+    root.append(frame);
+    document.body.append(host);
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+
+    const documentObserver = observers.find(({ target }) => target === document.documentElement);
+    const takeRecords = vi.spyOn(ControlledMutationObserver.prototype, 'takeRecords');
+    host.remove();
+    documentObserver.callback([{ removedNodes: [host] }]);
+
+    expect(takeRecords).toHaveBeenCalledTimes(1);
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data).toEqual({
+      token: 'shadow-token', revision: 2, playing: false, frameStructureChanged: true,
+    });
+  });
+
+  it('preserves pending iframe removal when a refresh snapshot collects a detached root first', async () => {
+    const observers = [];
+    const listeners = new Set();
+    class ControlledMutationObserver {
+      constructor(callback) {
+        this.callback = callback;
+        this.records = [];
+        observers.push(this);
+      }
+      observe(target) { this.target = target; }
+      disconnect() {}
+      takeRecords() {
+        const records = this.records;
+        this.records = [];
+        return records;
+      }
+    }
+    vi.stubGlobal('MutationObserver', ControlledMutationObserver);
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'refresh-token', sessionToken: 'refresh-session' }
+        : undefined),
+      onMessage: {
+        addListener: (listener) => listeners.add(listener),
+        removeListener: (listener) => listeners.delete(listener),
+      },
+    };
+    const host = document.createElement('div');
+    const root = host.attachShadow({ mode: 'open' });
+    const frame = document.createElement('iframe');
+    root.append(frame);
+    document.body.append(host);
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+
+    const rootObserver = observers.find(({ target }) => target === root);
+    const documentObserver = observers.find(({ target }) => target === document.documentElement);
+    rootObserver.records.push({ removedNodes: [frame] });
+    frame.remove();
+    host.remove();
+    [...listeners][0]({ action: MEDIA_OBSERVER_REFRESH });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(4));
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data).toEqual({
+      token: 'refresh-token', revision: 2, playing: false, frameStructureChanged: true,
+    });
+
+    documentObserver.callback([{ removedNodes: [host] }]);
+    expect(runtime.sendMessage).toHaveBeenCalledTimes(4);
   });
 
   it('disarms on STOP and observes newly inserted media while authorized', async () => {

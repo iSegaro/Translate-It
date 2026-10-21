@@ -75,6 +75,7 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
   };
 
   const collect = () => {
+    let frameStructureChanged = false;
     for (const element of media) if (!element.isConnected) media.delete(element);
     walkOpenShadowTree(document, (element) => {
       if (element.matches('audio, video')) media.add(element);
@@ -82,23 +83,27 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
     });
     for (const [root, rootObserver] of shadowRoots) {
       if (root.host.isConnected) continue;
+      const pendingRecords = rootObserver.takeRecords();
+      if (root.querySelector('iframe') || pendingRecords.some(({ removedNodes }) => [...removedNodes].some((node) =>
+        node.nodeType === 1 && (node.matches('iframe') || node.querySelector('iframe'))))) frameStructureChanged = true;
       for (const eventName of mediaEvents) root.removeEventListener(eventName, onMediaEvent, true);
       rootObserver.disconnect();
       shadowRoots.delete(root);
       for (const element of media) if (root.contains(element)) media.delete(element);
     }
+    return frameStructureChanged;
   };
 
   function onMutations(records) {
     if (!armed) return;
     const frameStructureChanged = records.some(({ removedNodes }) => [...removedNodes].some((node) =>
       node.nodeType === 1 && (node.matches('iframe') || node.querySelector('iframe'))));
-    collect();
+    const detachedFrameStructureChanged = collect();
     const nextPlaying = readPlaying();
-    if (nextPlaying !== playing || frameStructureChanged) {
+    if (nextPlaying !== playing || frameStructureChanged || detachedFrameStructureChanged) {
       playing = nextPlaying;
       revision += 1;
-      sendObservation(frameStructureChanged);
+      sendObservation(frameStructureChanged || detachedFrameStructureChanged);
     }
   }
 
@@ -121,10 +126,10 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
   }
 
   const snapshot = () => {
-    collect();
+    const frameStructureChanged = collect();
     playing = readPlaying();
     revision += 1;
-    sendObservation();
+    sendObservation(frameStructureChanged);
   };
 
   const authorize = async () => {
@@ -151,7 +156,6 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
       document.addEventListener('volumechange', onMediaEvent, true);
       observer = new MutationObserver(onMutations);
       observer.observe(document.documentElement, { childList: true, subtree: true });
-      collect();
     }
     token = response.token;
     sessionToken = response.sessionToken;

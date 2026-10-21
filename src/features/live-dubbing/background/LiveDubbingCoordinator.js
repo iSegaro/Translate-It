@@ -1585,6 +1585,7 @@ export class LiveDubbingCoordinator {
     if (this.mediaObservation.frames.size || this.mediaFrameDocuments.size) this.mediaActivityRevision += 1;
     this.mediaObservation.frames.clear();
     this.mediaFrameDocuments.clear();
+    this._refreshMediaObservation(expectedDescriptor.tabId);
     this._handleMediaDecision(expectedDescriptor, this.getMediaActivity());
   }
 
