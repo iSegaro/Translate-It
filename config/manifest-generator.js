@@ -114,6 +114,17 @@ export function generateManifest(browser = 'chrome') {
 function generateChromeManifest(baseManifest) {
   const manifest = {
     ...baseManifest,
+    content_scripts: [
+      ...baseManifest.content_scripts,
+      {
+        js: ['src/features/live-dubbing/content/index-media-observer.js'],
+        matches: ['<all_urls>', 'file:///*', '*://*/*'],
+        run_at: 'document_idle',
+        all_frames: true,
+        match_about_blank: true,
+        match_origin_as_fallback: true
+      }
+    ],
     manifest_version: 3,
     // WORKERS is available from Chrome 114; shared offscreen reasons including
     // USER_MEDIA require Chrome/Chromium 116.

@@ -8,11 +8,14 @@ import {
 import { isAuthorizedOffscreenRouterSender, isAuthorizedLiveDubbingOffscreenControlSender } from '../features/live-dubbing/contracts.js';
 import { getScopedLogger } from '../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../shared/logging/logConstants.js';
+import { debugModeBridge } from '../shared/logging/DebugModeBridge.js';
 
 // Hybrid offscreen logger. INFO/DEBUG stay level-gated through the centralized
 // scoped logger (default WARN keeps normal runs quiet). WARN/ERROR intentionally
-// bypass SafeConsole via direct console calls: this document never initializes
-// DebugModeBridge, so SafeConsole starts disabled and would silently discard them.
+// bypass SafeConsole via direct console calls, preserving their visibility when
+// SafeConsole is disabled. Initialize asynchronously without delaying startup.
+void debugModeBridge.initialize();
+
 const gatedLogger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Offscreen');
 const logger = {
   debug: (...args) => gatedLogger.debug(...args),
@@ -49,6 +52,7 @@ const OFFSCREEN_ALLOWED_ACTIONS = new Set([
   'OCR_PROCESS',
   'GENERATE_COMPOSITE_ICON',
   'GENERATE_SIMPLE_OVERLAY_ICON',
+  'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
 ]);
 
 function isAuthorizedOffscreenMessage(message, sender) {
@@ -312,8 +316,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
     return false;
   }
-  if (!isAuthorizedOffscreenMessage(message, sender)) {
+  if (!isAuthorizedOffscreenMessage(message, sender)
+    || (message.action === 'OFFSCREEN_LOGGING_SETTINGS_UPDATED'
+      && !isAuthorizedLiveDubbingOffscreenControlSender(sender, globalThis.chrome))) {
     sendResponse?.({ success: false, error: 'OFFSCREEN_UNAUTHORIZED' });
+    return false;
+  }
+
+  if (message.action === 'OFFSCREEN_LOGGING_SETTINGS_UPDATED') {
+    const settings = message.data || {};
+    if (typeof settings.DEBUG_MODE === 'boolean') {
+      debugModeBridge.handleDebugModeChange(settings.DEBUG_MODE);
+    }
+    if (settings.COMPONENT_LOG_LEVELS && typeof settings.COMPONENT_LOG_LEVELS === 'object') {
+      debugModeBridge.handleComponentLogLevelsChange(settings.COMPONENT_LOG_LEVELS);
+    }
+    sendResponse?.({ success: true });
     return false;
   }
 

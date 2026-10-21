@@ -14,10 +14,30 @@
 
 import { safeConsole } from './SafeConsole.js';
 import { getScopedLogger } from './logger.js';
-import { LOG_COMPONENTS } from './logConstants.js';
+import { LOG_COMPONENTS, LOG_LEVELS } from './logConstants.js';
 import { MessageActions } from '../messaging/core/MessageActions.js';
+import { isAuthorizedOffscreenSender } from '@/features/live-dubbing/contracts.js';
 
 const logger = getScopedLogger(LOG_COMPONENTS.CORE, 'DebugModeBridge');
+const validComponents = new Set(Object.values(LOG_COMPONENTS));
+const validLevels = new Set(Object.values(LOG_LEVELS));
+
+function sanitizeComponentLogLevels(levels) {
+  if (!levels || typeof levels !== 'object' || Array.isArray(levels)) return {};
+  return Object.fromEntries(Object.entries(levels).filter(([component, level]) =>
+    validComponents.has(component) && validLevels.has(level)));
+}
+
+function sanitizeLoggingSettings(settings = {}, partial = false) {
+  const sanitized = {};
+  if (!partial || Object.hasOwn(settings, 'DEBUG_MODE')) {
+    sanitized.DEBUG_MODE = settings.DEBUG_MODE === true;
+  }
+  if (!partial || Object.hasOwn(settings, 'COMPONENT_LOG_LEVELS')) {
+    sanitized.COMPONENT_LOG_LEVELS = sanitizeComponentLogLevels(settings.COMPONENT_LOG_LEVELS);
+  }
+  return sanitized;
+}
 
 /**
  * DebugModeBridge class manages the connection between DEBUG_MODE setting
@@ -30,17 +50,18 @@ class DebugModeBridge {
     this.context = this.detectContext();
     this.storageListener = null;
     this.messageListener = null;
+    this.offscreenSettingRevisions = { DEBUG_MODE: 0, COMPONENT_LOG_LEVELS: 0 };
   }
 
   /**
-   * Detect the current context (background, content script, popup, options)
+   * Detect the current context (background, content script, popup, options, offscreen)
    * @returns {string} Context name
    */
   detectContext() {
     try {
       // Check if we're in background script
       if (typeof chrome !== 'undefined' && chrome.runtime?.getManifest()) {
-        if (typeof window !== 'undefined' && !window.location?.href) {
+        if (typeof window === 'undefined' || !window.location?.href) {
           return 'background';
         }
       }
@@ -64,6 +85,9 @@ class DebugModeBridge {
         if (url.includes('/sidepanel.html') || url.includes('sidepanel/')) {
           return 'sidepanel';
         }
+        if (url.includes('/offscreen.html')) {
+          return 'offscreen';
+        }
       }
 
       return 'unknown';
@@ -82,6 +106,21 @@ class DebugModeBridge {
     }
 
     try {
+      if (this.context === 'offscreen') {
+        const requestRevisions = { ...this.offscreenSettingRevisions };
+        const response = await chrome.runtime.sendMessage({ action: MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET });
+        const settings = sanitizeLoggingSettings(response);
+        if (this.offscreenSettingRevisions.DEBUG_MODE === requestRevisions.DEBUG_MODE) {
+          this.currentDebugMode = settings.DEBUG_MODE;
+          await this.applyDebugMode(settings.DEBUG_MODE);
+        }
+        if (this.offscreenSettingRevisions.COMPONENT_LOG_LEVELS === requestRevisions.COMPONENT_LOG_LEVELS) {
+          await this.applyComponentLogLevels(settings.COMPONENT_LOG_LEVELS);
+        }
+        this.isInitialized = true;
+        return true;
+      }
+
       // Get current debug mode from storage
       const debugMode = await this.getDebugModeFromStorage();
       this.currentDebugMode = debugMode;
@@ -94,7 +133,7 @@ class DebugModeBridge {
       await this.applyComponentLogLevels(componentLogLevels);
 
       // Set up listeners for real-time updates
-      this.setupStorageListener();
+      if (this.context !== 'offscreen') this.setupStorageListener();
 
       this.isInitialized = true;
 
@@ -175,6 +214,12 @@ class DebugModeBridge {
    * @param {boolean} debugMode - Whether to enable debug mode
    */
   async applyDebugMode(debugMode) {
+    const offscreenRevision = this.context === 'offscreen'
+      ? this.offscreenSettingRevisions.DEBUG_MODE
+      : null;
+    const isCurrentOffscreenApplication = () =>
+      offscreenRevision === null || offscreenRevision === this.offscreenSettingRevisions.DEBUG_MODE;
+
     try {
       // Update SafeConsole
       safeConsole.setEnabled(debugMode);
@@ -182,6 +227,7 @@ class DebugModeBridge {
       // Update logging system's debug override
       try {
         const { setGlobalDebugOverride } = await import('./GlobalDebugState.js');
+        if (!isCurrentOffscreenApplication()) return;
         setGlobalDebugOverride(debugMode);
         logger.debug('Updated GlobalDebugState (debugOverride):', debugMode);
       } catch (error) {
@@ -191,6 +237,7 @@ class DebugModeBridge {
       // Update ErrorHandler debug mode
       try {
         const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+        if (!isCurrentOffscreenApplication()) return;
         const errorHandler = ErrorHandler.getInstance();
         if (errorHandler && typeof errorHandler.setDebugMode === 'function') {
           errorHandler.setDebugMode(debugMode);
@@ -200,7 +247,7 @@ class DebugModeBridge {
         logger.warn('Could not update ErrorHandler:', error);
       }
 
-      this.currentDebugMode = debugMode;
+      if (isCurrentOffscreenApplication()) this.currentDebugMode = debugMode;
     } catch (error) {
       logger.error('Failed to apply debug mode:', error);
     }
@@ -277,6 +324,18 @@ class DebugModeBridge {
    */
   getHandlerMappings() {
     return {
+      [MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET]: async (_message, sender) => {
+        if (!isAuthorizedOffscreenSender(sender, globalThis.chrome)) {
+          return { success: false, error: 'OFFSCREEN_UNAUTHORIZED' };
+        }
+        try {
+          const { storageManager } = await import('@/shared/storage/core/StorageCore.js');
+          const result = await storageManager.get({ DEBUG_MODE: false, COMPONENT_LOG_LEVELS: {} });
+          return sanitizeLoggingSettings(result);
+        } catch {
+          return { DEBUG_MODE: false, COMPONENT_LOG_LEVELS: {} };
+        }
+      },
       [MessageActions.DEBUG_MODE_CHANGED]: (message) => {
         this.handleDebugModeChange(message.data.debugMode);
         return { success: true };
@@ -284,7 +343,7 @@ class DebugModeBridge {
       [MessageActions.COMPONENT_LOG_LEVELS_CHANGED]: (message) => {
         this.handleComponentLogLevelsChange(message.data.levels);
         return { success: true };
-      }
+      },
     };
   }
 
@@ -308,6 +367,7 @@ class DebugModeBridge {
    * @param {boolean} newDebugMode - New debug mode value
    */
   handleDebugModeChange(newDebugMode) {
+    if (this.context === 'offscreen') this.offscreenSettingRevisions.DEBUG_MODE++;
     if (newDebugMode !== this.currentDebugMode) {
       logger.info('Debug mode changed', {
         from: this.currentDebugMode,
@@ -317,11 +377,14 @@ class DebugModeBridge {
 
       this.currentDebugMode = newDebugMode;
       this.applyDebugMode(newDebugMode);
+      if (this.context === 'background') this.sendOffscreenSettings({ DEBUG_MODE: newDebugMode });
 
-      // Broadcast to other contexts (except background script to avoid loops)
-      if (this.context !== 'background') {
+      // Background owns broadcasts; offscreen applies local changes only.
+      if (this.context !== 'background' && this.context !== 'offscreen') {
         this.broadcastChange(MessageActions.DEBUG_MODE_CHANGED, { debugMode: newDebugMode });
       }
+    } else if (this.context === 'offscreen') {
+      this.applyDebugMode(newDebugMode);
     }
   }
 
@@ -330,14 +393,17 @@ class DebugModeBridge {
    * @param {Object} levels - New component log levels object
    */
   handleComponentLogLevelsChange(levels) {
+    if (this.context === 'offscreen') this.offscreenSettingRevisions.COMPONENT_LOG_LEVELS++;
+    levels = sanitizeComponentLogLevels(levels);
     logger.info('Component log levels changed', {
       count: levels ? Object.keys(levels).length : 0,
       context: this.context
     });
 
     this.applyComponentLogLevels(levels);
+    if (this.context === 'background') this.sendOffscreenSettings({ COMPONENT_LOG_LEVELS: levels });
 
-    if (this.context !== 'background') {
+    if (this.context !== 'background' && this.context !== 'offscreen') {
       this.broadcastChange(MessageActions.COMPONENT_LOG_LEVELS_CHANGED, { levels });
     }
   }
@@ -360,6 +426,16 @@ class DebugModeBridge {
     } catch {
       // Silently ignore broadcast errors
     }
+  }
+
+  sendOffscreenSettings(data) {
+    try {
+      globalThis.chrome?.runtime?.sendMessage({
+        target: 'offscreen',
+        action: MessageActions.OFFSCREEN_LOGGING_SETTINGS_UPDATED,
+        data: sanitizeLoggingSettings(data, true),
+      }).catch(() => {});
+    } catch { /* offscreen may not exist */ }
   }
 
   /**

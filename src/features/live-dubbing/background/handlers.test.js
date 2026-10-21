@@ -16,6 +16,7 @@ import {
   handleLiveDubbingSetOriginalVolume,
   handleLiveDubbingStart,
   handleLiveDubbingStop,
+  handleLiveDubbingRetryMedia,
   handleLiveDubbingTranslatedTranscript,
 } from './handlers.js';
 import browser from 'webextension-polyfill';
@@ -533,5 +534,26 @@ describe('live dubbing browser gate', () => {
       success: false,
       error: 'LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE',
     });
+  });
+});
+
+describe('trusted media retry action', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('rejects non-UI callers and forwards trusted UI retries', async () => {
+    vi.stubGlobal('__BROWSER__', 'chrome');
+    browser.runtime.id = 'extension-id';
+    browser.runtime.getURL = (path = '') => `chrome-extension://extension-id/${path}`;
+    const retry = vi.spyOn(liveDubbingCoordinator, 'retryMedia').mockResolvedValue({ success: true });
+    expect(await handleLiveDubbingRetryMedia({ action: 'RETRY_LIVE_DUBBING_MEDIA' }, {
+      id: 'extension-id', url: 'https://example.test',
+    })).toEqual({ success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' });
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/popup.html' };
+    await expect(handleLiveDubbingRetryMedia({ action: 'RETRY_LIVE_DUBBING_MEDIA' }, sender))
+      .resolves.toEqual({ success: true });
+    expect(retry).toHaveBeenCalledWith(sender);
   });
 });

@@ -392,6 +392,9 @@
   "live_dubbing_offscreen_lost_error": {
     "message": "ライブ吹き替えが予期せず停止しました。もう一度開始してください。"
   },
+  "live_dubbing_media_observer_reload_required": {
+    "message": "このタブを再読み込みして、ライブ吹き替えをもう一度お試しください。"
+  },
   "live_dubbing_action_start": {
     "message": "開始"
   },
@@ -448,6 +451,48 @@
   },
   "live_dubbing_volume_dubbed_label": {
     "message": "吹き替え音量"
+  },
+  "live_dubbing_media_paused": {
+    "message": "一時停止中"
+  },
+  "live_dubbing_media_reconnecting": {
+    "message": "再接続中…"
+  },
+  "live_dubbing_media_ready": {
+    "message": "準備完了"
+  },
+  "live_dubbing_media_playing": {
+    "message": "再生中"
+  },
+  "live_dubbing_media_retry_available": {
+    "message": "再試行できます"
+  },
+  "live_dubbing_action_retry": {
+    "message": "再試行"
+  },
+  "live_dubbing_action_retrying": {
+    "message": "再試行中…"
+  },
+  "live_dubbing_action_retry_media_aria_label": {
+    "message": "音声の再生を再試行"
+  },
+  "live_dubbing_media_error_retry_exhausted": {
+    "message": "音声を復旧できませんでした。もう一度お試しください。"
+  },
+  "live_dubbing_media_error_retry_state_unavailable": {
+    "message": "音声の状態を取得できません。もう一度お試しください。"
+  },
+  "live_dubbing_media_error_pause_failed": {
+    "message": "音声を一時停止できませんでした。もう一度お試しください。"
+  },
+  "live_dubbing_media_error_resume_failed": {
+    "message": "音声を再開できませんでした。もう一度お試しください。"
+  },
+  "live_dubbing_media_error_rotation_failed": {
+    "message": "音声を再接続できませんでした。もう一度お試しください。"
+  },
+  "live_dubbing_media_error_generic": {
+    "message": "音声の再生に問題があります。"
   },
   "popup_more_actions_title": {
     "message": "その他のアクション"

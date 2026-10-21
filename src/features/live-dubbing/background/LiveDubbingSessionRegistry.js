@@ -12,6 +12,8 @@ export class LiveDubbingSessionRegistry {
 
   #bootstrapRequestSessions = new Set();
 
+  #mediaBootstrapGrants = new Map();
+
   getSessionState(sessionId) {
     return this.#sessionStates.get(sessionId) || null;
   }
@@ -81,5 +83,23 @@ export class LiveDubbingSessionRegistry {
 
   releaseBootstrapSession(sessionId) {
     return this.#bootstrapRequestSessions.delete(sessionId);
+  }
+
+  reserveMediaBootstrapGrant(sessionId, grant) {
+    const current = this.#mediaBootstrapGrants.get(sessionId);
+    if (current) return false;
+    this.#mediaBootstrapGrants.set(sessionId, grant);
+    return true;
+  }
+
+  claimMediaBootstrapGrant(sessionId, predicate) {
+    const grant = this.#mediaBootstrapGrants.get(sessionId);
+    if (!grant || !predicate(grant)) return null;
+    this.#mediaBootstrapGrants.delete(sessionId);
+    return grant;
+  }
+
+  revokeMediaBootstrapGrant(sessionId) {
+    return this.#mediaBootstrapGrants.delete(sessionId);
   }
 }

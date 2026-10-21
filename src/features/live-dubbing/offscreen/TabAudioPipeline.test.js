@@ -134,4 +134,71 @@ describe('capture PCM primitives', () => {
     expect(fake.context.close).toHaveBeenCalledOnce();
     expect(fake.context.audioWorklet.addModule).not.toHaveBeenCalled();
   });
+
+  it('gates frames synchronously and admits only the resumed generation', async () => {
+    const fake = createContext();
+    const onFrame = vi.fn();
+    const pipeline = new TabAudioPipeline({
+      audioContextFactory: async () => fake.context,
+      audioWorkletNodeFactory: () => fake.node,
+      onFrame,
+    });
+    await pipeline.start({});
+    const pause = pipeline.pauseInput(7);
+    expect(fake.port.postMessage).toHaveBeenLastCalledWith({ type: 'pause', generation: 7 });
+    fake.port.onmessage({ data: { type: 'pcm', generation: 0, buffer: new ArrayBuffer(2) } });
+    expect(onFrame).not.toHaveBeenCalled();
+    fake.port.onmessage({ data: { type: 'paused', generation: 7 } });
+    await pause;
+
+    const resume = pipeline.resumeInput(8);
+    fake.port.onmessage({ data: { type: 'resumed', generation: 7 } });
+    fake.port.onmessage({ data: { type: 'pcm', generation: 8, buffer: new ArrayBuffer(2) } });
+    expect(onFrame).not.toHaveBeenCalled();
+    fake.port.onmessage({ data: { type: 'resumed', generation: 8 } });
+    await resume;
+    fake.port.onmessage({ data: { type: 'pcm', generation: 7, buffer: new ArrayBuffer(2) } });
+    fake.port.onmessage({ data: { type: 'pcm', generation: 8, buffer: new ArrayBuffer(2) } });
+    expect(onFrame).toHaveBeenCalledOnce();
+    await pipeline.stop();
+  });
+
+  it('rejects superseded controls and clears pending controls on stop', async () => {
+    const fake = createContext();
+    const pipeline = new TabAudioPipeline({
+      audioContextFactory: async () => fake.context,
+      audioWorkletNodeFactory: () => fake.node,
+    });
+    await pipeline.start({});
+    const stale = pipeline.pauseInput(1);
+    const latest = pipeline.resumeInput(2);
+    await expect(stale).rejects.toMatchObject({ code: 'INPUT_AUDIO_CONTROL_SUPERSEDED' });
+    fake.port.onmessage({ data: { type: 'paused', generation: 1 } });
+    fake.port.onmessage({ data: { type: 'resumed', generation: 2 } });
+    await latest;
+    const pending = pipeline.pauseInput(3);
+    await pipeline.stop();
+    await expect(pending).rejects.toMatchObject({ code: 'INPUT_AUDIO_STOPPED' });
+    expect(pipeline._inputWaiters).toHaveLength(0);
+  });
+
+  it('times out control acknowledgements without reopening input', async () => {
+    vi.useFakeTimers();
+    try {
+      const fake = createContext();
+      const pipeline = new TabAudioPipeline({
+        audioContextFactory: async () => fake.context,
+        audioWorkletNodeFactory: () => fake.node,
+      });
+      await pipeline.start({});
+      const pending = pipeline.pauseInput(4);
+      const assertion = expect(pending).rejects.toMatchObject({ code: 'INPUT_AUDIO_CONTROL_TIMEOUT' });
+      await vi.advanceTimersByTimeAsync(1_000);
+      await assertion;
+      expect(pipeline.inputPaused).toBe(true);
+      await pipeline.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

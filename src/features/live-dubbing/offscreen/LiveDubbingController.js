@@ -284,6 +284,26 @@ function errorCode(error, fallback) {
     : fallback;
 }
 
+const MEDIA_DIAGNOSTIC_STAGES = new Set([
+  'reconnect', 'provider_created', 'provider_generation_wait', 'provider_creation', 'provider_bootstrap', 'provider_connection',
+  'audio_output_reset', 'media_gate', 'dubbed_volume_seed', 'commit', 'playback',
+]);
+const MEDIA_DIAGNOSTIC_OUTCOMES = new Set(['ready', 'failed', 'terminal', 'playing']);
+
+function formatMediaDiagnostic(message, fields = {}) {
+  const segments = [];
+  for (const key of ['mediaSequence', 'providerGeneration']) {
+    const value = fields[key];
+    if (Number.isSafeInteger(value) && value >= 0) segments.push(`${key}=${value}`);
+  }
+  if (MEDIA_DIAGNOSTIC_STAGES.has(fields.stage)) segments.push(`stage=${fields.stage}`);
+  if (MEDIA_DIAGNOSTIC_OUTCOMES.has(fields.outcome)) segments.push(`outcome=${fields.outcome}`);
+  if (typeof fields.errorCode === 'string' && SAFE_ERROR_CODE.test(fields.errorCode)) {
+    segments.push(`errorCode=${fields.errorCode}`);
+  }
+  return segments.length ? `${message} | ${segments.join(' | ')}` : message;
+}
+
 function hasAudioContext(options) {
   return Boolean(
     options.audioContextFactory
@@ -360,6 +380,9 @@ export class LiveDubbingController {
     return action === LIVE_DUBBING_ACTIONS.PREPARE
       || action === LIVE_DUBBING_ACTIONS.CONSUME
       || action === LIVE_DUBBING_ACTIONS.CONNECT_PROVIDER
+      || action === LIVE_DUBBING_ACTIONS.MEDIA_PAUSE
+      || action === LIVE_DUBBING_ACTIONS.MEDIA_RESUME
+      || action === LIVE_DUBBING_ACTIONS.MEDIA_COMMIT
       || action === LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN
       || action === LIVE_DUBBING_ACTIONS.GET_ORIGINAL_VOLUME_OFFSCREEN
       || action === LIVE_DUBBING_ACTIONS.SET_DUBBED_VOLUME_OFFSCREEN
@@ -377,8 +400,9 @@ export class LiveDubbingController {
           getMessageValue(message, 'targetLanguage'),
           getEventSequence(message),
           {
-            originalVolume: getMessageValue(message, 'originalVolume'),
-            dubbedVolume: getMessageValue(message, 'dubbedVolume'),
+          originalVolume: getMessageValue(message, 'originalVolume'),
+          dubbedVolume: getMessageValue(message, 'dubbedVolume'),
+          synchronizeMedia: getMessageValue(message, 'synchronizeMedia'),
           },
         );
       case LIVE_DUBBING_ACTIONS.CONSUME:
@@ -394,6 +418,25 @@ export class LiveDubbingController {
           getMessageValue(message, 'providerId'),
           getMessageValue(message, 'targetLanguage'),
           getEventSequence(message),
+        );
+      case LIVE_DUBBING_ACTIONS.MEDIA_PAUSE:
+        return this.pauseMedia(
+          getMessageValue(message, 'sessionId'),
+          getMessageValue(message, 'providerId'),
+          getEventSequence(message),
+          getMessageValue(message, 'mediaSequence'),
+        );
+      case LIVE_DUBBING_ACTIONS.MEDIA_RESUME:
+        return this.resumeMedia(
+          getMessageValue(message, 'sessionId'), getMessageValue(message, 'providerId'),
+          getEventSequence(message), getMessageValue(message, 'mediaSequence'),
+          getMessageValue(message, 'rotationId'),
+        );
+      case LIVE_DUBBING_ACTIONS.MEDIA_COMMIT:
+        return this.commitMedia(
+          getMessageValue(message, 'sessionId'), getMessageValue(message, 'providerId'),
+          getEventSequence(message), getMessageValue(message, 'mediaSequence'),
+          getMessageValue(message, 'rotationId'),
         );
       case LIVE_DUBBING_ACTIONS.SET_ORIGINAL_VOLUME_OFFSCREEN:
         return this.setOriginalVolume(
@@ -886,6 +929,7 @@ export class LiveDubbingController {
         streamStopped: false,
         capturePromise: null,
         connectPromise: null,
+        connectFailureCleaning: false,
         listeners: [],
         terminalSent: false,
         terminalDelivery: null,
@@ -895,6 +939,22 @@ export class LiveDubbingController {
         bootstrapRequestPromise: null,
         providerClient: null,
         providerGeneration: 0,
+        mediaSequence: 0,
+        mediaPaused: false,
+        mediaPausePromise: null,
+        synchronizeMedia: initialVolumes?.synchronizeMedia === true,
+        mediaAdmissionClosed: initialVolumes?.synchronizeMedia === true,
+        mediaState: initialVolumes?.synchronizeMedia === true ? 'paused' : 'playing',
+        mediaError: null,
+        mediaResumePromise: null,
+        mediaResumeClient: null,
+        mediaCommitPromise: null,
+        mediaReadyGeneration: null,
+        providerShutdownPromise: null,
+        providerShutdownPromises: new WeakMap(),
+        pendingProviderShutdowns: new Set(),
+        mediaShutdownClient: null,
+        lastProviderClient: null,
         providerDiagnostic: null,
         setupComplete: false,
         setupAcknowledged: false,
@@ -1310,8 +1370,22 @@ export class LiveDubbingController {
     const providerGeneration = ++this.providerGeneration;
     session.providerGeneration = providerGeneration;
     session.connectPromise = Promise.resolve().then(async () => {
+      if (session.synchronizeMedia && session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+        if (typeof session.inputPipeline?.pauseInput !== 'function') {
+          throw new Error('LIVE_DUBBING_INPUT_GATE_UNAVAILABLE');
+        }
+        await session.inputPipeline.pauseInput(providerGeneration);
+        if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
+          return this._disposedProviderResponse(session);
+        }
+      }
       const client = await this._createProviderClient(session, providerGeneration);
       if (!this._isCurrentProviderGeneration(session, providerGeneration)) {
+        try {
+          await this._awaitPauseOperations([this._shutdownProvider(session, client)]);
+        } catch {
+          return this.dispose(session.sessionId, session.providerId, 'STALE_PROVIDER_CLOSE_FAILED', session.eventSequence);
+        }
         return this._disposedProviderResponse(session);
       }
       if (!client || typeof client.connect !== 'function') {
@@ -1320,6 +1394,23 @@ export class LiveDubbingController {
         });
       }
       session.providerClient = client;
+      session.lastProviderClient = client;
+      if (session.mediaShutdownClient !== client) {
+        session.providerShutdownPromise = null;
+        session.mediaShutdownClient = client;
+      }
+      if (session.mediaAdmissionClosed) {
+        if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          if (typeof client.setMediaGateOpen !== 'function' || client.setMediaGateOpen(false) === false) {
+            throw new Error('Media provider gate unavailable');
+          }
+        } else {
+          if (typeof session.audioEngine?.setPlaybackMuted !== 'function'
+            || session.audioEngine.setPlaybackMuted(true) === false) {
+            throw new Error('PCM playback gate unavailable');
+          }
+        }
+      }
       // Seed a newly-created media-stream provider with the current session
       // dubbed volume before connect can produce remote playback. Duck-typed:
       // providers without setDubbedVolume keep their own default. A seed
@@ -1382,6 +1473,7 @@ export class LiveDubbingController {
        return this._providerReadyResponse(session);
     }).catch(error => {
       if (this._isCurrentProviderGeneration(session, providerGeneration)) {
+        session.connectFailureCleaning = true;
         this._providerFailed(session, error, 'PROVIDER_ERROR', error?.providerDiagnostic);
       }
       if (session.providerDiagnostic) return this._providerFailureResponse(session, error);
@@ -1390,7 +1482,508 @@ export class LiveDubbingController {
     return session.connectPromise;
   }
 
-  async _createProviderClient(session, generation) {
+  pauseMedia(sessionId, providerId, eventSequence, mediaSequence) {
+    if (!isSessionId(sessionId) || !isProviderId(providerId)
+      || !Number.isSafeInteger(eventSequence) || eventSequence < 0
+      || !Number.isSafeInteger(mediaSequence) || mediaSequence <= 0) {
+      return { success: false, ignored: true };
+    }
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId
+      || session.eventSequence !== eventSequence || session.status !== LIVE_DUBBING_STATUS.RUNNING) {
+      return { success: false, ignored: true };
+    }
+    if (session.mediaPaused && session.mediaPausePromise) {
+      if (mediaSequence < session.mediaSequence) return { success: false, ignored: true };
+      if (mediaSequence > session.mediaSequence) {
+        session.mediaSequence = mediaSequence;
+        session.rotationId = null;
+        this._setMediaState(session, 'paused');
+      }
+      return session.mediaPausePromise;
+    }
+    const cancellingRotation = (Boolean(session.mediaResumePromise || session.mediaCommitPromise)
+      || ['reconnecting', 'ready'].includes(session.mediaState))
+      && mediaSequence > session.mediaSequence;
+    if (cancellingRotation) {
+      const pendingResume = session.mediaResumePromise;
+      session.mediaSequence = mediaSequence;
+      session.rotationId = null;
+      session.mediaPaused = true;
+      session.mediaAdmissionClosed = true;
+      session.providerGeneration = ++this.providerGeneration;
+      session.setupComplete = false;
+      session.mediaReadyGeneration = null;
+      this._setMediaState(session, 'paused');
+      const client = session.providerClient;
+      const engine = session.audioEngine;
+        const output = session.outputPlayer;
+        const epoch = ++session.outputEpoch;
+        let captureAck;
+        try {
+        if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          if (client && (typeof client.setMediaGateOpen !== 'function' || client.setMediaGateOpen(false) === false)) {
+            throw new Error('Media gate failed');
+          }
+        } else {
+          if (typeof session.inputPipeline?.pauseInput !== 'function') throw new Error('Input pause unavailable');
+          captureAck = session.inputPipeline.pauseInput(session.providerGeneration);
+          if (captureAck === false) throw new Error('Input pause failed');
+          const mute = (engine || output)?.setPlaybackMuted;
+          if (typeof mute !== 'function' || mute.call(engine || output, true) === false) {
+            throw new Error('Playback mute failed');
+          }
+        }
+        let reset;
+        if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          const resetMethod = engine?.resetOutputEpochAndWait || output?.resetEpochAndWait;
+          if (typeof resetMethod !== 'function') throw new Error('Output reset unavailable');
+          reset = resetMethod.call(engine || output, epoch);
+        }
+        const close = this._shutdownProvider(session, client);
+        const task = this._awaitPauseOperations([captureAck, reset, close, pendingResume]).then(() => {
+          if (this.currentSession !== session || session.disposing) return { success: false, ignored: true };
+          if (session.providerClient === client) session.providerClient = null;
+          return this._mediaPauseResponse(session);
+        }).catch(() => this._failClosedMediaPause(session, providerId));
+        session.mediaPausePromise = task;
+        task.then(() => { if (session.mediaPausePromise === task) session.mediaPausePromise = null; }, () => {
+          if (session.mediaPausePromise === task) session.mediaPausePromise = null;
+        });
+        return task;
+      } catch {
+        return this._failClosedMediaPause(session, providerId);
+      }
+    }
+    if (session.mediaPaused) {
+      if (mediaSequence < session.mediaSequence) return { success: false, ignored: true };
+      if (mediaSequence > session.mediaSequence) {
+        session.mediaSequence = mediaSequence;
+        session.rotationId = null;
+        if (session.mediaState !== 'paused') this._setMediaState(session, 'paused');
+        else session.mediaError = null;
+      }
+      if (session.mediaPausePromise) return session.mediaPausePromise;
+      return this._mediaPauseResponse(session);
+    }
+    if (mediaSequence <= session.mediaSequence) return { success: false, ignored: true };
+
+    session.mediaSequence = mediaSequence;
+    session.mediaPaused = true;
+    session.mediaAdmissionClosed = true;
+    this._setMediaState(session, 'paused');
+    session.providerGeneration = ++this.providerGeneration;
+    session.setupComplete = false;
+    session.pendingInput = [];
+    session.pendingInputMs = 0;
+    session.metrics.inputPendingFrames = 0;
+    session.metrics.inputPendingBytes = 0;
+    session.metrics.inputPendingDurationMs = 0;
+
+    const client = session.providerClient;
+    const engine = session.audioEngine;
+    const output = session.outputPlayer;
+    const epoch = ++session.outputEpoch;
+    try {
+      const muteTarget = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
+        ? client
+        : (engine || output);
+      const mute = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
+        ? muteTarget?.setMediaGateOpen
+        : muteTarget?.setPlaybackMuted;
+      if (typeof mute !== 'function') throw new Error('Media mute primitive unavailable');
+      const muted = session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM
+        ? mute.call(muteTarget, false)
+        : mute.call(muteTarget, true);
+      if (muted === false) throw new Error('Media playback mute failed');
+    } catch {
+      return this._failClosedMediaPause(session, providerId);
+    }
+
+    const pausePromise = (async () => {
+      try {
+        let ack;
+        if (session.inputPipeline) {
+          if (typeof session.inputPipeline.pauseInput !== 'function') {
+            throw new Error('Input pause primitive unavailable');
+          }
+          ack = session.inputPipeline.pauseInput(session.providerGeneration);
+          if (ack === false) throw new Error('Input pause failed');
+        } else if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          throw new Error('Input pause primitive unavailable');
+        }
+        let reset;
+        if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          const resetMethod = engine?.resetOutputEpochAndWait || output?.resetEpochAndWait;
+          if (typeof resetMethod !== 'function') throw new Error('Output reset primitive unavailable');
+          reset = resetMethod.call(engine || output, epoch);
+        }
+        const providerClose = this._shutdownProvider(session, client);
+        await this._awaitPauseOperations([ack, reset, providerClose]);
+        if (this.currentSession !== session || session.disposing) return { success: false, ignored: true };
+        session.providerClient = null;
+        return this._mediaPauseResponse(session);
+      } catch {
+        return this._failClosedMediaPause(session, providerId);
+      }
+    })();
+    session.mediaPausePromise = pausePromise;
+    pausePromise.then(
+      () => {
+        if (session.mediaPausePromise === pausePromise) session.mediaPausePromise = null;
+      },
+      () => {
+        if (session.mediaPausePromise === pausePromise) session.mediaPausePromise = null;
+      },
+    );
+    return pausePromise;
+  }
+
+  _mediaPauseResponse(session) {
+    return { success: true, ack: LIVE_DUBBING_ACTIONS.MEDIA_PAUSE, sessionId: session.sessionId,
+      providerId: session.providerId, eventSequence: session.eventSequence,
+      mediaSequence: session.mediaSequence, paused: true };
+  }
+
+  async _awaitPauseOperations(operations) {
+    let timeoutId;
+    const timeout = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Media pause timed out')), LIVE_DUBBING_STOP_TIMEOUT);
+    });
+    try {
+      await Promise.race([Promise.all(operations.map(value => Promise.resolve(value))), timeout]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  _failClosedMediaPause(session, providerId) {
+    return this.dispose(session.sessionId, providerId, 'MEDIA_PAUSE_FAILED', session.eventSequence)
+      .then(result => ({ ...result, success: false, error: 'LIVE_DUBBING_MEDIA_PAUSE_FAILED' }));
+  }
+
+  _shutdownProvider(session, client) {
+    if (!client || (typeof client !== 'object' && typeof client !== 'function')) return Promise.resolve();
+    session.providerShutdownPromises ||= new WeakMap();
+    session.pendingProviderShutdowns ||= new Set();
+    const cached = session.providerShutdownPromises.get(client);
+    if (cached) return cached;
+    let shutdownPromise;
+    try {
+      const result = typeof client?.dispose === 'function' ? client.dispose() : client?.close?.();
+      shutdownPromise = Promise.resolve(result);
+    } catch (error) {
+      shutdownPromise = Promise.reject(error);
+    }
+    session.providerShutdownPromises.set(client, shutdownPromise);
+    session.pendingProviderShutdowns.add(shutdownPromise);
+    const forgetSettledShutdown = () => session.pendingProviderShutdowns.delete(shutdownPromise);
+    shutdownPromise.then(forgetSettledShutdown, forgetSettledShutdown);
+    if (session.providerClient === client || session.mediaShutdownClient === client) {
+      session.providerShutdownPromise = shutdownPromise;
+      session.mediaShutdownClient = client;
+    }
+    return shutdownPromise;
+  }
+
+  _mediaIdentityMatches(session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation) {
+    return this.currentSession === session && !session.disposing && !session.terminalRequested
+      && session.sessionId === sessionId && session.providerId === providerId
+      && session.eventSequence === eventSequence && session.mediaSequence === mediaSequence
+      && session.rotationId === rotationId
+      && (generation === undefined || session.providerGeneration === generation);
+  }
+
+  _setMediaState(session, mediaState, mediaError = null) {
+    session.mediaState = mediaState;
+    session.mediaError = mediaError;
+    if (mediaState === 'playing') session.mediaAdmissionClosed = false;
+    else session.mediaAdmissionClosed = true;
+    try {
+      const message = {
+        action: LIVE_DUBBING_ACTIONS.MEDIA_STATE_CHANGED,
+        data: {
+          sessionId: session.sessionId,
+          providerId: session.providerId,
+          eventSequence: session.eventSequence,
+          mediaSequence: session.mediaSequence,
+          rotationId: typeof session.rotationId === 'string' ? session.rotationId : null,
+          mediaState,
+          mediaError: typeof mediaError === 'string' && SAFE_ERROR_CODE.test(mediaError) ? mediaError : null,
+        },
+      };
+      Promise.resolve(this.notify(message)).catch(() => {});
+    } catch {
+      // State notification is best effort and contains scalar session metadata only.
+    }
+  }
+
+  resumeMedia(sessionId, providerId, eventSequence, mediaSequence, rotationId) {
+    if (!isSessionId(sessionId) || !isProviderId(providerId)
+      || !Number.isSafeInteger(eventSequence) || eventSequence < 0
+      || !Number.isSafeInteger(mediaSequence) || mediaSequence < 1
+      || typeof rotationId !== 'string' || !rotationId.trim()) return { success: false, ignored: true };
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId
+      || session.eventSequence !== eventSequence || session.status !== LIVE_DUBBING_STATUS.RUNNING
+      || !session.mediaPaused || !session.mediaAdmissionClosed) return { success: false, ignored: true };
+    if (mediaSequence < session.mediaSequence) return { success: false, ignored: true };
+    if (mediaSequence === session.mediaSequence) {
+      if (session.rotationId !== rotationId) return { success: false, ignored: true };
+      if (session.mediaResumePromise) return session.mediaResumePromise;
+      return session.mediaState === 'ready' || session.mediaState === 'playing'
+        ? this._mediaResumeResponse(session)
+        : { success: false, ignored: true };
+    }
+
+    session.mediaSequence = mediaSequence;
+    session.rotationId = rotationId;
+    session.providerGeneration = ++this.providerGeneration;
+    session.setupComplete = false;
+    session.mediaReadyGeneration = null;
+    this._setMediaState(session, 'reconnecting');
+    const generation = session.providerGeneration;
+    const mediaLogContext = { mediaSequence, providerGeneration: generation };
+    this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume started', { ...mediaLogContext, stage: 'reconnect' }));
+    const previousResume = session.mediaResumePromise;
+      const currentRotation = () => this._mediaIdentityMatches(
+        session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation,
+      );
+    const task = (async () => {
+      let client = null;
+      let fatalGateFailure = false;
+      let failureStage = 'provider_generation_wait';
+      const disposeStaleClient = async () => {
+        if (client) {
+          try {
+            await this._awaitPauseOperations([this._shutdownProvider(session, client)]);
+          } catch {
+            return this._mediaRotationTerminalFailure(session, providerId);
+          }
+          if (session.providerClient === client) session.providerClient = null;
+        }
+        return { success: false, ignored: true };
+      };
+      try {
+        await Promise.all([
+          session.mediaPausePromise?.catch(() => {}),
+          session.providerShutdownPromise || Promise.resolve(),
+          previousResume?.catch(() => {}),
+        ]);
+        if (!currentRotation()) return { success: false, ignored: true };
+        failureStage = 'provider_creation';
+        client = await this._createProviderClient(session, generation, { forceFresh: true });
+        this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume stage', {
+          ...mediaLogContext, stage: 'provider_created',
+        }));
+        if (!currentRotation()) {
+          return disposeStaleClient();
+        }
+        if (client === session.lastProviderClient) throw new Error('LIVE_DUBBING_PROVIDER_CLIENT_NOT_FRESH');
+        if (!client || typeof client.connect !== 'function') throw new Error('LIVE_DUBBING_PROVIDER_UNAVAILABLE');
+        session.providerClient = client;
+        session.lastProviderClient = client;
+        session.mediaResumeClient = client;
+        session.providerShutdownPromise = null;
+        session.mediaShutdownClient = null;
+        failureStage = 'media_gate';
+        if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          try {
+            if (typeof client.setMediaGateOpen !== 'function' || client.setMediaGateOpen(false) === false) {
+              throw new Error('LIVE_DUBBING_MEDIA_GATE_UNAVAILABLE');
+            }
+          } catch (error) {
+            fatalGateFailure = true;
+            throw error;
+          }
+          if (typeof client.setDubbedVolume === 'function') {
+            failureStage = 'dubbed_volume_seed';
+            await client.setDubbedVolume(session.dubbedVolume);
+          }
+        } else {
+          if (session.inputPipeline?.inputPaused !== true) {
+            if (typeof session.inputPipeline?.pauseInput !== 'function') {
+              fatalGateFailure = true;
+              throw new Error('LIVE_DUBBING_INPUT_GATE_UNAVAILABLE');
+            }
+            try {
+              const paused = await session.inputPipeline.pauseInput(generation);
+              if (paused === false) throw new Error('LIVE_DUBBING_INPUT_GATE_FAILED');
+            } catch (error) {
+              fatalGateFailure = true;
+              throw error;
+            }
+          }
+          try {
+            if (typeof session.audioEngine?.setPlaybackMuted !== 'function'
+              || session.audioEngine.setPlaybackMuted(true) === false) {
+              throw new Error('LIVE_DUBBING_OUTPUT_GATE_UNAVAILABLE');
+            }
+          } catch (error) {
+            fatalGateFailure = true;
+            throw error;
+          }
+        }
+        if (!currentRotation()) return disposeStaleClient();
+        failureStage = 'provider_bootstrap';
+        let bootstrapWrapper = await this.requestProviderBootstrapForSession(session, { mediaSequence, rotationId });
+        if (!currentRotation()) return disposeStaleClient();
+        if (!bootstrapWrapper) throw new Error('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
+        const options = { bootstrap: bootstrapWrapper.bootstrap, targetLanguage: bootstrapWrapper.targetLanguage };
+        if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) options.sourceStream = session.stream;
+        bootstrapWrapper = null;
+        failureStage = 'provider_connection';
+        try {
+          await client.connect(options);
+        } finally {
+          bootstrapWrapper = null;
+        }
+        if (!currentRotation()) return disposeStaleClient();
+        if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          failureStage = 'audio_output_reset';
+          const reset = session.audioEngine?.resetOutputEpochAndWait;
+          if (typeof reset !== 'function') {
+            fatalGateFailure = true;
+            throw new Error('LIVE_DUBBING_OUTPUT_RESET_UNAVAILABLE');
+          }
+          session.outputEpoch += 1;
+          try {
+            const resetAck = await reset.call(session.audioEngine, session.outputEpoch);
+            if (resetAck === false) throw new Error('LIVE_DUBBING_OUTPUT_RESET_FAILED');
+          } catch (error) {
+            fatalGateFailure = true;
+            throw error;
+          }
+        }
+        if (!currentRotation()) return disposeStaleClient();
+        session.setupAcknowledged = true;
+        session.setupComplete = true;
+        session.mediaReadyGeneration = generation;
+        this._setMediaState(session, 'ready');
+        this.log?.info?.(formatMediaDiagnostic('Live dubbing provider reconnected', {
+          ...mediaLogContext, outcome: 'ready',
+        }));
+        return this._mediaResumeResponse(session);
+      } catch (error) {
+        if (client) {
+          try {
+            await this._awaitPauseOperations([this._shutdownProvider(session, client)]);
+          } catch {
+            return this._mediaRotationTerminalFailure(session, providerId);
+          }
+          if (session.providerClient === client) session.providerClient = null;
+        }
+        if (!currentRotation()) return { success: false, ignored: true };
+        if (fatalGateFailure) {
+          this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume failed', {
+            ...mediaLogContext, stage: failureStage, outcome: 'terminal',
+            errorCode: errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED'),
+          }));
+          return this._mediaRotationTerminalFailure(session, providerId);
+        }
+        session.providerGeneration = ++this.providerGeneration;
+        session.setupComplete = false;
+        session.mediaReadyGeneration = null;
+        const code = errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED');
+        this.log?.debug?.(formatMediaDiagnostic('Live dubbing media resume failed', {
+          ...mediaLogContext, stage: failureStage, outcome: 'failed', errorCode: code,
+        }));
+        this._setMediaState(session, 'error', code);
+        return { success: false, error: code, sessionId, providerId, eventSequence, mediaSequence, rotationId };
+      }
+    })();
+    session.mediaResumePromise = task;
+    task.then(() => { if (session.mediaResumePromise === task) session.mediaResumePromise = null; }, () => {
+      if (session.mediaResumePromise === task) session.mediaResumePromise = null;
+    });
+    return task;
+  }
+
+  _mediaResumeResponse(session) {
+    return { success: true, sessionId: session.sessionId, providerId: session.providerId,
+      eventSequence: session.eventSequence, mediaSequence: session.mediaSequence,
+      rotationId: session.rotationId, ready: true };
+  }
+
+  commitMedia(sessionId, providerId, eventSequence, mediaSequence, rotationId) {
+    if (!isSessionId(sessionId) || !isProviderId(providerId)
+      || !Number.isSafeInteger(eventSequence) || eventSequence < 0
+      || !Number.isSafeInteger(mediaSequence) || mediaSequence < 1
+      || typeof rotationId !== 'string' || !rotationId.trim()) return { success: false, ignored: true };
+    const session = this.currentSession;
+    if (!session || session.sessionId !== sessionId || session.providerId !== providerId
+      || session.disposing || session.terminalRequested
+      || session.eventSequence !== eventSequence || session.mediaSequence !== mediaSequence
+      || session.rotationId !== rotationId || session.status !== LIVE_DUBBING_STATUS.RUNNING
+      || !['ready', 'playing'].includes(session.mediaState)) {
+      return { success: false, ignored: true };
+    }
+    if (session.mediaState === 'playing') {
+      if (session.mediaReadyGeneration !== session.providerGeneration || !session.providerClient) {
+        return { success: false, ignored: true };
+      }
+      return { success: true, sessionId, providerId, eventSequence, mediaSequence, rotationId, playing: true };
+    }
+    if (session.mediaReadyGeneration !== session.providerGeneration) return { success: false, ignored: true };
+    if (session.mediaCommitPromise) return session.mediaCommitPromise;
+    const generation = session.providerGeneration;
+    const mediaLogContext = { mediaSequence, providerGeneration: generation };
+    this.log?.debug?.(formatMediaDiagnostic('Live dubbing media commit started', {
+      ...mediaLogContext, stage: 'commit',
+    }));
+    const client = session.providerClient;
+    const isCurrentCommit = () => this._mediaIdentityMatches(
+      session, sessionId, providerId, eventSequence, mediaSequence, rotationId, generation,
+    ) && session.providerClient === client && session.mediaState === 'ready'
+      && session.mediaReadyGeneration === generation;
+    const operation = (async () => {
+      try {
+        if (!isCurrentCommit()) return { success: false, ignored: true };
+        if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) {
+          if (typeof client?.setMediaGateOpen !== 'function') throw new Error('LIVE_DUBBING_MEDIA_GATE_FAILED');
+          if (typeof client.setDubbedVolume === 'function') await client.setDubbedVolume(session.dubbedVolume);
+          if (!isCurrentCommit()) return { success: false, ignored: true };
+          if (client.setMediaGateOpen(true) === false) throw new Error('LIVE_DUBBING_MEDIA_GATE_FAILED');
+        } else {
+          if (typeof session.inputPipeline?.resumeInput !== 'function') throw new Error('LIVE_DUBBING_INPUT_RESUME_UNAVAILABLE');
+          const resumeAck = await session.inputPipeline.resumeInput(generation);
+          if (resumeAck === false) throw new Error('LIVE_DUBBING_INPUT_RESUME_FAILED');
+          if (!isCurrentCommit()) return { success: false, ignored: true };
+          if (typeof session.audioEngine?.setPlaybackMuted !== 'function'
+            || session.audioEngine.setPlaybackMuted(false) === true) {
+            throw new Error('LIVE_DUBBING_OUTPUT_UNMUTE_FAILED');
+          }
+        }
+        if (!isCurrentCommit()) return { success: false, ignored: true };
+        session.mediaPaused = false;
+        this._setMediaState(session, 'playing');
+        this.log?.info?.(formatMediaDiagnostic('Live dubbing media committed', {
+          ...mediaLogContext, stage: 'playback', outcome: 'playing',
+        }));
+        return { success: true, sessionId, providerId, eventSequence, mediaSequence, rotationId, playing: true };
+      } catch (error) {
+        if (!isCurrentCommit()) return { success: false, ignored: true };
+        this.log?.debug?.(formatMediaDiagnostic('Live dubbing media commit failed', {
+          ...mediaLogContext, stage: 'commit', outcome: 'failed',
+          errorCode: errorCode(error, 'LIVE_DUBBING_MEDIA_COMMIT_FAILED'),
+        }));
+        return this._mediaRotationTerminalFailure(session, providerId);
+      }
+    })();
+    session.mediaCommitPromise = operation;
+    operation.then(() => { if (session.mediaCommitPromise === operation) session.mediaCommitPromise = null; }, () => {
+      if (session.mediaCommitPromise === operation) session.mediaCommitPromise = null;
+    });
+    return operation;
+  }
+
+  _mediaRotationTerminalFailure(session, providerId) {
+    session.mediaResumeFailing = true;
+    return this.dispose(session.sessionId, providerId, 'MEDIA_ROTATION_FAILED', session.eventSequence)
+      .then(result => ({ ...result, success: false, error: 'LIVE_DUBBING_MEDIA_ROTATION_FAILED' }));
+  }
+
+  async _createProviderClient(session, generation, { forceFresh = false } = {}) {
     const callbacks = {
       onSetupComplete: () => {
         if (!this._isCurrentProvider(session, generation)) return;
@@ -1435,7 +2028,7 @@ export class LiveDubbingController {
         details,
       ),
     };
-    let client = this.providerClient;
+    let client = forceFresh ? null : this.providerClient;
     if (!client && typeof this.providerClientFactory === 'function') {
       client = await this.providerClientFactory({
         sessionId: session.sessionId,
@@ -1445,6 +2038,7 @@ export class LiveDubbingController {
         callbacks,
         ...callbacks,
       });
+      if (!this._isCurrentProviderGeneration(session, generation)) return client;
     }
     if (!client) {
       client = this.providerRegistry.create(session.providerId, {
@@ -1454,6 +2048,7 @@ export class LiveDubbingController {
         ...callbacks,
       });
     }
+    if (!this._isCurrentProviderGeneration(session, generation)) return client;
     for (const [name, callback] of Object.entries(callbacks)) client[name] = callback;
     session.telemetry.providerBaseline = this._readChildTelemetry(client);
     return client;
@@ -1468,21 +2063,30 @@ export class LiveDubbingController {
     if (!wasSetupComplete) {
       this._markMilestone(session, 'setupComplete');
     }
-    this._drainPendingInput(session);
+    if (!session.mediaAdmissionClosed) this._drainPendingInput(session);
     return true;
   }
 
-  requestProviderBootstrapForSession(session) {
-    if (session.bootstrapRequestPromise) return session.bootstrapRequestPromise;
-    if (session.bootstrapRequested) {
+  requestProviderBootstrapForSession(session, mediaGeneration = null) {
+    const requestKey = mediaGeneration
+      ? `${mediaGeneration.mediaSequence}:${mediaGeneration.rotationId}`
+      : 'initial';
+    if (session.bootstrapRequestPromise && session.bootstrapRequestKey === requestKey) {
+      return session.bootstrapRequestPromise;
+    }
+    if (!mediaGeneration && session.bootstrapRequested) {
       return Promise.resolve(null);
     }
-    session.bootstrapRequested = true;
+    if (!mediaGeneration) session.bootstrapRequested = true;
     const request = createProviderBootstrapRequest({
       sessionId: session.sessionId,
       providerId: session.providerId,
       targetLanguage: session.targetLanguage,
       eventSequence: session.eventSequence,
+      ...(mediaGeneration ? {
+        rotationId: mediaGeneration.rotationId,
+        mediaSequence: mediaGeneration.mediaSequence,
+      } : {}),
     });
     const bootstrapRequestPromise = Promise.resolve()
       .then(() => this.requestBootstrap(request))
@@ -1495,9 +2099,11 @@ export class LiveDubbingController {
     const trackedBootstrapRequest = bootstrapRequestPromise.finally(() => {
       if (session.bootstrapRequestPromise === trackedBootstrapRequest) {
         session.bootstrapRequestPromise = null;
+        session.bootstrapRequestKey = null;
       }
     });
     session.bootstrapRequestPromise = trackedBootstrapRequest;
+    session.bootstrapRequestKey = requestKey;
     return trackedBootstrapRequest;
   }
 
@@ -1560,6 +2166,11 @@ export class LiveDubbingController {
       captureReady: Boolean(session.stream),
       ...this._audioReadiness(session),
       setupComplete: session.setupComplete,
+      synchronizeMedia: session.synchronizeMedia === true,
+      mediaState: session.mediaState || (session.mediaAdmissionClosed ? 'paused' : 'playing'),
+      mediaSequence: safeInteger(session.mediaSequence),
+      rotationId: typeof session.rotationId === 'string' ? session.rotationId : null,
+      mediaError: typeof session.mediaError === 'string' ? session.mediaError : null,
       metrics: { ...session.metrics },
       ...(session.outputMetrics ? { outputMetrics: { ...session.outputMetrics } } : {}),
       ...(session.lastError ? { lastError: session.lastError } : {}),
@@ -1740,6 +2351,10 @@ export class LiveDubbingController {
     session.metrics.inputPendingDurationMs = 0;
 
     const client = session.providerClient;
+    const mediaResumeWork = session.mediaResumeFailing ? null : session.mediaResumePromise;
+    const connectWork = session.connectFailureCleaning ? null : session.connectPromise;
+    const transportShutdownWork = Promise.allSettled([mediaResumeWork, connectWork]).then(() =>
+      Promise.all(Array.from(session.pendingProviderShutdowns || [])));
     const audioEngine = session.audioEngine;
     const inputPipeline = session.inputPipeline;
     const outputPlayer = session.outputPlayer;
@@ -1755,14 +2370,7 @@ export class LiveDubbingController {
     // provider shutdown is awaited in the chain below. Tracks stay
     // Controller-owned — the provider never owns the capture stream —
     // and stop synchronously right after.
-    let providerShutdown = null;
-    try {
-      providerShutdown = typeof client?.dispose === 'function'
-        ? client.dispose()
-        : client?.close?.();
-    } catch {
-      // Provider teardown is best effort; callbacks are already fenced.
-    }
+    const providerShutdown = this._shutdownProvider(session, client).catch(() => {});
     if (stream && !session.streamStopped) {
       stopTracks(stream);
       session.streamStopped = true;
@@ -1791,6 +2399,9 @@ export class LiveDubbingController {
     session.cleanupPromise = Promise.allSettled([
       providerShutdown,
       audioShutdown,
+      mediaResumeWork,
+      connectWork,
+      transportShutdownWork,
     ]).then(() => {
       session.telemetry.outputQueueCurrentDurationMs = 0;
       this._markMilestone(session, 'cleanupComplete');
@@ -2015,7 +2626,8 @@ export class LiveDubbingController {
   }
 
   _handleInputFrame(session, frame) {
-    if (!this._isCurrentSession(session) || session.terminalRequested || session.disposing) return;
+    if (!this._isCurrentSession(session) || session.terminalRequested || session.disposing
+      || session.mediaPaused || session.mediaAdmissionClosed) return;
     // Media-stream providers consume the retained capture stream directly;
     // the PCM pending queue and the sendAudio path below are pcm-only.
     if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) return;
@@ -2069,7 +2681,8 @@ export class LiveDubbingController {
   }
 
   _drainPendingInput(session) {
-    if (!this._isCurrentSession(session) || !session.setupComplete || !session.providerClient) return;
+    if (!this._isCurrentSession(session) || session.mediaPaused || session.mediaAdmissionClosed
+      || !session.setupComplete || !session.providerClient) return;
     // sendAudio is a pcm-only contract, never universal: media-stream
     // providers receive the capture stream at connect and queue nothing.
     if (session.audioMode === LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) return;
@@ -2389,12 +3002,14 @@ export class LiveDubbingController {
    */
   _handleProviderPlaybackAccepted(session, generation, details = {}) {
     if (!this._isCurrentProvider(session, generation)) return;
+    if (session.mediaAdmissionClosed) return;
     if (session.audioMode !== LIVE_DUBBING_AUDIO_MODES.MEDIA_STREAM) return;
     this._handlePlaybackAccepted(session, details);
   }
 
   _handleProviderAudio(session, generation, audioBytes) {
-    if (!this._isCurrentProvider(session, generation) || !session.setupComplete) return;
+    if (!this._isCurrentProvider(session, generation) || !session.setupComplete
+      || session.mediaAdmissionClosed) return;
     try {
       this._markMilestone(session, 'firstTranslatedAudioReceived');
       const metadata = {
@@ -2429,7 +3044,7 @@ export class LiveDubbingController {
 
   _handleProviderTranscript(session, generation, transcript) {
     if (!this._isCurrentProvider(session, generation)
-      || !session.setupComplete) return;
+      || !session.setupComplete || session.mediaAdmissionClosed) return;
 
     const normalized = sanitizeLiveDubbingTranscript(transcript);
     if (!normalized) return;
@@ -2466,6 +3081,10 @@ export class LiveDubbingController {
 
   _handleProviderError(session, generation, error, providerDiagnostic = null) {
     if (!this._isCurrentProvider(session, generation)) return;
+    if (session.mediaAdmissionClosed && ['reconnecting', 'ready'].includes(session.mediaState)) {
+      this._recoverMediaProviderFailure(session, generation, error);
+      return;
+    }
     const reason = PROVIDER_AUDIO_TERMINAL_REASONS.has(error?.providerReason)
       ? error.providerReason
       : 'PROVIDER_ERROR';
@@ -2474,6 +3093,12 @@ export class LiveDubbingController {
 
   _handleProviderClose(session, generation, details = {}, providerDiagnostic = null) {
     if (!this._isCurrentProvider(session, generation) || session.disposing) return;
+    if (session.mediaAdmissionClosed && ['reconnecting', 'ready'].includes(session.mediaState)) {
+      this._recoverMediaProviderFailure(session, generation, Object.assign(new Error('Provider closed'), {
+        code: 'LIVE_DUBBING_PROVIDER_CLOSED',
+      }));
+      return;
+    }
     this._providerFailed(session, Object.assign(new Error('Live dubbing provider connection closed'), {
       code: 'LIVE_DUBBING_PROVIDER_CLOSED',
     }), 'PROVIDER_CLOSED', providerDiagnostic, details);
@@ -2481,10 +3106,33 @@ export class LiveDubbingController {
 
   _handleProviderTerminal(session, generation, reason, details = {}, providerDiagnostic = null) {
     if (!this._isCurrentProvider(session, generation)) return;
+    if (session.mediaAdmissionClosed && ['reconnecting', 'ready'].includes(session.mediaState)) {
+      this._recoverMediaProviderFailure(session, generation, Object.assign(new Error('Provider terminated'), {
+        code: errorCode(reason, 'LIVE_DUBBING_PROVIDER_FAILED'),
+      }));
+      return;
+    }
     providerDiagnostic ||= details?.providerDiagnostic;
     this._providerFailed(session, Object.assign(new Error('Live dubbing provider requested termination'), {
       code: reason,
     }), reason, providerDiagnostic);
+  }
+
+  _recoverMediaProviderFailure(session, generation, error) {
+    if (!this._isCurrentProvider(session, generation)) return;
+    const client = session.providerClient;
+    session.providerGeneration = ++this.providerGeneration;
+    session.setupComplete = false;
+    session.mediaReadyGeneration = null;
+    this._setMediaState(session, 'error', errorCode(error, 'LIVE_DUBBING_MEDIA_RESUME_FAILED'));
+    void (async () => {
+      try {
+        await this._awaitPauseOperations([this._shutdownProvider(session, client)]);
+        if (session.providerClient === client) session.providerClient = null;
+      } catch {
+        await this.dispose(session.sessionId, session.providerId, 'MEDIA_PROVIDER_CLOSE_FAILED', session.eventSequence);
+      }
+    })();
   }
 
   _providerFailed(session, error, reason, providerDiagnostic = null, closeDetails = {}) {

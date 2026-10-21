@@ -6,13 +6,20 @@ import {
 } from './OpenAIRealtimeProviderAdapter.js';
 
 function createTrack(kind = 'audio') {
-  return {
+  const track = {
     kind,
     readyState: 'live',
+    enabled: true,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     stop: vi.fn(),
   };
+  track.clone = vi.fn(() => {
+    const clone = { ...track, addEventListener: vi.fn(), removeEventListener: vi.fn(), stop: vi.fn() };
+    clone.clone = vi.fn();
+    return clone;
+  });
+  return track;
 }
 
 function createAudioElement(play = vi.fn(async () => {})) {
@@ -88,6 +95,7 @@ function createHarness({
     peerConnectionFactory: vi.fn(async () => peerConnection),
     fetchImpl,
     audioElementFactory: vi.fn(() => audioElement),
+    mediaStreamFactory: tracks => ({ getAudioTracks: () => tracks }),
     logger,
     setupTimeout,
     ...callbacks,
@@ -110,7 +118,7 @@ function createHarness({
 }
 
 describe('OpenAIRealtimeProviderAdapter', () => {
-  it('completes WebRTC SDP setup and attaches only source audio tracks', async () => {
+  it('completes WebRTC SDP setup using isolated clones of source audio tracks', async () => {
     const onSetupComplete = vi.fn();
     const harness = createHarness({ callbacks: { onSetupComplete } });
 
@@ -118,10 +126,10 @@ describe('OpenAIRealtimeProviderAdapter', () => {
 
     expect(harness.peerConnection.createDataChannel).toHaveBeenCalledWith(OPENAI_REALTIME_EVENTS_CHANNEL);
     expect(harness.peerConnection.addTrack).toHaveBeenCalledOnce();
-    expect(harness.peerConnection.addTrack).toHaveBeenCalledWith(
-      harness.audioTrack,
-      harness.sourceStream,
-    );
+    const [clone, isolatedStream] = harness.peerConnection.addTrack.mock.calls[0];
+    expect(clone).not.toBe(harness.audioTrack);
+    expect(clone.enabled).toBe(true);
+    expect(isolatedStream.getAudioTracks()).toEqual([clone]);
     expect(harness.peerConnection.addTrack).not.toHaveBeenCalledWith(
       harness.videoTrack,
       harness.sourceStream,
@@ -173,6 +181,120 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     resolvePlay();
     await Promise.resolve();
     expect(onPlaybackAccepted).toHaveBeenCalledOnce();
+  });
+
+  it('disables isolated input before addTrack and offer when gated before connect', async () => {
+    const harness = createHarness();
+    harness.adapter.setMediaGateOpen(false);
+    await harness.connect();
+    const [clone] = harness.peerConnection.addTrack.mock.calls[0];
+    expect(clone.enabled).toBe(false);
+    expect(harness.peerConnection.addTrack.mock.invocationCallOrder[0])
+      .toBeLessThan(harness.peerConnection.createOffer.mock.invocationCallOrder[0]);
+    expect(harness.audioTrack.enabled).toBe(true);
+    await harness.adapter.dispose();
+  });
+
+  it('holds early remote tracks until the media gate opens', async () => {
+    const play = vi.fn(async () => {});
+    const onPlaybackAccepted = vi.fn();
+    const harness = createHarness({
+      audioElement: createAudioElement(play),
+      callbacks: { onPlaybackAccepted },
+    });
+    harness.adapter.setMediaGateOpen(false);
+    await harness.connect();
+    const remoteTrack = createTrack();
+    const remoteStream = { id: 'early-remote' };
+    harness.peerConnection.ontrack({ track: remoteTrack, streams: [remoteStream] });
+    expect(play).not.toHaveBeenCalled();
+    expect(onPlaybackAccepted).not.toHaveBeenCalled();
+    harness.adapter.setMediaGateOpen(true);
+    expect(harness.audioElement.srcObject).toBe(remoteStream);
+    expect(play).toHaveBeenCalledOnce();
+    await Promise.resolve();
+    expect(onPlaybackAccepted).toHaveBeenCalledOnce();
+    await harness.adapter.dispose();
+  });
+
+  it('fences a pending play resolution after gate close and detaches output', async () => {
+    const pendingPlay = createDeferred();
+    const onPlaybackAccepted = vi.fn();
+    const harness = createHarness({
+      audioElement: createAudioElement(() => pendingPlay.promise),
+      callbacks: { onPlaybackAccepted },
+    });
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+    harness.adapter.setMediaGateOpen(false);
+    pendingPlay.resolve();
+    await Promise.resolve();
+    expect(harness.audioElement.pause).toHaveBeenCalled();
+    expect(harness.audioElement.muted).toBe(true);
+    expect(harness.audioElement.srcObject).toBeNull();
+    expect(onPlaybackAccepted).not.toHaveBeenCalled();
+    await harness.adapter.dispose();
+  });
+
+  it('fails closed if a source audio track cannot be cloned', async () => {
+    const harness = createHarness();
+    harness.audioTrack.clone = undefined;
+    await expect(harness.connect()).rejects.toMatchObject({ code: 'OPENAI_REALTIME_MEDIA_GATE_FAILED' });
+    expect(harness.peerConnection.addTrack).not.toHaveBeenCalled();
+    expect(harness.audioTrack.enabled).toBe(true);
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
+  it('stops adapter-owned clones on dispose without changing source tracks', async () => {
+    const harness = createHarness();
+    await harness.connect();
+    const [clone] = harness.peerConnection.addTrack.mock.calls[0];
+    await harness.adapter.dispose();
+    expect(clone.stop).toHaveBeenCalledOnce();
+    expect(harness.audioTrack.enabled).toBe(true);
+    expect(harness.audioTrack.readyState).toBe('live');
+    expect(harness.audioTrack.stop).not.toHaveBeenCalled();
+  });
+
+  it('keeps volume changes logical while muted and reapplies them before reopening playback', async () => {
+    const play = vi.fn(async () => {});
+    const harness = createHarness({ audioElement: createAudioElement(play) });
+    await harness.connect();
+    const remoteStream = { id: 'remote-volume' };
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [remoteStream] });
+    await Promise.resolve();
+    harness.adapter.setMediaGateOpen(false);
+    const [clone] = harness.peerConnection.addTrack.mock.calls[0];
+    expect(clone.enabled).toBe(false);
+    const volumeBeforeSet = harness.audioElement.volume;
+    expect(harness.adapter.setDubbedVolume(0.35)).toBe(0.35);
+    expect(harness.audioElement.volume).toBe(volumeBeforeSet);
+    expect(harness.audioElement.srcObject).toBeNull();
+    harness.adapter.setMediaGateOpen(true);
+    expect(clone.enabled).toBe(true);
+    expect(harness.audioElement.volume).toBe(0.35);
+    expect(harness.audioElement.srcObject).toBe(remoteStream);
+    expect(play).toHaveBeenCalledTimes(2);
+    await harness.adapter.dispose();
+  });
+
+  it('fails closed with a typed error when local output cannot be muted', async () => {
+    const onError = vi.fn();
+    const harness = createHarness({ callbacks: { onError } });
+    await harness.connect();
+    harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'remote' }] });
+    Object.defineProperty(harness.audioElement, 'muted', {
+      configurable: true,
+      set: () => { throw new Error('mute failed'); },
+    });
+    expect(() => harness.adapter.setMediaGateOpen(false)).toThrow(
+      expect.objectContaining({ code: 'OPENAI_REALTIME_MEDIA_GATE_FAILED' }),
+    );
+    expect(harness.audioElement.pause).toHaveBeenCalled();
+    expect(harness.audioElement.srcObject).toBeNull();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'OPENAI_REALTIME_MEDIA_GATE_FAILED',
+    }));
   });
 
   it('counts transcript events as scalar telemetry without retaining text', async () => {
@@ -450,6 +572,7 @@ describe('OpenAIRealtimeProviderAdapter', () => {
       peerConnectionFactory,
       fetchImpl: vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
       audioElementFactory: vi.fn(() => createAudioElement()),
+      mediaStreamFactory: tracks => ({ getAudioTracks: () => tracks }),
       setupTimeout: 50,
       callbacks: { onError, onClose },
     });
@@ -952,6 +1075,7 @@ describe('OpenAIRealtimeProviderAdapter', () => {
       peerConnectionFactory,
       fetchImpl: vi.fn(async () => ({ ok: true, text: async () => 'answer-sdp' })),
       audioElementFactory: vi.fn(() => createAudioElement()),
+      mediaStreamFactory: tracks => ({ getAudioTracks: () => tracks }),
       callbacks: { onError },
     });
     const audioTrack = createTrack();

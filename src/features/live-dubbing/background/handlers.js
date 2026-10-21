@@ -104,6 +104,28 @@ export function handleLiveDubbingOriginalTranscript(message, sender) {
   return liveDubbingCoordinator.handleOffscreenOriginalTranscript(message, sender);
 }
 
+export async function handleLiveDubbingMediaObserverHello(message, sender) {
+  if (!isChromeRuntime()) return { observe: false };
+  return liveDubbingCoordinator.authorizeMediaObserver(sender);
+}
+
+export async function handleLiveDubbingMediaObservation(message, sender) {
+  if (!isChromeRuntime()) return { success: true, ignored: true };
+  return liveDubbingCoordinator.handleMediaObservation(message, sender);
+}
+
+export async function handleLiveDubbingMediaStateChanged(message, sender) {
+  if (!isChromeRuntime()) return { success: true, ignored: true };
+  return liveDubbingCoordinator.handleOffscreenMediaStateChanged(message, sender);
+}
+
+export async function handleLiveDubbingRetryMedia(message, sender) {
+  if (!isChromeRuntime()) return unsupported();
+  if (message?.action && message.action !== LIVE_DUBBING_ACTIONS.RETRY_MEDIA) return unauthorized();
+  if (!isTrustedUi(sender)) return unauthorized();
+  return liveDubbingCoordinator.retryMedia(sender);
+}
+
 /**
  * Validate one caller-supplied draft Live Dubbing credential without
  * touching any session state. Background-owned: the request carries only

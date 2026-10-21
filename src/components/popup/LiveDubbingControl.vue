@@ -22,6 +22,16 @@
         dir="auto"
         aria-live="polite"
       >{{ statusText }}</span>
+      <BaseButton
+        v-if="canRetryMedia"
+        size="sm"
+        :disabled="isRetryingMedia || isStopping"
+        :text="isRetryingMedia
+          ? t('live_dubbing_action_retrying', 'Retrying…')
+          : t('live_dubbing_action_retry', 'Retry')"
+        :aria-label="t('live_dubbing_action_retry_media_aria_label', 'Retry audio')"
+        @click="retryMedia"
+      />
 
       <BaseButton
         v-if="!isRunning && !isStopping"
@@ -49,6 +59,14 @@
         @click="stop"
       />
     </div>
+
+    <p
+      v-if="mediaErrorText"
+      class="ti-live-dubbing-control-error"
+      role="status"
+    >
+      {{ mediaErrorText }}
+    </p>
 
     <p
       v-if="showUnavailableExplanation"
@@ -184,6 +202,11 @@ const extensionBrowser = typeof browser !== 'undefined' ? browser : null
 const SAFE_TERMINAL_ERROR = /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/
 const state = ref('loading')
 const authoritativeStatus = ref(null)
+const media = ref(null)
+const isRetryingMedia = ref(false)
+const mediaRefreshGeneration = ref(0)
+const pendingLifecycleReads = new Map()
+const lifecycleReconciliationNeeded = new Set()
 const sessionId = ref(null)
 const sessionDescriptor = ref(null)
 const sessionProviderId = ref(null)
@@ -273,6 +296,29 @@ const displayStatus = computed(() => {
   if (state.value === 'stopping') return 'stopping'
   return authoritativeStatus.value || state.value
 })
+const mediaStatusText = computed(() => ({
+  paused: t('live_dubbing_media_paused', 'Paused'),
+  reconnecting: t('live_dubbing_media_reconnecting', 'Reconnecting…'),
+  ready: t('live_dubbing_media_ready', 'Ready'),
+  playing: t('live_dubbing_media_playing', 'Running')
+}[media.value?.mediaState] || ''))
+const canRetryMedia = computed(() => isRunning.value && media.value?.mediaState === 'error' && media.value?.retryable === true)
+const mediaErrorText = computed(() => {
+  if (!isRunning.value || media.value?.mediaState !== 'error') return ''
+  if (media.value?.retryable !== true) {
+    return t('live_dubbing_media_error_generic', 'Audio playback needs attention.')
+  }
+  const code = media.value?.mediaError
+  const messages = {
+    LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED: ['live_dubbing_media_error_retry_exhausted', 'Audio could not recover. Retry to try again.'],
+    LIVE_DUBBING_MEDIA_RETRY_STATE_UNAVAILABLE: ['live_dubbing_media_error_retry_state_unavailable', 'Audio state is unavailable. Retry to try again.'],
+    LIVE_DUBBING_MEDIA_PAUSE_FAILED: ['live_dubbing_media_error_pause_failed', 'Audio could not be paused. Retry to try again.'],
+    LIVE_DUBBING_MEDIA_RESUME_FAILED: ['live_dubbing_media_error_resume_failed', 'Audio could not resume. Retry to try again.'],
+    LIVE_DUBBING_MEDIA_ROTATION_FAILED: ['live_dubbing_media_error_rotation_failed', 'Audio could not reconnect. Retry to try again.']
+  }
+  const [key, fallback] = messages[code] || ['live_dubbing_media_error_generic', 'Audio playback needs attention. Retry to try again.']
+  return t(key, fallback)
+})
 const statusText = computed(() => {
   // Hidden initial-loading window: the GET is still pending and the
   // presentation delay has not elapsed — render no status text at all, so
@@ -280,6 +326,9 @@ const statusText = computed(() => {
   // delay elapses the loading text shows; once resolved the authoritative
   // status replaces it immediately.
   if (state.value === 'loading' && !isInitialStatusLoadingVisible.value) return ''
+  if (isRunning.value && mediaStatusText.value) return mediaStatusText.value
+  if (canRetryMedia.value) return t('live_dubbing_media_retry_available', 'Retry available')
+  if (isRunning.value && media.value?.mediaState === 'error') return t('live_dubbing_status_error', 'Error')
   return ({
     loading: t('live_dubbing_status_loading', 'Checking availability…'),
     idle: t('live_dubbing_status_idle', 'Ready'),
@@ -337,6 +386,10 @@ const getErrorMessage = (error, fallback = 'Live dubbing failed.', providerId = 
   }
   const hardcoded = {
     LIVE_DUBBING_UNSUPPORTED: 'Live dubbing is not supported in this browser.',
+    LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED: t(
+      'live_dubbing_media_observer_reload_required',
+      'Reload this tab and try Live Dubbing again.'
+    ),
     INVALID_TARGET_LANGUAGE: 'This target language is not supported for live dubbing.'
   }
   return hardcoded[error] || (typeof error === 'string' && error ? error : fallback)
@@ -362,6 +415,7 @@ const normalizeTerminalOutcome = (value) => {
 
 const nextOperationGeneration = () => {
   operationGeneration += 1
+  lifecycleReconciliationNeeded.clear()
   return operationGeneration
 }
 
@@ -460,6 +514,7 @@ const applyStatus = (response, { preserveSession = false, syncTerminalOutcome = 
   if (syncTerminalOutcome) terminalOutcome.value = nextTerminalOutcome
   const nextSessionId = descriptor.sessionId || result.session?.id || null
   const prevSessionId = sessionId.value
+  if (nextSessionId && prevSessionId != null && nextSessionId !== prevSessionId) media.value = null
   if (nextSessionId) {
     sessionId.value = nextSessionId
     sessionDescriptor.value = descriptor
@@ -468,6 +523,7 @@ const applyStatus = (response, { preserveSession = false, syncTerminalOutcome = 
     sessionId.value = null
     sessionDescriptor.value = null
     sessionProviderId.value = null
+    media.value = null
   }
   // Session loss invalidates pending refreshes and clears presentation data.
   // On replacement, discard records for sessions no longer relevant but keep
@@ -584,15 +640,23 @@ const captureCurrentFence = () => {
  */
 const refreshLifecycleForVolume = async () => {
   const generation = operationGeneration
+  pendingLifecycleReads.set(generation, (pendingLifecycleReads.get(generation) || 0) + 1)
+  const statusRead = ++mediaRefreshGeneration.value
   const subtitlesSnapshot = captureSubtitlesSnapshot()
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
-    if (generation !== operationGeneration) return false
+    if (generation !== operationGeneration || statusRead !== mediaRefreshGeneration.value) return false
     applyStatus(response, { syncTerminalOutcome: true, subtitlesSnapshot })
+    media.value = response?.media || response?.data?.media || null
+    lifecycleReconciliationNeeded.delete(generation)
     return true
   } catch {
     if (generation !== operationGeneration) return false
     return false
+  } finally {
+    const pending = pendingLifecycleReads.get(generation) - 1
+    if (pending) pendingLifecycleReads.set(generation, pending)
+    else pendingLifecycleReads.delete(generation)
   }
 }
 
@@ -604,15 +668,22 @@ const refreshLifecycleForVolume = async () => {
  */
 const refreshLifecycleForDubbedVolume = async () => {
   const generation = operationGeneration
+  pendingLifecycleReads.set(generation, (pendingLifecycleReads.get(generation) || 0) + 1)
+  const statusRead = ++mediaRefreshGeneration.value
   const subtitlesSnapshot = captureSubtitlesSnapshot()
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
-    if (generation !== operationGeneration) return false
+    if (generation !== operationGeneration || statusRead !== mediaRefreshGeneration.value) return false
     applyStatus(response, { syncTerminalOutcome: true, subtitlesSnapshot })
+    media.value = response?.media || response?.data?.media || null
     return true
   } catch {
     if (generation !== operationGeneration) return false
     return false
+  } finally {
+    const pending = pendingLifecycleReads.get(generation) - 1
+    if (pending) pendingLifecycleReads.set(generation, pending)
+    else pendingLifecycleReads.delete(generation)
   }
 }
 
@@ -1022,12 +1093,15 @@ const flushPendingDubbedVolumeSend = () => {
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
 const queryStatus = async (generation = nextOperationGeneration()) => {
+  pendingLifecycleReads.set(generation, (pendingLifecycleReads.get(generation) || 0) + 1)
+  const statusRead = ++mediaRefreshGeneration.value
   const prevFence = volumeFence.value
   const subtitlesSnapshot = captureSubtitlesSnapshot()
   try {
     const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
-    if (generation !== operationGeneration) return false
+    if (generation !== operationGeneration || statusRead !== mediaRefreshGeneration.value) return false
     applyStatus(response, { syncTerminalOutcome: true, subtitlesSnapshot })
+    media.value = response?.media || response?.data?.media || null
     // After status recovery, recover volume if controllable — independent round trip.
     // The volumeFence watcher handles all fence transitions (active→active).
     // Only the initial mount (null→active) is owned here, since the watcher
@@ -1041,7 +1115,7 @@ const queryStatus = async (generation = nextOperationGeneration()) => {
     }
     return true
   } catch (error) {
-    if (generation !== operationGeneration) return false
+    if (generation !== operationGeneration || statusRead !== mediaRefreshGeneration.value) return false
     state.value = 'unavailable'
     authoritativeStatus.value = null
     if (!isSubtitlesFenced(sessionId.value, subtitlesSnapshot)) {
@@ -1052,6 +1126,10 @@ const queryStatus = async (generation = nextOperationGeneration()) => {
     resetVolumeState()
     resetDubbedVolumeState()
     return false
+  } finally {
+    const pending = pendingLifecycleReads.get(generation) - 1
+    if (pending) pendingLifecycleReads.set(generation, pending)
+    else pendingLifecycleReads.delete(generation)
   }
 }
 
@@ -1074,6 +1152,7 @@ const start = async () => {
     if (state.value === 'running' && !normalizeTerminalOutcome(unwrap(response).terminalOutcome)) {
       terminalOutcome.value = null
     }
+    if (sessionId.value) await refreshMediaStatus(sessionId.value)
     // Recover volume for the newly established controllable session.
     // The volumeFence watcher skips the initial null→active transition, so
     // START must own this recovery path.  For active→active (restart), the
@@ -1127,6 +1206,7 @@ const stop = async () => {
       sessionId.value = null
       sessionDescriptor.value = null
       sessionProviderId.value = null
+      media.value = null
     }
   } catch (error) {
     if (generation !== operationGeneration) return
@@ -1143,11 +1223,54 @@ const handleRuntimeMessage = (message, sender) => {
     void refreshSubtitlesUnavailable(message?.data?.sessionId)
     return
   }
+  if (message?.action === LIVE_DUBBING_ACTIONS.MEDIA_STATUS_CHANGED) {
+    if (message?.data?.sessionId === sessionId.value) void refreshMediaStatus(message.data.sessionId)
+    return
+  }
   if (message?.action !== LIVE_DUBBING_ACTIONS.TERMINAL_OUTCOME) return
 
   // Notifications only invalidate the view. The authoritative response is the
   // sole source used for rendering terminal outcome data.
   void queryStatus()
+}
+
+const refreshMediaStatus = async (expectedSessionId) => {
+  const generation = ++mediaRefreshGeneration.value
+  const operation = operationGeneration
+  if ((pendingLifecycleReads.get(operation) || 0) > 0) lifecycleReconciliationNeeded.add(operation)
+  const reconcileLifecycle = lifecycleReconciliationNeeded.has(operation)
+  const subtitlesSnapshot = captureSubtitlesSnapshot()
+  try {
+    const response = await sendMessage({ action: 'GET_LIVE_DUBBING_STATUS' })
+    const result = unwrap(response)
+    if (generation !== mediaRefreshGeneration.value || operation !== operationGeneration) return
+    const descriptor = result.status && typeof result.status === 'object' ? result.status : result
+    if (reconcileLifecycle) {
+      applyStatus(response, { syncTerminalOutcome: true, subtitlesSnapshot })
+      lifecycleReconciliationNeeded.delete(operation)
+    } else if (expectedSessionId !== sessionId.value || descriptor.sessionId !== expectedSessionId) {
+      return
+    }
+    media.value = result.media || null
+  } catch {
+    // A failed newer media read must not leave an older lifecycle read fenced out.
+    if (reconcileLifecycle && generation === mediaRefreshGeneration.value && operation === operationGeneration) {
+      await queryStatus(operation)
+    }
+  }
+}
+
+const retryMedia = async () => {
+  if (!canRetryMedia.value || isRetryingMedia.value || isStopping.value) return
+  isRetryingMedia.value = true
+  const session = sessionId.value
+  try {
+    await sendMessage({ action: LIVE_DUBBING_ACTIONS.RETRY_MEDIA })
+  } catch { /* The status read below remains authoritative. */ }
+  finally {
+    await refreshMediaStatus(session)
+    isRetryingMedia.value = false
+  }
 }
 
 // ── Presentation-only transcript-delivery refresh ────────────────────────────

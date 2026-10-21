@@ -88,6 +88,31 @@ describe('LiveDubbingRuntimeGateway', () => {
     expect(capturedTabs).toEqual([{ tabId: 42, status: 'active' }]);
   });
 
+  it('injects the media observer using the gateway browser API and current injectable frames', async () => {
+    const browserAPI = {
+      webNavigation: {
+        getAllFrames: vi.fn(async () => [
+          { frameId: 0, url: 'https://example.test' },
+          { frameId: 2, url: 'https://frame.example' },
+          { frameId: 3, url: 'chrome://settings' },
+          { frameId: 4, url: 'javascript:void(0)' },
+        ]),
+      },
+      scripting: { executeScript: vi.fn(async () => {}) },
+    };
+    const gateway = new LiveDubbingRuntimeGateway({ browserAPI, chromeAPI: {} });
+
+    await expect(gateway.injectMediaObserverForTab(42)).resolves.toEqual({
+      success: true,
+      injectedFrameCount: 2,
+    });
+    expect(browserAPI.webNavigation.getAllFrames).toHaveBeenCalledWith({ tabId: 42 });
+    expect(browserAPI.scripting.executeScript).toHaveBeenCalledWith({
+      target: { tabId: 42, frameIds: [0, 2] },
+      files: ['src/features/live-dubbing/content/index-media-observer.js'],
+    });
+  });
+
   it('returns raw captured-tab results and propagates capture rejection', async () => {
     const capturedTabs = [{ tabId: 42, status: 'pending' }];
     const failure = new Error('capture query failed');

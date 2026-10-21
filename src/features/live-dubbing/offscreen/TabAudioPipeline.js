@@ -364,8 +364,12 @@ export class TabAudioPipeline {
     this.sink = null;
     this.stream = null;
     this._flushWaiters = [];
+    this._inputWaiters = [];
     this._startPromise = null;
     this.generation = 0;
+    this.inputPaused = false;
+    this.inputGeneration = null;
+    this._inputOperation = 0;
   }
 
   async start(stream) {
@@ -459,6 +463,21 @@ export class TabAudioPipeline {
 
   _handleWorkletMessage(event) {
     const data = event?.data || {};
+    if (data.type === 'paused' || data.type === 'resumed') {
+      const waiterIndex = this._inputWaiters.findIndex(waiter =>
+        waiter.generation === data.generation
+        && waiter.ackType === data.type
+        && waiter.operation === this._inputOperation);
+      if (waiterIndex < 0) return;
+      const [waiter] = this._inputWaiters.splice(waiterIndex, 1);
+      clearTimeout(waiter.timer);
+      if (data.type === 'resumed') {
+        this.inputPaused = false;
+        this.inputGeneration = data.generation;
+      }
+      waiter.resolve();
+      return;
+    }
     if (data.type === 'flushed') {
       const waiters = this._flushWaiters.splice(0);
       for (const resolve of waiters) resolve(data);
@@ -473,6 +492,7 @@ export class TabAudioPipeline {
       return;
     }
     if (data.type !== 'pcm') return;
+    if (this.inputPaused || (this.inputGeneration !== null && data.generation !== this.inputGeneration)) return;
 
     const buffer = getMessageBuffer(data);
     if (!buffer) return;
@@ -500,6 +520,44 @@ export class TabAudioPipeline {
     });
   }
 
+  pauseInput(generation) {
+    return this._setInputState('pause', generation);
+  }
+
+  resumeInput(generation) {
+    return this._setInputState('resume', generation);
+  }
+
+  _setInputState(action, generation) {
+    // Close the local admission gate before posting or yielding to the worklet.
+    this.inputPaused = true;
+    this.inputGeneration = null;
+    const operation = ++this._inputOperation;
+    for (const waiter of this._inputWaiters.splice(0)) {
+      clearTimeout(waiter.timer);
+      waiter.reject(createAudioError('INPUT_AUDIO_CONTROL_SUPERSEDED', 'Capture input control was superseded'));
+    }
+    if (this.state !== 'running' || !this.workletNode?.port) {
+      return Promise.reject(createAudioError('INPUT_AUDIO_NOT_RUNNING', 'Capture input is not running'));
+    }
+    const ackType = action === 'pause' ? 'paused' : 'resumed';
+    return new Promise((resolve, reject) => {
+      const waiter = { generation, ackType, operation, resolve, reject, timer: null };
+      waiter.timer = setTimeout(() => {
+        this._inputWaiters = this._inputWaiters.filter(item => item !== waiter);
+        reject(createAudioError('INPUT_AUDIO_CONTROL_TIMEOUT', `Capture ${action} acknowledgement timed out`));
+      }, 1_000);
+      this._inputWaiters.push(waiter);
+      try {
+        this.workletNode.port.postMessage({ type: action, generation });
+      } catch (error) {
+        clearTimeout(waiter.timer);
+        this._inputWaiters = this._inputWaiters.filter(item => item !== waiter);
+        reject(error);
+      }
+    });
+  }
+
   getGraphInfo() {
     return {
       state: this.state,
@@ -515,6 +573,7 @@ export class TabAudioPipeline {
     await this._teardown();
     this.state = 'idle';
     this._flushWaiters.splice(0).forEach(resolve => resolve(null));
+    this._rejectInputWaiters(createAudioError('INPUT_AUDIO_STOPPED', 'Capture input stopped'));
   }
 
   dispose() {
@@ -546,6 +605,13 @@ export class TabAudioPipeline {
     closePort(workletNode?.port);
     await closeContext(context);
     if (this.stopStreamOnCleanup) stopStreamTracks(stream);
+  }
+
+  _rejectInputWaiters(error) {
+    for (const waiter of this._inputWaiters.splice(0)) {
+      clearTimeout(waiter.timer);
+      waiter.reject(error);
+    }
   }
 
   _assertCurrentGeneration(generation) {

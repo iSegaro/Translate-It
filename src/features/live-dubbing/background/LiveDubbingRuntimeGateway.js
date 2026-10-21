@@ -1,4 +1,5 @@
 import browser from 'webextension-polyfill';
+import { injectMediaObserverForTab } from '@/core/background/handlers/common/contentScriptInjector.js';
 
 /**
  * Thin platform boundary for Live Dubbing runtime, tab, and capture APIs.
@@ -13,6 +14,10 @@ export class LiveDubbingRuntimeGateway {
 
   supportsTabCapture() {
     return typeof this.chromeAPI?.tabCapture?.getMediaStreamId === 'function';
+  }
+
+  injectMediaObserverForTab(tabId) {
+    return injectMediaObserverForTab(tabId, this.browserAPI);
   }
 
   sendMessage(message) {

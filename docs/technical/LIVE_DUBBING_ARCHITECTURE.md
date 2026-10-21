@@ -77,16 +77,21 @@ order:
    an exception returns `LIVE_DUBBING_UNSUPPORTED`. If the method is absent, the
    prior behavior is preserved.
 6. Resolve the authoritative tab, recheck pending cancellation, and verify tab
-   capture support. Only then create and persist the descriptor, acquire the
-   exact lease, send `PREPARE`, obtain the one-time stream id, send `CONSUME`,
-   wait for capture/audio-path readiness, persist `CONNECTING_PROVIDER`, and
-   send `CONNECT_PROVIDER` for provider bootstrap and setup before the final
-   `RUNNING` commit.
+   capture support. Before creating the descriptor, inject the consent-gated
+   Media Observer into the tab's injectable frames. If frame enumeration or
+   injection fails, START returns the retryable
+   `LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED` result without creating a
+   session or acquiring media resources. Only then create and persist the
+   descriptor, acquire the exact lease, send `PREPARE`, obtain the one-time
+   stream id, send `CONSUME`, wait for capture/audio-path readiness, persist
+   `CONNECTING_PROVIDER`, and send `CONNECT_PROVIDER` for provider bootstrap and
+   setup before the final `RUNNING` commit.
 
 The early rejection paths through provider, language, storage, busy,
-outcome-barrier, credential, cancellation, and offscreen-capability checks
-occur before the descriptor write, lease acquisition, tab stream id, offscreen
-stage message, or media resource creation. Cancellation is also rechecked after
+outcome-barrier, credential, cancellation, offscreen-capability, tab/capture,
+and media-observer-injection checks occur before the descriptor write, lease
+acquisition, tab stream id, offscreen stage message, or media resource
+creation. Cancellation is also rechecked after
 descriptor persistence and between setup stages. A cancellation after
 resources are acquired enters the fenced terminal cleanup path and clears only
 after exact cleanup/lease settlement (or the proven-absence release path);
@@ -106,6 +111,14 @@ capability method is absent, offscreen support defaults to true to preserve the
 previous behavior. The method then reads the StateStore snapshot only: it does
 not acquire/create a lease, create/reconcile an offscreen document, or join the
 START/STOP mutation queue.
+
+The status DTO's `media.retryable` is true only for the exact current `RUNNING`
+descriptor when its session is nonterminal, has no terminal operation in
+progress, and media is in the error state with its retry budget exhausted
+(`media.exhausted`). It is false in every other state. The Popup treats this
+boolean as the sole authorization gate for showing/enabling media Retry;
+`retryMedia()` revalidates the background state; on an accepted retry, the
+background clears/consumes the exhausted retry state.
 
 ### Volume sliders
 
@@ -243,6 +256,70 @@ never call `track.stop()` on capture tracks — and the monitor only
 borrows the stream from Controller pipeline state. `setVolume(v)` is
 finite-`0..1` validated and non-terminal; calls arriving before monitor
 creation are stored and applied at lazy start.
+
+### Live media playback synchronization
+
+Chrome injects the media observer in all frames that match the eligible
+content-script rules (`all_frames`, including supported about:blank/origin
+fallback cases); this is not a promise that every browser frame is observable.
+Restricted pages, inaccessible documents, injection failures, and stale frame
+inventory can leave playback state unknown. The observer reports a DOM hint
+from connected `<audio>`/`<video>` elements (not paused, ended, muted, or at
+zero volume), plus a revision and frame identity. That hint is not proof that
+audio is audible. Missing or rejected inventory is unknown, not evidence of
+silence; no silence is inferred from an absent report. The browser-level frame
+inventory and available reports are aggregated, and a fresh playing barrier
+requires a current positive report from an inventoried document before a
+provider generation is admitted. Confirming an all-false episode end is
+stricter: every current inventoried document must provide a fresh false report.
+
+Observer HELLO and report messages are checked against the running session and
+tab, browser sender/runtime/frame/document identity, the browser's current
+document id, and per-frame tokens/revisions. Frame replacement retires the old
+document's observations. Provider media-state messages are separately fenced by
+session/provider/event sequence and, for `playing`, the exact media sequence and
+rotation id. The background broadcasts `LIVE_DUBBING_MEDIA_STATUS_CHANGED` with
+only `{ sessionId }` as a refresh hint. `GET_LIVE_DUBBING_STATUS` is the
+authoritative read and includes the media DTO
+`{ mediaState, mediaSequence, rotationId, mediaError }`; the notification is
+not a media-state or error payload.
+
+On a valid non-playing or unknown decision, Background immediately requests a
+fenced `MEDIA_PAUSE` when the current media sequence is not already acknowledged
+as paused, and revokes any outstanding bootstrap grant. The pause uses a higher
+media sequence. Once that asynchronous request reaches the offscreen Controller,
+its media-admission fence closes before teardown: PCM mode pauses capture input,
+mutes and resets the output epoch; media-stream mode closes its playback gate.
+The in-flight provider generation is invalidated and the provider client is
+shut down, while the Controller-owned capture session/stream is retained. Paused
+input is discarded rather than replayed. After a 200 ms positive debounce and
+fresh frame barriers before Resume and after READY, the Coordinator creates a
+new provider generation against the retained live capture stream. Its one-use
+bootstrap reservation is bound to the exact session/provider/event sequence,
+media sequence, rotation id, operation and session state; authorization is
+rechecked after the bootstrap await. The Controller admits input/output only
+after the matching COMMIT. The PCM wire framing remains ADR-018's fixed
+16 kHz mono frames of 1600 samples (100 ms); this synchronization lane does not
+change that framing.
+
+Automatic media rotation is bounded to three attempts per confirmed continuous
+playing episode (250 ms then 750 ms retry delays). Retry identity and exhaustion
+are persisted for service-worker recovery; recovery re-reads exact synchronized
+offscreen STATUS, quiesces with PAUSE, and does not renew the budget from
+unknown observations. A trusted extension-UI retry is the explicit override after
+exhaustion. This lane does not provide a generic Translation cancellation or
+reconnect API. Capture loss and proven offscreen-runtime loss remain terminal
+lifecycle outcomes; a failed offscreen pause/reset fails closed through session
+cleanup rather than being treated as a successful media pause.
+
+The path from content observer through the service worker to offscreen is
+asynchronous: “immediate pause” means the fenced Pause is dispatched without
+waiting for debounce and silencing begins when the offscreen fence is applied.
+It cannot recall translated audio already emitted before that fence. The
+deterministic Coordinator↔Controller test exercises Resume, Commit and delayed
+PCM admission in the tested harness. Any manual OpenAI gate is evidence only for
+the exact tested Chrome/configuration; neither it nor the deterministic test
+proves universal browser, site, or frame coverage.
 
 ### Chromium fullscreen limitation
 

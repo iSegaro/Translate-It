@@ -621,6 +621,18 @@ export function hasExactSessionEvent(message, descriptor) {
     && data.eventSequence === descriptor.eventSequence);
 }
 
+export function hasExactMediaGeneration(message, generation) {
+  const data = message?.data || message || {};
+  return Boolean(generation
+    && data.sessionId === generation.sessionId
+    && data.providerId === generation.providerId
+    && data.eventSequence === generation.eventSequence
+    && data.mediaSequence === generation.mediaSequence
+    && data.rotationId === generation.rotationId
+    && Number.isSafeInteger(data.mediaSequence) && data.mediaSequence > 0
+    && typeof data.rotationId === 'string' && data.rotationId.trim());
+}
+
 /**
  * Keep transcript fragments provider-neutral and deliberately small.
  * Provider payloads, source transcripts, and timing metadata do not cross a
@@ -878,11 +890,77 @@ function baseOffscreenMessage(action, descriptor) {
   };
 }
 
-export function createPrepareMessage(descriptor, initialVolumes = {}) {
+export function createPrepareMessage(descriptor, initialVolumes = {}, options = {}) {
   const message = baseOffscreenMessage(LIVE_DUBBING_ACTIONS.PREPARE, descriptor);
   message.data.originalVolume = normalizeLiveDubbingVolume(initialVolumes.originalVolume, 0);
   message.data.dubbedVolume = normalizeLiveDubbingVolume(initialVolumes.dubbedVolume, 1);
+  if (options.synchronizeMedia === true) message.data.synchronizeMedia = true;
   return message;
+}
+
+function validateMediaGeneration({ sessionId, providerId, eventSequence, mediaSequence, rotationId }) {
+  if (!isSessionId(sessionId) || !isLiveDubbingProviderId(providerId)
+    || !Number.isSafeInteger(eventSequence) || eventSequence < 0
+    || !Number.isSafeInteger(mediaSequence) || mediaSequence < 1
+    || typeof rotationId !== 'string' || !rotationId.trim()) {
+    throw new TypeError('media generation identity is invalid');
+  }
+}
+
+export function createMediaGenerationMessage(action, generation) {
+  if (action !== LIVE_DUBBING_ACTIONS.MEDIA_RESUME
+    && action !== LIVE_DUBBING_ACTIONS.MEDIA_COMMIT) throw new TypeError('media action is invalid');
+  validateMediaGeneration(generation || {});
+  return {
+    target: 'offscreen',
+    action,
+    data: {
+      sessionId: generation.sessionId,
+      providerId: generation.providerId,
+      eventSequence: generation.eventSequence,
+      mediaSequence: generation.mediaSequence,
+      rotationId: generation.rotationId,
+    },
+  };
+}
+
+export function createMediaPauseMessage(descriptor, mediaSequence) {
+  if (!isSessionId(descriptor?.sessionId) || !isLiveDubbingProviderId(descriptor?.providerId)
+    || !Number.isSafeInteger(descriptor?.eventSequence) || descriptor.eventSequence < 0
+    || !Number.isSafeInteger(mediaSequence) || mediaSequence < 1) {
+    throw new TypeError('media pause identity is invalid');
+  }
+  return {
+    target: 'offscreen',
+    action: LIVE_DUBBING_ACTIONS.MEDIA_PAUSE,
+    data: {
+      sessionId: descriptor.sessionId,
+      providerId: descriptor.providerId,
+      eventSequence: descriptor.eventSequence,
+      mediaSequence,
+    },
+  };
+}
+
+export function createMediaStateChangedMessage(generation, mediaState, mediaError = null) {
+  validateMediaGeneration(generation || {});
+  if (!['paused', 'reconnecting', 'ready', 'playing', 'error'].includes(mediaState)) {
+    throw new TypeError('mediaState is invalid');
+  }
+  return {
+    action: LIVE_DUBBING_ACTIONS.MEDIA_STATE_CHANGED,
+    data: {
+      sessionId: generation.sessionId,
+      providerId: generation.providerId,
+      eventSequence: generation.eventSequence,
+      mediaSequence: generation.mediaSequence,
+      rotationId: generation.rotationId,
+      mediaState,
+      mediaError: typeof mediaError === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(mediaError)
+        ? mediaError
+        : null,
+    },
+  };
 }
 
 export function createConsumeMessage(descriptor, streamId) {
@@ -1034,13 +1112,16 @@ export function createSessionMessage(action, sessionId, providerId) {
  * Build the one-time offscreen provider bootstrap request. Bootstrap data is
  * never placed in a broadcast action or in a session descriptor.
  */
-export function createProviderBootstrapRequest({ sessionId, providerId, targetLanguage, eventSequence }) {
+export function createProviderBootstrapRequest({ sessionId, providerId, targetLanguage, eventSequence, rotationId, mediaSequence }) {
   if (!isSessionId(sessionId)) throw new TypeError('sessionId is required');
   if (!Number.isInteger(eventSequence) || eventSequence < 0) {
     throw new TypeError('eventSequence is required');
   }
   if (!isLiveDubbingProviderId(providerId)) throw new TypeError('providerId is required');
 
+  if (rotationId !== undefined) validateMediaGeneration({
+    sessionId, providerId, eventSequence, mediaSequence, rotationId,
+  });
   return {
     action: LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP,
     data: {
@@ -1048,6 +1129,7 @@ export function createProviderBootstrapRequest({ sessionId, providerId, targetLa
       providerId,
       targetLanguage: normalizeProviderTargetLanguage(providerId, targetLanguage),
       eventSequence,
+      ...(rotationId !== undefined ? { rotationId, mediaSequence } : {}),
     },
   };
 }

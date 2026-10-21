@@ -110,6 +110,21 @@ function createMonitorContext() {
 }
 
 describe('LiveDubbingAudioEngine', () => {
+  it('delegates playback mute and awaited output reset without touching the original monitor', async () => {
+    const outputPlayer = createDouble({
+      setPlaybackMuted: vi.fn(),
+      resetEpochAndWait: vi.fn(async epoch => epoch),
+    });
+    const originalAudioMonitor = createMonitorDouble();
+    const engine = new LiveDubbingAudioEngine({ outputPlayer, originalAudioMonitor });
+    engine.outputPlayer = outputPlayer;
+    engine.setPlaybackMuted(true);
+    await expect(engine.resetOutputEpochAndWait(8)).resolves.toBe(8);
+    expect(outputPlayer.setPlaybackMuted).toHaveBeenCalledWith(true);
+    expect(outputPlayer.resetEpochAndWait).toHaveBeenCalledWith(8);
+    expect(originalAudioMonitor.setVolume).not.toHaveBeenCalled();
+  });
+
   it('starts both local PCM graphs with a borrowed stream', async () => {
     const input = createInputContext();
     const output = createOutputContext();

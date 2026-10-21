@@ -7,6 +7,7 @@ const logger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'ContentScriptInjector
 
 const MAIN_CONTENT_SCRIPT_FILE = 'src/core/content-scripts/index-main.js';
 const IFRAME_CONTENT_SCRIPT_FILE = 'src/core/content-scripts/index-iframe.js';
+const MEDIA_OBSERVER_CONTENT_SCRIPT_FILE = 'src/features/live-dubbing/content/index-media-observer.js';
 
 /**
  * Check whether a frame can safely receive the iframe content script.
@@ -32,15 +33,15 @@ function isInjectableSubframeUrl(url) {
  * @param {number[] | undefined} frameIds - Optional target frame IDs.
  * @returns {Promise<void>}
  */
-async function executeContentScriptInjection(tabId, file, frameIds) {
-  if (browser.scripting?.executeScript) {
+async function executeContentScriptInjection(tabId, file, frameIds, browserAPI = browser) {
+  if (browserAPI.scripting?.executeScript) {
     const target = { tabId };
 
     if (Array.isArray(frameIds) && frameIds.length > 0) {
       target.frameIds = frameIds;
     }
 
-    await browser.scripting.executeScript({
+    await browserAPI.scripting.executeScript({
       target,
       files: [file],
     });
@@ -48,7 +49,7 @@ async function executeContentScriptInjection(tabId, file, frameIds) {
   }
 
   const [frameId] = frameIds || [];
-  await browser.tabs.executeScript(tabId, {
+  await browserAPI.tabs.executeScript(tabId, {
     file,
     allFrames: false,
     ...(typeof frameId === 'number' ? { frameId } : {}),
@@ -112,6 +113,31 @@ export async function injectIframeContentScriptsForTab(tabId) {
   );
 
   return results.filter(Boolean).length;
+}
+
+/** Inject the consent-gated media observer into every currently injectable frame. */
+export async function injectMediaObserverForTab(tabId, browserAPI = browser) {
+  if (typeof tabId !== 'number' || !browserAPI.webNavigation?.getAllFrames) {
+    return { success: false, injectedFrameCount: 0 };
+  }
+
+  try {
+    const frames = await browserAPI.webNavigation.getAllFrames({ tabId });
+    const frameIds = frames.filter((frame) => typeof frame.frameId === 'number' &&
+      typeof frame.url === 'string'
+      && (!isRestrictedUrl(frame.url) || (frame.frameId > 0 && /^about:(blank|srcdoc)(?:[?#]|$)/i.test(frame.url)))
+      && !frame.url.startsWith('javascript:'))
+      .map(({ frameId }) => frameId);
+    if (frameIds.length === 0) return { success: false, injectedFrameCount: 0 };
+    await executeContentScriptInjection(tabId, MEDIA_OBSERVER_CONTENT_SCRIPT_FILE, frameIds, browserAPI);
+    return { success: true, injectedFrameCount: frameIds.length };
+  } catch (error) {
+    logger.debug('Media observer content script injection failed', {
+      tabId,
+      error: error?.message || String(error),
+    });
+    return { success: false, injectedFrameCount: 0 };
+  }
 }
 
 /**

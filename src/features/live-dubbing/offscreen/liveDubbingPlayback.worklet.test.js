@@ -76,6 +76,7 @@ describe('live dubbing playback worklet', () => {
     expect(port.postMessage).toHaveBeenNthCalledWith(1, {
       type: 'accepted',
       id: 'accepted-chunk',
+      epoch: 0,
       queuedSamples: 1,
     });
 
@@ -83,6 +84,7 @@ describe('live dubbing playback worklet', () => {
     expect(port.postMessage).toHaveBeenNthCalledWith(2, {
       type: 'rejected',
       id: 'stale-chunk',
+      epoch: 0,
       code: 'OUTPUT_AUDIO_STALE_EPOCH',
       message: 'PCM chunk belongs to an older output epoch',
       queuedSamples: 1,
@@ -97,9 +99,25 @@ describe('live dubbing playback worklet', () => {
     expect(port.postMessage).toHaveBeenNthCalledWith(3, {
       type: 'rejected',
       id: 'full-chunk',
+      epoch: 0,
       code: 'OUTPUT_AUDIO_QUEUE_SAFETY_LIMIT',
       message: 'Playback queue safety limit reached',
       queuedSamples: 1,
     });
+  });
+
+  it('clears queued playback synchronously on reset and acknowledges that epoch', async () => {
+    const port = createPort();
+    globalThis.AudioWorkletProcessor = class { constructor() { this.port = port; } };
+    globalThis.registerProcessor = vi.fn();
+    await import('./liveDubbingPlayback.worklet.js?reset-test');
+    const Processor = globalThis.registerProcessor.mock.calls[0][1];
+    const processor = new Processor();
+    processor.handleMessage({ type: 'enqueue', id: 1, epoch: 0, buffer: new Float32Array([0.5, 0.25]).buffer });
+    processor.process([], [[new Float32Array(1)]]);
+    expect(processor.queuedSamples()).toBe(1);
+    processor.handleMessage({ type: 'reset', epoch: 2, resetGeneration: 9 });
+    expect(processor.queuedSamples()).toBe(0);
+    expect(port.postMessage).toHaveBeenCalledWith({ type: 'reset-complete', epoch: 2, resetGeneration: 9 });
   });
 });

@@ -36,20 +36,24 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
     this.nextSourceTime = null;
     this.frameSourceSample = null;
     this.frameSourceTime = null;
+    this.generation = 0;
+    this.paused = false;
 
     this.port.onmessage = event => {
-      if (event?.data?.type === 'flush') {
+      const message = event?.data || {};
+      if (message.type === 'pause' || message.type === 'resume') {
+        this._clearFrame();
+        this.generation = message.generation;
+        this.paused = message.type === 'pause';
+        this.port.postMessage({ type: this.paused ? 'paused' : 'resumed', generation: this.generation });
+      } else if (message.type === 'flush') {
         const sampleCount = this.emitFrame(true);
         this.port.postMessage({
           type: 'flushed',
           sampleCount,
         });
-      } else if (event?.data?.type === 'reset') {
-        this.pendingSamples = 0;
-        this.nextSourceSample = null;
-        this.nextSourceTime = null;
-        this.frameSourceSample = null;
-        this.frameSourceTime = null;
+      } else if (message.type === 'reset') {
+        this._clearFrame();
       }
     };
   }
@@ -57,6 +61,7 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
   process(inputs, outputs) {
     for (const channel of outputs?.[0] || []) channel.fill(0);
     const channels = inputs?.[0] || [];
+    if (this.paused) return true;
     const channelCount = channels.length;
     if (channelCount === 0) return true;
 
@@ -97,6 +102,14 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
     return true;
   }
 
+  _clearFrame() {
+    this.pendingSamples = 0;
+    this.nextSourceSample = null;
+    this.nextSourceTime = null;
+    this.frameSourceSample = null;
+    this.frameSourceTime = null;
+  }
+
   emitFrame(partial) {
     if (this.pendingSamples === 0) return 0;
     const sampleCount = this.pendingSamples;
@@ -110,6 +123,7 @@ class LiveDubbingCaptureProcessor extends AudioWorkletProcessor {
     this.frameSourceTime = null;
     this.port.postMessage({
       type: 'pcm',
+      generation: this.generation,
       buffer: pcm.buffer,
       sampleRate: this.sampleRateValue,
       channels: 1,

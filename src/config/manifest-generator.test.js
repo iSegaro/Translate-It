@@ -36,4 +36,14 @@ describe('live dubbing manifest capability', () => {
     expect(chromeManifest.description).toBe('__MSG_description__');
     expect(firefoxManifest.description).toBe('__MSG_descriptionFirefox__');
   });
+
+  it('injects the lightweight media observer in Chrome frames only', () => {
+    const chromeScript = generateManifest('chrome').content_scripts.find(({ js }) =>
+      js.includes('src/features/live-dubbing/content/index-media-observer.js'));
+    const firefoxManifest = generateManifest('firefox');
+
+    expect(chromeScript).toMatchObject({ all_frames: true, run_at: 'document_idle', match_about_blank: true, match_origin_as_fallback: true });
+    expect(chromeScript.matches).toContain('<all_urls>');
+    expect(firefoxManifest.content_scripts.some(({ js }) => js.includes('index-media-observer.js'))).toBe(false);
+  });
 });

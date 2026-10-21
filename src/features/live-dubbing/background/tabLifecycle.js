@@ -16,8 +16,12 @@ export function registerLiveDubbingTabLifecycle({
     void coordinator.handleTabRemoved(tabId).catch(() => {});
   };
   const committedListener = (details) => {
-    if (details?.frameId !== 0) return;
-    void coordinator.handleTopLevelNavigation(details.tabId).catch(() => {});
+    if (!Number.isInteger(details?.frameId) || details.frameId < 0) return;
+    if (details.frameId === 0) {
+      void coordinator.handleTopLevelNavigation(details.tabId).catch(() => {});
+    } else {
+      coordinator.invalidateMediaFrame(details.tabId, details.frameId, details.documentId);
+    }
   };
   const captureStatusChangedListener = (details) => {
     const tabId = details?.tabId;

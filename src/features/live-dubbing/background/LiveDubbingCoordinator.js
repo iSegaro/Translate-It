@@ -7,6 +7,7 @@ import {
   LIVE_DUBBING_ACTION_TIMEOUTS,
   LIVE_DUBBING_CAPTURE_STAGES,
   LIVE_DUBBING_LEASE_REASONS,
+  LIVE_DUBBING_MEDIA_RETRY_STORAGE_KEY,
   LIVE_DUBBING_OPENAI_PROVIDER_ID,
   LIVE_DUBBING_ORIGINAL_TRANSCRIPT_KIND,
   LIVE_DUBBING_OWNER,
@@ -32,14 +33,18 @@ import {
   normalizeLiveDubbingVolume,
   createProviderConnectMessage,
   createPrepareMessage,
+  createMediaGenerationMessage,
+  createMediaPauseMessage,
   createSessionMessage,
   createStatusMessage,
   hasExactSessionEvent,
+  hasExactMediaGeneration,
   isValidLiveDubbingTranscriptSequence,
   isAuthorizedOffscreenSender,
   isAcknowledgedForSession,
   isExactSessionResponse,
   isLiveDubbingProviderId,
+  isTrustedLiveDubbingUiSender,
   normalizeProviderTargetLanguage,
   safeFailureCode,
   sanitizeLiveDubbingDiagnostic,
@@ -64,6 +69,29 @@ const NON_PROVIDER_SETUP_TERMINAL_CATEGORIES = new Set([
   'OUTPUT_AUDIO_ERROR',
   'OUTPUT_PIPELINE_ERROR',
 ]);
+
+const MEDIA_LOG_EVENTS = new Set([
+  'rotation', 'barrier', 'dispatch', 'ack', 'reconnected', 'retry-scheduled',
+  'rotation-exhausted', 'recovery',
+]);
+const MEDIA_LOG_STAGES = new Set([
+  'precondition', 'playing-report', 'final-inventory', 'start', 'barrier',
+  'retry-state', 'media-grant', 'media-resume-dispatch', 'media-resume-ack',
+  'commit-barrier', 'media-commit-dispatch', 'media-commit-ack', 'media-resume',
+  'media-commit', 'retry-state-restored', 'pause-dispatch', 'pause-ack', 'complete',
+]);
+const MEDIA_LOG_OUTCOMES = new Set([
+  'interrupted', 'not-playing', 'passed', 'failed', 'success', 'pending', 'exhausted', 'ready',
+]);
+const MEDIA_LOG_FIELDS = [
+  ['attempt', (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000],
+  ['maxAttempts', (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000],
+  ['mediaSequence', (value) => Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000_000],
+  ['stage', (value) => MEDIA_LOG_STAGES.has(value)],
+  ['outcome', (value) => MEDIA_LOG_OUTCOMES.has(value)],
+  ['retryDelayMs', (value) => Number.isFinite(value) && Number.isSafeInteger(value) && value >= 0 && value <= 60_000],
+  ['errorCode', (value) => typeof value === 'string' && /^LIVE_DUBBING_[A-Z0-9_-]{1,80}_FAILED$/.test(value)],
+];
 
 export { LIVE_DUBBING_CLEAR_OUTCOMES };
 
@@ -182,6 +210,15 @@ export class LiveDubbingCoordinator {
       || new LiveDubbingStateStore({ browserAPI: this.browserAPI });
     this.transition = Promise.resolve();
     this.transcriptRelayRecord = null;
+    this.mediaObservation = { sessionId: null, token: null, frames: new Map() };
+    this.mediaFrameDocuments = new Map();
+    this.mediaActivityRevision = 0;
+    this.mediaInventoryRequestId = 0;
+    this.mediaState = { mediaState: null, mediaSequence: null, rotationId: null, mediaError: null };
+    this.mediaRotationIncarnation = this.uuid();
+    this.mediaRotationCounter = 0;
+    this.mediaBarrierTimeoutMs = 5_000;
+    this.mediaRecoverySessions = new Set();
     this.cleanupManager = options.cleanupManager
       || new LiveDubbingCleanupManager({
         leaseManager: this.leaseManager,
@@ -220,6 +257,14 @@ export class LiveDubbingCoordinator {
   }
 
   stop(message = {}) {
+    const sessionId = message?.data?.sessionId || message?.sessionId;
+    const pendingStart = this.sessionRegistry.findPendingStart(sessionId);
+    if (pendingStart) pendingStart.terminalRequested = true;
+    const descriptor = this.descriptor;
+    if (descriptor?.sessionId === sessionId) {
+      const state = this.sessionRegistry.getSessionState(sessionId);
+      if (state) this._markTerminalState(state);
+    }
     return this._stop(message);
   }
 
@@ -251,10 +296,22 @@ export class LiveDubbingCoordinator {
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
     const terminalOutcome = this._getStatusTerminalOutcome();
+    const sessionState = this.descriptor
+      ? this.sessionRegistry.getSessionState(this.descriptor.sessionId)
+      : null;
+    const retryable = Boolean(this.descriptor?.status === LIVE_DUBBING_STATUS.RUNNING
+      && sessionState && !sessionState.terminalRequested
+      && !this.sessionRegistry.hasTerminalOperation(this.descriptor.sessionId)
+      && this._isSameDescriptorFence(sessionState.descriptor, this.descriptor)
+      && sessionState.media?.exhausted === true
+      && this.mediaState.mediaState === 'error');
     return {
       success: true,
       available,
       status: cloneDescriptor(this.descriptor),
+      media: this.descriptor ? { ...this.mediaState, retryable } : {
+        mediaState: null, mediaSequence: null, rotationId: null, mediaError: null, retryable: false,
+      },
       terminalOutcome,
       transcriptDeliveryUnavailable: this._isTranscriptDeliveryUnavailable(),
     };
@@ -829,6 +886,762 @@ export class LiveDubbingCoordinator {
     return this._stopForTab(tabId, 'TOP_LEVEL_NAVIGATION');
   }
 
+  _isMediaSessionTerminal(sessionId) {
+    return this.sessionRegistry.getSessionState(sessionId)?.terminalRequested === true
+      || this.sessionRegistry.hasTerminalOperation(sessionId);
+  }
+
+  async authorizeMediaObserver(sender) {
+    const descriptor = await this._readDescriptor();
+    if (this._storageReadFailed() || this._storageDescriptorInvalid()) return { observe: false };
+    const runtimeId = this.browserAPI?.runtime?.id;
+    const tabId = sender?.tab?.id;
+    const frameId = sender?.frameId;
+    const documentId = sender?.documentId;
+    if (!runtimeId || sender?.id !== runtimeId || !Number.isInteger(tabId)
+      || tabId < 0 || !Number.isInteger(frameId) || frameId < 0
+      || typeof documentId !== 'string' || !documentId
+      || typeof sender?.url === 'string' && sender.url.startsWith(`chrome-extension://${runtimeId}/`)
+      || descriptor?.status !== LIVE_DUBBING_STATUS.RUNNING || descriptor.tabId !== tabId
+      || this._isMediaSessionTerminal(descriptor.sessionId)
+      || this.mediaRecoverySessions.has(descriptor.sessionId)
+      || this.sessionRegistry.getSessionState(descriptor.sessionId)?.media?.recovering === true) {
+      return { observe: false };
+    }
+    const committedDocument = this.mediaFrameDocuments.get(frameId);
+    if (this.mediaFrameDocuments.has(frameId)) {
+      if (committedDocument !== documentId) return { observe: false };
+    } else {
+      let activeDocumentId;
+      try {
+        const frame = await this.browserAPI.webNavigation?.getFrame?.({ tabId, frameId });
+        activeDocumentId = frame?.documentId;
+      } catch { return { observe: false }; }
+      if (activeDocumentId !== documentId) return { observe: false };
+      const currentDescriptor = await this._readDescriptor();
+      if (this._storageReadFailed() || this._storageDescriptorInvalid()) return { observe: false };
+      if (!this._isSameDescriptorFence(currentDescriptor, descriptor)
+        || currentDescriptor.status !== LIVE_DUBBING_STATUS.RUNNING
+        || this._isMediaSessionTerminal(descriptor.sessionId)
+        || this.mediaRecoverySessions.has(descriptor.sessionId)
+        || this.sessionRegistry.getSessionState(descriptor.sessionId)?.media?.recovering === true) return { observe: false };
+      if (this.mediaFrameDocuments.has(frameId)
+        && this.mediaFrameDocuments.get(frameId) !== documentId) return { observe: false };
+      this.mediaFrameDocuments.set(frameId, documentId);
+      this.mediaInventoryRequestId += 1;
+    }
+    if (this._isMediaSessionTerminal(descriptor.sessionId)
+      || this.mediaRecoverySessions.has(descriptor.sessionId)
+      || this.sessionRegistry.getSessionState(descriptor.sessionId)?.media?.recovering === true) return { observe: false };
+    if (this.mediaObservation.sessionId !== descriptor.sessionId || !this.mediaObservation.token) {
+      this.mediaObservation = { sessionId: descriptor.sessionId, token: this.uuid(), frames: new Map() };
+    }
+    const key = `${frameId}:${documentId}`;
+    for (const existingKey of this.mediaObservation.frames.keys()) {
+      if (existingKey.startsWith(`${frameId}:`) && existingKey !== key) this.mediaObservation.frames.delete(existingKey);
+    }
+    if (!this.mediaObservation.frames.has(key)) {
+      this.mediaObservation.frames.set(key, { token: this.uuid(), revision: -1, playing: false });
+    }
+    const barrier = this.sessionRegistry.getSessionState(descriptor.sessionId)?.media?.barrier;
+    if (barrier?.inventoryReady) barrier.expectedFrames.add(key);
+    return {
+      observe: true,
+      token: this.mediaObservation.frames.get(key).token,
+      sessionToken: this.mediaObservation.token,
+    };
+  }
+
+  async handleMediaObservation(message, sender) {
+    const descriptor = await this._readDescriptor();
+    if (this._storageReadFailed() || this._storageDescriptorInvalid()) return { success: true, ignored: true };
+    const runtimeId = this.browserAPI?.runtime?.id;
+    const validSender = runtimeId && sender?.id === runtimeId
+      && Number.isInteger(sender?.tab?.id) && sender.tab.id === descriptor?.tabId
+      && Number.isInteger(sender?.frameId) && sender.frameId >= 0
+      && typeof sender?.documentId === 'string' && sender.documentId
+      && !(typeof sender?.url === 'string' && sender.url.startsWith(`chrome-extension://${runtimeId}/`))
+      && descriptor?.status === LIVE_DUBBING_STATUS.RUNNING;
+    const data = message?.data;
+    if (!validSender || this._isMediaSessionTerminal(descriptor.sessionId)
+      || this.mediaRecoverySessions.has(descriptor.sessionId)
+      || this.sessionRegistry.getSessionState(descriptor.sessionId)?.media?.recovering === true
+      || this.mediaObservation.sessionId !== descriptor.sessionId
+      || !this.mediaObservation.token
+      || !Number.isSafeInteger(data?.revision) || data.revision < 0
+      || typeof data.playing !== 'boolean'
+      || Object.hasOwn(data, 'frameStructureChanged') && typeof data.frameStructureChanged !== 'boolean') {
+      return { success: true, ignored: true };
+    }
+    const key = `${sender.frameId}:${sender.documentId}`;
+    if (this.mediaFrameDocuments.get(sender.frameId) !== sender.documentId) return { success: true, ignored: true };
+    const state = this.mediaObservation.frames.get(key);
+    if (!state || data.token !== state.token || data.revision <= state.revision) return { success: true, ignored: true };
+    state.revision = data.revision;
+    state.playing = data.playing;
+    this.mediaActivityRevision += 1;
+    if (data.frameStructureChanged === true) {
+      this.mediaInventoryRequestId += 1;
+      this._refreshMediaObservation(descriptor.tabId);
+      let inventoryValid = await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      if (!inventoryValid && !this._isMediaSessionTerminal(descriptor.sessionId)) {
+        inventoryValid = await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      }
+      if (!inventoryValid) {
+        if (!this._isMediaSessionTerminal(descriptor.sessionId)
+          && this._isSameDescriptorFence(this.descriptor, descriptor)) {
+          this._forgetMediaFrameInventory(descriptor);
+        }
+        return { success: true };
+      }
+    }
+    if (this.mediaObservation.frames.get(key) !== state) return { success: true };
+    this._onFreshMediaReport(descriptor, state, key);
+    if (!this._hasActiveMediaBarrier(descriptor.sessionId)) {
+      const activity = this.getMediaActivity();
+      this._handleMediaDecision(descriptor, activity);
+      const media = this._mediaStateFor(descriptor);
+      if (data.playing === false && activity.known && !activity.playing && media?.episodeId) {
+        void this._confirmMediaEpisodeEnded(descriptor, media, media.episodeId);
+      }
+    }
+    return { success: true };
+  }
+
+  _mediaStateFor(descriptor) {
+    const state = this.sessionRegistry.getSessionState(descriptor?.sessionId);
+    if (!state) return null;
+    state.media ||= {
+      mediaSequence: 0, episodeAttempts: 0, retryTimer: null, debounceTimer: null,
+      activeOperation: null, barrier: null, desiredPlaying: false, exhausted: false, committed: false,
+      episodeId: null, retryPersistence: Promise.resolve(),
+    };
+    return state.media;
+  }
+
+  async _readPersistedMediaRetryState(sessionId) {
+    try {
+      const key = `${LIVE_DUBBING_MEDIA_RETRY_STORAGE_KEY}:${sessionId}`;
+      const stored = await this.browserAPI.storage.session.get(key);
+      const value = stored?.[key];
+      if (value === undefined || value === null) return { state: null, failed: false };
+      if (!value || typeof value !== 'object' || value.sessionId !== sessionId
+        || typeof value.episodeId !== 'string' || !value.episodeId.trim()
+        || !Number.isSafeInteger(value.attempts) || value.attempts < 0 || value.attempts > 3
+        || typeof value.exhausted !== 'boolean') return { state: null, failed: true };
+      return { state: value, failed: false };
+    } catch {
+      return { state: null, failed: true };
+    }
+  }
+
+  async _persistMediaRetryState(sessionId, media) {
+    if (this._isMediaSessionTerminal(sessionId)) return false;
+    try {
+      media.episodeId ||= this.uuid();
+      const key = `${LIVE_DUBBING_MEDIA_RETRY_STORAGE_KEY}:${sessionId}`;
+      await this.browserAPI.storage.session.set({
+        [key]: {
+          sessionId,
+          episodeId: media.episodeId,
+          attempts: media.episodeAttempts,
+          exhausted: media.exhausted === true,
+        },
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _queueMediaRetryStatePersistence(sessionId, media) {
+    const next = Promise.resolve(media.retryPersistence).then(
+      () => this._persistMediaRetryState(sessionId, media),
+      () => this._persistMediaRetryState(sessionId, media),
+    );
+    media.retryPersistence = next;
+    return next;
+  }
+
+  async _clearPersistedMediaRetryState(sessionId) {
+    try {
+      const key = `${LIVE_DUBBING_MEDIA_RETRY_STORAGE_KEY}:${sessionId}`;
+      await this.browserAPI.storage.session.remove(key);
+    } catch { /* retry metadata is non-authoritative after STOP */ }
+  }
+
+  _hasActiveMediaBarrier(sessionId) {
+    return Boolean(this.sessionRegistry.getSessionState(sessionId)?.media?.barrier);
+  }
+
+  _logMedia(level, event, fields = {}) {
+    if (!MEDIA_LOG_EVENTS.has(event)) return;
+    const details = MEDIA_LOG_FIELDS.flatMap(([key, isValid]) => {
+      const value = fields?.[key];
+      if (!isValid(value)) return [];
+      return [`${key}=${value}`];
+    });
+    this.log?.[level]?.(`Live dubbing media ${event}${details.length ? ` | ${details.join(' | ')}` : ''}`);
+  }
+
+  _handleMediaDecision(descriptor, activity) {
+    const media = this._mediaStateFor(descriptor);
+    if (!media || !this._isCurrentMediaDescriptor(descriptor)) return;
+    const playing = activity?.known === true && activity.playing === true;
+    const wasPlaying = media.desiredPlaying;
+    media.desiredPlaying = playing;
+    if (!playing) {
+      media.committed = false;
+      clearTimeout(media.debounceTimer);
+      clearTimeout(media.retryTimer);
+      media.debounceTimer = null;
+      media.retryTimer = null;
+      if (wasPlaying && media.episodeId) media.episodeEndCandidate = media.episodeId;
+      this.sessionRegistry.revokeMediaBootstrapGrant(descriptor.sessionId);
+      if (media.activeOperation?.kind === 'pause'
+        && media.pauseSequence === media.mediaSequence) return;
+      if (media.activeOperation) media.activeOperation.cancelled = true;
+      if (media.pausedSequenceAcked === media.mediaSequence) return;
+      void this._pauseForMedia(descriptor, media);
+      return;
+    }
+    media.episodeId ||= this.uuid();
+    if (media.committed) return;
+    if (media.exhausted || media.activeOperation || media.debounceTimer || media.retryTimer) return;
+    media.debounceTimer = setTimeout(() => {
+      media.debounceTimer = null;
+      if (media.desiredPlaying) void this._beginMediaRotation(descriptor, media);
+    }, 200);
+  }
+
+  _isCurrentMediaDescriptor(descriptor) {
+    const current = this.descriptor;
+    const state = this.sessionRegistry.getSessionState(descriptor?.sessionId);
+    return Boolean(current?.status === LIVE_DUBBING_STATUS.RUNNING
+      && state && !state.terminalRequested
+      && !this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
+      && this._isSameDescriptorFence(current, descriptor)
+      && this._isSameDescriptorFence(state.descriptor, descriptor));
+  }
+
+  async _pauseForMedia(descriptor, media) {
+    if (!this._isCurrentMediaDescriptor(descriptor)) return;
+    const sequence = ++media.mediaSequence;
+    media.pauseSequence = sequence;
+    media.barrier?.cancel();
+    media.barrier = null;
+    const op = { mediaSequence: sequence, cancelled: false, kind: 'pause' };
+    media.activeOperation = op;
+    this.mediaState = { mediaState: 'paused', mediaSequence: sequence, rotationId: null, mediaError: null };
+    this._notifyMediaStatusChanged(descriptor);
+    try {
+      const response = await this._sendOffscreen(createMediaPauseMessage(descriptor, sequence));
+      if (op.cancelled || media.activeOperation !== op || !this._isCurrentMediaDescriptor(descriptor)) return;
+      if (response?.success !== true || response.sessionId !== descriptor.sessionId
+        || response.providerId !== descriptor.providerId || response.eventSequence !== descriptor.eventSequence
+        || response.mediaSequence !== sequence || response.paused !== true) {
+        media.activeOperation = null;
+        media.pauseSequence = null;
+        this._markMediaPauseFailure(descriptor, media);
+        return;
+      }
+      media.activeOperation = null;
+      media.pausedSequenceAcked = sequence;
+      media.pauseFailed = false;
+      if (media.desiredPlaying) this._handleMediaDecision(descriptor, { known: true, playing: true });
+    } catch {
+      if (media.activeOperation === op) {
+        media.activeOperation = null;
+        media.pauseSequence = null;
+        this._markMediaPauseFailure(descriptor, media);
+      }
+    }
+  }
+
+  _markMediaPauseFailure(descriptor, media) {
+    media.pauseFailed = true;
+    media.exhausted = true;
+    void this._queueMediaRetryStatePersistence(descriptor.sessionId, media);
+    this.mediaState = {
+      mediaState: 'error', mediaSequence: media.mediaSequence, rotationId: null,
+      mediaError: 'LIVE_DUBBING_MEDIA_PAUSE_FAILED',
+    };
+    this._notifyMediaStatusChanged(descriptor);
+  }
+
+  _onFreshMediaReport(descriptor, frame, key) {
+    const barrier = this._mediaStateFor(descriptor)?.barrier;
+    if (!barrier || frame.revision < barrier.minimumRevision) return;
+    barrier.reports.set(key, frame.playing);
+    if (frame.playing) {
+      barrier.resolve(true);
+      return;
+    }
+    this._resolveAllFalseMediaBarrier(barrier);
+  }
+
+  _resolveAllFalseMediaBarrier(barrier) {
+    if (!barrier.inventoryReady || barrier.expectedFrames.size === 0) return;
+    if ([...barrier.expectedFrames].every(key => barrier.reports.get(key) === false)) {
+      barrier.allFalse = true;
+      barrier.resolve(false);
+    }
+  }
+
+  _endConfirmedMediaEpisode(descriptor, media, episodeId) {
+    if (!episodeId || media.episodeId !== episodeId || media.desiredPlaying || media.exhausted) return false;
+    media.episodeAttempts = 0;
+    media.episodeId = this.uuid();
+    media.episodeEndCandidate = null;
+    void this._queueMediaRetryStatePersistence(descriptor.sessionId, media);
+    return true;
+  }
+
+  async _confirmMediaEpisodeEnded(descriptor, media, episodeId) {
+    if (!this._isCurrentMediaDescriptor(descriptor) || media.desiredPlaying || media.exhausted
+      || media.episodeId !== episodeId || media.confirmingEpisodeId === episodeId) return false;
+    const activity = this.getMediaActivity();
+    if (!activity.known || activity.playing) return false;
+    media.confirmingEpisodeId = episodeId;
+    const requestId = this.mediaInventoryRequestId + 1;
+    let timer;
+    try {
+      const inventoryValid = await Promise.race([
+        this._reconcileMediaFrameInventory(descriptor.tabId, descriptor),
+        new Promise(resolve => { timer = setTimeout(() => resolve(false), 1_000); }),
+      ]);
+      if (!inventoryValid || !this._isCurrentMediaDescriptor(descriptor)
+        || media.desiredPlaying || media.exhausted || media.episodeId !== episodeId) {
+        if (timer && this.mediaInventoryRequestId === requestId) this.mediaInventoryRequestId += 1;
+        return false;
+      }
+      const documents = [...this.mediaFrameDocuments.entries()];
+      if (!documents.length || documents.some(([frameId, documentId]) => {
+        const frame = this.mediaObservation.frames.get(`${frameId}:${documentId}`);
+        return !frame || frame.revision < 0 || frame.playing !== false;
+      })) return false;
+      return this._endConfirmedMediaEpisode(descriptor, media, episodeId);
+    } catch {
+      if (this.mediaInventoryRequestId === requestId) this.mediaInventoryRequestId += 1;
+      return false;
+    } finally {
+      clearTimeout(timer);
+      if (media.confirmingEpisodeId === episodeId) media.confirmingEpisodeId = null;
+    }
+  }
+
+  async _freshPlayingBarrier(descriptor, operation) {
+    if (!this._isCurrentMediaDescriptor(descriptor) || operation.cancelled) {
+      this._logMedia('debug', 'barrier', { stage: 'precondition', outcome: 'interrupted' });
+      return false;
+    }
+    const media = this._mediaStateFor(descriptor);
+    const frames = [...this.mediaObservation.frames.entries()];
+    const barrier = {
+      minimumRevision: 0, resolve: null, cancel: null,
+      expectedFrames: new Set(), reports: new Map(), inventoryReady: false, allFalse: false,
+      cancelled: false,
+    };
+    const positive = new Promise(resolve => { barrier.resolve = resolve; });
+    const interrupted = Object.freeze({ interrupted: true });
+    let resolveInterrupt;
+    let deadlineTimer;
+    const interruptPromise = new Promise(resolve => { resolveInterrupt = resolve; });
+    const interrupt = () => {
+      if (barrier.cancelled) return;
+      barrier.cancelled = true;
+      this.mediaInventoryRequestId += 1;
+      if (media.barrier === barrier) media.barrier = null;
+      barrier.resolve(false);
+      resolveInterrupt(interrupted);
+    };
+    deadlineTimer = setTimeout(interrupt, this.mediaBarrierTimeoutMs);
+    barrier.cancel = interrupt;
+    const withinDeadline = promise => Promise.race([
+      Promise.resolve(promise).then(value => ({ value })),
+      interruptPromise,
+    ]);
+    const reconcileBarrierInventory = async () => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const requestId = this.mediaInventoryRequestId + 1;
+        const result = await withinDeadline(
+          this._reconcileMediaFrameInventory(descriptor.tabId, descriptor),
+        );
+        if (result === interrupted || barrier.cancelled || operation.cancelled
+          || media.barrier !== barrier || !this._isCurrentMediaDescriptor(descriptor)) return interrupted;
+        if (result.value === true || this.mediaInventoryRequestId === requestId || attempt === 1) return result;
+      }
+      return { value: false };
+    };
+    media.barrier = barrier;
+    for (const [, frame] of frames) {
+      frame.token = this.uuid();
+      frame.revision = -1;
+      frame.playing = false;
+    }
+    this.mediaActivityRevision += 1;
+    barrier.minimumRevision = -1;
+    try {
+      const inventoryResult = await reconcileBarrierInventory();
+      if (inventoryResult === interrupted || barrier.cancelled
+        || media.barrier !== barrier || operation.cancelled
+        || !this._isCurrentMediaDescriptor(descriptor)) return false;
+      if (inventoryResult.value === true) {
+        barrier.expectedFrames = new Set([...this.mediaFrameDocuments.entries()]
+          .map(([frameId, documentId]) => `${frameId}:${documentId}`));
+        barrier.inventoryReady = true;
+        for (const key of [...barrier.reports.keys()]) {
+          if (!barrier.expectedFrames.has(key)) barrier.reports.delete(key);
+        }
+        if ([...barrier.expectedFrames].some(key => barrier.reports.get(key) === true)) {
+          barrier.resolve(true);
+        } else {
+          this._resolveAllFalseMediaBarrier(barrier);
+        }
+      }
+      this._refreshMediaObservation(descriptor.tabId);
+      const reportResult = await withinDeadline(positive);
+      if (reportResult === interrupted || barrier.cancelled || operation.cancelled
+        || !this._isCurrentMediaDescriptor(descriptor)) return false;
+      if (reportResult.value === false && barrier.allFalse) {
+        if (media.barrier === barrier) media.barrier = null;
+        const endingEpisodeId = media.episodeEndCandidate || media.episodeId;
+        this._handleMediaDecision(descriptor, { known: true, playing: false });
+        void this._confirmMediaEpisodeEnded(descriptor, media, endingEpisodeId);
+        return false;
+      }
+      if (reportResult.value !== true) {
+        this._logMedia('debug', 'barrier', { stage: 'playing-report', outcome: 'not-playing' });
+        return false;
+      }
+      const finalInventory = await reconcileBarrierInventory();
+      if (finalInventory === interrupted || barrier.cancelled || operation.cancelled
+        || !this._isCurrentMediaDescriptor(descriptor)) return false;
+      if (media.barrier === barrier) media.barrier = null;
+      const activity = this.getMediaActivity();
+      const passed = finalInventory.value === true && activity.known && activity.playing
+        && this._isCurrentMediaDescriptor(descriptor) && !operation.cancelled;
+      this._logMedia('debug', 'barrier', { stage: 'final-inventory', outcome: passed ? 'passed' : 'failed' });
+      return passed;
+    } finally {
+      clearTimeout(deadlineTimer);
+      if (media.barrier === barrier) media.barrier = null;
+    }
+  }
+
+  async _beginMediaRotation(descriptor, media) {
+    if (!this._isCurrentMediaDescriptor(descriptor) || !media.desiredPlaying
+      || media.activeOperation || media.episodeAttempts >= 3) {
+      if (media.episodeAttempts >= 3) this._exhaustMediaEpisode(descriptor, media);
+      return;
+    }
+    if (media.pausedSequenceAcked !== media.mediaSequence || media.pauseFailed) return;
+    const operation = { id: this.uuid(), cancelled: false };
+    media.activeOperation = operation;
+    media.episodeAttempts += 1;
+    this._logMedia('debug', 'rotation', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, stage: 'start' });
+    this.mediaState = { mediaState: 'reconnecting', mediaSequence: media.mediaSequence, rotationId: null, mediaError: null };
+    this._notifyMediaStatusChanged(descriptor);
+    let failureStage = 'barrier';
+    try {
+      if (!await this._freshPlayingBarrier(descriptor, operation)) throw new Error('MEDIA_BARRIER_FAILED');
+      if (media.activeOperation !== operation || operation.cancelled) return;
+      failureStage = 'retry-state';
+      await media.retryPersistence;
+      if (operation.cancelled || media.activeOperation !== operation) return;
+      if (!await this._queueMediaRetryStatePersistence(descriptor.sessionId, media)) {
+        media.activeOperation = null;
+        media.exhausted = true;
+        this.mediaState = {
+          mediaState: 'error', mediaSequence: media.mediaSequence, rotationId: null,
+          mediaError: 'LIVE_DUBBING_MEDIA_RETRY_STATE_UNAVAILABLE',
+        };
+        this._notifyMediaStatusChanged(descriptor);
+        return;
+      }
+      if (operation.cancelled || media.activeOperation !== operation) return;
+      failureStage = 'media-grant';
+      const generation = {
+        sessionId: descriptor.sessionId, providerId: descriptor.providerId,
+        eventSequence: descriptor.eventSequence, mediaSequence: media.mediaSequence + 1,
+        rotationId: `${this.mediaRotationIncarnation}:${++this.mediaRotationCounter}:${this.uuid()}`,
+      };
+      if (!Number.isSafeInteger(generation.mediaSequence) || generation.mediaSequence < 1) {
+        throw new Error('MEDIA_SEQUENCE_EXHAUSTED');
+      }
+      media.mediaSequence = generation.mediaSequence;
+      media.pausedSequenceAcked = null;
+      operation.generation = generation;
+      this.mediaState = {
+        mediaState: 'reconnecting', mediaSequence: generation.mediaSequence,
+        rotationId: generation.rotationId, mediaError: null,
+      };
+      this._notifyMediaStatusChanged(descriptor);
+      const grant = {
+        ...generation, operationId: operation.id,
+        descriptor: cloneDescriptor(descriptor), state: this.sessionRegistry.getSessionState(descriptor.sessionId),
+      };
+      if (!this.sessionRegistry.reserveMediaBootstrapGrant(descriptor.sessionId, grant)) throw new Error('MEDIA_GRANT_BUSY');
+      failureStage = 'media-resume-dispatch';
+      this._logMedia('debug', 'dispatch', { stage: failureStage, mediaSequence: generation.mediaSequence });
+      const ready = await this._sendOffscreen(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_RESUME, generation));
+      failureStage = 'media-resume-ack';
+      const resumeAcked = ready?.success === true && ready.sessionId === generation.sessionId
+        && ready.providerId === generation.providerId && ready.eventSequence === generation.eventSequence
+        && ready.mediaSequence === generation.mediaSequence && ready.rotationId === generation.rotationId
+        && ready.ready === true;
+      this._logMedia('debug', 'ack', { stage: 'media-resume', outcome: resumeAcked ? 'success' : 'failed', mediaSequence: generation.mediaSequence });
+      if (operation.cancelled || media.activeOperation !== operation
+        || !this._isCurrentMediaDescriptor(descriptor) || !resumeAcked) throw new Error('MEDIA_RESUME_FAILED');
+      failureStage = 'commit-barrier';
+      if (!await this._freshPlayingBarrier(descriptor, operation)) throw new Error('MEDIA_COMMIT_BARRIER_FAILED');
+      if (operation.cancelled || media.activeOperation !== operation || !this._isCurrentMediaDescriptor(descriptor)) return;
+      failureStage = 'media-commit-dispatch';
+      this._logMedia('debug', 'dispatch', { stage: failureStage, mediaSequence: generation.mediaSequence });
+      const committed = await this._sendOffscreen(createMediaGenerationMessage(LIVE_DUBBING_ACTIONS.MEDIA_COMMIT, generation));
+      failureStage = 'media-commit-ack';
+      const commitAcked = committed?.success === true && committed.sessionId === generation.sessionId
+        && committed.providerId === generation.providerId && committed.eventSequence === generation.eventSequence
+        && committed.mediaSequence === generation.mediaSequence && committed.rotationId === generation.rotationId
+        && committed.playing === true;
+      this._logMedia('debug', 'ack', { stage: 'media-commit', outcome: commitAcked ? 'success' : 'failed', mediaSequence: generation.mediaSequence });
+      if (!commitAcked || operation.cancelled || media.activeOperation !== operation) {
+        throw new Error('MEDIA_COMMIT_FAILED');
+      }
+      media.activeOperation = null;
+      media.committed = true;
+      media.pausedSequenceAcked = null;
+      this.mediaState = { mediaState: 'playing', mediaSequence: generation.mediaSequence, rotationId: generation.rotationId, mediaError: null };
+      this._notifyMediaStatusChanged(descriptor);
+      this._logMedia('info', 'reconnected', { attempt: media.episodeAttempts, mediaSequence: generation.mediaSequence, outcome: 'success' });
+    } catch {
+      this.sessionRegistry.revokeMediaBootstrapGrant(descriptor.sessionId);
+      if (media.activeOperation !== operation) return;
+      media.activeOperation = null;
+      if (!media.desiredPlaying || !this._isCurrentMediaDescriptor(descriptor)) return;
+      if (operation.generation && !await this._disposeFailedMediaGeneration(descriptor, media)) {
+        if (operation.cancelled || !media.desiredPlaying || media.activeOperation !== null
+          || !this._isCurrentMediaDescriptor(descriptor)) return;
+        this._markMediaPauseFailure(descriptor, media);
+        return;
+      }
+      if (operation.cancelled || !media.desiredPlaying || media.activeOperation !== null
+        || !this._isCurrentMediaDescriptor(descriptor)) return;
+      if (media.episodeAttempts >= 3) {
+        this._logMedia('warn', 'rotation-exhausted', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, stage: failureStage, errorCode: safeFailureCode(failureStage) });
+        this._exhaustMediaEpisode(descriptor, media);
+        return;
+      }
+      const retryDelayMs = media.episodeAttempts === 1 ? 250 : 750;
+      this._logMedia('debug', 'retry-scheduled', { attempt: media.episodeAttempts, maxAttempts: 3, mediaSequence: media.mediaSequence, retryDelayMs, stage: failureStage, errorCode: safeFailureCode(failureStage) });
+      media.retryTimer = setTimeout(() => {
+        media.retryTimer = null;
+        if (media.desiredPlaying) void this._beginMediaRotation(descriptor, media);
+      }, retryDelayMs);
+    }
+  }
+
+  async _disposeFailedMediaGeneration(descriptor, media) {
+    const mediaSequence = ++media.mediaSequence;
+    media.pauseSequence = mediaSequence;
+    const pause = { mediaSequence, cancelled: false, kind: 'pause' };
+    media.activeOperation = pause;
+    try {
+      const response = await this._sendOffscreen(createMediaPauseMessage(descriptor, mediaSequence));
+      const acknowledged = response?.success === true && response.sessionId === descriptor.sessionId
+        && response.providerId === descriptor.providerId && response.eventSequence === descriptor.eventSequence
+        && response.mediaSequence === mediaSequence && response.paused === true;
+      if (!this._isCurrentMediaDescriptor(descriptor)) return false;
+      if (media.activeOperation === pause) {
+        media.activeOperation = null;
+        if (acknowledged) media.pausedSequenceAcked = mediaSequence;
+      }
+      return acknowledged;
+    } catch {
+      if (media.activeOperation === pause) media.activeOperation = null;
+      return false;
+    }
+  }
+
+  _exhaustMediaEpisode(descriptor, media) {
+    media.exhausted = true;
+    media.activeOperation = null;
+    void this._queueMediaRetryStatePersistence(descriptor.sessionId, media);
+    this.sessionRegistry.revokeMediaBootstrapGrant(descriptor.sessionId);
+    this.mediaState = {
+      mediaState: 'error', mediaSequence: media.mediaSequence, rotationId: null,
+      mediaError: 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED',
+    };
+    this._notifyMediaStatusChanged(descriptor);
+  }
+
+  async retryMedia(sender) {
+    if (!isTrustedLiveDubbingUiSender(sender, this.browserAPI)) return { success: false, error: 'LIVE_DUBBING_UNAUTHORIZED' };
+    const descriptor = await this._readDescriptor();
+    const state = descriptor && this.sessionRegistry.getSessionState(descriptor.sessionId);
+    const media = state?.media;
+    if (this._storageReadFailed() || this._storageDescriptorInvalid()
+      || !descriptor || descriptor.status !== LIVE_DUBBING_STATUS.RUNNING
+      || !this._isSameDescriptorFence(this.descriptor, descriptor)
+      || !state || state.terminalRequested
+      || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
+      || !this._isSameDescriptorFence(state.descriptor, descriptor)
+      || !media?.exhausted || this.mediaState.mediaState !== 'error') {
+      return { success: false, error: 'LIVE_DUBBING_SESSION_UNAVAILABLE' };
+    }
+    media.exhausted = false;
+    media.episodeAttempts = 0;
+    media.episodeId = this.uuid();
+    media.desiredPlaying = true;
+    if (media.pauseFailed) {
+      media.pausedSequenceAcked = null;
+      media.pauseSequence = null;
+      void this._pauseForMedia(descriptor, media);
+    } else {
+      void this._beginMediaRotation(descriptor, media);
+    }
+    return { success: true };
+  }
+
+  getMediaActivity() {
+    const verifiedFrames = [...this.mediaObservation.frames.values()].filter(frame => frame.revision >= 0);
+    return { known: verifiedFrames.length > 0, playing: verifiedFrames.some(frame => frame.playing), revision: this.mediaActivityRevision };
+  }
+
+  async verifyMediaActivity() {
+    const descriptor = await this._readDescriptor();
+    if (this._storageReadFailed() || this._storageDescriptorInvalid()
+      || descriptor?.status !== LIVE_DUBBING_STATUS.RUNNING
+      || this._isMediaSessionTerminal(descriptor.sessionId)
+      || this.mediaObservation.sessionId !== descriptor.sessionId) {
+      return { known: false, playing: false, revision: this.mediaActivityRevision };
+    }
+    const exactDescriptor = cloneDescriptor(descriptor);
+    const inventoryValid = await this._reconcileMediaFrameInventory(descriptor.tabId, exactDescriptor);
+    const current = await this._readDescriptor();
+    if (this._storageReadFailed() || this._storageDescriptorInvalid()
+      || !this._isSameDescriptorFence(current, exactDescriptor)
+      || this.mediaObservation.sessionId !== exactDescriptor.sessionId
+      || this._isMediaSessionTerminal(exactDescriptor.sessionId)
+      || !inventoryValid) {
+      return { known: false, playing: false, revision: this.mediaActivityRevision };
+    }
+    return this.getMediaActivity();
+  }
+
+  async _reconcileMediaFrameInventory(tabId, expectedDescriptor) {
+    const requestId = ++this.mediaInventoryRequestId;
+    let inventory;
+    try {
+      const getAllFrames = this.browserAPI.webNavigation?.getAllFrames;
+      if (typeof getAllFrames !== 'function') throw new Error('frame inventory unavailable');
+      inventory = await getAllFrames.call(this.browserAPI.webNavigation, { tabId });
+    } catch {
+      if (requestId === this.mediaInventoryRequestId) {
+        this._forgetMediaFrameInventory(expectedDescriptor);
+      }
+      return false;
+    }
+    if (requestId !== this.mediaInventoryRequestId) return false;
+    const current = await this._readDescriptor();
+    if (this._storageReadFailed() || this._storageDescriptorInvalid()
+      || !this._isSameDescriptorFence(current, expectedDescriptor)
+      || this.mediaObservation.sessionId !== expectedDescriptor.sessionId
+      || this._isMediaSessionTerminal(expectedDescriptor.sessionId)
+      || requestId !== this.mediaInventoryRequestId) return false;
+    if (!Array.isArray(inventory) || inventory.some(frame => !Number.isInteger(frame?.frameId)
+      || frame.frameId < 0 || typeof frame.documentId !== 'string' || !frame.documentId)) {
+      if (requestId === this.mediaInventoryRequestId) {
+        this._forgetMediaFrameInventory(expectedDescriptor);
+      }
+      return false;
+    }
+    const currentDocuments = new Map(inventory.map(frame => [frame.frameId, frame.documentId]));
+    if (currentDocuments.size !== inventory.length) {
+      this._forgetMediaFrameInventory(expectedDescriptor);
+      return false;
+    }
+    let retired = false;
+    for (const [key] of this.mediaObservation.frames) {
+      const separator = key.indexOf(':');
+      const frameId = Number(key.slice(0, separator));
+      const documentId = key.slice(separator + 1);
+      if (currentDocuments.get(frameId) !== documentId) {
+        this.mediaObservation.frames.delete(key);
+        retired = true;
+      }
+    }
+    for (const frameId of this.mediaFrameDocuments.keys()) {
+      if (currentDocuments.get(frameId) !== this.mediaFrameDocuments.get(frameId)) retired = true;
+    }
+    this.mediaFrameDocuments = currentDocuments;
+    if (retired) this.mediaActivityRevision += 1;
+    return true;
+  }
+
+  _forgetMediaFrameInventory(expectedDescriptor) {
+    if (!expectedDescriptor || this.mediaObservation.sessionId !== expectedDescriptor.sessionId
+      || !this._isSameDescriptorFence(this.descriptor, expectedDescriptor)) return;
+    if (this.mediaObservation.frames.size || this.mediaFrameDocuments.size) this.mediaActivityRevision += 1;
+    this.mediaObservation.frames.clear();
+    this.mediaFrameDocuments.clear();
+    this._refreshMediaObservation(expectedDescriptor.tabId);
+    this._handleMediaDecision(expectedDescriptor, this.getMediaActivity());
+  }
+
+  invalidateMediaFrame(tabId, frameId, documentId) {
+    if (!Number.isInteger(tabId) || tabId !== this.descriptor?.tabId
+      || !Number.isInteger(frameId) || frameId < 0) return;
+    const nextDocument = typeof documentId === 'string' && documentId ? documentId : null;
+    const previousDocument = this.mediaFrameDocuments.get(frameId);
+    const hadDocument = this.mediaFrameDocuments.has(frameId);
+    this.mediaFrameDocuments.set(frameId, nextDocument);
+    const prefix = `${frameId}:`;
+    let retired = false;
+    for (const key of this.mediaObservation.frames.keys()) {
+      if (key.startsWith(prefix) && key !== `${prefix}${documentId}`) {
+        this.mediaObservation.frames.delete(key);
+        retired = true;
+      }
+    }
+    if (retired || !hadDocument || previousDocument !== nextDocument) this.mediaActivityRevision += 1;
+    this.mediaInventoryRequestId += 1;
+    this._handleMediaDecision(this.descriptor, this.getMediaActivity());
+  }
+
+  _invalidateMediaObservation(action, descriptor) {
+    if (!descriptor || !this._isSameDescriptorFence(this.descriptor, descriptor)
+      || this.mediaObservation.sessionId !== descriptor.sessionId) return;
+    const tabId = descriptor.tabId;
+    const sessionToken = this.mediaObservation.token;
+    this.mediaActivityRevision += 1;
+    this.mediaInventoryRequestId += 1;
+    this.mediaObservation = { sessionId: null, token: null, frames: new Map() };
+    this.mediaFrameDocuments.clear();
+    if (Number.isInteger(tabId)) {
+      try {
+        void this.browserAPI.tabs.sendMessage(tabId, {
+          action,
+          data: { sessionToken },
+        }).catch(() => {});
+      } catch { /* best effort */ }
+    }
+  }
+
+  _refreshMediaObservation(tabId) {
+    try {
+      void this.browserAPI.tabs.sendMessage(tabId, { action: LIVE_DUBBING_ACTIONS.MEDIA_OBSERVER_REFRESH }).catch(() => {});
+    } catch { /* best effort */ }
+  }
+
+  _startMediaObservationSession(descriptor) {
+    if (this.mediaObservation.sessionId !== descriptor.sessionId) {
+      this.mediaFrameDocuments.clear();
+      this.mediaInventoryRequestId += 1;
+      this.mediaObservation = { sessionId: descriptor.sessionId, token: null, frames: new Map() };
+    }
+  }
+
   async handleCaptureStatusChanged({ tabId, status } = {}) {
     if (!Number.isInteger(tabId) || tabId < 0) {
       return { success: false, error: 'INVALID_TAB_ID', ignored: true };
@@ -1150,7 +1963,14 @@ export class LiveDubbingCoordinator {
     // Bootstrap requests are part of the provider response currently awaited
     // by start(). They must use the already-persisted in-memory fence instead
     // of waiting behind that same transition.
-    if (type === 'bootstrap') return this._authorizeBootstrapRequest(message);
+    if (type === 'bootstrap') {
+      const data = message?.data || message;
+      return data.rotationId !== undefined
+        ? this._authorizeMediaBootstrapRequest(message)
+        : this._authorizeBootstrapRequest(message);
+    }
+
+    if (type === 'media-state') return this._authorizeMediaStateChanged(message);
 
     return this._enqueue(async () => {
       const descriptor = await this._readDescriptor();
@@ -1159,6 +1979,67 @@ export class LiveDubbingCoordinator {
 
       return cloneDescriptor(descriptor);
     });
+  }
+
+  _authorizeMediaStateChanged(message) {
+    const descriptor = this.descriptor;
+    const data = message?.data || message;
+    const sessionState = descriptor?.sessionId
+      ? this.sessionRegistry.getSessionState(descriptor.sessionId)
+      : null;
+    const activeGeneration = sessionState?.media?.activeOperation?.generation;
+    if (this.storageState !== LIVE_DUBBING_STORAGE_STATE.PRESENT || !descriptor
+      || descriptor.status !== LIVE_DUBBING_STATUS.RUNNING
+      || !['paused', 'reconnecting', 'ready', 'playing', 'error'].includes(data.mediaState)
+      || !Number.isSafeInteger(data.mediaSequence) || data.mediaSequence < 1
+      || typeof data.rotationId !== 'string' || !data.rotationId.trim()
+      || !hasExactMediaGeneration(message, activeGeneration)
+      || !hasExactSessionEvent(message, descriptor)
+      || !this._isSameDescriptorFence(this.sessionRegistry.getSessionState(descriptor.sessionId)?.descriptor, descriptor)
+      || this._isMediaSessionTerminal(descriptor.sessionId)) return null;
+    const current = this.mediaState;
+    if (current.mediaSequence !== null && data.mediaSequence < current.mediaSequence) return null;
+    if (data.mediaSequence === current.mediaSequence && data.rotationId !== current.rotationId) return null;
+    if (data.mediaSequence === current.mediaSequence && current.mediaState === 'error'
+      && (data.mediaState !== 'error' || data.mediaError !== current.mediaError)) return null;
+    if (data.mediaSequence === current.mediaSequence && current.mediaState === 'playing'
+      && ['reconnecting', 'ready'].includes(data.mediaState)) return null;
+    if (data.mediaSequence === current.mediaSequence && current.mediaState === 'ready'
+      && data.mediaState === 'reconnecting') return null;
+    if (data.mediaState === 'playing' && !hasExactMediaGeneration(message, {
+      ...descriptor,
+      mediaSequence: data.mediaSequence,
+      rotationId: data.rotationId,
+    })) return null;
+    if (data.mediaState === 'error') {
+      this.mediaState = {
+        mediaState: 'error', mediaSequence: data.mediaSequence, rotationId: data.rotationId,
+        mediaError: typeof data.mediaError === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(data.mediaError)
+          ? data.mediaError : 'LIVE_DUBBING_MEDIA_ERROR',
+      };
+    } else {
+      this.mediaState = {
+        mediaState: data.mediaState, mediaSequence: data.mediaSequence,
+        rotationId: data.rotationId, mediaError: null,
+      };
+    }
+    this._notifyMediaStatusChanged(descriptor);
+    return cloneDescriptor(descriptor);
+  }
+
+  _notifyMediaStatusChanged(descriptor) {
+    try {
+      void this.browserAPI.runtime.sendMessage({
+        action: LIVE_DUBBING_ACTIONS.MEDIA_STATUS_CHANGED,
+        data: { sessionId: descriptor.sessionId },
+      }).catch(() => {});
+    } catch { /* status hints are best effort */ }
+  }
+
+  async handleOffscreenMediaStateChanged(message, sender) {
+    if (!isAuthorizedOffscreenSender(sender, this.browserAPI)) return { success: false, ignored: true };
+    const accepted = this._authorizeMediaStateChanged(message);
+    return accepted ? { success: true } : { success: true, ignored: true };
   }
 
   /**
@@ -1227,6 +2108,29 @@ export class LiveDubbingCoordinator {
     return cloneDescriptor(descriptor);
   }
 
+  _authorizeMediaBootstrapRequest(message) {
+    const descriptor = this.descriptor;
+    const data = message?.data || message;
+    const state = descriptor?.sessionId ? this.sessionRegistry.getSessionState(descriptor.sessionId) : null;
+    if (message?.action !== LIVE_DUBBING_ACTIONS.REQUEST_PROVIDER_BOOTSTRAP
+      || !this._isCurrentMediaDescriptor(descriptor)
+      || data.targetLanguage !== descriptor.targetLanguage
+      || !Number.isSafeInteger(data.mediaSequence) || data.mediaSequence < 1
+      || typeof data.rotationId !== 'string' || !data.rotationId.trim()) return null;
+    const grant = this.sessionRegistry.claimMediaBootstrapGrant(descriptor.sessionId, item => (
+      item.sessionId === data.sessionId && item.providerId === data.providerId
+      && item.eventSequence === data.eventSequence && item.mediaSequence === data.mediaSequence
+      && item.rotationId === data.rotationId && item.state === state
+      && item.operationId === state.media?.activeOperation?.id
+      && state.media.activeOperation.cancelled !== true
+      && this._isSameDescriptorFence(item.descriptor, descriptor)
+      && this._isSameDescriptorFence(state.descriptor, descriptor)
+    ));
+    if (!grant || !hasExactMediaGeneration(message, grant)) return null;
+    return { ...cloneDescriptor(descriptor), bootstrapKind: 'media', mediaSequence: grant.mediaSequence,
+      rotationId: grant.rotationId, mediaOperationId: grant.operationId, mediaStateRef: state };
+  }
+
   /**
    * Recheck the fence after bootstrap resolution. A stop or terminal event
    * can win while the key manager is awaiting, so the key must not be sent
@@ -1237,6 +2141,19 @@ export class LiveDubbingCoordinator {
 
     const current = this.descriptor;
     const state = this.sessionRegistry.getSessionState(descriptor.sessionId);
+    if (descriptor.bootstrapKind === 'media') {
+      return this.storageState === LIVE_DUBBING_STORAGE_STATE.PRESENT
+        && this._isSameDescriptorFence(current, descriptor)
+        && state === descriptor.mediaStateRef
+        && this._isSameDescriptorFence(state?.descriptor, descriptor)
+        && !state?.terminalRequested
+        && !this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
+        && state?.media?.activeOperation?.id === descriptor.mediaOperationId
+        && state.media.activeOperation.cancelled !== true
+        && state.media.activeOperation.generation?.mediaSequence === descriptor.mediaSequence
+        && state.media.activeOperation.generation?.rotationId === descriptor.rotationId
+        && state.media.mediaSequence === descriptor.mediaSequence;
+    }
     return this.storageState === LIVE_DUBBING_STORAGE_STATE.PRESENT
       && current?.status === LIVE_DUBBING_STATUS.CONNECTING_PROVIDER
       && this._isSameDescriptorFence(current, descriptor)
@@ -1403,6 +2320,24 @@ export class LiveDubbingCoordinator {
       return { success: false, error: 'TAB_CAPTURE_UNAVAILABLE' };
     }
 
+    let observerInjection;
+    try {
+      observerInjection = await this.runtimeGateway.injectMediaObserverForTab(tab.id);
+    } catch {
+      observerInjection = null;
+    }
+    if (pendingStart.terminalRequested) {
+      return { success: false, error: 'LIVE_DUBBING_START_CANCELLED' };
+    }
+    if (observerInjection?.success !== true) {
+      return {
+        success: false,
+        error: 'LIVE_DUBBING_MEDIA_OBSERVER_RELOAD_REQUIRED',
+        reloadRequired: true,
+        retryable: true,
+      };
+    }
+
     const descriptor = createDescriptor({
       sessionId: pendingStart.sessionId,
       tabId: tab.id,
@@ -1418,6 +2353,11 @@ export class LiveDubbingCoordinator {
       terminalRequested: false,
       cleanupCompleted: false,
       providerDiagnostic: null,
+      media: {
+        mediaSequence: 0, episodeAttempts: 0, retryTimer: null, debounceTimer: null,
+        activeOperation: null, barrier: null, desiredPlaying: false, exhausted: false, committed: false,
+        episodeId: null, retryPersistence: Promise.resolve(),
+      },
     };
     this.sessionRegistry.setSessionState(descriptor.sessionId, sessionState);
     if (!await this._writeDescriptor(descriptor)) {
@@ -1465,7 +2405,7 @@ export class LiveDubbingCoordinator {
       const initialVolumes = await this._readVolumePreferences();
       const prepareResponse = await this._sendCaptureStage(
         LIVE_DUBBING_CAPTURE_STAGES.OFFSCREEN_PREPARE,
-        createPrepareMessage(descriptor, initialVolumes),
+        createPrepareMessage(descriptor, initialVolumes, { synchronizeMedia: true }),
       );
       if (!isAcknowledgedForSession(prepareResponse, 'READY', descriptor.sessionId, descriptor.providerId)) {
         throw createCaptureStageFailure(
@@ -1611,6 +2551,9 @@ export class LiveDubbingCoordinator {
         );
       }
       if (sessionState.terminalRequested) throw new Error('live dubbing terminal requested');
+      this._startMediaObservationSession(activeDescriptor);
+      this._refreshMediaObservation(activeDescriptor.tabId);
+      this._handleMediaDecision(activeDescriptor, this.getMediaActivity());
       return { success: true, status: cloneDescriptor(activeDescriptor) };
     } catch (error) {
       this._clearVolumeEventSequenceReservation(descriptor.sessionId, descriptor.providerId);
@@ -1783,6 +2726,13 @@ export class LiveDubbingCoordinator {
     const retainedStartupError = allowedStartupCodes.has(cleanupFailureError) ? cleanupFailureError : null;
     const currentState = this.sessionRegistry.getSessionState(descriptor.sessionId);
     const existingTerminal = this.sessionRegistry.getTerminalOperation(descriptor.sessionId);
+    if ((descriptor.status === LIVE_DUBBING_STATUS.RUNNING
+      || this.mediaObservation.sessionId === descriptor.sessionId)
+      && this._isSameDescriptorFence(this.descriptor, descriptor)
+      && (!existingTerminal || (existingTerminal.providerId === descriptor.providerId
+        && existingTerminal.state === currentState))) {
+      this._invalidateMediaObservation(LIVE_DUBBING_ACTIONS.MEDIA_OBSERVER_STOP, descriptor);
+    }
     if (existingTerminal?.providerId === descriptor.providerId
       && existingTerminal.state === currentState) {
       return this._awaitStop(existingTerminal, descriptor, reason);
@@ -2018,6 +2968,7 @@ export class LiveDubbingCoordinator {
     const descriptor = await this._readDescriptor();
     if (this._storageReadFailed()) return this._storageReadFailure();
     if (this._storageDescriptorInvalid()) return this._storageDescriptorFailure();
+    if (descriptor?.status === LIVE_DUBBING_STATUS.RUNNING) this._beginWorkerMediaRecovery(descriptor);
     const terminalState = descriptor && this.sessionRegistry.getSessionState(descriptor.sessionId);
     if (terminalState?.terminalRequested && terminalState.cleanupCompleted) {
       const cleanupRetry = await this._stopDescriptor(descriptor, 'RECONCILE_CLEANUP');
@@ -2116,13 +3067,27 @@ export class LiveDubbingCoordinator {
       };
     }
 
-    if (this._isRecoverableRunningStatus(
+    const synchronizedMediaRecovery = this._isRecoverableSynchronizedMediaStatus(
+      descriptorStatus,
+      descriptor,
+    );
+    if (synchronizedMediaRecovery || this._isRecoverableRunningStatus(
       descriptorStatus,
       descriptor.sessionId,
       descriptor.providerId,
     )) {
       if (!matchingLease) {
-        const acquired = await this._acquireRecoveryLease(descriptor);
+        const recoveryState = this.sessionRegistry.getSessionState(descriptor.sessionId);
+        const leasePromise = this._acquireRecoveryLease(descriptor);
+        if (recoveryState) recoveryState.leasePromise = leasePromise;
+        const acquired = await leasePromise;
+        if (recoveryState && this.sessionRegistry.isSessionState(descriptor.sessionId, recoveryState)) {
+          recoveryState.leaseAcquired = acquired;
+          if (recoveryState.leasePromise === leasePromise) recoveryState.leasePromise = null;
+        }
+        if (recoveryState?.terminalRequested || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)) {
+          return { success: false, stopped: false, ignored: true, recovered: false };
+        }
         if (!acquired) {
           this._rememberReconciledSession(descriptor, false);
           const failed = this._advance(
@@ -2148,7 +3113,7 @@ export class LiveDubbingCoordinator {
       const activeDescriptor = descriptor.status === LIVE_DUBBING_STATUS.RUNNING
         ? descriptor
         : this._advance(descriptor, LIVE_DUBBING_STATUS.RUNNING);
-      this._rememberReconciledSession(activeDescriptor, Boolean(matchingLease));
+      const recoveredState = this._rememberReconciledSession(activeDescriptor, Boolean(matchingLease));
 
       const persisted = descriptor.status === LIVE_DUBBING_STATUS.RUNNING
         || await this._writeDescriptor(activeDescriptor, descriptor.sessionId);
@@ -2159,6 +3124,29 @@ export class LiveDubbingCoordinator {
           recovered: false,
           retryable: true,
         };
+      }
+      if (activeDescriptor.status === LIVE_DUBBING_STATUS.RUNNING) {
+        if (synchronizedMediaRecovery) {
+          const quiesced = await this._quiesceRecoveredMediaSession(
+            activeDescriptor,
+            descriptorStatus,
+            recoveredState,
+          );
+          if (!quiesced) {
+            return {
+              success: false,
+              error: 'LIVE_DUBBING_MEDIA_RECOVERY_PAUSE_FAILED',
+              status: cloneDescriptor(activeDescriptor),
+              recovered: false,
+              retryable: true,
+            };
+          }
+        } else {
+        this.mediaRecoverySessions.delete(activeDescriptor.sessionId);
+        if (recoveredState.media) recoveredState.media.recovering = false;
+        this._startMediaObservationSession(activeDescriptor);
+        this._refreshMediaObservation(activeDescriptor.tabId);
+        }
       }
 
       let unmatchedCleaned = true;
@@ -2296,6 +3284,44 @@ export class LiveDubbingCoordinator {
     };
   }
 
+  _beginWorkerMediaRecovery(descriptor) {
+    const sessionId = descriptor?.sessionId;
+    if (!sessionId) return;
+    this._logMedia('debug', 'recovery', { stage: 'start', outcome: 'pending' });
+    this.mediaRecoverySessions.add(sessionId);
+    let state = this.sessionRegistry.getSessionState(sessionId);
+    if (!state) {
+      state = {
+        descriptor,
+        leasePromise: null,
+        leaseAcquired: this._hasLiveLease(sessionId),
+        prepared: true,
+        terminalRequested: false,
+        cleanupCompleted: false,
+        providerDiagnostic: null,
+      };
+      this.sessionRegistry.setSessionState(sessionId, state);
+    }
+    const media = state?.media;
+    if (media) {
+      media.recovering = true;
+      clearTimeout(media.debounceTimer);
+      clearTimeout(media.retryTimer);
+      media.debounceTimer = null;
+      media.retryTimer = null;
+      media.barrier?.cancel?.();
+      media.barrier = null;
+      if (media.activeOperation) media.activeOperation.cancelled = true;
+      media.activeOperation = null;
+    }
+    this.sessionRegistry.revokeMediaBootstrapGrant(sessionId);
+    this.sessionRegistry.releaseBootstrapSession(sessionId);
+    this.mediaInventoryRequestId += 1;
+    this.mediaActivityRevision += 1;
+    this.mediaObservation = { sessionId, token: this.uuid(), frames: new Map() };
+    this.mediaFrameDocuments.clear();
+  }
+
   async _queryStatus(descriptor, sessionId, providerId = descriptor?.providerId) {
     try {
       const response = await this._sendOffscreen(
@@ -2379,7 +3405,7 @@ export class LiveDubbingCoordinator {
       current.prepared = true;
       current.cleanupCompleted = false;
       this.cleanupManager.syncLeaseOwnership(descriptor.sessionId, current, leaseAcquired);
-      return;
+      return current;
     }
 
     const newState = {
@@ -2392,12 +3418,26 @@ export class LiveDubbingCoordinator {
       providerDiagnostic: null,
     };
     this.sessionRegistry.setSessionState(descriptor.sessionId, newState);
+    return newState;
   }
 
   _markTerminalState(state) {
     if (!state?.descriptor?.sessionId) return;
     state.terminalRequested = true;
     state.volumeEventSequenceReservation = null;
+    const media = state.media;
+    if (media) {
+      media.terminal = true;
+      clearTimeout(media.debounceTimer);
+      clearTimeout(media.retryTimer);
+      media.debounceTimer = null;
+      media.retryTimer = null;
+      if (media.activeOperation) media.activeOperation.cancelled = true;
+      media.barrier?.cancel?.();
+      media.barrier = null;
+      media.activeOperation = null;
+    }
+    this.sessionRegistry.revokeMediaBootstrapGrant(state.descriptor.sessionId);
     this.sessionRegistry.releaseBootstrapSession(state.descriptor.sessionId);
   }
 
@@ -2460,6 +3500,10 @@ export class LiveDubbingCoordinator {
   _forgetSessionState(sessionId, expectedState = null) {
     if (expectedState && !this.sessionRegistry.isSessionState(sessionId, expectedState)) return;
     const state = this.sessionRegistry.getSessionState(sessionId);
+    this.mediaRecoverySessions.delete(sessionId);
+    this.sessionRegistry.revokeMediaBootstrapGrant(sessionId);
+    void Promise.resolve(state?.media?.retryPersistence).catch(() => false)
+      .then(() => this._clearPersistedMediaRetryState(sessionId));
     if (state) state.volumeEventSequenceReservation = null;
     // Delegate physical facts ownership; manager fences exact generation only.
     if (expectedState) {
@@ -2630,7 +3674,105 @@ export class LiveDubbingCoordinator {
       && response.active === true
       && response.captureReady === true
       && response.audioPathReady === true
+      && response.mediaState === undefined
+      && response.mediaSequence === undefined
+      && response.synchronizeMedia === undefined
       && response.setupComplete === true;
+  }
+
+  _isRecoverableSynchronizedMediaStatus(response, descriptor) {
+    return this._isExactSessionStatus(response, descriptor?.sessionId, descriptor?.providerId)
+      && response.status === LIVE_DUBBING_STATUS.RUNNING
+      && response.active === true
+      && response.captureReady === true
+      && response.audioPathReady === true
+      && response.synchronizeMedia === true
+      && response.eventSequence === descriptor.eventSequence
+      && typeof response.setupComplete === 'boolean'
+      && response.mediaState !== undefined
+      && ['paused', 'reconnecting', 'ready', 'playing', 'error'].includes(response.mediaState)
+      && Number.isSafeInteger(response.mediaSequence) && response.mediaSequence >= 0
+      && response.mediaSequence < Number.MAX_SAFE_INTEGER
+      && (response.mediaSequence > 0 || response.synchronizeMedia === true)
+      && (response.rotationId === null || response.rotationId === undefined
+        || typeof response.rotationId === 'string' && response.rotationId.trim().length > 0)
+      && (response.mediaError === null || response.mediaError === undefined
+        || typeof response.mediaError === 'string' && /^[A-Z0-9_.-]{1,80}$/.test(response.mediaError));
+  }
+
+  async _quiesceRecoveredMediaSession(descriptor, status, state) {
+    if (!state || !this.sessionRegistry.isSessionState(descriptor.sessionId, state)
+      || state.terminalRequested || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)) return false;
+    const media = state.media ||= {};
+    clearTimeout(media.debounceTimer);
+    clearTimeout(media.retryTimer);
+    media.debounceTimer = null;
+    media.retryTimer = null;
+    media.barrier?.cancel?.();
+    media.barrier = null;
+    if (media.activeOperation) media.activeOperation.cancelled = true;
+    media.activeOperation = null;
+    media.desiredPlaying = status.mediaState === 'playing';
+    media.committed = false;
+    media.recovering = true;
+    media.mediaSequence = status.mediaSequence;
+    this.sessionRegistry.revokeMediaBootstrapGrant(descriptor.sessionId);
+    this.sessionRegistry.releaseBootstrapSession(descriptor.sessionId);
+    this.mediaInventoryRequestId += 1;
+    this.mediaActivityRevision += 1;
+    this.mediaObservation = { sessionId: descriptor.sessionId, token: this.uuid(), frames: new Map() };
+    this.mediaFrameDocuments.clear();
+
+    const persistedRetry = await this._readPersistedMediaRetryState(descriptor.sessionId);
+    if (state.terminalRequested || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
+      || !this.sessionRegistry.isSessionState(descriptor.sessionId, state)) return false;
+    media.episodeId = persistedRetry.state?.episodeId || this.uuid();
+    media.episodeAttempts = persistedRetry.state?.attempts || 0;
+    media.exhausted = status.mediaState === 'error'
+      || persistedRetry.state?.exhausted === true || persistedRetry.failed;
+    this._logMedia('debug', 'recovery', { stage: 'retry-state-restored', outcome: media.exhausted ? 'exhausted' : 'ready', attempt: media.episodeAttempts, mediaSequence: status.mediaSequence });
+
+    const mediaSequence = status.mediaSequence + 1;
+    const operation = { id: this.uuid(), cancelled: false, kind: 'recovery-pause' };
+    media.activeOperation = operation;
+    let response;
+    try {
+      response = await this._sendOffscreen(createMediaPauseMessage(descriptor, mediaSequence));
+    } catch {
+      if (media.activeOperation === operation) media.activeOperation = null;
+      this._logMedia('debug', 'recovery', { stage: 'pause-dispatch', outcome: 'failed', mediaSequence });
+      return false;
+    }
+    if (operation.cancelled || media.activeOperation !== operation
+      || !this.sessionRegistry.isSessionState(descriptor.sessionId, state)
+      || state.terminalRequested || this.sessionRegistry.hasTerminalOperation(descriptor.sessionId)
+      || !this._isCurrentMediaDescriptor(descriptor)
+      || response?.success !== true || response.sessionId !== descriptor.sessionId
+      || response.providerId !== descriptor.providerId || response.eventSequence !== descriptor.eventSequence
+       || response.mediaSequence !== mediaSequence || response.paused !== true) {
+      this._logMedia('debug', 'recovery', { stage: 'pause-ack', outcome: 'failed', mediaSequence });
+      return false;
+    }
+
+    media.activeOperation = null;
+    media.mediaSequence = mediaSequence;
+    media.pauseSequence = mediaSequence;
+    media.pausedSequenceAcked = mediaSequence;
+    media.recovering = false;
+    this.mediaRecoverySessions.delete(descriptor.sessionId);
+    this.mediaState = media.exhausted
+      ? {
+        mediaState: 'error', mediaSequence, rotationId: status.rotationId || null,
+        mediaError: persistedRetry.failed
+          ? 'LIVE_DUBBING_MEDIA_RETRY_STATE_UNAVAILABLE'
+          : status.mediaError || 'LIVE_DUBBING_MEDIA_RETRY_EXHAUSTED',
+      }
+      : { mediaState: 'paused', mediaSequence, rotationId: null, mediaError: null };
+    this._notifyMediaStatusChanged(descriptor);
+    this._startMediaObservationSession(descriptor);
+    this._refreshMediaObservation(descriptor.tabId);
+    this._logMedia('info', 'recovery', { stage: 'complete', outcome: 'success', mediaSequence });
+    return true;
   }
 
   _isProvablyAbsent(response, sessionId, providerId) {
