@@ -146,12 +146,14 @@ To load a development build, open `chrome://extensions`, enable Developer mode, 
 To actively develop and apply changes in real time, use the following commands:
 
 ```bash
-# Watch for changes
+# Watch for changes (0 ms delay by default; preserves existing behavior)
 pnpm run watch:chrome
+pnpm run watch:chrome --delay=30000
 pnpm run watch:firefox
+pnpm run watch:firefox --delay=30000
 ```
 
-Watch builds update the output files but do not automatically reload the extension. Reload it in `chrome://extensions` or `about:debugging` after a rebuild; refresh open pages as well to reload content scripts, and reopen extension views such as the popup or Options page.
+The optional `--delay` is a non-negative integer number of milliseconds. The initial build starts immediately; after a change, a rebuild waits until no further changes occur for the specified duration. The default is `0`, preserving the existing rebuild behavior. Watch builds update the output files but do not automatically reload the extension. Reload it in `chrome://extensions` or `about:debugging` after a rebuild; refresh open pages as well to reload content scripts, and reopen extension views such as the popup or Options page.
 
 ### Viewing Logs and Debug Mode
 

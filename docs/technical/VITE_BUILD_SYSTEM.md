@@ -168,10 +168,12 @@ rollupOptions: {
 ## 4. Developer Workflow Commands
 
 ### Active Compilation Commands:
-*   **`pnpm run watch:chrome`**: Development watch compiler for Chrome. Instantly compiles changes in the background, mutes intentional logger warnings, and keeps the terminal completely clean.
-*   **`pnpm run watch:firefox`**: Tailored watch mode with live hot-reloading path corrections for Firefox.
+*   **`pnpm run watch:chrome`** / **`pnpm run watch:firefox`**: Start the development watch compiler for the selected browser. The initial build starts immediately; subsequent rebuilds use a `0` ms debounce by default, preserving existing behavior.
+*   **`pnpm run watch:chrome --delay=30000`** / **`pnpm run watch:firefox --delay=30000`**: Set an optional non-negative integer debounce delay in milliseconds. Rebuilds wait until no further changes occur during that duration; this is not a fixed rebuild interval.
 *   **`pnpm run build`**: Production compiler, applying minification via Terser, dropping console logs, and splitting static assets.
 *   **`pnpm run validate:production-bundle`**: Validates the production bundle against release invariants (see [Production Bundle Invariants](#production-bundle-invariants)).
+
+The watch commands run through `scripts/dev/watch.mjs`, which validates `--delay` and starts Vite's build watcher. The wrapper passes the delay to the Chrome or Firefox Vite config, where it becomes Rolldown's native `build.watch.buildDelay`. The value is applied to the top-level build and to the `htmlViteConfig` and `scriptViteConfig` child builds created by `vite-plugin-web-extension`, so each watcher uses the same debounce delay. A delay of `0` retains the default behavior.
 
 ---
 

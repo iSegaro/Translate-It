@@ -4,6 +4,7 @@ import { resolve } from 'path'
 import { visualizer } from 'rollup-plugin-visualizer'
 import analyzerPkg from 'rollup-plugin-analyzer'
 const analyzer = analyzerPkg.default || analyzerPkg
+const configDir = import.meta.dirname
 
 export default defineConfig({
   plugins: [
@@ -26,14 +27,14 @@ export default defineConfig({
   
   resolve: {
     alias: {
-      '@': resolve(__dirname, '../../src'),
-      '@components': resolve(__dirname, '../../src/components'),
-      '@views': resolve(__dirname, '../../src/views'),
-      '@store': resolve(__dirname, '../../src/store'),
-      '@composables': resolve(__dirname, '../../src/composables'),
-      '@utils': resolve(__dirname, '../../src/utils'),
-      '@providers': resolve(__dirname, '../../src/providers'),
-      '@assets': resolve(__dirname, '../../src/assets')
+      '@': resolve(configDir, '../../src'),
+      '@components': resolve(configDir, '../../src/components'),
+      '@views': resolve(configDir, '../../src/views'),
+      '@store': resolve(configDir, '../../src/store'),
+      '@composables': resolve(configDir, '../../src/composables'),
+      '@utils': resolve(configDir, '../../src/utils'),
+      '@providers': resolve(configDir, '../../src/providers'),
+      '@assets': resolve(configDir, '../../src/assets')
     }
   },
 
@@ -41,9 +42,9 @@ export default defineConfig({
     outDir: 'dist-vue',
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, '../../popup.html'),
-        sidepanel: resolve(__dirname, '../../sidepanel.html'),
-        options: resolve(__dirname, '../../options.html')
+        popup: resolve(configDir, '../../popup.html'),
+        sidepanel: resolve(configDir, '../../sidepanel.html'),
+        options: resolve(configDir, '../../options.html')
       },
       
       external: [
