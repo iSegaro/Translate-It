@@ -20,14 +20,15 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
   let observer;
   let armed = false;
   const media = new Set();
-  const shadowRoots = new Set();
+  const shadowRoots = new Map();
   const mediaEvents = ['play', 'playing', 'pause', 'ended', 'volumechange'];
 
   const listenToShadowRoot = (root) => {
     if (shadowRoots.has(root)) return;
-    shadowRoots.add(root);
     for (const eventName of mediaEvents) root.addEventListener(eventName, onMediaEvent, true);
-    observer?.observe(root, { childList: true, subtree: true });
+    const rootObserver = new MutationObserver(onMutations);
+    rootObserver.observe(root, { childList: true, subtree: true });
+    shadowRoots.set(root, rootObserver);
   };
 
   const disarm = () => {
@@ -40,8 +41,9 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
     document.removeEventListener('pause', onMediaEvent, true);
     document.removeEventListener('ended', onMediaEvent, true);
     document.removeEventListener('volumechange', onMediaEvent, true);
-    for (const root of shadowRoots) {
+    for (const [root, rootObserver] of shadowRoots) {
       for (const eventName of mediaEvents) root.removeEventListener(eventName, onMediaEvent, true);
+      rootObserver.disconnect();
     }
     shadowRoots.clear();
     media.clear();
@@ -78,7 +80,27 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
       if (element.matches('audio, video')) media.add(element);
       if (element.shadowRoot) listenToShadowRoot(element.shadowRoot);
     });
+    for (const [root, rootObserver] of shadowRoots) {
+      if (root.host.isConnected) continue;
+      for (const eventName of mediaEvents) root.removeEventListener(eventName, onMediaEvent, true);
+      rootObserver.disconnect();
+      shadowRoots.delete(root);
+      for (const element of media) if (root.contains(element)) media.delete(element);
+    }
   };
+
+  function onMutations(records) {
+    if (!armed) return;
+    const frameStructureChanged = records.some(({ removedNodes }) => [...removedNodes].some((node) =>
+      node.nodeType === 1 && (node.matches('iframe') || node.querySelector('iframe'))));
+    collect();
+    const nextPlaying = readPlaying();
+    if (nextPlaying !== playing || frameStructureChanged) {
+      playing = nextPlaying;
+      revision += 1;
+      sendObservation(frameStructureChanged);
+    }
+  }
 
   const readPlaying = () => {
     for (const element of media) {
@@ -127,18 +149,7 @@ export function installMediaObserver({ runtime = globalThis.chrome?.runtime, doc
       document.addEventListener('pause', onMediaEvent, true);
       document.addEventListener('ended', onMediaEvent, true);
       document.addEventListener('volumechange', onMediaEvent, true);
-      observer = new MutationObserver((records) => {
-        if (!armed) return;
-        const frameStructureChanged = records.some(({ removedNodes }) => [...removedNodes].some((node) =>
-          node.nodeType === 1 && (node.matches('iframe') || node.querySelector('iframe'))));
-        collect();
-        const nextPlaying = readPlaying();
-        if (nextPlaying !== playing || frameStructureChanged) {
-          playing = nextPlaying;
-          revision += 1;
-          sendObservation(frameStructureChanged);
-        }
-      });
+      observer = new MutationObserver(onMutations);
       observer.observe(document.documentElement, { childList: true, subtree: true });
       collect();
     }

@@ -983,7 +983,17 @@ export class LiveDubbingCoordinator {
     if (data.frameStructureChanged === true) {
       this.mediaInventoryRequestId += 1;
       this._refreshMediaObservation(descriptor.tabId);
-      await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      let inventoryValid = await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      if (!inventoryValid && !this._isMediaSessionTerminal(descriptor.sessionId)) {
+        inventoryValid = await this._reconcileMediaFrameInventory(descriptor.tabId, descriptor);
+      }
+      if (!inventoryValid) {
+        if (!this._isMediaSessionTerminal(descriptor.sessionId)
+          && this._isSameDescriptorFence(this.descriptor, descriptor)) {
+          this._forgetMediaFrameInventory(descriptor);
+        }
+        return { success: true };
+      }
     }
     if (this.mediaObservation.frames.get(key) !== state) return { success: true };
     this._onFreshMediaReport(descriptor, state, key);

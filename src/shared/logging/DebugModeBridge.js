@@ -50,6 +50,7 @@ class DebugModeBridge {
     this.context = this.detectContext();
     this.storageListener = null;
     this.messageListener = null;
+    this.offscreenSettingRevisions = { DEBUG_MODE: 0, COMPONENT_LOG_LEVELS: 0 };
   }
 
   /**
@@ -106,11 +107,16 @@ class DebugModeBridge {
 
     try {
       if (this.context === 'offscreen') {
+        const requestRevisions = { ...this.offscreenSettingRevisions };
         const response = await chrome.runtime.sendMessage({ action: MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET });
         const settings = sanitizeLoggingSettings(response);
-        this.currentDebugMode = settings.DEBUG_MODE;
-        await this.applyDebugMode(settings.DEBUG_MODE);
-        await this.applyComponentLogLevels(settings.COMPONENT_LOG_LEVELS);
+        if (this.offscreenSettingRevisions.DEBUG_MODE === requestRevisions.DEBUG_MODE) {
+          this.currentDebugMode = settings.DEBUG_MODE;
+          await this.applyDebugMode(settings.DEBUG_MODE);
+        }
+        if (this.offscreenSettingRevisions.COMPONENT_LOG_LEVELS === requestRevisions.COMPONENT_LOG_LEVELS) {
+          await this.applyComponentLogLevels(settings.COMPONENT_LOG_LEVELS);
+        }
         this.isInitialized = true;
         return true;
       }
@@ -208,6 +214,12 @@ class DebugModeBridge {
    * @param {boolean} debugMode - Whether to enable debug mode
    */
   async applyDebugMode(debugMode) {
+    const offscreenRevision = this.context === 'offscreen'
+      ? this.offscreenSettingRevisions.DEBUG_MODE
+      : null;
+    const isCurrentOffscreenApplication = () =>
+      offscreenRevision === null || offscreenRevision === this.offscreenSettingRevisions.DEBUG_MODE;
+
     try {
       // Update SafeConsole
       safeConsole.setEnabled(debugMode);
@@ -215,6 +227,7 @@ class DebugModeBridge {
       // Update logging system's debug override
       try {
         const { setGlobalDebugOverride } = await import('./GlobalDebugState.js');
+        if (!isCurrentOffscreenApplication()) return;
         setGlobalDebugOverride(debugMode);
         logger.debug('Updated GlobalDebugState (debugOverride):', debugMode);
       } catch (error) {
@@ -224,6 +237,7 @@ class DebugModeBridge {
       // Update ErrorHandler debug mode
       try {
         const { ErrorHandler } = await import('@/shared/error-management/ErrorHandler.js');
+        if (!isCurrentOffscreenApplication()) return;
         const errorHandler = ErrorHandler.getInstance();
         if (errorHandler && typeof errorHandler.setDebugMode === 'function') {
           errorHandler.setDebugMode(debugMode);
@@ -233,7 +247,7 @@ class DebugModeBridge {
         logger.warn('Could not update ErrorHandler:', error);
       }
 
-      this.currentDebugMode = debugMode;
+      if (isCurrentOffscreenApplication()) this.currentDebugMode = debugMode;
     } catch (error) {
       logger.error('Failed to apply debug mode:', error);
     }
@@ -353,6 +367,7 @@ class DebugModeBridge {
    * @param {boolean} newDebugMode - New debug mode value
    */
   handleDebugModeChange(newDebugMode) {
+    if (this.context === 'offscreen') this.offscreenSettingRevisions.DEBUG_MODE++;
     if (newDebugMode !== this.currentDebugMode) {
       logger.info('Debug mode changed', {
         from: this.currentDebugMode,
@@ -368,6 +383,8 @@ class DebugModeBridge {
       if (this.context !== 'background' && this.context !== 'offscreen') {
         this.broadcastChange(MessageActions.DEBUG_MODE_CHANGED, { debugMode: newDebugMode });
       }
+    } else if (this.context === 'offscreen') {
+      this.applyDebugMode(newDebugMode);
     }
   }
 
@@ -376,6 +393,7 @@ class DebugModeBridge {
    * @param {Object} levels - New component log levels object
    */
   handleComponentLogLevelsChange(levels) {
+    if (this.context === 'offscreen') this.offscreenSettingRevisions.COMPONENT_LOG_LEVELS++;
     levels = sanitizeComponentLogLevels(levels);
     logger.info('Component log levels changed', {
       count: levels ? Object.keys(levels).length : 0,

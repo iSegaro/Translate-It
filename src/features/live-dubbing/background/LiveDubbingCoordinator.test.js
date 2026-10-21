@@ -1134,6 +1134,53 @@ describe('Live Dubbing media observation authorization', () => {
     expect(coordinator.getMediaActivity()).toMatchObject({ known: true, playing: true });
   });
 
+  it('revalidates a superseded structure-change inventory before retiring removed playing frames', async () => {
+    const { coordinator, browserAPI } = createHarness({ stored: {
+      sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,
+      targetLanguage: 'en', status: LIVE_DUBBING_STATUS.RUNNING,
+      startedAt: 123, lastError: null, eventSequence: 1,
+    } });
+    const sender = (frameId, documentId) => ({ id: 'extension-id', tab: { id: 42 }, frameId, documentId, url: 'https://example.test' });
+    coordinator.mediaFrameDocuments.set(0, 'top-doc');
+    coordinator.mediaFrameDocuments.set(1, 'stale-doc');
+    coordinator.mediaFrameDocuments.set(2, 'unchanged-doc');
+    const top = await coordinator.authorizeMediaObserver(sender(0, 'top-doc'));
+    const stale = await coordinator.authorizeMediaObserver(sender(1, 'stale-doc'));
+    const unchanged = await coordinator.authorizeMediaObserver(sender(2, 'unchanged-doc'));
+    await coordinator.handleMediaObservation({ data: { token: top.token, revision: 0, playing: false } }, sender(0, 'top-doc'));
+    await coordinator.handleMediaObservation({ data: { token: stale.token, revision: 0, playing: true } }, sender(1, 'stale-doc'));
+    await coordinator.handleMediaObservation({ data: { token: unchanged.token, revision: 0, playing: false } }, sender(2, 'unchanged-doc'));
+    const unchangedObservation = coordinator.mediaObservation.frames.get('2:unchanged-doc');
+    const inventoryResolvers = [];
+    browserAPI.webNavigation.getFrame.mockResolvedValue({ documentId: 'new-doc' });
+    browserAPI.webNavigation.getAllFrames.mockImplementation(() => new Promise(resolve => inventoryResolvers.push(resolve)));
+
+    const structureChange = coordinator.handleMediaObservation({ data: {
+      token: top.token, revision: 1, playing: false, frameStructureChanged: true,
+    } }, sender(0, 'top-doc'));
+    await vi.waitFor(() => expect(inventoryResolvers).toHaveLength(1));
+    const newFrame = await coordinator.authorizeMediaObserver(sender(3, 'new-doc'));
+    expect(newFrame.observe).toBe(true);
+    inventoryResolvers[0]([
+      { frameId: 0, documentId: 'top-doc' },
+      { frameId: 2, documentId: 'unchanged-doc' },
+    ]);
+    await vi.waitFor(() => expect(inventoryResolvers).toHaveLength(2));
+    inventoryResolvers[1]([
+      { frameId: 0, documentId: 'top-doc' },
+      { frameId: 2, documentId: 'unchanged-doc' },
+      { frameId: 3, documentId: 'new-doc' },
+    ]);
+    await structureChange;
+
+    expect(coordinator.mediaObservation.frames.has('1:stale-doc')).toBe(false);
+    expect(coordinator.mediaObservation.frames.get('2:unchanged-doc')).toBe(unchangedObservation);
+    expect(coordinator.mediaFrameDocuments).toEqual(new Map([
+      [0, 'top-doc'], [2, 'unchanged-doc'], [3, 'new-doc'],
+    ]));
+    expect(coordinator.getMediaActivity()).toMatchObject({ known: true, playing: false });
+  });
+
   it('does not mark acknowledged failed-generation cleanup as pause failure after source pause', async () => {
     const harness = createHarness({ stored: {
       sessionId: 'session-1', tabId: 42, providerId: LIVE_DUBBING_PROVIDER_ID,

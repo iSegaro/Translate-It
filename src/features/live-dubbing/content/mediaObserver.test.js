@@ -160,6 +160,72 @@ describe('live dubbing media observer', () => {
     });
   });
 
+  it('releases detached shadow roots while keeping connected roots and the document observer active', async () => {
+    const runtime = {
+      sendMessage: vi.fn(async (message) => message.action === MEDIA_OBSERVER_HELLO
+        ? { observe: true, token: 'shadow-token', sessionToken: 'shadow-session' }
+        : undefined),
+      onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
+    };
+    const observedBy = new Map();
+    const disconnected = new Set();
+    const nativeObserve = MutationObserver.prototype.observe;
+    const nativeDisconnect = MutationObserver.prototype.disconnect;
+    const observe = vi.spyOn(MutationObserver.prototype, 'observe').mockImplementation(function (target, options) {
+      observedBy.set(target, this);
+      return nativeObserve.call(this, target, options);
+    });
+    const disconnect = vi.spyOn(MutationObserver.prototype, 'disconnect').mockImplementation(function () {
+      disconnected.add(this);
+      return nativeDisconnect.call(this);
+    });
+    const connectedHost = document.createElement('div');
+    const connectedRoot = connectedHost.attachShadow({ mode: 'open' });
+    const detachedRoots = [];
+    const addHost = () => {
+      const replacement = document.createElement('div');
+      const root = replacement.attachShadow({ mode: 'open' });
+      vi.spyOn(root, 'removeEventListener');
+      detachedRoots.push(root);
+      return replacement;
+    };
+    let currentHost = addHost();
+    document.body.append(currentHost, connectedHost);
+    cleanup = installMediaObserver({ runtime, document });
+    await vi.waitFor(() => expect(runtime.sendMessage).toHaveBeenCalledTimes(2));
+
+    for (let index = 0; index < 3; index += 1) {
+      const replacement = addHost();
+      currentHost.replaceWith(replacement);
+      currentHost = replacement;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await vi.waitFor(() => {
+      for (const root of detachedRoots.slice(0, -1)) {
+        expect(root.removeEventListener).toHaveBeenCalledWith('play', expect.any(Function), true);
+        expect(disconnected.has(observedBy.get(root))).toBe(true);
+      }
+    });
+
+    const documentObserver = observedBy.get(document.documentElement);
+    expect(disconnected.has(documentObserver)).toBe(false);
+    expect(disconnected.has(observedBy.get(connectedRoot))).toBe(false);
+
+    const media = document.createElement('video');
+    setPlayback(media, true);
+    currentHost.shadowRoot.append(media);
+    await vi.waitFor(() => expect(observedBy.has(media.getRootNode())).toBe(true));
+    setPlayback(media, false);
+    media.dispatchEvent(new Event('pause'));
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data.playing).toBe(false);
+    setPlayback(media, true);
+    media.dispatchEvent(new Event('playing'));
+    expect(runtime.sendMessage.mock.calls.at(-1)[0].data.playing).toBe(true);
+    for (const root of detachedRoots) root.removeEventListener.mockRestore();
+    observe.mockRestore();
+    disconnect.mockRestore();
+  });
+
   it('disarms on STOP and observes newly inserted media while authorized', async () => {
     const listeners = new Set();
     const runtime = {

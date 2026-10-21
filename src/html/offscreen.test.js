@@ -947,6 +947,62 @@ describe('offscreen logging contract', () => {
     expect(getComponentLogLevel('LiveDubbing')).toBe(1);
   });
 
+  it('preserves a newer DEBUG_MODE update over the deferred initial settings response', async () => {
+    let resolveSettings;
+    state.loggingResponse = new Promise((resolve) => { resolveSettings = resolve; });
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    const backgroundSender = { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' };
+
+    state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { DEBUG_MODE: true },
+    }, backgroundSender, vi.fn());
+    resolveSettings({ DEBUG_MODE: false, COMPONENT_LOG_LEVELS: { LiveDubbing: 2 } });
+    await waitForBridgeInitialization(debugModeBridge);
+
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
+    const { getComponentLogLevel } = await import('../shared/logging/GlobalDebugState.js');
+    expect(getComponentLogLevel('LiveDubbing')).toBe(2);
+  });
+
+  it('treats an equal-to-current DEBUG_MODE update as authoritative', async () => {
+    let resolveSettings;
+    state.loggingResponse = new Promise((resolve) => { resolveSettings = resolve; });
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { DEBUG_MODE: false },
+    }, { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' }, vi.fn());
+    resolveSettings({ DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {} });
+    await waitForBridgeInitialization(debugModeBridge);
+
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(false);
+  });
+
+  it('preserves newer component log levels over the deferred initial settings response', async () => {
+    let resolveSettings;
+    state.loggingResponse = new Promise((resolve) => { resolveSettings = resolve; });
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    const backgroundSender = { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' };
+
+    state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { COMPONENT_LOG_LEVELS: { LiveDubbing: 3 } },
+    }, backgroundSender, vi.fn());
+    resolveSettings({ DEBUG_MODE: true, COMPONENT_LOG_LEVELS: { LiveDubbing: 1 } });
+    await waitForBridgeInitialization(debugModeBridge);
+
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
+    const { getComponentLogLevel } = await import('../shared/logging/GlobalDebugState.js');
+    expect(getComponentLogLevel('LiveDubbing')).toBe(3);
+  });
+
   it('keeps ordinary INFO/DEBUG activity out of normal test output', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});

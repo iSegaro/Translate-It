@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { storageGet, storageOn } = vi.hoisted(() => ({ storageGet: vi.fn(), storageOn: vi.fn() }));
+const { storageGet, storageOn, setEnabled, setGlobalDebugOverride, setErrorDebugMode } = vi.hoisted(() => ({
+  storageGet: vi.fn(), storageOn: vi.fn(), setEnabled: vi.fn(),
+  setGlobalDebugOverride: vi.fn(), setErrorDebugMode: vi.fn(),
+}));
+
+vi.mock('./SafeConsole.js', () => ({ safeConsole: { setEnabled } }));
+vi.mock('./logger.js', () => ({ getScopedLogger: () => ({
+  info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn(),
+}) }));
+vi.mock('./GlobalDebugState.js', () => ({ setGlobalDebugOverride }));
+vi.mock('@/shared/error-management/ErrorHandler.js', () => ({
+  ErrorHandler: { getInstance: () => ({ setDebugMode: setErrorDebugMode }) },
+}));
 
 vi.mock('@/shared/storage/core/StorageCore.js', () => ({
   storageManager: { get: storageGet, on: storageOn },
@@ -80,5 +92,50 @@ describe('DebugModeBridge offscreen settings handoff', () => {
     offscreenBridge.context = 'offscreen';
     await offscreenBridge.initialize();
     expect(storageOn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GlobalDebugState import', 'global'],
+    ['ErrorHandler import', 'error'],
+  ])('does not let an old application resume after the %s', async (_boundary, boundary) => {
+    let releaseImport;
+    let markImportEntered;
+    const importEntered = new Promise((resolve) => { markImportEntered = resolve; });
+    const importGate = new Promise((resolve) => { releaseImport = resolve; });
+    vi.resetModules();
+    vi.doMock('./GlobalDebugState.js', async () => {
+      if (boundary === 'global') {
+        markImportEntered();
+        await importGate;
+      }
+      return { setGlobalDebugOverride };
+    });
+    vi.doMock('@/shared/error-management/ErrorHandler.js', async () => {
+      if (boundary === 'error') await importGate;
+      return { ErrorHandler: { getInstance: () => ({ setDebugMode: setErrorDebugMode }) } };
+    });
+
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const bridge = new DebugModeBridge();
+    bridge.context = 'offscreen';
+    const oldApplication = bridge.applyDebugMode(true);
+
+    if (boundary === 'global') {
+      await importEntered;
+    } else {
+      await vi.waitFor(() => expect(setGlobalDebugOverride).toHaveBeenCalledWith(true));
+    }
+
+    bridge.handleDebugModeChange(false);
+    releaseImport();
+    await oldApplication;
+    await vi.waitFor(() => expect(setErrorDebugMode).toHaveBeenCalledWith(false));
+
+    expect(bridge.currentDebugMode).toBe(false);
+    expect(setEnabled).toHaveBeenLastCalledWith(false);
+    expect(setGlobalDebugOverride).toHaveBeenLastCalledWith(false);
+    expect(setErrorDebugMode).toHaveBeenLastCalledWith(false);
+    if (boundary === 'global') expect(setGlobalDebugOverride).not.toHaveBeenCalledWith(true);
+    expect(setErrorDebugMode).not.toHaveBeenCalledWith(true);
   });
 });
