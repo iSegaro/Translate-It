@@ -1,97 +1,20 @@
 # Contributing to Translate It!
 
-Thank you for your interest in Translate It! This document explains how to find existing work, propose and coordinate changes, submit pull requests, communicate with maintainers, and set up the project locally.
+Thank you for your interest in Translate It! The workflow below helps you find useful work, choose the right channel, coordinate changes, and submit them for review.
 
-## Before You Start
+## Getting Started
 
-Before proposing or implementing a change, take a moment to look for existing work:
+1. **Find existing work.** Browse the public [Translate It Roadmap](https://github.com/orgs/Translate-It-App/projects/2), then search [GitHub Issues](https://github.com/Translate-It-App/Translate-It/issues) and [Discussions](https://github.com/Translate-It-App/Translate-It/discussions) for related work. Add context to an existing item rather than creating a duplicate. Look for `good first issue` and `help wanted` labels when available. The roadmap needs no permission or edit access to browse.
+2. **Choose a channel.** Use Issues for actionable bugs, feature requests, enhancements, documentation, and technical debt; feature requests need no prior approval. See the [Project Backlog](../Backlog.md) for detailed tracking rules. Use Discussions for early ideas, research, architecture or product discussion, and Q&A. When a Discussion becomes actionable, create an Issue or link it to an existing one. Small independent fixes (such as typos, minor documentation corrections, and straightforward bug fixes) may go directly to a PR without an Issue.
+3. **Coordinate before substantial work.** Comment on the relevant Issue to express interest and discuss scope before beginning substantial changes, including new features, major UI/UX or architectural changes, and substantial refactors. Do not duplicate assigned or in-progress work without coordinating with the maintainer. Design suggestions and feedback are welcome on existing Issues, including those assigned to someone else.
+4. **Make and validate your change.** Fork the repository, create a branch, and implement the change. Run relevant checks (see [Code Quality and Validation](#code-quality-and-validation)) and review your diff.
+5. **Submit a pull request.** Open a PR from your fork's branch to upstream `main`, ready for review. Include a clear title and summary, link relevant Issues when applicable, and report the validation you ran.
 
-- Review the public [Translate It Roadmap](https://github.com/orgs/Translate-It-App/projects/2) to see what is planned and in progress. The Roadmap is public — you do not need permission or edit access to browse it.
-- Search [GitHub Issues](https://github.com/Translate-It-App/Translate-It/issues) and [Discussions](https://github.com/Translate-It-App/Translate-It/discussions) for a related report, proposal, or conversation.
-- If something similar already exists, add your context there instead of opening a duplicate or starting an overlapping implementation.
-- To contribute to existing work, comment on the relevant Issue to express your interest.
-- Before starting work on an assigned or already in-progress Issue, coordinate with the maintainer so effort is not duplicated.
-- Expressing interest does not automatically assign ownership of an Issue, and it does not guarantee that a proposal or implementation will be accepted.
+The roadmap's `Ready` status means work has been prepared for implementation; it does not mean it is available. An unassigned Issue is not necessarily approved for implementation, and expressing interest is neither ownership nor a guarantee of acceptance. Maintainers control assignments, priorities, scope, review, and merge decisions; prior discussion or approval of an idea and passing CI do not guarantee that an implementation will be accepted or merged. Review may request revisions, and a particular assignment, timeline, or review turnaround is not guaranteed.
 
-This is about reducing duplicated effort and keeping changes aligned — not about gatekeeping. Questions are always welcome.
+Issues also carry Organization Issue Fields describing relative urgency and complexity: **Priority** (`Urgent`, `High`, `Medium`, `Low`) and **Effort** (`Small`, `Medium`, `Large`). These complement the Roadmap's `Status` and help gauge a task before starting.
 
-## Finding Work
-
-The public [Translate It Roadmap](https://github.com/orgs/Translate-It-App/projects/2) is the best place to see what is planned and in progress. A `Ready` Status means the work has been prepared for implementation — it does not guarantee the Issue is unassigned or available to claim.
-
-- Use [GitHub Issues](https://github.com/Translate-It-App/Translate-It/issues) to inspect scope, acceptance criteria, and any existing discussion.
-- Look for the `good first issue` and `help wanted` labels when available; they mark work the maintainer considers approachable or wants help with.
-- Comment on the Issue to express interest before starting substantial work.
-
-Issues also carry Organization Issue Fields that describe relative urgency and complexity:
-
-- **Priority:** `Urgent`, `High`, `Medium`, `Low`.
-- **Effort:** `Small`, `Medium`, `Large`.
-
-These are set on the Issue itself and complement the Roadmap's `Status`, helping you gauge what a task involves before you start.
-
-## Choosing the Right Workflow
-
-Use the channel that matches the stage of your idea.
-
-**GitHub Issues** — for actionable work: bug reports, feature requests (which can be submitted without prior approval), enhancements, documentation work, and technical debt. See the [Project Backlog](../Backlog.md) for the detailed tracking rules rather than duplicating them here. For substantial changes, discuss the implementation scope on the Issue before starting, so the approach is agreed on before significant work is done.
-
-**GitHub Discussions** — for work that is not yet ready to implement: early-stage ideas, research, architecture or product discussions, and general questions. When a proposal becomes actionable, turn it into a new Issue or link it to an existing one so it can be tracked.
-
-**Pull Requests** — for implementations and concrete changes ready for review.
-
-- Small, independent fixes such as typos, minor documentation corrections, and straightforward bug fixes may be submitted directly without a prior Issue.
-- New features, major UI/UX changes, architectural changes, and substantial refactors should be coordinated before implementation so the direction is agreed on first.
-
-These guidelines exist to keep work coordinated, not to add bureaucracy. When in doubt, open a Discussion or comment on an Issue and ask.
-
-## Coordination and Issue Ownership
-
-- You can volunteer to work on available Issues by commenting on them.
-- The maintainer coordinates scope, priorities, and assignments.
-- An Issue being unassigned does not necessarily mean implementation is approved.
-- Do not independently reimplement an assigned or in-progress Issue without coordinating first.
-- Use Issue comments for coordination rather than private messages, so the discussion stays visible and traceable for everyone.
-- Design suggestions and feedback are welcome on existing Issues, even when implementation is assigned to someone else.
-
-We cannot promise a particular assignment, timeline, or review turnaround, but every contribution is appreciated.
-
-## Communication Channels
-
-- **Issue comments:** coordination on specific, actionable work.
-- **Discussions → Ideas:** early-stage proposals and design or product ideas.
-- **Discussions → Q&A:** questions about development and contributing.
-- **Pull Requests:** implementation review and technical feedback.
-- **Security reports:** report sensitive vulnerabilities privately through GitHub Private Vulnerability Reporting, as described in [SECURITY.md](../../SECURITY.md). Do not post exploitable vulnerability details in public Issues, Discussions, or PRs — ordinary bugs belong in Issues.
-- **Commercial partnerships:** see [PARTNERSHIPS.md](../../PARTNERSHIPS.md) or email [partnerships@translate-it.app](mailto:partnerships@translate-it.app).
-
-Where practical, keep ordinary open-source collaboration public and traceable in these channels.
-
-## Maintainer Responsibilities and Review
-
-Maintainers review proposals, set priorities, coordinate implementation scope, and review Pull Requests. To help a PR move smoothly:
-
-- Provide a clear description of the change.
-- Link relevant Issues when applicable.
-- Report the validation you ran.
-
-Review feedback may ask for revisions. A passing CI run does not automatically mean a PR will be merged, and prior discussion or approval of an idea does not guarantee that a particular implementation will be accepted. Final acceptance and merge decisions remain with the project maintainers.
-
-## How to Contribute
-
-We welcome contributions of all kinds! While we have a recommended workflow to keep things organized, we aren't overly strict. The most important thing is that your contribution is clear and easy to understand.
-
-### Recommended Workflow:
-
-1. **Fork the Repository**: Create your own copy of `Translate-It-App/Translate-It` on GitHub.
-2. **Create a Branch**: Clone your fork and create a feature branch.
-3. **Make Your Changes**: Implement your feature or fix.
-4. **Validation**: It's a good idea to run a quick lint/build check (see [Code Quality](#code-quality-and-validation)) to ensure everything is working correctly.
-5. **Submit a Pull Request (PR)**: Open a PR from your fork's branch to the upstream `main` branch.
-   - Give your PR a clear title (preferably naming the feature or fix you added).
-   - Briefly explain what you’ve changed.
-
-*Don't worry if you don't follow every step perfectly—we're happy to help you through the process!*
+Keep ordinary collaboration public and traceable in Issues, Discussions, and PRs; uncertainty can be discussed there, and questions are welcome. Use Issue comments for coordination rather than private messages. Report sensitive vulnerabilities privately through GitHub Private Vulnerability Reporting as described in [SECURITY.md](../../SECURITY.md); do not post exploitable details in public Issues, Discussions, or PRs (ordinary bugs belong in Issues). For commercial partnerships, see [PARTNERSHIPS.md](../../PARTNERSHIPS.md) or email [partnerships@translate-it.app](mailto:partnerships@translate-it.app).
 
 ---
 
