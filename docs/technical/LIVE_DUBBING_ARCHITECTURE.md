@@ -346,6 +346,17 @@ remains ADR-018's fixed
 16 kHz mono frames of 1600 samples (100 ms); this synchronization lane does not
 change that framing.
 
+Gemini uses the same conservative close-and-reconnect fallback on every pause;
+the requested short warm-pause retention window is deliberately disabled.
+Gemini Live Translation is a continuous bidirectional audio stream, but its
+server events do not identify which input generation produced an output chunk
+or certify that all prior output has drained. `audioStreamEnd` flushes input,
+not pending translated output, and `turnComplete`, `generationComplete`, and
+`interrupted` are not a whole-input drain acknowledgement. Retaining a socket
+across pause could therefore admit old translated audio after a later Resume.
+See [Live Translation](https://ai.google.dev/gemini-api/docs/live-api/live-translate)
+and the [BidiGenerateContent server-content event definitions](https://ai.google.dev/api/live#BidiGenerateContentServerContent).
+
 Provider setup failures after successful START belong to the existing bounded
 media retry episode: three attempts per confirmed playing episode (250 ms then
 750 ms retry delays), with retry identity and exhaustion persisted for
