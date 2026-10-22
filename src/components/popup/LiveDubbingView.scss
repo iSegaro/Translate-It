@@ -292,7 +292,7 @@
   border-inline-end: 1.5px solid currentColor;
   border-block-end: 1.5px solid currentColor;
   transform: rotate(45deg);
-  transition: transform 190ms cubic-bezier(0.2, 0, 0, 1);
+  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
   opacity: 0.7;
 }
 
@@ -302,8 +302,20 @@
 }
 
 .live-dubbing-transcript-preferences-content {
+  position: relative;
   box-sizing: border-box;
-  padding: 0;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.ti-live-dubbing-transcript-preferences-expanded {
+  grid-template-rows: 1fr;
+}
+
+.ti-live-dubbing-transcript-preferences-content-clip {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .live-dubbing-transcript-preferences-content-inner {
@@ -352,7 +364,6 @@
 }
 
 .live-dubbing-transcript-preferences-list {
-  position: relative;
   display: flex;
   flex-flow: row wrap;
   align-items: center;
@@ -391,10 +402,10 @@
 .live-dubbing-openai-original-info::after {
   position: absolute;
   z-index: 1;
-  inset-inline: 0;
+  inset-inline: 10px;
   inset-block-end: calc(100% + 6px);
   box-sizing: border-box;
-  width: 100%;
+  width: auto;
   padding: 6px 8px;
   border-radius: 5px;
   background: var(--color-text, #333);
@@ -622,6 +633,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .ti-live-dubbing-transcript-preferences-content,
   .live-dubbing-transcript-preferences-chevron,
   .live-dubbing-change-font-enter-active,
   .live-dubbing-change-font-leave-active,

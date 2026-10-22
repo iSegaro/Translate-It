@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick, reactive } from 'vue'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -66,6 +66,7 @@ const LanguageSelectorStub = {
 const setupLifecycle = { mounts: 0 }
 
 const controlLifecycle = { mounts: 0, unmounts: 0, nextId: 0 }
+const attachedWrappers = []
 
   const LiveDubbingControlStub = {
   name: 'LiveDubbingControl',
@@ -157,8 +158,9 @@ const settle = async () => {
   await nextTick()
 }
 
-const mountView = (props = {}) => mount(LiveDubbingView, {
+const mountView = (props = {}, options = {}) => mount(LiveDubbingView, {
   props: { targetLanguage: 'en', providerId: 'gemini', ...props },
+  ...options,
   global: {
     stubs: {
       LanguageSelector: LanguageSelectorStub,
@@ -174,6 +176,10 @@ const transcriptHeaderRow = (wrapper) => wrapper.find('.live-dubbing-transcript-
 const transcriptContent = (wrapper) => wrapper.find('#live-dubbing-transcript-preferences-content')
 
 describe('LiveDubbingView', () => {
+  afterEach(() => {
+    attachedWrappers.splice(0).forEach(wrapper => wrapper.unmount())
+  })
+
   beforeEach(() => {
     setupLifecycle.mounts = 0
     controlLifecycle.mounts = 0
@@ -270,12 +276,14 @@ describe('LiveDubbingView', () => {
 
   it('keeps Change font hidden and non-focusable while the Subtitles card is collapsed', () => {
     harness.i18n.live_dubbing_change_font_label = 'Change font locally'
-    const wrapper = mountView()
+    const wrapper = mountView({}, { attachTo: document.body })
+    attachedWrappers.push(wrapper)
 
     const link = wrapper.find('.live-dubbing-change-font-link')
     expect(link.exists()).toBe(true)
     expect(link.attributes('style')).toContain('display: none')
-    expect(link.element.matches(':focus')).toBe(false)
+    link.element.focus()
+    expect(document.activeElement).not.toBe(link.element)
     expect(link.text()).toBe('Change font locally')
     const header = transcriptHeaderRow(wrapper)
     expect(header.element.contains(link.element)).toBe(true)
@@ -315,7 +323,8 @@ describe('LiveDubbingView', () => {
   })
 
   it('starts the Subtitles card collapsed when both subtitle preferences are off', () => {
-    const wrapper = mountView()
+    const wrapper = mountView({}, { attachTo: document.body })
+    attachedWrappers.push(wrapper)
 
     expect(transcriptHeader(wrapper).element.tagName).toBe('BUTTON')
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
@@ -324,7 +333,10 @@ describe('LiveDubbingView', () => {
     expect(transcriptContent(wrapper).exists()).toBe(true)
     expect(transcriptContent(wrapper).attributes('inert')).toBe('')
     expect(wrapper.findAllComponents({ name: 'BaseToggle' })).toHaveLength(2)
-    expect(wrapper.find('.live-dubbing-change-font-link').attributes('style')).toContain('display: none')
+    const changeFont = wrapper.find('.live-dubbing-change-font-link')
+    expect(changeFont.attributes('style')).toContain('display: none')
+    changeFont.element.focus()
+    expect(document.activeElement).not.toBe(changeFont.element)
   })
 
   it('uses one full-header disclosure target with separately layered caption, chevron, and Change font', () => {
@@ -359,7 +371,8 @@ describe('LiveDubbingView', () => {
   })
 
   it('shows Change font when expanded without coupling its click to disclosure', async () => {
-    const wrapper = mountView()
+    const wrapper = mountView({}, { attachTo: document.body })
+    attachedWrappers.push(wrapper)
     const disclosure = transcriptHeader(wrapper)
     const changeFont = wrapper.find('.live-dubbing-change-font-link')
 
@@ -367,6 +380,8 @@ describe('LiveDubbingView', () => {
     expect(disclosure.attributes('aria-expanded')).toBe('true')
     expect(changeFont.attributes('style')).not.toContain('display: none')
     expect(changeFont.element.matches(':enabled')).toBe(true)
+    changeFont.element.focus()
+    expect(document.activeElement).toBe(changeFont.element)
 
     await changeFont.trigger('click')
 
@@ -423,11 +438,15 @@ describe('LiveDubbingView', () => {
     expect(harness.store.updateSettingAndPersist).toHaveBeenCalledTimes(updateCount)
     expect(harness.store.updateSettingLocally).toHaveBeenCalledTimes(localUpdateCount)
     expect(wrapper.findComponent({ name: 'LiveDubbingControl' }).vm.instanceId).toBe(controlId)
+    expect(controlLifecycle).toMatchObject({ mounts: 1, unmounts: 0 })
 
     await transcriptHeader(wrapper).trigger('click')
     await settle()
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
     expect(transcriptContent(wrapper).attributes('inert')).toBe('')
+    expect(harness.store.updateSettingAndPersist).toHaveBeenCalledTimes(updateCount)
+    expect(harness.store.updateSettingLocally).toHaveBeenCalledTimes(localUpdateCount)
+    expect(controlLifecycle).toMatchObject({ mounts: 1, unmounts: 0 })
   })
 
   it('keeps the existing subtitle controls hidden or visible with the disclosure state', async () => {
@@ -444,93 +463,44 @@ describe('LiveDubbingView', () => {
     expect(wrapper.findAllComponents({ name: 'BaseToggle' })).toHaveLength(2)
   })
 
-  it('animates measured height and cleans up temporary styles after opening and closing', async () => {
-    vi.useFakeTimers()
-    const frameCallbacks = []
-    const requestAnimationFrameMock = vi.spyOn(window, 'requestAnimationFrame')
-      .mockImplementation(callback => {
-        frameCallbacks.push(callback)
-        return frameCallbacks.length
-      })
-    const cancelAnimationFrameMock = vi.spyOn(window, 'cancelAnimationFrame')
-      .mockImplementation(() => {})
-    const wrapper = mountView()
-    const content = transcriptContent(wrapper).element
-    Object.defineProperty(content, 'scrollHeight', { configurable: true, value: 144 })
-
-    await transcriptHeader(wrapper).trigger('click')
-    expect(content.style.height).toBe('0px')
-    while (content.style.height === '0px' && frameCallbacks.length) frameCallbacks.shift()()
-    expect(content.style.height).toBe('144px')
-    vi.advanceTimersByTime(190)
-    await nextTick()
-    expect(content.style.height).toBe('')
-    expect(content.style.transition).toBe('')
-
-    await transcriptHeader(wrapper).trigger('click')
-    expect(content.style.height).toBe('144px')
-    while (content.style.height !== '0px' && frameCallbacks.length) frameCallbacks.shift()()
-    expect(content.style.height).toBe('0px')
-    vi.advanceTimersByTime(190)
-    await nextTick()
-    expect(content.style.height).toBe('')
-    expect(content.style.transition).toBe('')
-
-    requestAnimationFrameMock.mockRestore()
-    cancelAnimationFrameMock.mockRestore()
-    vi.useRealTimers()
-  })
-
   it('settles rapid disclosure toggles on the latest requested state', async () => {
-    vi.useFakeTimers()
-    const frameCallbacks = []
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
-      frameCallbacks.push(callback)
-      return frameCallbacks.length
-    })
-    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
     const wrapper = mountView()
-    const content = transcriptContent(wrapper).element
-    Object.defineProperty(content, 'scrollHeight', { configurable: true, value: 144 })
+    const content = transcriptContent(wrapper)
 
     await transcriptHeader(wrapper).trigger('click')
     await transcriptHeader(wrapper).trigger('click')
     await transcriptHeader(wrapper).trigger('click')
-    frameCallbacks.splice(0).forEach(callback => callback())
-    vi.advanceTimersByTime(190)
-    await nextTick()
+    await settle()
 
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
-    expect(content.attributes.inert).toBeUndefined()
-    expect(content.style.height).toBe('')
-    expect(content.style.transition).toBe('')
-
-    vi.restoreAllMocks()
-    vi.useRealTimers()
-  })
-
-  it('skips height animation when reduced motion is preferred', async () => {
-    vi.useFakeTimers()
-    const originalMatchMedia = window.matchMedia
-    const matchMediaMock = vi.fn().mockReturnValue({ matches: true })
-    window.matchMedia = matchMediaMock
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 1)
-    const wrapper = mountView()
-    const content = transcriptContent(wrapper).element
-    Object.defineProperty(content, 'scrollHeight', { configurable: true, value: 144 })
+    expect(content.attributes('inert')).toBeUndefined()
+    expect(content.classes()).toContain('ti-live-dubbing-transcript-preferences-expanded')
 
     await transcriptHeader(wrapper).trigger('click')
+    await transcriptHeader(wrapper).trigger('click')
+    await settle()
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
+    expect(content.attributes('inert')).toBeUndefined()
+    expect(content.classes()).toContain('ti-live-dubbing-transcript-preferences-expanded')
 
-    expect(matchMediaMock).toHaveBeenCalledWith('(prefers-reduced-motion: reduce)')
-    // Change font's independent fade may use a frame; the disclosure height
-    // transition itself must still complete synchronously under reduced motion.
-    expect(content.style.height).toBe('')
-    expect(content.style.transition).toBe('')
+    await transcriptHeader(wrapper).trigger('click')
+    await settle()
+    expect(content.exists()).toBe(true)
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
+    expect(content.attributes('inert')).toBe('')
+    expect(content.classes()).not.toContain('ti-live-dubbing-transcript-preferences-expanded')
+  })
 
-    vi.restoreAllMocks()
-    if (originalMatchMedia) window.matchMedia = originalMatchMedia
-    else delete window.matchMedia
-    vi.useRealTimers()
+  it('uses CSS grid transition states and disables them for reduced motion', () => {
+    const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-content\s*\{[^}]*grid-template-rows:\s*0fr/)
+    expect(scss).toMatch(/\.ti-live-dubbing-transcript-preferences-expanded[\s\S]*?grid-template-rows:\s*1fr/)
+    const clipRule = scss.match(/\.ti-live-dubbing-transcript-preferences-content-clip\s*\{[^}]*\}/)?.[0]
+    expect(clipRule).toMatch(/min-height:\s*0/)
+    expect(clipRule).toMatch(/overflow:\s*hidden/)
+    const reducedMotionRules = scss.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/)?.[0]
+    expect(reducedMotionRules).toMatch(/\.ti-live-dubbing-transcript-preferences-content[\s\S]*?transition:\s*none/)
+    expect(reducedMotionRules).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*none/)
   })
 
   it('does not auto-toggle the disclosure when subtitle preferences change', async () => {
@@ -850,14 +820,23 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/\.live-dubbing-openai-original-info:hover::after/)
     expect(scss).toMatch(/\.live-dubbing-openai-original-info:focus-visible::after/)
     expect(scss).toMatch(/content:\s*attr\(data-tooltip\)/)
+    const contentRule = scss.match(/\.live-dubbing-transcript-preferences-content\s*\{[^}]*\}/)?.[0]
+    const clipRule = scss.match(/\.ti-live-dubbing-transcript-preferences-content-clip\s*\{[^}]*\}/)?.[0]
     const tooltipRule = scss.match(/\.live-dubbing-openai-original-info::after\s*\{[^}]*\}/)?.[0]
     const controlsRowRule = scss.match(/\.live-dubbing-transcript-preferences-list\s*\{[^}]*\}/)?.[0]
     const rtlTooltipRule = scss.match(/\.live-dubbing-view--rtl \.live-dubbing-openai-original-info::after\s*\{[^}]*\}/)?.[0]
-    expect(controlsRowRule).toMatch(/position:\s*relative/)
+    expect(contentRule).toMatch(/position:\s*relative/)
+    expect(clipRule).toMatch(/min-height:\s*0/)
+    expect(clipRule).toMatch(/overflow:\s*hidden/)
+    expect(controlsRowRule).not.toMatch(/position:\s*relative/)
     expect(tooltipRule).toMatch(/position:\s*absolute/)
-    expect(tooltipRule).toMatch(/inset-inline:\s*0/)
-    expect(tooltipRule).toMatch(/width:\s*100%/)
+    expect(tooltipRule).toMatch(/inset-inline:\s*10px/)
+    expect(tooltipRule).toMatch(/width:\s*auto/)
     expect(tooltipRule).not.toMatch(/(?:left:\s*50%|translateX\(-50%\))/)
+    const clip = wrapper.find('.ti-live-dubbing-transcript-preferences-content-clip')
+    const controls = wrapper.find('.live-dubbing-transcript-preferences-list')
+    expect(clip.exists()).toBe(true)
+    expect(clip.element.contains(controls.element)).toBe(true)
     expect(rtlTooltipRule).toMatch(/direction:\s*rtl/)
     expect(rtlTooltipRule).toMatch(/text-align:\s*start/)
 
@@ -1413,21 +1392,20 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-inline-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?border-block-end:/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron\s*\{[^}]*border-(?:inline-end|block-end):\s*[^;]*currentColor/)
-    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*transform\s+190ms\s+cubic-bezier\(0\.2,\s*0,\s*0,\s*1\)/)
+    expect(scss).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*transform\s+150ms\s+cubic-bezier\(0\.2,\s*0,\s*0,\s*1\)/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-toggle\s*\{[^}]*inline-size:\s*100%/)
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-header--expanded[\s\S]*?transform:\s*rotate\(225deg\)/)
-    expect(scss).not.toMatch(/grid-template-rows/)
     const contentRule = scss.match(
       /\.live-dubbing-transcript-preferences-content\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(contentRule).toMatch(/box-sizing:\s*border-box/)
-    expect(contentRule).toMatch(/padding:\s*0/)
+    expect(contentRule).toMatch(/grid-template-rows:\s*0fr/)
     const contentInnerRule = scss.match(
       /\.live-dubbing-transcript-preferences-content-inner\s*\{[\s\S]*?\n\}/m
     )?.[0]
     expect(contentInnerRule).toMatch(/padding-block:\s*0 8px/)
     expect(contentInnerRule).toMatch(/padding-inline:\s*10px/)
-    expect(contentRule).not.toMatch(/opacity|transition/)
+    expect(contentRule).toMatch(/transition:\s*grid-template-rows/)
     expect(scss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*none/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?flex:\s*1\s+1\s+112px\s*!important/)
     expect(scss).toMatch(/\.live-dubbing-subtitle-size-select\s*\{[\s\S]*?inline-size:\s*112px\s*!important/)
