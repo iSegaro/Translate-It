@@ -38,7 +38,7 @@
   </a>
   <br>
   <a href="https://youtu.be/VxgRWlx20wU">
-    <img src="./Images/Windows.png" alt="動画を見る" width="560" />
+    <img src="./Images/Windows.webp" alt="動画を見る" width="560" />
   </a>
 </p>
 
@@ -93,24 +93,24 @@ API キーが必要なプロバイダーもあれば、キーなしで使える�
 <table>
   <tr>
     <td align="center">
-      <img src="./Images/Popup-Text-Light.png" alt="テキスト翻訳" />
+      <img src="./Images/Popup-Text-Light.webp" alt="テキスト翻訳" />
       <br>
       <b>テキスト翻訳</b>
     </td>
     <td align="center">
-      <img src="./Images/Popup-Dubbing-Dark.png" alt="Live Dubbing" />
+      <img src="./Images/Popup-Dubbing-Dark.webp" alt="Live Dubbing" />
       <br>
       <b>Live Dubbing</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="./Images/Select-Element.png" alt="要素の選択" />
+      <img src="./Images/Select-Element.webp" alt="要素の選択" />
       <br>
       <b>要素の選択</b>
     </td>
     <td align="center">
-      <img src="./Images/Desktop-FAB-Dark.png" alt="デスクトップ FAB" />
+      <img src="./Images/Desktop-FAB-Dark.webp" alt="デスクトップ FAB" />
       <br>
       <b>デスクトップ FAB</b>
     </td>

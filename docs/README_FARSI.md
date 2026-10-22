@@ -38,7 +38,7 @@
   </a>
   <br>
   <a href="https://youtu.be/VxgRWlx20wU">
-    <img src="./Images/Windows.png" alt="مشاهده ویدیو" width="560" />
+    <img src="./Images/Windows.webp" alt="مشاهده ویدیو" width="560" />
   </a>
 </p>
 
@@ -93,24 +93,24 @@
 <table>
   <tr>
     <td align="center">
-      <img src="./Images/Popup-Text-Light.png" alt="ترجمهٔ متن" />
+      <img src="./Images/Popup-Text-Light.webp" alt="ترجمهٔ متن" />
       <br>
       <b>ترجمهٔ متن</b>
     </td>
     <td align="center">
-      <img src="./Images/Popup-Dubbing-Dark.png" alt="Live Dubbing" />
+      <img src="./Images/Popup-Dubbing-Dark.webp" alt="Live Dubbing" />
       <br>
       <b>Live Dubbing</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="./Images/Select-Element.png" alt="ترجمهٔ عنصر انتخاب‌شده" />
+      <img src="./Images/Select-Element.webp" alt="ترجمهٔ عنصر انتخاب‌شده" />
       <br>
       <b>انتخاب عنصر</b>
     </td>
     <td align="center">
-      <img src="./Images/Desktop-FAB-Dark.png" alt="دکمهٔ شناور دسکتاپ" />
+      <img src="./Images/Desktop-FAB-Dark.webp" alt="دکمهٔ شناور دسکتاپ" />
       <br>
       <b>FAB دسکتاپ</b>
     </td>
