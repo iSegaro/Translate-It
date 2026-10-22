@@ -323,7 +323,8 @@ describe('LiveDubbingView', () => {
   })
 
   it('starts the Subtitles card collapsed when both subtitle preferences are off', () => {
-    const wrapper = mountView()
+    const wrapper = mountView({}, { attachTo: document.body })
+    attachedWrappers.push(wrapper)
 
     expect(transcriptHeader(wrapper).element.tagName).toBe('BUTTON')
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
@@ -473,24 +474,33 @@ describe('LiveDubbingView', () => {
 
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
     expect(content.attributes('inert')).toBeUndefined()
-    expect(content.attributes('style')).not.toContain('display: none')
+    expect(content.classes()).toContain('ti-live-dubbing-transcript-preferences-expanded')
 
     await transcriptHeader(wrapper).trigger('click')
     await transcriptHeader(wrapper).trigger('click')
     await settle()
     expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('true')
     expect(content.attributes('inert')).toBeUndefined()
+    expect(content.classes()).toContain('ti-live-dubbing-transcript-preferences-expanded')
+
+    await transcriptHeader(wrapper).trigger('click')
+    await settle()
+    expect(content.exists()).toBe(true)
+    expect(transcriptHeader(wrapper).attributes('aria-expanded')).toBe('false')
+    expect(content.attributes('inert')).toBe('')
+    expect(content.classes()).not.toContain('ti-live-dubbing-transcript-preferences-expanded')
   })
 
   it('uses CSS grid transition states and disables them for reduced motion', () => {
     const scss = readFileSync(resolve(here, 'LiveDubbingView.scss'), 'utf8')
     expect(scss).toMatch(/\.live-dubbing-transcript-preferences-content\s*\{[^}]*grid-template-rows:\s*0fr/)
-    expect(scss).toMatch(/\.ti-live-dubbing-transcript-preferences-enter-from[\s\S]*?grid-template-rows:\s*0fr/)
-    expect(scss).toMatch(/\.ti-live-dubbing-transcript-preferences-leave-to[\s\S]*?grid-template-rows:\s*0fr/)
-    expect(scss).toMatch(/\.ti-live-dubbing-transcript-preferences-enter-to[\s\S]*?grid-template-rows:\s*1fr/)
-    expect(scss).toMatch(/\.ti-live-dubbing-transcript-preferences-leave-from[\s\S]*?grid-template-rows:\s*1fr/)
     expect(scss).toMatch(/\.ti-live-dubbing-transcript-preferences-expanded[\s\S]*?grid-template-rows:\s*1fr/)
-    expect(scss).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.ti-live-dubbing-transcript-preferences-content[\s\S]*?transition:\s*none/)
+    const clipRule = scss.match(/\.ti-live-dubbing-transcript-preferences-content-clip\s*\{[^}]*\}/)?.[0]
+    expect(clipRule).toMatch(/min-height:\s*0/)
+    expect(clipRule).toMatch(/overflow:\s*hidden/)
+    const reducedMotionRules = scss.match(/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[\s\S]*?\n\}/)?.[0]
+    expect(reducedMotionRules).toMatch(/\.ti-live-dubbing-transcript-preferences-content[\s\S]*?transition:\s*none/)
+    expect(reducedMotionRules).toMatch(/\.live-dubbing-transcript-preferences-chevron[\s\S]*?transition:\s*none/)
   })
 
   it('does not auto-toggle the disclosure when subtitle preferences change', async () => {

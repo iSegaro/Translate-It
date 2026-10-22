@@ -312,16 +312,6 @@
   grid-template-rows: 1fr;
 }
 
-.ti-live-dubbing-transcript-preferences-enter-from,
-.ti-live-dubbing-transcript-preferences-leave-to {
-  grid-template-rows: 0fr;
-}
-
-.ti-live-dubbing-transcript-preferences-enter-to,
-.ti-live-dubbing-transcript-preferences-leave-from {
-  grid-template-rows: 1fr;
-}
-
 .ti-live-dubbing-transcript-preferences-content-clip {
   min-height: 0;
   overflow: hidden;

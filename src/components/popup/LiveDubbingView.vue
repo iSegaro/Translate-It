@@ -99,68 +99,65 @@
           aria-hidden="true"
         />
       </div>
-      <Transition name="ti-live-dubbing-transcript-preferences">
-        <div
-          v-show="isTranscriptPreferencesExpanded"
-          id="live-dubbing-transcript-preferences-content"
-          class="live-dubbing-transcript-preferences-content ti-live-dubbing-transcript-preferences-content"
-          :class="{ 'ti-live-dubbing-transcript-preferences-expanded': isTranscriptPreferencesExpanded }"
-          :inert="!isTranscriptPreferencesExpanded ? '' : undefined"
-        >
-          <div class="ti-live-dubbing-transcript-preferences-content-clip">
-            <div class="live-dubbing-transcript-preferences-content-inner">
-              <div class="live-dubbing-transcript-preferences-list">
-                <div class="live-dubbing-transcript-preference">
-                  <span class="live-dubbing-transcript-preference-label">
-                    {{ t('live_dubbing_show_translated_transcript', 'Dubbed') }}
-                  </span>
-                  <BaseToggle
-                    class="live-dubbing-transcript-preference-toggle"
-                    :class="{ 'live-dubbing-toggle--pending-neutral': hasTranslatedPreferenceWritePending }"
-                    :model-value="showTranslatedTranscript"
-                    :disabled="hasTranslatedPreferenceWritePending"
-                    :title="t('live_dubbing_show_translated_transcript', 'Dubbed')"
-                    @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
-                  />
-                </div>
-                <div class="live-dubbing-transcript-preference">
-                  <span class="live-dubbing-transcript-preference-label">
-                    {{ t('live_dubbing_show_original_transcript', 'Original') }}
-                  </span>
-                  <span
-                    v-if="providerModel === LIVE_DUBBING_OPENAI_PROVIDER_ID"
-                    class="live-dubbing-openai-original-info"
-                    role="note"
-                    tabindex="0"
-                    :aria-label="t('live_dubbing_openai_original_info', 'Uses additional transcription with OpenAI.')"
-                    :data-tooltip="t('live_dubbing_openai_original_info', 'Uses additional transcription with OpenAI.')"
-                  >
-                    ⓘ
-                  </span>
-                  <BaseToggle
-                    class="live-dubbing-transcript-preference-toggle"
-                    :class="{ 'live-dubbing-toggle--pending-neutral': hasOriginalPreferenceWritePending && !isOriginalOpenAIRestricted }"
-                    :model-value="showOriginalTranscript"
-                    :disabled="hasOriginalPreferenceWritePending || isOriginalOpenAIRestricted"
-                    :title="t('live_dubbing_show_original_transcript', 'Original')"
-                    @update:model-value="updateTranscriptPreference(originalPreferenceKey, $event)"
-                  />
-                </div>
-                <div class="live-dubbing-transcript-preference live-dubbing-transcript-preference--size">
-                  <BaseSelect
-                    id="live-dubbing-subtitle-size-select"
-                    v-model="subtitleSizeModel"
-                    :aria-label="t('live_dubbing_subtitle_size_label', 'Subtitle size')"
-                    class="live-dubbing-subtitle-size-select"
-                    :options="subtitleSizeOptions"
-                    :disabled="hasSubtitleSizePreferenceWritePending"
-                  />
-                </div>
+      <div
+        id="live-dubbing-transcript-preferences-content"
+        class="live-dubbing-transcript-preferences-content ti-live-dubbing-transcript-preferences-content"
+        :class="{ 'ti-live-dubbing-transcript-preferences-expanded': isTranscriptPreferencesExpanded }"
+        :inert="!isTranscriptPreferencesExpanded ? '' : undefined"
+      >
+        <div class="ti-live-dubbing-transcript-preferences-content-clip">
+          <div class="live-dubbing-transcript-preferences-content-inner">
+            <div class="live-dubbing-transcript-preferences-list">
+              <div class="live-dubbing-transcript-preference">
+                <span class="live-dubbing-transcript-preference-label">
+                  {{ t('live_dubbing_show_translated_transcript', 'Dubbed') }}
+                </span>
+                <BaseToggle
+                  class="live-dubbing-transcript-preference-toggle"
+                  :class="{ 'live-dubbing-toggle--pending-neutral': hasTranslatedPreferenceWritePending }"
+                  :model-value="showTranslatedTranscript"
+                  :disabled="hasTranslatedPreferenceWritePending"
+                  :title="t('live_dubbing_show_translated_transcript', 'Dubbed')"
+                  @update:model-value="updateTranscriptPreference('LIVE_DUBBING_SHOW_TRANSLATED_TRANSCRIPT', $event)"
+                />
+              </div>
+              <div class="live-dubbing-transcript-preference">
+                <span class="live-dubbing-transcript-preference-label">
+                  {{ t('live_dubbing_show_original_transcript', 'Original') }}
+                </span>
+                <span
+                  v-if="providerModel === LIVE_DUBBING_OPENAI_PROVIDER_ID"
+                  class="live-dubbing-openai-original-info"
+                  role="note"
+                  tabindex="0"
+                  :aria-label="t('live_dubbing_openai_original_info', 'Uses additional transcription with OpenAI.')"
+                  :data-tooltip="t('live_dubbing_openai_original_info', 'Uses additional transcription with OpenAI.')"
+                >
+                  ⓘ
+                </span>
+                <BaseToggle
+                  class="live-dubbing-transcript-preference-toggle"
+                  :class="{ 'live-dubbing-toggle--pending-neutral': hasOriginalPreferenceWritePending && !isOriginalOpenAIRestricted }"
+                  :model-value="showOriginalTranscript"
+                  :disabled="hasOriginalPreferenceWritePending || isOriginalOpenAIRestricted"
+                  :title="t('live_dubbing_show_original_transcript', 'Original')"
+                  @update:model-value="updateTranscriptPreference(originalPreferenceKey, $event)"
+                />
+              </div>
+              <div class="live-dubbing-transcript-preference live-dubbing-transcript-preference--size">
+                <BaseSelect
+                  id="live-dubbing-subtitle-size-select"
+                  v-model="subtitleSizeModel"
+                  :aria-label="t('live_dubbing_subtitle_size_label', 'Subtitle size')"
+                  class="live-dubbing-subtitle-size-select"
+                  :options="subtitleSizeOptions"
+                  :disabled="hasSubtitleSizePreferenceWritePending"
+                />
               </div>
             </div>
           </div>
         </div>
-      </Transition>
+      </div>
     </section>
 
     <!-- Credential setup: rendered only while the selected provider has no key -->
