@@ -302,6 +302,7 @@
 }
 
 .live-dubbing-transcript-preferences-content {
+  position: relative;
   box-sizing: border-box;
   display: grid;
   grid-template-rows: 0fr;
@@ -363,7 +364,6 @@
 }
 
 .live-dubbing-transcript-preferences-list {
-  position: relative;
   display: flex;
   flex-flow: row wrap;
   align-items: center;
@@ -402,10 +402,10 @@
 .live-dubbing-openai-original-info::after {
   position: absolute;
   z-index: 1;
-  inset-inline: 0;
+  inset-inline: 10px;
   inset-block-end: calc(100% + 6px);
   box-sizing: border-box;
-  width: 100%;
+  width: auto;
   padding: 6px 8px;
   border-radius: 5px;
   background: var(--color-text, #333);

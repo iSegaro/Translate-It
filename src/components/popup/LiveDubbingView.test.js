@@ -820,14 +820,23 @@ describe('LiveDubbingView', () => {
     expect(scss).toMatch(/\.live-dubbing-openai-original-info:hover::after/)
     expect(scss).toMatch(/\.live-dubbing-openai-original-info:focus-visible::after/)
     expect(scss).toMatch(/content:\s*attr\(data-tooltip\)/)
+    const contentRule = scss.match(/\.live-dubbing-transcript-preferences-content\s*\{[^}]*\}/)?.[0]
+    const clipRule = scss.match(/\.ti-live-dubbing-transcript-preferences-content-clip\s*\{[^}]*\}/)?.[0]
     const tooltipRule = scss.match(/\.live-dubbing-openai-original-info::after\s*\{[^}]*\}/)?.[0]
     const controlsRowRule = scss.match(/\.live-dubbing-transcript-preferences-list\s*\{[^}]*\}/)?.[0]
     const rtlTooltipRule = scss.match(/\.live-dubbing-view--rtl \.live-dubbing-openai-original-info::after\s*\{[^}]*\}/)?.[0]
-    expect(controlsRowRule).toMatch(/position:\s*relative/)
+    expect(contentRule).toMatch(/position:\s*relative/)
+    expect(clipRule).toMatch(/min-height:\s*0/)
+    expect(clipRule).toMatch(/overflow:\s*hidden/)
+    expect(controlsRowRule).not.toMatch(/position:\s*relative/)
     expect(tooltipRule).toMatch(/position:\s*absolute/)
-    expect(tooltipRule).toMatch(/inset-inline:\s*0/)
-    expect(tooltipRule).toMatch(/width:\s*100%/)
+    expect(tooltipRule).toMatch(/inset-inline:\s*10px/)
+    expect(tooltipRule).toMatch(/width:\s*auto/)
     expect(tooltipRule).not.toMatch(/(?:left:\s*50%|translateX\(-50%\))/)
+    const clip = wrapper.find('.ti-live-dubbing-transcript-preferences-content-clip')
+    const controls = wrapper.find('.live-dubbing-transcript-preferences-list')
+    expect(clip.exists()).toBe(true)
+    expect(clip.element.contains(controls.element)).toBe(true)
     expect(rtlTooltipRule).toMatch(/direction:\s*rtl/)
     expect(rtlTooltipRule).toMatch(/text-align:\s*start/)
 
