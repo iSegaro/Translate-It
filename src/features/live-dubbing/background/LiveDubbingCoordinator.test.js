@@ -9022,92 +9022,6 @@ describe('LiveDubbingCoordinator', () => {
     expect(stored.lastError).toBe('STOP_FAILED');
   });
 
-  // Finding 4: narrow SETUP_FAILED classification – Controller-local pipeline/audio failures must not be SETUP_FAILED
-  it('Finding4: INPUT_PIPELINE_ERROR while CONNECTING_PROVIDER is classified as START_FAILED not SETUP_FAILED (structured diagnostic)', async () => {
-    const harness = createHarness();
-    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
-    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
-      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
-        return {
-          success: false,
-          error: 'LIVE_DUBBING_INPUT_PIPELINE_ERROR',
-          sessionId: message.data.sessionId,
-          providerId: message.data.providerId,
-          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
-          providerDiagnostic: {
-            stage: 'CONNECT_PROVIDER',
-            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
-            terminalCategory: 'INPUT_PIPELINE_ERROR',
-            wsOpen: true,
-            setupSent: true,
-            setupComplete: false,
-          },
-        };
-      }
-      return original(message);
-    });
-    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
-    expect(result).toMatchObject({ success: true, status: { status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 2 } });
-    expect(harness.browserAPI.runtime.sendMessage.mock.calls.some(([message]) => message.action === 'LIVE_DUBBING_CONNECT_PROVIDER')).toBe(false);
-  });
-
-  it('Finding4: OUTPUT_PIPELINE_ERROR while CONNECTING_PROVIDER is classified as START_FAILED', async () => {
-    const harness = createHarness();
-    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
-    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
-      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
-        return {
-          success: false,
-          error: 'LIVE_DUBBING_OUTPUT_PIPELINE_ERROR',
-          sessionId: message.data.sessionId,
-          providerId: message.data.providerId,
-          status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER,
-          providerDiagnostic: {
-            stage: 'CONNECT_PROVIDER',
-            code: 'OPENAI_REALTIME_SDP_EXCHANGE_FAILED',
-            terminalCategory: 'OUTPUT_PIPELINE_ERROR',
-            setupComplete: false,
-          },
-        };
-      }
-      return original(message);
-    });
-    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
-    expect(result).toMatchObject({ success: true, status: { status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 2 } });
-    expect(harness.browserAPI.runtime.sendMessage.mock.calls.some(([message]) => message.action === 'LIVE_DUBBING_CONNECT_PROVIDER')).toBe(false);
-  });
-
-  it.each([
-    'INPUT_PIPELINE_ERROR',
-    'INPUT_SEND_ERROR',
-    'INVALID_OUTPUT_AUDIO',
-    'OUTPUT_AUDIO_ERROR',
-    'OUTPUT_PIPELINE_ERROR',
-  ])('Finding4: excluded terminalCategory %s while CONNECTING_PROVIDER → START_FAILED', async (terminalCategory) => {
-    const harness = createHarness();
-    const original = harness.browserAPI.runtime.sendMessage.getMockImplementation();
-    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
-      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
-        return {
-          success: false,
-          error: `LIVE_DUBBING_${terminalCategory}`,
-          sessionId: message.data.sessionId,
-          providerId: message.data.providerId,
-          providerDiagnostic: {
-            stage: 'CONNECT_PROVIDER',
-            code: 'GEMINI_LIVE_SETUP_TIMEOUT',
-            terminalCategory,
-            setupComplete: false,
-          },
-        };
-      }
-      return original(message);
-    });
-    const result = await harness.coordinator.start({ data: { targetLanguage: 'en' } }, {});
-    expect(result).toMatchObject({ success: true, status: { status: LIVE_DUBBING_STATUS.RUNNING, eventSequence: 2 } });
-    expect(harness.browserAPI.runtime.sendMessage.mock.calls.some(([message]) => message.action === 'LIVE_DUBBING_CONNECT_PROVIDER')).toBe(false);
-  });
-
   it('handles a genuine capture pipeline error after capture-only RUNNING without connecting a provider', async () => {
     const harness = createHarness();
     const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
@@ -9215,46 +9129,16 @@ describe('LiveDubbingCoordinator', () => {
     })).toBe('LIVE_DUBBING_PROVIDER_BOOTSTRAP_UNAVAILABLE');
   });
 
-  it('Finding4: no message substring matching – error.message containing provider string does not affect classification', async () => {
-    const harness = createHarness();
-    // Simulate error.message containing GEMINI_LIVE_SETUP_TIMEOUT but no structured code; should remain START_FAILED
-    harness.browserAPI.runtime.sendMessage.mockImplementation(async message => {
-      if (message.action === 'LIVE_DUBBING_CONNECT_PROVIDER') {
-        // Return no providerDiagnostic code, only message substring
-        return {
-          success: false,
-          error: 'LIVE_DUBBING_START_FAILED',
-          sessionId: message.data.sessionId,
-          providerId: message.data.providerId,
-          // providerDiagnostic has no code, but message-like field would contain substring if we matched it – we don't
-          providerDiagnostic: {
-            stage: 'CONNECT_PROVIDER',
-            code: null,
-            terminalCategory: null,
-            setupComplete: false,
-          },
-          // Also test error object with message substring
-          diagnostic: { stage: 'CONNECT_PROVIDER', error: { message: 'GEMINI_LIVE_SETUP_TIMEOUT occurred', name: 'Error' } },
-        };
-      }
-      if (message.action === 'LIVE_DUBBING_PREPARE' || message.action === 'LIVE_DUBBING_CONSUME' || message.action === 'LIVE_DUBBING_DISPOSE') {
-        // delegate to original behavior for other stages
-        // fallback: return success for prepare/consume
-        if (message.action === 'LIVE_DUBBING_PREPARE') return { success: true, ack: 'READY', sessionId: message.data.sessionId, providerId: message.data.providerId, eventSequence: message.data.eventSequence };
-        if (message.action === 'LIVE_DUBBING_CONSUME') return { success: true, ack: 'MEDIA_ACQUIRED', sessionId: message.data.sessionId, providerId: message.data.providerId, status: LIVE_DUBBING_STATUS.CONNECTING_PROVIDER, eventSequence: message.data.eventSequence, captureReady: true, audioPathReady: true };
-        if (message.action === 'LIVE_DUBBING_DISPOSE') return { success: true, ack: 'DISPOSED', sessionId: message.data.sessionId, providerId: message.data.providerId };
-      }
-      return { success: true };
-    });
-    // For this isolated substring test, use direct classify to prove no substring logic
-    const direct = harness.coordinator._classifyStartFailure({
+  it('Finding4: no message substring matching – error.message containing provider string does not affect classification', () => {
+    const coordinator = createHarness().coordinator;
+    const direct = coordinator._classifyStartFailure({
       error: { message: 'GEMINI_LIVE_SETUP_TIMEOUT failed badly', error: 'LIVE_DUBBING_START_FAILED' },
       providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: null, terminalCategory: null, setupComplete: false },
       providerStartAttempted: true,
     });
     expect(direct).toBe('LIVE_DUBBING_START_FAILED');
     // Also ensure normal provider code still classifies correctly (not via substring)
-    const setup = harness.coordinator._classifyStartFailure({
+    const setup = coordinator._classifyStartFailure({
       error: {},
       providerDiagnostic: { stage: 'CONNECT_PROVIDER', code: 'GEMINI_LIVE_SETUP_TIMEOUT', terminalCategory: 'SETUP_TIMEOUT', setupComplete: false },
       providerStartAttempted: true,

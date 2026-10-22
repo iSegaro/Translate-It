@@ -134,6 +134,9 @@ describe('OpenAIRealtimeProviderAdapter', () => {
     await harness.connect();
     harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'private-stream' }] });
     harness.peerConnection.ontrack({ track: createTrack(), streams: [{ id: 'replacement-stream' }] });
+    expect(harness.adapter.getTelemetry().milestones.firstTranslatedAudioReceived).toBeNull();
+    await Promise.resolve();
+    expect(harness.adapter.getTelemetry().milestones.firstTranslatedAudioAcceptedByPlayback).toBe(10);
 
     const logs = logger.debug.mock.calls.map(([line]) => line);
     expect(logs).toEqual([
@@ -142,7 +145,7 @@ describe('OpenAIRealtimeProviderAdapter', () => {
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=sdp_http_exchange | durationMs=0 | outcome=success',
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=remote_sdp_apply | durationMs=0 | outcome=success',
       'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=transport_ready | durationMs=0 | outcome=success',
-      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=first_audio_received | durationMs=10 | outcome=success',
+      'Live dubbing timing | provider=openai | operation=resume | generation=8 | stage=remote_track_observed | durationMs=10 | outcome=success',
     ]);
     expect(logs.every(line => !line.includes('private-stream') && !line.includes('replacement-stream'))).toBe(true);
   });

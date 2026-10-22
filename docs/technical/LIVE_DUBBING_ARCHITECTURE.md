@@ -945,8 +945,12 @@ or descriptor adoption is performed for an uncertain owner.
   reports original-transcript setting read, eligible-key retrieval, proxy-config
   resolution, and each client-secret HTTP request; its adapter reports SDP HTTP
   exchange, remote SDP application, and transport viability as separate stage
-  durations. Durations are individual stage intervals, not cumulative operation
-  totals. Timing messages contain only provider, operation, generation, stage,
+  intervals; remote-track observation is elapsed from the Offscreen Controller's
+  `resumeMedia()` timing checkpoint (before provider creation/bootstrap) to the
+  first observed remote audio track and is not proof of received audio samples. The
+  `provider_ready` and `commit` checkpoints report elapsed operation time from
+  rotation start; other setup-stage timings report their individual stage
+  intervals. Timing messages contain only provider, operation, generation, stage,
   duration, and outcome (plus a numeric request-attempt discriminator when key
   failover issues multiple mint requests). OpenAI bootstrap timing's generation
   is the authorized media sequence; credential validation is labeled separately

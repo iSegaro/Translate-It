@@ -734,12 +734,9 @@ export class OpenAIRealtimeProviderAdapter {
   _handleRemoteTrack(session, event, isCurrent) {
     if (!isCurrent() || !isLiveAudioTrack(event?.track)) return;
     session.telemetry.remoteTracks += 1;
-    if (session.telemetry.milestones.firstTranslatedAudioReceived === null) {
-      session.telemetry.milestones.firstTranslatedAudioReceived = nowMs(this.performanceNow);
-    }
     if (!session.timing.firstAudioLogged) {
       session.timing.firstAudioLogged = true;
-      this._logTiming(session, 'first_audio_received', session.timing.startedAt, 'success');
+      this._logTiming(session, 'remote_track_observed', session.timing.startedAt, 'success');
     }
 
     let stream = event?.streams?.[0] || null;
