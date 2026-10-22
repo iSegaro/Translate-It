@@ -79,7 +79,9 @@ async function loadOffscreen({ mediaDevices = null, loggingSettings = null, cont
       sendMessage: vi.fn((message) => {
         state.messages.push(message);
         if (message.action === 'OFFSCREEN_LOGGING_SETTINGS_GET') {
-          return Promise.resolve(state.loggingResponse);
+          return Promise.resolve(typeof state.loggingResponse === 'function'
+            ? state.loggingResponse()
+            : state.loggingResponse);
         }
         return Promise.resolve();
       }),
@@ -869,6 +871,104 @@ describe('offscreen live-dubbing control sender authorization', () => {
 });
 
 describe('offscreen logging contract', () => {
+  it('detects real offscreen URL with a runtime subset and applies background settings', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const storageGet = vi.fn();
+    vi.doMock('@/shared/storage/core/StorageCore.js', () => ({
+      storageManager: { get: storageGet, on: vi.fn() },
+    }));
+    const realWindow = window;
+    vi.stubGlobal('window', new Proxy(realWindow, {
+      get: (target, property, receiver) => property === 'location'
+        ? { href: 'chrome-extension://extension-id/src/html/offscreen.html' }
+        : Reflect.get(target, property, receiver),
+    }));
+    state.loggingResponse = { DEBUG_MODE: true, COMPONENT_LOG_LEVELS: { LiveDubbing: 3 } };
+    await loadOffscreen();
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await waitForBridgeInitialization(debugModeBridge);
+    vi.stubGlobal('window', realWindow);
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    expect(debugModeBridge.context).toBe('offscreen');
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ action: 'OFFSCREEN_LOGGING_SETTINGS_GET' });
+    expect(storageGet).not.toHaveBeenCalled();
+    expect(liveDubbingController.log.isDebugEnabled()).toBe(true);
+    liveDubbingController.log.info('actual URL logger enabled');
+    liveDubbingController.log.debug('actual URL debug logger enabled');
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('actual URL logger enabled'));
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('actual URL debug logger enabled'));
+  });
+
+  it('keeps initialization pending after failed settings fetch and recovers', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    let firstRequest = true;
+    state.loggingResponse = () => {
+      if (firstRequest) {
+        firstRequest = false;
+        return Promise.reject(new Error('transient'));
+      }
+      return { DEBUG_MODE: true, COMPONENT_LOG_LEVELS: { LiveDubbing: 3 } };
+    };
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await vi.waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(debugModeBridge.isInitialized).toBe(true));
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    expect(liveDubbingController.log.isDebugEnabled()).toBe(true);
+    liveDubbingController.log.info('recovered logger enabled');
+    liveDubbingController.log.debug('recovered debug logger enabled');
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('recovered logger enabled'));
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('recovered debug logger enabled'));
+  });
+
+  it('recovers after bounded bridge retries and stops retrying after success', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    let settingsRequests = 0;
+    state.loggingResponse = () => {
+      settingsRequests++;
+      if (settingsRequests <= 3) return Promise.reject(new Error('initial settings unavailable'));
+      return { DEBUG_MODE: true, COMPONENT_LOG_LEVELS: { LiveDubbing: 3 } };
+    };
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(state.bridgeInitialization).resolves.toBe(false);
+    expect(settingsRequests).toBe(3);
+    expect(debugModeBridge.isInitialized).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(state.bridgeInitialization).resolves.toBe(true);
+    expect(debugModeBridge.isInitialized).toBe(true);
+    const { liveDubbingController } = await import('../features/live-dubbing/offscreen/LiveDubbingController.js');
+    expect(liveDubbingController.log.isDebugEnabled()).toBe(true);
+    liveDubbingController.log.info('entrypoint recovery enabled INFO');
+    liveDubbingController.log.debug('entrypoint recovery enabled DEBUG');
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('entrypoint recovery enabled INFO'));
+    expect(debugSpy).toHaveBeenCalledWith(expect.stringContaining('entrypoint recovery enabled DEBUG'));
+
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(settingsRequests).toBe(4);
+  });
+
+  it('cancels delayed entrypoint recovery when the offscreen document unloads', async () => {
+    let settingsRequests = 0;
+    state.loggingResponse = () => {
+      settingsRequests++;
+      return Promise.reject(new Error('settings unavailable'));
+    };
+    await loadOffscreen({ context: 'offscreen' });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(state.bridgeInitialization).resolves.toBe(false);
+    expect(settingsRequests).toBe(3);
+
+    window.dispatchEvent(new Event('beforeunload'));
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(settingsRequests).toBe(3);
+  });
+
   it('gets logging preferences over runtime only and applies allowed component settings', async () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     const debugSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -960,6 +1060,32 @@ describe('offscreen logging contract', () => {
     expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
     const { getComponentLogLevel } = await import('../shared/logging/GlobalDebugState.js');
     expect(getComponentLogLevel('LiveDubbing')).toBe(2);
+  });
+
+  it('preserves a newer update received during retry backoff', async () => {
+    let firstRequest = true;
+    state.loggingResponse = () => {
+      if (firstRequest) {
+        firstRequest = false;
+        return Promise.reject(new Error('transient'));
+      }
+      return { DEBUG_MODE: false, COMPONENT_LOG_LEVELS: {} };
+    };
+    await loadOffscreen({ context: 'offscreen' });
+    const { debugModeBridge } = await import('../shared/logging/DebugModeBridge.js');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(chrome.runtime.sendMessage.mock.calls.filter(([message]) =>
+      message.action === 'OFFSCREEN_LOGGING_SETTINGS_GET')).toHaveLength(1);
+    state.listener({
+      target: 'offscreen',
+      action: 'OFFSCREEN_LOGGING_SETTINGS_UPDATED',
+      data: { DEBUG_MODE: true },
+    }, { id: 'extension-id', url: 'chrome-extension://extension-id/background.js' }, vi.fn());
+    await vi.advanceTimersByTimeAsync(50);
+    await vi.waitFor(() => expect(debugModeBridge.isInitialized).toBe(true));
+
+    expect(debugModeBridge.getCurrentDebugMode()).toBe(true);
   });
 
   it('treats an equal-to-current DEBUG_MODE update as authoritative', async () => {

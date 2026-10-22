@@ -403,7 +403,9 @@ describe('live dubbing browser gate', () => {
     openAIRealtimeBootstrapService.mintClientSecret.mockResolvedValue('ek_openai-secret');
     vi.spyOn(liveDubbingCoordinator, 'isBootstrapRequestStillAuthorized').mockReturnValue(true);
     vi.spyOn(liveDubbingCoordinator, 'authorizeOffscreenControlMessage')
-      .mockResolvedValue({ sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US' });
+      .mockResolvedValue({
+        sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US', mediaSequence: 37,
+      });
 
     await expect(handleLiveDubbingBootstrapRequest({
       data: { sessionId: 'session-openai', providerId: 'openai', targetLanguage: 'en-US', eventSequence: 1 },
@@ -417,7 +419,9 @@ describe('live dubbing browser gate', () => {
       bootstrap: { secret: 'ek_openai-secret' },
     });
     expect(geminiLiveBootstrapService.mintEphemeralToken).not.toHaveBeenCalled();
-    expect(openAIRealtimeBootstrapService.mintClientSecret).toHaveBeenCalledWith('en-US');
+    expect(openAIRealtimeBootstrapService.mintClientSecret).toHaveBeenCalledWith(
+      'en-US', { mediaSequence: 37 },
+    );
   });
 
   it('does not return an OpenAI secret when the active session fence closes first', async () => {

@@ -62,6 +62,8 @@ The primary way to manage log levels is through the Options UI:
 
 For troubleshooting, check the component's configured level as well as the global Debug Mode gate. Extension contexts have separate consoles (for example, the background worker and a page's content script), so inspect the console belonging to the context that emitted the log.
 
+The offscreen document retrieves its initial logging settings from the authorized background context over runtime messaging; it does not read extension storage directly. A valid response contains boolean `DEBUG_MODE` and object `COMPONENT_LOG_LEVELS` values. Failed or malformed requests remain uninitialized and are retried up to three total attempts; subsequent explicit initialization calls can retry after exhaustion. Targeted setting updates received during this process take precedence over the initial response.
+
 ### 2. Default Values
 To change default verbosity permanently:
 1.  **Open**: `src/shared/logging/GlobalDebugState.js`

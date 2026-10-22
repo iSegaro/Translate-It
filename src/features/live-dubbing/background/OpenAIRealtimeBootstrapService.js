@@ -173,6 +173,30 @@ export class OpenAIRealtimeBootstrapService {
       ? options.authTokenEndpoint
       : OPENAI_REALTIME_TRANSLATIONS_CLIENT_SECRETS_ENDPOINT;
     this.log = options.logger || logger;
+    this.performanceNow = typeof options.performanceNow === 'function'
+      ? options.performanceNow
+      : () => globalThis.performance?.now?.() ?? null;
+  }
+
+  _timingNow() {
+    try { return this.log?.isDebugEnabled?.() === true ? this.performanceNow() : null; } catch { return null; }
+  }
+
+  _logTiming(timing, stage, startedAt, outcome) {
+    try {
+      const attempt = timing?.attempt ?? 0;
+      const eventKey = `${stage}:${attempt}`;
+      if (!timing || !Number.isFinite(startedAt) || timing.logged.has(eventKey)
+        || this.log?.isDebugEnabled?.() !== true) return;
+      const now = this.performanceNow();
+      if (!Number.isFinite(now)) return;
+      timing.logged.add(eventKey);
+      this.log.debug(`Live dubbing timing | provider=openai | operation=${timing.operation} | generation=${timing.generation ?? 'none'} | attempt=${attempt} | stage=${stage} | durationMs=${Math.max(0, Math.round(now - startedAt))} | outcome=${outcome}`);
+    } catch { /* timing diagnostics are best effort */ }
+  }
+
+  _createTiming(operation, generation = null) {
+    return { operation, generation, attempt: 0, logged: new Set() };
   }
 
   /**
@@ -180,7 +204,7 @@ export class OpenAIRealtimeBootstrapService {
    * @param {unknown} targetLanguage
    * @returns {Promise<string|null>} The documented response `value`, or null.
    */
-  async mintClientSecret(targetLanguage) {
+  async mintClientSecret(targetLanguage, metadata = {}) {
     let normalized;
     try {
       normalized = normalizeProviderTargetLanguage(LIVE_DUBBING_OPENAI_PROVIDER_ID, targetLanguage);
@@ -188,12 +212,16 @@ export class OpenAIRealtimeBootstrapService {
       return null;
     }
 
-    const showOriginalTranscript = await this._readOriginalTranscriptEnabled();
-    const keys = await this._eligibleKeys();
+    const generation = Number.isSafeInteger(metadata?.mediaSequence) && metadata.mediaSequence >= 0
+      ? metadata.mediaSequence
+      : null;
+    const timing = this._createTiming('bootstrap', generation);
+    const showOriginalTranscript = await this._readOriginalTranscriptEnabled(timing);
+    const keys = await this._eligibleKeys(timing);
     if (keys.length === 0) return null;
 
     for (let index = 0; index < keys.length; index += 1) {
-      const outcome = await this._attemptMint(keys[index], normalized, showOriginalTranscript);
+      const outcome = await this._attemptMint(keys[index], normalized, showOriginalTranscript, timing);
       if (outcome.ok) return outcome.secret;
       if (!outcome.tryNext) {
         this.log.debug('[OpenAIRealtimeBootstrapService] Client secret mint failed without failover');
@@ -209,10 +237,14 @@ export class OpenAIRealtimeBootstrapService {
    * ordering or persisting failover state.
    * @returns {Promise<string[]>}
    */
-  async _eligibleKeys() {
+  async _eligibleKeys(timing = null) {
+    const startedAt = timing ? this._timingNow() : null;
     try {
-      return toEligibleKeys(await this.getKeysImpl());
+      const keys = toEligibleKeys(await this.getKeysImpl());
+      this._logTiming(timing, 'eligible_keys', startedAt, 'success');
+      return keys;
     } catch {
+      this._logTiming(timing, 'eligible_keys', startedAt, 'failure');
       return [];
     }
   }
@@ -221,10 +253,14 @@ export class OpenAIRealtimeBootstrapService {
     return (await this._eligibleKeys()).length > 0;
   }
 
-  async _readOriginalTranscriptEnabled() {
+  async _readOriginalTranscriptEnabled(timing = null) {
+    const startedAt = timing ? this._timingNow() : null;
     try {
-      return (await this.getOriginalTranscriptEnabledImpl()) === true;
+      const enabled = (await this.getOriginalTranscriptEnabledImpl()) === true;
+      this._logTiming(timing, 'original_transcript_setting', startedAt, 'success');
+      return enabled;
     } catch {
+      this._logTiming(timing, 'original_transcript_setting', startedAt, 'failure');
       return false;
     }
   }
@@ -260,11 +296,13 @@ export class OpenAIRealtimeBootstrapService {
       );
     }
 
-    const showOriginalTranscript = await this._readOriginalTranscriptEnabled();
+    const timing = this._createTiming('credential_validation');
+    const showOriginalTranscript = await this._readOriginalTranscriptEnabled(timing);
     const outcome = await this._attemptMint(
       draftApiKey.trim(),
       normalized,
       showOriginalTranscript,
+      timing,
     );
     if (outcome.ok) {
       return createLiveDubbingCredentialResult(true, LIVE_DUBBING_CREDENTIAL_REASONS.VALID);
@@ -276,7 +314,8 @@ export class OpenAIRealtimeBootstrapService {
    * One classified mint attempt. It never throws or surfaces provider data.
    * @returns {Promise<{ok: boolean, secret?: string, tryNext?: boolean, failure?: object}>}
    */
-  async _attemptMint(apiKey, targetLanguage, showOriginalTranscript) {
+  async _attemptMint(apiKey, targetLanguage, showOriginalTranscript, timing = null) {
+    if (timing) timing.attempt += 1;
     let response;
     try {
       response = await this._fetch(this.authTokenEndpoint, {
@@ -286,7 +325,7 @@ export class OpenAIRealtimeBootstrapService {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(buildMintBody(targetLanguage, showOriginalTranscript)),
-      });
+      }, timing);
     } catch {
       return { ok: false, tryNext: false, failure: { kind: 'TRANSPORT' } };
     }
@@ -329,16 +368,41 @@ export class OpenAIRealtimeBootstrapService {
    * marker or envelope, so 401/429 responses fail closed and do not advance
    * bootstrap keys.
    */
-  async _fetch(url, options) {
-    if (this.fetchImpl) return this.fetchImpl(url, options);
+  async _fetch(url, options, timing = null) {
+    if (this.fetchImpl) {
+      const requestStartedAt = timing ? this._timingNow() : null;
+      try {
+        const response = await this.fetchImpl(url, options);
+        this._logTiming(timing, 'client_secret_http_request', requestStartedAt,
+          response?.ok === true ? 'success' : 'failure');
+        return response;
+      } catch (error) {
+        this._logTiming(timing, 'client_secret_http_request', requestStartedAt, 'failure');
+        throw error;
+      }
+    }
 
     const { resolveProxyConfig } = await import('@/shared/proxy/ProxySettings.js');
     const { proxyManager } = await import('@/shared/proxy/ProxyManager.js');
-    return proxyManager.fetch(
-      url,
-      options,
-      await resolveProxyConfig(),
-    );
+    const proxyStartedAt = timing ? this._timingNow() : null;
+    let config;
+    try {
+      config = await resolveProxyConfig();
+      this._logTiming(timing, 'proxy_config_resolution', proxyStartedAt, 'success');
+    } catch (error) {
+      this._logTiming(timing, 'proxy_config_resolution', proxyStartedAt, 'failure');
+      throw error;
+    }
+    const requestStartedAt = timing ? this._timingNow() : null;
+    try {
+      const response = await proxyManager.fetch(url, options, config);
+      this._logTiming(timing, 'client_secret_http_request', requestStartedAt,
+        response?.ok === true ? 'success' : 'failure');
+      return response;
+    } catch (error) {
+      this._logTiming(timing, 'client_secret_http_request', requestStartedAt, 'failure');
+      throw error;
+    }
   }
 }
 

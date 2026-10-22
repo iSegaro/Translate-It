@@ -67,6 +67,15 @@ async function handleLiveDubbingOriginalTranscriptLazy(message, sender) {
   }
 }
 
+async function handleDebugBridgeActionLazy(action, ...args) {
+  try {
+    const { debugModeBridge } = await import('@/shared/logging/DebugModeBridge.js');
+    return debugModeBridge.getHandlerMappings()[action](...args);
+  } catch {
+    return { success: false, error: 'DEBUG_LOGGING_HANDLER_UNAVAILABLE' };
+  }
+}
+
 class LifecycleManager {
   constructor() {
     this.initialized = false;
@@ -228,6 +237,12 @@ class LifecycleManager {
       'contentScriptWillReload': Handlers.handleContentScriptWillReload,
       [MessageActions.SETTINGS_UPDATED]: Handlers.handleSettingsUpdatedLazy,
       [MessageActions.SET_PROVIDER_CATEGORY_COLLAPSED]: Handlers.handleSetProviderCategoryCollapsedLazy,
+      [MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET]: (...args) =>
+        handleDebugBridgeActionLazy(MessageActions.OFFSCREEN_LOGGING_SETTINGS_GET, ...args),
+      [MessageActions.DEBUG_MODE_CHANGED]: (...args) =>
+        handleDebugBridgeActionLazy(MessageActions.DEBUG_MODE_CHANGED, ...args),
+      [MessageActions.COMPONENT_LOG_LEVELS_CHANGED]: (...args) =>
+        handleDebugBridgeActionLazy(MessageActions.COMPONENT_LOG_LEVELS_CHANGED, ...args),
       
       // Lifecycle handlers
       'contextInvalid': Handlers.handleContextInvalid,
@@ -351,21 +366,6 @@ class LifecycleManager {
     
     // Register all handlers with proper action names
     const { registeredCount, failedCount } = this.performHandlerRegistration(handlerMappings);
-    
-    // Register DebugModeBridge handlers
-    try {
-      import('@/shared/logging/DebugModeBridge.js').then(({ debugModeBridge }) => {
-        const debugHandlers = debugModeBridge.getHandlerMappings();
-        for (const [action, handler] of Object.entries(debugHandlers)) {
-          this.messageHandler.registerHandler(action, handler);
-        }
-        logger.info('Registered DebugModeBridge handlers in background');
-      }).catch(err => {
-        logger.warn('Failed to load DebugModeBridge for handler registration:', err);
-      });
-    } catch (error) {
-      logger.warn('Error during DebugModeBridge registration:', error);
-    }
     
     logger.info(`Handler registration complete: ${registeredCount} registered, ${failedCount} failed`);
   }

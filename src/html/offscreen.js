@@ -10,12 +10,6 @@ import { getScopedLogger } from '../shared/logging/logger.js';
 import { LOG_COMPONENTS } from '../shared/logging/logConstants.js';
 import { debugModeBridge } from '../shared/logging/DebugModeBridge.js';
 
-// Hybrid offscreen logger. INFO/DEBUG stay level-gated through the centralized
-// scoped logger (default WARN keeps normal runs quiet). WARN/ERROR intentionally
-// bypass SafeConsole via direct console calls, preserving their visibility when
-// SafeConsole is disabled. Initialize asynchronously without delaying startup.
-void debugModeBridge.initialize();
-
 const gatedLogger = getScopedLogger(LOG_COMPONENTS.BACKGROUND, 'Offscreen');
 const logger = {
   debug: (...args) => gatedLogger.debug(...args),
@@ -68,9 +62,11 @@ class OffscreenResourceTracker {
     this.timeouts = new Set();
     this.intervals = new Set();
     this.eventListeners = new Map(); // Track event listeners: element -> {event, handler, options}
+    this.cleaned = false;
   }
 
   trackTimeout(callback, delay) {
+    if (this.cleaned) return null;
     const timeoutId = setTimeout(() => {
       this.timeouts.delete(timeoutId);
       callback();
@@ -108,6 +104,7 @@ class OffscreenResourceTracker {
   }
 
   cleanup() {
+    this.cleaned = true;
     // Clear all tracked timeouts
     for (const timeoutId of this.timeouts) {
       clearTimeout(timeoutId);
@@ -129,6 +126,25 @@ class OffscreenResourceTracker {
 
 // Create global resource tracker for offscreen
 const resourceTracker = new OffscreenResourceTracker();
+
+function initializeOffscreenLogging(retryIndex = 0) {
+  const retryDelays = [1000, 5000];
+  const scheduleRetry = () => {
+    if (retryIndex < retryDelays.length) {
+      resourceTracker.trackTimeout(() => initializeOffscreenLogging(retryIndex + 1), retryDelays[retryIndex]);
+    }
+  };
+  let initialization;
+  try {
+    initialization = debugModeBridge.initialize();
+  } catch {
+    scheduleRetry();
+    return;
+  }
+  Promise.resolve(initialization).then((initialized) => {
+    if (!initialized) scheduleRetry();
+  }, scheduleRetry);
+}
 
 let currentAudio = null;
 let currentUtterance = null;
@@ -296,6 +312,12 @@ function sendResponseOnce(playback, sendResponse, response) {
 }
 
 logger.info("TTS script loaded - Version 1.6 - Tokenized playback lifecycle");
+
+// Hybrid offscreen logger. INFO/DEBUG stay level-gated through the centralized
+// scoped logger (default WARN keeps normal runs quiet). WARN/ERROR intentionally
+// bypass SafeConsole via direct console calls, preserving their visibility when
+// SafeConsole is disabled. Initialize asynchronously without delaying startup.
+initializeOffscreenLogging();
 
 // Signal readiness immediately to parent
 if (chrome.runtime) {

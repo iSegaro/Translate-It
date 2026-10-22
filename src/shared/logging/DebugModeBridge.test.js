@@ -4,6 +4,7 @@ const { storageGet, storageOn, setEnabled, setGlobalDebugOverride, setErrorDebug
   storageGet: vi.fn(), storageOn: vi.fn(), setEnabled: vi.fn(),
   setGlobalDebugOverride: vi.fn(), setErrorDebugMode: vi.fn(),
 }));
+const originalLocation = Object.getOwnPropertyDescriptor(window, 'location');
 
 vi.mock('./SafeConsole.js', () => ({ safeConsole: { setEnabled } }));
 vi.mock('./logger.js', () => ({ getScopedLogger: () => ({
@@ -20,7 +21,9 @@ vi.mock('@/shared/storage/core/StorageCore.js', () => ({
 
 describe('DebugModeBridge offscreen settings handoff', () => {
   afterEach(() => {
+    vi.useRealTimers();
     delete globalThis.chrome;
+    Object.defineProperty(window, 'location', originalLocation);
     vi.resetModules();
     vi.clearAllMocks();
   });
@@ -92,6 +95,120 @@ describe('DebugModeBridge offscreen settings handoff', () => {
     offscreenBridge.context = 'offscreen';
     await offscreenBridge.initialize();
     expect(storageOn).not.toHaveBeenCalled();
+  });
+
+  it('detects an offscreen URL when runtime has no getManifest capability', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: 'chrome-extension://extension-id/src/html/offscreen.html' },
+    });
+    globalThis.chrome = { runtime: { sendMessage: vi.fn(async () => ({
+      DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {},
+    })) } };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const bridge = new DebugModeBridge();
+    expect(bridge.context).toBe('offscreen');
+  });
+
+  it('does not probe getManifest for a windowed offscreen URL', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: 'chrome-extension://extension-id/src/html/offscreen.html' },
+    });
+    const getManifest = vi.fn(() => { throw new Error('runtime probe failed'); });
+    globalThis.chrome = { runtime: { getManifest } };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+
+    expect(new DebugModeBridge().context).toBe('offscreen');
+    expect(getManifest).not.toHaveBeenCalled();
+  });
+
+  it('returns an explicit failure when settings storage is unavailable', async () => {
+    storageGet.mockRejectedValue(new Error('private storage failure'));
+    globalThis.chrome = {
+      runtime: {
+        id: 'extension-id',
+        getURL: (path) => `chrome-extension://extension-id/${path}`,
+      },
+    };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const handler = new DebugModeBridge().getHandlerMappings().OFFSCREEN_LOGGING_SETTINGS_GET;
+    const sender = { id: 'extension-id', url: 'chrome-extension://extension-id/src/html/offscreen.html' };
+
+    await expect(handler({}, sender)).resolves.toEqual({
+      success: false,
+      error: 'OFFSCREEN_LOGGING_SETTINGS_UNAVAILABLE',
+    });
+    expect(storageGet).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, null, [], {}, { DEBUG_MODE: true },
+    { success: false, error: 'FAILED', DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {} },
+    { success: true, DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {} },
+  ])('does not mark malformed settings response initialized (%s)', async (response) => {
+    globalThis.chrome = { runtime: { sendMessage: vi.fn(async () => response) } };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const bridge = new DebugModeBridge();
+    bridge.context = 'offscreen';
+    await expect(bridge.initialize()).resolves.toBe(false);
+    expect(bridge.isInitialized).toBe(false);
+  });
+
+  it('retries transient response failures with bounded attempts', async () => {
+    const sendMessage = vi.fn()
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValue({ DEBUG_MODE: true, COMPONENT_LOG_LEVELS: {} });
+    globalThis.chrome = { runtime: { sendMessage } };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const bridge = new DebugModeBridge();
+    bridge.context = 'offscreen';
+    const initialization = bridge.initialize();
+    await expect(initialization).resolves.toBe(true);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(bridge.isInitialized).toBe(true);
+  });
+
+  it('exhausts three attempts and permits a later explicit initialization', async () => {
+    vi.useFakeTimers();
+    const sendMessage = vi.fn()
+      .mockRejectedValueOnce(new Error('temporary'))
+      .mockRejectedValueOnce(new Error('temporary'))
+      .mockRejectedValueOnce(new Error('temporary'))
+      .mockResolvedValue({ DEBUG_MODE: false, COMPONENT_LOG_LEVELS: {} });
+    globalThis.chrome = { runtime: { sendMessage } };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const bridge = new DebugModeBridge();
+    bridge.context = 'offscreen';
+    const first = bridge.initialize();
+    await vi.runAllTimersAsync();
+    await expect(first).resolves.toBe(false);
+    expect(sendMessage).toHaveBeenCalledTimes(3);
+    expect(bridge.isInitialized).toBe(false);
+    await expect(bridge.initialize()).resolves.toBe(true);
+    expect(sendMessage).toHaveBeenCalledTimes(4);
+    vi.useRealTimers();
+  });
+
+  it('deduplicates concurrent initialization and cancels retry backoff on cleanup', async () => {
+    vi.useFakeTimers();
+    const sendMessage = vi.fn().mockRejectedValue(new Error('transient'));
+    globalThis.chrome = { runtime: { sendMessage } };
+    const { DebugModeBridge } = await import('./DebugModeBridge.js');
+    const bridge = new DebugModeBridge();
+    bridge.context = 'offscreen';
+    const initialization = bridge.initialize();
+    expect(bridge.initialize()).toBe(initialization);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sendMessage).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(1);
+
+    bridge.cleanup();
+    await expect(initialization).resolves.toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(sendMessage).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   it.each([

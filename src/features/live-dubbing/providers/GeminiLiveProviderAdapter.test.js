@@ -109,6 +109,147 @@ describe('GeminiLiveProviderAdapter', () => {
     expect(client._socketContext).toEqual({ targetLanguage: 'zh-Hans' });
   });
 
+  it('logs generation-scoped websocket and setup timings as single safe strings', async () => {
+    let now = 10;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const client = createClient({ logger, performanceNow: () => now,
+      timingOperation: 'resume', timingGeneration: 12 });
+    const connection = client.connect({ bootstrap: { accessToken: 'short-lived-secret' }, targetLanguage: 'fr' });
+    const socket = FakeWebSocket.instances.at(-1);
+    now = 25;
+    socket.open();
+    now = 38;
+    socket.receive({ setupComplete: {} });
+    await connection;
+
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=12 | stage=ws_open | durationMs=15 | outcome=success'],
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=12 | stage=setup_complete | durationMs=13 | outcome=success'],
+    ]);
+  });
+
+  it('times only a successful post-commit PCM send and its first translated audio per generation', async () => {
+    let now = 0;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const makeReadyClient = async timingGeneration => {
+      const client = createClient({ logger, performanceNow: () => now,
+        timingOperation: 'resume', timingGeneration });
+      const connected = client.connect({ bootstrap: { accessToken: `token-${timingGeneration}` }, targetLanguage: 'fr' });
+      const socket = FakeWebSocket.instances.at(-1);
+      socket.open();
+      socket.receive({ setupComplete: {} });
+      await connected;
+      return { client, socket };
+    };
+    const outputAudio = { serverContent: { modelTurn: {
+      parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: 'AQ==' } }],
+    } } };
+
+    const first = await makeReadyClient(4);
+    logger.debug.mockClear();
+    now = 90;
+    first.socket.receive(outputAudio);
+    expect(logger.debug).not.toHaveBeenCalled();
+    expect(first.client.getTelemetry().milestones.firstTranslatedAudioReceived).toBe(90);
+
+    now = 100;
+    expect(first.client.markMediaCommitted()).toBe(true);
+    first.socket.bufferedAmount = 64 * 1024;
+    expect(first.client.sendAudio(new Uint8Array([1]))).toBe(false);
+    expect(logger.debug).not.toHaveBeenCalled();
+
+    first.socket.bufferedAmount = 0;
+    now = 120;
+    expect(first.client.sendAudio(new Uint8Array([1]))).toBe(true);
+    now = 145;
+    first.socket.receive(outputAudio);
+    first.socket.receive(outputAudio);
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=4 | stage=commit_to_first_input_sent | durationMs=20 | outcome=success'],
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=4 | stage=first_input_sent_to_first_audio_received | durationMs=25 | outcome=success'],
+    ]);
+
+    first.client.close();
+    const second = await makeReadyClient(5);
+    logger.debug.mockClear();
+    now = 200;
+    expect(second.client.markMediaCommitted()).toBe(true);
+    now = 207;
+    expect(second.client.sendAudio(new Uint8Array([2]))).toBe(true);
+    now = 219;
+    second.socket.receive(outputAudio);
+    first.socket.receive(outputAudio); // The closed prior generation is fenced.
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=5 | stage=commit_to_first_input_sent | durationMs=7 | outcome=success'],
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=5 | stage=first_input_sent_to_first_audio_received | durationMs=12 | outcome=success'],
+    ]);
+    second.client.close();
+  });
+
+  it('logs failed send and cancelled cleanup outcomes without counting dropped PCM', async () => {
+    let now = 10;
+    const logger = { isDebugEnabled: () => true, debug: vi.fn() };
+    const client = createClient({ logger, performanceNow: () => now,
+      timingOperation: 'resume', timingGeneration: 9 });
+    const connected = client.connect({ bootstrap: { accessToken: 'private-token' }, targetLanguage: 'fr' });
+    const socket = FakeWebSocket.instances.at(-1);
+    socket.open();
+    socket.receive({ setupComplete: {} });
+    await connected;
+    logger.debug.mockClear();
+
+    now = 30;
+    client.markMediaCommitted();
+    socket.bufferedAmount = 64 * 1024;
+    expect(client.sendAudio(new Uint8Array([1]))).toBe(false);
+    socket.bufferedAmount = 0;
+    vi.spyOn(socket, 'send').mockImplementationOnce(() => { throw new Error('private socket failure'); });
+    now = 37;
+    expect(client.sendAudio(new Uint8Array([1]))).toBe(false);
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=9 | stage=commit_to_first_input_sent | durationMs=7 | outcome=failure'],
+    ]);
+
+    const cancelled = createClient({ logger, performanceNow: () => now,
+      timingOperation: 'resume', timingGeneration: 10 });
+    const cancelledConnect = cancelled.connect({ bootstrap: { accessToken: 'another-private-token' }, targetLanguage: 'fr' });
+    const cancelledSocket = FakeWebSocket.instances.at(-1);
+    cancelledSocket.open();
+    cancelledSocket.receive({ setupComplete: {} });
+    await cancelledConnect;
+    logger.debug.mockClear();
+    now = 50;
+    cancelled.markMediaCommitted();
+    now = 60;
+    cancelled.close();
+    expect(logger.debug.mock.calls).toEqual([
+      ['Live dubbing timing | provider=gemini | operation=resume | generation=10 | stage=commit_to_first_input_sent | durationMs=10 | outcome=cancelled'],
+    ]);
+    const serialized = JSON.stringify(logger.debug.mock.calls);
+    expect(serialized).not.toContain('private-token');
+    expect(serialized).not.toContain('private socket failure');
+    expect(serialized).not.toContain('AQ==');
+  });
+
+  it('does not read the timing clock for the commit/send timings when debug is disabled', async () => {
+    let now = 10;
+    const performanceNow = vi.fn(() => now);
+    const logger = { isDebugEnabled: () => false, debug: vi.fn() };
+    const client = createClient({ logger, performanceNow, timingGeneration: 3 });
+    const connected = client.connect({ bootstrap: { accessToken: 'private-token' }, targetLanguage: 'fr' });
+    const socket = FakeWebSocket.instances.at(-1);
+    socket.open();
+    socket.receive({ setupComplete: {} });
+    await connected;
+    const readsBeforeCommit = performanceNow.mock.calls.length;
+    now = 20;
+    client.markMediaCommitted();
+    expect(performanceNow).toHaveBeenCalledTimes(readsBeforeCommit);
+    expect(client.sendAudio(new Uint8Array([1]))).toBe(true);
+    expect(logger.debug).not.toHaveBeenCalled();
+    client.close();
+  });
+
   it('accepts ArrayBuffer JSON for setupComplete', async () => {
     const client = createClient();
     const connection = client.connect({ bootstrap: { accessToken: 'short-lived-secret' }, targetLanguage: 'fr' });

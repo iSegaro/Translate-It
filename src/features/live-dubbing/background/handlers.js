@@ -188,7 +188,10 @@ export async function handleLiveDubbingBootstrapRequest(message, sender) {
       if (typeof accessToken === 'string' && accessToken) bootstrap = { accessToken };
     } else if (descriptor.providerId === LIVE_DUBBING_OPENAI_PROVIDER_ID) {
       const { openAIRealtimeBootstrapService } = await import('./OpenAIRealtimeBootstrapService.js');
-      const secret = await openAIRealtimeBootstrapService.mintClientSecret(descriptor.targetLanguage);
+      const secret = await openAIRealtimeBootstrapService.mintClientSecret(
+        descriptor.targetLanguage,
+        { mediaSequence: descriptor.mediaSequence },
+      );
       if (typeof secret === 'string' && secret) bootstrap = { secret };
     }
 
