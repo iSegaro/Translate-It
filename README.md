@@ -38,7 +38,7 @@ Powered by **10+ translation providers**, Translate It focuses on privacy, flexi
   </a>
   <br>
   <a href="https://youtu.be/VxgRWlx20wU">
-    <img src="./docs/Images/Windows.png" alt="Watch the video" width="560" />
+    <img src="./docs/Images/Windows.webp" alt="Watch the video" width="560" />
   </a>
 </p>
 
@@ -93,24 +93,24 @@ Some providers require an API key, while others work without one.
 <table>
   <tr>
     <td align="center">
-      <img src="./docs/Images/Popup-Text-Light.png" alt="Text Translation" />
+      <img src="./docs/Images/Popup-Text-Light.webp" alt="Text Translation" />
       <br>
       <b>Text Translation</b>
     </td>
     <td align="center">
-      <img src="./docs/Images/Popup-Dubbing-Dark.png" alt="Live Dubbing" />
+      <img src="./docs/Images/Popup-Dubbing-Dark.webp" alt="Live Dubbing" />
       <br>
       <b>Live Dubbing</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="./docs/Images/Select-Element.png" alt="Select Element Translation" />
+      <img src="./docs/Images/Select-Element.webp" alt="Select Element Translation" />
       <br>
       <b>Select Element</b>
     </td>
     <td align="center">
-      <img src="./docs/Images/Desktop-FAB-Dark.png" alt="Desktop Floating Action Button" />
+      <img src="./docs/Images/Desktop-FAB-Dark.webp" alt="Desktop Floating Action Button" />
       <br>
       <b>Desktop FAB</b>
     </td>
