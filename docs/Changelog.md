@@ -1,3 +1,15 @@
+#### v1.25.0 – Released on October 22, 2026
+
+##### Added
+
+- Added automatic Pause/Resume synchronization between Live Dubbing and media playback.
+
+##### Fixed
+
+- Fixed various minor bugs and compatibility issues.
+
+---
+
 #### v1.24.0 – Released on October 18, 2026
 
 ##### Added
