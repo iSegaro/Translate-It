@@ -127,19 +127,25 @@ describe("localization validation", () => {
     const english = {
       greeting: { message: "Hello" },
       farewell: { message: "Goodbye" },
+      welcome: { message: "Welcome" },
     };
     const invalid = {
-      greeting: { message: 42 },
+      greeting: null,
+      farewell: { message: 42 },
       unexpected: { message: "Extra" },
     };
 
     withFixture({ en: english, fa: invalid, ja: english }, (result) => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain(
-        'key "greeting" must have a string message field',
+        'key "greeting" must map to a message object',
       );
-      expect(result.stderr).toContain('missing key "farewell"');
+      expect(result.stderr).toContain(
+        'key "farewell" must have a string message field',
+      );
+      expect(result.stderr).toContain('missing key "welcome"');
       expect(result.stderr).toContain('extra key "unexpected"');
+      expect(result.stderr).not.toContain("TypeError");
     });
   });
 

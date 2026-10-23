@@ -253,11 +253,22 @@ function compareCatalogs(
   for (const key of referenceKeys) {
     if (!catalogKeySet.has(key)) continue;
 
+    const referenceEntry = referenceCatalog[key];
+    const entry = catalog[key];
+    if (
+      !isPlainObject(referenceEntry) ||
+      typeof referenceEntry.message !== "string" ||
+      !isPlainObject(entry) ||
+      typeof entry.message !== "string"
+    ) {
+      continue;
+    }
+
     const expectedBraceNames = [
-      ...referencedBracePlaceholderNames(referenceCatalog[key].message),
+      ...referencedBracePlaceholderNames(referenceEntry.message),
     ].sort();
     const actualBraceNames = [
-      ...referencedBracePlaceholderNames(catalog[key].message),
+      ...referencedBracePlaceholderNames(entry.message),
     ].sort();
     if (expectedBraceNames.join("\0") !== actualBraceNames.join("\0")) {
       errors.push(
